@@ -96,25 +96,32 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
       // Get recent activity which includes invoices
       const activity = await tenantBillingService.getRecentActivity(tenantId, 100);
       
+      console.log('[Invoices] Activity data:', activity);
+      
       // Transform activity data into invoice format
       const invoiceData: Invoice[] = activity
         .filter(item => item.type === 'invoice')
-        .map((item, index) => ({
-          id: item.id.replace('invoice_', ''),
-          number: `INV-${String(index + 1).padStart(4, '0')}`,
-          amount_cents: item.amount || 0,
-          status: item.status === 'success' ? 'paid' : item.status === 'failed' ? 'void' : 'open',
-          due_date: new Date(item.date.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
-          created_at: item.date,
-          paid_at: item.status === 'success' ? item.date : null,
-          billing_period_start: new Date(item.date.getTime() - 30 * 24 * 60 * 60 * 1000),
-          billing_period_end: item.date,
-          subscription_tier: 'Storefront', // Would come from actual data
-          type: 'subscription' // Would come from actual data
-        }));
+        .map((item, index) => {
+          const dateObj = new Date(item.date);
+          return {
+            id: item.id,
+            number: `INV-${String(index + 1).padStart(4, '0')}`,
+            amount_cents: item.amount || 0,
+            status: item.status === 'paid' ? 'paid' : item.status === 'failed' ? 'void' : 'open',
+            due_date: item.dueDate ? new Date(item.dueDate) : new Date(dateObj.getTime() + 30 * 24 * 60 * 60 * 1000),
+            created_at: dateObj,
+            paid_at: (item as any).paidAt ? new Date((item as any).paidAt) : null,
+            billing_period_start: new Date(dateObj.getTime() - 30 * 24 * 60 * 60 * 1000),
+            billing_period_end: dateObj,
+            subscription_tier: 'Storefront',
+            type: 'subscription'
+          };
+        });
 
+      console.log('[Invoices] Transformed invoice data:', invoiceData);
       setInvoices(invoiceData);
     } catch (err: any) {
+      console.error('[Invoices] Error:', err);
       setError(err.message || 'Failed to load invoices');
     } finally {
       setLoading(false);
@@ -293,20 +300,34 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
 
       {/* Invoices Table */}
       <Card>
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Invoice</Table.Th>
-              <Table.Th>Type</Table.Th>
-              <Table.Th>Amount</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Due Date</Table.Th>
-              <Table.Th>Created</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {paginatedInvoices.map((invoice) => (
+        {filteredInvoices.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto mb-4 text-gray-400">
+              <IconFileInvoice size={48} />
+            </div>
+            <Text size="lg" fw={500}>No invoices found</Text>
+            <Text size="sm" c="dimmed">
+              {statusFilter !== 'all' || typeFilter !== 'all' 
+                ? 'Try adjusting your filters'
+                : 'Invoices will appear here once you have billing activity'}
+            </Text>
+          </div>
+        ) : (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Invoice</Table.Th>
+                <Table.Th>Type</Table.Th>
+                <Table.Th>Amount</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Due Date</Table.Th>
+                <Table.Th>Paid On</Table.Th>
+                <Table.Th>Created</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {paginatedInvoices.map((invoice) => (
               <Table.Tr key={invoice.id}>
                 <Table.Td>
                   <Group>
@@ -335,7 +356,23 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Text>{formatDate(invoice.due_date)}</Text>
+                  {invoice.due_date && invoice.status !== 'paid' && 
+                   (new Date(invoice.due_date).getTime() - Date.now()) < 14 * 24 * 60 * 60 * 1000 ? (
+                    <Badge color="red" variant="light" size="sm">
+                      {formatDate(invoice.due_date)}
+                    </Badge>
+                  ) : (
+                    <Text size="sm">{formatDate(invoice.due_date)}</Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  {invoice.paid_at ? (
+                    <Badge color="green" variant="light" size="sm">
+                      {formatDate(invoice.paid_at)}
+                    </Badge>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{formatDate(invoice.created_at)}</Text>
@@ -376,6 +413,7 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
             ))}
           </Table.Tbody>
         </Table>
+        )}
 
         {totalPages > 1 && (
           <div className="flex justify-center mt-4">

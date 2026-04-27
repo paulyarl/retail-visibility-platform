@@ -104,6 +104,16 @@ export function AdvancedNotificationsReal({
   const [selectedRule, setSelectedRule] = useState<any | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [editModalOpened, setEditModalOpened] = useState(false);
+  const [editRule, setEditRule] = useState({
+    id: '',
+    name: '',
+    description: '',
+    type: 'payment' as 'payment' | 'invoice' | 'trial' | 'subscription' | 'system',
+    trigger: '',
+    enabled: true,
+    template: 'default'
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [newRule, setNewRule] = useState({
@@ -122,6 +132,7 @@ export function AdvancedNotificationsReal({
     metrics, 
     loading: notificationsLoading, 
     createRule, 
+    updateRule,
     toggleRule, 
     testRule 
   } = useNotifications();
@@ -165,6 +176,36 @@ export function AdvancedNotificationsReal({
     } catch (error) {
       console.error('Failed to create notification rule:', error);
     }
+  };
+
+  // Handle edit notification rule
+  const handleEditRule = async () => {
+    try {
+      await updateRule(editRule.id, {
+        name: editRule.name,
+        description: editRule.description,
+        type: editRule.type,
+        trigger: editRule.trigger,
+        enabled: editRule.enabled
+      });
+      setEditModalOpened(false);
+      setModalOpened(false);
+    } catch (error) {
+      console.error('Failed to update notification rule:', error);
+    }
+  };
+
+  const openEditModal = (rule: any) => {
+    setEditRule({
+      id: rule.id,
+      name: rule.name,
+      description: rule.description || '',
+      type: rule.type,
+      trigger: rule.trigger || '',
+      enabled: rule.enabled,
+      template: rule.template || 'default'
+    });
+    setEditModalOpened(true);
   };
 
   // Generate notification events based on real data
@@ -604,7 +645,7 @@ export function AdvancedNotificationsReal({
               <Text size="xs" c="dimmed">Type: {selectedRule.type}</Text>
               <Text size="xs" c="dimmed">Trigger: {selectedRule.trigger}</Text>
               <Text size="xs" c="dimmed">Condition: {selectedRule.condition}</Text>
-              <Text size="xs" c="dimmed">Recipients: {selectedRule.recipients.join(', ')}</Text>
+              <Text size="xs" c="dimmed">Recipients: {(selectedRule.recipients || []).join(', ') || 'None'}</Text>
             </Stack>
             
             <Divider />
@@ -620,7 +661,7 @@ export function AdvancedNotificationsReal({
               <Button variant="subtle" onClick={() => setModalOpened(false)}>
                 Close
               </Button>
-              <Button>
+              <Button onClick={() => openEditModal(selectedRule)}>
                 Edit Rule
               </Button>
             </Group>
@@ -698,6 +739,81 @@ export function AdvancedNotificationsReal({
             </Button>
             <Button onClick={handleCreateRule} disabled={!newRule.name || !newRule.trigger}>
               Create Rule
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Edit Notification Rule Modal */}
+      <Modal 
+        opened={editModalOpened} 
+        onClose={() => setEditModalOpened(false)}
+        title="Edit Notification Rule"
+        size="md"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Rule Name"
+            placeholder="Enter rule name"
+            value={editRule.name}
+            onChange={(e) => setEditRule({ ...editRule, name: e.target.value })}
+            required
+          />
+          
+          <Textarea
+            label="Description"
+            placeholder="Describe what this notification rule does"
+            value={editRule.description}
+            onChange={(e) => setEditRule({ ...editRule, description: e.target.value })}
+            rows={3}
+          />
+          
+          <Select
+            label="Rule Type"
+            data={[
+              { value: 'payment', label: 'Payment' },
+              { value: 'invoice', label: 'Invoice' },
+              { value: 'trial', label: 'Trial' },
+              { value: 'subscription', label: 'Subscription' },
+              { value: 'system', label: 'System' }
+            ]}
+            value={editRule.type}
+            onChange={(value) => setEditRule({ ...editRule, type: value as any })}
+          />
+          
+          <TextInput
+            label="Trigger"
+            placeholder="What triggers this notification?"
+            value={editRule.trigger}
+            onChange={(e) => setEditRule({ ...editRule, trigger: e.target.value })}
+            required
+          />
+          
+          <Select
+            label="Template"
+            data={[
+              { value: 'default', label: 'Default Template' },
+              { value: 'payment-success', label: 'Payment Success' },
+              { value: 'payment-failure', label: 'Payment Failure' },
+              { value: 'invoice-due', label: 'Invoice Due' },
+              { value: 'trial-expiry', label: 'Trial Expiry' }
+            ]}
+            value={editRule.template}
+            onChange={(value) => setEditRule({ ...editRule, template: value || 'default' })}
+          />
+          
+          <Switch
+            label="Enable rule"
+            checked={editRule.enabled}
+            onChange={(e) => setEditRule({ ...editRule, enabled: e.currentTarget.checked })}
+          />
+          
+          <Group justify="flex-end" gap="xs">
+            <Button variant="outline" onClick={() => setEditModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditRule} disabled={!editRule.name || !editRule.trigger}>
+              Save Changes
             </Button>
           </Group>
         </Stack>

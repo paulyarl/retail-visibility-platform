@@ -5,6 +5,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
 
 export interface ManualInvoice {
   id: string;
@@ -351,18 +352,38 @@ class ManualBillingService extends AdminApiSingleton {
     error?: string;
   }> {
     try {
-      const result = await this.makeDefaultRequest('/api/admin/manual-billing/generate-invoice-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use makeDefaultRequest with responseType BLOB to get proper blob response
+      const result = await this.makeDefaultRequest<Blob>(
+        '/api/admin/manual-billing/generate-invoice-pdf',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ invoiceId }),
         },
-        body: JSON.stringify({ invoiceId }),
-      }, `generate-pdf-${invoiceId}`, this.cacheTTL);
+        `manual-invoice-pdf-${invoiceId}`,
+        0, // No caching for PDF downloads
+        {
+          responseType: ResponseType.BLOB, // Use BLOB response type
+        }
+      );
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: typeof result.error === 'string' 
+            ? result.error 
+            : (result.error as any)?.message || 'Failed to generate invoice PDF'
+        };
+      }
+
+      // Create a blob URL for the PDF from the returned Blob
+      const pdfUrl = URL.createObjectURL(result.data!);
 
       return {
-        success: result.success,
-        pdfUrl: (result.data as any)?.pdfUrl,
-        error: typeof result.error === 'string' ? result.error : undefined
+        success: true,
+        pdfUrl,
       };
     } catch (error) {
       console.error('Error generating invoice PDF:', error);

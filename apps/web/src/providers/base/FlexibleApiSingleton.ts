@@ -258,6 +258,12 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         case ResponseType.TEXT:
           data = (await response.text()) as unknown as T;
           break;
+        case ResponseType.ARRAY_BUFFER:
+          data = (await response.arrayBuffer()) as unknown as T;
+          break;
+        case ResponseType.STREAM:
+          data = response.body as unknown as T;
+          break;
         case ResponseType.NONE:
           data = null as T;
           break;
@@ -604,7 +610,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     
     // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
     
     // Convert to PublicApiResponse format
     return result as PublicApiResponse<T>;
@@ -679,7 +685,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     
     // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
     
     // Convert to AuthenticatedApiResponse format
     return result as AuthenticatedApiResponse<T>;
@@ -756,7 +762,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     
     // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
     
     // Convert to TenantApiResponse format
     return result as TenantApiResponse<T>;
@@ -836,7 +842,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     
     // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
     
     // Convert to AdminApiResponse format
     return result as AdminApiResponse<T>;
@@ -927,7 +933,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     
     // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
     
     // Convert to ExternalApiResponse format
     return result as ExternalApiResponse<T>;
@@ -951,6 +957,10 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // const requestIsolation = requestOptions?.isolation || this.defaultIsolation;
     let requestContext = requestOptions?.context ;
     let requestIsolation = requestOptions?.isolation ;
+    let responseType = requestOptions?.responseType ;
+    // if (responseType){
+    //   console.log("responseType 1", responseType);
+    // }
     // console.log(`[FlexibleApiSingleton] makeDefaultRequest - requestType: ${requestType}, requestTarget: ${requestTarget}, requestContext: ${requestContext}, requestIsolation: ${requestIsolation}`);
 
 
@@ -963,11 +973,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         url,
         options,
         cacheKey,
-        ttl
+        ttl,
+        requestOptions // Pass requestOptions to preserve responseType
       );
     } else {
       // console.log(`[FlexibleApiSingleton] makeDefaultRequest - using standard caching: ${JSON.stringify(requestOptions)}`);
     }
+    // if (responseType){
+    //   console.log("responseType 2", responseType);
+    // }
      // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
      if (!requestContext){
       requestContext = requestOptions?.context || this.defaultContext;
@@ -1045,7 +1059,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
     
     // Delegate to unified execution - single source of truth
-    return await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
+    return await this.executeUnifiedRequest<T>(url, setupResult, responseType || requestOptions?.responseType);
   }
 
   // ====================

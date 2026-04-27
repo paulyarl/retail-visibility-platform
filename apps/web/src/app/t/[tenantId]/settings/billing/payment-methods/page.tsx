@@ -14,7 +14,7 @@ import {
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
+import { tenantBillingService, type PaymentMethod } from '@/services/TenantBillingService';
 import { StripeCardForm } from '@/components/billing/StripeCardForm';
 
 export default function PaymentMethodsPage({ params }: { params: Promise<{ tenantId: string }> }) {
@@ -46,7 +46,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
     try {
       setLoading(true);
       setError(null);
-      const methods = await subscriptionBillingService.getPaymentMethods();
+      const methods = await tenantBillingService.getPaymentMethods(tenantId);
       setPaymentMethods(methods);
       
       // Set default payment method ID
@@ -73,7 +73,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
 
   const handleSetDefault = async (paymentMethodId: string) => {
     try {
-      await subscriptionBillingService.setDefaultPaymentMethod(paymentMethodId);
+      await tenantBillingService.updatePaymentMethod(tenantId, paymentMethodId, { isDefault: true });
       await loadPaymentMethods();
     } catch (err: any) {
       setError(err.message || 'Failed to update default payment method');
@@ -86,7 +86,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
     }
 
     try {
-      await subscriptionBillingService.removePaymentMethod(paymentMethodId);
+      await tenantBillingService.removePaymentMethod(tenantId, paymentMethodId);
       await loadPaymentMethods();
     } catch (err: any) {
       setError(err.message || 'Failed to remove payment method');

@@ -27,6 +27,7 @@ interface BillingStatement {
   transactionFees: number;
   status: 'draft' | 'available' | 'paid';
   generatedAt: Date;
+  paidAt?: Date | null;
   downloadUrl?: string;
 }
 
@@ -131,7 +132,11 @@ export default function BillingStatementsPage({ params }: { params: Promise<{ te
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `billing-statement-${statement.period}.pdf`;
+      // Generate clean filename
+      const dateStr = new Date().toISOString().split('T')[0];
+      const safePeriod = statement.period.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const shortId = statement.id.substring(0, 8);
+      a.download = `statement-${safePeriod}-${dateStr}-${shortId}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -272,6 +277,7 @@ export default function BillingStatementsPage({ params }: { params: Promise<{ te
               <Table.Th>Amount</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Generated</Table.Th>
+              <Table.Th>Paid On</Table.Th>
               <Table.Th>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -307,6 +313,15 @@ export default function BillingStatementsPage({ params }: { params: Promise<{ te
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{formatDate(statement.generatedAt)}</Text>
+                </Table.Td>
+                <Table.Td>
+                  {statement.paidAt ? (
+                    <Badge color="green" variant="light" size="sm">
+                      {formatDate(statement.paidAt)}
+                    </Badge>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
@@ -377,6 +392,16 @@ export default function BillingStatementsPage({ params }: { params: Promise<{ te
               <div>
                 <Text size="sm" c="dimmed">Generated</Text>
                 <Text>{formatDate(selectedStatement.generatedAt)}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">Paid On</Text>
+                {selectedStatement.paidAt ? (
+                  <Badge color="green" variant="light" size="sm">
+                    {formatDate(selectedStatement.paidAt)}
+                  </Badge>
+                ) : (
+                  <Text c="dimmed">-</Text>
+                )}
               </div>
             </div>
             

@@ -14,6 +14,16 @@ export enum RequestType {
   EXTERNAL = 'external'
 }
 
+export enum ResponseType {
+  JSON = 'json',
+  TEXT = 'text',
+  BLOB = 'blob',
+  ARRAY_BUFFER = 'arrayBuffer',
+  STREAM = 'stream',
+  NONE = 'none'
+}
+
+
 export enum RequestTarget {
   API = 'api',
   DATABASE = 'database',
@@ -23,10 +33,15 @@ export enum RequestTarget {
   WEB = 'web'
 }
 
-export interface PublicRequestOptions {
+export interface UniversalResponseOptions {
+  responseType?: ResponseType;
+}
+
+export interface PublicRequestOptions extends UniversalResponseOptions {
   cacheKey?: string;
   ttl?: number;
   requestTarget?: RequestTarget;
+  responseType?: ResponseType;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
   context?: AppContext;
   isolation?: CacheIsolation;
@@ -34,20 +49,22 @@ export interface PublicRequestOptions {
   userId?: string;
 }
 
-export interface AuthenticatedRequestOptions {
+export interface AuthenticatedRequestOptions extends UniversalResponseOptions {
   cacheKey?: string;
   ttl?: number;
   requireAuth?: boolean;
+  responseType?: ResponseType;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
   context?: AppContext;
   isolation?: CacheIsolation;
   userId?: string;
 }
 
-export interface TenantRequestOptions {
+export interface TenantRequestOptions extends UniversalResponseOptions {
   tenantId: string;
   ttl?: number;
   requestTarget?: RequestTarget;
+  responseType?: ResponseType;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
   context?: AppContext;
   isolation?: CacheIsolation;
@@ -55,11 +72,12 @@ export interface TenantRequestOptions {
   cacheKey?: string;
 }
 
-export interface AdminRequestOptions {
+export interface AdminRequestOptions extends UniversalResponseOptions {
   cacheKey?: string;
   ttl?: number;
   requireAdmin?: boolean;
   requestTarget?: RequestTarget;
+  responseType?: ResponseType;
   requireAdminContext?: boolean;
   bypassCache?: boolean;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
@@ -68,11 +86,12 @@ export interface AdminRequestOptions {
   userId?: string;
 }
 
-export interface ExternalRequestOptions {
+export interface ExternalRequestOptions extends UniversalResponseOptions {
   cacheKey?: string;
   ttl?: number;
   timeout?: number;
   requestTarget?: RequestTarget;
+  responseType?: ResponseType;
   headers?: Record<string, string>;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
   context?: AppContext;
@@ -81,7 +100,7 @@ export interface ExternalRequestOptions {
   includeCredentials?: boolean; // Allow controlling credential inclusion for external APIs
 }
 
-export interface SystemRequestOptions {
+export interface SystemRequestOptions extends UniversalResponseOptions {
   cacheKey?: string;
   ttl?: number;
   requestTarget?: RequestTarget;
@@ -90,14 +109,8 @@ export interface SystemRequestOptions {
   systemKey?: string;
 }
 
-export enum ResponseType {
-  JSON = 'json',
-  BLOB = 'blob',
-  TEXT = 'text',
-  NONE = 'none'
-}
 
-export interface RequestOptions {
+export interface RequestOptions extends UniversalResponseOptions {
   requestType?: RequestType;
   requestTarget?: RequestTarget;
   retries?: number;
@@ -154,6 +167,7 @@ interface ApiEnhancedCacheOptions extends EnhancedCacheOptions {
   useAuthUser?: boolean;
   cacheKey?: string;
   requestTarget?: RequestTarget;
+  responseType?: ResponseType;
   invalidateOnMutation?: boolean;
   cacheTags?: string[];
   priority?: 'low' | 'medium' | 'high';
@@ -351,7 +365,9 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
       context,
       isolation,
       tenantId,
-      userId
+      userId,
+      // Preserve responseType for blob/text/etc responses
+      responseType: requestOptions?.responseType,
     };
 
     // Use existing makeDefaultRequest - it will generate enhanced cacheKey with context

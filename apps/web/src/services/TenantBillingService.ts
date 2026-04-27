@@ -6,6 +6,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
+import { RequestType, ResponseType } from '@/providers/base/FlexibleApiSingleton';  
 // Types for billing data
 export interface BillingOverview {
   currentBalance: number;
@@ -58,8 +59,9 @@ export interface RecentActivity {
   type: 'payment' | 'invoice' | 'subscription_change';
   title: string;
   amount?: number;
-  status: 'success' | 'failed' | 'pending';
+  status: 'success' | 'failed' | 'pending' | 'paid' | 'succeeded';
   date: Date;
+  dueDate?: Date;
 }
 
 export interface PaymentMethod {
@@ -127,14 +129,18 @@ class TenantBillingService extends TenantApiSingleton {
         `billing-overview-${tenantId}`
       );
       
+      // Handle double-wrapped response
+      const actualData = response.data as any;
+      const data = actualData?.success ? actualData.data : response.data;
+      
       // Ensure the response has all required fields
       return {
-        currentBalance: response.data?.currentBalance || 0,
-        nextPaymentDue: response.data?.nextPaymentDue || null,
-        subscriptionStatus: response.data?.subscriptionStatus || 'active',
-        lastPaymentStatus: response.data?.lastPaymentStatus || 'pending',
-        subscriptionTier: response.data?.subscriptionTier || 'Unknown',
-        monthlyAmount: response.data?.monthlyAmount || 0
+        currentBalance: data?.currentBalance || 0,
+        nextPaymentDue: data?.nextPaymentDue || null,
+        subscriptionStatus: data?.subscriptionStatus || 'active',
+        lastPaymentStatus: data?.lastPaymentStatus || 'pending',
+        subscriptionTier: data?.subscriptionTier || 'Unknown',
+        monthlyAmount: data?.monthlyAmount || 0
       };
     } catch (error) {
       // Return default overview object if API fails
@@ -161,13 +167,17 @@ class TenantBillingService extends TenantApiSingleton {
         5 * 60 * 1000 // 5 minutes cache
       );
       
+      // Handle double-wrapped response
+      const actualData = response.data as any;
+      const data = actualData?.success ? actualData.data : response.data;
+      
       // Ensure the response has all required fields
       return {
-        level: response.data?.level || 'low',
-        score: response.data?.score || 0,
-        factors: response.data?.factors || [],
-        projectedDefaultDate: response.data?.projectedDefaultDate,
-        recommendedActions: response.data?.recommendedActions || []
+        level: data?.level || 'low',
+        score: data?.score || 0,
+        factors: data?.factors || [],
+        projectedDefaultDate: data?.projectedDefaultDate,
+        recommendedActions: data?.recommendedActions || []
       };
     } catch (error) {
       // Return default low risk object if API fails
@@ -192,8 +202,16 @@ class TenantBillingService extends TenantApiSingleton {
         5 * 60 * 1000 // 5 minutes cache
       );
       
-      // Ensure the response is always an array
-      return Array.isArray(response.data) ? response.data : [];
+      // Handle double-wrapped response
+      const actualData = response.data as any;
+      if (actualData?.success && Array.isArray(actualData.data)) {
+        return actualData.data;
+      }
+      // Fallback for single-wrapped response
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     } catch (error) {
       // Return empty array if API fails
       return [];
@@ -212,10 +230,19 @@ class TenantBillingService extends TenantApiSingleton {
         2 * 60 * 1000 // 2 minutes cache
       );
       
-      // Ensure the response is always an array
-      return Array.isArray(response.data) ? response.data : [];
+      // Handle double-wrapped response: { success: true, data: { success: true, data: [...] } }
+      const actualData = response.data as any;
+      if (actualData?.success && Array.isArray(actualData.data)) {
+        return actualData.data;
+      }
+      // Fallback for single-wrapped response
+      if (response.success && Array.isArray(response.data)) {
+        return response.data;
+      }
+      console.warn('[TenantBillingService] getRecentActivity - unexpected response:', response);
+      return [];
     } catch (error) {
-      // Return empty array if API fails
+      console.error('[TenantBillingService] getRecentActivity error:', error);
       return [];
     }
   }
@@ -231,7 +258,16 @@ class TenantBillingService extends TenantApiSingleton {
       10 * 60 * 1000 // 10 minutes cache
     );
     
-    return response.data;
+    // Handle double-wrapped response
+    const actualData = response.data as any;
+    if (actualData?.success && Array.isArray(actualData.data)) {
+      return actualData.data;
+    }
+    // Fallback for single-wrapped response
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
   }
 
   /**
@@ -335,8 +371,16 @@ class TenantBillingService extends TenantApiSingleton {
         15 * 60 * 1000 // 15 minutes cache
       );
       
-      // Ensure the response is always an array
-      return Array.isArray(response.data?.statements) ? response.data.statements : [];
+      // Handle double-wrapped response
+      const actualData = response.data as any;
+      if (actualData?.success && Array.isArray(actualData.statements)) {
+        return actualData.statements;
+      }
+      // Fallback for single-wrapped response
+      if (Array.isArray(actualData?.statements)) {
+        return actualData.statements;
+      }
+      return [];
     } catch (error) {
       // Return empty array if API fails
       return [];
@@ -347,17 +391,19 @@ class TenantBillingService extends TenantApiSingleton {
    * Download statement PDF
    */
   async downloadStatement(tenantId: string, statementId: string): Promise<Blob> {
-    const response = await fetch(`/api/tenants/${tenantId}/billing/statements/${statementId}/download`, {
-      headers: {
-        'Authorization': `Bearer ${this.getAuthToken()}`
-      }
-    });
+    const result = await this.makeDefaultRequest<Blob>(
+      `/api/tenants/${tenantId}/billing/statements/${statementId}/download`,
+      { method: 'GET' },
+      `statement-pdf-${statementId}`,
+      0, // No caching for PDF downloads
+      { responseType: ResponseType.BLOB }
+    );
 
-    if (!response.ok) {
-      throw new Error('Failed to download statement');
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to download statement');
     }
 
-    return response.blob();
+    return result.data!;
   }
 
   /**
@@ -371,6 +417,11 @@ class TenantBillingService extends TenantApiSingleton {
       30 * 60 * 1000 // 30 minutes cache
     );
     
+    // Handle double-wrapped response
+    const actualData = response.data as any;
+    if (actualData?.success && actualData?.data) {
+      return actualData.data;
+    }
     return response.data;
   }
 
@@ -397,6 +448,11 @@ class TenantBillingService extends TenantApiSingleton {
       10 * 60 * 1000 // 10 minutes cache
     );
     
+    // Handle double-wrapped response
+    const actualData = response.data as any;
+    if (actualData?.success && actualData?.data) {
+      return actualData.data;
+    }
     return response.data;
   }
 

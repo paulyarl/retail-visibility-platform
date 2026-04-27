@@ -77,9 +77,18 @@ export function ManualBillingDashboard({
     try {
       const result = await manualBillingService.generateInvoicePDF(invoice.id);
       if (result.success && result.pdfUrl) {
-        // Open PDF in new window
-        window.open(result.pdfUrl, '_blank');
-        setAlertMessage({ type: 'success', message: 'Invoice PDF generated successfully' });
+        // For viewing (not downloading), we need to keep blob URL alive longer
+        const url = result.pdfUrl;
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        // No download attribute - opens in new tab for viewing
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // Delay revoking URL so PDF has time to load in new tab
+        setTimeout(() => window.URL.revokeObjectURL(url), 30000);
+        setAlertMessage({ type: 'success', message: 'Invoice PDF opened in new tab' });
       } else {
         setAlertMessage({ type: 'error', message: result.error || 'Failed to generate invoice PDF' });
       }

@@ -7195,17 +7195,15 @@ function getAccessLevelSummary(userRole: string, groups: string[], permissions: 
 }
 
 /* ------------------------------ example role-protected routes ------------------------------ */
-// Tenant admin operations
-app.get('/api/tenants/:id/users', authenticateToken, requireRoleGroup('IS_TENANT_ADMIN'), (req, res) => {
-  res.json({ message: 'Tenant admin access granted', tenantId: req.params.id });
-});
-console.log('✅ Tenant admin route mounted at /api/tenants/:id/users (IS_TENANT_ADMIN protected)');
+// Tenant admin operations - NOTE: Actual tenant user management is handled by tenantsRoutes
+// app.get('/api/tenants/:id/users', authenticateToken, requireRoleGroup('IS_TENANT_ADMIN'), (req, res) => {
+//   res.json({ message: 'Tenant admin access granted', tenantId: req.params.id });
+// });
 
-// Tenant owner operations
-app.get('/api/tenants/:id/billing', authenticateToken, requireRoleGroup('IS_TENANT_OWNER'), (req, res) => {
-  res.json({ message: 'Tenant owner access granted', tenantId: req.params.id });
-});
-console.log('✅ Tenant owner route mounted at /api/tenants/:id/billing (IS_TENANT_OWNER protected)');
+// Tenant owner operations - NOTE: Actual billing routes are handled by tenant-billing routes
+// app.get('/api/tenants/:id/billing', authenticateToken, requireRoleGroup('IS_TENANT_OWNER'), (req, res) => {
+//   res.json({ message: 'Tenant owner access granted', tenantId: req.params.id });
+// });
 
 // Platform admin operations
 app.get('/api/admin/system/status', authenticateToken, requireRoleGroup('IS_PLATFORM_ADMIN'), (req, res) => {

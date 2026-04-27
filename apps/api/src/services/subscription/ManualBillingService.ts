@@ -374,6 +374,7 @@ export class ManualBillingService {
     paymentInstructions?: string;
     adminCreatedBy?: string;
     createdAt: Date;
+    isManual: boolean;
     payments: Array<{
       id: string;
       gatewayType: string;
@@ -407,6 +408,7 @@ export class ManualBillingService {
         paymentInstructions: invoice.payment_instructions || undefined,
         adminCreatedBy: invoice.admin_created_by || undefined,
         createdAt: invoice.created_at || new Date(),
+        isManual: invoice.manual_payment || false,
         payments: invoice.subscription_payments.map(payment => ({
           id: payment.id,
           gatewayType: payment.gateway_type || 'manual',
@@ -438,6 +440,7 @@ export class ManualBillingService {
     tenantName: string;
     tier: string;
     paymentInstructions?: string;
+    isManual?: boolean;
     payments?: Array<{
       id: string;
       gatewayType: string;
@@ -487,6 +490,7 @@ export class ManualBillingService {
         tenantName: invoice.tenants?.name || 'Unknown',
         tier: invoice.tenants?.subscription_tier || 'unknown',
         paymentInstructions: invoice.payment_instructions || undefined,
+        isManual: invoice.manual_payment || false,
         payments: invoice.subscription_payments.map(payment => ({
           id: payment.id,
           gatewayType: payment.gateway_type,
@@ -517,6 +521,7 @@ export class ManualBillingService {
     tenantName: string;
     tier: string;
     paymentInstructions?: string;
+    isManual?: boolean;
     payments?: Array<{
       id: string;
       gatewayType: string;
@@ -558,6 +563,7 @@ export class ManualBillingService {
         tenantName: invoice.tenants?.name || 'Unknown',
         tier: invoice.tenants?.subscription_tier || 'unknown',
         paymentInstructions: invoice.payment_instructions || undefined,
+        isManual: invoice.manual_payment || false,
         payments: invoice.subscription_payments.map(payment => ({
           id: payment.id,
           gatewayType: payment.gateway_type || 'manual',
@@ -631,3 +637,4 @@ export function getManualBillingService(): ManualBillingService {
   }
   return instance;
 }
+

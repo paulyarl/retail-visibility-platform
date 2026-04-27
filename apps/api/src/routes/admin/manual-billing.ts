@@ -908,7 +908,7 @@ router.get('/tenants', async (req, res) => {
 
 /**
  * POST /api/admin/manual-billing/generate-invoice-pdf
- * Generate a PDF for a manual invoice
+ * Generate a PDF for a manual invoice and return the binary directly
  */
 const generateInvoicePDFSchema = z.object({
   invoiceId: z.string().min(1, 'Invoice ID is required'),
@@ -941,8 +941,231 @@ router.post('/generate-invoice-pdf', async (req, res) => {
       });
     }
 
-    // Generate a mock PDF URL (in production, this would generate a real PDF)
-    const pdfUrl = `/api/admin/manual-billing/invoices/${invoiceId}/pdf?t=${Date.now()}`;
+    // Get platform branding settings
+    const platformSettings = await prisma.platform_settings_list.findFirst();
+    const branding = {
+      platformName: platformSettings?.platform_name || 'Visible Shelf',
+      logoUrl: platformSettings?.logo_url,
+      primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
+      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',
+      contactPhone: platformSettings?.contact_phone || '(913) 703-6157',
+      contactAddress: platformSettings?.contact_address || '',
+      contactWebsite: platformSettings?.contact_website || 'https://visibleshelf.store',
+    };
+
+    // Get tenant info for billing address
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: invoice.tenantId },
+      select: { name: true, slug: true },
+    });
+
+    // Generate PDF using jsPDF
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let yPos = 20;
+
+    // Header with platform branding - try to add logo
+    let logoWidth = 0;
+    const logoHeight = 15; // Fixed height for header logo
+    if (branding.logoUrl) {
+      try {
+        // Fetch the logo image
+        const logoResponse = await fetch(branding.logoUrl);
+        if (logoResponse.ok) {
+          const logoBuffer = await logoResponse.arrayBuffer();
+          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
+          const contentType = logoResponse.headers.get('content-type') || 'image/png';
+          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
+
+          // Add logo to PDF with fixed height, auto-calculate width to maintain aspect ratio
+          // For square logos, this will result in 15x15
+          const imgProps = doc.getImageProperties(logoDataUri);
+          const aspectRatio = imgProps.width / imgProps.height;
+          logoWidth = logoHeight * aspectRatio;
+
+          doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+          yPos += 12; // Adjust for logo
+        }
+      } catch (logoError) {
+        console.warn('[PDF] Could not load platform logo:', logoError);
+        // Continue without logo
+      }
+    }
+
+    // Platform name next to logo or standalone
+    doc.setFontSize(24);
+    doc.setTextColor(branding.primaryColor);
+    const textX = logoWidth > 0 ? margin + logoWidth + 5 : margin;
+    doc.text(branding.platformName, textX, yPos);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    yPos += 8;
+    if (branding.contactWebsite) {
+      doc.text(branding.contactWebsite, textX, yPos);
+    }
+
+    // Invoice title
+    yPos += 15;
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text('MANUAL INVOICE', pageWidth - margin - 50, 20, { align: 'left' });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`#${invoice.id}`, pageWidth - margin - 50, 28, { align: 'left' });
+
+    // From/To section
+    yPos = 50;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // From
+    doc.setFont('helvetica', 'bold');
+    doc.text('From:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(branding.platformName, margin, yPos);
+    yPos += 5;
+    if (branding.contactEmail) doc.text(branding.contactEmail, margin, yPos);
+    yPos += 5;
+    if (branding.contactAddress) {
+      const addressLines = branding.contactAddress.split('\n');
+      for (const line of addressLines) {
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // To (right side)
+    yPos = 50;
+    const toX = pageWidth / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', toX, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(tenant?.name || invoice.tenantName || 'Tenant', toX, yPos);
+
+    // Invoice details
+    yPos = Math.max(yPos, 85) + 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    // Invoice info table
+    doc.setFontSize(10);
+    const formatDate = (date: string | Date | null | undefined) => {
+      if (!date) return '-';
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    };
+
+    const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+    const infoRows = [
+      ['Invoice ID:', invoice.id],
+      ['Tenant ID:', invoice.tenantId || '-'],
+      ['Tier:', (invoice as any).tier?.toUpperCase() || 'MANUAL'],
+      ['Invoice Date:', formatDate(invoice.createdAt)],
+      ['Due Date:', formatDate(invoice.dueDate)],
+      ['Status:', invoice.status.toUpperCase()],
+      ['Type:', invoice.isManual ? 'Manual Invoice' : 'Subscription Invoice'],
+    ];
+
+    // Add payment date if paid
+    if (invoice.status === 'paid' && invoice.paidAt) {
+      infoRows.push(['Payment Date:', formatDate(invoice.paidAt)]);
+    }
+
+    // Add transaction ID if payment exists
+    if (invoice.payments && invoice.payments.length > 0) {
+      const latestPayment = invoice.payments[invoice.payments.length - 1];
+      if (latestPayment.transactionId) {
+        infoRows.push(['Transaction ID:', latestPayment.transactionId]);
+      }
+    }
+
+    for (const [label, value] of infoRows) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + 40, yPos);
+      yPos += 6;
+    }
+
+    // Line items header
+    yPos += 10;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', margin + 2, yPos + 5);
+    doc.text('Amount', pageWidth - margin - 20, yPos + 5, { align: 'right' });
+    yPos += 12;
+
+    // Line item
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.description || 'Manual Invoice', margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+    yPos += 8;
+
+    // Total
+    yPos += 5;
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total:', margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+
+    // Payment history
+    if (invoice.payments && invoice.payments.length > 0) {
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment History', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      for (const payment of invoice.payments) {
+        doc.text(`${payment.gatewayType} - ${formatDate(payment.createdAt)} - ${formatPrice(payment.amountCents)} - ${payment.status}`, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // Payment instructions
+    if (invoice.paymentInstructions) {
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment Instructions:', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const instructionLines = doc.splitTextToSize(invoice.paymentInstructions, pageWidth - 2 * margin);
+      for (const line of instructionLines) {
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // Footer
+    yPos = doc.internal.pageSize.getHeight() - 30;
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Thank you for your business!', margin, yPos);
+    yPos += 10;
+    if (branding.contactPhone) {
+      doc.text(`Phone: ${branding.contactPhone}  |  Email: ${branding.contactEmail}`, margin, yPos);
+    } else {
+      doc.text(`Email: ${branding.contactEmail}`, margin, yPos);
+    }
 
     // Log the action for audit
     await audit({
@@ -952,14 +1175,14 @@ router.post('/generate-invoice-pdf', async (req, res) => {
       payload: { invoiceId },
     });
 
-    res.json({
-      success: true,
-      data: {
-        pdfUrl,
-        invoiceId,
-        generatedAt: new Date().toISOString(),
-      },
-    });
+    // Set response headers for PDF download - return binary directly
+    let filename = `manual-invoice-${invoice.id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    
+    // Send PDF as buffer
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    res.send(pdfBuffer);
 
   } catch (error: any) {
     console.error('[POST /api/admin/manual-billing/generate-invoice-pdf] Error:', error);
@@ -1068,10 +1291,10 @@ router.get('/invoices/:invoiceId/pdf', async (req, res) => {
       platformName: platformSettings?.platform_name || 'Visible Shelf',
       logoUrl: platformSettings?.logo_url,
       primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
-      contactEmail: platformSettings?.contact_email || 'billing@visible-shelf.com',
-      contactPhone: platformSettings?.contact_phone || '',
+      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',
+      contactPhone: platformSettings?.contact_phone || '(913) 703-6157',
       contactAddress: platformSettings?.contact_address || '',
-      contactWebsite: platformSettings?.contact_website || '',
+      contactWebsite: platformSettings?.contact_website || 'https://visibleshelf.store',
     };
 
     // Get tenant info for billing address
@@ -1083,29 +1306,58 @@ router.get('/invoices/:invoiceId/pdf', async (req, res) => {
     // Generate PDF using jsPDF
     const { jsPDF } = await import('jspdf');
     const doc = new jsPDF();
-    
+
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
     let yPos = 20;
 
-    // Header with platform branding
+    // Header with platform branding - try to add logo
+    let logoWidth = 0;
+    const logoHeight = 15; // Fixed height for header logo
+    if (branding.logoUrl) {
+      try {
+        // Fetch the logo image
+        const logoResponse = await fetch(branding.logoUrl);
+        if (logoResponse.ok) {
+          const logoBuffer = await logoResponse.arrayBuffer();
+          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
+          const contentType = logoResponse.headers.get('content-type') || 'image/png';
+          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
+
+          // Add logo to PDF with fixed height, auto-calculate width to maintain aspect ratio
+          // For square logos, this will result in 15x15
+          const imgProps = doc.getImageProperties(logoDataUri);
+          const aspectRatio = imgProps.width / imgProps.height;
+          logoWidth = logoHeight * aspectRatio;
+
+          doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+          yPos += 12; // Adjust for logo
+        }
+      } catch (logoError) {
+        console.warn('[PDF] Could not load platform logo:', logoError);
+        // Continue without logo
+      }
+    }
+
+    // Platform name next to logo or standalone
     doc.setFontSize(24);
     doc.setTextColor(branding.primaryColor);
-    doc.text(branding.platformName, margin, yPos);
-    
+    const textX = logoWidth > 0 ? margin + logoWidth + 5 : margin;
+    doc.text(branding.platformName, textX, yPos);
+
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     yPos += 8;
     if (branding.contactWebsite) {
-      doc.text(branding.contactWebsite, margin, yPos);
+      doc.text(branding.contactWebsite, textX, yPos);
     }
-    
+
     // Invoice title
     yPos += 15;
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text('MANUAL INVOICE', pageWidth - margin - 50, 20, { align: 'left' });
-    
+
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
     doc.text(`#${invoice.id}`, pageWidth - margin - 50, 28, { align: 'left' });
@@ -1161,11 +1413,27 @@ router.get('/invoices/:invoiceId/pdf', async (req, res) => {
     const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
     const infoRows = [
+      ['Invoice ID:', invoice.id],
+      ['Tenant ID:', invoice.tenantId || '-'],
+      ['Tier:', (invoice as any).tier?.toUpperCase() || 'MANUAL'],
       ['Invoice Date:', formatDate(invoice.createdAt)],
       ['Due Date:', formatDate(invoice.dueDate)],
       ['Status:', invoice.status.toUpperCase()],
-      ['Type:', 'Manual Invoice'],
+      ['Type:', invoice.isManual ? 'Manual Invoice' : 'Subscription Invoice'],
     ];
+
+    // Add payment date if paid
+    if (invoice.status === 'paid' && invoice.paidAt) {
+      infoRows.push(['Payment Date:', formatDate(invoice.paidAt)]);
+    }
+
+    // Add transaction ID if payment exists
+    if (invoice.payments && invoice.payments.length > 0) {
+      const latestPayment = invoice.payments[invoice.payments.length - 1];
+      if (latestPayment.transactionId) {
+        infoRows.push(['Transaction ID:', latestPayment.transactionId]);
+      }
+    }
 
     for (const [label, value] of infoRows) {
       doc.setFont('helvetica', 'bold');

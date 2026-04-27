@@ -37,6 +37,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { PlatformInvoice } from '@/services/AdminBillingService';
 import { useInvoiceManagement } from '../hooks/useInvoiceManagement';
+import { manualBillingService } from '@/services/ManualBillingService';
+import { subscriptionBillingService } from '@/services/SubscriptionBillingService';
 
 interface InvoiceManagementProps {
   manualInvoices?: any[];
@@ -83,6 +85,9 @@ export function InvoiceManagement({
   const [selectedType, setSelectedType] = useState<string>('all');
   const [showBulkActions, setShowBulkActions] = useState<boolean>(false);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [viewLoading, setViewLoading] = useState<string | null>(null);
+  const [sendLoading, setSendLoading] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Use real invoice data - combine manual invoices and manual billing invoices, ensuring unique IDs
   const invoices = [...manualInvoices, ...manualBillingInvoices].reduce((unique: InvoiceData[], invoice: InvoiceData) => {
@@ -172,13 +177,72 @@ export function InvoiceManagement({
     // Implementation for bulk actions
   };
 
-  const handleInvoiceAction = (invoiceId: string, action: 'view' | 'send' | 'retry' | 'cancel') => {
-    console.log(`Invoice action: ${action} on invoice:`, invoiceId);
+  const handleInvoiceAction = async (invoiceId: string, action: 'view' | 'send' | 'retry' | 'cancel') => {
+    const invoice = invoices.find((inv: InvoiceData) => inv.id === invoiceId);
+    if (!invoice) return;
+
     if (action === 'view') {
-      const invoice = invoices.find((inv: InvoiceData) => inv.id === invoiceId);
-      if (invoice) {
-        setSelectedInvoice(invoice);
-        setModalOpened(true);
+      setViewLoading(invoiceId);
+      try {
+        // Determine if manual or subscription invoice based on ID pattern
+        const isManualInvoice = invoiceId.startsWith('inv-');
+        
+        let blob: Blob;
+        if (isManualInvoice) {
+          // Manual invoice - use ManualBillingService
+          const result = await manualBillingService.generateInvoicePDF(invoiceId);
+          if (!result.success || !result.pdfUrl) {
+            setAlertMessage({ type: 'error', message: result.error || 'Failed to generate invoice PDF' });
+            return;
+          }
+          // Fetch the blob from the URL
+          const response = await fetch(result.pdfUrl);
+          blob = await response.blob();
+        } else {
+          // Subscription invoice - use SubscriptionBillingService
+          // Need tenant ID - for admin view, we may need to fetch it
+          const tenantId = (invoice as any).tenantId || '';
+          if (!tenantId) {
+            setAlertMessage({ type: 'error', message: 'Tenant ID required for subscription invoice' });
+            return;
+          }
+          blob = await subscriptionBillingService.downloadInvoicePdf(invoiceId, tenantId);
+        }
+
+        // Create blob URL and open in new tab
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setAlertMessage({ type: 'success', message: 'Invoice PDF opened in new tab' });
+      } catch (error) {
+        setAlertMessage({ type: 'error', message: 'Failed to generate invoice PDF' });
+      } finally {
+        setViewLoading(null);
+      }
+    } else if (action === 'send') {
+      setSendLoading(invoiceId);
+      try {
+        // Only manual invoices can be sent via ManualBillingService
+        const isManualInvoice = invoiceId.startsWith('inv-');
+        if (!isManualInvoice) {
+          setAlertMessage({ type: 'error', message: 'Only manual invoices can be sent manually' });
+          return;
+        }
+        const result = await manualBillingService.sendInvoice(invoiceId);
+        if (result.success) {
+          setAlertMessage({ type: 'success', message: 'Invoice sent successfully' });
+        } else {
+          setAlertMessage({ type: 'error', message: result.error || 'Failed to send invoice' });
+        }
+      } catch (error) {
+        setAlertMessage({ type: 'error', message: 'Failed to send invoice' });
+      } finally {
+        setSendLoading(null);
       }
     }
   };
@@ -189,6 +253,19 @@ export function InvoiceManagement({
 
   return (
     <div>
+    {/* Alert Message */}
+    {alertMessage && (
+      <Alert
+        icon={alertMessage.type === 'success' ? <IconCheck size="1rem" /> : <IconAlertTriangle size="1rem" />}
+        title={alertMessage.type === 'success' ? 'Success' : 'Error'}
+        color={alertMessage.type === 'success' ? 'green' : 'red'}
+        withCloseButton
+        onClose={() => setAlertMessage(null)}
+        mb="md"
+      >
+        {alertMessage.message}
+      </Alert>
+    )}
     <Stack gap="md">
       {/* Header Controls */}
       <Card withBorder padding="lg" radius="md">
@@ -444,30 +521,38 @@ export function InvoiceManagement({
                   <Text size="sm">Platform Billing</Text>
                 </Table.Td><Table.Td>
                   <Group gap="xs">
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      onClick={() => handleInvoiceAction(invoice.id, 'view')}
-                    >
-                      <IconEye size="0.875rem" />
-                    </ActionIcon>
-                    {invoice.status === 'pending' && (
+                    <Tooltip label="View PDF">
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => handleInvoiceAction(invoice.id, 'send')}
+                        onClick={() => handleInvoiceAction(invoice.id, 'view')}
+                        loading={viewLoading === invoice.id}
                       >
-                        <IconSend size="0.875rem" />
+                        <IconEye size="0.875rem" />
                       </ActionIcon>
+                    </Tooltip>
+                    {invoice.status === 'pending' && (
+                      <Tooltip label="Send Invoice">
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={() => handleInvoiceAction(invoice.id, 'send')}
+                          loading={sendLoading === invoice.id}
+                        >
+                          <IconSend size="0.875rem" />
+                        </ActionIcon>
+                      </Tooltip>
                     )}
                     {invoice.status === 'overdue' && (
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        onClick={() => handleInvoiceAction(invoice.id, 'retry')}
-                      >
-                        <IconRefresh size="0.875rem" />
-                      </ActionIcon>
+                      <Tooltip label="Retry Payment">
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={() => handleInvoiceAction(invoice.id, 'retry')}
+                        >
+                          <IconRefresh size="0.875rem" />
+                        </ActionIcon>
+                      </Tooltip>
                     )}
                   </Group>
                 </Table.Td>
@@ -548,15 +633,15 @@ export function InvoiceManagement({
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="xs">Platform Fees</Text>
-                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees.platformFees)}</Text>
+                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees?.platformFees || 0)}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="xs">Processing Fees</Text>
-                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees.processingFees)}</Text>
+                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees?.processingFees || 0)}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="xs">Other Fees</Text>
-                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees.otherFees)}</Text>
+                  <Text size="xs" fw={500}>{formatCurrency(selectedInvoice.fees?.otherFees || 0)}</Text>
                 </Group>
               </Stack>
             </div>

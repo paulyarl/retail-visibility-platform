@@ -616,10 +616,10 @@ router.get('/invoices/:id/pdf', requirePermission('CAN_MANAGE_TENANT_BILLING'), 
       platformName: platformSettings?.platform_name || 'Visible Shelf',
       logoUrl: platformSettings?.logo_url,
       primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
-      contactEmail: platformSettings?.contact_email || 'billing@visible-shelf.com',
-      contactPhone: platformSettings?.contact_phone || '',
+      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',
+      contactPhone: platformSettings?.contact_phone || '(913) 703-6157',
       contactAddress: platformSettings?.contact_address || '',
-      contactWebsite: platformSettings?.contact_website || '',
+      contactWebsite: platformSettings?.contact_website || 'https://visibleshelf.store',
     };
 
     // Get tenant info for billing address

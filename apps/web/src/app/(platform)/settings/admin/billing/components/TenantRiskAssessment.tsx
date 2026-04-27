@@ -15,7 +15,8 @@ import {
   Alert,
   Button,
   Timeline,
-  Tooltip
+  Tooltip,
+  ActionIcon
 } from '@mantine/core';
 import { 
   IconAlertTriangle,
@@ -34,6 +35,7 @@ import {
   IconChartBar,
   IconEye
 } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
 import { Tenant } from '../types';
 
 interface TenantRiskAssessmentProps {
@@ -45,6 +47,8 @@ export function TenantRiskAssessment({
   tenants, 
   isLoading = false 
 }: TenantRiskAssessmentProps) {
+  const router = useRouter();
+  
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -357,9 +361,15 @@ export function TenantRiskAssessment({
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
-                        <Button size="xs" variant="subtle">
-                          <IconEye size="0.875rem" />
-                        </Button>
+                        <Tooltip label="View Billing Dashboard">
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            onClick={() => router.push(`/t/${tenant.id}/settings/billing`)}
+                          >
+                            <IconEye size="0.875rem" />
+                          </ActionIcon>
+                        </Tooltip>
                       </Group>
                     </Table.Td>
                   </Table.Tr>

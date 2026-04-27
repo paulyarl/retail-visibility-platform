@@ -60,7 +60,7 @@ function checkRateLimit(key: string, operation: keyof typeof RATE_LIMITS): { all
   return { allowed: true, remaining: config.maxRequests - record.count, resetTime: record.resetTime };
 }
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 /**
  * GET /api/tenants

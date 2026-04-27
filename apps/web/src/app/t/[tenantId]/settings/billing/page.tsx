@@ -96,7 +96,7 @@ const RISK_ICONS = {
 import { tenantBillingService } from '@/services/TenantBillingService';
 
 // Risk Indicator Component
-const RiskIndicator = ({ risk }: { risk: SubscriptionRisk }) => {
+const RiskIndicator = ({ risk, tenantId }: { risk: SubscriptionRisk; tenantId: string }) => {
   if (!risk || !risk.level) {
     return null;
   }
@@ -145,7 +145,13 @@ const RiskIndicator = ({ risk }: { risk: SubscriptionRisk }) => {
                 key={index}
                 variant={action.priority === 'urgent' ? 'filled' : 'outline'}
                 size="sm"
-                onClick={() => window.location.href = action.actionUrl}
+                onClick={() => {
+                  // Prepend tenant path if not already present
+                  const url = action.actionUrl.startsWith('/t/') 
+                    ? action.actionUrl 
+                    : `/t/${tenantId}${action.actionUrl}`;
+                  window.location.href = url;
+                }}
               >
                 {action.actionText}
               </Button>
@@ -201,7 +207,7 @@ const BillingOverviewCards = ({ overview }: { overview: BillingOverview }) => {
             <div>
               <Text size="xs" c="dimmed">Next Payment</Text>
               <Text size="lg" fw={500}>
-                {overview.nextPaymentDue ? overview.nextPaymentDue.toLocaleDateString() : 'N/A'}
+                {overview.nextPaymentDue ? new Date(overview.nextPaymentDue).toLocaleDateString() : 'N/A'}
               </Text>
             </div>
           </Group>
@@ -293,7 +299,7 @@ const BillingActionItems = ({ actions, riskLevel }: { actions: BillingAction[], 
                 <p className="font-medium">{action.title}</p>
                 <p className="text-sm text-gray-600">{action.description}</p>
                 {action.dueDate && (
-                  <p className="text-xs text-gray-500">Due: {action.dueDate.toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-500">Due: {new Date(action.dueDate).toLocaleDateString()}</p>
                 )}
               </div>
             </div>
@@ -358,7 +364,7 @@ const BillingRecentActivity = ({ activities }: { activities: RecentActivity[] })
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">{activity.title}</p>
-                <p className="text-sm text-gray-600">{activity.date.toLocaleDateString()}</p>
+                <p className="text-sm text-gray-600">{new Date(activity.date).toLocaleDateString()}</p>
               </div>
               {activity.amount && (
                 <Text fw={500}>{formatCurrency(activity.amount)}</Text>
@@ -459,7 +465,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
 
       {/* Risk Indicator - Only show if there's risk */}
       {risk && risk.level !== 'low' && (
-        <RiskIndicator risk={risk} />
+        <RiskIndicator risk={risk} tenantId={tenantId} />
       )}
 
       {/* Billing Overview Cards */}

@@ -87,6 +87,15 @@ export function BillingWorkflowsReal({
   const [selectedRule, setSelectedRule] = useState<any | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [editModalOpened, setEditModalOpened] = useState(false);
+  const [editWorkflow, setEditWorkflow] = useState({
+    id: '',
+    name: '',
+    description: '',
+    type: 'payment' as 'payment' | 'invoice' | 'trial' | 'subscription',
+    trigger: '',
+    enabled: true
+  });
   const [newWorkflow, setNewWorkflow] = useState({
     name: '',
     description: '',
@@ -103,7 +112,8 @@ export function BillingWorkflowsReal({
     executeWorkflow, 
     toggleWorkflow, 
     testWorkflow,
-    createWorkflow 
+    createWorkflow,
+    updateWorkflow
   } = useBillingWorkflows();
 
   // Calculate metrics from service data
@@ -230,6 +240,34 @@ export function BillingWorkflowsReal({
     } catch (error) {
       console.error('Failed to create workflow:', error);
     }
+  };
+
+  const handleEditWorkflow = async () => {
+    try {
+      await updateWorkflow(editWorkflow.id, {
+        name: editWorkflow.name,
+        description: editWorkflow.description,
+        type: editWorkflow.type,
+        trigger: editWorkflow.trigger,
+        enabled: editWorkflow.enabled
+      });
+      setEditModalOpened(false);
+      setModalOpened(false);
+    } catch (error) {
+      console.error('Failed to update workflow:', error);
+    }
+  };
+
+  const openEditModal = (rule: any) => {
+    setEditWorkflow({
+      id: rule.id,
+      name: rule.name,
+      description: rule.description || '',
+      type: rule.type,
+      trigger: rule.trigger || '',
+      enabled: rule.enabled
+    });
+    setEditModalOpened(true);
   };
 
   const getActivityIcon = (type: string, status: string) => {
@@ -532,7 +570,7 @@ export function BillingWorkflowsReal({
               <Button variant="subtle" onClick={() => setModalOpened(false)}>
                 Close
               </Button>
-              <Button>
+              <Button onClick={() => openEditModal(selectedRule)}>
                 Edit Workflow
               </Button>
             </Group>
@@ -596,6 +634,67 @@ export function BillingWorkflowsReal({
             </Button>
             <Button onClick={handleCreateWorkflow} disabled={!newWorkflow.name || !newWorkflow.trigger}>
               Create Workflow
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Edit Workflow Modal */}
+      <Modal 
+        opened={editModalOpened} 
+        onClose={() => setEditModalOpened(false)}
+        title="Edit Workflow"
+        size="md"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Workflow Name"
+            placeholder="Enter workflow name"
+            value={editWorkflow.name}
+            onChange={(e) => setEditWorkflow({ ...editWorkflow, name: e.target.value })}
+            required
+          />
+          
+          <Textarea
+            label="Description"
+            placeholder="Describe what this workflow does"
+            value={editWorkflow.description}
+            onChange={(e) => setEditWorkflow({ ...editWorkflow, description: e.target.value })}
+            rows={3}
+          />
+          
+          <Select
+            label="Workflow Type"
+            data={[
+              { value: 'payment', label: 'Payment' },
+              { value: 'invoice', label: 'Invoice' },
+              { value: 'trial', label: 'Trial' },
+              { value: 'subscription', label: 'Subscription' }
+            ]}
+            value={editWorkflow.type}
+            onChange={(value) => setEditWorkflow({ ...editWorkflow, type: value as any })}
+          />
+          
+          <TextInput
+            label="Trigger"
+            placeholder="What triggers this workflow?"
+            value={editWorkflow.trigger}
+            onChange={(e) => setEditWorkflow({ ...editWorkflow, trigger: e.target.value })}
+            required
+          />
+          
+          <Switch
+            label="Enable workflow"
+            checked={editWorkflow.enabled}
+            onChange={(e) => setEditWorkflow({ ...editWorkflow, enabled: e.currentTarget.checked })}
+          />
+          
+          <Group justify="flex-end" gap="xs">
+            <Button variant="outline" onClick={() => setEditModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditWorkflow} disabled={!editWorkflow.name || !editWorkflow.trigger}>
+              Save Changes
             </Button>
           </Group>
         </Stack>

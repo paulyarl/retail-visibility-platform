@@ -126,7 +126,23 @@ router.post(
   ]),
   async (req: any, res) => {
     try {
-      const parsed = platform_settings_listSchema.safeParse(req.body);
+      // Pre-process form data - parse JSON strings and numbers from multipart form
+      const processedBody = { ...req.body };
+      if (typeof processedBody.themeColors === 'string') {
+        try {
+          processedBody.themeColors = JSON.parse(processedBody.themeColors);
+        } catch {
+          // Keep as-is, validation will fail
+        }
+      }
+      if (typeof processedBody.themeSpacing === 'string') {
+        const parsed = parseInt(processedBody.themeSpacing, 10);
+        if (!isNaN(parsed)) {
+          processedBody.themeSpacing = parsed;
+        }
+      }
+
+      const parsed = platform_settings_listSchema.safeParse(processedBody);
       if (!parsed.success) {
         return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
       }
