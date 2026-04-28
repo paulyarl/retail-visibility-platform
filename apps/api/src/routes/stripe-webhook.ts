@@ -129,10 +129,14 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       // Create invoice via billing service internal method
       // This is handled by the subscribe method, but webhook might arrive first
       console.log(`[StripeWebhook] Payment for ${tenantId} - amount: ${amount} cents`);
+      
+      // Activate subscription with amount
+      await statusService.handlePaymentSuccess(tenantId, tier || 'starter', paymentIntent.id, amount);
+      return;
     }
   }
 
-  // Activate subscription
+  // Activate subscription without amount (fallback)
   await statusService.handlePaymentSuccess(tenantId, tier || 'starter', paymentIntent.id);
 }
 
@@ -171,8 +175,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   const statusService = getSubscriptionStatusService();
   const tier = invoice.metadata?.tier || 'professional';
+  const amount = invoice.amount_paid;
 
-  await statusService.handlePaymentSuccess(tenantId, tier, invoice.id);
+  await statusService.handlePaymentSuccess(tenantId, tier, invoice.id, amount);
 }
 
 /**

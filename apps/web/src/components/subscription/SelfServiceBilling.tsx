@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, SegmentedControl } from '@mantine/core';
 import { IconCreditCard, IconPlus, IconTrash, IconStar, IconCheck, IconAlertCircle, IconBrandPaypal } from '@tabler/icons-react';
 import { subscriptionBillingService, type TierPricing, type PaymentMethod, type SubscriptionPreview } from '@/services/SubscriptionBillingService';
@@ -15,8 +15,8 @@ let useElementsHook: (() => any) | null = null;
 
 // Get Stripe publishable key from either env var name
 function getStripePublishableKey(): string | undefined {
-  console.log(`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`);
-  console.log(`NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY}`);
+  // console.log(`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`);
+  // console.log(`NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY}`);
   return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY;
 }
 
@@ -30,7 +30,7 @@ function isStripeConfigured(): boolean {
 async function loadStripePackages(): Promise<boolean> {
   // Check if Stripe is configured before loading
   if (!isStripeConfigured()) {
-    console.warn('[SelfServiceBilling] Stripe not configured - missing or invalid Stripe publishable key');
+    // console.warn('[SelfServiceBilling] Stripe not configured - missing or invalid Stripe publishable key');
     return false;
   }
   
@@ -80,38 +80,67 @@ export function SelfServiceBilling({
   // Modal states
   const [showAddCard, setShowAddCard] = useState(false);
   const [showConfirmTier, setShowConfirmTier] = useState(false);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
 
   // Load data
   useEffect(() => {
     loadData();
   }, [tenantId]);
 
+  // Track if PayPal return is being processed to prevent loops
+  const paypalProcessingRef = useRef(false);
+
   // Handle PayPal return URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const paypalToken = urlParams.get('paypal-token');
-    // PayPal returns 'token' (order ID) after approval
+    const paypalStatus = urlParams.get('paypal');
     const tokenId = urlParams.get('token') || urlParams.get('approval_token_id') || urlParams.get('token_id');
+    const subscriptionId = urlParams.get('subscription_id');
+    const baToken = urlParams.get('ba_token');
     
-    if (paypalToken === 'success' && tokenId) {
-      // PayPal billing agreement approved - save the payment method
-      const savePayPalMethod = async () => {
+    // console.log('[SelfServiceBilling] PayPal return params:', { paypalStatus, tokenId, subscriptionId, baToken });
+    
+    if (paypalStatus === 'success' && !paypalProcessingRef.current) {
+      paypalProcessingRef.current = true; // Prevent duplicate calls
+      
+      // Clean up URL immediately to prevent re-triggering
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      const handlePayPalReturn = async () => {
         try {
           setProcessing(true);
-          await subscriptionBillingService.savePayPalPaymentMethod(tokenId);
-          setSuccess('PayPal payment method added successfully!');
-          // Clean up URL
-          window.history.replaceState({}, '', window.location.pathname);
+          
+          // If we have a subscription_id, the subscription was created
+          if (subscriptionId) {
+            // Activate the PayPal subscription
+            const result = await subscriptionBillingService.activatePayPalSubscription(subscriptionId);
+            // console.log('[SelfServiceBilling] PayPal subscription activated:', result);
+            
+            if (result.success) {
+              setSuccess(`Successfully subscribed via PayPal!`);
+              if (result.tier) {
+                onTierChange?.(result.tier);
+              }
+            } else {
+              setError(result.error || 'Failed to activate PayPal subscription');
+            }
+          } else if (tokenId || baToken) {
+            // This is a billing agreement (payment method) approval
+            await subscriptionBillingService.savePayPalPaymentMethod(tokenId || baToken!);
+            setSuccess('PayPal payment method added successfully!');
+          }
+          
           // Reload data
           loadData();
         } catch (err: any) {
-          setError(err.message || 'Failed to save PayPal payment method');
+          console.error('[SelfServiceBilling] PayPal return error:', err);
+          setError(err.message || 'Failed to process PayPal return');
         } finally {
           setProcessing(false);
         }
       };
-      savePayPalMethod();
-    } else if (paypalToken === 'cancel') {
+      handlePayPalReturn();
+    } else if (paypalStatus === 'cancel') {
       setError('PayPal authorization was cancelled');
       // Clean up URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -177,6 +206,7 @@ export function SelfServiceBilling({
       const previewData = await subscriptionBillingService.previewSubscriptionChange(tier, billingCycle);
       setPreview(previewData);
       setSelectedTier(tier);
+      setSelectedPaymentMethodId(null); // Reset selection, will default to isDefault
       setShowConfirmTier(true);
     } catch (err: any) {
       // Handle specific validation errors with user-friendly messages
@@ -232,14 +262,19 @@ export function SelfServiceBilling({
         : (tier?.annualPriceCents || 0);
 
       let paymentMethodId: string | undefined;
-      const defaultMethod = paymentMethods.find(m => m.isDefault);
-      if (!defaultMethod) {
-        setError('Please add a payment method before subscribing');
+      
+      // Use selected payment method, or default if none selected
+      const selectedMethod = selectedPaymentMethodId 
+        ? paymentMethods.find(m => m.id === selectedPaymentMethodId)
+        : paymentMethods.find(m => m.isDefault);
+        
+      if (price > 0 && !selectedMethod) {
+        setError('Please select a payment method before subscribing');
         setShowConfirmTier(false);
         setShowAddCard(true);
         return;
       }
-      paymentMethodId = defaultMethod.id;
+      paymentMethodId = selectedMethod?.id;
 
       const result = await subscriptionBillingService.subscribe(
         selectedTier,
@@ -247,11 +282,98 @@ export function SelfServiceBilling({
         billingCycle
       );
 
-      if (result.success) {
-        setSuccess(`Successfully subscribed to ${selectedTier} tier!`);
-        setShowConfirmTier(false);
-        onTierChange?.(selectedTier);
-        await loadData();
+      // console.log('[SelfServiceBilling] Subscribe result:', JSON.stringify(result, null, 2));
+      // console.log('[SelfServiceBilling] result.success:', result.success);
+      
+      // Handle nested response structure: { success: true, data: { success: true, requiresAction: true, ... } }
+      const innerData = (result as any).data || result;
+      // console.log('[SelfServiceBilling] innerData.requiresAction:', innerData.requiresAction);
+      // console.log('[SelfServiceBilling] innerData.clientSecret:', innerData.clientSecret ? 'present' : 'missing');
+      // console.log('[SelfServiceBilling] innerData.stripeSubscriptionId:', innerData.stripeSubscriptionId);
+
+      if (result.success || innerData.success) {
+        // Check if PayPal redirect is required
+        if (innerData.paypalApprovalUrl) {
+          // console.log('[SelfServiceBilling] PayPal approval required, redirecting...');
+          window.location.href = innerData.paypalApprovalUrl;
+          return;
+        }
+        
+        // Check if 3D Secure authentication is required
+        const requiresAction = innerData.requiresAction;
+        const clientSecret = innerData.clientSecret;
+        
+        // console.log('[SelfServiceBilling] Checking 3D Secure:', { requiresAction, hasClientSecret: !!clientSecret });
+        
+        if (requiresAction && clientSecret) {
+          // console.log('[SelfServiceBilling] 3D Secure required - loading Stripe...');
+          
+          // Load Stripe directly to ensure it's available
+          let stripe: any = null;
+          try {
+            const stripeJs = await import('@stripe/stripe-js');
+            const key = getStripePublishableKey();
+            // console.log('[SelfServiceBilling] Stripe key:', key ? 'present' : 'missing');
+            if (key) {
+              stripe = await stripeJs.loadStripe(key);
+              // console.log('[SelfServiceBilling] Stripe loaded:', !!stripe);
+            }
+          } catch (e) {
+            console.error('[SelfServiceBilling] Failed to load Stripe:', e);
+          }
+          
+          if (!stripe) {
+            console.error('[SelfServiceBilling] Stripe not available');
+            setError('Stripe not configured for payment confirmation');
+            return;
+          }
+          
+          // console.log('[SelfServiceBilling] Calling stripe.confirmCardPayment...');
+          
+          // Confirm the payment with 3D Secure
+          const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+            clientSecret
+          );
+          
+          // console.log('[SelfServiceBilling] confirmCardPayment result:', { 
+          //   error: confirmError?.message, 
+          //   paymentIntentStatus: paymentIntent?.status,
+          //   paymentIntentId: paymentIntent?.id
+          // });
+          
+          if (confirmError) {
+            setError(`Payment authentication failed: ${confirmError.message}`);
+            return;
+          }
+          
+          if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'processing') {
+            // Call backend to confirm the subscription and update tenant tier
+            // console.log('[SelfServiceBilling] Calling confirm endpoint...');
+            const confirmResult = await subscriptionBillingService.confirm(
+              paymentIntent.id,
+              innerData.stripeSubscriptionId,
+              selectedTier
+            );
+            // console.log('[SelfServiceBilling] Confirm result:', confirmResult);
+            
+            if (confirmResult.success) {
+              setSuccess(`Successfully subscribed to ${selectedTier} tier!`);
+              setShowConfirmTier(false);
+              onTierChange?.(selectedTier);
+              await loadData();
+            } else {
+              setError(confirmResult.error || 'Failed to confirm subscription');
+            }
+          } else {
+            setError(`Payment status: ${paymentIntent?.status}`);
+          }
+        } else {
+          // No action required - immediate success
+          setSuccess(`Successfully subscribed to ${selectedTier} tier!`);
+          setShowConfirmTier(false);
+          onTierChange?.(selectedTier);
+          await loadData();
+        }
       } else {
         setError(result.error || 'Failed to subscribe');
       }
@@ -289,7 +411,7 @@ export function SelfServiceBilling({
     try {
       setProcessing(true);
       const result = await subscriptionBillingService.createPayPalBillingAgreement();
-      console.log('[PayPal] Billing agreement result:', result);
+      // console.log('[PayPal] Billing agreement result:', result);
       // Handle nested response structure
       const approvalUrl = (result as any)?.data?.approvalUrl || result?.approvalUrl;
       if (approvalUrl) {
@@ -863,61 +985,85 @@ export function SelfServiceBilling({
               )}
             </div>
 
-            {/* Payment Method Selection - Only Stripe cards can be charged directly */}
-            {preview.newPrice > 0 && paymentMethods.filter(m => m.gatewayType === 'stripe').length > 0 && (
-              <div className="pt-2 border-t">
-                <Text size="sm" fw={500} mb="xs">Pay with saved card (Stripe):</Text>
-                <div className="space-y-2">
-                  {paymentMethods.filter(m => m.gatewayType === 'stripe' && m.isDefault).map(method => (
-                    <div key={method.id} className="flex items-center gap-2 p-2 bg-neutral-50 rounded">
-                      <div className="w-8 h-5 bg-purple-600 rounded flex items-center justify-center text-white text-xs font-bold">
-                        Stripe
-                      </div>
-                      <Text size="sm">Card ending in {method.cardLast4}</Text>
-                      {method.isDefault && (
-                        <Badge size="xs" variant="light" color="green">Default</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* PayPal Smart Buttons - Direct Payment Option */}
+            {/* Payment Method Selection */}
             {preview.newPrice > 0 && (
-              <div className="pt-3 border-t">
-                <Text size="xs" c="dimmed" mb="sm">Or pay directly with PayPal:</Text>
-                <PayPalSmartButtons
-                  tier={selectedTier!}
-                  billingCycle={billingCycle}
-                  amount={preview.newPrice}
-                  tenantId={tenantId}
-                  onSuccess={(result) => {
-                    setSuccess(`Successfully subscribed to ${result.tier} tier!`);
-                    setShowConfirmTier(false);
-                    onTierChange?.(result.tier);
-                    loadData();
-                  }}
-                  onError={(err) => setError(err)}
-                />
+              <div className="pt-2 border-t">
+                <Text size="sm" fw={500} mb="xs">Select payment method:</Text>
+                <div className="space-y-2">
+                  {paymentMethods.map(method => {
+                    const isSelected = selectedPaymentMethodId === method.id || 
+                      (!selectedPaymentMethodId && method.isDefault);
+                    return (
+                      <div 
+                        key={method.id} 
+                        onClick={() => setSelectedPaymentMethodId(method.id)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-neutral-200 hover:border-neutral-300'
+                        }`
+                      }
+                      >
+                        <div className="flex-shrink-0">
+                          {method.gatewayType === 'paypal' ? (
+                            <div className="w-10 h-6 bg-blue-600 rounded flex items-center justify-center text-white">
+                              <IconBrandPaypal size="1rem" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-6 bg-purple-600 rounded flex items-center justify-center text-white text-xs font-bold">
+                              {method.cardBrand?.toUpperCase() || 'CARD'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-grow">
+                          <Text size="sm" fw={500}>
+                            {method.gatewayType === 'paypal' 
+                              ? 'PayPal' 
+                              : `${method.cardBrand || 'Card'} ending in ${method.cardLast4}`}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {method.gatewayType === 'paypal' 
+                              ? method.paypalEmail || 'PayPal Account' 
+                              : 'Credit/Debit Card'}
+                          </Text>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {method.isDefault && (
+                            <Badge size="xs" variant="light" color="green">Default</Badge>
+                          )}
+                          {isSelected && (
+                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center ml-2">
+                              <IconCheck size="0.75rem" className="text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {paymentMethods.length === 0 && (
+                  <Alert color="yellow" variant="light" mt="sm">
+                    <Text size="sm">No payment methods saved. Please add a payment method first.</Text>
+                  </Alert>
+                )}
               </div>
             )}
 
-            {/* Card Payment Button */}
-            {preview.newPrice > 0 && paymentMethods.length > 0 && (
-              <Group justify="flex-end" mt="md">
-                <Button variant="subtle" onClick={() => setShowConfirmTier(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleConfirmTierChange} 
-                  loading={processing}
-                  leftSection={<IconCreditCard size="1rem" />}
-                >
-                  Pay with Stripe Card
-                </Button>
-              </Group>
-            )}
+            {/* Confirm Button */}
+            <Group justify="flex-end" mt="md">
+              <Button variant="subtle" onClick={() => setShowConfirmTier(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmTierChange} 
+                loading={processing}
+                disabled={preview.newPrice > 0 && paymentMethods.length === 0}
+                leftSection={<IconCreditCard size="1rem" />}
+              >
+                Confirm & Pay
+              </Button>
+            </Group>
           </Stack>
         )}
       </Modal>

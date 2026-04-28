@@ -205,8 +205,8 @@ class PayPalService {
           custom_id: JSON.stringify({ tenantId, tier, billingCycle }),
         }],
         application_context: {
-          return_url: `${process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'}/settings/subscription?paypal=success`,
-          cancel_url: `${process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'}/settings/subscription?paypal=cancel`,
+          return_url: `${process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'}/t/${tenantId}/settings/subscription?paypal=success`,
+          cancel_url: `${process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'}/t/${tenantId}/settings/subscription?paypal=cancel`,
           brand_name: 'VisibleShelf',
           user_action: 'PAY_NOW',
         },
@@ -303,8 +303,8 @@ class PayPalService {
           },
         }],
         application_context: {
-          return_url: `${baseUrl}/settings/subscription?paypal-token=success`,
-          cancel_url: `${baseUrl}/settings/subscription?paypal-token=cancel`,
+          return_url: `${baseUrl}/t/${tenantId}/settings/subscription?paypal-token=success`,
+          cancel_url: `${baseUrl}/t/${tenantId}/settings/subscription?paypal-token=cancel`,
           brand_name: 'VisibleShelf',
           user_action: 'PAY_NOW',
         },
@@ -524,26 +524,34 @@ class PayPalService {
     billingCycle: 'monthly' | 'annual'
   ): Promise<string> {
     const productId = await this.createProduct(tier);
-    const planId = `visibleshelf-${tier}-${billingCycle}`;
+    const cacheKey = `paypal_plan_${tier}_${billingCycle}`;
     const amount = (amountCents / 100).toFixed(2);
     const interval = billingCycle === 'monthly' ? 'MONTH' : 'YEAR';
     const intervalCount = 1;
 
-    try {
-      // Check if plan already exists
-      const existing = await this.apiRequest<PayPalPlan>(`/v1/billing/plans/${planId}`);
-      if (existing && existing.id) {
-        return existing.id;
+    // Check if we have a cached plan ID in platform_payment_config metadata
+    const config = await prisma.platform_payment_config.findFirst();
+    const metadata = (config?.metadata as Record<string, any>) || {};
+    
+    if (metadata[cacheKey]) {
+      // Verify the plan still exists in PayPal
+      try {
+        const existing = await this.apiRequest<PayPalPlan>(`/v1/billing/plans/${metadata[cacheKey]}`);
+        if (existing && existing.id) {
+          console.log(`[PayPal] Using cached plan: ${metadata[cacheKey]}`);
+          return existing.id;
+        }
+      } catch {
+        // Plan no longer exists, create new one
       }
-    } catch {
-      // Plan doesn't exist, create it
     }
 
+    // Create new plan - let PayPal generate the ID
+    console.log(`[PayPal] Creating new plan for ${tier} ${billingCycle}...`);
     const plan = await this.apiRequest<PayPalPlan>(
       '/v1/billing/plans',
       'POST',
       {
-        id: planId,
         product_id: productId,
         name: `${tier} tier - ${billingCycle}`,
         description: `VisibleShelf ${tier} tier ${billingCycle} subscription`,
@@ -575,6 +583,20 @@ class PayPalService {
       }
     );
 
+    // Cache the plan ID in metadata
+    metadata[cacheKey] = plan.id;
+    await prisma.platform_payment_config.upsert({
+      where: { id: 'platform_main' },
+      create: {
+        id: 'platform_main',
+        metadata: metadata,
+      },
+      update: {
+        metadata: metadata,
+      }
+    });
+
+    console.log(`[PayPal] Created plan: ${plan.id}`);
     return plan.id;
   }
 
@@ -609,8 +631,8 @@ class PayPalService {
             payer_selected: 'PAYPAL',
             payee_preferred: 'IMMEDIATE_PAYMENT_REQUIRED',
           },
-          return_url: `${baseUrl}/settings/subscription?paypal=success`,
-          cancel_url: `${baseUrl}/settings/subscription?paypal=cancel`,
+          return_url: `${baseUrl}/t/${tenantId}/settings/subscription?paypal=success`,
+          cancel_url: `${baseUrl}/t/${tenantId}/settings/subscription?paypal=cancel`,
         },
       }
     );

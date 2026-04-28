@@ -32,7 +32,8 @@ export class SubscriptionStatusService {
   async handlePaymentSuccess(
     tenantId: string,
     tier: string,
-    invoiceId: string
+    invoiceId: string,
+    amount?: number
   ): Promise<StatusTransitionResult> {
     // Get current status
     const current = await this.getTenantSubscriptionState(tenantId);
@@ -57,6 +58,7 @@ export class SubscriptionStatusService {
       tenantId,
       type: 'payment_success',
       tier,
+      amount,
     }).catch(err => console.error('[SubscriptionStatus] Failed to send notification:', err));
 
     return {

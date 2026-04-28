@@ -94,8 +94,16 @@ const RISK_ICONS = {
 };
 
 // Import the real TenantBillingService
-import { tenantBillingService } from '@/services/TenantBillingService';
+import { tenantBillingService, type PaymentMethod } from '@/services/TenantBillingService';
 import { subscriptionBillingService, type TierPricing } from '@/services/SubscriptionBillingService';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Get Stripe publishable key
+const getStripePublishableKey = () => {
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_KEY;
+};
+
+const stripePromise = getStripePublishableKey() ? loadStripe(getStripePublishableKey()!) : null;
 
 // Risk Indicator Component
 const RiskIndicator = ({ risk, tenantId }: { risk: SubscriptionRisk; tenantId: string }) => {
@@ -441,6 +449,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     const resolveTenantId = async () => {
@@ -462,12 +471,13 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
       setError(null);
 
       // Load all billing data in parallel
-      const [overviewData, riskData, actionsData, activityData, tiersData] = await Promise.all([
+      const [overviewData, riskData, actionsData, activityData, tiersData, paymentMethodsData] = await Promise.all([
         tenantBillingService.getBillingOverview(tenantId),
         tenantBillingService.getSubscriptionRisk(tenantId),
         tenantBillingService.getBillingActions(tenantId),
         tenantBillingService.getRecentActivity(tenantId),
-        subscriptionBillingService.getTierPricing()
+        subscriptionBillingService.getTierPricing(),
+        tenantBillingService.getPaymentMethods(tenantId)
       ]);
 
       setOverview(overviewData);
@@ -475,6 +485,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
       setActions(actionsData);
       setRecentActivity(activityData);
       setTiers(tiersData);
+      setPaymentMethods(paymentMethodsData || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load billing data');
     } finally {
@@ -489,17 +500,95 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
       setProcessing(true);
       setError(null);
       
-      const result = await subscriptionBillingService.subscribe(selectedTier, undefined, billingCycle);
+      // Use existing payment method if available
+      const existingPaymentMethodId = paymentMethods.length > 0 ? paymentMethods[0].id : undefined;
+      const result = await subscriptionBillingService.subscribe(selectedTier, existingPaymentMethodId, billingCycle);
       
-      if (result.success) {
-        setSuccess(`Successfully changed to ${selectedTier} tier!`);
-        setShowTierModal(false);
-        setSelectedTier(null);
-        await loadBillingData();
+      // console.log('[BillingPage] Subscribe result:', JSON.stringify(result, null, 2));
+      // console.log('[BillingPage] result.success:', result.success);
+      
+      // Handle nested response structure: { success: true, data: { success: true, requiresAction: true, ... } }
+      const innerData = (result as any).data || result;
+      // console.log('[BillingPage] innerData.requiresAction:', innerData.requiresAction);
+      // console.log('[BillingPage] innerData.clientSecret:', innerData.clientSecret ? 'present' : 'missing');
+      
+      if (result.success || innerData.success) {
+        // Check if PayPal redirect is required
+        if (innerData.paypalApprovalUrl) {
+          console.log('[BillingPage] PayPal approval required, redirecting...');
+          window.location.href = innerData.paypalApprovalUrl;
+          return;
+        }
+        
+        // Check if 3D Secure authentication is required
+        const requiresAction = innerData.requiresAction;
+        const clientSecret = innerData.clientSecret;
+        
+        // console.log('[BillingPage] Checking 3D Secure:', { requiresAction, hasClientSecret: !!clientSecret });
+        
+        if (requiresAction && clientSecret) {
+          // console.log('[BillingPage] 3D Secure required - loading Stripe...');
+          
+          const stripe = await stripePromise;
+          // console.log('[BillingPage] Stripe loaded:', !!stripe);
+          
+          if (!stripe) {
+            console.error('[BillingPage] Stripe not available');
+            setError('Stripe not configured for payment confirmation');
+            return;
+          }
+          
+          // console.log('[BillingPage] Calling stripe.confirmCardPayment...');
+          
+          const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+            clientSecret
+          );
+          
+          // console.log('[BillingPage] confirmCardPayment result:', { 
+          //   error: confirmError?.message, 
+          //   paymentIntentStatus: paymentIntent?.status,
+          //   paymentIntentId: paymentIntent?.id
+          // });
+          
+          if (confirmError) {
+            setError(`Payment authentication failed: ${confirmError.message}`);
+            return;
+          }
+          
+          if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'processing') {
+            // Call backend to confirm the subscription and update tenant tier
+            // console.log('[BillingPage] Calling confirm endpoint...');
+            const confirmResult = await subscriptionBillingService.confirm(
+              paymentIntent.id,
+              innerData.stripeSubscriptionId,
+              selectedTier
+            );
+            // console.log('[BillingPage] Confirm result:', confirmResult);
+            
+            if (confirmResult.success) {
+              setSuccess(`Successfully changed to ${selectedTier} tier!`);
+              setShowTierModal(false);
+              setSelectedTier(null);
+              await loadBillingData();
+            } else {
+              setError(confirmResult.error || 'Failed to confirm subscription');
+            }
+          } else {
+            setError(`Payment status: ${paymentIntent?.status}`);
+          }
+        } else {
+          // No action required - immediate success
+          // console.log('[BillingPage] No 3D Secure required - immediate success');
+          setSuccess(`Successfully changed to ${selectedTier} tier!`);
+          setShowTierModal(false);
+          setSelectedTier(null);
+          await loadBillingData();
+        }
       } else {
         setError(result.error || 'Failed to change tier');
       }
     } catch (err: any) {
+      console.error('[BillingPage] Error:', err);
       setError(err.message || 'Failed to change tier');
     } finally {
       setProcessing(false);
@@ -661,23 +750,23 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
               const price = billingCycle === 'monthly' 
                 ? (tier.monthlyPriceCents || 0)
                 : (tier.annualPriceCents || 0);
-              const isCurrent = tier.tier === overview?.subscriptionTier;
+              const isCurrent = tier.tier.toLowerCase() === (overview?.subscriptionTier || '').toLowerCase();
               const isSelected = tier.tier === selectedTier;
 
               return (
                 <div
                   key={tier.id}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`p-3 rounded-lg border-2 transition-all ${
                     isCurrent 
-                      ? 'border-blue-500 bg-blue-50' 
+                      ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-60' 
                       : isSelected
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? 'border-green-500 bg-green-50 cursor-pointer'
+                        : 'border-gray-200 hover:border-blue-300 cursor-pointer'
                   }`}
                   onClick={() => !isCurrent && setSelectedTier(tier.tier)}
                 >
                   {isCurrent && (
-                    <Badge color="blue" variant="filled" className="mb-1">Current</Badge>
+                    <Badge color="gray" variant="light" className="mb-1">Current Plan</Badge>
                   )}
                   <Text fw={600} size="sm">{tier.displayName || tier.tier.charAt(0).toUpperCase() + tier.tier.slice(1)}</Text>
                   <Text size="lg" fw={700}>{formatPrice(price)}</Text>

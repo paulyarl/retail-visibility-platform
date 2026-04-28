@@ -43,6 +43,7 @@ export class SubscriptionValidationService {
         manual_subscription_control: true,
         manual_subscription_expires_at: true,
         created_at: true,
+        tier_updated_at: true,
       }
     } as any);
 
@@ -131,6 +132,23 @@ export class SubscriptionValidationService {
         reason: 'Contact support to change manually managed subscription',
         errorCode: 'MANUAL_CONTROL_RESTRICTION' 
       };
+    }
+
+    // Rule 7: Tier change rate limiting (minimum 15 days between changes)
+    // Only applies to paid tier changes (not trial -> paid upgrades)
+    if ((tenant as any).tier_updated_at && !isCurrentTrial && currentTier !== newTier) {
+      const lastTierChange = new Date((tenant as any).tier_updated_at);
+      const daysSinceLastChange = Math.floor((Date.now() - lastTierChange.getTime()) / (1000 * 60 * 60 * 24));
+      const minDaysBetweenChanges = 15;
+      
+      if (daysSinceLastChange < minDaysBetweenChanges) {
+        const daysRemaining = minDaysBetweenChanges - daysSinceLastChange;
+        return {
+          allowed: false,
+          reason: `Tier can only be changed once every ${minDaysBetweenChanges} days. Please wait ${daysRemaining} more day${daysRemaining > 1 ? 's' : ''}.`,
+          errorCode: 'TIER_CHANGE_RATE_LIMITED',
+        };
+      }
     }
 
     return { allowed: true };

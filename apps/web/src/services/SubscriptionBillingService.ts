@@ -65,6 +65,15 @@ export interface SubscribeResult {
   status: string;
   activatedAt: string;
   invoiceId?: string;
+  stripeSubscriptionId?: string;
+  requiresAction?: boolean;
+  clientSecret?: string;
+  stripeConnect?: {
+    needed: boolean;
+    status: string | null;
+    payoutsEnabled: boolean;
+    onboardingUrl: string | null;
+  };
   error?: string;
 }
 
@@ -280,6 +289,40 @@ class SubscriptionBillingService extends TenantApiSingleton {
     );
     
     return response.data!;
+  }
+
+  /**
+   * Confirm a subscription after 3D Secure payment succeeds
+   */
+  async confirm(paymentIntentId: string, stripeSubscriptionId: string, tier: string): Promise<{ success: boolean; tier: string; status: string; invoiceId?: string; error?: string }> {
+    const response = await this.makeDefaultRequest<{ success: boolean; tier: string; status: string; invoiceId?: string }>(
+      '/api/subscription/confirm',
+      {
+        method: 'POST',
+        body: JSON.stringify({ paymentIntentId, stripeSubscriptionId, tier }),
+      },
+      'subscription-confirm'
+    );
+    
+    const data = (response as any).data || response;
+    return data;
+  }
+
+  /**
+   * Activate a PayPal subscription after approval
+   */
+  async activatePayPalSubscription(subscriptionId: string): Promise<{ success: boolean; tier?: string; error?: string }> {
+    const response = await this.makeDefaultRequest<{ success: boolean; tier?: string; error?: string }>(
+      '/api/subscription/paypal/activate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      },
+      'subscription-paypal-activate'
+    );
+    
+    const data = (response as any).data || response;
+    return data;
   }
 
   /**

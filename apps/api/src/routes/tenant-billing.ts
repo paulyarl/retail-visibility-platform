@@ -62,20 +62,68 @@ router.get('/overview', requireAuth, async (req: Request, res: Response) => {
     const { tenantId } = req.params;
     const user = (req as any).user;
 
+    console.log('[TenantBilling] Getting billing overview for tenant:', tenantId);
+
     const accessCheck = await verifyTenantAccess(tenantId, user);
     if (!accessCheck.allowed) {
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock data for now - replace with actual database queries
+    // Get tenant subscription data
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        subscription_status: true,
+        subscription_ends_at: true,
+        billing_cycle_start: true,
+        billing_cycle_end: true,
+        stripe_subscription_id: true,
+      }
+    });
+
+    console.log('[TenantBilling] Tenant subscription data:', {
+      tier: tenant?.subscription_tier,
+      status: tenant?.subscription_status,
+      subscription_ends_at: tenant?.subscription_ends_at
+    });
+
+    // Get latest invoice
+    const latestInvoice = await prisma.subscription_invoices.findFirst({
+      where: { tenant_id: tenantId },
+      orderBy: { created_at: 'desc' }
+    });
+
+    console.log('[TenantBilling] Latest invoice:', latestInvoice?.id, latestInvoice?.status);
+
+    // Get tier pricing
+    const tierData = tenant?.subscription_tier
+      ? await prisma.subscription_tiers_list.findFirst({
+          where: { tier_key: tenant.subscription_tier }
+        })
+      : null;
+
+    // Convert price_monthly (decimal string) to cents
+    const monthlyAmountCents = tierData?.price_monthly 
+      ? Math.round(parseFloat(String(tierData.price_monthly)) * 100)
+      : 0;
+
+    // Calculate next payment due
+    const nextPaymentDue = tenant?.billing_cycle_end || 
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
     const overview = {
-      currentBalance: 15000, // $150.00
-      nextPaymentDue: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      subscriptionStatus: 'active',
-      lastPaymentStatus: 'success',
-      subscriptionTier: 'Storefront',
-      monthlyAmount: 5900 // $59.00
+      currentBalance: latestInvoice?.amount_cents || 0,
+      nextPaymentDue: nextPaymentDue.toISOString(),
+      subscriptionStatus: tenant?.subscription_status || 'trial',
+      lastPaymentStatus: latestInvoice?.status === 'paid' ? 'success' : 
+                         latestInvoice?.status === 'past_due' ? 'failed' : 'pending',
+      subscriptionTier: tenant?.subscription_tier || 'starter',
+      monthlyAmount: monthlyAmountCents,
+      stripeSubscriptionId: tenant?.stripe_subscription_id,
     };
+
+    console.log('[TenantBilling] Returning overview:', overview);
 
     return res.status(200).json({ success: true, data: overview });
   } catch (error: any) {
@@ -569,7 +617,13 @@ router.put('/payment-methods/:paymentMethodId', requireAuth, async (req: Request
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock implementation
+    // If setting as default, use the billing service
+    if (isDefault) {
+      const { getSubscriptionBillingService } = await import('../services/subscription/SubscriptionBillingService');
+      const billingService = getSubscriptionBillingService();
+      await billingService.setDefaultPaymentMethod(tenantId, paymentMethodId);
+    }
+
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error('[TenantBilling] Error updating payment method:', error);
@@ -591,7 +645,11 @@ router.delete('/payment-methods/:paymentMethodId', requireAuth, async (req: Requ
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock implementation
+    // Use the billing service to remove the payment method
+    const { getSubscriptionBillingService } = await import('../services/subscription/SubscriptionBillingService');
+    const billingService = getSubscriptionBillingService();
+    await billingService.removePaymentMethod(tenantId, paymentMethodId);
+
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error('[TenantBilling] Error removing payment method:', error);

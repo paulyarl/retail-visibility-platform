@@ -370,11 +370,93 @@ router.post('/subscribe', requirePermission('CAN_MANAGE_TENANT_BILLING'), async 
     const pricing = await billingService.getTierPricingByTier(tier);
     const requiresPayment = pricing && (billingCycle === 'monthly' ? pricing.monthlyPriceCents : pricing.annualPriceCents) > 0;
     
+    // Check if this is a synthetic payment method (derived from payment history)
+    const isSyntheticPaymentMethod = paymentMethodId?.startsWith('synthetic-');
+    
     if (requiresPayment && !paymentMethodId) {
       return res.status(400).json({
         success: false,
         error: 'Payment method required for paid tiers',
       });
+    }
+
+    // For synthetic payment methods, verify tenant has existing Stripe customer
+    if (isSyntheticPaymentMethod && requiresPayment) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { stripe_customer_id: true, name: true },
+      });
+      
+      // If no Stripe customer, try to find one from payment history
+      if (!tenant?.stripe_customer_id) {
+        // Look up the Stripe customer from successful payments
+        const successfulPayment = await prisma.subscription_payments.findFirst({
+          where: { 
+            invoice_id: { startsWith: `inv-${tenantId}` },
+            status: 'succeeded',
+            gateway_type: 'stripe'
+          },
+          orderBy: { created_at: 'desc' },
+          select: { transaction_id: true }
+        });
+        
+        if (successfulPayment?.transaction_id) {
+          // Create a new Stripe customer for this tenant
+          const stripeCustomerId = await billingService.createStripeCustomerForTenant(
+            tenantId, 
+            tenant?.name || 'Unknown'
+          );
+          
+          if (stripeCustomerId) {
+            // Attach the payment method from the original charge
+            const paymentMethodAttached = await billingService.attachPaymentMethodFromCharge(
+              stripeCustomerId,
+              successfulPayment.transaction_id
+            );
+            
+            if (!paymentMethodAttached) {
+              // Could not attach payment method - need real payment method
+              return res.status(400).json({ 
+                success: false, 
+                error: 'Your saved payment method is no longer valid. Please add a new payment method to continue.' 
+              });
+            }
+            
+            // Now try subscription with the new customer
+            const result = await billingService.subscribeWithExistingCustomer(
+              tenantId,
+              tier,
+              stripeCustomerId,
+              billingCycle
+            );
+            
+            if (result.success) {
+              return res.json({ success: true, data: result });
+            } else {
+              return res.status(400).json({ success: false, error: result.error || 'Subscription failed' });
+            }
+          }
+        }
+        
+        return res.status(400).json({
+          success: false,
+          error: 'No valid payment method on file. Please add a payment method to continue.',
+        });
+      }
+      
+      // Use the existing Stripe customer for subscription
+      const result = await billingService.subscribeWithExistingCustomer(
+        tenantId,
+        tier,
+        tenant.stripe_customer_id,
+        billingCycle
+      );
+      
+      if (result.success) {
+        return res.json({ success: true, data: result });
+      } else {
+        return res.status(400).json({ success: false, error: result.error || 'Subscription failed' });
+      }
     }
 
     const result = await billingService.subscribe(
@@ -424,6 +506,235 @@ router.post('/subscribe', requirePermission('CAN_MANAGE_TENANT_BILLING'), async 
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to subscribe',
+    });
+  }
+});
+
+/**
+ * POST /api/subscription/confirm
+ * Confirm a subscription after 3D Secure payment succeeds
+ * This is called by the frontend after stripe.confirmCardPayment succeeds
+ */
+router.post('/confirm', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { paymentIntentId, stripeSubscriptionId, tier } = req.body;
+
+    console.log('[Subscription] Confirm endpoint called:', {
+      tenantId,
+      paymentIntentId,
+      stripeSubscriptionId,
+      tier
+    });
+
+    if (!tenantId) {
+      console.error('[Subscription] Confirm failed: No tenant context');
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    if (!paymentIntentId || !stripeSubscriptionId || !tier) {
+      console.error('[Subscription] Confirm failed: Missing required fields:', {
+        hasPaymentIntentId: !!paymentIntentId,
+        hasStripeSubscriptionId: !!stripeSubscriptionId,
+        hasTier: !!tier
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'paymentIntentId, stripeSubscriptionId, and tier are required',
+      });
+    }
+
+    console.log(`[Subscription] Confirming payment for tenant ${tenantId}, tier: ${tier}`);
+
+    const billingService = getSubscriptionBillingService();
+    const { getSubscriptionStatusService } = await import('../services/subscription/SubscriptionStatusService');
+    const statusService = getSubscriptionStatusService();
+
+    // Get pricing for invoice
+    const pricing = await billingService.getTierPricingByTier(tier);
+    const amount = pricing ? pricing.monthlyPriceCents : 0;
+    console.log('[Subscription] Pricing:', { tier, amount, pricingFound: !!pricing });
+
+    // Create invoice record
+    console.log('[Subscription] Creating invoice...');
+    const invoiceId = await billingService.createInvoice(tenantId, tier, amount, stripeSubscriptionId);
+    console.log('[Subscription] Invoice created:', invoiceId);
+
+    // Update tenant tier
+    console.log('[Subscription] Updating tenant tier...');
+    await billingService.updateTenantTier(tenantId, tier, stripeSubscriptionId);
+    console.log('[Subscription] Tenant tier updated');
+
+    // Update subscription status
+    console.log('[Subscription] Calling handlePaymentSuccess...');
+    await statusService.handlePaymentSuccess(tenantId, tier, paymentIntentId, amount);
+    console.log('[Subscription] Payment success handled');
+
+    console.log(`[Subscription] Payment confirmed for tenant ${tenantId}, tier updated to ${tier}`);
+
+    res.json({
+      success: true,
+      data: {
+        tier,
+        status: 'active',
+        invoiceId,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Error confirming payment:', error);
+    console.error('[Subscription] Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to confirm payment',
+    });
+  }
+});
+
+/**
+ * POST /api/subscription/paypal/activate
+ * Activate a PayPal subscription after user approval
+ */
+router.post('/paypal/activate', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { subscriptionId } = req.body;
+
+    console.log('[Subscription] PayPal activate:', { tenantId, subscriptionId });
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    if (!subscriptionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'subscriptionId is required',
+      });
+    }
+
+    // Get PayPal subscription details
+    const { payPalService } = await import('../services/subscription/PayPalService');
+    const paypalSubscription = await payPalService.getSubscription(subscriptionId);
+
+    if (!paypalSubscription) {
+      return res.status(400).json({
+        success: false,
+        error: 'PayPal subscription not found',
+      });
+    }
+
+    console.log('[Subscription] PayPal subscription status:', paypalSubscription.status);
+
+    // Parse custom_id to get tier info
+    let tier = 'unknown';
+    let billingCycle = 'monthly';
+    try {
+      const customData = JSON.parse((paypalSubscription as any).custom_id || '{}');
+      tier = customData.tier || tier;
+      billingCycle = customData.billingCycle || billingCycle;
+    } catch (e) {
+      console.warn('[Subscription] Could not parse PayPal custom_id');
+    }
+
+    // Get pricing
+    const tierData = await prisma.subscription_tiers_list.findFirst({
+      where: { tier_key: tier }
+    });
+    const amount = tierData?.price_monthly 
+      ? Math.round(parseFloat(String(tierData.price_monthly)) * 100)
+      : 0;
+
+    // Check if invoice already exists for this PayPal subscription (idempotency)
+    const existingPayment = await prisma.subscription_payments.findFirst({
+      where: { transaction_id: subscriptionId }
+    });
+    
+    if (existingPayment) {
+      console.log('[Subscription] PayPal subscription already activated, skipping invoice creation');
+      
+      // Still update tenant tier if needed and return success
+      const existingInvoice = await prisma.subscription_invoices.findFirst({
+        where: { id: existingPayment.invoice_id }
+      });
+      
+      return res.json({
+        success: true,
+        tier: existingInvoice?.tier || tier,
+        status: 'active',
+        invoiceId: existingInvoice?.id,
+        alreadyActivated: true,
+      });
+    }
+
+    // Create invoice
+    const invoiceId = `inv-${tenantId}-${Date.now().toString(36)}`;
+    const now = new Date();
+    const billingPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await prisma.subscription_invoices.create({
+      data: {
+        id: invoiceId,
+        tenant_id: tenantId,
+        tier: tier,
+        amount_cents: amount,
+        status: 'paid',
+        due_date: now,
+        paid_at: now,
+        billing_period_start: now,
+        billing_period_end: billingPeriodEnd,
+        created_at: now,
+        updated_at: now,
+        subscription_payments: {
+          create: {
+            id: `pay-${tenantId}-${Date.now().toString(36)}`,
+            gateway_type: 'paypal',
+            transaction_id: subscriptionId,
+            amount_cents: amount,
+            status: 'completed',
+            created_at: now,
+          }
+        }
+      }
+    });
+
+    console.log('[Subscription] Invoice created:', invoiceId);
+
+    // Update tenant tier
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        subscription_tier: tier,
+        subscription_status: 'active',
+        stripe_subscription_id: `paypal_${subscriptionId}`,
+        billing_cycle_start: new Date(),
+        billing_cycle_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        updated_at: new Date(),
+      }
+    });
+
+    console.log('[Subscription] Tenant tier updated to:', tier);
+
+    // Handle payment success (send notifications, etc.)
+    const { getSubscriptionStatusService } = await import('../services/subscription/SubscriptionStatusService');
+    const statusService = getSubscriptionStatusService();
+    await statusService.handlePaymentSuccess(tenantId, tier, `paypal_${subscriptionId}`, amount);
+
+    res.json({
+      success: true,
+      tier,
+      status: 'active',
+      invoiceId,
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Error activating PayPal subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to activate PayPal subscription',
     });
   }
 });

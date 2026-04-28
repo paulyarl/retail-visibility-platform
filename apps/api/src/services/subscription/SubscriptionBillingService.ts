@@ -690,25 +690,51 @@ export class SubscriptionBillingService {
 
         const customer = await this.getOrCreateStripeCustomer(tenantId, tenant?.name || 'Unknown');
 
-        // Attach payment method to customer for recurring charges
-        await this.stripe.paymentMethods.attach(
-          paymentMethod.paymentMethodToken,
-          { customer: customer.id }
-        );
+        // Determine which customer to use for subscription
+        let subscriptionCustomerId = customer.id;
+        
+        // Check if payment method is already attached to a customer
+        const pm = await this.stripe.paymentMethods.retrieve(paymentMethod.paymentMethodToken);
+        
+        if (pm.customer) {
+          // Payment method is already attached to a customer
+          if (pm.customer !== customer.id) {
+            // Attached to a different customer - use that customer instead
+            const existingCustomerId = typeof pm.customer === 'string' ? pm.customer : pm.customer.id;
+            console.log(`[SubscriptionBilling] Payment method already attached to customer ${existingCustomerId}, using that customer`);
+            // Update tenant to use the existing customer
+            await prisma.tenants.update({
+              where: { id: tenantId },
+              data: { stripe_customer_id: existingCustomerId }
+            });
+            subscriptionCustomerId = existingCustomerId;
+          }
+          // Already attached to the correct customer - skip attach
+        } else {
+          // Attach payment method to customer for recurring charges
+          await this.stripe.paymentMethods.attach(
+            paymentMethod.paymentMethodToken,
+            { customer: customer.id }
+          );
+        }
 
-        // Set as default payment method for customer
-        await this.stripe.customers.update(customer.id, {
-          invoice_settings: {
-            default_payment_method: paymentMethod.paymentMethodToken,
-          },
-        });
+        // Set as default payment method for the customer we're using
+        try {
+          await this.stripe.customers.update(subscriptionCustomerId, {
+            invoice_settings: {
+              default_payment_method: paymentMethod.paymentMethodToken,
+            },
+          });
+        } catch (updateErr: any) {
+          console.log('[SubscriptionBilling] Could not update customer default payment method:', updateErr.message);
+        }
 
         // Get or create Stripe Price for this tier
         const priceId = await this.getOrCreateStripePrice(tier, billingCycle, amount);
 
         // Create Stripe Subscription for automatic recurring billing
         const subscription = await this.stripe.subscriptions.create({
-          customer: customer.id,
+          customer: subscriptionCustomerId,
           items: [{ price: priceId }],
           payment_behavior: 'default_incomplete',
           payment_settings: {
@@ -876,6 +902,115 @@ export class SubscriptionBillingService {
   }
 
   /**
+   * Subscribe using existing Stripe customer (for synthetic payment methods)
+   * Used when tenant has payment history but no explicit payment method record
+   */
+  async subscribeWithExistingCustomer(
+    tenantId: string,
+    tier: string,
+    stripeCustomerId: string,
+    billingCycle: 'monthly' | 'annual' = 'monthly'
+  ): Promise<{
+    success: boolean;
+    tier: string;
+    status: string;
+    activatedAt: Date;
+    invoiceId?: string;
+    stripeSubscriptionId?: string;
+    error?: string;
+  }> {
+    // Get pricing
+    const pricing = await this.getTierPricingByTier(tier);
+    if (!pricing) {
+      throw new Error(`Tier pricing not found: ${tier}`);
+    }
+
+    const amount = billingCycle === 'monthly' 
+      ? pricing.monthlyPriceCents 
+      : pricing.annualPriceCents;
+
+    // Free tier - no payment needed
+    if (amount === 0) {
+      await this.updateTenantTier(tenantId, tier);
+      return {
+        success: true,
+        tier,
+        status: 'active',
+        activatedAt: new Date(),
+      };
+    }
+
+    // Create subscription using existing Stripe customer
+    if (this.stripe) {
+      try {
+        // Get or create Stripe Price for this tier
+        const priceId = await this.getOrCreateStripePrice(tier, billingCycle, amount);
+
+        // Create Stripe Subscription - will use customer's default payment method
+        const subscription = await this.stripe.subscriptions.create({
+          customer: stripeCustomerId,
+          items: [{ price: priceId }],
+          payment_behavior: 'default_incomplete',
+          payment_settings: {
+            payment_method_types: ['card'],
+            save_default_payment_method: 'on_subscription',
+          },
+          expand: ['latest_invoice'],
+          metadata: {
+            tenantId,
+            tier,
+            billingCycle,
+          },
+        });
+
+        // Check if payment succeeded immediately
+        const invoice = subscription.latest_invoice as Stripe.Invoice;
+        
+        if (invoice && invoice.status === 'paid') {
+          // Payment succeeded
+          const invoiceId = await this.createInvoice(tenantId, tier, amount, subscription.id);
+          await this.updateTenantTier(tenantId, tier, subscription.id);
+          
+          return {
+            success: true,
+            tier,
+            status: 'active',
+            activatedAt: new Date(),
+            invoiceId,
+            stripeSubscriptionId: subscription.id,
+          };
+        } else {
+          // Payment requires action or failed
+          return {
+            success: false,
+            tier,
+            status: 'failed',
+            activatedAt: new Date(),
+            error: `Invoice status: ${invoice?.status || 'unknown'}. Please add a payment method.`,
+          };
+        }
+      } catch (error: any) {
+        console.error('[SubscriptionBilling] Stripe subscription with existing customer failed:', error);
+        return {
+          success: false,
+          tier,
+          status: 'failed',
+          activatedAt: new Date(),
+          error: error.message,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      tier,
+      status: 'failed',
+      activatedAt: new Date(),
+      error: 'Stripe not configured',
+    };
+  }
+
+  /**
    * Update tenant tier and billing cycle
    */
   async updateTenantTier(
@@ -903,6 +1038,77 @@ export class SubscriptionBillingService {
         ...(Object.keys(metadata).length > 0 && { metadata }),
       },
     });
+  }
+
+  /**
+   * Create Stripe customer for tenant and save customer ID
+   */
+  async createStripeCustomerForTenant(tenantId: string, tenantName: string): Promise<string | null> {
+    if (!this.stripe) {
+      console.error('[SubscriptionBilling] Stripe not configured');
+      return null;
+    }
+
+    try {
+      const customer = await this.stripe.customers.create({
+        name: tenantName,
+        metadata: {
+          tenantId,
+        },
+      });
+
+      // Save customer ID to tenant
+      await prisma.tenants.update({
+        where: { id: tenantId },
+        data: { stripe_customer_id: customer.id },
+      });
+
+      console.log('[SubscriptionBilling] Created Stripe customer:', customer.id, 'for tenant:', tenantId);
+      return customer.id;
+    } catch (error: any) {
+      console.error('[SubscriptionBilling] Failed to create Stripe customer:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Retrieve payment method from a past Stripe charge and attach to customer
+   */
+  async attachPaymentMethodFromCharge(stripeCustomerId: string, chargeId: string): Promise<string | null> {
+    if (!this.stripe) {
+      console.error('[SubscriptionBilling] Stripe not configured');
+      return null;
+    }
+
+    try {
+      // Retrieve the charge to get the payment method
+      const charge = await this.stripe.charges.retrieve(chargeId);
+      
+      if (!charge.payment_method) {
+        console.log('[SubscriptionBilling] No payment method on charge:', chargeId);
+        return null;
+      }
+
+      const paymentMethodId = charge.payment_method as string;
+
+      // Attach the payment method to the customer
+      await this.stripe.paymentMethods.attach(paymentMethodId, {
+        customer: stripeCustomerId,
+      });
+
+      // Set as default payment method
+      await this.stripe.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+
+      console.log('[SubscriptionBilling] Attached payment method:', paymentMethodId, 'to customer:', stripeCustomerId);
+      return paymentMethodId;
+    } catch (error: any) {
+      console.error('[SubscriptionBilling] Failed to attach payment method from charge:', error);
+      return null;
+    }
   }
 
   /**
@@ -1131,30 +1337,17 @@ export class SubscriptionBillingService {
         return;
       }
 
-      // Get tenant owner for email
-      const userTenant = await prisma.user_tenants.findFirst({
-        where: { 
-          tenant_id: tenantId,
-          role: 'OWNER'
-        },
-      } as any);
+      // Get tenant's contact email from business profile
+      const businessProfile = await prisma.tenant_business_profiles_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { email: true, contact_person: true }
+      });
 
-      if (!userTenant) {
-        console.error(`[SubscriptionBillingService] No owner found for tenant: ${tenantId}`);
-        return;
-      }
+      const contactEmail = businessProfile?.email;
+      const contactName = businessProfile?.contact_person || tenant.name;
 
-      // Get user details separately
-      const user = await prisma.users.findUnique({
-        where: { id: userTenant.user_id },
-        select: {
-          email: true,
-          name: true,
-        },
-      } as any);
-
-      if (!user) {
-        console.error(`[SubscriptionBillingService] No user found for tenant owner: ${userTenant.user_id}`);
+      if (!contactEmail) {
+        console.warn(`[SubscriptionBillingService] No contact email found for tenant: ${tenantId}`);
         return;
       }
 
@@ -1163,8 +1356,8 @@ export class SubscriptionBillingService {
       const invoiceEmailService = new InvoiceEmailService();
 
       await invoiceEmailService.sendInvoiceNotification({
-        customerEmail: (user as any).email,
-        customerName: (user as any).name,
+        customerEmail: contactEmail,
+        customerName: contactName,
         tenantName: tenant.name,
         invoiceId,
         amount: amountCents,
@@ -1178,7 +1371,7 @@ export class SubscriptionBillingService {
         paymentMethod: 'Stripe',
       });
 
-      console.log(`[SubscriptionBillingService] Invoice email sent to ${(user as any).email} for invoice ${invoiceId}`);
+      console.log(`[SubscriptionBillingService] Invoice email sent to ${contactEmail} for invoice ${invoiceId}`);
     } catch (error) {
       console.error('[SubscriptionBillingService] Error sending invoice email:', error);
       throw error;

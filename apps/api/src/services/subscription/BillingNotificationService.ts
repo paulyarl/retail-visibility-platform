@@ -75,30 +75,26 @@ class BillingNotificationService {
   }
 
   /**
-   * Get tenant owner email
+   * Get tenant contact email from business profile
    */
   private async getTenantOwner(tenantId: string): Promise<{ email: string; name: string } | null> {
-    const userTenant = await prisma.user_tenants.findFirst({
-      where: { 
-        tenant_id: tenantId,
-        role: 'OWNER'
-      },
-      include: {
-        users: {
-          select: {
-            email: true,
-            first_name: true,
-            last_name: true
-          }
-        }
-      }
+    // Get tenant's contact email from business profile
+    const businessProfile = await prisma.tenant_business_profiles_list.findUnique({
+      where: { tenant_id: tenantId },
+      select: { email: true, contact_person: true }
     });
 
-    if (!userTenant?.users) return null;
+    if (!businessProfile?.email) return null;
+
+    // Get tenant name as fallback
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
 
     return {
-      email: userTenant.users.email,
-      name: `${userTenant.users.first_name || ''} ${userTenant.users.last_name || ''}`.trim() || userTenant.users.email
+      email: businessProfile.email,
+      name: businessProfile.contact_person || tenant?.name || 'Tenant'
     };
   }
 

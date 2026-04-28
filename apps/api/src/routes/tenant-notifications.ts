@@ -12,8 +12,8 @@ const router = Router();
 
 // Schema definitions
 const notificationFiltersSchema = z.object({
-  page: z.string().transform(Number).default('1'),
-  limit: z.string().transform(Number).default('20'),
+  page: z.string().transform(Number).default(1),
+  limit: z.string().transform(Number).default(20),
   type: z.string().optional(),
   read: z.string().transform(val => val === 'true').optional(),
   severity: z.string().optional(),
@@ -74,6 +74,8 @@ router.get('/:tenantId/notifications', authenticateToken, async (req, res) => {
     });
 
     // Transform to match expected format
+    // console.log(`[TenantNotifications] Found ${notifications.length} notifications`);
+    // console.log(`[TenantNotifications] Notifications:`, notifications);
     const transformedNotifications = notifications.map(log => ({
       id: log.id,
       type: log.type,
