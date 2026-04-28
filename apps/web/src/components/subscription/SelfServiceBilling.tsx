@@ -313,7 +313,7 @@ export function SelfServiceBilling({
           try {
             const stripeJs = await import('@stripe/stripe-js');
             const key = getStripePublishableKey();
-            // console.log('[SelfServiceBilling] Stripe key:', key ? 'present' : 'missing');
+            console.log('[SelfServiceBilling] Stripe key:', key ? 'present' : 'missing');
             if (key) {
               stripe = await stripeJs.loadStripe(key);
               // console.log('[SelfServiceBilling] Stripe loaded:', !!stripe);

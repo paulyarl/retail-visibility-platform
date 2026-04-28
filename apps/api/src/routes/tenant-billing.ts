@@ -62,7 +62,7 @@ router.get('/overview', requireAuth, async (req: Request, res: Response) => {
     const { tenantId } = req.params;
     const user = (req as any).user;
 
-    console.log('[TenantBilling] Getting billing overview for tenant:', tenantId);
+    // console.log('[TenantBilling] Getting billing overview for tenant:', tenantId);
 
     const accessCheck = await verifyTenantAccess(tenantId, user);
     if (!accessCheck.allowed) {
