@@ -1036,8 +1036,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             {/* Category Selection */}
             <div>
               <Button
-                type="button"
-                variant="secondary"
+                type="button"                
                 onClick={() => setShowCategorySelector(!showCategorySelector)}
                 disabled={saving}
                 className="w-full"

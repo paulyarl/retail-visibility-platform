@@ -472,7 +472,6 @@ export function CategoryEditModal({
           Cancel
         </Button>
         <Button 
-          variant="primary" 
           onClick={handleSave} 
           disabled={!formName.trim() || saving}
         >

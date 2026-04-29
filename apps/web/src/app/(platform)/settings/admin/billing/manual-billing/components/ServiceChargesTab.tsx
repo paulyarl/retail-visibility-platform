@@ -829,7 +829,7 @@ export default function ServiceChargesTab() {
               <Button variant="light" onClick={() => setEditModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" variant="filled" style={{ color: 'white' }}>
                 Save Changes
               </Button>
             </Group>

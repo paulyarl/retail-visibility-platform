@@ -428,7 +428,7 @@ export default function TenantBrandingPage() {
         {/* Save Button */}
         <div className="flex justify-end gap-3">
           <Button
-            variant="secondary"
+             variant="secondary" style={{ color: 'white' }}
             onClick={loadBranding}
             disabled={loading || saving}
           >
@@ -436,6 +436,8 @@ export default function TenantBrandingPage() {
           </Button>
           <Button
             onClick={handleSave}
+            variant="filled"
+            style={{ color: 'white' }}
             disabled={loading || saving || uploadingLogo || uploadingBanner}
           >
             {saving ? 'Saving...' : 'Save Changes'}

@@ -194,8 +194,7 @@ export default function SwisPreviewSettings({
 
           {/* Save Button */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
-            <Button
-              variant="primary"
+            <Button 
               onClick={handleSave}
               disabled={!hasChanges || saving}
               loading={saving}

@@ -754,6 +754,8 @@ export default function PlatformBrandingPage() {
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2"
+          variant="filled"
+          style={{ color: 'white' }}
         >
           {saving ? (
             <>

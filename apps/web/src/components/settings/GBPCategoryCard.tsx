@@ -257,6 +257,8 @@ export default function GBPCategoryCard({
           <Button
             onClick={handleSave}
             disabled={saving || !primary}
+            variant="filled" 
+            style={{ color: 'white' }}
             loading={saving}
           >
             Save & Sync to Directory

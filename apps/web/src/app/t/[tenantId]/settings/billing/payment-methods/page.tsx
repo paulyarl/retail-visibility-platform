@@ -241,6 +241,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
             <Button
               leftSection={<IconCreditCard size="1rem" />}
               onClick={() => handleAddPaymentMethod('card')}
+               variant="filled" style={{ color: 'white' }}
             >
               Add Card
             </Button>
@@ -248,6 +249,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
               leftSection={<IconBrandPaypal size="1rem" />}
               onClick={() => handleAddPaymentMethod('paypal')}
               loading={processing}
+               variant="filled" style={{ color: 'white' }}
             >
               Add PayPal
             </Button>
@@ -268,6 +270,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
                 size="xs" 
                 leftSection={<IconCreditCard size="0.875rem" />}
                 onClick={() => handleAddPaymentMethod('card')}
+                variant="filled" style={{ color: 'white' }}
               >
                 Add Card
               </Button>
@@ -276,6 +279,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
                 leftSection={<IconBrandPaypal size="0.875rem" />}
                 onClick={() => handleAddPaymentMethod('paypal')}
                 loading={processing}
+                variant="filled" style={{ color: 'white' }}
               >
                 Add PayPal
               </Button>
@@ -295,15 +299,15 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
                 <div className="flex flex-wrap gap-2 justify-center">
                   <Button 
                     size="sm"
-                    variant="outline"
+                    variant="filled" style={{ color: 'white' }}
                     leftSection={<IconCreditCard size="1rem" />}
-                    onClick={() => handleAddPaymentMethod('card')}
+                    onClick={() => handleAddPaymentMethod('card')} 
                   >
                     Add Card (Stripe)
                   </Button>
                   <Button 
                     size="sm"
-                    variant="outline"
+                    variant="filled" style={{ color: 'white' }}
                     leftSection={<IconBrandPaypal size="1rem" />}
                     onClick={() => handleAddPaymentMethod('paypal')}
                     loading={processing}

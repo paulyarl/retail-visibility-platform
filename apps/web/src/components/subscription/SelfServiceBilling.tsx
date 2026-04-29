@@ -39,8 +39,8 @@ async function loadStripePackages(): Promise<boolean> {
       import('@stripe/stripe-js').catch(() => null),
       import('@stripe/react-stripe-js').catch(() => null),
     ]);
-    console.log(`[SelfServiceBilling] stripeJs: ${stripeJs}`);
-    console.log(`[SelfServiceBilling] stripeReact: ${stripeReact}`);
+    // console.log(`[SelfServiceBilling] stripeJs: ${stripeJs}`);
+    // console.log(`[SelfServiceBilling] stripeReact: ${stripeReact}`);
     
     if (stripeJs && stripeReact) {
       stripePromise = stripeJs.loadStripe(getStripePublishableKey()!);
@@ -48,11 +48,11 @@ async function loadStripePackages(): Promise<boolean> {
       StripeCardElement = stripeReact.CardElement;
       useStripeHook = stripeReact.useStripe;
       useElementsHook = stripeReact.useElements;
-      console.log(`[SelfServiceBilling] Stripe packages loaded successfully`);
-      console.log(`StripeElements: ${StripeElements}`);
-      console.log(`StripeCardElement: ${StripeCardElement}`);
-      console.log(`useStripeHook: ${useStripeHook}`);
-      console.log(`useElementsHook: ${useElementsHook}`);
+      // console.log(`[SelfServiceBilling] Stripe packages loaded successfully`);
+      // console.log(`StripeElements: ${StripeElements}`);
+      // console.log(`StripeCardElement: ${StripeCardElement}`);
+      // console.log(`useStripeHook: ${useStripeHook}`);
+      // console.log(`useElementsHook: ${useElementsHook}`);
       return true;
     }
   } catch (e) {
@@ -109,7 +109,7 @@ export function SelfServiceBilling({
     const subscriptionId = urlParams.get('subscription_id');
     const baToken = urlParams.get('ba_token');
     
-    console.log('[SelfServiceBilling] PayPal return params:', { paypalStatus, tokenId, subscriptionId, baToken });
+    // console.log('[SelfServiceBilling] PayPal return params:', { paypalStatus, tokenId, subscriptionId, baToken });
     
     if ((paypalStatus === 'success') && !paypalProcessingRef.current) {
       paypalProcessingRef.current = true; // Prevent duplicate calls
@@ -323,12 +323,12 @@ export function SelfServiceBilling({
           let stripe: any = null;
           try {
             const stripeJs = await import('@stripe/stripe-js');
-            console.log(`[SelfServiceBilling] stripeJs: ${stripeJs}`);
+            // console.log(`[SelfServiceBilling] stripeJs: ${stripeJs}`);
             const key = getStripePublishableKey();
-            console.log('[SelfServiceBilling] Stripe key:', key ? 'present' : 'missing');
+            // console.log('[SelfServiceBilling] Stripe key:', key ? 'present' : 'missing');
             if (key) {
               stripe = await stripeJs.loadStripe(key);
-              console.log('[SelfServiceBilling] Stripe loaded:', !!stripe);
+              // console.log('[SelfServiceBilling] Stripe loaded:', !!stripe);
             }
           } catch (e) {
             console.error('[SelfServiceBilling] Failed to load Stripe:', e);
@@ -512,7 +512,7 @@ export function SelfServiceBilling({
                     size="sm" 
                     variant="outline"
                     leftSection={<IconCreditCard size="1rem" />}
-                    onClick={() => setShowAddCard(true)}
+                    onClick={() => setShowAddCard(true)}  
                   >
                     Add Card (Stripe)
                   </Button>
@@ -521,7 +521,7 @@ export function SelfServiceBilling({
                     variant="outline"
                     leftSection={<IconBrandPaypal size="1rem" />}
                     onClick={handleAddPayPal}
-                    loading={processing}
+                    loading={processing}  
                   >
                     Add PayPal
                   </Button>
@@ -598,7 +598,7 @@ export function SelfServiceBilling({
                   variant="outline" 
                   size="sm"
                   leftSection={<IconCreditCard size="1rem" />}
-                  onClick={() => setShowAddCard(true)}
+                  onClick={() => setShowAddCard(true)} 
                 >
                   Add Card (Stripe)
                 </Button>
@@ -607,7 +607,7 @@ export function SelfServiceBilling({
                   size="sm"
                   leftSection={<IconBrandPaypal size="1rem" />}
                   onClick={handleAddPayPal}
-                  loading={processing}
+                  loading={processing} 
                 >
                   Add PayPal
                 </Button>
@@ -1178,7 +1178,7 @@ function StripeCardForm({
           <Button variant="subtle" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" loading={loading} disabled={!stripe} leftSection={<IconCreditCard size="1rem" />}>
+          <Button type="submit" loading={loading} disabled={!stripe} leftSection={<IconCreditCard size="1rem"/>} variant="filled" style={{ color: 'white' }}>
             Add Card (Stripe)
           </Button>
         </Group>

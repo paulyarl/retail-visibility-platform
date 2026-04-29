@@ -668,7 +668,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Button
-            variant="outline"
+            variant="filled" style={{ color: 'white' }}
             leftSection={<IconArrowsExchange size="1rem" />}
             onClick={() => setShowTierModal(true)}
           >
@@ -682,7 +682,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
             View Invoices
           </Button>
           <Button
-            variant="outline"
+            variant="filled" style={{ color: 'white' }}
             leftSection={<IconCreditCard size="1rem" />}
             onClick={() => router.push(`/t/${tenantId}/settings/billing/payment-methods`)}
           >
@@ -785,6 +785,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
               onClick={handleTierChange} 
               disabled={!selectedTier || selectedTier === overview?.subscriptionTier}
               loading={processing}
+              variant="filled" style={{ color: 'white' }}
             >
               Confirm Change
             </Button>

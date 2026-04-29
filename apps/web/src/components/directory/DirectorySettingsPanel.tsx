@@ -6,6 +6,7 @@ import DirectoryCategorySelectorAdapter from './DirectoryCategorySelectorAdapter
 import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
 import DirectoryPhotoGallery from './DirectoryPhotoGallery';
+import { Button } from '@mantine/core';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -313,26 +314,27 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button
+            <Button
               onClick={handleSave}
               disabled={isSaving}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+            </Button>
             {listing.isPublished ? (
-              <button
+              <Button
                 onClick={handleUnpublish}
                 disabled={isSaving}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="outlined"
               >
                 Unpublish
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 onClick={handlePublish}
                 disabled={isSaving || !canPublish}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="filled" 
+                style={{ color: 'white' }}
                 title={
                   !canPublish 
                     ? missingBusinessName && missingPrimaryCategory
@@ -344,7 +346,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                 }
               >
                 Publish
-              </button>
+              </Button>
             )}
           </div>
 
