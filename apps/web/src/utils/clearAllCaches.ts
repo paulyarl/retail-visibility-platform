@@ -3,11 +3,28 @@
  * Use this when switching cache implementations or troubleshooting cache issues
  */
 
+import { cacheInvalidationService } from '../services/CacheInvalidationService';
+
+/**
+ * Clear API caches via the cache invalidation service
+ */
+async function clearApiCaches(): Promise<void> {
+  try {
+    await cacheInvalidationService.clearAllTenantCaches();
+  } catch (error) {
+    console.warn('⚠️ API cache clear error:', error);
+  }
+}
+
 /**
  * Clear all browser storage caches
  */
 export async function clearAllBrowserCaches(): Promise<void> {
   console.log('🧹 Starting cache cleanup...');
+  
+  // Clear API caches first
+  console.log('🌐 Clearing API caches...');
+  await clearApiCaches();
   
   // Clear localStorage
   try {
@@ -63,12 +80,14 @@ export async function clearAllBrowserCaches(): Promise<void> {
 export async function clearCachesWithConfirmation(): Promise<boolean> {
   if (typeof window !== 'undefined') {
     const confirmed = window.confirm(
-      'This will clear all cached data including:\n' +
+      'This will clear ALL cached data including:\n' +
+      '• API server caches (Redis)\n' +
+      '• Browser storage (localStorage/sessionStorage)\n' +
       '• Directory listings\n' +
       '• User preferences\n' +
       '• Product data\n' +
       '• Session data\n\n' +
-      'The app will reload with fresh data. Continue?'
+      'This resolves most cache-related delays. The app will reload with fresh data. Continue?'
     );
     
     if (confirmed) {
