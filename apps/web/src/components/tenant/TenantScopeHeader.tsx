@@ -87,16 +87,15 @@ export default function TenantScopeHeader({
       try {
         let list: any[] = [];
         
-        // PLATFORM_ADMIN gets all active tenants
+        // PLATFORM_ADMIN gets all tenants (active and inactive)
         if (user.role === 'PLATFORM_ADMIN') {
           const allTenants = await adminSecurityMonitoringService.getAvailableTenants();
-          list = allTenants
-            .filter((t: any) => t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial_discovery')
-            .map((t: any) => ({
-              id: t.id,
-              name: t.name,
-              locationStatus: t.subscriptionStatus === 'expired' ? 'inactive' : 'active'
-            }));
+          list = allTenants.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            locationStatus: t.subscriptionStatus === 'expired' || t.subscriptionStatus === 'cancelled' ? 'inactive' : 'active',
+            subscriptionStatus: t.subscriptionStatus
+          }));
         } else {
           // Regular users get their assigned tenants
           const sessionInfo = await securitySingletonService.getSessionInfo();
@@ -136,6 +135,12 @@ export default function TenantScopeHeader({
   // Handle tenant switch
   const handleTenantSwitch = async (newTenantId: string) => {
     if (newTenantId === tenantId || switching) return;
+
+    // Check if tenant is inactive
+    const targetTenant = availableTenants.find(t => t.id === newTenantId);
+    if (targetTenant?.locationStatus === 'inactive') {
+      return; // Don't allow switching to inactive tenants
+    }
 
     // Check permissions
     if (!user || (user.role !== 'PLATFORM_ADMIN' && !canSwitchToTenant(user, newTenantId))) {
@@ -266,24 +271,26 @@ export default function TenantScopeHeader({
                   <div className="max-h-96 overflow-y-auto">
                     {availableTenants.map((tenant) => {
                       const isActive = tenant.id === tenantId;
+                      const isInactive = tenant.locationStatus === 'inactive';
                       const role = user?.tenants?.find((t: any) => t.id === tenant.id)?.role;
                       
                       return (
-                        <button
+                        <div
                           key={tenant.id}
-                          onClick={() => handleTenantSwitch(tenant.id)}
-                          disabled={isActive || switching}
+                          onClick={() => !isInactive && handleTenantSwitch(tenant.id)}
                           className={`w-full px-4 py-3 text-left transition-all duration-150 ${
                             isActive
                               ? 'bg-primary-50 border-l-4 border-primary-500'
-                              : 'hover:bg-neutral-50 border-l-4 border-transparent hover:border-neutral-300'
+                              : isInactive
+                              ? 'bg-neutral-50 border-l-4 border-neutral-200 opacity-60 cursor-not-allowed'
+                              : 'hover:bg-neutral-50 border-l-4 border-transparent hover:border-neutral-300 cursor-pointer'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className={`text-sm font-medium truncate ${
-                                  isActive ? 'text-primary-900' : 'text-neutral-900'
+                                  isActive ? 'text-primary-900' : isInactive ? 'text-neutral-400' : 'text-neutral-900'
                                 }`}>
                                   {tenant.name}
                                 </p>
@@ -292,20 +299,34 @@ export default function TenantScopeHeader({
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
+                                {isInactive && (
+                                  <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                )}
                               </div>
                               {role && (
-                                <p className="text-xs text-neutral-500 mt-0.5">
+                                <p className={`text-xs mt-0.5 ${
+                                  isInactive ? 'text-neutral-400' : 'text-neutral-500'
+                                }`}>
                                   {role.replace('_', ' ').toLowerCase()}
                                 </p>
                               )}
                             </div>
-                            {tenant.locationStatus && tenant.locationStatus !== 'active' && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
-                                {tenant.locationStatus}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {isInactive && (
+                                <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 flex-shrink-0">
+                                  Inactive
+                                </span>
+                              )}
+                              {!isInactive && tenant.locationStatus && tenant.locationStatus !== 'active' && (
+                                <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+                                  {tenant.locationStatus}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
