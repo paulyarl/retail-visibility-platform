@@ -143,9 +143,13 @@ export default function TenantScopeHeader({
 
     // Check if tenant is inactive and show confirmation
     const targetTenant = availableTenants.find(t => t.id === newTenantId);
-    if (targetTenant?.locationStatus === 'inactive') {
+    if (targetTenant?.locationStatus !== 'active') {
+      const statusText = targetTenant.locationStatus === 'inactive' 
+        ? 'inactive due to subscription issues'
+        : `currently ${targetTenant.locationStatus}`;
+      
       const confirmed = window.confirm(
-        `⚠️ Inactive Location\n\n"${targetTenant.name}" is currently inactive due to subscription issues.\n\nDo you want to switch there to manage reactivation?`
+        `⚠️ Non-Active Location\n\n"${targetTenant.name}" is ${statusText}.\n\nDo you want to switch there to manage this location?`
       );
       if (!confirmed) return;
     }
@@ -274,7 +278,7 @@ export default function TenantScopeHeader({
                   <div className="max-h-96 overflow-y-auto">
                     {availableTenants.map((tenant) => {
                       const isActive = tenant.id === tenantId;
-                      const isInactive = tenant.locationStatus === 'inactive';
+                      const isInactive = tenant.locationStatus !== 'active';
                       const role = user?.tenants?.find((t: any) => t.id === tenant.id)?.role;
                       
                       return (
@@ -318,13 +322,8 @@ export default function TenantScopeHeader({
                             </div>
                             <div className="flex items-center gap-2">
                               {isInactive && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 flex-shrink-0 animate-pulse">
-                                  Inactive
-                                </span>
-                              )}
-                              {!isInactive && tenant.locationStatus && tenant.locationStatus !== 'active' && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
-                                  {tenant.locationStatus}
+                                <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 flex-shrink-0 animate-pulse capitalize">
+                                  {tenant.locationStatus || 'Inactive'}
                                 </span>
                               )}
                             </div>

@@ -127,7 +127,7 @@ export class ClientTenantContextManager {
       console.warn('[ClientTenantContextManager] Failed to store context metadata:', error);
     }
     
-    console.log(`[ClientTenantContextManager] Tenant context set: ${tenantId} (source: ${source})`);
+    // console.log(`[ClientTenantContextManager] Tenant context set: ${tenantId} (source: ${source})`);
   }
   
   /**
