@@ -136,15 +136,18 @@ export default function TenantScopeHeader({
   const handleTenantSwitch = async (newTenantId: string) => {
     if (newTenantId === tenantId || switching) return;
 
-    // Check if tenant is inactive
-    const targetTenant = availableTenants.find(t => t.id === newTenantId);
-    if (targetTenant?.locationStatus === 'inactive') {
-      return; // Don't allow switching to inactive tenants
-    }
-
     // Check permissions
     if (!user || (user.role !== 'PLATFORM_ADMIN' && !canSwitchToTenant(user, newTenantId))) {
       return;
+    }
+
+    // Check if tenant is inactive and show confirmation
+    const targetTenant = availableTenants.find(t => t.id === newTenantId);
+    if (targetTenant?.locationStatus === 'inactive') {
+      const confirmed = window.confirm(
+        `⚠️ Inactive Location\n\n"${targetTenant.name}" is currently inactive due to subscription issues.\n\nDo you want to switch there to manage reactivation?`
+      );
+      if (!confirmed) return;
     }
 
     try {
@@ -277,12 +280,12 @@ export default function TenantScopeHeader({
                       return (
                         <div
                           key={tenant.id}
-                          onClick={() => !isInactive && handleTenantSwitch(tenant.id)}
+                          onClick={() => handleTenantSwitch(tenant.id)}
                           className={`w-full px-4 py-3 text-left transition-all duration-150 ${
                             isActive
                               ? 'bg-primary-50 border-l-4 border-primary-500'
                               : isInactive
-                              ? 'bg-neutral-50 border-l-4 border-neutral-200 opacity-60 cursor-not-allowed'
+                              ? 'bg-red-50 border-l-4 border-red-200 hover:bg-red-100 cursor-pointer'
                               : 'hover:bg-neutral-50 border-l-4 border-transparent hover:border-neutral-300 cursor-pointer'
                           }`}
                         >
@@ -290,7 +293,7 @@ export default function TenantScopeHeader({
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className={`text-sm font-medium truncate ${
-                                  isActive ? 'text-primary-900' : isInactive ? 'text-neutral-400' : 'text-neutral-900'
+                                  isActive ? 'text-primary-900' : isInactive ? 'text-red-700' : 'text-neutral-900'
                                 }`}>
                                   {tenant.name}
                                 </p>
@@ -300,14 +303,14 @@ export default function TenantScopeHeader({
                                   </svg>
                                 )}
                                 {isInactive && (
-                                  <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                   </svg>
                                 )}
                               </div>
                               {role && (
                                 <p className={`text-xs mt-0.5 ${
-                                  isInactive ? 'text-neutral-400' : 'text-neutral-500'
+                                  isInactive ? 'text-red-600' : 'text-neutral-500'
                                 }`}>
                                   {role.replace('_', ' ').toLowerCase()}
                                 </p>
@@ -315,7 +318,7 @@ export default function TenantScopeHeader({
                             </div>
                             <div className="flex items-center gap-2">
                               {isInactive && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 flex-shrink-0">
+                                <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 flex-shrink-0 animate-pulse">
                                   Inactive
                                 </span>
                               )}
