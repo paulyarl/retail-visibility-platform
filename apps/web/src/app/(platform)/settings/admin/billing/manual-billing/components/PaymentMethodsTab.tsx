@@ -506,7 +506,9 @@ export default function PaymentMethodsTab() {
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit"                 
+                variant="filled" 
+                style={{ color: 'white' }}>
                 Add Payment Method
               </Button>
             </Group>

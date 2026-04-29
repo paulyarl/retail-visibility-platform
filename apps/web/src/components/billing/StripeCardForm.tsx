@@ -10,10 +10,10 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 
 // Get Stripe publishable key from either env var name
 function getStripePublishableKey(): string | undefined {
-  console.log(`[StripeCardForm] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`);
-  console.log(`[StripeCardForm] NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY}`);
+  // console.log(`[StripeCardForm] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`);
+  // console.log(`[StripeCardForm] NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY}`);
   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY;
-  console.log('[StripeCardForm] Stripe publishable key:', key ? `${key.substring(0, 8)}...` : 'NOT_FOUND');
+  // console.log('[StripeCardForm] Stripe publishable key:', key ? `${key.substring(0, 8)}...` : 'NOT_FOUND');
   return key;
 }
 
@@ -21,13 +21,13 @@ function getStripePublishableKey(): string | undefined {
 function isStripeConfigured(): boolean {
   const key = getStripePublishableKey();
   const configured = !!(key && key.length > 0 && key.startsWith('pk_'));
-  console.log('Stripe configured:', configured);
+  // console.log('Stripe configured:', configured);
   return configured;
 }
 
 // Initialize Stripe
 const stripePromise = isStripeConfigured() ? loadStripe(getStripePublishableKey()!) : null;
-console.log(`[StripeCardForm] stripePromise: ${stripePromise}`);
+// console.log(`[StripeCardForm] stripePromise: ${stripePromise}`);
 
 interface StripeCardFormProps {
   onSuccess: () => void;
@@ -38,8 +38,8 @@ interface StripeCardFormProps {
 function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
   const stripe = useStripe();
   const elements = useElements();
-  console.log(`[StripeCardForm] stripe: ${stripe}`);
-  console.log(`[StripeCardForm] elements: ${elements}`);
+  // console.log(`[StripeCardForm] stripe: ${stripe}`);
+  // console.log(`[StripeCardForm] elements: ${elements}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
     }
 
     const cardElement = elements.getElement(CardElement);
-    console.log(`[StripeCardForm] cardElement: ${cardElement}`);
+    // console.log(`[StripeCardForm] cardElement: ${cardElement}`);
     if (!cardElement) {
       return;
     }
@@ -66,8 +66,8 @@ function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
         type: 'card',
         card: cardElement,
       });
-      console.log(`[StripeCardForm] stripeError: ${stripeError}`);
-      console.log(`[StripeCardForm] paymentMethod: ${paymentMethod}`);
+      // console.log(`[StripeCardForm] stripeError: ${stripeError}`);
+      // console.log(`[StripeCardForm] paymentMethod: ${paymentMethod}`);
 
       if (stripeError) {
         setError(stripeError.message || 'Failed to create payment method');
@@ -121,7 +121,10 @@ function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
         </div>
 
         <Group gap="sm">
-          <Button type="submit" loading={loading} flex={1}>
+          <Button type="submit" loading={loading} flex={1}          
+                variant="filled" 
+                style={{ color: 'white' }}
+                >
             Add Payment Method
           </Button>
           <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>

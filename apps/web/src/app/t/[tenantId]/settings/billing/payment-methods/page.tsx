@@ -361,6 +361,9 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
       {/* Add Payment Method Modal */}
       <Modal
         opened={showAddModal}
+        
+        variant="filled" 
+        style={{ color: 'white' }}
         onClose={() => setShowAddModal(false)}
         title="Add Payment Method"
         size="md"
