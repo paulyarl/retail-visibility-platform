@@ -69,7 +69,7 @@ export class StripeConnectService {
     const connection = await prisma.merchant_stripe_connections.findUnique({
       where: { tenant_id: tenantId },
     });
-    console.log(`[StripeConnectService] Merchant Stripe account for tenant ${tenantId}:`, connection?.stripe_account_id)
+    // console.log(`[StripeConnectService] Merchant Stripe account for tenant ${tenantId}:`, connection?.stripe_account_id)
 
     return connection?.stripe_account_id ?? null;
   }
@@ -201,7 +201,7 @@ export class StripeConnectService {
         netToMerchantCents: fees.netToMerchantCents,
       };
     } catch (error: any) {
-      console.error('[StripeConnect] Charge error:', error);
+      // console.error('[StripeConnect] Charge error:', error);
       return {
         success: false,
         error: error.message || 'Failed to create charge',
@@ -264,7 +264,7 @@ export class StripeConnectService {
         platformFeeCents: fees.platformFeeCents,
       };
     } catch (error: any) {
-      console.error('[StripeConnect] PaymentIntent error:', error);
+      // console.error('[StripeConnect] PaymentIntent error:', error);
       return {
         success: false,
         error: error.message || 'Failed to create payment intent',
@@ -317,7 +317,7 @@ export class StripeConnectService {
         transferId: transfer.id,
       };
     } catch (error: any) {
-      console.error('[StripeConnect] Transfer error:', error);
+      // console.error('[StripeConnect] Transfer error:', error);
       return {
         success: false,
         error: error.message || 'Failed to transfer funds',
@@ -402,7 +402,7 @@ export class StripeConnectService {
         retailerAmountCents,
       };
     } catch (error: any) {
-      console.error('[StripeConnect] Forfeit error:', error);
+      // console.error('[StripeConnect] Forfeit error:', error);
       return {
         success: false,
         error: error.message || 'Failed to process forfeiture',
@@ -473,7 +473,7 @@ export class StripeConnectService {
         reversedFeeCents,
       };
     } catch (error: any) {
-      console.error('[StripeConnect] Fee reversal error:', error);
+      // console.error('[StripeConnect] Fee reversal error:', error);
       return {
         success: false,
         error: error.message || 'Failed to reverse fee',
@@ -502,16 +502,16 @@ export class StripeConnectService {
     });
 
     return {
-      totalCents: transactions.reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+      totalCents: transactions.reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       transactionFeesCents: transactions
         .filter(t => t.transaction_type === 'transaction_fee')
-        .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+        .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       depositForfeitsCents: transactions
         .filter(t => t.transaction_type === 'deposit_forfeit')
-        .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+        .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       subscriptionsCents: transactions
         .filter(t => t.transaction_type === 'subscription')
-        .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+        .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       transactionCount: transactions.length,
     };
   }
