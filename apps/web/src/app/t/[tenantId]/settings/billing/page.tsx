@@ -104,6 +104,7 @@ const getStripePublishableKey = () => {
 };
 
 const stripePromise = getStripePublishableKey() ? loadStripe(getStripePublishableKey()!) : null;
+console.log(`[BillingPage] stripePromise: ${stripePromise}`);
 
 // Risk Indicator Component
 const RiskIndicator = ({ risk, tenantId }: { risk: SubscriptionRisk; tenantId: string }) => {

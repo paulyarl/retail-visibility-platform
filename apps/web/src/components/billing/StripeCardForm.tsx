@@ -27,6 +27,7 @@ function isStripeConfigured(): boolean {
 
 // Initialize Stripe
 const stripePromise = isStripeConfigured() ? loadStripe(getStripePublishableKey()!) : null;
+console.log(`[StripeCardForm] stripePromise: ${stripePromise}`);
 
 interface StripeCardFormProps {
   onSuccess: () => void;
@@ -37,6 +38,8 @@ interface StripeCardFormProps {
 function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
   const stripe = useStripe();
   const elements = useElements();
+  console.log(`[StripeCardForm] stripe: ${stripe}`);
+  console.log(`[StripeCardForm] elements: ${elements}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +52,7 @@ function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
     }
 
     const cardElement = elements.getElement(CardElement);
+    console.log(`[StripeCardForm] cardElement: ${cardElement}`);
     if (!cardElement) {
       return;
     }
@@ -62,6 +66,8 @@ function StripeFormInner({ onSuccess, onCancel }: StripeCardFormProps) {
         type: 'card',
         card: cardElement,
       });
+      console.log(`[StripeCardForm] stripeError: ${stripeError}`);
+      console.log(`[StripeCardForm] paymentMethod: ${paymentMethod}`);
 
       if (stripeError) {
         setError(stripeError.message || 'Failed to create payment method');
