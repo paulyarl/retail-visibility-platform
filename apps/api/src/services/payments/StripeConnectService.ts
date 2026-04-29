@@ -69,6 +69,7 @@ export class StripeConnectService {
     const connection = await prisma.merchant_stripe_connections.findUnique({
       where: { tenant_id: tenantId },
     });
+    console.log(`[StripeConnectService] Merchant Stripe account for tenant ${tenantId}:`, connection?.stripe_account_id)
 
     return connection?.stripe_account_id ?? null;
   }

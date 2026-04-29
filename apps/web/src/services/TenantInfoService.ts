@@ -196,6 +196,7 @@ class TenantInfoService extends TenantApiSingleton {
           requestType: RequestType.AUTHENTICATED
         }
       );
+      console.log(`[TenantInfoService] Start Stripe Connect onboarding result for tenant ${tenantId}:`, result);
       if (!result.success) {
         console.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', result.error);
         const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to start onboarding';
