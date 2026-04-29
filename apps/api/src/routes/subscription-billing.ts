@@ -44,12 +44,14 @@ router.use(authenticateToken);
  * Checks: X-Tenant-ID header, req.user.tenantId, params, body, query
  */
 function getTenantId(req: Request): string | null {
+  // For subscription routes, prioritize query parameter (from URL) over header
+  // This fixes issues when switching tenants in the UI
   return (
-    req.headers['x-tenant-id'] as string ||
-    (req as any).user?.tenantId ||
-    req.params.tenantId ||
-    req.body?.tenantId ||
-    (req.query.tenantId as string) ||
+    req.query.tenantId as string || // URL parameter ?tenantId=...
+    req.params.tenantId || // Route parameter /:tenantId
+    req.body?.tenantId || // Request body
+    req.headers['x-tenant-id'] as string || // X-Tenant-ID header
+    (req as any).user?.tenantId || // User's default tenant
     null
   );
 }
@@ -1377,6 +1379,18 @@ router.post('/paypal/save-payment-method', requirePermission('CAN_MANAGE_TENANT_
         paypalAccountId: captureResult.payerId,
       }
     );
+
+    // Send notification about payment method added
+    const { getBillingNotificationService } = await import('../services/subscription/BillingNotificationService');
+    const notificationService = getBillingNotificationService();
+    await notificationService.sendNotification({
+      tenantId,
+      type: 'payment_method_added',
+      metadata: {
+        paymentType: 'PayPal',
+        paypalEmail: captureResult.payerEmail,
+      }
+    }).catch(err => console.error('[Subscription] Failed to send payment method added notification:', err));
 
     res.json({
       success: true,

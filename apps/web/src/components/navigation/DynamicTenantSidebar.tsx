@@ -11,6 +11,8 @@ import { NavItemRow, type NavItem } from '@/components/navigation/NavItemRow';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavLinks } from '@/hooks/useNavLinks';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
 
 // Types are imported from NavItemRow component
 type NavItemWithRBAC = NavItem & RBACNavGates;
@@ -214,85 +216,86 @@ function computeExpanded(items: NavItem[], pathname: string): Set<string> {
 
 function buildTenantNav(
   tenantId: string,
-  slug: string | undefined,
-  directorySlug: string | undefined,
-  isPublished: boolean,
-): NavItem[] {
+  currentTenantId: string,
+  slug?: string,
+  isPublished?: boolean,
+  directorySlug?: string,
+): NavItemWithRBAC[] {
   return [
     {
       label: 'Dashboard',
-      href: `/t/${tenantId}/dashboard`,
+      href: `/t/${currentTenantId}/dashboard`,
       icon: <Icon.Dashboard />,
     },
     {
       label: 'Inventory',
-      href: `/t/${tenantId}/items`,
+      href: `/t/${currentTenantId}/items`,
       icon: <Icon.Inventory />,
       children: [
-        { label: 'Product Manager', href: `/t/${tenantId}/items` },
-        { label: 'Add Product', href: `/t/${tenantId}/items/create` },
-        { label: 'Product Catalog', href: `/t/${tenantId}/catalog` },
-        { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
-        { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
-        { label: 'Categories', href: `/t/${tenantId}/categories` },
-        { label: 'Featured Products', href: `/t/${tenantId}/settings/featured-products` },
+        { label: 'Product Manager', href: `/t/${currentTenantId}/items` },
+        { label: 'Add Product', href: `/t/${currentTenantId}/items/create` },
+        { label: 'Product Catalog', href: `/t/${currentTenantId}/catalog` },
+        { label: 'Barcode Scan', href: `/t/${currentTenantId}/scan` },
+        { label: 'Quick Start', href: `/t/${currentTenantId}/quick-start` },
+        { label: 'Categories', href: `/t/${currentTenantId}/categories` },
+        { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products` },
       ],
     },
     {
       label: 'Orders',
-      href: `/t/${tenantId}/orders`,
+      href: `/t/${currentTenantId}/orders`,
       icon: <Icon.Orders />,
       requiredGroup: 'IS_TENANT_MANAGER',
       children: [
-        { label: 'Order Management', href: `/t/${tenantId}/orders` },
-        { label: 'Payment Gateways', href: `/t/${tenantId}/settings/payment-gateways`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
-        { label: 'Fulfillment Options', href: `/t/${tenantId}/settings/fulfillment`, requiredGroup: 'IS_TENANT_MANAGER' },
+        { label: 'Order Management', href: `/t/${currentTenantId}/orders` },
+        { label: 'Payment Gateways', href: `/t/${currentTenantId}/settings/payment-gateways`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
+        { label: 'Fulfillment Options', href: `/t/${currentTenantId}/settings/fulfillment`, requiredGroup: 'IS_TENANT_MANAGER' },
       ],
     },
     {
       label: 'Directory & Storefront',
-      href: `/t/${tenantId}/settings/directory`,
+      href: `/t/${currentTenantId}/settings/directory`,
       icon: <Icon.Directory />,
       children: [
         ...(isPublished && directorySlug
           ? [{ label: 'View in Directory', href: `/directory/${directorySlug}`, badge: 'Live', badgeVariant: 'success' as const }]
           : []),
-        { label: 'Directory Settings', href: `/t/${tenantId}/settings/directory` },
-        { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
-        { label: 'Store Hours', href: `/t/${tenantId}/settings/hours` },
-        { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
-        { label: 'Location Status', href: `/t/${tenantId}/settings/location-status` },
-        { label: 'Review Management', href: `/t/${tenantId}/reviews` },
+        { label: 'Directory Settings', href: `/t/${currentTenantId}/settings/directory` },
+        { label: 'Branding', href: `/t/${currentTenantId}/settings/branding` },
+        { label: 'Store Hours', href: `/t/${currentTenantId}/settings/hours` },
+        { label: 'Business Category', href: `/t/${currentTenantId}/settings/gbp-category` },
+        { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status` },
+        { label: 'Review Management', href: `/t/${currentTenantId}/reviews` },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },
     {
       label: 'Integrations',
-      href: `/t/${tenantId}/settings/integrations`,
+      href: `/t/${currentTenantId}/settings/integrations`,
       icon: <Icon.Integrations />,
       requiredGroup: 'IS_TENANT_ADMIN',
       children: [
-        { label: 'Google Merchant Center', href: `/t/${tenantId}/settings/integrations/google` },
-        { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
-        { label: 'Clover POS', href: `/t/${tenantId}/settings/integrations/clover` },
-        { label: 'Square POS', href: `/t/${tenantId}/settings/integrations/square` },
+        { label: 'Google Merchant Center', href: `/t/${currentTenantId}/settings/integrations/google` },
+        { label: 'Feed Validation', href: `/t/${currentTenantId}/feed-validation` },
+        { label: 'Clover POS', href: `/t/${currentTenantId}/settings/integrations/clover` },
+        { label: 'Square POS', href: `/t/${currentTenantId}/settings/integrations/square` },
       ],
     },
     {
       label: 'Settings',
-      href: `/t/${tenantId}/settings`,
+      href: `/t/${currentTenantId}/settings`,
       icon: <Icon.Settings />,
       requiredGroup: 'IS_TENANT_MANAGER',
       children: [
-        { label: 'Store Profile', href: `/t/${tenantId}/settings/tenant`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Team Members', href: `/t/${tenantId}/settings/users`, requiredPermission: 'CAN_MANAGE_TENANT_USERS' },
-        { label: 'Appearance', href: `/t/${tenantId}/settings/appearance` },
-        { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },
-        { label: 'Subscription', href: `/t/${tenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
-        { label: 'Onboarding', href: `/t/${tenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Organization Dashboard', href: `/t/${tenantId}/settings/organization` },
-        { label: 'Propagation Settings', href: `/t/${tenantId}/settings/propagation` },
-        { label: 'Propagation Center', href: `/t/${tenantId}/propagation` },
+        { label: 'Store Profile', href: `/t/${currentTenantId}/settings/tenant`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
+        { label: 'Team Members', href: `/t/${currentTenantId}/settings/users`, requiredPermission: 'CAN_MANAGE_TENANT_USERS' },
+        { label: 'Appearance', href: `/t/${currentTenantId}/settings/appearance` },
+        { label: 'Language & Region', href: `/t/${currentTenantId}/settings/language` },
+        { label: 'Subscription', href: `/t/${currentTenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
+        { label: 'Onboarding', href: `/t/${currentTenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
+        { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization` },
+        { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation` },
+        { label: 'Propagation Center', href: `/t/${currentTenantId}/propagation` },
       ],
     },
     {
@@ -540,6 +543,23 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const pathname = usePathname();
   const { filterNavItems } = useRBAC();
   const { user } = useAuth();
+  
+  // Use centralized tenant context - this ensures sidebar aligns with current context
+  const [currentTenantId, setCurrentTenantId] = useState<string | null>(tenantId);
+  
+  useEffect(() => {
+    // Check tenant context every second to stay in sync
+    const checkContext = () => {
+      const context = clientTenantContextManager.getTenantContext();
+      if (context.tenantId && context.tenantId !== currentTenantId) {
+        setCurrentTenantId(context.tenantId);
+      }
+    };
+    
+    checkContext();
+    const interval = setInterval(checkContext, 1000);
+    return () => clearInterval(interval);
+  }, [currentTenantId]);
   const { tenantLinks } = useNavLinks();
 
   // Stabilize user.tenants to prevent infinite re-renders
@@ -750,6 +770,11 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
             <Icon.Menu />
           </button>
           <span className="font-semibold text-neutral-900 dark:text-white text-sm truncate">{tenantName}</span>
+        </div>
+
+        {/* Tenant Scope Header - Desktop only, mobile uses top bar */}
+        <div className="hidden md:block">
+          <TenantScopeHeader tenantId={currentTenantId || tenantId} />
         </div>
 
         {/* Page content */}

@@ -53,13 +53,46 @@ export class SubscriptionStatusService {
     await this.logStatusTransition(tenantId, current.status, 'active', current.tier, tier, 'payment_success');
 
     // Send notification
+    console.log('[SubscriptionStatus] Sending payment_success notification:', { tenantId, tier, amount });
     const notificationService = getBillingNotificationService();
-    notificationService.sendNotification({
+    const notificationResult = await notificationService.sendNotification({
       tenantId,
       type: 'payment_success',
       tier,
       amount,
-    }).catch(err => console.error('[SubscriptionStatus] Failed to send notification:', err));
+    });
+    console.log('[SubscriptionStatus] Notification result:', notificationResult);
+
+    // Create platform revenue transaction for subscription payment
+    if (amount && amount > 0) {
+      try {
+        const transactionId = `rev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await prisma.platform_revenue_transactions.create({
+          data: {
+            id: transactionId,
+            tenant_id: tenantId,
+            transaction_type: 'subscription',
+            gross_amount_cents: amount,
+            platform_fee_cents: amount, // Full amount is platform revenue for subscriptions
+            gateway_fee_cents: 0, // Will be updated when actual gateway fees are known
+            net_amount_cents: amount,
+            stripe_transaction_id: invoiceId?.startsWith('paypal_') ? null : invoiceId,
+            status: 'completed',
+            processed_at: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
+            metadata: {
+              tier,
+              payment_method: invoiceId?.startsWith('paypal_') ? 'paypal' : 'stripe'
+            }
+          }
+        });
+        console.log('[SubscriptionStatus] Platform revenue transaction created:', transactionId);
+      } catch (error) {
+        console.error('[SubscriptionStatus] Failed to create platform revenue transaction:', error);
+        // Don't fail the subscription activation if revenue tracking fails
+      }
+    }
 
     return {
       previousStatus: current.status,

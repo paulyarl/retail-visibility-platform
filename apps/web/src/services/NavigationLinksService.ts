@@ -9,6 +9,7 @@ import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { ApiResult, RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { ReactNode } from 'react';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
 // Type for navigation items with ReactNode icons (imported from useNavLinks)
 export type ProcessedNavLink = Omit<NavLink, 'icon'> & {
@@ -109,18 +110,19 @@ export class NavTemplateParser {
   }
 
   /**
-   * Extract context from localStorage
+   * Extract context from centralized tenant context manager
    */
   static extractContextFromStorage(): NavTemplateContext {
     const context: NavTemplateContext = {};
     
     try {
-      // Get from localStorage if available
-      const storedTenantId = localStorage.getItem('currentTenantId');
-      if (storedTenantId) {
-        context.tenantId = storedTenantId;
+      // Use centralized tenant context manager for consistency
+      const tenantContext = clientTenantContextManager.getTenantContext();
+      if (tenantContext.tenantId) {
+        context.tenantId = tenantContext.tenantId;
       }
       
+      // For other context values, still check localStorage as fallback
       const storedSlug = localStorage.getItem('currentTenantSlug');
       if (storedSlug) {
         context.slug = storedSlug;

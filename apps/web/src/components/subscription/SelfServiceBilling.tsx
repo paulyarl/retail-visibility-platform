@@ -84,6 +84,10 @@ export function SelfServiceBilling({
 
   // Load data
   useEffect(() => {
+    // Set tenant ID in window context for service to use
+    if (typeof window !== 'undefined') {
+      (window as any).__currentTenantId = tenantId;
+    }
     loadData();
   }, [tenantId]);
 
@@ -93,14 +97,14 @@ export function SelfServiceBilling({
   // Handle PayPal return URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const paypalStatus = urlParams.get('paypal');
-    const tokenId = urlParams.get('token') || urlParams.get('approval_token_id') || urlParams.get('token_id');
+    const paypalStatus = urlParams.get('paypal') || urlParams.get('paypal-token');
+    const tokenId = urlParams.get('token') || urlParams.get('approval_token_id') || urlParams.get('token_id') || urlParams.get('PayerID');
     const subscriptionId = urlParams.get('subscription_id');
     const baToken = urlParams.get('ba_token');
     
-    // console.log('[SelfServiceBilling] PayPal return params:', { paypalStatus, tokenId, subscriptionId, baToken });
+    console.log('[SelfServiceBilling] PayPal return params:', { paypalStatus, tokenId, subscriptionId, baToken });
     
-    if (paypalStatus === 'success' && !paypalProcessingRef.current) {
+    if ((paypalStatus === 'success') && !paypalProcessingRef.current) {
       paypalProcessingRef.current = true; // Prevent duplicate calls
       
       // Clean up URL immediately to prevent re-triggering

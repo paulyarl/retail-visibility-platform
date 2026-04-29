@@ -126,12 +126,16 @@ export class SubscriptionValidationService {
 
     // Rule 6: Manual subscription control restrictions
     if ((tenant as any).manual_subscription_control) {
-      // Allow only admin changes for manually controlled subscriptions
-      return { 
-        allowed: false, 
-        reason: 'Contact support to change manually managed subscription',
-        errorCode: 'MANUAL_CONTROL_RESTRICTION' 
-      };
+      // Check if manual control has expired
+      const expiresAt = (tenant as any).manual_subscription_expires_at;
+      if (expiresAt && new Date(expiresAt) > new Date()) {
+        // Manual control is still active
+        return { 
+          allowed: false, 
+          reason: 'Contact support to change manually managed subscription',
+          errorCode: 'MANUAL_CONTROL_RESTRICTION' 
+        };
+      }
     }
 
     // Rule 7: Tier change rate limiting (minimum 15 days between changes)

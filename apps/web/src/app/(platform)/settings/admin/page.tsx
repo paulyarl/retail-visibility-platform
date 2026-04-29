@@ -12,6 +12,7 @@ import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageB
 import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { clearCachesWithConfirmation } from '@/utils/clearAllCaches';
+import { TenantContextSwitcher } from '@/components/admin/TenantContextSwitcher';
 
 type AdminSection = {
   title: string;
@@ -598,16 +599,27 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="Admin Dashboard"
         description="Platform administration and configuration"
-        icon={Icons.Admin}
-        backLink={{
-          href: '/settings',
-          label: 'Back to Settings'
-        }}
+        icon={Icons.Settings}
       />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* System Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar with Tenant Context */}
+          <div className="lg:col-span-1 space-y-6">
+            <TenantContextSwitcher 
+              onTenantChange={(tenantId) => {
+                // Clear any cached data when switching tenants
+                clearCachesWithConfirmation();
+                // Optionally redirect to tenant's subscription page
+                window.location.href = `/t/${tenantId}/settings/subscription`;
+              }}
+            />
+          </div>
+          
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* System Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <AnimatedCard delay={0} hover={false}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -835,15 +847,16 @@ export default function AdminDashboardPage() {
                 <p><strong>Cache types cleared:</strong></p>
                 <ul className="mt-1 space-y-1">
                   <li>• Directory listings and search results</li>
-                  <li>• Product and store data</li>
                   <li>• User preferences and session data</li>
-                  <li>• API response caches</li>
-                  <li>• Location and behavior tracking data</li>
+                  <li>• Product data and inventory</li>
+                  <li>• API responses and computed values</li>
                 </ul>
               </div>
             </div>
           </CardContent>
         </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

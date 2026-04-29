@@ -256,8 +256,18 @@ class SubscriptionBillingService extends TenantApiSingleton {
     tier: string,
     billingCycle: 'monthly' | 'annual' = 'monthly'
   ): Promise<SubscriptionPreview> {
+    // Get current tenant ID from URL or context
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenantIdFromUrl = urlParams.get('tenantId');
+    const tenantIdFromContext = await this.getCurrentTenantId();
+    const tenantId = tenantIdFromUrl || tenantIdFromContext;
+    
+    if (!tenantId) {
+      throw new Error('No tenant context available. Please ensure you are on a tenant page.');
+    }
+    
     const response = await this.makeDefaultRequest<SubscriptionPreview>(
-      `/api/subscription/preview?tier=${tier}&billingCycle=${billingCycle}`,
+      `/api/subscription/preview?tier=${tier}&billingCycle=${billingCycle}&tenantId=${tenantId}`,
       { method: 'GET' },
       'subscription-preview'
     );

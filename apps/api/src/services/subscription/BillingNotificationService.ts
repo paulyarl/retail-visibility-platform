@@ -17,6 +17,7 @@ export type BillingNotificationType =
   | 'grace_period_warning'
   | 'grace_period_final'
   | 'payment_method_update_reminder'
+  | 'payment_method_added'
   | 'subscription_canceled'
   | 'subscription_reactivated'
   | 'tier_changed'
@@ -35,6 +36,7 @@ export interface BillingNotificationData {
   gracePeriodDaysRemaining?: number;
   reason?: string;
   invoiceId?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface EmailPayload {
@@ -54,7 +56,9 @@ class BillingNotificationService {
       // Get tenant owner email
       const owner = await this.getTenantOwner(data.tenantId);
       if (!owner) {
-        console.error(`[BillingNotification] No owner found for tenant ${data.tenantId}`);
+        console.error(`[BillingNotification] No email found for tenant ${data.tenantId}`);
+        // Still log the notification attempt
+        await this.logNotification(data, false);
         return false;
       }
 
@@ -70,6 +74,8 @@ class BillingNotificationService {
       return sent;
     } catch (error) {
       console.error('[BillingNotification] Error sending notification:', error);
+      // Still log the failed attempt
+      await this.logNotification(data, false);
       return false;
     }
   }
@@ -84,18 +90,43 @@ class BillingNotificationService {
       select: { email: true, contact_person: true }
     });
 
-    if (!businessProfile?.email) return null;
+    if (businessProfile?.email) {
+      // Get tenant name as fallback
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { name: true }
+      });
 
-    // Get tenant name as fallback
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: { name: true }
+      return {
+        email: businessProfile.email,
+        name: businessProfile.contact_person || tenant?.name || 'Tenant'
+      };
+    }
+
+    // Fallback: Get the owner user's email
+    const ownerUser = await prisma.users.findFirst({
+      where: { 
+        role: 'OWNER',
+        user_tenants: {
+          some: { tenant_id: tenantId }
+        }
+      },
+      select: { email: true, first_name: true, last_name: true }
     });
 
-    return {
-      email: businessProfile.email,
-      name: businessProfile.contact_person || tenant?.name || 'Tenant'
-    };
+    if (ownerUser) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { name: true }
+      });
+
+      return {
+        email: ownerUser.email,
+        name: `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() || tenant?.name || 'Tenant'
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -152,6 +183,14 @@ class BillingNotificationService {
           subject: `Reminder: Update Your Payment Method - ${businessName}`,
           html: this.buildPaymentMethodReminderHtml(ownerName, businessName, data),
           text: this.buildPaymentMethodReminderText(ownerName, businessName, data),
+        };
+
+      case 'payment_method_added':
+        return {
+          to: toEmail,
+          subject: `Payment Method Added - ${businessName}`,
+          html: this.buildPaymentMethodAddedHtml(ownerName, businessName, data),
+          text: this.buildPaymentMethodAddedText(ownerName, businessName, data),
         };
 
       case 'subscription_canceled':
@@ -569,6 +608,52 @@ Your new plan is now active.`;
     }
 
     return results;
+  }
+
+  // Email templates - Payment Method Added
+  private buildPaymentMethodAddedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const paymentType = data.metadata?.paymentType || 'payment method';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+          <h1>Payment Method Added</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9f9f9;">
+          <p>Hi ${name},</p>
+          <p>Your ${paymentType} has been successfully added to ${business}.</p>
+          <p>You can now use this payment method for subscription payments and other transactions.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/billing/payment-methods" 
+               style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+              Manage Payment Methods
+            </a>
+          </div>
+          <p>Thank you for keeping your payment information up to date!</p>
+        </div>
+        <div style="background-color: #333; color: white; padding: 20px; text-align: center; font-size: 12px;">
+          <p>${business}</p>
+          <p>If you didn't add this payment method, please contact support immediately.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  private buildPaymentMethodAddedText(name: string, business: string, data: BillingNotificationData): string {
+    const paymentType = data.metadata?.paymentType || 'payment method';
+    return `
+Hi ${name},
+
+Your ${paymentType} has been successfully added to ${business}.
+
+You can now use this payment method for subscription payments and other transactions.
+
+Manage your payment methods at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/billing/payment-methods
+
+Thank you for keeping your payment information up to date!
+
+${business}
+If you didn't add this payment method, please contact support immediately.
+    `.trim();
   }
 }
 
