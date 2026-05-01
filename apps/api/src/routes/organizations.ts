@@ -760,13 +760,21 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
       });
     }
 
-    // Get source item
+    // Get source item with slug registry
     const sourceItem = await prisma.inventory_items.findUnique({
       where: { id: sourceItemId },
       include: {
         photo_assets: true,
       },
     });
+
+    // Get source item's slug registry entry if exists
+    const sourceSlugRegistry = sourceItem ? await prisma.product_slug_registry.findFirst({
+      where: {
+        tenant_id: sourceItem.tenant_id,
+        original_sku: sourceItem.sku,
+      },
+    }) : null;
 
     if (!sourceItem) {
       return res.status(400).json({ 
@@ -883,6 +891,28 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
               featured_type: sourceItem.featured_type,
             },
           });
+
+          // Update slug registry entry if exists
+          if (sourceSlugRegistry) {
+            await prisma.product_slug_registry.upsert({
+              where: {
+                product_slug: sourceSlugRegistry.product_slug,
+              },
+              update: {
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+              },
+              create: {
+                id: `psr-${generateItemId()}`,
+                product_slug: sourceSlugRegistry.product_slug,
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+                created_at: new Date(),
+              },
+            });
+          }
 
           // Delete old photos and copy new ones
           await prisma.photo_assets.deleteMany({
@@ -1005,6 +1035,21 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             featured_type: sourceItem.featured_type,
           },
         });
+
+        // Create slug registry entry if source has one
+        if (sourceSlugRegistry) {
+          await prisma.product_slug_registry.create({
+            data: {
+              id: `psr-${generateItemId()}`,
+              product_slug: sourceSlugRegistry.product_slug,
+              universal_sku: sourceSlugRegistry.universal_sku,
+              slug_hash: sourceSlugRegistry.slug_hash,
+              tenant_id: tenantId,
+              original_sku: sourceItem.sku,
+              created_at: new Date(),
+            },
+          });
+        }
 
         // Copy photos if any
         if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
@@ -1169,10 +1214,95 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
       where: { 
         id: { in: sourceItemIds },
       },
-      include: {
-        photo_assets: true,
+      select: {
+        id: true,
+        tenant_id: true,
+        sku: true,
+        name: true,
+        price_cents: true,
+        stock: true,
+        image_url: true,
+        metadata: true,
+        marketing_description: true,
+        image_gallery: true,
+        custom_cta: true,
+        social_links: true,
+        custom_branding: true,
+        custom_sections: true,
+        landing_page_theme: true,
+        audit_log_id: true,
+        availability: true,
+        brand: true,
+        category_path: true,
+        directory_category_id: true,
+        condition: true,
+        currency: true,
+        description: true,
+        eligibility_reason: true,
+        gtin: true,
+        item_status: true,
+        location_id: true,
+        merchant_name: true,
+        mpn: true,
+        price: true,
+        quantity: true,
+        sync_status: true,
+        synced_at: true,
+        title: true,
+        visibility: true,
+        manufacturer: true,
+        source: true,
+        enrichment_status: true,
+        enriched_at: true,
+        enriched_by: true,
+        enriched_from_barcode: true,
+        missing_images: true,
+        missing_description: true,
+        missing_specs: true,
+        missing_brand: true,
+        sale_price_cents: true,
+        payment_gateway_type: true,
+        payment_gateway_id: true,
+        product_type: true,
+        digital_delivery_method: true,
+        digital_assets: true,
+        access_duration_days: true,
+        download_limit: true,
+        license_type: true,
+        has_variants: true,
+        is_featured: true,
+        featured_at: true,
+        featured_until: true,
+        featured_priority: true,
+        featured_type: true,
+        photo_assets: {
+          select: {
+            id: true,
+            url: true,
+            width: true,
+            height: true,
+            contentType: true,
+            bytes: true,
+            position: true,
+            alt: true,
+            caption: true,
+          },
+        },
       },
     });
+
+    // Get all source slug registry entries
+    const sourceSlugRegistries = await prisma.product_slug_registry.findMany({
+      where: {
+        tenant_id: { in: sourceItems.map(item => item.tenant_id) },
+        original_sku: { in: sourceItems.map(item => item.sku) },
+      },
+    });
+
+    // Create a map for quick lookup
+    const slugRegistryMap = new Map(
+      sourceSlugRegistries.map(registry => [`${registry.tenant_id}-${registry.original_sku}`, registry])
+    );
 
     if (sourceItems.length === 0) {
       return res.status(400).json({ 
@@ -1237,6 +1367,29 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
               sourceItem.directory_category_id,
               tenantId
             );
+
+            // Update slug registry entry if exists
+            const sourceSlugRegistry = slugRegistryMap.get(`${sourceItem.tenant_id}-${sourceItem.sku}`);
+            if (sourceSlugRegistry) {
+              await prisma.product_slug_registry.upsert({
+                where: {
+                  product_slug: sourceSlugRegistry.product_slug,
+                },
+                update: {
+                  tenant_id: tenantId,
+                  original_sku: sourceItem.sku,
+                },
+                create: {
+                  id: `psr-${generateItemId()}`,
+                  product_slug: sourceSlugRegistry.product_slug,
+                  universal_sku: sourceSlugRegistry.universal_sku,
+                  slug_hash: sourceSlugRegistry.slug_hash,
+                  tenant_id: tenantId,
+                  original_sku: sourceItem.sku,
+                  created_at: new Date(),
+                },
+              });
+            }
             
             // Update mode - update existing item
             const updatedItem = await prisma.inventory_items.update({
@@ -1417,6 +1570,22 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
             featured_type: sourceItem.featured_type,
             } as any,
           });
+
+          // Create slug registry entry if source has one
+          const sourceSlugRegistry = slugRegistryMap.get(`${sourceItem.tenant_id}-${sourceItem.sku}`);
+          if (sourceSlugRegistry) {
+            await prisma.product_slug_registry.create({
+              data: {
+                id: `psr-${generateItemId()}`,
+                product_slug: sourceSlugRegistry.product_slug,
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+                created_at: new Date(),
+              },
+            });
+          }
 
           // Copy photos if any
           if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {

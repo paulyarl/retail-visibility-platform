@@ -7351,6 +7351,21 @@ console.log('✅ Organizations routes mounted at /organizations');
 app.use('/api/organizations', authenticateToken, organizationRoutes);
 console.log('✅ Organizations routes mounted at /api/organizations (with authentication)');
 
+/* ------------------------------ hero location ------------------------------ */
+import heroLocationRoutes from './routes/hero-location';
+app.use('/api/hero-location', heroLocationRoutes);
+console.log('✅ Hero location routes mounted at /api/hero-location');
+
+/* ------------------------------ order management ------------------------------ */
+import orderManagementRoutes from './routes/order-management';
+app.use('/api/order-management', orderManagementRoutes);
+console.log('✅ Order management routes mounted at /api/order-management');
+
+/* ------------------------------ fulfillment coordination ------------------------------ */
+import fulfillmentRoutes from './routes/fulfillment';
+app.use('/api/fulfillment', fulfillmentRoutes);
+console.log('✅ Fulfillment coordination routes mounted at /api/fulfillment');
+
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';
 import squareRoutes from './routes/integrations/square';

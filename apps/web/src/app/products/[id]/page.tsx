@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import Link from 'next/link';
+// import Link from 'next/link';
 import Image from 'next/image';
 import ProductGallery from '@/components/products/ProductGallery';
 
@@ -8,11 +8,11 @@ import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 
 // Product Components
-import { ProductNavigation } from '@/components/products/ProductNavigation';
+// import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
 import { FeaturedTypeProducts } from '@/components/products/FeaturedTypeProducts';
 import LastViewed from '@/components/directory/LastViewed';
-import { computeStoreStatus } from '@/lib/hours-utils';
+// import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -21,8 +21,8 @@ import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 // import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsWrapper';
 import DirectoryActions from '@/components/directory/DirectoryActions';
-import { Badge, Group } from '@mantine/core';
-import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
+// import { Badge, Group } from '@mantine/core';
+// import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 import { productDataService } from '@/services/ProductDataService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';

@@ -19,7 +19,7 @@ import { createSquareBatchProcessor } from '../services/square/batch-processor';
 const squareIntegrationService = new SquareIntegrationService();
 
 // Test configuration
-const TEST_TENANT_ID = process.env.TEST_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+const TEST_TENANT_ID = process.env.TEST_TENANT_ID || 'tid-mrsyk3w6';
 const TEST_AUTH_CODE = process.env.TEST_AUTH_CODE; // Optional: from OAuth flow
 
 // Colors for console output

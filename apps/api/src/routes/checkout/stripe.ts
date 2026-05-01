@@ -60,7 +60,7 @@ router.post('/create-payment-intent', async (req, res) => {
       where: { id: paymentId },
       data: {
         gateway_transaction_id: result.paymentIntentId,
-        payment_method: 'stripe',
+        payment_method: 'credit_card',
         payment_status: 'pending',
         platform_fee_cents: result.platformFeeCents,
         updated_at: new Date(),

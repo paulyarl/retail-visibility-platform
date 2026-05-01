@@ -767,6 +767,34 @@ model gbp_sync_tracking {
   @@index([tenant_id], map: "idx_gbp_sync_tracking_tenant_id")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model global_product_catalog {
+  id               String          @id @db.VarChar(255)
+  product_slug     String          @unique @db.VarChar(255)
+  universal_sku    String?         @unique @db.VarChar(255)
+  name             String          @db.VarChar(500)
+  brand            String?         @db.VarChar(200)
+  category_path    String[]
+  gtin_upc         String?         @unique @db.VarChar(50)
+  description      String?
+  specifications   Json?
+  images           Json?
+  status           String?         @default("active") @db.VarChar(20)
+  source           catalog_source? @default(platform)
+  catalog_metadata Json?
+  created_at       DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?       @default(now()) @db.Timestamp(6)
+
+  @@index([brand], map: "idx_global_products_brand")
+  @@index([category_path], map: "idx_global_products_category", type: Gin)
+  @@index([product_slug], map: "idx_global_products_slug")
+  @@index([source], map: "idx_global_products_source")
+  @@index([status], map: "idx_global_products_status")
+  @@index([universal_sku], map: "idx_global_products_universal_sku")
+  @@index([gtin_upc], map: "idx_global_products_upc")
+}
+
 model google_merchant_links_list {
   id                         String                     @id
   account_id                 String
@@ -1219,61 +1247,63 @@ model order_status_history {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model orders {
-  id                      String                  @id @db.VarChar(255)
-  tenant_id               String                  @db.VarChar(255)
-  customer_id             String?                 @db.VarChar(255)
-  order_number            String                  @unique @db.VarChar(255)
-  order_status            order_status            @default(draft)
-  payment_status          payment_status          @default(pending)
-  fulfillment_status      fulfillment_status      @default(unfulfilled)
-  subtotal_cents          Int                     @default(0)
-  tax_cents               Int                     @default(0)
-  shipping_cents          Int                     @default(0)
-  discount_cents          Int                     @default(0)
-  total_cents             Int                     @default(0)
-  currency                String                  @default("USD") @db.VarChar(3)
-  customer_email          String                  @db.VarChar(255)
-  customer_name           String?                 @db.VarChar(255)
-  customer_phone          String?                 @db.VarChar(50)
-  shipping_address_line1  String?                 @db.VarChar(255)
-  shipping_address_line2  String?                 @db.VarChar(255)
-  shipping_city           String?                 @db.VarChar(100)
-  shipping_state          String?                 @db.VarChar(100)
-  shipping_postal_code    String?                 @db.VarChar(20)
-  shipping_country        String?                 @default("US") @db.VarChar(2)
-  billing_address_line1   String?                 @db.VarChar(255)
-  billing_address_line2   String?                 @db.VarChar(255)
-  billing_city            String?                 @db.VarChar(100)
-  billing_state           String?                 @db.VarChar(100)
-  billing_postal_code     String?                 @db.VarChar(20)
-  billing_country         String?                 @default("US") @db.VarChar(2)
-  notes                   String?
-  internal_notes          String?
-  metadata                Json?                   @default("{}")
-  source                  String?                 @db.VarChar(50)
-  source_id               String?                 @db.VarChar(255)
-  ip_address              String?                 @db.VarChar(45)
-  user_agent              String?
-  confirmed_at            DateTime?               @db.Timestamp(6)
-  paid_at                 DateTime?               @db.Timestamp(6)
-  fulfilled_at            DateTime?               @db.Timestamp(6)
-  cancelled_at            DateTime?               @db.Timestamp(6)
-  created_at              DateTime                @default(now()) @db.Timestamp(6)
-  updated_at              DateTime                @default(now()) @db.Timestamp(6)
-  shipping_provider       String?                 @db.VarChar(50)
-  checkout_mode           String?                 @db.VarChar(20)
-  deposit_percentage      Decimal?                @db.Decimal(5, 2)
-  deposit_cents           Int?                    @default(0)
-  remaining_balance_cents Int?                    @default(0)
-  deposit_forfeited_at    DateTime?               @db.Timestamp(6)
-  pickup_deadline         DateTime?               @db.Timestamp(6)
-  digital_access_grants   digital_access_grants[]
-  order_items             order_items[]
-  order_status_history    order_status_history[]
-  tenants                 tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
-  payments                payments[]
-  refunds                 refunds[]
-  shipments               shipments[]
+  id                        String                      @id @db.VarChar(255)
+  tenant_id                 String                      @db.VarChar(255)
+  customer_id               String?                     @db.VarChar(255)
+  order_number              String                      @unique @db.VarChar(255)
+  order_status              order_status                @default(draft)
+  payment_status            payment_status              @default(pending)
+  fulfillment_status        fulfillment_status          @default(unfulfilled)
+  subtotal_cents            Int                         @default(0)
+  tax_cents                 Int                         @default(0)
+  shipping_cents            Int                         @default(0)
+  discount_cents            Int                         @default(0)
+  total_cents               Int                         @default(0)
+  currency                  String                      @default("USD") @db.VarChar(3)
+  customer_email            String                      @db.VarChar(255)
+  customer_name             String?                     @db.VarChar(255)
+  customer_phone            String?                     @db.VarChar(50)
+  shipping_address_line1    String?                     @db.VarChar(255)
+  shipping_address_line2    String?                     @db.VarChar(255)
+  shipping_city             String?                     @db.VarChar(100)
+  shipping_state            String?                     @db.VarChar(100)
+  shipping_postal_code      String?                     @db.VarChar(20)
+  shipping_country          String?                     @default("US") @db.VarChar(2)
+  billing_address_line1     String?                     @db.VarChar(255)
+  billing_address_line2     String?                     @db.VarChar(255)
+  billing_city              String?                     @db.VarChar(100)
+  billing_state             String?                     @db.VarChar(100)
+  billing_postal_code       String?                     @db.VarChar(20)
+  billing_country           String?                     @default("US") @db.VarChar(2)
+  notes                     String?
+  internal_notes            String?
+  metadata                  Json?                       @default("{}")
+  source                    String?                     @db.VarChar(50)
+  source_id                 String?                     @db.VarChar(255)
+  ip_address                String?                     @db.VarChar(45)
+  user_agent                String?
+  confirmed_at              DateTime?                   @db.Timestamp(6)
+  paid_at                   DateTime?                   @db.Timestamp(6)
+  fulfilled_at              DateTime?                   @db.Timestamp(6)
+  cancelled_at              DateTime?                   @db.Timestamp(6)
+  created_at                DateTime                    @default(now()) @db.Timestamp(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamp(6)
+  shipping_provider         String?                     @db.VarChar(50)
+  checkout_mode             String?                     @db.VarChar(20)
+  deposit_percentage        Decimal?                    @db.Decimal(5, 2)
+  deposit_cents             Int?                        @default(0)
+  remaining_balance_cents   Int?                        @default(0)
+  deposit_forfeited_at      DateTime?                   @db.Timestamp(6)
+  pickup_deadline           DateTime?                   @db.Timestamp(6)
+  digital_access_grants     digital_access_grants[]
+  fulfillment_notifications fulfillment_notifications[]
+  fulfillment_schedules     fulfillment_schedules?
+  order_items               order_items[]
+  order_status_history      order_status_history[]
+  tenants                   tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
+  payments                  payments[]
+  refunds                   refunds[]
+  shipments                 shipments[]
 
   @@index([checkout_mode], map: "idx_orders_checkout_mode")
   @@index([customer_email], map: "idx_orders_customer_email")
@@ -1721,6 +1751,22 @@ model product_queue {
   @@index([tenant_id], map: "idx_product_queue_tenant_id")
   @@index([tenant_id, priority, status], map: "idx_product_queue_tenant_priority_status")
   @@index([tenant_id, status], map: "idx_product_queue_tenant_status")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model product_slug_registry {
+  id            String    @id @db.VarChar(255)
+  product_slug  String    @unique @db.VarChar(255)
+  universal_sku String?   @unique @db.VarChar(255)
+  slug_hash     String?   @unique @db.VarChar(64)
+  tenant_id     String?   @db.VarChar(255)
+  original_sku  String?   @db.VarChar(255)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([slug_hash], map: "idx_slug_registry_hash")
+  @@index([tenant_id], map: "idx_slug_registry_tenant")
+  @@index([universal_sku], map: "idx_slug_registry_universal_sku")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -2319,32 +2365,33 @@ model subscription_payments {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model subscription_tiers_list {
-  id                       String               @id
-  tier_key                 String               @unique
+  id                       String                     @id
+  tier_key                 String                     @unique
   name                     String
   display_name             String
   description              String?
-  price_monthly            Decimal              @db.Decimal(10, 2)
+  price_monthly            Decimal                    @db.Decimal(10, 2)
   max_skus                 Int?
   max_locations            Int?
-  tier_type                String               @default("individual")
-  is_active                Boolean              @default(true)
-  sort_order               Int                  @default(0)
+  tier_type                String                     @default("individual")
+  is_active                Boolean                    @default(true)
+  sort_order               Int                        @default(0)
   metadata                 Json?
-  created_at               DateTime             @default(now())
-  updated_at               DateTime             @default(now())
+  created_at               DateTime                   @default(now())
+  updated_at               DateTime                   @default(now())
   updated_by               String?
   created_by               String?
-  featured_store_selection Int                  @default(0)
-  featured_new_arrival     Int                  @default(0)
-  featured_seasonal        Int                  @default(0)
-  featured_sale            Int                  @default(0)
-  featured_staff_pick      Int                  @default(0)
-  featured_bestseller      Int                  @default(0)
-  featured_clearance       Int                  @default(0)
-  featured_trending        Int                  @default(0)
-  featured_featured        Int                  @default(0)
-  featured_recommended     Int                  @default(0)
+  featured_store_selection Int                        @default(0)
+  featured_new_arrival     Int                        @default(0)
+  featured_seasonal        Int                        @default(0)
+  featured_sale            Int                        @default(0)
+  featured_staff_pick      Int                        @default(0)
+  featured_bestseller      Int                        @default(0)
+  featured_clearance       Int                        @default(0)
+  featured_trending        Int                        @default(0)
+  featured_featured        Int                        @default(0)
+  featured_recommended     Int                        @default(0)
+  tier_catalog_permissions tier_catalog_permissions[]
   tier_features_list       tier_features_list[]
 }
 
@@ -2607,10 +2654,14 @@ model tenants {
   business_hours_list                                                                    business_hours_list?
   business_hours_special_list                                                            business_hours_special_list[]
   category_mirror_runs                                                                   category_mirror_runs[]
+  customer_tenant_relationships                                                          customer_tenant_relationships[]
   directory_featured_listings_list                                                       directory_featured_listings_list[]
   directory_photos                                                                       directory_photos[]
   directory_settings_list                                                                directory_settings_list?
   featured_products                                                                      featured_products[]
+  fulfillment_notifications                                                              fulfillment_notifications[]
+  fulfillment_schedules                                                                  fulfillment_schedules[]
+  fulfillment_time_slots                                                                 fulfillment_time_slots[]
   gbp_attributes                                                                         gbp_attributes[]
   gbp_media                                                                              gbp_media[]
   gbp_posts                                                                              gbp_posts[]
@@ -2708,6 +2759,26 @@ model ticker_messages {
   created_by      String?
 
   @@index([type], map: "idx_ticker_messages_type")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tier_catalog_permissions {
+  id                             String                    @id @db.VarChar(255)
+  tier_id                        String?                   @db.VarChar(255)
+  can_browse_global_catalog      Boolean?                  @default(true)
+  can_add_from_global_catalog    Boolean?                  @default(true)
+  can_override_global_inclusion  Boolean?                  @default(false)
+  can_remove_from_global_catalog Boolean?                  @default(false)
+  can_edit_global_catalog        Boolean?                  @default(false)
+  default_global_inclusion       Boolean?                  @default(true)
+  can_opt_out_global_inclusion   Boolean?                  @default(false)
+  catalog_visibility_level       catalog_visibility_level? @default(public)
+  max_catalog_products           Int?
+  created_at                     DateTime?                 @default(now()) @db.Timestamp(6)
+  subscription_tiers_list        subscription_tiers_list?  @relation(fields: [tier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tier_id], map: "idx_tier_permissions_tier")
 }
 
 model tier_change_logs_list {
@@ -2907,6 +2978,147 @@ model webhook_events {
   @@index([processed], map: "idx_webhook_events_processed")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_tenant_relationships {
+  id                    String    @id
+  customer_id           String
+  tenant_id             String
+  customer_segment      String?   @default("regular")
+  loyalty_points        Int?      @default(0)
+  tenant_orders         Int?      @default(0)
+  tenant_value_cents    Int?      @default(0)
+  first_tenant_order_at DateTime? @db.Timestamp(6)
+  last_tenant_order_at  DateTime? @db.Timestamp(6)
+  tenant_tags           Json?     @default("[]")
+  tenant_preferences    Json?     @default("{}")
+  internal_notes        String?
+  is_active             Boolean?  @default(true)
+  created_at            DateTime  @default(now()) @db.Timestamp(6)
+  updated_at            DateTime  @default(now()) @db.Timestamp(6)
+  customers             customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_customer")
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_tenant")
+
+  @@unique([customer_id, tenant_id], map: "customer_tenant_relationships_unique")
+  @@index([customer_id], map: "idx_customer_tenant_customer")
+  @@index([last_tenant_order_at], map: "idx_customer_tenant_last_order")
+  @@index([loyalty_points], map: "idx_customer_tenant_loyalty")
+  @@index([customer_segment], map: "idx_customer_tenant_segment")
+  @@index([tenant_id], map: "idx_customer_tenant_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customers {
+  id                            String                          @id
+  customer_number               String                          @unique(map: "customers_customer_number_unique")
+  email                         String                          @unique(map: "customers_email_unique")
+  first_name                    String?
+  last_name                     String?
+  phone                         String?
+  date_of_birth                 DateTime?                       @db.Date
+  gender                        String?
+  preferred_language            String?                         @default("en")
+  timezone                      String?                         @default("UTC")
+  marketing_consent             Boolean?                        @default(false)
+  sms_consent                   Boolean?                        @default(false)
+  email_consent                 Boolean?                        @default(true)
+  platform_orders               Int?                            @default(0)
+  platform_value_cents          Int?                            @default(0)
+  first_platform_order_at       DateTime?                       @db.Timestamp(6)
+  last_platform_order_at        DateTime?                       @db.Timestamp(6)
+  tags                          Json?                           @default("[]")
+  preferences                   Json?                           @default("{}")
+  metadata                      Json?                           @default("{}")
+  created_at                    DateTime                        @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime                        @default(now()) @db.Timestamp(6)
+  customer_tenant_relationships customer_tenant_relationships[]
+
+  @@index([created_at], map: "idx_customers_created_at")
+  @@index([email], map: "idx_customers_email")
+  @@index([last_platform_order_at], map: "idx_customers_last_platform_order")
+  @@index([first_name, last_name], map: "idx_customers_name")
+  @@index([phone], map: "idx_customers_phone")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_notifications {
+  id                String    @id
+  order_id          String
+  tenant_id         String
+  customer_id       String
+  notification_type String
+  channel           String
+  status            String    @default("pending")
+  content           String
+  scheduled_at      DateTime? @db.Timestamp(6)
+  sent_at           DateTime? @db.Timestamp(6)
+  error             String?
+  metadata          Json?     @default("{}")
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @default(now()) @db.Timestamp(6)
+  orders            orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_order")
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_tenant")
+
+  @@index([channel], map: "idx_fulfillment_notifications_channel")
+  @@index([customer_id], map: "idx_fulfillment_notifications_customer")
+  @@index([order_id], map: "idx_fulfillment_notifications_order")
+  @@index([status], map: "idx_fulfillment_notifications_status")
+  @@index([tenant_id], map: "idx_fulfillment_notifications_tenant")
+  @@index([notification_type], map: "idx_fulfillment_notifications_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_schedules {
+  id                     String                  @id
+  order_id               String                  @unique(map: "fulfillment_schedules_order_id_unique")
+  tenant_id              String
+  scheduled_date         DateTime                @db.Date
+  scheduled_time         DateTime                @db.Time(6)
+  fulfillment_method     String                  @default("pickup")
+  time_slot_id           String?
+  customer_name          String
+  customer_email         String
+  customer_phone         String?
+  order_status           String                  @default("confirmed")
+  notes                  String?
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
+  orders                 orders                  @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_order")
+  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_tenant")
+  fulfillment_time_slots fulfillment_time_slots? @relation(fields: [time_slot_id], references: [id], onUpdate: NoAction, map: "fk_fulfillment_schedules_time_slot")
+
+  @@index([scheduled_date], map: "idx_fulfillment_schedules_date")
+  @@index([fulfillment_method], map: "idx_fulfillment_schedules_method")
+  @@index([order_id], map: "idx_fulfillment_schedules_order")
+  @@index([order_status], map: "idx_fulfillment_schedules_status")
+  @@index([tenant_id], map: "idx_fulfillment_schedules_tenant")
+  @@index([time_slot_id], map: "idx_fulfillment_schedules_time_slot")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_time_slots {
+  id                    String                  @id
+  tenant_id             String
+  date                  DateTime                @db.Date
+  start_time            DateTime                @db.Time(6)
+  end_time              DateTime                @db.Time(6)
+  max_orders            Int                     @default(4)
+  is_active             Boolean                 @default(true)
+  fulfillment_method    String                  @default("pickup")
+  created_at            DateTime                @default(now()) @db.Timestamp(6)
+  updated_at            DateTime                @default(now()) @db.Timestamp(6)
+  fulfillment_schedules fulfillment_schedules[]
+  tenants               tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_time_slots_tenant")
+
+  @@index([is_active], map: "idx_fulfillment_time_slots_active")
+  @@index([date], map: "idx_fulfillment_time_slots_date")
+  @@index([fulfillment_method], map: "idx_fulfillment_time_slots_method")
+  @@index([tenant_id], map: "idx_fulfillment_time_slots_tenant")
+}
+
 enum action {
   create
   update
@@ -2927,6 +3139,18 @@ enum availability_status {
   in_stock
   out_of_stock
   preorder
+}
+
+enum catalog_source {
+  platform
+  merchant
+  partner
+}
+
+enum catalog_visibility_level {
+  public
+  organization
+  private
 }
 
 enum digital_delivery_method {
@@ -3024,8 +3248,6 @@ enum payment_method {
   credit_card
   debit_card
   paypal
-  stripe
-  square
   apple_pay
   google_pay
   cash

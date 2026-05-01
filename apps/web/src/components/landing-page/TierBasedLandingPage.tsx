@@ -12,6 +12,7 @@ import ProductActions from '@/components/products/ProductActions';
 import ProductVariantSelector from '@/components/products/ProductVariantSelector';
 import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
+import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
 import Link from 'next/link';
 import { TenantPaymentProvider, useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
@@ -1462,6 +1463,20 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                   </>
                 )}
               </dl>
+            </div>
+          )}
+
+          {/* Multi-Location Availability */}
+          {tenant.organizationId && (
+            <div className="mb-6">
+              <LocationAvailabilitySection
+                productSlug={product.sku || product.id}
+                productName={product.name}
+                organizationId={tenant.organizationId}
+                preferredTenantId={product.tenantId}
+                maxDistance={50}
+                maxResults={5}
+              />
             </div>
           )}
 

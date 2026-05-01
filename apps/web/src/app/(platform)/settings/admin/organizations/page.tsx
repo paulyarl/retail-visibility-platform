@@ -235,7 +235,7 @@ export default function AdminOrganizationsPage() {
               Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
             </p>
           ) : <div />}
-          <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>+ Create New Organization</Button>
+          <Button variant="filled" style={{ color: 'white' }} size="sm" onClick={() => setShowCreateModal(true)}>+ Create New Organization</Button>
         </div>
 
         {organizations.length === 0 ? (
@@ -283,9 +283,9 @@ export default function AdminOrganizationsPage() {
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="primary" size="sm" onClick={() => window.location.href = `/settings/organization?organizationId=${org.id}`}>View Dashboard</Button>
-                  <Button variant="secondary" size="sm" onClick={() => openManageModal(org)}>Manage Locations</Button>
-                  <Button variant="secondary" size="sm" onClick={() => openEditTierModal(org)}>Edit Tier</Button>
+                  <Button variant="filled" style={{ color: 'white' }} size="sm" onClick={() => window.location.href = `/settings/organization?organizationId=${org.id}`}>View Dashboard</Button>
+                  <Button variant="filled" style={{ color: 'white' }} size="sm" onClick={() => openManageModal(org)}>Manage Locations</Button>
+                  <Button variant="filled" style={{ color: 'white' }} size="sm" onClick={() => openEditTierModal(org)}>Edit Tier</Button>
                 </div>
               </div>
             </Card>

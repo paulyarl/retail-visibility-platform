@@ -26,6 +26,10 @@ import paymentGatewaysRoutes from '../payment-gateways';
 import digitalDownloadsRoutes from '../digital-downloads';
 import shopCategoriesRoutes from '../shop-categories';
 import tenantLogoRoutes from '../tenant-logo';
+import globalCatalogRoutes from '../global-catalog';
+import catalogSlugsRoutes from '../catalog-slugs';
+import catalogAdoptionRoutes from '../catalog-adoption';
+import locationAvailabilityRoutes from '../location-availability';
 
 /**
  * Mount core business routes
@@ -71,6 +75,12 @@ export function mountCoreRoutes(app: Express) {
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/shop-categories', shopCategoriesRoutes);
   app.use('/api/public/tenant', tenantLogoRoutes);
+  
+  // Global catalog routes (public access for browsing)
+  app.use('/api/catalog', globalCatalogRoutes);
+  app.use('/api/catalog/slugs', catalogSlugsRoutes);
+  app.use('/api/catalog', catalogAdoptionRoutes);
+  app.use('/api/catalog/availability', locationAvailabilityRoutes);
 
   console.log('✅ Core business routes mounted');
 }

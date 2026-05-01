@@ -34,6 +34,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       notes,
       source = 'web',
       fulfillment_method,
+      pickup_tenant_id, // Multi-location: selected pickup location
     } = req.body;
 
     // Validation
@@ -68,6 +69,42 @@ router.post('/orders', async (req: Request, res: Response) => {
           break;
         }
       }
+    }
+
+    // Multi-location checkout: use pickup_tenant_id if provided
+    // This allows orgs with multiple locations to specify pickup location
+    if (pickup_tenant_id) {
+      // Validate pickup location has all items in stock
+      const { checkoutLocationService } = await import('../services/CheckoutLocationService');
+      const validation = await checkoutLocationService.validateLocationForCart(
+        pickup_tenant_id,
+        items.map((item: any) => ({
+          inventoryItemId: item.id,
+          productSlug: item.productSlug,
+          sku: item.sku,
+          quantity: item.quantity,
+        }))
+      );
+      
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: 'pickup_location_unavailable',
+          message: `Selected pickup location does not have all items: ${validation.missingItems.join(', ')}`,
+          missingItems: validation.missingItems,
+        });
+      }
+      
+      // Use pickup location as the order tenant
+      tenant_id = pickup_tenant_id;
+    }
+
+    // Route payment through hero location if this is an organization order
+    let paymentTenantId = tenant_id;
+    if (tenant_id && tenant_id !== 'demo-tenant') {
+      const { HeroLocationService } = await import('../services/HeroLocationService');
+      const heroLocationService = HeroLocationService.getInstance();
+      paymentTenantId = await heroLocationService.routeOrderPayment(tenant_id);
     }
 
     // Fallback to demo-tenant if no tenant found (for testing)
@@ -245,7 +282,11 @@ router.post('/orders', async (req: Request, res: Response) => {
         order_status: 'draft',
         source,
         notes,
-        metadata: fulfillment_method ? { fulfillment_method } : {},
+        metadata: {
+          ...(fulfillment_method ? { fulfillment_method } : {}),
+          ...(pickup_tenant_id ? { pickup_tenant_id, is_multi_location_order: true } : {}),
+          ...(paymentTenantId !== tenant_id ? { payment_tenant_id: paymentTenantId, is_hero_payment: true } : {}),
+        },
         updated_at: new Date(),
         // Order totals
         subtotal_cents: totals.subtotal_cents,
