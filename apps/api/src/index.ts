@@ -7366,6 +7366,11 @@ import fulfillmentRoutes from './routes/fulfillment';
 app.use('/api/fulfillment', fulfillmentRoutes);
 console.log('✅ Fulfillment coordination routes mounted at /api/fulfillment');
 
+/* ------------------------------ customer management ------------------------------ */
+import customerRoutes from './routes/customers';
+app.use('/api/customers', customerRoutes);
+console.log('✅ Customer management routes mounted at /api/customers');
+
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';
 import squareRoutes from './routes/integrations/square';

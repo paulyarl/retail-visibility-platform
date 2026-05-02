@@ -9,6 +9,10 @@
  */
 
 import { prisma } from '../prisma';
+import { 
+  generateCustomerId,
+  generateCustomerTenantRelationshipId
+} from '../lib/id-generator';
 
 export interface Customer {
   id: string;
@@ -83,7 +87,7 @@ export class CustomerService {
       // Create new customer
       customer = await prisma.customers.create({
         data: {
-          id: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCustomerId(),
           customer_number: customerNumber,
           email: email.toLowerCase(),
           first_name: customerData?.firstName,
@@ -194,7 +198,7 @@ export class CustomerService {
     if (!relationship) {
       relationship = await prisma.customer_tenant_relationships.create({
         data: {
-          id: `rel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCustomerTenantRelationshipId(tenantId),
           customer_id: customerId,
           tenant_id: tenantId,
         },

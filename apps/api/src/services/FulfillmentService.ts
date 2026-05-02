@@ -9,6 +9,12 @@
  */
 
 import { prisma } from '../prisma';
+import { 
+  generateTimeSlotId,
+  generateScheduleId,
+  generateNotificationId
+} from '../lib/id-generator';
+
 import { HeroLocationService } from './HeroLocationService';
 import { OrderManagementService } from './OrderManagementService';
 import { CustomerService } from './CustomerService';
@@ -81,21 +87,23 @@ export class FulfillmentService {
    * Create pickup time slots for a location
    */
   async createTimeSlots(tenantId: string, timeSlots: Omit<PickupTimeSlot, 'id' | 'currentOrders'>[]): Promise<PickupTimeSlot[]> {
+    // Create time slots
     const createdSlots = await Promise.all(
-      timeSlots.map(slot => 
-        prisma.fulfillment_time_slots.create({
+      timeSlots.map(async (slot) => {
+        const createdSlot = await prisma.fulfillment_time_slots.create({
           data: {
-            id: `slot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: generateTimeSlotId(tenantId),
             tenant_id: tenantId,
             date: slot.date,
-            start_time: slot.startTime,
-            end_time: slot.endTime,
+            start_time: new Date(`1970-01-01T${slot.startTime}:00.000Z`),
+            end_time: new Date(`1970-01-01T${slot.endTime}:00.000Z`),
             max_orders: slot.maxOrders,
             is_active: slot.isActive,
             fulfillment_method: slot.fulfillmentMethod,
           },
-        })
-      )
+        });
+        return createdSlot;
+      })
     );
 
     return createdSlots.map(slot => ({
@@ -175,7 +183,7 @@ export class FulfillmentService {
       where: {
         tenant_id: tenantId,
         date: scheduledDate,
-        start_time: scheduledTime,
+        start_time: new Date(`1970-01-01T${scheduledTime}:00.000Z`),
         fulfillment_method: fulfillmentMethod,
         is_active: true,
       },
@@ -214,22 +222,24 @@ export class FulfillmentService {
 
     // Create or update fulfillment schedule
     const schedule = await prisma.fulfillment_schedules.upsert({
-      where: { order_id: orderId },
+      where: {
+        order_id: orderId,
+      },
       update: {
         tenant_id: tenantId,
         scheduled_date: scheduledDate,
-        scheduled_time: scheduledTime,
+        scheduled_time: new Date(`1970-01-01T${scheduledTime}:00.000Z`),
         fulfillment_method: fulfillmentMethod,
         time_slot_id: timeSlot.id,
         notes,
         updated_at: new Date(),
       },
       create: {
-        id: `schedule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: generateScheduleId(tenantId),
         order_id: orderId,
         tenant_id: tenantId,
         scheduled_date: scheduledDate,
-        scheduled_time: scheduledTime,
+        scheduled_time: new Date(`1970-01-01T${scheduledTime}:00.000Z`),
         fulfillment_method: fulfillmentMethod,
         time_slot_id: timeSlot.id,
         customer_name: order.customer_name || '',
@@ -336,19 +346,22 @@ export class FulfillmentService {
     type: 'order_confirmed' | 'ready_for_pickup' | 'pickup_reminder' | 'order_completed' | 'order_cancelled',
     channel: 'email' | 'sms' | 'push',
     content: string,
-    scheduledAt?: Date
+    scheduledAt?: Date,
+    metadata?: any
   ): Promise<FulfillmentNotification> {
+    // Create notification
     const notification = await prisma.fulfillment_notifications.create({
       data: {
-        id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: generateNotificationId(tenantId),
         order_id: orderId,
         tenant_id: tenantId,
         customer_id: customerId,
         notification_type: type,
         channel,
-        content,
-        scheduled_at: scheduledAt,
         status: 'pending',
+        content: content,
+        scheduled_at: scheduledAt,
+        metadata: metadata || {},
       },
     });
 

@@ -109,18 +109,18 @@ export function generateQuickStartSku(index?: number): string {
  * Generates short photo asset IDs
  * Format: photo-abc123 (13 chars)
  */
-export function generatePhotoId(tenantId?: string,itemId?: string): string {
+export function generatePhotoId(tenantId: string,itemId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `phid-${tenantId}-${itemId}-${nanoid()}`;
+  return `phid-${generateTenantKey(tenantId)}-${itemId}-${nanoid()}`;
 }
 
 /**
  * Generates short session IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateSessionId(tenantId?: string): string {
+export function generateSessionId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `sid-${tenantId}-${nanoid()}`;
+  return `sid-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 
@@ -128,9 +128,9 @@ export function generateSessionId(tenantId?: string): string {
  * Generates short order IDs
  * Format: ord-abc123 (12 chars)
  */
-export function generateOrderId(tenantId?: string): string {
+export function generateOrderId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `oid-${tenantId}-${nanoid()}`;
+  return `oid-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -219,7 +219,7 @@ export function generateCloverSyncLogId(): string {
  */
 export function generateGbpHoursSyncLogId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `bhsid-${tenantId}-${nanoid()}`;
+  return `gbp-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -228,7 +228,7 @@ export function generateGbpHoursSyncLogId(tenantId: string): string {
  */
 export function generateSpecialHoursId(tenantId: string = 'shid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `shid-${tenantId}-${nanoid()}`;
+  return `special-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -237,16 +237,16 @@ export function generateSpecialHoursId(tenantId: string = 'shid'): string {
  */
 export function generateFeedPushJobId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `fpid-${nanoid()}`;
+  return `feed-${nanoid()}`;
 }
 
 /**
  * Generates short directory category IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateProductCatId(tenantId?: string): string {
+export function generateProductCatId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `scid-${tenantId}-${nanoid()}`;
+  return `cat-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -255,7 +255,7 @@ export function generateProductCatId(tenantId?: string): string {
  */
 export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `dfid-${tenantId}-${nanoid()}`;
+  return `featured-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -264,7 +264,7 @@ export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
  */
 export function generateOrganizationId(ownerId: string = 'oid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `oid-${ownerId}-${nanoid()}`;
+  return `org-${ownerId}-${nanoid()}`;
 }
 
 /**
@@ -285,7 +285,7 @@ import { prisma } from '../prisma';
 
 export async function generateOrderNumber(tenantId: string): Promise<string> {
   const year = new Date().getFullYear();
-  const prefix = `ORD-${year}-`;
+  const prefix = `ORD-${generateTenantKey(tenantId)}-${year}-`;
 
   // Use timestamp + random suffix for guaranteed uniqueness (no race condition)
   // This is simpler and more reliable than sequential with retries
@@ -301,7 +301,7 @@ export async function generateOrderNumber(tenantId: string): Promise<string> {
  */
 export function generatePaymentId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
-  return `pay-${tenantId}-${nanoid()}`;
+  return `pay-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -310,7 +310,7 @@ export function generatePaymentId(tenantId: string): string {
  */
 export function generateBillingMethodId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `mbg-${tenantId}-${nanoid()}`;
+  return `mbg-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -319,7 +319,7 @@ export function generateBillingMethodId(tenantId: string): string {
  */
 export function generateInvoiceId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `inv-${tenantId}-${nanoid()}`;
+  return `inv-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -364,7 +364,7 @@ export function generateOrderItemHistoryId(id: string): string {
  */
 export function generateShipmentId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `ship-${tenantId}-${nanoid()}`;
+  return `ship-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -373,7 +373,7 @@ export function generateShipmentId(tenantId: string): string {
  */
 export function generateServiceChargeId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `svc-${tenantId}-${nanoid()}`;
+  return `svc-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -382,7 +382,7 @@ export function generateServiceChargeId(tenantId: string): string {
  */
 export function generateManualInvoiceId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `miv-${tenantId}-${nanoid()}`;
+  return `manual-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 // Generate variant ID function
@@ -538,6 +538,56 @@ export function generateVariantSkuFromParent(
   return `${parentItemSku}-V${uniqueSuffix}`;
 }
 /**
+ * Generates short fulfillment time slot IDs
+ * Format: slot-tid-abc123 (17 chars vs 36 for UUID)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateTimeSlotId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `slot-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generates short fulfillment schedule IDs
+ * Format: sched-tid-abc123 (18 chars vs 36 for UUID)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateScheduleId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 9);
+  return `sched-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generates short fulfillment notification IDs
+ * Format: notif-tid-abc123 (20 chars vs 36 for UUID)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateNotificationId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 9);
+  return `notif-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generates short customer IDs
+ * Format: cust-abc123xyz (14 chars vs 36 for UUID)
+ * URL-safe, readable, unique, platform-wide
+ */
+export function generateCustomerId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
+  return `cust-${nanoid()}`;
+}
+
+/**
+ * Generates short customer tenant relationship IDs
+ * Format: ctr-tid-abc123 (17 chars vs 36 for UUID)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCustomerTenantRelationshipId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ctr-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Example outputs:
  * 
  * Tenant ID: t-a3k9m2x7 (9 chars vs 36 for UUID)
@@ -546,6 +596,11 @@ export function generateVariantSkuFromParent(
  * Regular SKU: SKU-A3K9M2X7 (12 chars)
  * Photo ID: p-c5q7r3z8 (10 chars)
  * Session ID: s-d6w4t2v9 (10 chars)
+ * Customer ID: cust-abc123xyz (14 chars)
+ * Customer Tenant Relationship ID: ctr-tid-042hi7ju-2fqjrivec (25 chars)
+ * Time Slot ID: slot-tid-042hi7ju-kyovpf8qd (27 chars)
+ * Schedule ID: sched-tid-042hi7ju-3ynhluhql (29 chars)
+ * Notification ID: notif-tid-042hi7ju-4mnp9wrxs (31 chars)
  * 
  * Benefits:
  * - 70-80% shorter than current IDs
@@ -554,4 +609,9 @@ export function generateVariantSkuFromParent(
  * - Unique (collision probability: ~1 in 2.8 trillion for 8 chars)
  * - Sortable by creation time (if using sequential suffix)
  * - Professional appearance
+ * - **Intelligent traceability across fulfillment system**
+ * - **Tenant-scoped identification for debugging and support**
+ * - **Cross-system correlation (orders → schedules → notifications)**
+ * - **Platform-wide customer identification**
+ * - **Customer-tenant relationship tracking**
  */
