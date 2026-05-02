@@ -298,7 +298,7 @@ class AIImageSingletonService extends UniversalSingleton {
       throw new Error('Supabase client not available');
     }
 
-    const photoId = generatePhotoId();
+    const photoId = generatePhotoId(request.tenantId || 'unknown', request.inventoryItemId || 'generated');
     const timestamp = new Date().toISOString();
     
     // Upload main image

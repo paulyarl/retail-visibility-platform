@@ -500,8 +500,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                   {hoursStatus ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Hours Badge - Status */}
-          <HoursStatusBadge status={hoursStatus} />
-            <Text>{hoursStatus?.label}</Text>
+          <HoursStatusBadge status={hoursStatus} /> 
                   </div>
                 ) : (
                   <p className="text-sm sm:text-base text-neutral-500">

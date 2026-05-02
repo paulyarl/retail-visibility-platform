@@ -239,6 +239,68 @@ model consent_records {
   @@index([user_id, consent_type], map: "idx_consent_records_user_type")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_tenant_relationships {
+  id                    String    @id
+  customer_id           String
+  tenant_id             String
+  customer_segment      String?   @default("regular")
+  loyalty_points        Int?      @default(0)
+  tenant_orders         Int?      @default(0)
+  tenant_value_cents    Int?      @default(0)
+  first_tenant_order_at DateTime? @db.Timestamp(6)
+  last_tenant_order_at  DateTime? @db.Timestamp(6)
+  tenant_tags           Json?     @default("[]")
+  tenant_preferences    Json?     @default("{}")
+  internal_notes        String?
+  is_active             Boolean?  @default(true)
+  created_at            DateTime  @default(now()) @db.Timestamp(6)
+  updated_at            DateTime  @default(now()) @db.Timestamp(6)
+  customers             customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_customer")
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_tenant")
+
+  @@unique([customer_id, tenant_id], map: "customer_tenant_relationships_unique")
+  @@index([customer_id], map: "idx_customer_tenant_customer")
+  @@index([last_tenant_order_at], map: "idx_customer_tenant_last_order")
+  @@index([loyalty_points], map: "idx_customer_tenant_loyalty")
+  @@index([customer_segment], map: "idx_customer_tenant_segment")
+  @@index([tenant_id], map: "idx_customer_tenant_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customers {
+  id                            String                          @id
+  customer_number               String                          @unique(map: "customers_customer_number_unique")
+  email                         String                          @unique(map: "customers_email_unique")
+  first_name                    String?
+  last_name                     String?
+  phone                         String?
+  date_of_birth                 DateTime?                       @db.Date
+  gender                        String?
+  preferred_language            String?                         @default("en")
+  timezone                      String?                         @default("UTC")
+  marketing_consent             Boolean?                        @default(false)
+  sms_consent                   Boolean?                        @default(false)
+  email_consent                 Boolean?                        @default(true)
+  platform_orders               Int?                            @default(0)
+  platform_value_cents          Int?                            @default(0)
+  first_platform_order_at       DateTime?                       @db.Timestamp(6)
+  last_platform_order_at        DateTime?                       @db.Timestamp(6)
+  tags                          Json?                           @default("[]")
+  preferences                   Json?                           @default("{}")
+  metadata                      Json?                           @default("{}")
+  created_at                    DateTime                        @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime                        @default(now()) @db.Timestamp(6)
+  customer_tenant_relationships customer_tenant_relationships[]
+
+  @@index([created_at], map: "idx_customers_created_at")
+  @@index([email], map: "idx_customers_email")
+  @@index([last_platform_order_at], map: "idx_customers_last_platform_order")
+  @@index([first_name, last_name], map: "idx_customers_name")
+  @@index([phone], map: "idx_customers_phone")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model digital_access_grants {
   id                String          @id @db.VarChar(255)
@@ -552,6 +614,85 @@ model fk_count {
   count BigInt?
 
   @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_notifications {
+  id                String    @id
+  order_id          String
+  tenant_id         String
+  customer_id       String
+  notification_type String
+  channel           String
+  status            String    @default("pending")
+  content           String
+  scheduled_at      DateTime? @db.Timestamp(6)
+  sent_at           DateTime? @db.Timestamp(6)
+  error             String?
+  metadata          Json?     @default("{}")
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @default(now()) @db.Timestamp(6)
+  orders            orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_order")
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_tenant")
+
+  @@index([channel], map: "idx_fulfillment_notifications_channel")
+  @@index([customer_id], map: "idx_fulfillment_notifications_customer")
+  @@index([order_id], map: "idx_fulfillment_notifications_order")
+  @@index([status], map: "idx_fulfillment_notifications_status")
+  @@index([tenant_id], map: "idx_fulfillment_notifications_tenant")
+  @@index([notification_type], map: "idx_fulfillment_notifications_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_schedules {
+  id                     String                  @id
+  order_id               String                  @unique(map: "fulfillment_schedules_order_id_unique")
+  tenant_id              String
+  scheduled_date         DateTime                @db.Date
+  scheduled_time         DateTime                @db.Time(6)
+  fulfillment_method     String                  @default("pickup")
+  time_slot_id           String?
+  customer_name          String
+  customer_email         String
+  customer_phone         String?
+  order_status           String                  @default("confirmed")
+  notes                  String?
+  created_at             DateTime                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                @default(now()) @db.Timestamp(6)
+  orders                 orders                  @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_order")
+  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_tenant")
+  fulfillment_time_slots fulfillment_time_slots? @relation(fields: [time_slot_id], references: [id], onUpdate: NoAction, map: "fk_fulfillment_schedules_time_slot")
+
+  @@index([scheduled_date], map: "idx_fulfillment_schedules_date")
+  @@index([fulfillment_method], map: "idx_fulfillment_schedules_method")
+  @@index([order_id], map: "idx_fulfillment_schedules_order")
+  @@index([order_status], map: "idx_fulfillment_schedules_status")
+  @@index([tenant_id], map: "idx_fulfillment_schedules_tenant")
+  @@index([time_slot_id], map: "idx_fulfillment_schedules_time_slot")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fulfillment_time_slots {
+  id                    String                  @id
+  tenant_id             String
+  date                  DateTime                @db.Date
+  start_time            DateTime                @db.Time(6)
+  end_time              DateTime                @db.Time(6)
+  max_orders            Int                     @default(4)
+  is_active             Boolean                 @default(true)
+  fulfillment_method    String                  @default("pickup")
+  created_at            DateTime                @default(now()) @db.Timestamp(6)
+  updated_at            DateTime                @default(now()) @db.Timestamp(6)
+  fulfillment_schedules fulfillment_schedules[]
+  tenants               tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_time_slots_tenant")
+
+  @@index([is_active], map: "idx_fulfillment_time_slots_active")
+  @@index([date], map: "idx_fulfillment_time_slots_date")
+  @@index([fulfillment_method], map: "idx_fulfillment_time_slots_method")
+  @@index([tenant_id], map: "idx_fulfillment_time_slots_tenant")
 }
 
 model gbp_attributes {
@@ -954,6 +1095,96 @@ model inventory_items {
   @@index([tenant_id, updated_at])
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_sync_events {
+  id                                                 String          @id @db.VarChar(255)
+  tenant_id                                          String          @db.VarChar(255)
+  location_id                                        String          @db.VarChar(255)
+  sku                                                String          @db.VarChar(255)
+  event_type                                         sync_event_type
+  quantity_before                                    Int?
+  quantity_after                                     Int?
+  source_event_id                                    String?         @db.VarChar(255)
+  triggered_by                                       String?         @db.VarChar(255)
+  triggered_at                                       DateTime?       @default(now()) @db.Timestamp(6)
+  processed_at                                       DateTime?       @db.Timestamp(6)
+  status                                             sync_status?    @default(pending)
+  error_message                                      String?
+  metadata                                           Json?           @default("{}")
+  tenants_inventory_sync_events_location_idTotenants tenants         @relation("inventory_sync_events_location_idTotenants", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_location")
+  tenants_inventory_sync_events_tenant_idTotenants   tenants         @relation("inventory_sync_events_tenant_idTotenants", fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_tenant")
+  users                                              users?          @relation(fields: [triggered_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_triggered_by")
+
+  @@index([location_id], map: "idx_inventory_sync_events_location")
+  @@index([status], map: "idx_inventory_sync_events_status")
+  @@index([tenant_id], map: "idx_inventory_sync_events_tenant")
+  @@index([triggered_at], map: "idx_inventory_sync_events_triggered_at")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_transfer_logs {
+  id                  String              @id @db.VarChar(255)
+  transfer_id         String              @db.VarChar(255)
+  tenant_id           String              @db.VarChar(255)
+  action              transfer_log_action
+  performed_by        String              @db.VarChar(255)
+  performed_at        DateTime?           @default(now()) @db.Timestamp(6)
+  old_status          transfer_status?
+  new_status          transfer_status?
+  quantity_change     Int?
+  notes               String?
+  metadata            Json?               @default("{}")
+  users               users               @relation(fields: [performed_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_performed_by")
+  tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_tenant")
+  inventory_transfers inventory_transfers @relation(fields: [transfer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_transfer")
+
+  @@index([performed_at], map: "idx_inventory_transfer_logs_performed_at")
+  @@index([tenant_id], map: "idx_inventory_transfer_logs_tenant")
+  @@index([transfer_id], map: "idx_inventory_transfer_logs_transfer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_transfers {
+  id                                                      String                    @id @db.VarChar(255)
+  tenant_id                                               String                    @db.VarChar(255)
+  source_location_id                                      String                    @db.VarChar(255)
+  target_location_id                                      String                    @db.VarChar(255)
+  sku                                                     String                    @db.VarChar(255)
+  quantity                                                Int
+  status                                                  transfer_status?          @default(pending)
+  initiated_by                                            String                    @db.VarChar(255)
+  initiated_at                                            DateTime?                 @default(now()) @db.Timestamp(6)
+  approved_by                                             String?                   @db.VarChar(255)
+  approved_at                                             DateTime?                 @db.Timestamp(6)
+  shipped_by                                              String?                   @db.VarChar(255)
+  shipped_at                                              DateTime?                 @db.Timestamp(6)
+  received_by                                             String?                   @db.VarChar(255)
+  received_at                                             DateTime?                 @db.Timestamp(6)
+  cancelled_by                                            String?                   @db.VarChar(255)
+  cancelled_at                                            DateTime?                 @db.Timestamp(6)
+  notes                                                   String?
+  metadata                                                Json?                     @default("{}")
+  tracking_number                                         String?                   @db.VarChar(255)
+  estimated_arrival                                       DateTime?                 @db.Timestamp(6)
+  created_at                                              DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at                                              DateTime?                 @default(now()) @db.Timestamp(6)
+  inventory_transfer_logs                                 inventory_transfer_logs[]
+  users_inventory_transfers_approved_byTousers            users?                    @relation("inventory_transfers_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_approved_by")
+  users_inventory_transfers_cancelled_byTousers           users?                    @relation("inventory_transfers_cancelled_byTousers", fields: [cancelled_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_cancelled_by")
+  users_inventory_transfers_initiated_byTousers           users                     @relation("inventory_transfers_initiated_byTousers", fields: [initiated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_initiated_by")
+  users_inventory_transfers_received_byTousers            users?                    @relation("inventory_transfers_received_byTousers", fields: [received_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_received_by")
+  users_inventory_transfers_shipped_byTousers             users?                    @relation("inventory_transfers_shipped_byTousers", fields: [shipped_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_shipped_by")
+  tenants_inventory_transfers_source_location_idTotenants tenants                   @relation("inventory_transfers_source_location_idTotenants", fields: [source_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_source")
+  tenants_inventory_transfers_target_location_idTotenants tenants                   @relation("inventory_transfers_target_location_idTotenants", fields: [target_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_target")
+  tenants_inventory_transfers_tenant_idTotenants          tenants                   @relation("inventory_transfers_tenant_idTotenants", fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_tenant")
+
+  @@index([initiated_at], map: "idx_inventory_transfers_initiated_at")
+  @@index([sku], map: "idx_inventory_transfers_sku")
+  @@index([source_location_id, target_location_id], map: "idx_inventory_transfers_source_target")
+  @@index([status], map: "idx_inventory_transfers_status")
+  @@index([tenant_id], map: "idx_inventory_transfers_tenant")
+}
+
 model invitations {
   id          String           @id @default(dbgenerated("gen_random_uuid()"))
   email       String           @unique
@@ -971,6 +1202,30 @@ model invitations {
   @@index([email])
   @@index([expires_at])
   @@index([tenant_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model location_inventory_pools {
+  id                                                    String    @id @db.VarChar(255)
+  tenant_id                                             String    @db.VarChar(255)
+  location_id                                           String    @db.VarChar(255)
+  sku                                                   String    @db.VarChar(255)
+  total_quantity                                        Int       @default(0)
+  available_quantity                                    Int       @default(0)
+  reserved_quantity                                     Int       @default(0)
+  in_transit_quantity                                   Int       @default(0)
+  low_stock_threshold                                   Int?      @default(5)
+  reorder_point                                         Int?      @default(10)
+  reorder_quantity                                      Int?      @default(20)
+  last_updated                                          DateTime? @default(now()) @db.Timestamp(6)
+  metadata                                              Json?     @default("{}")
+  tenants_location_inventory_pools_location_idTotenants tenants   @relation("location_inventory_pools_location_idTotenants", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_location_inventory_pools_location")
+  tenants_location_inventory_pools_tenant_idTotenants   tenants   @relation("location_inventory_pools_tenant_idTotenants", fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_location_inventory_pools_tenant")
+
+  @@unique([tenant_id, location_id, sku], map: "unique_location_sku")
+  @@index([location_id], map: "idx_location_inventory_pools_location")
+  @@index([sku], map: "idx_location_inventory_pools_sku")
+  @@index([tenant_id], map: "idx_location_inventory_pools_tenant")
 }
 
 model location_status_logs {
@@ -2670,7 +2925,15 @@ model tenants {
   gbp_sync_tracking                                                                      gbp_sync_tracking[]
   google_oauth_accounts_list                                                             google_oauth_accounts_list[]
   inventory_items                                                                        inventory_items[]
+  inventory_sync_events_inventory_sync_events_location_idTotenants                       inventory_sync_events[]            @relation("inventory_sync_events_location_idTotenants")
+  inventory_sync_events_inventory_sync_events_tenant_idTotenants                         inventory_sync_events[]            @relation("inventory_sync_events_tenant_idTotenants")
+  inventory_transfer_logs                                                                inventory_transfer_logs[]
+  inventory_transfers_inventory_transfers_source_location_idTotenants                    inventory_transfers[]              @relation("inventory_transfers_source_location_idTotenants")
+  inventory_transfers_inventory_transfers_target_location_idTotenants                    inventory_transfers[]              @relation("inventory_transfers_target_location_idTotenants")
+  inventory_transfers_inventory_transfers_tenant_idTotenants                             inventory_transfers[]              @relation("inventory_transfers_tenant_idTotenants")
   invitations                                                                            invitations[]
+  location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]         @relation("location_inventory_pools_location_idTotenants")
+  location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]         @relation("location_inventory_pools_tenant_idTotenants")
   location_status_logs                                                                   location_status_logs[]
   merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]        @relation("merchant_billing_gateways_tenant_idTotenants")
   merchant_paypal_connections                                                            merchant_paypal_connections?
@@ -2920,46 +3183,53 @@ model user_tenants {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model users {
-  id                               String                             @id
-  email                            String                             @unique
-  password_hash                    String
-  first_name                       String?
-  last_name                        String?
-  role                             user_role                          @default(USER)
-  email_verified                   Boolean                            @default(false)
-  email_verification_token         String?
-  password_reset_token             String?
-  password_reset_expires           DateTime?
-  last_login                       DateTime?
-  is_active                        Boolean                            @default(true)
-  created_at                       DateTime                           @default(now())
-  updated_at                       DateTime
-  mfa_enabled                      Boolean?                           @default(false)
-  mfa_secret                       String?
-  mfa_backup_codes                 String[]
-  mfa_method                       String?                            @db.VarChar(50)
-  mfa_verified_at                  DateTime?                          @db.Timestamp(6)
-  onboarding_completed             Boolean                            @default(false)
-  onboarding_step                  String?                            @db.VarChar(50)
-  onboarding_data                  Json?
-  auth0_id                         String?                            @unique @db.VarChar(255)
-  business_name                    String?                            @db.VarChar(255)
-  business_type                    String?                            @db.VarChar(100)
-  phone                            String?                            @db.VarChar(50)
-  picture                          String?                            @db.VarChar(500)
-  consent_records                  consent_records[]
-  directory_featured_listings_list directory_featured_listings_list[]
-  featured_products                featured_products[]
-  invitations                      invitations[]
-  login_attempts                   login_attempts[]
-  order_status_history             order_status_history[]
-  security_alerts                  security_alerts[]
-  security_threats                 security_threats[]
-  shopping_carts                   shopping_carts[]
-  tenants                          tenants[]
-  user_preferences                 user_preferences[]
-  user_sessions_list               user_sessions_list[]
-  user_tenants                     user_tenants[]
+  id                                                          String                             @id
+  email                                                       String                             @unique
+  password_hash                                               String
+  first_name                                                  String?
+  last_name                                                   String?
+  role                                                        user_role                          @default(USER)
+  email_verified                                              Boolean                            @default(false)
+  email_verification_token                                    String?
+  password_reset_token                                        String?
+  password_reset_expires                                      DateTime?
+  last_login                                                  DateTime?
+  is_active                                                   Boolean                            @default(true)
+  created_at                                                  DateTime                           @default(now())
+  updated_at                                                  DateTime
+  mfa_enabled                                                 Boolean?                           @default(false)
+  mfa_secret                                                  String?
+  mfa_backup_codes                                            String[]
+  mfa_method                                                  String?                            @db.VarChar(50)
+  mfa_verified_at                                             DateTime?                          @db.Timestamp(6)
+  onboarding_completed                                        Boolean                            @default(false)
+  onboarding_step                                             String?                            @db.VarChar(50)
+  onboarding_data                                             Json?
+  auth0_id                                                    String?                            @unique @db.VarChar(255)
+  business_name                                               String?                            @db.VarChar(255)
+  business_type                                               String?                            @db.VarChar(100)
+  phone                                                       String?                            @db.VarChar(50)
+  picture                                                     String?                            @db.VarChar(500)
+  consent_records                                             consent_records[]
+  directory_featured_listings_list                            directory_featured_listings_list[]
+  featured_products                                           featured_products[]
+  inventory_sync_events                                       inventory_sync_events[]
+  inventory_transfer_logs                                     inventory_transfer_logs[]
+  inventory_transfers_inventory_transfers_approved_byTousers  inventory_transfers[]              @relation("inventory_transfers_approved_byTousers")
+  inventory_transfers_inventory_transfers_cancelled_byTousers inventory_transfers[]              @relation("inventory_transfers_cancelled_byTousers")
+  inventory_transfers_inventory_transfers_initiated_byTousers inventory_transfers[]              @relation("inventory_transfers_initiated_byTousers")
+  inventory_transfers_inventory_transfers_received_byTousers  inventory_transfers[]              @relation("inventory_transfers_received_byTousers")
+  inventory_transfers_inventory_transfers_shipped_byTousers   inventory_transfers[]              @relation("inventory_transfers_shipped_byTousers")
+  invitations                                                 invitations[]
+  login_attempts                                              login_attempts[]
+  order_status_history                                        order_status_history[]
+  security_alerts                                             security_alerts[]
+  security_threats                                            security_threats[]
+  shopping_carts                                              shopping_carts[]
+  tenants                                                     tenants[]
+  user_preferences                                            user_preferences[]
+  user_sessions_list                                          user_sessions_list[]
+  user_tenants                                                user_tenants[]
 }
 
 model webhook_events {
@@ -2976,147 +3246,6 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model customer_tenant_relationships {
-  id                    String    @id
-  customer_id           String
-  tenant_id             String
-  customer_segment      String?   @default("regular")
-  loyalty_points        Int?      @default(0)
-  tenant_orders         Int?      @default(0)
-  tenant_value_cents    Int?      @default(0)
-  first_tenant_order_at DateTime? @db.Timestamp(6)
-  last_tenant_order_at  DateTime? @db.Timestamp(6)
-  tenant_tags           Json?     @default("[]")
-  tenant_preferences    Json?     @default("{}")
-  internal_notes        String?
-  is_active             Boolean?  @default(true)
-  created_at            DateTime  @default(now()) @db.Timestamp(6)
-  updated_at            DateTime  @default(now()) @db.Timestamp(6)
-  customers             customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_customer")
-  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_tenant_tenant")
-
-  @@unique([customer_id, tenant_id], map: "customer_tenant_relationships_unique")
-  @@index([customer_id], map: "idx_customer_tenant_customer")
-  @@index([last_tenant_order_at], map: "idx_customer_tenant_last_order")
-  @@index([loyalty_points], map: "idx_customer_tenant_loyalty")
-  @@index([customer_segment], map: "idx_customer_tenant_segment")
-  @@index([tenant_id], map: "idx_customer_tenant_tenant")
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model customers {
-  id                            String                          @id
-  customer_number               String                          @unique(map: "customers_customer_number_unique")
-  email                         String                          @unique(map: "customers_email_unique")
-  first_name                    String?
-  last_name                     String?
-  phone                         String?
-  date_of_birth                 DateTime?                       @db.Date
-  gender                        String?
-  preferred_language            String?                         @default("en")
-  timezone                      String?                         @default("UTC")
-  marketing_consent             Boolean?                        @default(false)
-  sms_consent                   Boolean?                        @default(false)
-  email_consent                 Boolean?                        @default(true)
-  platform_orders               Int?                            @default(0)
-  platform_value_cents          Int?                            @default(0)
-  first_platform_order_at       DateTime?                       @db.Timestamp(6)
-  last_platform_order_at        DateTime?                       @db.Timestamp(6)
-  tags                          Json?                           @default("[]")
-  preferences                   Json?                           @default("{}")
-  metadata                      Json?                           @default("{}")
-  created_at                    DateTime                        @default(now()) @db.Timestamp(6)
-  updated_at                    DateTime                        @default(now()) @db.Timestamp(6)
-  customer_tenant_relationships customer_tenant_relationships[]
-
-  @@index([created_at], map: "idx_customers_created_at")
-  @@index([email], map: "idx_customers_email")
-  @@index([last_platform_order_at], map: "idx_customers_last_platform_order")
-  @@index([first_name, last_name], map: "idx_customers_name")
-  @@index([phone], map: "idx_customers_phone")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model fulfillment_notifications {
-  id                String    @id
-  order_id          String
-  tenant_id         String
-  customer_id       String
-  notification_type String
-  channel           String
-  status            String    @default("pending")
-  content           String
-  scheduled_at      DateTime? @db.Timestamp(6)
-  sent_at           DateTime? @db.Timestamp(6)
-  error             String?
-  metadata          Json?     @default("{}")
-  created_at        DateTime  @default(now()) @db.Timestamp(6)
-  updated_at        DateTime  @default(now()) @db.Timestamp(6)
-  orders            orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_order")
-  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_notifications_tenant")
-
-  @@index([channel], map: "idx_fulfillment_notifications_channel")
-  @@index([customer_id], map: "idx_fulfillment_notifications_customer")
-  @@index([order_id], map: "idx_fulfillment_notifications_order")
-  @@index([status], map: "idx_fulfillment_notifications_status")
-  @@index([tenant_id], map: "idx_fulfillment_notifications_tenant")
-  @@index([notification_type], map: "idx_fulfillment_notifications_type")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model fulfillment_schedules {
-  id                     String                  @id
-  order_id               String                  @unique(map: "fulfillment_schedules_order_id_unique")
-  tenant_id              String
-  scheduled_date         DateTime                @db.Date
-  scheduled_time         DateTime                @db.Time(6)
-  fulfillment_method     String                  @default("pickup")
-  time_slot_id           String?
-  customer_name          String
-  customer_email         String
-  customer_phone         String?
-  order_status           String                  @default("confirmed")
-  notes                  String?
-  created_at             DateTime                @default(now()) @db.Timestamp(6)
-  updated_at             DateTime                @default(now()) @db.Timestamp(6)
-  orders                 orders                  @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_order")
-  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_schedules_tenant")
-  fulfillment_time_slots fulfillment_time_slots? @relation(fields: [time_slot_id], references: [id], onUpdate: NoAction, map: "fk_fulfillment_schedules_time_slot")
-
-  @@index([scheduled_date], map: "idx_fulfillment_schedules_date")
-  @@index([fulfillment_method], map: "idx_fulfillment_schedules_method")
-  @@index([order_id], map: "idx_fulfillment_schedules_order")
-  @@index([order_status], map: "idx_fulfillment_schedules_status")
-  @@index([tenant_id], map: "idx_fulfillment_schedules_tenant")
-  @@index([time_slot_id], map: "idx_fulfillment_schedules_time_slot")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model fulfillment_time_slots {
-  id                    String                  @id
-  tenant_id             String
-  date                  DateTime                @db.Date
-  start_time            DateTime                @db.Time(6)
-  end_time              DateTime                @db.Time(6)
-  max_orders            Int                     @default(4)
-  is_active             Boolean                 @default(true)
-  fulfillment_method    String                  @default("pickup")
-  created_at            DateTime                @default(now()) @db.Timestamp(6)
-  updated_at            DateTime                @default(now()) @db.Timestamp(6)
-  fulfillment_schedules fulfillment_schedules[]
-  tenants               tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fulfillment_time_slots_tenant")
-
-  @@index([is_active], map: "idx_fulfillment_time_slots_active")
-  @@index([date], map: "idx_fulfillment_time_slots_date")
-  @@index([fulfillment_method], map: "idx_fulfillment_time_slots_method")
-  @@index([tenant_id], map: "idx_fulfillment_time_slots_tenant")
 }
 
 enum action {
@@ -3320,10 +3449,42 @@ enum shipment_status {
   cancelled
 }
 
+enum sync_event_type {
+  sale
+  transfer_out
+  transfer_in
+  adjustment
+  restock
+  return
+  damage
+  loss
+}
+
 enum sync_status {
   pending
   success
   error
+}
+
+enum transfer_log_action {
+  initiated
+  approved
+  shipped
+  received
+  cancelled
+  rejected
+  modified
+}
+
+enum transfer_status {
+  pending
+  approved
+  shipped
+  in_transit
+  delivered
+  received
+  cancelled
+  rejected
 }
 
 enum user_role {

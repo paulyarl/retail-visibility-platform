@@ -34,7 +34,7 @@ export function generateUserId(): string {
  */
 export function generateUserTenantId(userId: string = 'uid',tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `utid-${userId}-${tenantId}-${nanoid()}`;
+  return `utid-${userId}-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 // id: `ut_${tenantId}_${user.id}`,
 /**
@@ -49,7 +49,7 @@ export function generateUserTenantId(userId: string = 'uid',tenantId: string = '
  */
 export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `cmid-${tenantId}-${catId}-${nanoid()}`;
+  return `cmid-${generateTenantKey(tenantId)}-${catId}-${nanoid()}`;
 }
 // id: `ut_${tenantId}_${user.id}`,
 /**
@@ -60,6 +60,16 @@ export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid')
 export function generateItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `pid-${nanoid()}`;
+}
+// id: `ut_${tenantId}_${user.id}`,
+/**
+ * Generates short item/SKU IDs
+ * Format: item-xyz789 (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generateTenantItemId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pid-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 // id: `ciid_${tenantId}_${user.id}`,
 /**

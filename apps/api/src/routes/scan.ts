@@ -89,7 +89,7 @@ router.post('/scan/start', authenticateToken, requireWritableSubscription, /* re
     // Create session
     const session = await prisma.scan_sessions_list.create({
       data: {
-        id: generateSessionId(),
+        id: generateSessionId(tenantId),
         tenant_id:tenantId,
         user_id:userId,
         template_id:templateId,
@@ -266,7 +266,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     // Create scan result
     const result = await prisma.scan_results_list.create({
       data: {
-        id: generateSessionId(),
+        id: generateSessionId(session.tenant_id),
         tenant_id: session.tenant_id,
         session_id:sessionId,
         barcode,

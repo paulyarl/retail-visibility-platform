@@ -552,7 +552,7 @@ export class BarcodeEnrichmentService {
       await prisma.barcode_enrichment.upsert({
         where: { barcode },
         create: {
-          id: generateSessionId(), // Generate ID for new records
+          id: generateSessionId('platform'), // Generate ID for new records
           barcode,
           name: data.name || null,
           brand: data.brand || null,

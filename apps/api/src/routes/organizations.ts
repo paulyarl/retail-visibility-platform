@@ -6,7 +6,7 @@ import { validateOrganizationTier, validateOrganizationLimits, validateOrganizat
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateItemId, generateOrganizationId, generatePhotoId, generateProductCatId, generateTenantId, generateUserTenantId,generateVariantId } from '../lib/id-generator';
+import { generateItemId, generateTenantItemId,generateOrganizationId, generatePhotoId, generateProductCatId, generateTenantId, generateUserTenantId,generateVariantId } from '../lib/id-generator';
 import { propagateVariants } from '../utils/variant-propagation';
 import { authenticateToken } from '../middleware/auth';
 import { user_tenant_role } from '@prisma/client';
@@ -903,7 +903,7 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
                 original_sku: sourceItem.sku,
               },
               create: {
-                id: `psr-${generateItemId()}`,
+                id: `psr-${generateTenantItemId(tenantId)}`,
                 product_slug: sourceSlugRegistry.product_slug,
                 universal_sku: sourceSlugRegistry.universal_sku,
                 slug_hash: sourceSlugRegistry.slug_hash,
@@ -972,7 +972,7 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
         // Create mode - create new item
         const newItem = await prisma.inventory_items.create({
           data: {
-            id: generateItemId(),
+            id: generateTenantItemId(tenantId),
             tenant_id: tenantId,
             sku: sourceItem.sku,
             name: sourceItem.name,
@@ -1040,7 +1040,7 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
         if (sourceSlugRegistry) {
           await prisma.product_slug_registry.create({
             data: {
-              id: `psr-${generateItemId()}`,
+              id: `psr-${generateTenantItemId(tenantId)}`,
               product_slug: sourceSlugRegistry.product_slug,
               universal_sku: sourceSlugRegistry.universal_sku,
               slug_hash: sourceSlugRegistry.slug_hash,
@@ -1380,7 +1380,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
                   original_sku: sourceItem.sku,
                 },
                 create: {
-                  id: `psr-${generateItemId()}`,
+                  id: `psr-${generateTenantItemId(tenantId)}`,
                   product_slug: sourceSlugRegistry.product_slug,
                   universal_sku: sourceSlugRegistry.universal_sku,
                   slug_hash: sourceSlugRegistry.slug_hash,
@@ -1507,7 +1507,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
           // Create the item for this tenant
           const newItem = await prisma.inventory_items.create({
             data: {
-              id: generateItemId(),
+              id: generateTenantItemId(tenantId),
               tenant_id: tenantId,
             sku: sourceItem.sku,
             name: sourceItem.name,
@@ -1576,7 +1576,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
           if (sourceSlugRegistry) {
             await prisma.product_slug_registry.create({
               data: {
-                id: `psr-${generateItemId()}`,
+                id: `psr-${generateTenantItemId(tenantId)}`,
                 product_slug: sourceSlugRegistry.product_slug,
                 universal_sku: sourceSlugRegistry.universal_sku,
                 slug_hash: sourceSlugRegistry.slug_hash,
@@ -1815,7 +1815,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           // Create the item for this tenant
           const newItem = await prisma.inventory_items.create({
             data: {
-              id: generateItemId(),
+              id: generateTenantItemId(targetTenant.id),
               tenant_id: targetTenant.id,
             sku: sourceItem.sku,
             name: sourceItem.name,

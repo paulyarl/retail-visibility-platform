@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/tier-access';
-import { generateItemId, generateProductCatId, generateQsCatId } from '../lib/id-generator';
+import { generateItemId, generateTenantItemId, generateProductCatId, generateQsCatId } from '../lib/id-generator';
 import { generateAutoSKU } from '../lib/sku-generator';
 
 const router = Router();
@@ -132,7 +132,7 @@ router.post('/product', authenticateToken, requireWritableSubscription, async (r
     // Create the cloned product
     const clonedProduct = await prisma.inventory_items.create({
       data: {
-        id: generateItemId(),
+        id: generateTenantItemId(tenantId),
         tenant_id: tenantId,
         sku: newSku,
         name: newName,

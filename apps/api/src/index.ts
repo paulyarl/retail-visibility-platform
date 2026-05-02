@@ -28,7 +28,7 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
-import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId, generateVariantSkuFromParent } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateVariantSkuFromParent } from './lib/id-generator';
 import { propagateVariants } from './utils/variant-propagation';
 
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
@@ -5032,7 +5032,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       // Create the main item
       const created = await tx.inventory_items.create({ 
         data: {
-          id: generateItemId(),
+          id: generateTenantItemId(itemData.tenant_id || ''),
           ...data,
           updated_at: new Date(),
         }
@@ -6887,6 +6887,11 @@ import notificationLogsRoutes from './routes/admin/notification-logs';
 app.use('/api/admin/notification-logs', notificationLogsRoutes);
 console.log('Admin notification logs routes mounted at /api/admin/notification-logs');
 
+/* ------------------------------ admin inventory transfers ------------------------------ */
+import adminInventoryTransferRoutes from './routes/admin/inventory-transfers';
+app.use('/api/admin/inventory-transfers', adminInventoryTransferRoutes);
+console.log('Admin inventory transfer routes mounted at /api/admin/inventory-transfers');
+
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
 app.use('/api/gbp-advanced-sync-singleton', gbpAdvancedSyncSingletonRoutes);
@@ -7052,6 +7057,11 @@ console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/f
 /* ------------------------------ tenant orders ------------------------------ */
 app.use('/api', tenantOrdersRoutes);
 console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders');
+
+/* ------------------------------ tenant inventory transfers ------------------------------ */
+import tenantInventoryTransferRoutes from './routes/tenant-inventory-transfers';
+app.use('/api/tenant/inventory-transfers', tenantInventoryTransferRoutes); // Temporarily removed auth for testing
+console.log('✅ Tenant inventory transfer routes mounted at /api/tenant/inventory-transfers');
 
 /* ------------------------------ feed validation ------------------------------ */
 // NOTE: Must be mounted BEFORE tenantCategoriesRoutes to avoid /:tenantId/categories/:id matching /coverage
@@ -7484,32 +7494,6 @@ if (process.env.NODE_ENV !== "test") {
     process.exit(1);
   }
 }
-
-// Catch-all route handler for debugging unmatched routes
-app.use((req, res) => {
-  console.log(`[CATCH-ALL] Unmatched route: ${req.method} ${req.path}`, {
-    query: req.query,
-    userAgent: req.get('User-Agent'),
-    referer: req.get('Referer'),
-    timestamp: new Date().toISOString()
-  });
-  
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.path,
-    method: req.method,
-    availableRoutes: [
-      '/api/public/shops/discover/:bucketType',
-      '/api/public/shops/featured/trending',
-      '/api/public/shops/featured/random',
-      '/api/public/shops/featured/new',
-      '/api/public/shops/featured/sale',
-      '/api/public/shops/featured/seasonal',
-      '/api/public/shops/featured/staff',
-      '/api/public/shops/featured/selection'
-    ]
-  });
-});
 
 // Export the Express app for Vercel compatibility
 export default app;
