@@ -15,6 +15,60 @@ router.use(authenticateToken);
 // Note: /security-alerts endpoint moved to security-alerts.ts for full implementation
 
 /**
+ * GET /user/tenants - Get user's accessible tenants
+ * Returns list of tenants the user has access to
+ */
+router.get('/tenants', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    // Get user's tenant memberships
+    const userTenants = await prisma.user_tenants.findMany({
+      where: {
+        user_id: userId,
+      },
+      include: {
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            location_status: true,
+          }
+        }
+      }
+    });
+
+    // Filter out inactive tenants and format response
+    const activeTenants = userTenants
+      .filter(ut => ut.tenants.location_status === 'active')
+      .map(ut => ({
+        id: ut.tenants.id,
+        name: ut.tenants.name,
+        slug: ut.tenants.slug,
+        role: ut.role,
+      }));
+
+    return res.json({
+      success: true,
+      data: activeTenants,
+      count: activeTenants.length
+    });
+  } catch (error: any) {
+    console.error('[GET /user/tenants] Error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'internal_error', 
+      message: error.message 
+    });
+  }
+});
+
+/**
  * GET /user/preferences - Get user preferences
  * Returns user's privacy and notification preferences
  */

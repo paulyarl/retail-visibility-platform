@@ -399,7 +399,7 @@ export class InventoryTransferService {
   }
 
   /**
-   * Get all inventory pools for a location
+   * Get all inventory pools for a location (hybrid: universal + legacy via product_slug bridge + variant support)
    */
   async getLocationInventoryPools(
     tenantId: string,
@@ -411,33 +411,289 @@ export class InventoryTransferService {
       offset?: number;
     }
   ): Promise<{ pools: LocationInventoryPool[], total: number }> {
-    const where: any = {
+    console.log(`[InventoryTransferService] Getting variant-aware hybrid inventory for tenant: ${tenantId}, location: ${locationId}`);
+    
+    // Query legacy inventory_items table (primary source)
+    const legacyWhere: any = {
       tenant_id: tenantId,
-      location_id: locationId
+      item_status: 'active',
+      availability: 'in_stock'
     };
 
     if (options?.sku) {
-      where.sku = { contains: options.sku, mode: 'insensitive' };
+      legacyWhere.sku = { contains: options.sku, mode: 'insensitive' };
     }
 
     if (options?.lowStockOnly) {
-      where.available_quantity = { lte: prisma.location_inventory_pools.fields.low_stock_threshold };
+      legacyWhere.stock = { lte: 5 }; // Low stock threshold for legacy system
     }
 
-    const [pools, total] = await Promise.all([
-      prisma.location_inventory_pools.findMany({
-        where,
-        orderBy: { sku: 'asc' },
+    const [legacyItems, legacyTotal] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where: legacyWhere,
+        orderBy: { stock: 'asc' },
         take: options?.limit || 100,
-        skip: options?.offset || 0
+        skip: options?.offset || 0,
+        select: {
+          id: true,
+          tenant_id: true,
+          sku: true,
+          stock: true,
+          name: true,
+          price: true,
+          brand: true,
+          category_path: true,
+          gtin: true,
+          metadata: true,
+          has_variants: true,
+          created_at: true,
+          updated_at: true
+        }
       }),
-      prisma.location_inventory_pools.count({ where })
+      prisma.inventory_items.count({ where: legacyWhere })
     ]);
 
+    console.log(`[InventoryTransferService] Found ${legacyItems.length} legacy inventory items`);
+    
+    // Get variants for items that have them
+    const itemsWithVariants = legacyItems.filter(item => item.has_variants);
+    const variantData = new Map();
+    
+    if (itemsWithVariants.length > 0) {
+      console.log(`[InventoryTransferService] Loading variants for ${itemsWithVariants.length} items with variants`);
+      
+      const variants = await prisma.product_variants.findMany({
+        where: {
+          parent_item_id: { in: itemsWithVariants.map(item => item.id) },
+          tenant_id: tenantId,
+          is_active: true,
+          stock: { gt: 0 } // Only variants with stock
+        },
+        select: {
+          id: true,
+          parent_item_id: true,
+          sku: true,
+          variant_name: true,
+          stock: true,
+          price_cents: true,
+          attributes: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true
+        }
+      });
+      
+      // Group variants by parent item
+      variants.forEach(variant => {
+        if (!variantData.has(variant.parent_item_id)) {
+          variantData.set(variant.parent_item_id, []);
+        }
+        variantData.get(variant.parent_item_id).push(variant);
+      });
+      
+      console.log(`[InventoryTransferService] Loaded ${variants.length} variants across ${variantData.size} parent items`);
+    }
+
+    // Get global catalog mappings for universal integration
+    // Note: Using a simplified approach - check if global_product_catalog table exists
+    let globalCatalogItems: any[] = [];
+    try {
+      globalCatalogItems = await prisma.$queryRawUnsafe(`
+        SELECT 
+          product_slug,
+          universal_sku,
+          name,
+          brand,
+          category_path,
+          gtin_upc,
+          catalog_metadata
+        FROM global_product_catalog 
+        WHERE status = 'active'
+        LIMIT 1000
+      `);
+      console.log(`[InventoryTransferService] Loaded ${globalCatalogItems.length} global catalog products`);
+    } catch (error) {
+      console.log('[InventoryTransferService] Global catalog table not found, using legacy-only mode');
+    }
+
+    console.log(`[InventoryTransferService] Loaded ${globalCatalogItems.length} global catalog products`);
+
+    // Create lookup map for global catalog
+    const globalCatalogMap = new Map(
+      globalCatalogItems.map(item => [item.product_slug, item])
+    );
+
+    // Transform to LocationInventoryPool format with variants and product_slug bridge
+    const pools: any[] = [];
+    
+    for (const item of legacyItems) {
+      // Generate product slug for this legacy item (same logic as migration)
+      const generatedSlug = this.generateProductSlug(item);
+      
+      // Check if this product exists in global catalog (universal bridge)
+      const globalProduct = globalCatalogMap.get(generatedSlug);
+      const isUniversal = !!globalProduct;
+      
+      // Get variants for this item (if any)
+      const variants = variantData.get(item.id) || [];
+      
+      if (variants.length > 0) {
+        // Item has variants - create individual pools for each variant
+        console.log(`[InventoryTransferService] Processing ${variants.length} variants for item ${item.name}`);
+        
+        for (const variant of variants) {
+          const variantSlug = this.generateVariantSlug(item, variant);
+          const variantGlobalProduct = globalCatalogMap.get(variantSlug);
+          const variantIsUniversal = !!variantGlobalProduct;
+          
+          pools.push({
+            id: variantIsUniversal ? `universal-variant-${variant.id}` : `legacy-variant-${variant.id}`,
+            tenantId: item.tenant_id,
+            locationId: locationId,
+            sku: variant.sku,
+            totalQuantity: variant.stock,
+            availableQuantity: variant.stock,
+            reservedQuantity: 0,
+            inTransitQuantity: 0,
+            lowStockThreshold: Math.max(1, Math.floor(variant.stock * 0.2)),
+            reorderPoint: Math.max(2, Math.floor(variant.stock * 0.3)),
+            reorderQuantity: Math.max(5, Math.floor(variant.stock * 0.5)),
+            lastUpdated: variant.updated_at,
+            metadata: {
+              legacyItemId: item.id,
+              variantId: variant.id,
+              name: `${item.name} - ${variant.variant_name}`,
+              variantName: variant.variant_name,
+              priceCents: variant.price_cents || Math.round(Number(item.price) * 100) || 0,
+              brand: item.brand,
+              categoryPath: item.category_path,
+              gtin: item.gtin,
+              attributes: variant.attributes,
+              productSlug: variantSlug,
+              isUniversal: variantIsUniversal,
+              universalSource: variantIsUniversal ? 'global_catalog' : 'legacy_variant_only',
+              universalSku: variantIsUniversal ? variantGlobalProduct!.universal_sku : null,
+              globalProduct: variantIsUniversal ? {
+                product_slug: variantGlobalProduct!.product_slug,
+                universal_sku: variantGlobalProduct!.universal_sku,
+                gtin_upc: variantGlobalProduct!.gtin_upc
+              } : null,
+              parentItem: {
+                id: item.id,
+                name: item.name,
+                sku: item.sku
+              },
+              variantType: 'product_variant',
+              createdAt: variant.created_at,
+              enrichedAt: variant.updated_at
+            }
+          });
+        }
+      } else {
+        // Item has no variants - create pool for the parent item
+        pools.push({
+          id: isUniversal ? `universal-${item.id}` : `legacy-${item.id}`,
+          tenantId: item.tenant_id,
+          locationId: locationId,
+          sku: item.sku,
+          totalQuantity: item.stock,
+          availableQuantity: item.stock,
+          reservedQuantity: 0,
+          inTransitQuantity: 0,
+          lowStockThreshold: Math.max(1, Math.floor(item.stock * 0.2)),
+          reorderPoint: Math.max(2, Math.floor(item.stock * 0.3)),
+          reorderQuantity: Math.max(5, Math.floor(item.stock * 0.5)),
+          lastUpdated: item.updated_at,
+          metadata: {
+            legacyItemId: item.id,
+            name: item.name,
+            priceCents: item.price ? Math.round(Number(item.price) * 100) : 0,
+            brand: item.brand,
+            categoryPath: item.category_path,
+            gtin: item.gtin,
+            productSlug: generatedSlug,
+            isUniversal,
+            universalSource: isUniversal ? 'global_catalog' : 'legacy_only',
+            universalSku: isUniversal ? globalProduct!.universal_sku : null,
+            globalProduct: isUniversal ? {
+              product_slug: globalProduct!.product_slug,
+              universal_sku: globalProduct!.universal_sku,
+              gtin_upc: globalProduct!.gtin_upc
+            } : null,
+            variantType: 'parent_item',
+            createdAt: item.created_at,
+            enrichedAt: item.updated_at
+          }
+        });
+      }
+    }
+
+    // Log universal integration stats
+    const universalItems = pools.filter(p => p.metadata.isUniversal);
+    const legacyOnlyItems = pools.filter(p => !p.metadata.isUniversal);
+    
+    console.log(`[InventoryTransferService] Universal integration via product_slug: ${universalItems.length} universal, ${legacyOnlyItems.length} legacy-only`);
+
     return {
-      pools: pools.map(pool => this.formatLocationInventoryPool(pool)),
-      total
+      pools,
+      total: legacyTotal
     };
+  }
+
+  /**
+   * Generate product slug using new UPC/LPC system
+   */
+  private generateProductSlug(item: {
+    brand: string | null;
+    name: string;
+    category_path: string[];
+    gtin: string | null;
+    sku?: string;
+    id?: string;
+  }): string {
+    const { generateProductSlug } = require('../lib/id-generator');
+    
+    return generateProductSlug({
+      brand: item.brand || 'unknown',
+      name: item.name || 'unknown',
+      category: item.category_path?.[0] || 'general',
+      categoryPath: item.category_path,
+      gtin: item.gtin,
+      sku: item.sku,
+      itemId: item.id
+    });
+  }
+
+  /**
+   * Generate variant slug (parent slug + variant attributes)
+   */
+  private generateVariantSlug(parentItem: any, variant: {
+    variant_name: string;
+    attributes: Record<string, string>;
+  }): string {
+    const parentSlug = this.generateProductSlug(parentItem);
+    
+    // Add variant attributes to slug
+    const attrString = Object.entries(variant.attributes)
+      .map(([key, value]) => `${key}-${value}`)
+      .join('-');
+    
+    let variantSlug = `${parentSlug}-${attrString}`;
+    
+    // Clean up the slug
+    variantSlug = variantSlug
+      .replace(/\s+/g, '-')
+      .replace(/_/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/--/g, '-')
+      .toLowerCase();
+    
+    // Add variant name suffix for uniqueness
+    if (variant.variant_name) {
+      variantSlug += `-${variant.variant_name.toLowerCase().replace(/\s+/g, '-').slice(0, 10)}`;
+    }
+    
+    return variantSlug;
   }
 
   /**
@@ -511,6 +767,66 @@ export class InventoryTransferService {
       alerts: pools.map(pool => this.formatLocationInventoryPool(pool)),
       total
     };
+  }
+
+  /**
+   * Create a new transfer
+   */
+  async createTransfer(transferData: {
+    tenantId: string;
+    sourceLocationId: string;
+    targetLocationId: string;
+    sku: string;
+    quantity: number;
+    notes?: string | null;
+    initiatedBy: string;
+  }): Promise<InventoryTransfer> {
+    try {
+      // Generate transfer ID
+      const transferId = `sched-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+
+      // Create the transfer record
+      const transfer = await prisma.inventory_transfers.create({
+        data: {
+          id: transferId,
+          tenant_id: transferData.tenantId,
+          source_location_id: transferData.sourceLocationId,
+          target_location_id: transferData.targetLocationId,
+          sku: transferData.sku,
+          quantity: transferData.quantity,
+          status: 'pending',
+          initiated_by: transferData.initiatedBy,
+          notes: transferData.notes || null,
+          metadata: {}
+        }
+      });
+
+      // Log the initiation
+      await prisma.inventory_transfer_logs.create({
+        data: {
+          id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+          transfer_id: transferId,
+          tenant_id: transferData.tenantId,
+          action: 'initiated',
+          performed_by: transferData.initiatedBy,
+          performed_at: new Date()
+        }
+      });
+
+      console.log('[InventoryTransferService] Transfer created:', {
+        id: transferId,
+        tenantId: transferData.tenantId,
+        sourceLocationId: transferData.sourceLocationId,
+        targetLocationId: transferData.targetLocationId,
+        sku: transferData.sku,
+        quantity: transferData.quantity
+      });
+
+      return this.formatTransfer(transfer);
+    } catch (error) {
+      console.error('[InventoryTransferService] Failed to create transfer:', error);
+      throw error;
+    }
   }
 
   // Public helper methods

@@ -72,6 +72,132 @@ router.get('/transfers', async (req: Request, res: Response) => {
   }
 });
 
+// Get incoming transfers (where tenant is target)
+router.get('/transfers/incoming', async (req: Request, res: Response) => {
+  try {
+    const {
+      targetTenantId,
+      status,
+      sourceLocationId,
+      sku,
+      limit = 50,
+      offset = 0
+    } = req.query;
+
+    if (!targetTenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'target_tenant_id_required',
+        message: 'Target tenant ID is required for incoming transfers view'
+      });
+    }
+
+    const result = await inventoryTransferService.getTransfers(targetTenantId as string, {
+      status: status as string,
+      sourceLocationId: sourceLocationId as string,
+      sku: sku as string,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string)
+    });
+
+    res.json({
+      success: true,
+      data: {
+        transfers: result.transfers,
+        total: result.total
+      }
+    });
+  } catch (error: any) {
+    console.error('[Admin Inventory] Get incoming transfers error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'failed_to_get_incoming_transfers',
+      message: error.message
+    });
+  }
+});
+
+// Create new transfer
+router.post('/transfers', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.query;
+    const {
+      sourceLocationId,
+      targetLocationId,
+      sku,
+      quantity,
+      notes
+    } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required'
+      });
+    }
+
+    // Validate required fields
+    if (!sourceLocationId || !targetLocationId || !sku || !quantity) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_required_fields',
+        message: 'Source location, target location, SKU, and quantity are required'
+      });
+    }
+
+    // Validate quantity
+    if (quantity < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_quantity',
+        message: 'Quantity must be at least 1'
+      });
+    }
+
+    // Check if source and target are different
+    if (sourceLocationId === targetLocationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'same_location',
+        message: 'Source and target locations must be different'
+      });
+    }
+
+    // Create the transfer
+    const transfer = await inventoryTransferService.createTransfer({
+      tenantId: tenantId as string,
+      sourceLocationId,
+      targetLocationId,
+      sku,
+      quantity,
+      notes: notes || null,
+      initiatedBy: req.headers['x-auth0-id'] as string
+    });
+
+    console.log('[Admin Inventory] Transfer created:', {
+      id: transfer.id,
+      tenantId,
+      sourceLocationId,
+      targetLocationId,
+      sku,
+      quantity
+    });
+
+    res.json({
+      success: true,
+      data: transfer
+    });
+  } catch (error: any) {
+    console.error('[Admin Inventory] Create transfer error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'failed_to_create_transfer',
+      message: error.message
+    });
+  }
+});
+
 // Get transfer details
 router.get('/transfers/:transferId', async (req: Request, res: Response) => {
   try {

@@ -133,7 +133,7 @@ export default function AssignCategoryModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
           <div>
-            <h3 className="text-lg font-semibold">Assign Category</h3>
+            <h3 className="text-lg font-semibold">Assign A Category</h3>
             <p className="text-sm text-gray-600 mt-1">{itemName}</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

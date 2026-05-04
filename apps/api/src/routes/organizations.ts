@@ -8,6 +8,7 @@ import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateItemId, generateTenantItemId,generateOrganizationId, generatePhotoId, generateProductCatId, generateTenantId, generateUserTenantId,generateVariantId } from '../lib/id-generator';
 import { propagateVariants } from '../utils/variant-propagation';
+import { ensureGlobalCatalogEntry, hasGlobalCatalogEntry } from '../utils/global-catalog-sync';
 import { authenticateToken } from '../middleware/auth';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
@@ -817,6 +818,8 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
 
         // Handle based on mode
         if (existing) {
+          console.log(`[Organizations] Found existing item: ${existing.id}, has_variants=${existing.has_variants}, sku=${existing.sku}`);
+          console.log(`[Organizations] Source item has_variants=${sourceItem.has_variants} vs existing has_variants=${existing.has_variants}`);
           if (mode === 'create_only') {
             results.skipped.push({ tenantId, reason: 'sku_already_exists' });
             continue;
@@ -937,8 +940,77 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             });
           }
 
+          // Ensure global catalog entry exists for availability system
+          try {
+            const hasGlobalEntry = await hasGlobalCatalogEntry(sourceItem.sku);
+            if (!hasGlobalEntry) {
+              console.log(`[Organizations] Creating global catalog entry for SKU: ${sourceItem.sku}`);
+              
+              // Fetch variants if source item has them
+              let variants: Array<{
+                sku: string;
+                variant_name: string;
+                price_cents: number | null;
+                attributes: Record<string, any> | null;
+              }> = [];
+              if (sourceItem.has_variants) {
+                const rawVariants = await prisma.product_variants.findMany({
+                  where: { parent_item_id: sourceItem.id },
+                  select: {
+                    sku: true,
+                    variant_name: true,
+                    price_cents: true,
+                    attributes: true
+                  },
+                  orderBy: [
+                    { sort_order: 'asc' },
+                    { created_at: 'asc' }
+                  ]
+                });
+                  
+                // Cast JsonValue to expected type
+                variants = rawVariants.map(v => ({
+                  sku: v.sku,
+                  variant_name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || null
+                }));
+              }
+              
+              await ensureGlobalCatalogEntry({
+                id: existing.id,
+                tenant_id: tenantId,
+                sku: sourceItem.sku,
+                name: sourceItem.name,
+                description: sourceItem.description || undefined,
+                brand: sourceItem.brand || undefined,
+                category_path: sourceItem.category_path || undefined,
+                gtin: sourceItem.gtin || undefined,
+                price_cents: sourceItem.price_cents || undefined,
+                image_url: sourceItem.image_url || undefined,
+                has_variants: sourceItem.has_variants || false,
+                variants: variants.map(v => ({
+                  sku: v.sku,
+                  name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || {}
+                }))
+              });
+              console.log(`[Organizations] Global catalog entry created for SKU: ${sourceItem.sku} with ${variants.length} variants`);
+            } else {
+              console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
+            }
+          } catch (error) {
+            console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+            // Don't fail the propagation, just log the error
+          }
+
           // Propagate variants if source item has them
           if (sourceItem.has_variants) {
+            console.log(`[Organizations] UPDATE MODE: Propagating variants for source ${sourceItem.id} -> existing ${existing.id} (tenant: ${tenantId})`);
+            console.log(`[Organizations] UPDATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+            console.log(`[Organizations] UPDATE MODE: Existing parent item ID: ${existing.id}`);
+            
             const variantResult = await propagateVariants(
               sourceItem.id,
               tenantId,
@@ -948,9 +1020,18 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
               'update'
             );
             
+            console.log(`[Organizations] UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+            
             if (variantResult.errors.length > 0) {
               console.error(`[Organizations] Variant propagation errors for ${updatedItem.id}:`, variantResult.errors);
             }
+            
+            // Verify the parent item still has has_variants set correctly after update
+            const verifyParent = await prisma.inventory_items.findUnique({
+              where: { id: existing.id },
+              select: { id: true, has_variants: true, sku: true }
+            });
+            console.log(`[Organizations] UPDATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
           }
 
           results.updated.push(tenantId);
@@ -1038,8 +1119,17 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
 
         // Create slug registry entry if source has one
         if (sourceSlugRegistry) {
-          await prisma.product_slug_registry.create({
-            data: {
+          await prisma.product_slug_registry.upsert({
+            where: {
+              product_slug: sourceSlugRegistry.product_slug,
+            },
+            update: {
+              universal_sku: sourceSlugRegistry.universal_sku,
+              slug_hash: sourceSlugRegistry.slug_hash,
+              tenant_id: tenantId,
+              original_sku: sourceItem.sku,
+            },
+            create: {
               id: `psr-${generateTenantItemId(tenantId)}`,
               product_slug: sourceSlugRegistry.product_slug,
               universal_sku: sourceSlugRegistry.universal_sku,
@@ -1072,6 +1162,10 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
 
         // Propagate variants if source item has them
         if (sourceItem.has_variants) {
+          console.log(`[Organizations] Propagating variants for source ${sourceItem.id} -> target ${newItem.id} (tenant: ${tenantId})`);
+          console.log(`[Organizations] Source item has_variants: ${sourceItem.has_variants}`);
+          console.log(`[Organizations] Target parent item ID: ${newItem.id}`);
+          
           const variantResult = await propagateVariants(
             sourceItem.id,
             tenantId,
@@ -1081,9 +1175,18 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             'create'
           );
           
+          console.log(`[Organizations] Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+          
           if (variantResult.errors.length > 0) {
             console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
           }
+          
+          // Verify the parent item still has has_variants set correctly
+          const verifyParent = await prisma.inventory_items.findUnique({
+            where: { id: newItem.id },
+            select: { id: true, has_variants: true, sku: true }
+          });
+          console.log(`[Organizations] Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
         }
 
         results.created.push(tenantId);
@@ -1479,6 +1582,100 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
               });
             }
 
+            // Ensure global catalog entry exists for availability system
+            try {
+              const hasGlobalEntry = await hasGlobalCatalogEntry(sourceItem.sku);
+              if (!hasGlobalEntry) {
+                console.log(`[Organizations] Creating global catalog entry for SKU: ${sourceItem.sku}`);
+                
+                // Fetch variants if source item has them
+                let variants: Array<{
+                  sku: string;
+                  variant_name: string;
+                  price_cents: number | null;
+                  attributes: Record<string, any> | null;
+                }> = [];
+                if (sourceItem.has_variants) {
+                  const rawVariants = await prisma.product_variants.findMany({
+                    where: { parent_item_id: sourceItem.id },
+                    select: {
+                      sku: true,
+                      variant_name: true,
+                      price_cents: true,
+                      attributes: true
+                    },
+                    orderBy: [
+                      { sort_order: 'asc' },
+                      { created_at: 'asc' }
+                    ]
+                  });
+                  
+                  // Cast JsonValue to expected type
+                  variants = rawVariants.map(v => ({
+                    sku: v.sku,
+                    variant_name: v.variant_name,
+                    price_cents: v.price_cents,
+                    attributes: (v.attributes as Record<string, any>) || null
+                  }));
+                }
+                
+                await ensureGlobalCatalogEntry({
+                  id: existing.id,
+                  tenant_id: tenantId,
+                  sku: sourceItem.sku,
+                  name: sourceItem.name,
+                  description: sourceItem.description || undefined,
+                  brand: sourceItem.brand || undefined,
+                  category_path: sourceItem.category_path || undefined,
+                  gtin: sourceItem.gtin || undefined,
+                  price_cents: sourceItem.price_cents || undefined,
+                  image_url: sourceItem.image_url || undefined,
+                  has_variants: sourceItem.has_variants || false,
+                  variants: variants.map(v => ({
+                    sku: v.sku,
+                    name: v.variant_name,
+                    price_cents: v.price_cents,
+                    attributes: (v.attributes as Record<string, any>) || {}
+                  }))
+                });
+                console.log(`[Organizations] Global catalog entry created for SKU: ${sourceItem.sku} with ${variants.length} variants`);
+              } else {
+                console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
+              }
+            } catch (error) {
+              console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+              // Don't fail the propagation, just log the error
+            }
+
+            // Propagate variants if source item has them (MISSING IN BULK UPDATE!)
+            if (sourceItem.has_variants) {
+              console.log(`[Organizations] BULK UPDATE MODE: Propagating variants for source ${sourceItem.id} -> existing ${existing.id} (tenant: ${tenantId})`);
+              console.log(`[Organizations] BULK UPDATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+              console.log(`[Organizations] BULK UPDATE MODE: Existing parent item ID: ${existing.id}`);
+              
+              const variantResult = await propagateVariants(
+                sourceItem.id,
+                tenantId,
+                undefined, // newItemId is not provided for update mode
+                existing.id,
+                sourceItem.directory_category_id,
+                'update'
+              );
+              
+              console.log(`[Organizations] BULK UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+              
+              if (variantResult.errors.length > 0) {
+                console.error(`[Organizations] BULK UPDATE MODE: Variant propagation errors for ${existing.id}:`, variantResult.errors);
+              }
+              
+              // Verify the parent item still has has_variants set correctly after update
+              const verifyParent = await prisma.inventory_items.findUnique({
+                where: { id: existing.id },
+                select: { id: true, has_variants: true, sku: true }
+              });
+              console.log(`[Organizations] BULK UPDATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
+            }
+
             results.updated.push({ 
               item_id: sourceItem.id, 
               tenantId, 
@@ -1574,8 +1771,17 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
           // Create slug registry entry if source has one
           const sourceSlugRegistry = slugRegistryMap.get(`${sourceItem.tenant_id}-${sourceItem.sku}`);
           if (sourceSlugRegistry) {
-            await prisma.product_slug_registry.create({
-              data: {
+            await prisma.product_slug_registry.upsert({
+              where: {
+                product_slug: sourceSlugRegistry.product_slug,
+              },
+              update: {
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+              },
+              create: {
                 id: `psr-${generateTenantItemId(tenantId)}`,
                 product_slug: sourceSlugRegistry.product_slug,
                 universal_sku: sourceSlugRegistry.universal_sku,
@@ -1608,6 +1814,10 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
 
           // Propagate variants if source item has them
           if (sourceItem.has_variants) {
+            console.log(`[Organizations] BULK CREATE MODE: Propagating variants for source ${sourceItem.id} -> target ${newItem.id} (tenant: ${tenantId})`);
+            console.log(`[Organizations] BULK CREATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+            console.log(`[Organizations] BULK CREATE MODE: Target parent item ID: ${newItem.id}`);
+            
             const variantResult = await propagateVariants(
               sourceItem.id,
               tenantId,
@@ -1617,9 +1827,18 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
               'create'
             );
             
+            console.log(`[Organizations] BULK CREATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+            
             if (variantResult.errors.length > 0) {
-              console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+              console.error(`[Organizations] BULK CREATE MODE: Variant propagation errors for ${newItem.id}:`, variantResult.errors);
             }
+            
+            // Verify the parent item still has has_variants set correctly
+            const verifyParent = await prisma.inventory_items.findUnique({
+              where: { id: newItem.id },
+              select: { id: true, has_variants: true, sku: true }
+            });
+            console.log(`[Organizations] BULK CREATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
           }
 
           results.created.push({ 

@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { safeTransformToCamel } from '@/utils/case-transform';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 
@@ -25,7 +25,16 @@ interface UseBusinessProfileOptions {
   tenantId?: string;
 }
 
-class BusinessProfileSingletonService extends AuthenticatedApiSingleton {
+class BusinessProfileSingletonService extends TenantApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    return ['business-profile-*'];
+  }
+  public invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void> {
+    if (tenantId) {
+      return this.invalidateCache(`business-profile-${tenantId}`);
+    }
+    return Promise.resolve();
+  }
   private static instance: BusinessProfileSingletonService;
 
   private constructor() {

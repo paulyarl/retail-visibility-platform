@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
-import { generateVariantId, generateVariantSkuFromParent } from '../lib/id-generator';
+import { generateVariantId, generateTenantVariantId,generateVariantSkuFromParent } from '../lib/id-generator';
 
 const router = Router();
 
@@ -102,7 +102,7 @@ router.post('/items/:itemId/variants', authenticateToken, async (req: Request, r
 
     const variant = await prisma.product_variants.create({
       data: {
-        id: generateVariantId(itemId),
+        id: generateTenantVariantId(itemId, item.tenant_id),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
         variant_name: variantName,
@@ -227,7 +227,7 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
     // Create all variants
     const created = await prisma.product_variants.createMany({
       data: uniqueVariants.map((v, index) => ({
-        id: generateVariantId(itemId),
+        id: generateTenantVariantId(itemId, item.tenant_id),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
         variant_name: v.variant_name,

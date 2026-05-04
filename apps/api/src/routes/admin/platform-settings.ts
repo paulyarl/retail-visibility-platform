@@ -22,6 +22,15 @@ const platformSettingsSchema = z.object({
   rateLimitConfigurations: z.array(rateLimitConfigSchema).optional(),
 });
 
+// Schema for payment settings
+const paymentSettingsSchema = z.object({
+  minimumPaymentAmount: z.object({
+    amount: z.number().min(0),
+    currency: z.string(),
+    displayAmount: z.string(),
+  }),
+});
+
 // GET / - Get admin platform settings (router mounted at /api/admin/platform-settings)
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -139,6 +148,85 @@ router.put('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[PUT /api/admin/platform-settings] Error:', error);
     res.status(500).json({ error: 'Failed to update platform settings' });
+  }
+});
+
+// GET /payment - Get payment settings
+router.get('/payment', async (req: Request, res: Response) => {
+  try {
+    // Get payment settings from platform_settings table
+    const paymentSettings = await basePrisma.$queryRaw`
+      SELECT 
+        minimum_payment_amount,
+        minimum_payment_currency,
+        minimum_payment_display
+      FROM platform_settings_list
+      WHERE id = 1
+    ` as Array<{
+      minimum_payment_amount: number;
+      minimum_payment_currency: string;
+      minimum_payment_display: string;
+    }>;
+
+    const settings = paymentSettings[0];
+
+    if (!settings || !settings.minimum_payment_amount) {
+      // Return default settings if none exist
+      return res.json({
+        minimumPaymentAmount: {
+          amount: 200, // $2.00 in cents
+          currency: 'USD',
+          displayAmount: '$2.00',
+        }
+      });
+    }
+
+    res.json({
+      minimumPaymentAmount: {
+        amount: settings.minimum_payment_amount,
+        currency: settings.minimum_payment_currency,
+        displayAmount: settings.minimum_payment_display,
+      }
+    });
+  } catch (error) {
+    console.error('[GET /api/admin/platform-settings/payment] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch payment settings' });
+  }
+});
+
+// PUT /payment - Update payment settings
+router.put('/payment', async (req: Request, res: Response) => {
+  try {
+    const parsed = paymentSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: 'invalid_payload', 
+        details: parsed.error.flatten() 
+      });
+    }
+
+    const { minimumPaymentAmount } = parsed.data;
+
+    // Update payment settings in platform_settings table
+    await basePrisma.$executeRaw`
+      UPDATE platform_settings_list 
+      SET 
+        minimum_payment_amount = ${minimumPaymentAmount.amount},
+        minimum_payment_currency = ${minimumPaymentAmount.currency},
+        minimum_payment_display = ${minimumPaymentAmount.displayAmount},
+        updated_at = NOW()
+      WHERE id = 1
+    `;
+
+    // Return updated settings
+    res.json({
+      minimumPaymentAmount,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user?.email || 'admin',
+    });
+  } catch (error) {
+    console.error('[PUT /api/admin/platform-settings/payment] Error:', error);
+    res.status(500).json({ error: 'Failed to update payment settings' });
   }
 });
 

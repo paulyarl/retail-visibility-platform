@@ -121,7 +121,7 @@ export function generateQuickStartSku(index?: number): string {
  */
 export function generatePhotoId(tenantId: string,itemId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `phid-${generateTenantKey(tenantId)}-${itemId}-${nanoid()}`;
+  return `photo-${generateTenantKey(tenantId)}-${itemId}-${nanoid()}`;
 }
 
 /**
@@ -130,7 +130,7 @@ export function generatePhotoId(tenantId: string,itemId: string): string {
  */
 export function generateSessionId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `sid-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `session-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 
@@ -140,7 +140,7 @@ export function generateSessionId(tenantId: string): string {
  */
 export function generateOrderId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `oid-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `order-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -149,7 +149,7 @@ export function generateOrderId(tenantId: string): string {
  */
 export function generateAuditId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `alid-${nanoid()}`;
+  return `audit-${nanoid()}`;
 }
 
 /**
@@ -158,7 +158,7 @@ export function generateAuditId(): string {
  */
 export function generateTierId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `tid-${nanoid()}`;
+  return `tier-${nanoid()}`;
 }
 
 /**
@@ -176,7 +176,7 @@ export function generateTierChangeId(): string {
  */
 export function generateFeatureId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 5);
-  return `tfid-${nanoid()}`;
+  return `feature-${nanoid()}`;
 }
 
 /**
@@ -194,7 +194,7 @@ export function generateQsCatId(): string {
  */
 export function generateDcCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `dccatid-${nanoid()}`;
+  return `dircat-${nanoid()}`;
 }
 
 /**
@@ -203,7 +203,7 @@ export function generateDcCatId(): string {
  */
 export function generateCloverCatId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `ccid-${nanoid()}`;
+  return `clovercat-${nanoid()}`;
 }
 /**
  * Generates clover OAuth change log IDs
@@ -211,7 +211,7 @@ export function generateCloverCatId(): string {
  */
 export function generateCloverOauthChangeLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `cocid-${nanoid()}`;
+  return `cloveroauth-${nanoid()}`;
 }
 
 /**
@@ -220,7 +220,7 @@ export function generateCloverOauthChangeLogId(): string {
  */
 export function generateCloverSyncLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `cpid-${nanoid()}`;
+  return `cloversync-${nanoid()}`;
 }
 
 /**
@@ -229,7 +229,7 @@ export function generateCloverSyncLogId(): string {
  */
 export function generateGbpHoursSyncLogId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `gbp-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `gbphours-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -256,7 +256,7 @@ export function generateFeedPushJobId(): string {
  */
 export function generateProductCatId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `cat-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `itemcat-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -265,7 +265,7 @@ export function generateProductCatId(tenantId: string): string {
  */
 export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `featured-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `dirfeatured-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -320,7 +320,7 @@ export function generatePaymentId(tenantId: string): string {
  */
 export function generateBillingMethodId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `mbg-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `bill-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -338,7 +338,7 @@ export function generateInvoiceId(tenantId: string): string {
  */
 export function generateSubscriptionPaymentId(invoiceId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `spay-${invoiceId}-${nanoid()}`;
+  return `subpay-${invoiceId}-${nanoid()}`;
 }
 
 /**
@@ -347,7 +347,7 @@ export function generateSubscriptionPaymentId(invoiceId: string): string {
  */
 export function generateTierPricingId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `tpr-${nanoid()}`;
+  return `tierprice-${nanoid()}`;
 }
 
 /**
@@ -356,7 +356,7 @@ export function generateTierPricingId(): string {
  */
 export function generateOrderItemId(id: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `oiid-${id}-${nanoid()}`;
+  return `orderitem-${id}-${nanoid()}`;
 }
 
 /**
@@ -365,7 +365,7 @@ export function generateOrderItemId(id: string): string {
  */
 export function generateOrderItemHistoryId(id: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `oih-${id}-${nanoid()}`;
+  return `orderhist-${id}-${nanoid()}`;
 }
 
 /**
@@ -383,7 +383,7 @@ export function generateShipmentId(tenantId: string): string {
  */
 export function generateServiceChargeId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `svc-${generateTenantKey(tenantId)}-${nanoid()}`;
+  return `charge-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -398,7 +398,12 @@ export function generateManualInvoiceId(tenantId: string): string {
 // Generate variant ID function
 export function generateVariantId(parentItemId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 3);
-  return `vid-${parentItemId}-${nanoid()}`;
+  return `variant-${parentItemId}-${nanoid()}`;
+}
+// Generate variant ID function
+export function generateTenantVariantId(parentItemId: string,tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 3);
+  return `variant-${parentItemId}-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 // Generate variant SKU function - creates SKUs related to parent item SKU
@@ -625,3 +630,63 @@ export function generateCustomerTenantRelationshipId(tenantId: string): string {
  * - **Platform-wide customer identification**
  * - **Customer-tenant relationship tracking**
  */
+
+/**
+ * Generate global product catalog ID
+ * Format: gpc-abc123 (10 chars)
+ */
+export function generateGlobalProductId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `gpc-${nanoid()}`;
+}
+
+/**
+ * Generate product slug using new UPC/LPC system
+ * Matches database trigger logic exactly
+ * 
+ * Character Rules:
+ * _ = part boundary (after prefix, between parts)
+ * - = bonded part (within parts)
+ * 
+ * Format: (prefix)_(brand)_(category)_(upc-code)_(name-hash)
+ * Prefix: upc, lpc
+ */
+export function generateProductSlug(params: {
+  brand: string;
+  name: string;
+  category: string;
+  gtin?: string;
+  categoryPath?: string[];
+  sku?: string;
+  itemId?: string;
+}): string {
+  const { createHash } = require('crypto');
+  
+  // Normalize parts (bond words with hyphens)
+  const normalizePart = (part: string) => 
+    part
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  
+  // Generate name hash (first 8 chars of MD5)
+  const nameHash = createHash('md5')
+    .update(params.name.toLowerCase().trim())
+    .digest('hex')
+    .substring(0, 8);
+  
+  // Use first category if categoryPath is provided
+  const category = params.categoryPath?.[0] || params.category || 'general';
+  
+  // Determine slug type based on GTIN/UPC presence
+  if (params.gtin && params.gtin.trim() !== '') {
+    // UPC-based product: upc_(brand)_(category)_(upc-code)_(name-hash)
+    return `upc_${normalizePart(params.brand)}_${normalizePart(category)}_${params.gtin.trim()}_${nameHash}`;
+  } else {
+    // LPC-based product: lpc_(sku)_(category)_(item-id)_(name-hash)
+    if (!params.sku || !params.itemId) {
+      throw new Error('LPC products require sku and itemId');
+    }
+    return `lpc_${params.sku}_${normalizePart(category)}_${params.itemId}_${nameHash}`;
+  }
+}

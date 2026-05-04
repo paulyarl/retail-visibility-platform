@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
+
 interface TenantCategory {
   id: string;
   name: string;
@@ -21,6 +22,7 @@ interface TenantCategorySelectorProps {
   categoryPath?: string[]; // From enrichment data
   onSelect: (categoryId: string, googleCategoryPath?: string, googleTaxonomyId?: string) => void; // Allow passing Google category info
   onCancel?: () => void;
+  tenantId?: string;
 }
 
 /**
@@ -37,9 +39,14 @@ export default function TenantCategorySelector({
   categoryPath,
   onSelect,
   onCancel,
+  tenantId,
 }: TenantCategorySelectorProps) {
+  // console.log('[TenantCategorySelector] tenantId:', tenantId);
+  
   const params = useParams();
-  const tenantId = params.tenantId as string;
+  // console.log('[TenantCategorySelector] params:', params);
+  const resolvedTenantId = tenantId || (params.tenantId as string);
+  // console.log('[TenantCategorySelector] resolved tenantId:', resolvedTenantId);
   const [categories, setCategories] = useState<TenantCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [localSelectedId, setLocalSelectedId] = useState<string>(selectedCategoryId || '');
@@ -56,7 +63,9 @@ export default function TenantCategorySelector({
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const fetchedCategories = await tenantCategoriesService.getTenantCategories(tenantId);
+        // console.log('[TenantCategorySelector] Fetching categories for tenant:', resolvedTenantId);
+        const fetchedCategories = await tenantCategoriesService.getTenantCategories(resolvedTenantId);
+        // console.log('[TenantCategorySelector] Fetched categories:', fetchedCategories.length);
         setCategories(fetchedCategories);
         setRecentIds(fetchedCategories.slice(0, 30).map(cat => cat.id));
       } catch (error) {
@@ -66,7 +75,7 @@ export default function TenantCategorySelector({
       }
     }
     fetchCategories();
-  }, [tenantId]);
+  }, [resolvedTenantId]);
 
   // Update local selection when prop changes
   useEffect(() => {

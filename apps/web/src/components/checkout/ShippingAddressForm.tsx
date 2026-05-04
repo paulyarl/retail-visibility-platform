@@ -175,7 +175,9 @@ export function ShippingAddressForm({ initialData, onSubmit }: ShippingAddressFo
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" disabled={isSubmitting} 
+        style={{ color: 'white' }} 
+        variant="gradient">
           {isSubmitting ? 'Processing...' : 'Continue to Payment'}
         </Button>
       </form>

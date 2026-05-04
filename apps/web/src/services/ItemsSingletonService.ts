@@ -331,6 +331,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-photos-${itemId}`,
         15 * 60 * 1000 // 15 minutes
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get photos:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -357,6 +361,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `item-set-primary-photo-${itemId}-${photoId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to set primary photo:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -382,6 +390,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `item-delete-photo-${itemId}-${photoId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to delete photo:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -408,6 +420,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `item-migrate-photos-${itemId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to migrate legacy photos:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -437,6 +453,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `item-update-photo-${itemId}-${photoId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to update photo:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -460,6 +480,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-trash-capacity-${tenantId}`,
         5 * 60 * 1000 // 5 minutes for capacity data
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get trash capacity:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -483,6 +507,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-trashed-${tenantId}-${limit}`,
         5 * 60 * 1000 // 5 minutes for trash data
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get trashed items:', result.error);
+        throw result.error;
+      }
 
       return result;
     } catch (error) {
@@ -505,6 +533,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         { method: 'PATCH' },
         `item-restore-${itemId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to restore item:', result.error);
+        throw result.error;
+      }
     } catch (error) {
       console.error('[ItemsSingleton] Failed to restore item:', error);
       throw error;
@@ -525,6 +557,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         { method: 'DELETE' },
         `item-purge-${itemId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to purge item:', result.error);
+        throw result.error;
+      }
     } catch (error) {
       console.error('[ItemsSingleton] Failed to purge item:', error);
       throw error;
@@ -540,15 +576,42 @@ class ItemsSingletonService extends TenantApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await Promise.all(itemIds.map(itemId => 
+      const results = await Promise.all(itemIds.map(itemId => 
         this.makeDefaultRequest<void>(
           `/api/items/${itemId}/purge`,
           { method: 'DELETE' },
           `item-purge-${itemId}`
         )
       ));
+      if (!results.every(result => result?.success)) {
+        throw new Error('Failed to empty trash');
+      }
     } catch (error) {
       console.error('[ItemsSingleton] Failed to empty trash:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's accessible tenants
+   */
+  async getUserTenants(): Promise<any> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/user/tenants',
+        {},
+        'user-tenants-list',
+        10 * 60 * 1000 // 10 minutes
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get user tenants:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get user tenants:', error);
       throw error;
     }
   }
@@ -568,8 +631,12 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-my-scan-sessions-${tenantId}`,
         10 * 60 * 1000 // 10 minutes for scan sessions
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get my scan sessions:', result.error);
+        throw result.error;
+      }
 
-      return result;
+      return result?.data;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get my scan sessions:', error);
       throw error;
@@ -597,7 +664,12 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-start-scan-session-${tenantId}`
       );
 
-      return result;
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to start scan session:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to start scan session:', error);
       throw error;
@@ -613,13 +685,163 @@ class ItemsSingletonService extends TenantApiSingleton {
         throw new Error('Session ID is required');
       }
 
-      await this.makeDefaultRequest<void>(
+      const result = await this.makeDefaultRequest<void>(
         `/api/scan/${sessionId}`,
         { method: 'DELETE' },
         `items-cancel-scan-session-${sessionId}`
       );
+      if (!result?.success){
+        console.error('[ItemsSingleton] Failed to cancel scan session:', result.error);
+        throw result.error;
+      }
     } catch (error) {
       console.error('[ItemsSingleton] Failed to cancel scan session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific scan session
+   */
+  async getScanSession(sessionId: string): Promise<any> {
+    try {
+      if (!sessionId) {
+        throw new Error('Session ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/scan/${sessionId}`,
+        {},
+        `items-get-scan-session-${sessionId}`,
+        10 * 60 * 1000 // 10 minutes
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to get scan session:', result.error);
+        throw result.error;
+      }
+
+      return result; // Return full result, not just data
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get scan session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lookup barcode information
+   */
+  async lookupBarcode(sessionId: string, barcode: string): Promise<any> {
+    try {
+      if (!sessionId || !barcode) {
+        throw new Error('Session ID and barcode are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/scan/${sessionId}/lookup-barcode`,
+        { 
+          method: 'POST',
+          body: JSON.stringify({ barcode })
+        },
+        `items-lookup-barcode-${sessionId}-${barcode}`,
+        5 * 60 * 1000 // 5 minutes
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to lookup barcode:', result.error);
+        throw result.error;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to lookup barcode:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update scan result enrichment
+   */
+  async updateScanResult(sessionId: string, resultId: string, enrichment: any): Promise<any> {
+    try {
+      if (!sessionId || !resultId) {
+        throw new Error('Session ID and Result ID are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/scan/${sessionId}/results/${resultId}/enrichment`,
+        { 
+          method: 'PATCH',
+          body: JSON.stringify(enrichment)
+        },
+        `items-update-scan-result-${sessionId}-${resultId}`
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to update scan result:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to update scan result:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove scan result
+   */
+  async removeScanResult(sessionId: string, resultId: string): Promise<any> {
+    try {
+      if (!sessionId || !resultId) {
+        throw new Error('Session ID and Result ID are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/scan/${sessionId}/results/${resultId}`,
+        { method: 'DELETE' },
+        `items-remove-scan-result-${sessionId}-${resultId}`
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to remove scan result:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to remove scan result:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Commit scan session
+   */
+  async commitScanSession(sessionId: string, skipValidation: boolean = false): Promise<any> {
+    try {
+      if (!sessionId) {
+        throw new Error('Session ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/scan/${sessionId}/commit`,
+        { 
+          method: 'POST',
+          body: JSON.stringify({ skipValidation })
+        },
+        `items-commit-scan-session-${sessionId}`
+      );
+
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to commit scan session:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to commit scan session:', error);
       throw error;
     }
   }
@@ -633,7 +855,7 @@ class ItemsSingletonService extends TenantApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeDefaultRequest<void>(
+      const results = await this.makeDefaultRequest<void>(
         '/api/scan/cleanup-my-sessions',
         { 
           method: 'POST',
@@ -641,6 +863,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `items-cleanup-scan-sessions-${tenantId}`
       );
+      if (!results?.success) {
+        console.error('[ItemsSingleton] Failed to cleanup scan sessions:', results.error);
+        throw results.error;
+      }
     } catch (error) {
       console.error('[ItemsSingleton] Failed to cleanup scan sessions:', error);
       throw error;
@@ -664,6 +890,10 @@ class ItemsSingletonService extends TenantApiSingleton {
         },
         `item-delete-${itemId}`
       );
+      if (!result?.success) {
+        console.error('[ItemsSingleton] Failed to delete item:', result.error);
+        throw result.error;
+      }
 
       // Invalidate items complete cache for this tenant
       await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);

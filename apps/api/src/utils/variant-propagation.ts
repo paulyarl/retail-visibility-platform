@@ -7,14 +7,14 @@
  */
 
 import { prisma } from '../prisma';
-import { generateProductCatId } from '../lib/id-generator';
+import { generateProductCatId,generateTenantVariantId } from '../lib/id-generator';
 import { customAlphabet } from 'nanoid';
 
 // Generate variant ID function
-function generateVariantId(parentItemId: string): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `vid-${parentItemId}-${nanoid()}`;
-}
+// function generateVariantId(parentItemId: string): string {
+//   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+//   return `vid-${parentItemId}-${nanoid()}`;
+// }
 
 export interface VariantPropagationResult {
   created: number;
@@ -100,11 +100,18 @@ export async function propagateVariants(
   };
 
   try {
+    console.log(`[Variant Propagation] Starting: source=${sourceItemId}, target=${targetTenantId}, mode=${mode}`);
+    
     // Get source variants
     const sourceVariants = await prisma.product_variants.findMany({
       where: { parent_item_id: sourceItemId },
-      orderBy: { sort_order: 'asc', created_at: 'asc' }
+      orderBy: [
+        { sort_order: 'asc' },
+        { created_at: 'asc' }
+      ]
     });
+
+    console.log(`[Variant Propagation] Found ${sourceVariants.length} source variants`);
 
     if (sourceVariants.length === 0) {
       return result; // No variants to propagate
@@ -126,24 +133,53 @@ export async function propagateVariants(
       throw new Error('Target item ID is required for variant propagation');
     }
 
-    const variantData = sourceVariants.map((variant, index) => ({
-      id: generateVariantId(targetItemId),
-      parent_item_id: targetItemId,
-      tenant_id: targetTenantId,
-      variant_name: variant.variant_name,
-      sku: variant.sku, // Keep original SKU for consistency
-      price_cents: variant.price_cents,
-      sale_price_cents: variant.sale_price_cents || null,
-      stock: variant.stock,
-      attributes: variant.attributes as any,
-      is_active: variant.is_active,
-      sort_order: variant.sort_order,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
+    console.log(`[Variant Propagation] Target item ID: ${targetItemId}`);
+
+    const variantData = sourceVariants.map((variant, index) => {
+      const variantId = generateTenantVariantId(targetItemId, targetTenantId);
+      console.log(`[Variant Propagation] Creating variant ${index + 1}/${sourceVariants.length}: ${variantId} -> parent: ${targetItemId}`);
+      
+      return {
+        id: variantId,
+        parent_item_id: targetItemId,
+        tenant_id: targetTenantId,
+        variant_name: variant.variant_name,
+        sku: variant.sku, // Keep original SKU for consistency
+        price_cents: variant.price_cents,
+        sale_price_cents: variant.sale_price_cents || null,
+        stock: variant.stock,
+        attributes: variant.attributes as any,
+        is_active: variant.is_active,
+        sort_order: variant.sort_order,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+    });
 
     await prisma.product_variants.createMany({
       data: variantData
+    });
+
+    console.log(`[Variant Propagation] Created ${variantData.length} variants for target ${targetItemId}`);
+    
+    // Verify the variants were created correctly
+    const createdVariants = await prisma.product_variants.findMany({
+      where: { 
+        parent_item_id: targetItemId,
+        tenant_id: targetTenantId 
+      },
+      select: {
+        id: true,
+        parent_item_id: true,
+        tenant_id: true,
+        variant_name: true,
+        sku: true
+      }
+    });
+
+    console.log(`[Variant Propagation] Verification: Found ${createdVariants.length} variants with correct parent relationship`);
+    createdVariants.forEach(v => {
+      console.log(`  - ${v.id}: parent=${v.parent_item_id}, tenant=${v.tenant_id}, sku=${v.sku}`);
     });
 
     result.created = variantData.length;
@@ -178,6 +214,9 @@ export async function itemHasVariants(itemId: string): Promise<boolean> {
 export async function getItemVariants(itemId: string) {
   return await prisma.product_variants.findMany({
     where: { parent_item_id: itemId },
-    orderBy: { sort_order: 'asc', created_at: 'asc' }
+    orderBy: [
+      { sort_order: 'asc' },
+      { created_at: 'asc' }
+    ]
   });
 }

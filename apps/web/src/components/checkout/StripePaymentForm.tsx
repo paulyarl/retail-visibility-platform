@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/Button';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Currency, Loader2 } from 'lucide-react';
 import { checkoutService } from '@/services/CheckoutService';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
 
 interface StripePaymentFormProps {
   amount: number;
@@ -131,6 +133,20 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { settings: platformSettings } = usePlatformSettings();
+
+  // Validate minimum payment amount using platform-wide settings
+  const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
+  
+  if (!paymentValidation.isValid) {
+    console.log('[Stripe] Amount validation failed:', paymentValidation);
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800 font-medium">Payment Amount Too Low</p>
+        <p className="text-red-600 text-sm mt-1">{paymentValidation.message}</p>
+      </div>
+    );
+  }
 
   useEffect(() => {
     // We'll create the payment intent after the user submits the form
@@ -154,17 +170,106 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
     );
   }
 
+  // Check if Stripe publishable key is available
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  
+  if (!publishableKey) {
+    console.error('[Stripe] Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable');
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800">
+          Stripe is not properly configured. Please contact support.
+        </p>
+      </div>
+    );
+  }
+
+  // Create a wrapper component to handle Stripe loading errors
+  function StripeWrapper({ children }: { children: React.ReactNode }) {
+    const [stripeError, setStripeError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+      const loadStripeAsync = async () => {
+        try {
+          console.log('[Stripe] Starting to load Stripe...');
+          const stripe = await loadStripe(publishableKey!);
+          console.log('[Stripe] Stripe loaded successfully:', stripe ? 'OK' : 'FAILED');
+          if (!stripe) {
+            setStripeError('Failed to load Stripe library');
+          }
+        } catch (error) {
+          console.error('[Stripe] Error loading Stripe:', error);
+          setStripeError('Stripe library failed to initialize');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      if (publishableKey) {
+        loadStripeAsync();
+      } else {
+        setStripeError('Stripe publishable key not found');
+        setIsLoading(false);
+      }
+    }, [publishableKey]);
+
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+          <span className="ml-2 text-sm text-gray-600">Loading payment system...</span>
+        </div>
+      );
+    }
+
+    if (stripeError) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 font-medium">Payment System Error</p>
+          <p className="text-red-600 text-sm mt-1">{stripeError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+
+    return <>{children}</>;
+  }
+
+  
+  // Create payment intent options - use payment mode for simplicity
+  const options = {
+    mode: 'payment' as const,
+    currency: 'usd',
+    amount: props.amount,
+    // In production, you'd want to create a payment intent on the server
+    // and pass the clientSecret here instead
+  };
+
   // For Stripe, we need to create the payment intent first
   // This is a simplified version - in production, you'd want to handle this differently
   return (
-    <div className="space-y-4">
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <p className="text-purple-800 text-sm">
-          Stripe checkout requires the merchant to have a connected Stripe account.
-          Please ensure Stripe Connect is configured before accepting Stripe payments.
-        </p>
+    <StripeWrapper>
+      <div className="space-y-4">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <p className="text-purple-800 text-sm">
+            Stripe checkout requires the merchant to have a connected Stripe account.
+            Please ensure Stripe Connect is configured before accepting Stripe payments.
+          </p>
+        </div>
+
+        <Elements 
+          stripe={loadStripe(publishableKey!)} 
+          options={options}
+        >
+          <StripeCheckoutForm {...props} />
+        </Elements>
       </div>
-      <StripeCheckoutForm {...props} />
-    </div>
+    </StripeWrapper>
   );
 }

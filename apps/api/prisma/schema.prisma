@@ -1074,6 +1074,7 @@ model inventory_items {
   featured_until          DateTime?                @db.Timestamp(6)
   featured_priority       Int?                     @default(0)
   featured_type           String?                  @default("store_selection")
+  product_slug            String?                  @db.VarChar(255)
   digital_access_grants   digital_access_grants[]
   featured_products       featured_products[]
   tenant_payment_gateways tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
@@ -1926,30 +1927,33 @@ model platform_revenue_transactions {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model platform_settings_list {
-  id                    Int      @id @default(1)
-  platform_name         String?
-  platform_description  String?
-  logo_url              String?
-  favicon_url           String?
-  created_at            DateTime @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime @db.Timestamptz(6)
-  rate_limiting_enabled Boolean? @default(true)
-  theme_preset          String?  @default("default") @db.VarChar(255)
-  theme_colors          Json?
-  theme_font_family     String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif") @db.VarChar(255)
-  theme_border_radius   String?  @default("md") @db.VarChar(50)
-  theme_button_size     String?  @default("sm") @db.VarChar(50)
-  theme_spacing         Int?     @default(16)
-  contact_email         String?  @db.VarChar(255)
-  contact_phone         String?  @db.VarChar(50)
-  contact_address       String?
-  contact_website       String?  @db.VarChar(500)
-  social_facebook       String?  @db.VarChar(500)
-  social_twitter        String?  @db.VarChar(500)
-  social_instagram      String?  @db.VarChar(500)
-  social_linkedin       String?  @db.VarChar(500)
-  social_youtube        String?  @db.VarChar(500)
-  banner_url            String?  @db.VarChar(500)
+  id                       Int      @id @default(1)
+  platform_name            String?
+  platform_description     String?
+  logo_url                 String?
+  favicon_url              String?
+  created_at               DateTime @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime @db.Timestamptz(6)
+  rate_limiting_enabled    Boolean? @default(true)
+  theme_preset             String?  @default("default") @db.VarChar(255)
+  theme_colors             Json?
+  theme_font_family        String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif") @db.VarChar(255)
+  theme_border_radius      String?  @default("md") @db.VarChar(50)
+  theme_button_size        String?  @default("sm") @db.VarChar(50)
+  theme_spacing            Int?     @default(16)
+  contact_email            String?  @db.VarChar(255)
+  contact_phone            String?  @db.VarChar(50)
+  contact_address          String?
+  contact_website          String?  @db.VarChar(500)
+  social_facebook          String?  @db.VarChar(500)
+  social_twitter           String?  @db.VarChar(500)
+  social_instagram         String?  @db.VarChar(500)
+  social_linkedin          String?  @db.VarChar(500)
+  social_youtube           String?  @db.VarChar(500)
+  banner_url               String?  @db.VarChar(500)
+  minimum_payment_amount   Int?     @default(200)
+  minimum_payment_currency String?  @default("USD") @db.VarChar(3)
+  minimum_payment_display  String?  @default("$2.00") @db.VarChar(20)
 }
 
 model product_performances {

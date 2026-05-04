@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Flags } from '@/lib/flags';
+import { UserTenantSelector } from '@/components/tenant/UserTenantSelector';
 
 
 interface ScanSession {
@@ -28,16 +29,31 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('usb');
+  const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+  const [cleaningUp, setCleaningUp] = useState(false);
+
+  useEffect(() => {
+    // Initialize selected tenant from localStorage
+    const lastTenantId = localStorage.getItem('lastTenantId');
+    if (lastTenantId) {
+      setSelectedTenant(lastTenantId);
+    }
+  }, []);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [selectedTenant]);
 
   const loadSessions = async () => {
     try {
-      // TODO: Implement GET /api/scan/sessions endpoint
-      // For now, just set empty array
-      setSessions([]);
+      if (!selectedTenant) {
+        setSessions([]);
+        setLoading(false);
+        return;
+      }
+      
+      const data = await itemsSingletonService.getMyScanSessions(selectedTenant);
+      setSessions(data.sessions || []);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
@@ -45,39 +61,37 @@ export default function ScanPage() {
     }
   };
 
-  const startNewSession = async () => {
-    if (!Flags.SKU_SCANNING) {
-      alert('SKU scanning is not enabled. Please contact your administrator.');
+  const cancelSession = async (sessionId: string) => {
+    try {
+      await itemsSingletonService.cancelScanSession(sessionId);
+      await loadSessions(); // Refresh the list
+    } catch (err) {
+      console.error('[ScanPage] Failed to cancel session:', err);
+      alert('Failed to cancel session');
+    }
+  };
+
+  const cleanupMySessions = async () => {
+    if (!selectedTenant) {
+      alert('Please select a tenant first');
       return;
     }
-
-    if (selectedDevice === 'camera' && !Flags.SCAN_CAMERA) {
-      alert('Camera scanning is not enabled. Please select USB or manual mode.');
+    
+    if (!confirm('This will close all active scan sessions for this tenant. Continue?')) {
       return;
     }
 
     try {
-      setCreating(true);
+      setCleaningUp(true);
       
-      const tenantId = localStorage.getItem('lastTenantId');
-      
-      if (!tenantId) {
-        alert('Please select a tenant first');
-        return;
-      }
-
-      const data = await itemsSingletonService.startScanSession(tenantId, selectedDevice);
-
-      if (data && data.session) {
-        router.push(`/scan/${data.session.id}`);
-      } else {
-        alert('Failed to start session: Unknown error');
-      }
+      await itemsSingletonService.cleanupMyScanSessions(selectedTenant);
+      alert(`✅ Cleaned up active sessions. You can now start a new scan.`);
+      await loadSessions();
     } catch (error) {
-      console.error('Failed to start session:', error);
-      alert('Failed to start scanning session');
+      console.error('Failed to cleanup sessions:', error);
+      alert('Failed to cleanup sessions');
     } finally {
-      setCreating(false);
+      setCleaningUp(false);
     }
   };
 
@@ -91,6 +105,38 @@ export default function ScanPage() {
         return <Badge variant="default">Cancelled</Badge>;
       default:
         return <Badge variant="default">{status}</Badge>;
+    }
+  };
+
+  const startNewSession = async () => {
+    if (!Flags.SKU_SCANNING) {
+      alert('SKU scanning is not enabled. Please contact your administrator.');
+      return;
+    }
+
+    if (!selectedTenant) {
+      alert('Please select a tenant first');
+      return;
+    }
+
+    try {
+      setCreating(true);
+
+      const data = await itemsSingletonService.startScanSession(selectedTenant, selectedDevice);
+
+      if (data && data.session) {
+        // Store selected tenant in localStorage for future use
+        localStorage.setItem('lastTenantId', selectedTenant);
+        router.push(`/scan/${data.session.id}`);
+      } else {
+        console.error('Invalid session response:', data);
+        alert('Failed to start session: Invalid response from server');
+      }
+    } catch (error) {
+      console.error('Failed to start session:', error);
+      alert('Failed to start scanning session');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -133,6 +179,18 @@ export default function ScanPage() {
               </div>
             </div>
             <div className="space-y-4">
+              {/* Tenant Selection */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+                  Select Tenant
+                </label>
+                <UserTenantSelector
+                  selectedTenant={selectedTenant}
+                  onTenantSelect={setSelectedTenant}
+                  placeholder="Select a tenant to start scanning..."
+                />
+              </div>
+
               {/* Device Selection */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
@@ -225,6 +283,8 @@ export default function ScanPage() {
                   onClick={startNewSession}
                   disabled={creating || !Flags.SKU_SCANNING}
                   loading={creating}
+                  variant='gradient'
+                  style={{color:'white',hover:{color:'indigo'}}}
                   className="px-6"
                 >
                   {creating ? 'Starting...' : 'Start Scanning'}
@@ -263,10 +323,9 @@ export default function ScanPage() {
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/scan/${session.id}`)}
+                    className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1" onClick={() => router.push(`/scan/${session.id}`)}>
                       <div className="flex items-center gap-3 mb-1">
                         {getStatusBadge(session.status)}
                         <span className="text-sm text-neutral-600 dark:text-neutral-400">
@@ -283,15 +342,58 @@ export default function ScanPage() {
                         )}
                       </div>
                     </div>
-                    <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <div className="flex items-center gap-2">
+                      {session.status === 'active' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Cancel this session?')) {
+                              cancelSession(session.id);
+                            }
+                          }}
+                          className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         </Card>
+
+        {/* Session Management Tips */}
+        {sessions.length > 0 && (
+          <Card className="p-6 rounded-lg">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    💡 Best Practice: Keep Your Sessions Clean
+                  </p>
+                  <p className="text-sm text-blue-800 dark:text-blue-400 mt-1">
+                    You have {sessions.length} scan sessions. For better performance, we recommend completing or canceling old sessions regularly. Active sessions should be committed or canceled within the same day.
+                  </p>
+                  <button
+                    onClick={cleanupMySessions}
+                    disabled={cleaningUp}
+                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cleaningUp ? 'Cleaning Up...' : 'Clean Up Active Sessions'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

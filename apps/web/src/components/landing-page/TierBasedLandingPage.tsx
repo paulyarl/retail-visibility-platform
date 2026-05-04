@@ -939,6 +939,7 @@ interface Product {
   upc?: string;
   gtin?: string;
   mpn?: string;
+  product_slug?: string; // New product slug field for simplified availability
   
   // Nutrition & dietary
   nutritionFacts?: {
@@ -1041,7 +1042,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // console.log(`[TierBasedLandingPage] Context payment: ${JSON.stringify(contextPayment, null, 2)}`);
 
   // Debug logging for variants
-  // console.log('[TierBasedLandingPage] Product:', product);
+  console.log('[TierBasedLandingPage] Product:', product);
   // console.log('[TierBasedLandingPage] Tenant:', tenant);
   // console.log('[TierBasedLandingPage] Product variants:', product.variants);
   // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
@@ -1470,12 +1471,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {tenant.organizationId && (
             <div className="mb-6">
               <LocationAvailabilitySection
-                productSlug={product.sku || product.id}
+                productSlug={product.product_slug || product.sku || product.id}
                 productName={product.name}
                 organizationId={tenant.organizationId}
                 preferredTenantId={product.tenantId}
                 maxDistance={50}
                 maxResults={5}
+                useSmartFallback={true} // Enable slug -> SKU fallback
               />
             </div>
           )}

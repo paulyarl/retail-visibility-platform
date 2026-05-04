@@ -249,6 +249,8 @@ export default function FulfillmentMethodForm({
         type="submit"
         disabled={!selectedMethod}
         className="w-full"
+        style={{ color: 'white' }}
+        variant="gradient"
       >
         Continue to {selectedMethod === 'pickup' ? 'Payment' : 'Address'}
       </Button>

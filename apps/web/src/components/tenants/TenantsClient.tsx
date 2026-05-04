@@ -43,6 +43,7 @@ type Tenant = {
   status?: string;
   subscriptionStatus?: string;
   subscriptionTier?: string;
+  tenantLogo?: string;
   locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   organization?: {
     id: string;
@@ -181,6 +182,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     const endIndex = startIndex + pageSize;
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
+  console.log(`[TenantsClient] paginatedTenants:`, paginatedTenants);
 
   // Reset to page 1 when status filter changes (client-side filtering only)
   useEffect(() => {
@@ -736,6 +738,7 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
   canRename?: boolean;
   canDelete?: boolean;
 }) {
+  // console.log(`[TenantRow] tenant:`, tenant);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(tenant.name);
   const [showDeleteModal, setShowDeleteModal] = useState(false);

@@ -182,7 +182,7 @@ function getContextualLabel(segment: string, fullPath: string, isTenantContext: 
     // Inventory Center
     'inventory': 'Inventory Center',
     'items': 'Items',
-    'scanner': 'Barcode Scanner',
+    'scanner': 'Barcode Scanners',
     'quick-start': 'Quick Start',
 
     // Platform Dashboard
@@ -190,6 +190,8 @@ function getContextualLabel(segment: string, fullPath: string, isTenantContext: 
     'insights': 'Insights',
     'shops': 'Shops',
     'directory': 'Directory',
+    'barcodes': 'Barcode Scanners',
+    'barcode': 'Barcode Scanners',
     'analytics': 'Analytics',
     'reports': 'Reports',
     'performance': 'Performance',

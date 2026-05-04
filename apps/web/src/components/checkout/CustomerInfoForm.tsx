@@ -107,7 +107,9 @@ export function CustomerInfoForm({ initialData, onSubmit }: CustomerInfoFormProp
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" disabled={isSubmitting} 
+        style={{ color: 'white', animation: 'step-start 0s' }} 
+        variant="gradient">
           {isSubmitting ? 'Processing...' : 'Continue to Shipping'}
         </Button>
       </form>

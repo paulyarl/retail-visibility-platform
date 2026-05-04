@@ -2,28 +2,23 @@
 
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
 import { useState, useEffect } from 'react';
-import TenantCategorySelector from '@/components/items/TenantCategorySelector';
+import CategoryAssignmentModal from '@/components/items/CategoryAssignmentModal';
+import { Item } from '@/services/itemsDataService';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 // Helper component to display category name by ID
-function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
+function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; tenantId?: string }) {
   const [categoryName, setCategoryName] = useState<string>('Loading...');
-  const [tenantId, setTenantId] = useState<string>('');
-
-  useEffect(() => {
-    // Extract tenant ID from URL
-    try {
-      const m = window.location.pathname.match(/\/t\/([^/]+)/);
-      if (m) setTenantId(m[1]);
-    } catch {}
-  }, []);
 
   useEffect(() => {
     async function fetchCategory() {
+      // console.log(`[EnrichmentPreview] Fetching category for tenant: ${tenantId}, category: ${categoryId}`);
       if (!tenantId) return;
       
       try {
+        // console.log(`[EnrichmentPreview] Fetching categories for tenant: ${tenantId}`);
         const categories = await tenantCategoriesService.getTenantCategories(tenantId);
+        // console.log(`[EnrichmentPreview] Received categories:`, categories);
         const category = categories.find((c: any) => c.id === categoryId);
         if (category) {
           setCategoryName(category.name);
@@ -32,6 +27,7 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
           }
         }
       } catch (error) {
+        console.log(`[EnrichmentPreview] Error fetching category: ${error}`);
         setCategoryName('Unknown category');
       }
     }
@@ -74,6 +70,7 @@ interface EnrichmentPreviewProps {
   isLoading?: boolean;
   onEdit?: (field: string, value: any) => void;
   editable?: boolean;
+  tenantId?: string;
 }
 
 export default function EnrichmentPreview({
@@ -84,8 +81,10 @@ export default function EnrichmentPreview({
   isLoading = false,
   onEdit,
   editable = false,
+  tenantId,
 }: EnrichmentPreviewProps) {
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  // console.log(`[EnrichmentPreview] tenantId: ${tenantId}`)
 
   const hasErrors = validation.some(v => v.severity === 'error');
   const hasWarnings = validation.some(v => v.severity === 'warning');
@@ -135,11 +134,9 @@ export default function EnrichmentPreview({
     setShowCategorySelector(false);
   };
 
-  const handleCategoryCancel = () => {
-    setShowCategorySelector(false);
-  };
-
+  
   return (
+
     <Card className="w-full">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -280,7 +277,7 @@ export default function EnrichmentPreview({
                   <div className="space-y-2">
                     {enrichment?.tenantCategoryId ? (
                       <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                        <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} />
+                        <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} tenantId={tenantId} />
                         <button
                           type="button"
                           onClick={() => setShowCategorySelector(true)}
@@ -309,7 +306,7 @@ export default function EnrichmentPreview({
                   </div>
                 ) : (
                   enrichment?.tenantCategoryId ? (
-                    <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} />
+                    <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} tenantId={tenantId} />
                   ) : (
                     <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <p className="font-medium">Category Required</p>
@@ -378,84 +375,32 @@ export default function EnrichmentPreview({
         </div>
       </CardContent>
 
-      {/* Category Selector Modal */}
-      {showCategorySelector && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-                Select Category
-              </h3>
-              <button
-                onClick={handleCategoryCancel}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              <TenantCategorySelector
-                selectedCategoryId={enrichment?.tenantCategoryId || null}
-                categoryPath={enrichment?.categoryPath}
-                onSelect={async (categoryId, googleCategoryPath, googleTaxonomyId) => {
-                  if (onEdit) {
-                    // If it's a Google taxonomy selection, create a new tenant category
-                    if (googleCategoryPath) {
-                      try {
-                        const categoryName = googleCategoryPath.split(' > ').pop() || 'Unknown';
-                        console.log('[EnrichmentPreview] Creating category from Google taxonomy:', {
-                          googleCategoryPath,
-                          googleTaxonomyId,
-                          categoryName
-                        });
-
-                        // Extract tenant ID from URL
-                        const tenantId = window.location.pathname.match(/\/t\/([^/]+)/)?.[1];
-                        if (!tenantId) throw new Error('Could not extract tenant ID');
-
-                        // Create category with Google taxonomy ID using service
-                        const { tenantCategoriesService } = await import('@/services/TenantCategoriesService');
-                        const createResponse = await tenantCategoriesService.createCategory(tenantId, {
-                            name: categoryName,
-                            googleCategoryId: googleTaxonomyId,
-                            sortOrder: 0, // Add required sortOrder
-                        });
-
-                        console.log('[EnrichmentPreview] Category creation response:', createResponse);
-
-                        if (createResponse) {
-                          console.log('[EnrichmentPreview] Category created successfully:', createResponse);
-                          onEdit('tenantCategoryId', createResponse.id);
-                        } else {
-                          console.error('[EnrichmentPreview] Category creation failed');
-                          alert(`Failed to create category from Google taxonomy. Please try selecting a different category or contact support.`);
-                        }
-                      } catch (error) {
-                        console.error('[EnrichmentPreview] Error creating category from Google taxonomy:', error);
-                        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                        alert(`Error creating category from Google taxonomy: ${errorMessage}. Please try selecting a different category.`);
-                        // Don't set tenantCategoryId to avoid storing invalid Google taxonomy IDs
-                      }
-                    } else {
-                      // Validate that categoryId is not a Google taxonomy ID (numeric only)
-                      if (/^\d+$/.test(categoryId)) {
-                        console.warn('[EnrichmentPreview] Rejecting numeric categoryId that looks like Google taxonomy ID:', categoryId);
-                        alert('Invalid category selection. Please select a proper tenant category.');
-                        return;
-                      }
-                      onEdit('tenantCategoryId', categoryId);
-                    }
-                  }
-                  setShowCategorySelector(false);
-                }}
-                onCancel={handleCategoryCancel}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Category Assignment Modal */}
+      {showCategorySelector && enrichment && (
+        // console.log('[EnrichmentPreview] Showing category selector', { enrichment, tenantId }),
+        <CategoryAssignmentModal
+          item={{
+            id: 'temp-scan-item',
+            sku: sku || barcode,
+            name: enrichment.name || 'Scanned Item',
+            description: enrichment.description,
+            brand: enrichment.brand,
+            price: null,
+            stock: 0,
+            status: 'active' as const,
+            visibility: 'private' as const,
+            categoryPath: enrichment.categoryPath,
+            tenantCategoryId: enrichment.tenantCategoryId,
+            tenantId: tenantId || '',
+          }}
+          onSave={async (itemId: string, categoryId: string) => {
+            if (onEdit) {
+              onEdit('tenantCategoryId', categoryId);
+            }
+            setShowCategorySelector(false);
+          }}
+          onClose={() => setShowCategorySelector(false)}
+        />
       )}
     </Card>
   );

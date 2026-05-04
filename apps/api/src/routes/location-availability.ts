@@ -84,10 +84,30 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     const maxDist = parseInt(maxDistance);
     const maxRes = parseInt(maxResults);
 
-    // Get the global product
-    const globalProduct = await prisma.global_product_catalog.findFirst({
+    // Get the global product - first try by slug, then fallback to SKU
+    let globalProduct = await prisma.global_product_catalog.findFirst({
       where: { product_slug: slug, status: 'active' }
     });
+
+    // If not found by slug, try by universal_sku (SKU fallback) - same logic as SKU endpoint
+    if (!globalProduct) {
+      console.log(`[LocationAvailability] Slug lookup failed for: ${slug}, trying SKU fallback`);
+      
+      // Find product by universal SKU using slug registry (same as SKU endpoint)
+      const slugRegistry = await prisma.product_slug_registry.findFirst({
+        where: { universal_sku: slug }
+      });
+      
+      if (slugRegistry) {
+        console.log(`[LocationAvailability] Found slug registry entry for ${slug}: ${slugRegistry.product_slug}`);
+        globalProduct = await prisma.global_product_catalog.findFirst({
+          where: { product_slug: slugRegistry.product_slug, status: 'active' }
+        });
+        console.log(`[LocationAvailability] SKU fallback result for ${slug}:`, globalProduct ? 'FOUND' : 'NOT_FOUND');
+      } else {
+        console.log(`[LocationAvailability] No slug registry entry found for SKU: ${slug}`);
+      }
+    }
 
     if (!globalProduct) {
       return res.status(404).json({
@@ -303,7 +323,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
     }
 
     // Re-query using slug - redirect to the slug endpoint logic
-    req.query = Object.fromEntries(new URLSearchParams({
+    const slugQuery = {
       slug: slugRegistry.product_slug,
       ...(lat && { lat }),
       ...(lng && { lng }),
@@ -312,7 +332,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
       includeOutOfStock,
       ...(organizationId && { organizationId }),
       sortBy
-    }));
+    };
 
     // Get the global product
     const globalProduct = await prisma.global_product_catalog.findFirst({

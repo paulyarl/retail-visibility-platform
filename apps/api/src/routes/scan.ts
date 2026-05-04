@@ -8,7 +8,7 @@ import { audit } from '../audit';
 import { z } from 'zod';
 import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
-import { generateItemId, generateSessionId, generatePhotoId } from '../lib/id-generator';
+import { generateItemId, generateSessionId, generatePhotoId, generateTenantItemId } from '../lib/id-generator';
 import { requireWritableSubscription } from '../middleware/tier-access';
 //import { requireWritableSubscription } from '../middleware/subscription';
 
@@ -241,14 +241,14 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       return res.status(409).json({ success: false, error: 'duplicate_barcode', result: existing });
     }
 
-    // Check for duplicates in inventory (exclude soft-deleted items)
+    // Check for duplicates in inventory by GTIN (barcode) instead of SKU (exclude soft-deleted items)
     const duplicateItem = await prisma.inventory_items.findFirst({
       where: {
         tenant_id: session.tenant_id,
-        sku: sku || barcode,
+        gtin: barcode, // Check by GTIN (barcode) instead of SKU
         item_status: { not: 'trashed' }, // Exclude soft-deleted items
       },
-      select: { id: true, name: true, sku: true },
+      select: { id: true, name: true, sku: true, gtin: true },
     });
 
     // Perform barcode lookup/enrichment using the service with category suggestions
@@ -263,6 +263,9 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       // Continue without enrichment
     }
 
+    // Generate SKU for scan result and keep barcode separate
+    const generatedSku = generateTenantItemId(session.tenant_id);
+    
     // Create scan result
     const result = await prisma.scan_results_list.create({
       data: {
@@ -270,11 +273,11 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
         tenant_id: session.tenant_id,
         session_id:sessionId,
         barcode,
-        sku: sku || barcode,
+        sku: generatedSku, // Use generated SKU instead of barcode
         status: duplicateItem ? 'duplicate' : 'new',
         enrichment: enrichment as any || {},
         duplicate_of: duplicateItem?.id,
-        raw_payload: { barcode, sku, timestamp: new Date().toISOString() },
+        raw_payload: { barcode, sku: generatedSku, timestamp: new Date().toISOString() },
       },
     });
 
@@ -447,12 +450,15 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
           enrichedAt: new Date().toISOString(),
         };
 
-        // Check if there's a trashed item with the same SKU that we should restore
-        const sku = result.sku || result.barcode;
+        // Generate SKU for scanned product and use barcode as GTIN
+        const generatedSku = generateTenantItemId(session.tenant_id);
+        const barcodeGtin = result.barcode; // Move barcode to GTIN field
+        
+        // Check if there's a trashed item with the same barcode (now GTIN) that we should restore
         const existingTrashedItem = await prisma.inventory_items.findFirst({
           where: {
             tenant_id: session.tenant_id,
-            sku: sku,
+            gtin: barcodeGtin, // Check by GTIN instead of SKU
             item_status: 'trashed',
           },
         });
@@ -460,7 +466,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         let item;
         if (existingTrashedItem) {
           // Restore the trashed item with updated data
-          console.log(`[commit] Restoring trashed item ${existingTrashedItem.id} for SKU ${sku}`);
+          console.log(`[commit] Restoring trashed item ${existingTrashedItem.id} for GTIN ${barcodeGtin}`);
           item = await prisma.inventory_items.update({
             where: { id: existingTrashedItem.id },
             data: {
@@ -468,6 +474,8 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
               title: enrichment.name || `Product ${result.barcode}`,
               brand: enrichment.brand || 'Unknown',
               description: enrichment.description || null,
+              sku: generatedSku, // Use generated SKU
+              gtin: barcodeGtin, // Set barcode as GTIN
               price: (enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0) / 100,
               price_cents: enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0,
               stock: enrichment.stock || 0,
@@ -495,13 +503,14 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
           const stock = enrichment.stock || 0;
           item = await prisma.inventory_items.create({
             data: {
-              id: generateItemId(),
+              id: generateTenantItemId(session.tenant_id),
               tenant_id: session.tenant_id,
               name: enrichment.name || `Product ${result.barcode}`,
               title: enrichment.name || `Product ${result.barcode}`,
               brand: enrichment.brand || 'Unknown',
               description: enrichment.description || null,
-              sku: sku,
+              sku: generatedSku, // Use generated SKU
+              gtin: barcodeGtin, // Set barcode as GTIN
               price: (enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0) / 100,
               price_cents: enrichment.priceCents || session.scan_templates_list?.default_price_cents || 0,
               stock: stock,
@@ -706,6 +715,7 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
     // Transform the response to use camelCase
     const transformedSession = {
       id: session.id,
+      tenantId: session.tenant_id,
       status: session.status,
       deviceType: session.device_type,
       scannedCount: session.scanned_count,

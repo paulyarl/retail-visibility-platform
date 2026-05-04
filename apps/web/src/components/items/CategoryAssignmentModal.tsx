@@ -3,11 +3,13 @@ import { Item } from '@/services/itemsDataService';
 import CategorySelector from './CategorySelector';
 import TenantCategorySelector from './TenantCategorySelector';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
+import { undefined } from 'zod';
 
 interface CategoryAssignmentModalProps {
   item: Item;
   onSave: (itemId: string, categoryId: string) => Promise<void>;
   onClose: () => void;
+  tenantId?: string;
 }
 
 /**
@@ -20,62 +22,89 @@ export default function CategoryAssignmentModal({
   item,
   onSave,
   onClose,
+  tenantId,
 }: CategoryAssignmentModalProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(item.tenantCategoryId || '');
   const [selectedCategoryName, setSelectedCategoryName] = useState<string>('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [mode, setMode] = useState<'tenant' | 'google'>('tenant'); // Default to easy mode
 
+  // Use tenant ID from the item or props
+  const finalTenantId = tenantId || item.tenantId;
+
   const handleTenantCategorySelect = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     // The name will be shown via the selected state display
   };
+  
 
   const handleGoogleCategorySelect = async (category: { path: string[]; id: string; name: string }) => {
     try {
       setIsCreatingCategory(true);
       
-      // Extract tenant ID from URL
-      const tenantId = window.location.pathname.match(/\/t\/([^/]+)/)?.[1];
-      if (!tenantId) throw new Error('Could not extract tenant ID');
+      if (!finalTenantId) throw new Error('Item does not have tenant ID');
 
       // The id is the Google taxonomy ID (e.g., "1239")
       const googleTaxonomyId = category.id;
       const categoryName = category.name;
       const categoryPath = category.path.join(' > ');
       
-      console.log('[CategoryAssignmentModal] Selected Google category:', {
-        googleTaxonomyId,
-        categoryName,
-        categoryPath
-      });
+      // console.log('[CategoryAssignmentModal] Selected Google category:', {
+      //   googleTaxonomyId,
+      //   categoryName,
+      //   categoryPath
+      // });
 
       // First, check if a tenant category with this googleCategoryId already exists
-      const existingCategories = await tenantCategoriesService.getTenantCategories(tenantId);
+      // console.log(`[CategoryAssignmentModal] Getting tenant categories for tenant: ${finalTenantId}`);
+      const existingCategories = await tenantCategoriesService.getTenantCategories(finalTenantId);
+      // console.log(`[CategoryAssignmentModal] Found ${existingCategories.length} tenant categories`);
       const existingCategory = existingCategories.find(cat => 
         cat.googleCategoryId === googleTaxonomyId
       );
 
       if (existingCategory) {
-        console.log('[CategoryAssignmentModal] Found existing tenant category:', existingCategory.id);
+        // console.log('[CategoryAssignmentModal] Found existing tenant category:', existingCategory.id);
         setSelectedCategoryId(existingCategory.id);
         setSelectedCategoryName(existingCategory.name);
       } else {
         // Create a new tenant category with the Google taxonomy ID
-        console.log('[CategoryAssignmentModal] Creating new tenant category for Google ID:', googleTaxonomyId);
-        const newCategory = await tenantCategoriesService.createCategory(tenantId, {
-          name: categoryName,
-          googleCategoryId: googleTaxonomyId,
-          sortOrder: 0,
-        } as any);
+        // console.log('[CategoryAssignmentModal] Creating new tenant category for Google ID:', googleTaxonomyId);
+        try {
+          const newCategory = await tenantCategoriesService.createCategory(finalTenantId, {
+            name: categoryName,
+            googleCategoryId: googleTaxonomyId,
+            sortOrder: 0,
+          } as any);
 
-        console.log('[CategoryAssignmentModal] createCategory response:', newCategory);
-        if (newCategory && newCategory.id) {
-          console.log('[CategoryAssignmentModal] Created tenant category:', newCategory.id);
-          setSelectedCategoryId(newCategory.id);
-          setSelectedCategoryName(newCategory.name);
-        } else {
-          console.error('[CategoryAssignmentModal] createCategory returned invalid response:', newCategory);
+          // console.log('[CategoryAssignmentModal] createCategory response:', newCategory);
+          if (newCategory && newCategory.id) {
+            // console.log('[CategoryAssignmentModal] Created tenant category:', newCategory.id);
+            setSelectedCategoryId(newCategory.id);
+            setSelectedCategoryName(newCategory.name);
+          } else {
+            console.error('[CategoryAssignmentModal] createCategory returned invalid response:', newCategory);
+          }
+        } catch (createErr) {
+          // Handle case where category already exists (race condition)
+          const errorMessage = createErr instanceof Error ? createErr.message : String(createErr);
+          if (errorMessage.includes('already exists') || errorMessage.includes('slug already exists')) {
+            console.log('[CategoryAssignmentModal] Category already exists, refreshing categories...');
+            // Refresh categories and find the existing one
+            const refreshedCategories = await tenantCategoriesService.getTenantCategories(finalTenantId);
+            const existingCategory = refreshedCategories.find(cat => 
+              cat.googleCategoryId === googleTaxonomyId
+            );
+            if (existingCategory) {
+              setSelectedCategoryId(existingCategory.id);
+              setSelectedCategoryName(existingCategory.name);
+            } else {
+              console.error('[CategoryAssignmentModal] Could not find existing category after conflict');
+              alert('Category assignment failed. Please try selecting the category manually.');
+            }
+          } else {
+            throw createErr; // Re-throw other errors
+          }
         }
       }
     } catch (err) {
@@ -99,12 +128,13 @@ export default function CategoryAssignmentModal({
   };
 
   return (
+    // console.log('[CategoryAssignmentModal] Rendering modal', { item, selectedCategoryId }),
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
           <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-            Assign Category
+            Assign A Category
           </h3>
           <button
             onClick={onClose}
@@ -174,10 +204,12 @@ export default function CategoryAssignmentModal({
 
           {/* Category Selector */}
           {mode === 'tenant' ? (
+            // console.log('[CategoryAssignmentModal] Rendering tenant mode'),
             <TenantCategorySelector
               selectedCategoryId={selectedCategoryId}
               onSelect={handleTenantCategorySelect}
-              onCancel={undefined}
+              onCancel={onClose}
+              tenantId={finalTenantId}
             />
           ) : (
             <CategorySelector

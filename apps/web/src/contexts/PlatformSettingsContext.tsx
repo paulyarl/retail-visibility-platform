@@ -2,12 +2,19 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { publicBrandingService } from '@/services/PublicBrandingService';
+import { adminSettingsService } from '@/services/AdminSettingsService';
 
 interface PlatformSettings {
   platformName: string;
   platformDescription: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  // Payment settings
+  minimumPaymentAmount?: {
+    amount: number; // in cents
+    currency: string;
+    displayAmount: string; // formatted for display
+  };
 }
 
 interface PlatformSettingsContextType {
@@ -36,11 +43,29 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       // Map PlatformSettings to the context's PlatformSettings interface
       if (settingsData) {
         // console.log('[PlatformSettingsProvider] Raw settings data:', settingsData);
+        
+        // Try to fetch payment settings from admin service
+        let paymentSettings = null;
+        try {
+          const paymentData = await adminSettingsService.getPaymentSettings();
+          if (paymentData) {
+            paymentSettings = paymentData.minimumPaymentAmount;
+          }
+        } catch (paymentError) {
+          console.warn('[PlatformSettingsProvider] Failed to fetch payment settings, using defaults:', paymentError);
+        }
+
         const mappedSettings: PlatformSettings = {
           platformName: settingsData.platformName || 'Visible Shelf',
           platformDescription: settingsData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: settingsData.logoUrl || null,
           faviconUrl: settingsData.faviconUrl || null,
+          // Use payment settings from API or fallback to defaults
+          minimumPaymentAmount: paymentSettings || {
+            amount: 200, // $2.00 in cents
+            currency: 'USD',
+            displayAmount: '$2.00',
+          },
         };
         // console.log('[PlatformSettingsProvider] Mapped settings:', mappedSettings);
         setSettings(mappedSettings);

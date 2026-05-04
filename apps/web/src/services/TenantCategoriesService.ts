@@ -158,6 +158,9 @@ class TenantCategoriesService extends TenantApiSingleton {
         `tenant-categories-${tenantId}${includeInactive ? '-all' : ''}`,
         this.CATEGORIES_TTL
       );
+      if (!response.data) {
+        return [];
+      }
 
       return response.data?.data || [];
     } catch (error) {
@@ -217,6 +220,11 @@ class TenantCategoriesService extends TenantApiSingleton {
         },
         `tenant-categories-${tenantId}`
       );
+      
+      if (!response?.success) {
+        console.error('[TenantCategoriesService] Failed to create category:', response.error);
+        throw response.error;
+      }
 
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
@@ -239,7 +247,7 @@ class TenantCategoriesService extends TenantApiSingleton {
    */
   async updateCategory(tenantId: string, categoryId: string, data: Partial<CategoryFormData>): Promise<Category | null> {
     try {
-      const response = await this.makeDefaultRequest<Category>(
+      const results = await this.makeDefaultRequest<Category>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
         {
           method: 'PUT',
@@ -251,11 +259,15 @@ class TenantCategoriesService extends TenantApiSingleton {
         },
         `tenant-categories-${tenantId}`
       );
+      if (!results?.success) {
+        console.error('[TenantCategoriesService] Failed to update category:', results.error);
+        throw results.error;
+      }
 
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       
-      return response.data || null;
+      return results.data || null;
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to update category:', error);
       return null;
@@ -268,13 +280,18 @@ class TenantCategoriesService extends TenantApiSingleton {
    */
   async deleteCategory(tenantId: string, categoryId: string): Promise<boolean> {
     try {
-      await this.makeDefaultRequest<void>(
+      const results = await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
         {
           method: 'DELETE',
         },
         `tenant-categories-${tenantId}`
       );
+
+      if (!results?.success) {
+        console.error('[TenantCategoriesService] Failed to delete category:', results.error);
+        throw results.error;
+      }
 
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
@@ -292,7 +309,7 @@ class TenantCategoriesService extends TenantApiSingleton {
    */
   async alignCategory(tenantId: string, categoryId: string, googleCategoryId: string): Promise<boolean> {
     try {
-      await this.makeDefaultRequest<void>(
+      const results = await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}/align`,
         {
           method: 'POST',
@@ -300,6 +317,10 @@ class TenantCategoriesService extends TenantApiSingleton {
         },
         `alignment-status-${tenantId}`
       );
+      if (!results?.success) {
+        console.error('[TenantCategoriesService] Failed to align category:', results.error);
+        throw results.error;
+      }
 
       // Invalidate cached alignment status
       await this.invalidateCache(`alignment-status-${tenantId}`);
@@ -356,6 +377,11 @@ class TenantCategoriesService extends TenantApiSingleton {
         `tenant-categories-${tenantId}`
       );
 
+      if (!response?.success) {
+        console.error('[TenantCategoriesService] Failed to quick start categories:', response.error);
+        throw response.error;
+      }
+
       // Invalidate cached categories and alignment status
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       await this.invalidateCache(`alignment-status-${tenantId}`);
@@ -373,7 +399,7 @@ class TenantCategoriesService extends TenantApiSingleton {
    */
   async propagateCategories(heroTenantId: string, mode: string = 'all'): Promise<boolean> {
     try {
-      await this.makeDefaultRequest<void>(
+      const results = await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${heroTenantId}/categories/propagate`,
         {
           method: 'POST',
@@ -381,6 +407,10 @@ class TenantCategoriesService extends TenantApiSingleton {
         },
         `propagation-${heroTenantId}`
       );
+      if (!results.success){
+        console.error('[TenantCategoriesService] Failed to propagate categories:', results.error);
+        throw results.error;
+      }
 
       return true;
     } catch (error) {

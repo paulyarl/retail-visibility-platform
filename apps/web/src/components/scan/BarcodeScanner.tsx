@@ -19,6 +19,7 @@ export default function BarcodeScanner({
   disabled = false,
   autoFocus = true,
 }: BarcodeScannerProps) {
+    
   const [buffer, setBuffer] = useState('');
   const [lastScan, setLastScan] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState('');
@@ -29,7 +30,9 @@ export default function BarcodeScanner({
 
   // USB Scanner Mode - Capture keyboard input
   useEffect(() => {
-    if (mode !== 'usb' || disabled) return;
+    if (mode !== 'usb' || disabled) {
+      return;
+    }
 
     let scanBuffer = '';
     let scanTimeout: NodeJS.Timeout;
@@ -200,6 +203,7 @@ export default function BarcodeScanner({
             </div>
           </div>
 
+          
           {/* USB Mode - Instructions */}
           {mode === 'usb' && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">

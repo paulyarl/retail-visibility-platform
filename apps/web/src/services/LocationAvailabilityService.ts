@@ -307,6 +307,41 @@ class LocationAvailabilityService extends PublicApiSingleton {
       outOfStock: locations.filter(l => l.availability === 'out_of_stock').length
     };
   }
+
+  /**
+   * Smart availability lookup - tries slug first, then SKU as fallback
+   * Provides backward compatibility during migration
+   */
+  async getAvailabilityWithFallback(
+    identifier: string, // Can be slug or SKU
+    userLocation?: UserLocation,
+    options: LocationQueryOptions = {}
+  ): Promise<MultiLocationAvailability | null> {
+    // First try as slug (new approach)
+    try {
+      const slugResult = await this.getProductAvailability(identifier, userLocation, options);
+      if (slugResult && slugResult.totalLocations > 0) {
+        console.log(`[LocationAvailabilityService] Found by slug: ${identifier}`);
+        return slugResult;
+      }
+    } catch (error) {
+      console.log(`[LocationAvailabilityService] Slug lookup failed for: ${identifier}`, error);
+    }
+
+    // Fallback to SKU lookup (legacy approach)
+    try {
+      const skuResult = await this.getAvailabilityBySku(identifier, userLocation, options);
+      if (skuResult && skuResult.totalLocations > 0) {
+        console.log(`[LocationAvailabilityService] Found by SKU fallback: ${identifier}`);
+        return skuResult;
+      }
+    } catch (error) {
+      console.log(`[LocationAvailabilityService] SKU fallback failed for: ${identifier}`, error);
+    }
+
+    console.log(`[LocationAvailabilityService] No availability found for: ${identifier}`);
+    return null;
+  }
 }
 
 // Export singleton instance

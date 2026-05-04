@@ -124,6 +124,22 @@ const locationIdStr = Array.isArray(locationId) ? locationId[0] : locationId;
     } = req.query;
     
     const tenantId = req.headers['x-tenant-id'] as string;
+    const authEmail = req.headers['x-auth0-email'] as string;
+    const authId = req.headers['x-auth0-id'] as string;
+
+    console.log('🔍 [DEBUG] Location Inventory Request:', {
+      locationId: locationIdStr,
+      tenantId,
+      authEmail,
+      authId,
+      query: req.query,
+      headers: {
+        'x-tenant-id': tenantId,
+        'x-auth0-email': authEmail,
+        'x-auth0-id': authId,
+        'user-agent': req.headers['user-agent']
+      }
+    });
 
     if (!tenantId) {
       return res.status(400).json({
@@ -132,6 +148,17 @@ const locationIdStr = Array.isArray(locationId) ? locationId[0] : locationId;
         message: 'Tenant ID is required'
       });
     }
+
+    console.log('🔍 [DEBUG] Calling getLocationInventoryPools with:', {
+      tenantId,
+      locationId: locationIdStr,
+      options: {
+        lowStockOnly: lowStockOnly === 'true',
+        sku: sku as string,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string)
+      }
+    });
 
     const result = await inventoryTransferService.getLocationInventoryPools(
       tenantId,
@@ -143,6 +170,13 @@ const locationIdStr = Array.isArray(locationId) ? locationId[0] : locationId;
         offset: parseInt(offset as string)
       }
     );
+
+    console.log('🔍 [DEBUG] getLocationInventoryPools result:', {
+      success: true,
+      data: result,
+      poolsCount: result.pools?.length || 0,
+      total: result.total
+    });
 
     res.json({
       success: true,
@@ -251,6 +285,111 @@ router.get('/alerts/low-stock', async (req: Request, res: Response) => {
 // ========================================
 // Analytics
 // ========================================
+
+// Sync items catalog to inventory pools
+router.post('/sync-inventory', async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'] as string;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenant_id',
+        message: 'Tenant ID is required'
+      });
+    }
+
+    console.log('🔍 [DEBUG] Syncing inventory for tenant:', tenantId);
+
+    // Get items from catalog
+    const itemsResponse = await fetch(`http://localhost:4000/api/items/complete?tenant_id=${tenantId}&limit=100`, {
+      headers: {
+        'x-auth0-email': req.headers['x-auth0-email'] as string,
+        'x-auth0-id': req.headers['x-auth0-id'] as string,
+      }
+    });
+
+    if (!itemsResponse.ok) {
+      throw new Error('Failed to fetch items catalog');
+    }
+
+    const itemsData = await itemsResponse.json() as any;
+    const items = itemsData.items || [];
+
+    console.log('🔍 [DEBUG] Found items:', items.length);
+
+    // Create inventory pools for each item
+    const syncResults = [];
+    for (const item of items) {
+      if (item.stock > 0) {
+        try {
+          // Check if pool already exists
+          const existingPool = await inventoryTransferService.getLocationInventoryPool(
+            tenantId,
+            tenantId, // Use tenant ID as location ID for now
+            item.sku
+          );
+
+          if (!existingPool) {
+            // Create new pool
+            // Note: createInventoryPool method doesn't exist, this sync endpoint needs to be rethought
+            // For now, just log that this would create a pool
+            console.log(`Would create inventory pool for ${item.sku}`);
+            syncResults.push({
+              sku: item.sku,
+              name: item.name,
+              stock: item.stock,
+              status: 'would_create',
+              message: 'createInventoryPool method not implemented'
+            });
+          } else {
+            syncResults.push({
+              sku: item.sku,
+              name: item.name,
+              stock: item.stock,
+              status: 'exists',
+              pool: existingPool
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to sync item ${item.sku}:`, error);
+          syncResults.push({
+            sku: item.sku,
+            name: item.name,
+            stock: item.stock,
+            status: 'error',
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+    }
+
+    console.log('🔍 [DEBUG] Sync results:', {
+      total: syncResults.length,
+      created: syncResults.filter(r => r.status === 'created').length,
+      exists: syncResults.filter(r => r.status === 'exists').length,
+      errors: syncResults.filter(r => r.status === 'error').length
+    });
+
+    res.json({
+      success: true,
+      message: 'Inventory sync completed',
+      data: {
+        totalItems: items.length,
+        synced: syncResults.length,
+        created: syncResults.filter(r => r.status === 'created').length,
+        results: syncResults
+      }
+    });
+  } catch (error: any) {
+    console.error('[Tenant Inventory] Sync inventory error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'failed_to_sync_inventory',
+      message: error.message
+    });
+  }
+});
 
 // Get inventory analytics
 router.get('/analytics/inventory', async (req: Request, res: Response) => {

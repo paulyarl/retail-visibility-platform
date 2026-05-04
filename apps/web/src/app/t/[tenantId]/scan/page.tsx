@@ -78,7 +78,13 @@ export default function TenantScanPage() {
       try {
         const data = await itemsSingletonService.startScanSession(tenantId, selectedDevice);
         setRateLimitError(false);
-        router.push(`/t/${tenantId}/scan/${data.session.id}`);
+        
+        if (data && data.session && data.session.id) {
+          router.push(`/t/${tenantId}/scan/${data.session.id}`);
+        } else {
+          console.error('Invalid session response:', data);
+          alert('Failed to start session: Invalid response from server');
+        }
       } catch (error) {
         console.error('Failed to start session:', error);
         if (error instanceof Error && error.message === 'rate_limit_exceeded') {

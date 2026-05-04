@@ -5,6 +5,8 @@ import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
 
 interface SquarePaymentFormProps {
   amount: number;
@@ -170,30 +172,38 @@ function SquarePaymentFormContent({
       if (result.status === 'OK') {
         const token = result.token;
 
-        // Process payment with backend
-        const response = await customerOrderService.processSquarePayment({
-          orderId,
-          paymentId,
-          sourceId: token,
-          amount,
-          customerInfo,
-          shippingAddress,
-          cartItems,
-        });
+        try {
+          // Process payment with backend
+          const response = await customerOrderService.processSquarePayment({
+            orderId,
+            paymentId,
+            sourceId: token,
+            amount,
+            customerInfo,
+            shippingAddress,
+            cartItems,
+          });
 
-        if (!response) {
-          throw new Error('Payment failed');
+          if (!response) {
+            throw new Error('Payment failed');
+          }
+
+          const { payment } = response;
+          
+          // Success - call onSuccess with order number and transaction ID
+          onSuccess(orderNumber, payment.id);
+        } catch (paymentError) {
+          console.error('Backend payment error:', paymentError);
+          setError(paymentError instanceof Error ? paymentError.message : 'Payment processing failed');
+          setIsProcessing(false);
         }
-
-        const { payment } = response;
-        
-        // Success - call onSuccess with order number and transaction ID
-        onSuccess(orderNumber, payment.id);
       } else {
-        // Handle tokenization errors
+        // Handle tokenization errors gracefully
         const errors = result.errors || [];
         const errorMessage = errors.map((e: any) => e.message).join(', ');
-        throw new Error(errorMessage || 'Card validation failed');
+        console.error('Square tokenization errors:', errors);
+        setError(errorMessage || 'Card validation failed');
+        setIsProcessing(false);
       }
     } catch (err) {
       console.error('Square payment error:', err);
@@ -272,6 +282,20 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
   const [paymentId, setPaymentId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { settings: platformSettings } = usePlatformSettings();
+
+  // Validate minimum payment amount using platform-wide settings
+  const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
+  
+  if (!paymentValidation.isValid) {
+    console.log('[Square] Amount validation failed:', paymentValidation);
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800 font-medium">Payment Amount Too Low</p>
+        <p className="text-red-600 text-sm mt-1">{paymentValidation.message}</p>
+      </div>
+    );
+  }
 
   // Destructure props for useEffect dependencies
   const { customerInfo, shippingAddress, cartItems, amount } = props;

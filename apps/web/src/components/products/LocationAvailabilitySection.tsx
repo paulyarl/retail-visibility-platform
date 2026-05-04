@@ -50,6 +50,7 @@ interface LocationAvailabilitySectionProps {
   showMap?: boolean;
   maxDistance?: number;
   maxResults?: number;
+  useSmartFallback?: boolean; // Enable slug -> SKU fallback
 }
 
 export function LocationAvailabilitySection({
@@ -60,7 +61,8 @@ export function LocationAvailabilitySection({
   onLocationSelect,
   showMap = false,
   maxDistance = 50,
-  maxResults = 10
+  maxResults = 10,
+  useSmartFallback = false
 }: LocationAvailabilitySectionProps) {
   const [availability, setAvailability] = useState<MultiLocationAvailability | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,18 +96,32 @@ export function LocationAvailabilitySection({
       setError(null);
 
       try {
-        const result = await locationAvailabilityService.getProductAvailability(
-          productSlug,
-          userLocation || undefined,
-          {
-            maxDistance,
-            maxResults,
-            includeOutOfStock: true,
-            preferredTenantId,
-            organizationId,
-            sortBy: 'distance'
-          }
-        );
+        // Use smart fallback if enabled (provides backward compatibility)
+        const result = useSmartFallback 
+          ? await locationAvailabilityService.getAvailabilityWithFallback(
+              productSlug,
+              userLocation || undefined,
+              {
+                maxDistance,
+                maxResults,
+                includeOutOfStock: true,
+                preferredTenantId,
+                organizationId,
+                sortBy: 'distance'
+              }
+            )
+          : await locationAvailabilityService.getProductAvailability(
+              productSlug,
+              userLocation || undefined,
+              {
+                maxDistance,
+                maxResults,
+                includeOutOfStock: true,
+                preferredTenantId,
+                organizationId,
+                sortBy: 'distance'
+              }
+            );
 
         setAvailability(result);
       } catch (err) {
@@ -151,6 +167,7 @@ export function LocationAvailabilitySection({
 
   const formatDistance = (distance: number) => {
     if (distance >= 999) return 'Distance unknown';
+    // if (distance >= 999) return '';
     return `${distance.toFixed(1)} mi away`;
   };
 

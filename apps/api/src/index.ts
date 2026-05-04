@@ -28,7 +28,7 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
-import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateVariantSkuFromParent } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateTenantVariantId,generateVariantSkuFromParent } from './lib/id-generator';
 import { propagateVariants } from './utils/variant-propagation';
 
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
@@ -5054,7 +5054,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
           
           await tx.product_variants.create({
             data: {
-              id: generateVariantId(created.id),
+              id: generateTenantVariantId(created.id,created.tenant_id),
               parent_item_id: created.id,
               tenant_id: created.tenant_id,
               variant_name: variantName || `Variant ${variants.indexOf(variant) + 1}`, // Ensure string value
@@ -5236,7 +5236,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     // Process variants if they exist
     if (variantsData && Array.isArray(variantsData)) {
-      const { generateVariantId, generateVariantSkuFromParent } = await import('./lib/id-generator');
+      const { generateVariantId,generateTenantVariantId ,generateVariantSkuFromParent } = await import('./lib/id-generator');
       
       // Delete existing variants for this item
       await prisma.product_variants.deleteMany({
@@ -5253,7 +5253,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         
         return prisma.product_variants.create({
           data: {
-            id: generateVariantId(itemId), // Unique variant ID
+            id: generateTenantVariantId(itemId,updated.tenant_id), // Unique variant ID
             parent_item_id: itemId,
             tenant_id: updated.tenant_id,
             sku: sku, // Variant SKU following parent SKU pattern
@@ -5919,7 +5919,7 @@ app.get("/google/callback", async (req, res) => {
  * Get Google account status for tenant
  * GET /google/status?tenant_id=xxx or ?tenantId=xxx
  */
-app.get("/google/status", async (req, res) => {
+app.get("/api/google/status", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     

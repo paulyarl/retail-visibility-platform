@@ -2,7 +2,7 @@ interface NavLinksProps {
   links: {
     dashboard: string;
     tenants: string;
-    shops: string;
+    barcode: string;
     directory: string;
     analytics?: string;
     settings: string;
@@ -50,13 +50,13 @@ export default function NavLinks({
       </a>
       <a 
         className={`${baseLinkClass} ${itemClassName}`} 
-        href={links.shops}
+        href={links.barcode}
         onClick={onClick}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
-        Shops
+        Barcode
       </a> 
       {links.directory && (
         <a 

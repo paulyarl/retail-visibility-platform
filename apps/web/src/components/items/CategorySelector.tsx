@@ -97,7 +97,9 @@ export default function CategorySelector({
     try {
       setLoading(true);
       const fullPath = path.join(' > ');
+      console.log(`[CategorySelector] Fetching children for path: ${fullPath}`);
       const googleCategories = await googleTaxonomyService.browseGoogleTaxonomy(fullPath);
+      console.log(`[CategorySelector] Received children:`, googleCategories);
       
       if (googleCategories) {
         const childCategories = googleCategories.map(mapToCategoryOption);

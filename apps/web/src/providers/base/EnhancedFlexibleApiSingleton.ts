@@ -61,7 +61,7 @@ export interface AuthenticatedRequestOptions extends UniversalResponseOptions {
 }
 
 export interface TenantRequestOptions extends UniversalResponseOptions {
-  tenantId: string;
+  tenantId?: string;
   ttl?: number;
   requestTarget?: RequestTarget;
   responseType?: ResponseType;

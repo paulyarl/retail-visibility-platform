@@ -1,27 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import BarcodeScanner from '@/components/scan/BarcodeScanner';
 import BatchReview from '@/components/scan/BatchReview';
 import EnrichmentPreview from '@/components/scan/EnrichmentPreview';
-import { inventoryScanService, ScanSession, ScanResult as ServiceScanResult } from '@/services/InventoryScanService';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 
 // Interface compatible with BatchReview component
 interface ScanResult {
   id: string;
   barcode: string;
-  sku?: string;
+  sku: string;
   status: string;
   enrichment?: {
     name?: string;
+    brand?: string;
     description?: string;
     categoryPath?: string[];
+    tenantCategoryId?: string;
     metadata?: Record<string, any>;
   };
-  duplicateOf?: string;
   createdAt: string;
+}
+
+interface ScanSession {
+  id: string;
+  tenantId: string;
+  status: string;
+  deviceType: string;
+  scannedCount: number;
+  committedCount: number;
+  duplicateCount: number;
+  startedAt: string;
+  template?: any;
+  results: ScanResult[];
 }
 
 export default function ActiveScanPage() {
@@ -35,6 +49,11 @@ export default function ActiveScanPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [committing, setCommitting] = useState(false);
+  // console.log('[PlatformScanPage] Component mounted', { selectedResult });
+  // console.log('[PlatformScanPage] Component mounted', { sessionId });
+  // console.log('[PlatformScanPage] Component mounted', { loading });
+  // console.log('[PlatformScanPage] Component mounted', { scanning });
+  // console.log('[PlatformScanPage] Component mounted', { committing });
 
   useEffect(() => {
     if (sessionId) {
@@ -44,27 +63,29 @@ export default function ActiveScanPage() {
 
   const loadSession = async () => {
     try {
-      const [sessionData, resultsData] = await Promise.all([
-        inventoryScanService.getScanSession(sessionId),
-        inventoryScanService.getScanResults(sessionId)
-      ]);
+      const sessionData = await itemsSingletonService.getScanSession(sessionId);
+      // console.log('[PlatformScanPage] Session data:', sessionData);
       
-      if (sessionData) {
-        setSession(sessionData);
+      if (sessionData && sessionData.success && sessionData.data) {
+        const session = sessionData.data.session || sessionData.data; // Handle nested structure
+          // console.log('[PlatformScanPage] Session:', session);
+          // console.log('[PlatformScanPage] Device type:', session.device_type, session.deviceType);
+          // console.log('[PlatformScanPage] Session status:', session.status);
+          // console.log('[PlatformScanPage] Tenant ID:', session.tenantId);
+        setSession(session);
         
-        // Transform service results to BatchReview format
-        const transformedResults = (resultsData || []).map((result: ServiceScanResult): ScanResult => ({
+        // Transform results to BatchReview format
+        // Results might be nested under different property names
+        const results = session.results || session.scan_results_list || [];
+        // console.log('[PlatformScanPage] Results:', results);
+        
+        const transformedResults = results.map((result: any): ScanResult => ({
           id: result.id,
-          barcode: result.productId, // Use productId as barcode
+          barcode: result.barcode,
           sku: result.sku,
           status: result.status,
-          enrichment: result.metadata ? {
-            name: result.metadata.name,
-            description: result.metadata.description,
-            categoryPath: result.metadata.categoryPath,
-            metadata: result.metadata
-          } : undefined,
-          createdAt: result.scannedAt, // Use scannedAt as createdAt
+          enrichment: result.enrichment,
+          createdAt: result.created_at,
         }));
         
         setResults(transformedResults);
@@ -74,6 +95,7 @@ export default function ActiveScanPage() {
           setSelectedResult(transformedResults[0]);
         }
       } else {
+        console.error('[PlatformScanPage] Invalid session response:', sessionData);
         alert('Failed to load session');
         router.push('/scan');
       }
@@ -87,7 +109,7 @@ export default function ActiveScanPage() {
   };
 
   const handleScan = async (barcode: string) => {
-    if (!session || session.status !== 'in_progress') {
+    if (!session || session.status !== 'active') {
       alert('Session is not active');
       return;
     }
@@ -95,32 +117,38 @@ export default function ActiveScanPage() {
     try {
       setScanning(true);
       
-      const data = await inventoryScanService.lookupBarcode(sessionId, barcode);
-      
-      // Show duplicate warning
-      if (data.duplicate) {
-        alert(`⚠️ ${data.duplicate.warning}\n\nItem: ${data.duplicate.item.name || data.duplicate.item.sku}`);
+      const tenantId = session.tenantId;
+      if (!tenantId) {
+        console.error('[PlatformScanPage] No tenant ID found in session');
+        alert('Session is missing tenant information');
+        return;
       }
       
-      // Reload session and results to get updated data
-      await loadSession();
+      const data = await itemsSingletonService.lookupBarcode(sessionId, barcode);
       
-      // Select the newly added result
-      if (data.result) {
-        const transformedResult: ScanResult = {
-          id: data.result.id,
-          barcode: data.result.productId,
-          sku: data.result.sku,
-          status: data.result.status,
-          enrichment: data.result.metadata ? {
-            name: data.result.metadata.name,
-            description: data.result.metadata.description,
-            categoryPath: data.result.metadata.categoryPath,
-            metadata: data.result.metadata
-          } : undefined,
-          createdAt: data.result.scannedAt,
-        };
-        setSelectedResult(transformedResult);
+      if (data && data.success) {
+        // Show duplicate warning
+        if (data.duplicate) {
+          alert(`⚠️ Duplicate item detected\n\nItem: ${data.duplicate.name || data.duplicate.sku}`);
+        }
+        
+        // Reload session and results to get updated data
+        await loadSession();
+        
+        // Select the newly added result
+        if (data.result) {
+          const transformedResult: ScanResult = {
+            id: data.result.id,
+            barcode: data.result.barcode,
+            sku: data.result.sku,
+            status: data.result.status,
+            enrichment: data.result.enrichment,
+            createdAt: data.result.created_at,
+          };
+          setSelectedResult(transformedResult);
+        }
+      } else {
+        alert(data?.error || 'Failed to scan barcode');
       }
     } catch (error) {
       console.error('Failed to scan barcode:', error);
@@ -130,14 +158,55 @@ export default function ActiveScanPage() {
     }
   };
 
+  const handleEnrichmentEdit = useCallback(async (field: string, value: any) => {
+    if (!selectedResult || !session || session.status !== 'active') {
+      return;
+    }
+
+    // Update local state immediately for responsive UI
+    const updatedEnrichment = {
+      ...selectedResult.enrichment,
+      [field]: value,
+    };
+
+    setSelectedResult(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        enrichment: updatedEnrichment,
+      };
+    });
+
+    // Update session results to keep UI in sync
+    setSession((prev: ScanSession | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        results: prev.results.map((r: ScanResult) => 
+          r.id === selectedResult.id 
+            ? { ...r, enrichment: updatedEnrichment }
+            : r
+        ),
+      };
+    });
+
+    // Persist the enrichment changes to the API
+    try {
+      await itemsSingletonService.updateScanResult(sessionId, selectedResult.id, updatedEnrichment);
+    } catch (error) {
+      console.error('Failed to update scan result enrichment:', error);
+      // Could show error toast here, but for now just log it
+    }
+  }, [selectedResult, session, sessionId]);
+
   const handleRemove = async (resultId: string) => {
-    if (!session || session.status !== 'in_progress') {
+    if (!session || session.status !== 'active') {
       alert('Session is not active');
       return;
     }
 
     try {
-      await inventoryScanService.deleteScanResult(sessionId, resultId);
+      await itemsSingletonService.removeScanResult(sessionId, resultId);
 
       // Clear selection if we're removing the selected item
       if (selectedResult?.id === resultId) {
@@ -153,7 +222,7 @@ export default function ActiveScanPage() {
   };
 
   const handleCommit = async () => {
-    if (!session || session.status !== 'in_progress') {
+    if (!session || session.status !== 'active') {
       alert('Session is not active');
       return;
     }
@@ -167,7 +236,7 @@ export default function ActiveScanPage() {
     try {
       setCommitting(true);
       
-      await inventoryScanService.commitScanSession(sessionId);
+      await itemsSingletonService.commitScanSession(sessionId);
       alert(`✅ Successfully committed ${validCount} items to inventory!`);
       router.push('/scan');
     } catch (error) {
@@ -184,7 +253,7 @@ export default function ActiveScanPage() {
     }
 
     try {
-      await inventoryScanService.deleteScanSession(sessionId);
+      await itemsSingletonService.cancelScanSession(sessionId);
       router.push('/scan');
     } catch (error) {
       console.error('Failed to cancel session:', error);
@@ -217,7 +286,7 @@ export default function ActiveScanPage() {
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
         title="Active Scanning Session"
-        description={`${session.scannedItems || 0} items scanned • ${results?.length || 0} total results`}
+        description={`${session.scannedCount || 0} items scanned • ${results?.length || 0} total results`}
         icon={Icons.Inventory}
         backLink={{ href: '/scan', label: 'Back to Sessions' }}
       />
@@ -230,20 +299,22 @@ export default function ActiveScanPage() {
             <BarcodeScanner
               onScan={handleScan}
               onError={(error) => alert(error)}
-              mode="camera" // Fixed mode since deviceType is not in ScanSession interface
-              disabled={session.status !== 'in_progress' || scanning}
+              mode={session.deviceType === 'manual' ? 'manual' : session.deviceType === 'camera' ? 'camera' : 'usb'}
+              disabled={session.status !== 'active' || scanning}
             />
 
             {/* Enrichment Preview */}
             {selectedResult && (
+              // console.log('[ScanPage] Selected result:', selectedResult),
               <EnrichmentPreview
                 barcode={selectedResult.barcode}
                 sku={selectedResult.sku}
                 enrichment={selectedResult.enrichment}
+                tenantId={session.tenantId}
                 validation={[
-                  ...(selectedResult.status === 'error' ? [{
-                    field: 'error',
-                    message: 'There was an error with this scan',
+                  ...(selectedResult.status === 'duplicate' ? [{
+                    field: 'duplicate',
+                    message: 'This item already exists in inventory',
                     severity: 'warning' as const,
                   }] : []),
                   ...(!selectedResult.enrichment?.name ? [{
@@ -251,8 +322,15 @@ export default function ActiveScanPage() {
                     message: 'Product name is required',
                     severity: 'error' as const,
                   }] : []),
+                  ...(!selectedResult.enrichment?.tenantCategoryId ? [{
+                    field: 'category',
+                    message: 'Category is required',
+                    severity: 'error' as const,
+                  }] : []),
                 ]}
-                isLoading={scanning}
+                isLoading={scanning && selectedResult.barcode === selectedResult.barcode}
+                editable={session.status === 'active'}
+                onEdit={handleEnrichmentEdit}
               />
             )}
           </div>
@@ -265,7 +343,7 @@ export default function ActiveScanPage() {
               onCommit={handleCommit}
               onCancel={handleCancel}
               isCommitting={committing}
-              disabled={session.status !== 'in_progress'}
+              disabled={session.status !== 'active'}
             />
           </div>
         </div>

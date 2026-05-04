@@ -949,7 +949,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options?: RequestInit,
     cacheKey?: string,
     ttl?: number,
-    requestOptions?: RequestOptions & EnhancedCacheOptions
+    requestOptions?: RequestOptions & EnhancedCacheOptions & TenantRequestOptions
   ): Promise<ApiResult<T>> {
     const requestType = requestOptions?.requestType || this.defaultRequestType;
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;

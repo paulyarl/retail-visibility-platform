@@ -239,6 +239,20 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                   </Button>
                 </Link>
               </Tooltip>
+              <Tooltip label="Inventory transfer management">
+                <Link href={`/t/${tenantId}/inventory-transfers`}>
+                  <Button 
+                    variant="subtle" 
+                    size="sm"
+                    className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Transfers
+                  </Button>
+                </Link>
+              </Tooltip>
               <Tooltip label="Store settings and configuration">
                 <Link href={`/t/${tenantId}/settings`}>
                   <Button 

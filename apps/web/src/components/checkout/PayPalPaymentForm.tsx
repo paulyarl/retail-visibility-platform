@@ -6,6 +6,8 @@ import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
 
 interface PayPalPaymentFormProps {
   amount: number;
@@ -199,6 +201,20 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
   const [paymentId, setPaymentId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { settings: platformSettings } = usePlatformSettings();
+
+  // Validate minimum payment amount using platform-wide settings
+  const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
+  
+  if (!paymentValidation.isValid) {
+    console.log('[PayPal] Amount validation failed:', paymentValidation);
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800 font-medium">Payment Amount Too Low</p>
+        <p className="text-red-600 text-sm mt-1">{paymentValidation.message}</p>
+      </div>
+    );
+  }
 
   useEffect(() => {
     createOrderAndPayment();

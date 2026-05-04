@@ -5,8 +5,8 @@ import { ROLE_GROUPS } from '@/config/rbac';
 interface AppLinks {
   dashboard: string;
   tenants: string;
+  barcode: string;
   directory: string;
-  shops: string;
   analytics?: string;
   settings: string;
 }
@@ -32,8 +32,8 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
   const [links, setLinks] = useState<AppLinks>({
     dashboard: `/dashboard`,
     tenants: `/tenants`, 
-    directory: `/directory`, 
-    shops: `/shops`, 
+    barcode: '/settings/scan',
+    directory: `/directory`,  
     // analytics: `/`,
     settings: `/settings`,
   });
@@ -98,15 +98,15 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
           ...(hasPublishedDirectory ? {
             dashboard: `/t/${tenantId}/dashboard`,
             tenants: `/tenants`,
-            directory: `/directory/${tenantSlug}`,
-            shops: `/shops/${tenantSlug}`,
+            barcode: `/settings/scan`,
             // analytics: `/`,
+            directory: `/directory/${tenantSlug}`,
             settings: `/t/${tenantId}/settings`,
           } : {
             dashboard: `/t/${tenantId}/dashboard`,
             tenants: `/tenants`,
-            directory: `/directory`,
-            shops: `/shops`,
+            barcode: `/settings/scan`,
+            directory: `/directory`, 
             // analytics: `/`,
             settings: `/t/${tenantId}/settings`,
           })
@@ -117,8 +117,8 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
         setLinks({
           dashboard: `/dashboard`,
           tenants: `/auth/login`,
+          barcode: `/settings/scan`,
           directory: `/directory`,
-          shops: `/shops`,
           // analytics: `/`,
           settings: `/`,
         });
@@ -128,8 +128,8 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
         setLinks({
           dashboard: `/dashboard`,
           tenants: `/tenants`,
+          barcode: `/settings/scan`,
           directory: `/directory`,
-          shops: `/shops`,
           // analytics: `/`,
           settings: `/settings`,
         });

@@ -28,6 +28,7 @@ export interface Product {
   gtin?: string;
   mpn?: string;
   tenantId: string;
+  product_slug?: string; // New product slug field for simplified availability
   tenant?: {
     id: string;
     name: string;
