@@ -6892,6 +6892,21 @@ import adminInventoryTransferRoutes from './routes/admin/inventory-transfers';
 app.use('/api/admin/inventory-transfers', adminInventoryTransferRoutes);
 console.log('Admin inventory transfer routes mounted at /api/admin/inventory-transfers');
 
+/* ------------------------------ admin slug registry ------------------------------ */
+import adminSlugRegistryRoutes from './routes/admin/slug-registry';
+app.use('/api/admin/slug-registry', adminSlugRegistryRoutes);
+console.log('Admin slug registry routes mounted at /api/admin/slug-registry');
+
+/* ------------------------------ admin catalog ------------------------------ */
+import adminCatalogRoutes from './routes/admin/catalog';
+app.use('/api/admin/catalog', adminCatalogRoutes);
+console.log('Admin catalog routes mounted at /api/admin/catalog');
+
+/* ------------------------------ admin inventory stats ------------------------------ */
+import adminInventoryStatsRoutes from './routes/admin/inventory-stats';
+app.use('/api/admin/inventory', adminInventoryStatsRoutes);
+console.log('Admin inventory stats routes mounted at /api/admin/inventory');
+
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
 app.use('/api/gbp-advanced-sync-singleton', gbpAdvancedSyncSingletonRoutes);

@@ -55,36 +55,51 @@ const StoreQuerySchema = z.object({
 
 /**
  * GET /api/public/products/:id
- * Get single product by ID with full details - Universal Identifier Pattern
+ * Get single product by ID or product_slug with full details - Universal Identifier Pattern
+ * Supports both UUID and product_slug lookup for cross-tenant awareness
  */
 router.get('/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { tenant_id } = req.query; // Optional tenant filter for slug lookup
 
-    console.log(`[Public API] Single product request for ID: ${id}`);
+    console.log(`[Public API] Single product request for ID/slug: ${id}`);
 
     // Use SingleProductService with caching
     const { SingleProductService } = await import('../services/SingleProductService');
     const productService = SingleProductService.getInstance();
 
-    const product = await productService.getProductById(id);
+    // Check if this is a UUID or a product_slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    
+    let product;
+    if (isUUID) {
+      // Standard UUID lookup
+      product = await productService.getProductById(id);
+    } else {
+      // Product slug lookup - find product by slug
+      product = await productService.getProductBySlug(id, tenant_id as string | undefined);
+    }
 
     if (!product) {
       return res.status(404).json({
         success: false,
         error: 'Product not found',
-        message: `No product found with ID: ${id}`
+        message: `No product found with ID/slug: ${id}`
       });
     }
 
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
     res.setHeader('X-Service-Source', 'SingleProductService');
+    res.setHeader('X-Lookup-Type', isUUID ? 'uuid' : 'slug');
 
     res.json({
       success: true,
       data: product,
       metadata: {
-        productId: id,
+        productId: product.id,
+        productSlug: product.productSlug,
+        lookupType: isUUID ? 'uuid' : 'slug',
         cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });

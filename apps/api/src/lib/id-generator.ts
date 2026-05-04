@@ -646,10 +646,10 @@ export function generateGlobalProductId(): string {
  * 
  * Character Rules:
  * _ = part boundary (after prefix, between parts)
- * - = bonded part (within parts)
+ * - = bonded part (within parts, preserved)
  * 
- * Format: (prefix)_(brand)_(category)_(upc-code)_(name-hash)
- * Prefix: upc, lpc
+ * UPC Format: upc_(brand)_(category)_(upc-code)_(name-hash)
+ * LPC Format: lpc_(sku)_(category)_(item-id)_(name-hash)
  */
 export function generateProductSlug(params: {
   brand: string;
@@ -662,11 +662,12 @@ export function generateProductSlug(params: {
 }): string {
   const { createHash } = require('crypto');
   
-  // Normalize parts (bond words with hyphens)
+  // Normalize parts - preserve bonded words with hyphens
+  // Matches DB: trim(both '-' from regexp_replace(lower(part), '[^a-z0-9-]+', '-', 'g'))
   const normalizePart = (part: string) => 
     part
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+      .replace(/[^a-z0-9-]+/g, '-') // Replace non-alphanumeric (except hyphens) with hyphens
       .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
   
   // Generate name hash (first 8 chars of MD5)
@@ -679,14 +680,16 @@ export function generateProductSlug(params: {
   const category = params.categoryPath?.[0] || params.category || 'general';
   
   // Determine slug type based on GTIN/UPC presence
-  if (params.gtin && params.gtin.trim() !== '') {
+  if (params.gtin && params.gtin.trim() !== '' && params.gtin.trim().length >= 6) {
     // UPC-based product: upc_(brand)_(category)_(upc-code)_(name-hash)
+    // Brand preserves bonded words: "General Mills" -> "general-mills"
     return `upc_${normalizePart(params.brand)}_${normalizePart(category)}_${params.gtin.trim()}_${nameHash}`;
   } else {
     // LPC-based product: lpc_(sku)_(category)_(item-id)_(name-hash)
+    // SKU preserves bonded words: "PROD-123" -> "prod-123"
     if (!params.sku || !params.itemId) {
       throw new Error('LPC products require sku and itemId');
     }
-    return `lpc_${params.sku}_${normalizePart(category)}_${params.itemId}_${nameHash}`;
+    return `lpc_${normalizePart(params.sku)}_${normalizePart(category)}_${params.itemId}_${nameHash}`;
   }
 }

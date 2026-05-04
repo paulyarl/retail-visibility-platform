@@ -31,6 +31,13 @@ export interface Recommendation {
   productStock?: number;
   productImageUrl?: string;
   productBrand?: string;
+  // NEW: Slug registry fields for cross-tenant matching
+  productSlug?: string;
+  brandNormalized?: string;
+  categoryNormalized?: string;
+  slugType?: string;
+  platformTenantCount?: number;
+  platformPurchaseCount?: number;
   productRatingLive?: number;
   productReviewsCountLive?: number;
   productHelpfulCountLive?: number;
@@ -520,6 +527,13 @@ export async function getProductsViewedBySameUsers(
         mgd.stock as product_stock,
         mgd.image_url as product_image_url,
         mgd.brand as product_brand,
+        -- NEW: Slug registry fields for cross-tenant matching
+        mgd.product_slug,
+        mgd.brand_normalized,
+        mgd.category_normalized,
+        mgd.slug_type,
+        mgd.platform_tenant_count,
+        mgd.platform_purchase_count,
         mgd.product_rating_live,
         mgd.product_reviews_count_live,
         mgd.product_helpful_count_live,
@@ -593,6 +607,13 @@ export async function getProductsViewedBySameUsers(
       productStock: row.product_stock,
       productImageUrl: row.product_image_url,
       productBrand: row.product_brand,
+      // NEW: Slug registry fields
+      productSlug: row.product_slug,
+      brandNormalized: row.brand_normalized,
+      categoryNormalized: row.category_normalized,
+      slugType: row.slug_type,
+      platformTenantCount: row.platform_tenant_count,
+      platformPurchaseCount: row.platform_purchase_count,
       productRatingLive: typeof row.product_rating_live === 'string' ? parseFloat(row.product_rating_live) : row.product_rating_live,
       productReviewsCountLive: row.product_reviews_count_live,
       productHelpfulCountLive: row.product_helpful_count_live,

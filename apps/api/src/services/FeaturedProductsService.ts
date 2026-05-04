@@ -70,6 +70,13 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
         image_urls,
         thumbnail_url,
         featured_image_url,
+        -- NEW: Slug registry fields
+        product_slug,
+        brand_normalized,
+        category_normalized,
+        slug_type,
+        platform_tenant_count,
+        platform_purchase_count,
         view_count,
         unique_viewers,
         engagement_count,
@@ -122,7 +129,14 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
       has_variants: false,
       payment_gateway_type: null,
       price: item.price_cents ? item.price_cents / 100 : 0,
-      imageUrl: item.image_url
+      imageUrl: item.image_url,
+      // NEW: Slug registry fields
+      product_slug: item.product_slug,
+      brand_normalized: item.brand_normalized,
+      category_normalized: item.category_normalized,
+      slug_type: item.slug_type,
+      platform_tenant_count: item.platform_tenant_count,
+      platform_purchase_count: item.platform_purchase_count
     }));
   } catch (error) {
     console.error('Error generating trending products from MV:', error);
@@ -151,6 +165,12 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
         image_urls,
         thumbnail_url,
         featured_image_url,
+        -- NEW: Slug registry fields
+        product_slug,
+        brand_normalized,
+        category_normalized,
+        slug_type,
+        platform_tenant_count,
         product_average_rating,
         product_review_count,
         product_rating_live,
@@ -213,7 +233,13 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
       has_variants: false,
       payment_gateway_type: null,
       price: item.price_cents ? item.price_cents / 100 : 0,
-      imageUrl: item.image_url
+      imageUrl: item.image_url,
+      // NEW: Slug registry fields
+      product_slug: item.product_slug,
+      brand_normalized: item.brand_normalized,
+      category_normalized: item.category_normalized,
+      slug_type: item.slug_type,
+      platform_tenant_count: item.platform_tenant_count
     }));
   } catch (error) {
     console.error('Error generating recommended products from MV:', error);
@@ -242,6 +268,13 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
         image_urls,
         thumbnail_url,
         featured_image_url,
+        -- NEW: Slug registry fields
+        product_slug,
+        brand_normalized,
+        category_normalized,
+        slug_type,
+        platform_tenant_count,
+        platform_purchase_count,
         conversion_count,
         revenue_cents,
         units_sold,
@@ -297,6 +330,13 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
       availability: 'available',
       has_variants: false,
       payment_gateway_type: null,
+      // NEW: Slug registry fields
+      product_slug: item.product_slug,
+      brand_normalized: item.brand_normalized,
+      category_normalized: item.category_normalized,
+      slug_type: item.slug_type,
+      platform_tenant_count: item.platform_tenant_count,
+      platform_purchase_count: item.platform_purchase_count,
       price: item.price_cents ? item.price_cents / 100 : 0,
       imageUrl: item.image_url
     }));

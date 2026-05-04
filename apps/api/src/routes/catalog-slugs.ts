@@ -2,9 +2,11 @@
  * Catalog Slug API Routes
  * 
  * Provides REST API endpoints for product slug management:
- * - Validate slug uniqueness
+ * - Validate slug format and uniqueness
  * - Register new slugs
  * - Get slug registry entries
+ * - Compare products by slug components
+ * - Parse slug into components
  */
 
 import { Router, Request, Response } from 'express';
@@ -12,6 +14,7 @@ import { authenticateToken, optionalAuth } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { parseSlugToJSON, generateProductSlug, determineSlugType } from '../lib/slug-generator';
 
 const router = Router();
 
@@ -147,6 +150,122 @@ router.post('/register', authenticateToken, async (req: Request, res: Response) 
   } catch (error) {
     console.error('[CatalogSlugs] Error registering slug:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to register slug' });
+  }
+});
+
+/**
+ * GET /api/catalog/slugs/:slug/parse
+ * Parse a slug into its components
+ * 
+ * Response:
+ * {
+ *   "type": "lpc",
+ *   "sku": "qsid-1766436467817",
+ *   "brand": null,
+ *   "category": "bakery",
+ *   "identifier": "sid-pk2onrx2",
+ *   "name_hash": "323098b8"
+ * }
+ */
+router.get('/:slug/parse', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+
+    // Validate slug format
+    const slugRegex = /^(upc|lpc)_[^_]+_[^_]+_[^_]+_[a-f0-9]{8}$/;
+    if (!slugRegex.test(slug)) {
+      return res.status(400).json({ 
+        error: 'invalid_slug_format',
+        message: 'Slug must follow format: {type}_{sku/brand}_{category}_{identifier}_{hash}'
+      });
+    }
+
+    const components = parseSlugToJSON(slug);
+
+    res.json(components);
+  } catch (error) {
+    console.error('[CatalogSlugs] Error parsing slug:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to parse slug' });
+  }
+});
+
+/**
+ * POST /api/catalog/slugs/compare
+ * Compare two products by their slug components
+ * 
+ * Body:
+ * { "slug1": "lpc_...", "slug2": "lpc_..." }
+ * or
+ * { "registryId1": "psr-...", "registryId2": "psr-..." }
+ * 
+ * Response:
+ * {
+ *   "match_type": "exact" | "category" | "type" | "none",
+ *   "type_match": true,
+ *   "category_match": false,
+ *   "exact_match": false,
+ *   "similarity_score": 40
+ * }
+ */
+router.post('/compare', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { slug1, slug2, registryId1, registryId2 } = req.body;
+
+    // Must provide either slugs or registry IDs
+    if (!slug1 && !registryId1) {
+      return res.status(400).json({ error: 'missing_identifier', message: 'Provide slug1 or registryId1' });
+    }
+    if (!slug2 && !registryId2) {
+      return res.status(400).json({ error: 'missing_identifier', message: 'Provide slug2 or registryId2' });
+    }
+
+    // If registry IDs provided, use DB function
+    if (registryId1 && registryId2) {
+      const result = await prisma.$queryRaw<[{ compare_registry_products: Record<string, any> }]>`
+        SELECT compare_registry_products(${registryId1}, ${registryId2})
+      `;
+      return res.json(result[0].compare_registry_products);
+    }
+
+    // Otherwise compare by parsing slugs
+    const parsed1 = parseSlugToJSON(slug1);
+    const parsed2 = parseSlugToJSON(slug2);
+
+    const typeMatch = parsed1.type === parsed2.type;
+    const categoryMatch = parsed1.category === parsed2.category;
+    const identifierMatch = parsed1.identifier === parsed2.identifier;
+    const exactMatch = slug1 === slug2;
+
+    let matchType = 'none';
+    let similarityScore = 0;
+
+    if (exactMatch) {
+      matchType = 'exact';
+      similarityScore = 100;
+    } else if (identifierMatch) {
+      matchType = 'identifier';
+      similarityScore = 80;
+    } else if (typeMatch && categoryMatch) {
+      matchType = 'category';
+      similarityScore = 40;
+    } else if (typeMatch) {
+      matchType = 'type';
+      similarityScore = 20;
+    }
+
+    res.json({
+      match_type: matchType,
+      type_match: typeMatch,
+      category_match: categoryMatch,
+      identifier_match: identifierMatch,
+      exact_match: exactMatch,
+      similarity_score: similarityScore,
+      slug1_components: parsed1,
+      slug2_components: parsed2,
+    });
+  } catch (error) {
+    console.error('[CatalogSlugs] Error comparing products:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to compare products' });
   }
 });
 

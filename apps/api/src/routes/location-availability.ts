@@ -93,9 +93,16 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     if (!globalProduct) {
       console.log(`[LocationAvailability] Slug lookup failed for: ${slug}, trying SKU fallback`);
       
-      // Find product by universal SKU using slug registry (same as SKU endpoint)
+      // Find product by universal SKU or original SKU using slug registry
+      // UPC products: universal_sku = UPC code (unique across tenants)
+      // LPC products: universal_sku = NULL, use original_sku (tenant-scoped)
       const slugRegistry = await prisma.product_slug_registry.findFirst({
-        where: { universal_sku: slug }
+        where: {
+          OR: [
+            { universal_sku: slug },  // UPC lookup
+            { original_sku: slug }     // LPC fallback
+          ]
+        }
       });
       
       if (slugRegistry) {
@@ -310,9 +317,16 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
       });
     }
 
-    // Find product by universal SKU
+    // Find product by universal SKU or original SKU
+    // UPC products: universal_sku = UPC code (unique across tenants)
+    // LPC products: universal_sku = NULL, use original_sku (tenant-scoped)
     const slugRegistry = await prisma.product_slug_registry.findFirst({
-      where: { universal_sku: sku }
+      where: {
+        OR: [
+          { universal_sku: sku },  // UPC lookup
+          { original_sku: sku }     // LPC fallback
+        ]
+      }
     });
 
     if (!slugRegistry) {

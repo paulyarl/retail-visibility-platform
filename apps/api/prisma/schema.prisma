@@ -2015,15 +2015,25 @@ model product_queue {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model product_slug_registry {
-  id            String    @id @db.VarChar(255)
-  product_slug  String    @unique @db.VarChar(255)
-  universal_sku String?   @unique @db.VarChar(255)
-  slug_hash     String?   @unique @db.VarChar(64)
-  tenant_id     String?   @db.VarChar(255)
-  original_sku  String?   @db.VarChar(255)
-  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  id                  String    @id @db.VarChar(255)
+  product_slug        String    @unique @db.VarChar(255)
+  universal_sku       String?   @db.VarChar(255)
+  slug_hash           String?   @unique @db.VarChar(64)
+  tenant_id           String?   @db.VarChar(255)
+  original_sku        String?   @db.VarChar(255)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  slug_type           String?   @default("lpc") @db.VarChar(10)
+  slug_prefix         String?   @db.VarChar(10)
+  brand_normalized    String?   @db.VarChar(100)
+  category_normalized String?   @db.VarChar(100)
+  format_version      String?   @default("v1") @db.VarChar(10)
+  slug_components     Json?
+  is_active           Boolean?  @default(true)
+  migration_status    String?   @default("pending") @db.VarChar(20)
 
+  @@index([slug_type], map: "idx_product_slug_registry_type")
   @@index([slug_hash], map: "idx_slug_registry_hash")
+  @@index([migration_status, format_version], map: "idx_slug_registry_migration")
   @@index([tenant_id], map: "idx_slug_registry_tenant")
   @@index([universal_sku], map: "idx_slug_registry_universal_sku")
 }

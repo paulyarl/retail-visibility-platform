@@ -30,6 +30,7 @@ import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
+import { AvailableNearby } from '@/components/products/AvailableNearby';
 
 import { tenantPublicService,SubscriptionStatusInfo,LocationStatusInfo,PublicTenantInfo,TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -98,6 +99,15 @@ interface ProductData {
     enhancedDescription?: string;
   };
   tenantId: string;
+  // NEW: Slug registry fields for cross-tenant matching
+  productSlug?: string;
+  brandNormalized?: string;
+  categoryNormalized?: string;
+  slugType?: 'upc' | 'lpc';
+  platformTenantCount?: number;
+  platformPurchaseCount?: number;
+  platformTotalStock?: number;
+  otherTenantsCount?: number;
   itemStatus: string;
   visibility: string;
   imageUrl?: string;
@@ -696,7 +706,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         />
       </div>
 
-      
+      {/* Available Nearby - Cross-Tenant Product Discovery */}
+      {product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+          <AvailableNearby 
+            productSlug={product.productSlug}
+            currentTenantId={product.tenantId}
+            className="w-full max-w-md mx-auto"
+          />
+        </div>
+      )}
 
       {/* Product Recommendations - Full Width */}
       <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />

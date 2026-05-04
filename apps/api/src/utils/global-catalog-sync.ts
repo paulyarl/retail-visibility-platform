@@ -113,20 +113,37 @@ export async function ensureGlobalCatalogEntry(item: GlobalCatalogItem): Promise
     });
 
     // Create or update slug registry entry
+    // universal_sku rules:
+    // - UPC products: universal_sku = UPC code (unique across tenants)
+    // - LPC products: universal_sku = NULL (not unique, tenant-scoped)
+    const universalSku = item.gtin && item.gtin.trim() !== '' && item.gtin.trim().length >= 6
+      ? item.gtin.trim()  // UPC: use the UPC code
+      : null;              // LPC: no universal SKU
+
     const slugRegistry = await prisma.product_slug_registry.upsert({
       where: { product_slug: productSlug },
       update: {
         tenant_id: item.tenant_id,
         original_sku: item.sku,
-        universal_sku: item.sku, // Use the same SKU as universal for now
+        universal_sku: universalSku,
+        slug_type: item.gtin ? 'upc' : 'lpc',
+        format_version: 'v2',
+        is_active: true,
       },
       create: {
         id: `psr-${item.id}`,
         product_slug: productSlug,
-        universal_sku: item.sku,
-        slug_hash: productSlug.split('-').slice(0, 3).join('-'), // Simple hash
+        universal_sku: universalSku,
+        slug_hash: productSlug.split('_').slice(0, 3).join('_'), // Simple hash from slug parts
         tenant_id: item.tenant_id,
         original_sku: item.sku,
+        slug_type: item.gtin ? 'upc' : 'lpc',
+        slug_prefix: item.gtin ? 'upc' : 'lpc',
+        brand_normalized: item.brand?.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || null,
+        category_normalized: item.category_path?.[0]?.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'general',
+        format_version: 'v2',
+        migration_status: 'auto_created',
+        is_active: true,
         created_at: new Date()
       }
     });

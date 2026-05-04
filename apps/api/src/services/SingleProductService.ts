@@ -15,6 +15,15 @@ export interface SingleProductResult {
   availability: string;
   stock: number;
   quantity: number;
+  // NEW: Slug registry fields for cross-tenant matching
+  productSlug?: string;
+  brandNormalized?: string;
+  categoryNormalized?: string;
+  slugType?: 'upc' | 'lpc';
+  platformTenantCount?: number;
+  platformPurchaseCount?: number;
+  platformTotalStock?: number;
+  otherTenantsCount?: number;
   images: Array<{
     id: string;
     url: string;
@@ -172,24 +181,73 @@ export class SingleProductService {
         }
       }) : null;
 
-    // Get featured types from mv_global_discovery materialized view
+    // Get featured types and slug fields from mv_global_discovery materialized view
     let featuredTypes: string[] = [];
+    let slugData: {
+      product_slug?: string;
+      brand_normalized?: string;
+      category_normalized?: string;
+      slug_type?: 'upc' | 'lpc';
+      platform_tenant_count?: number;
+      platform_purchase_count?: number;
+      platform_total_stock?: number;
+    } = {};
     try {
       const pool = require('../utils/db-pool').getDirectPool();
-      const featuredResult = await pool.query(
-        `SELECT featured_type 
+      const mvResult = await pool.query(
+        `SELECT featured_type, product_slug, brand_normalized, category_normalized, 
+                slug_type, platform_tenant_count, platform_purchase_count, platform_total_stock
          FROM mv_global_discovery 
          WHERE inventory_item_id = $1 
            AND is_actively_featured = true`,
         [productId]
       );
       
-      if (featuredResult.rows.length > 0) {
-        featuredTypes = featuredResult.rows.map((row: any) => row.featured_type).filter(Boolean);
+      if (mvResult.rows.length > 0) {
+        featuredTypes = mvResult.rows.map((row: any) => row.featured_type).filter(Boolean);
+        // Take slug data from first row
+        slugData = {
+          product_slug: mvResult.rows[0].product_slug,
+          brand_normalized: mvResult.rows[0].brand_normalized,
+          category_normalized: mvResult.rows[0].category_normalized,
+          slug_type: mvResult.rows[0].slug_type,
+          platform_tenant_count: mvResult.rows[0].platform_tenant_count,
+          platform_purchase_count: mvResult.rows[0].platform_purchase_count,
+          platform_total_stock: mvResult.rows[0].platform_total_stock
+        };
       }
     } catch (error) {
-      console.log('[SingleProductService] Featured types query failed:', error);
-      // Continue without featured types if query fails
+      console.log('[SingleProductService] MV query failed:', error);
+      // Continue without featured types/slug data if query fails
+    }
+    
+    // Try to get slug data even if not featured
+    if (!slugData.product_slug) {
+      try {
+        const pool = require('../utils/db-pool').getDirectPool();
+        const slugResult = await pool.query(
+          `SELECT product_slug, brand_normalized, category_normalized, 
+                  slug_type, platform_tenant_count, platform_purchase_count, platform_total_stock
+           FROM mv_global_discovery 
+           WHERE inventory_item_id = $1 
+           LIMIT 1`,
+          [productId]
+        );
+        
+        if (slugResult.rows.length > 0) {
+          slugData = {
+            product_slug: slugResult.rows[0].product_slug,
+            brand_normalized: slugResult.rows[0].brand_normalized,
+            category_normalized: slugResult.rows[0].category_normalized,
+            slug_type: slugResult.rows[0].slug_type,
+            platform_tenant_count: slugResult.rows[0].platform_tenant_count,
+            platform_purchase_count: slugResult.rows[0].platform_purchase_count,
+            platform_total_stock: slugResult.rows[0].platform_total_stock
+          };
+        }
+      } catch (error) {
+        console.log('[SingleProductService] Slug data query failed:', error);
+      }
     }
 
     // Transform the product data
@@ -273,7 +331,18 @@ export class SingleProductService {
       licenseType: product.license_type || undefined,
       accessDurationDays: product.access_duration_days || undefined,
       downloadLimit: product.download_limit || undefined,
-      featuredTypes: featuredTypes || []
+      featuredTypes: featuredTypes || [],
+      // NEW: Slug registry fields for cross-tenant matching
+      productSlug: slugData.product_slug,
+      brandNormalized: slugData.brand_normalized,
+      categoryNormalized: slugData.category_normalized,
+      slugType: slugData.slug_type,
+      platformTenantCount: slugData.platform_tenant_count,
+      platformPurchaseCount: slugData.platform_purchase_count,
+      platformTotalStock: slugData.platform_total_stock,
+      otherTenantsCount: slugData.platform_tenant_count && slugData.platform_tenant_count > 1 
+        ? slugData.platform_tenant_count - 1 
+        : 0
     };
 
     // Cache the result
@@ -398,7 +467,17 @@ export class SingleProductService {
           name: category.name,
           slug: category.slug,
           googleCategoryId: category.googleCategoryId || null
-        } : null
+        } : null,
+        // NEW: Slug registry fields (not available in batch lookup from inventory_items)
+        // These would need a separate MV query for batch operations
+        productSlug: undefined,
+        brandNormalized: undefined,
+        categoryNormalized: undefined,
+        slugType: undefined,
+        platformTenantCount: undefined,
+        platformPurchaseCount: undefined,
+        platformTotalStock: undefined,
+        otherTenantsCount: undefined
       };
     });
 
@@ -450,6 +529,219 @@ export class SingleProductService {
     this.setCache(`product:${product.id}`, transformedProduct);
 
     return transformedProduct;
+  }
+
+  /**
+   * Get product by product_slug with optional tenant filter
+   * Used for cross-tenant product discovery
+   */
+  async getProductBySlug(productSlug: string, tenantId?: string): Promise<SingleProductResult | null> {
+    const cacheKey = `product:slug:${productSlug}${tenantId ? `:${tenantId}` : ''}`;
+
+    // Check cache first
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      console.log(`[SingleProductService] Cache hit for product slug: ${productSlug}`);
+      return cached;
+    }
+
+    console.log(`[SingleProductService] Cache miss, fetching product by slug: ${productSlug}`);
+
+    try {
+      const pool = require('../utils/db-pool').getDirectPool();
+      
+      // Query mv_global_discovery for product by slug
+      let query = `
+        SELECT 
+          inventory_item_id,
+          product_name,
+          product_title,
+          product_description,
+          sku,
+          current_price_cents,
+          list_price_cents,
+          sale_price_cents,
+          stock,
+          image_url,
+          brand,
+          product_slug,
+          brand_normalized,
+          category_normalized,
+          slug_type,
+          platform_tenant_count,
+          platform_purchase_count,
+          platform_total_stock,
+          tenant_id,
+          tenant_name,
+          tenant_slug,
+          tenant_logo_url,
+          tenant_city,
+          tenant_state,
+          product_category,
+          product_category_slug,
+          in_stock,
+          item_status,
+          visibility
+        FROM mv_global_discovery
+        WHERE product_slug = $1
+          AND item_status = 'active'
+          AND visibility = 'public'
+      `;
+      
+      const params: any[] = [productSlug];
+      
+      if (tenantId) {
+        query += ` AND tenant_id = $2`;
+        params.push(tenantId);
+      }
+      
+      query += ` LIMIT 1`;
+
+      const result = await pool.query(query, params);
+
+      if (result.rows.length === 0) {
+        console.log(`[SingleProductService] Product not found for slug: ${productSlug}`);
+        return null;
+      }
+
+      const row = result.rows[0];
+
+      // Get additional product details from inventory_items
+      const { prisma } = await import('../prisma');
+      const fullProduct = await prisma.inventory_items.findFirst({
+        where: {
+          id: row.inventory_item_id,
+          item_status: 'active'
+        }
+      });
+
+      if (!fullProduct) {
+        console.log(`[SingleProductService] Full product not found for ID: ${row.inventory_item_id}`);
+        return null;
+      }
+
+      // Get photos
+      const photos = await prisma.photo_assets.findMany({
+        where: { inventoryItemId: row.inventory_item_id },
+        orderBy: { position: 'asc' }
+      });
+
+      // Get variants
+      const variants = fullProduct.has_variants ? 
+        await prisma.product_variants.findMany({
+          where: { 
+            parent_item_id: row.inventory_item_id,
+            is_active: true 
+          },
+          orderBy: { sort_order: 'asc' }
+        }) : [];
+
+      // Get category
+      const category = fullProduct.directory_category_id ? 
+        await prisma.directory_category.findUnique({
+          where: { id: fullProduct.directory_category_id },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            googleCategoryId: true
+          }
+        }) : null;
+
+      // Transform the product data
+      const transformedProduct: SingleProductResult = {
+        id: fullProduct.id,
+        name: fullProduct.name,
+        title: fullProduct.name,
+        description: fullProduct.description || '',
+        price: fullProduct.sale_price_cents ? fullProduct.sale_price_cents / 100 : (fullProduct.price_cents ? fullProduct.price_cents / 100 : null),
+        priceCents: fullProduct.sale_price_cents || fullProduct.price_cents || 0,
+        listPriceCents: fullProduct.price_cents || 0,
+        salePriceCents: fullProduct.sale_price_cents || 0,
+        isOnSale: !!(fullProduct.sale_price_cents && fullProduct.sale_price_cents < fullProduct.price_cents),
+        discountPercentage: fullProduct.sale_price_cents && fullProduct.price_cents ? 
+          Math.round(((fullProduct.price_cents - fullProduct.sale_price_cents) / fullProduct.price_cents) * 100).toString() : '0',
+        sku: fullProduct.sku || '',
+        availability: this.determineAvailability(fullProduct.stock, fullProduct.quantity),
+        stock: fullProduct.stock || 0,
+        quantity: fullProduct.quantity || 0,
+        images: photos.map((photo: any) => ({
+          id: photo.id,
+          url: photo.url,
+          position: photo.position,
+          isPrimary: photo.position === 0
+        })),
+        tenant: {
+          id: row.tenant_id,
+          name: row.tenant_name,
+          slug: row.tenant_slug || '',
+          subscriptionTier: undefined,
+          city: row.tenant_city,
+          state: row.tenant_state
+        },
+        category: category || undefined,
+        brand: fullProduct.brand || '',
+        condition: fullProduct.condition || '',
+        createdAt: fullProduct.created_at,
+        updatedAt: fullProduct.updated_at,
+        metadata: fullProduct.metadata || {},
+        tenantId: row.tenant_id,
+        itemStatus: fullProduct.item_status || 'active',
+        visibility: fullProduct.visibility || 'public',
+        manufacturer: fullProduct.manufacturer || '',
+        imageUrl: fullProduct.image_url || '',
+        currency: fullProduct.currency || 'USD',
+        tenantCategoryId: fullProduct.directory_category_id || undefined,
+        tenantCategory: category ? {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          googleCategoryId: category.googleCategoryId
+        } : undefined,
+        variants: variants.map(v => ({
+          id: v.id,
+          sku: v.sku,
+          variant_name: v.variant_name,
+          price_cents: v.price_cents,
+          sale_price_cents: v.sale_price_cents,
+          stock: v.stock,
+          image_url: v.image_url,
+          attributes: v.attributes,
+          sort_order: v.sort_order,
+          is_active: v.is_active,
+          is_on_sale: v.sale_price_cents && v.price_cents ? v.sale_price_cents < v.price_cents : false,
+          discount_percentage: v.sale_price_cents && v.price_cents ? 
+            Math.round(((v.price_cents - v.sale_price_cents) / v.price_cents) * 100) : 0
+        })),
+        productType: fullProduct.product_type || 'physical',
+        digitalDeliveryMethod: fullProduct.digital_delivery_method || undefined,
+        digitalAssets: Array.isArray(fullProduct.digital_assets) ? fullProduct.digital_assets : [],
+        licenseType: fullProduct.license_type || undefined,
+        accessDurationDays: fullProduct.access_duration_days || undefined,
+        downloadLimit: fullProduct.download_limit || undefined,
+        featuredTypes: [],
+        // NEW: Slug registry fields for cross-tenant matching
+        productSlug: row.product_slug,
+        brandNormalized: row.brand_normalized,
+        categoryNormalized: row.category_normalized,
+        slugType: row.slug_type,
+        platformTenantCount: row.platform_tenant_count,
+        platformPurchaseCount: row.platform_purchase_count,
+        platformTotalStock: row.platform_total_stock,
+        otherTenantsCount: row.platform_tenant_count && row.platform_tenant_count > 1 
+          ? row.platform_tenant_count - 1 
+          : 0
+      };
+
+      // Cache the result
+      this.setCache(cacheKey, transformedProduct);
+
+      console.log(`[SingleProductService] Cached product by slug: ${productSlug}`);
+      return transformedProduct;
+    } catch (error) {
+      console.error('[SingleProductService] Error fetching product by slug:', error);
+      return null;
+    }
   }
 
   /**

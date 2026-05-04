@@ -32,12 +32,13 @@ export interface SlugParts {
 }
 
 /**
- * Normalize a slug part by converting to lowercase and bonding with hyphens
+ * Normalize a slug part by converting to lowercase and preserving bonded words with hyphens
+ * Matches DB function: trim(both '-' from regexp_replace(lower(part), '[^a-z0-9-]+', '-', 'g'))
  */
 function normalizePart(part: string): string {
   return part
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+    .replace(/[^a-z0-9-]+/g, '-') // Replace non-alphanumeric (except hyphens) with hyphens
     .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
@@ -53,16 +54,19 @@ function generateNameHash(name: string): string {
 
 /**
  * Generate a product slug based on the new UPC/LPC system
+ * Matches DB functions: generate_lpc_slug() and generate_upc_slug()
  */
 export function generateProductSlug(params: SlugGenerationParams): string {
   const nameHash = generateNameHash(params.name);
   
   if (params.type === 'upc' && params.upc) {
     // Format: upc_(brand)_(category)_(upc-code)_(name-hash)
+    // Brand preserves bonded words: "General Mills" -> "general-mills"
     return `upc_${normalizePart(params.brand)}_${normalizePart(params.category)}_${params.upc}_${nameHash}`;
   } else if (params.type === 'lpc' && params.sku && params.itemId) {
     // Format: lpc_(sku)_(category)_(item-id)_(name-hash)
-    return `lpc_${params.sku}_${normalizePart(params.category)}_${params.itemId}_${nameHash}`;
+    // SKU preserves bonded words: "PROD-123" -> "prod-123"
+    return `lpc_${normalizePart(params.sku)}_${normalizePart(params.category)}_${params.itemId}_${nameHash}`;
   }
   
   throw new Error('Invalid slug generation parameters');
@@ -130,6 +134,7 @@ export function extractItemId(slug: string): string | null {
 
 /**
  * Parse all slug components into a structured object
+ * Matches DB function: parse_slug_components()
  */
 export function parseSlug(slug: string): SlugParts {
   const parts = extractSlugParts(slug);
@@ -150,11 +155,26 @@ export function parseSlug(slug: string): SlugParts {
       category: parts[2],
       itemId: parts[3],
       nameHash: parts[4],
-      brand: '', // LPC doesn't have brand in the same way
+      brand: '', // LPC doesn't have brand in slug
     };
   }
   
   throw new Error(`Invalid slug format: ${slug}`);
+}
+
+/**
+ * Parse slug into JSONB-like object (matches DB parse_slug_components return format)
+ */
+export function parseSlugToJSON(slug: string): Record<string, string | null> {
+  const parts = parseSlug(slug);
+  return {
+    type: parts.type,
+    sku: parts.sku || null,
+    brand: parts.brand || null,
+    category: parts.category,
+    identifier: parts.upc || parts.itemId || null,
+    name_hash: parts.nameHash,
+  };
 }
 
 /**

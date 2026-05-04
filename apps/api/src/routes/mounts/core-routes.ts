@@ -30,6 +30,7 @@ import globalCatalogRoutes from '../global-catalog';
 import catalogSlugsRoutes from '../catalog-slugs';
 import catalogAdoptionRoutes from '../catalog-adoption';
 import locationAvailabilityRoutes from '../location-availability';
+import crossTenantProductsRoutes from '../cross-tenant-products';
 
 /**
  * Mount core business routes
@@ -81,6 +82,9 @@ export function mountCoreRoutes(app: Express) {
   app.use('/api/catalog/slugs', catalogSlugsRoutes);
   app.use('/api/catalog', catalogAdoptionRoutes);
   app.use('/api/catalog/availability', locationAvailabilityRoutes);
+  
+  // Cross-tenant product routes (leverage product_slug for platform-wide queries)
+  app.use('/api/cross-tenant', crossTenantProductsRoutes);
 
   console.log('✅ Core business routes mounted');
 }

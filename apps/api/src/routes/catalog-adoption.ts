@@ -17,7 +17,6 @@ const adoptProductSchema = z.object({
   tenantId: z.string().min(1),
   globalProductId: z.string().min(1),
   productSlug: z.string().min(1),
-  universalSku: z.string().min(1),
   priceCents: z.number().int().positive(),
   stock: z.number().int().min(0),
   sku: z.string().min(1),
@@ -53,7 +52,6 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
       tenantId,
       globalProductId,
       productSlug,
-      universalSku,
       priceCents,
       stock,
       sku,
@@ -181,7 +179,6 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         metadata: {
           global_product_id: globalProductId,
           product_slug: productSlug,
-          universal_sku: universalSku,
           adopted_at: new Date().toISOString(),
           adopted_from: 'global_catalog'
         }
@@ -189,6 +186,13 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
     });
 
     // Register slug if not already registered
+    // universal_sku rules:
+    // - UPC products: universal_sku = UPC code (unique across tenants)
+    // - LPC products: universal_sku = NULL (not unique, tenant-scoped)
+    const universalSku = globalProduct.gtin_upc && globalProduct.gtin_upc.trim() !== '' && globalProduct.gtin_upc.trim().length >= 6
+      ? globalProduct.gtin_upc.trim()  // UPC: use the UPC code
+      : null;              // LPC: no universal SKU
+
     await prisma.product_slug_registry.upsert({
       where: { product_slug: productSlug },
       create: {
@@ -197,11 +201,20 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         universal_sku: universalSku,
         slug_hash: crypto.createHash('sha256').update(productSlug).digest('hex'),
         tenant_id: tenantId,
-        original_sku: sku
+        original_sku: sku,
+        slug_type: globalProduct.gtin_upc ? 'upc' : 'lpc',
+        slug_prefix: globalProduct.gtin_upc ? 'upc' : 'lpc',
+        brand_normalized: globalProduct.brand?.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || null,
+        category_normalized: globalProduct.category_path?.[0]?.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'general',
+        format_version: 'v2',
+        migration_status: 'adopted',
+        is_active: true
       },
       update: {
         tenant_id: tenantId,
-        original_sku: sku
+        original_sku: sku,
+        universal_sku: universalSku,
+        is_active: true
       }
     });
 
