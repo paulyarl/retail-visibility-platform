@@ -79,163 +79,130 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       });
     }
 
+    // Validate that input is a proper product_slug format (lpc_* or upc_*)
+    const isProductSlug = /^(lpc_|upc_)/i.test(slug);
+    
+    if (!isProductSlug) {
+      // Input looks like an SKU, not a product_slug - client should use /sku endpoint
+      return res.status(400).json({
+        error: 'invalid_slug_format',
+        message: 'Parameter must be a product_slug (lpc_* or upc_* prefix). For SKU lookup, use /api/catalog/availability/sku endpoint.',
+        hint: 'Use the /sku endpoint with the sku parameter for SKU-based lookups'
+      });
+    }
+
     const userLat = lat ? parseFloat(lat) : null;
     const userLng = lng ? parseFloat(lng) : null;
     const maxDist = parseInt(maxDistance);
     const maxRes = parseInt(maxResults);
 
-    // Get the global product - first try by slug, then fallback to SKU
-    let globalProduct = await prisma.global_product_catalog.findFirst({
-      where: { product_slug: slug, status: 'active' }
+    // Find the product in slug registry
+    const slugRegistry = await prisma.product_slug_registry.findFirst({
+      where: {
+        product_slug: slug
+      }
     });
 
-    // If not found by slug, try by universal_sku (SKU fallback) - same logic as SKU endpoint
-    if (!globalProduct) {
-      console.log(`[LocationAvailability] Slug lookup failed for: ${slug}, trying SKU fallback`);
-      
-      // Find product by universal SKU or original SKU using slug registry
-      // UPC products: universal_sku = UPC code (unique across tenants)
-      // LPC products: universal_sku = NULL, use original_sku (tenant-scoped)
-      const slugRegistry = await prisma.product_slug_registry.findFirst({
-        where: {
-          OR: [
-            { universal_sku: slug },  // UPC lookup
-            { original_sku: slug }     // LPC fallback
-          ]
-        }
-      });
-      
-      if (slugRegistry) {
-        console.log(`[LocationAvailability] Found slug registry entry for ${slug}: ${slugRegistry.product_slug}`);
-        globalProduct = await prisma.global_product_catalog.findFirst({
-          where: { product_slug: slugRegistry.product_slug, status: 'active' }
-        });
-        console.log(`[LocationAvailability] SKU fallback result for ${slug}:`, globalProduct ? 'FOUND' : 'NOT_FOUND');
-      } else {
-        console.log(`[LocationAvailability] No slug registry entry found for SKU: ${slug}`);
-      }
-    }
-
-    if (!globalProduct) {
+    if (!slugRegistry) {
       return res.status(404).json({
         error: 'not_found',
-        message: 'Product not found in global catalog'
+        message: `Product slug not found: ${slug}`
       });
     }
 
-    // Find inventory items matching this product (by UPC or name/brand)
-    const inventoryQuery: any = {
-      where: {
-        item_status: 'active',
-        visibility: 'public',
-        ...(organizationId && {
-          tenants: {
-            organization_id: organizationId
-          }
-        }),
-        ...(includeOutOfStock === 'false' && {
-          availability: 'in_stock'
-        })
-      },
-      include: {
-        tenants: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            organization_id: true,
-            tenant_business_profiles_list: {
-              select: {
-                business_name: true,
-                address_line1: true,
-                city: true,
-                state: true,
-                postal_code: true,
-                latitude: true,
-                longitude: true,
-                logo_url: true
-              }
-            }
-          }
-        }
-      }
-    };
+    const productSlug = slugRegistry.product_slug;
+    const universalSku = slugRegistry.universal_sku || slugRegistry.original_sku || slug;
+    console.log(`[LocationAvailability] Found slug registry for ${slug}: product_slug=${productSlug}`);
 
-    // Match by UPC first, then by name similarity
-    let inventoryItems: any[] = [];
+    // Query mv_global_discovery for availability across all tenants
+    // This is the authoritative source for product availability
+    const pool = require('../utils/db-pool').getDirectPool();
     
-    if (globalProduct.gtin_upc) {
-      inventoryItems = await prisma.inventory_items.findMany({
-        ...inventoryQuery,
-        where: {
-          ...inventoryQuery.where,
-          gtin: globalProduct.gtin_upc
-        }
+    let locationQuery = `
+      SELECT 
+        inventory_item_id,
+        product_name,
+        product_slug,
+        sku,
+        current_price_cents,
+        list_price_cents,
+        sale_price_cents,
+        is_on_sale,
+        discount_percentage,
+        stock,
+        in_stock,
+        image_url,
+        tenant_id,
+        tenant_name,
+        tenant_slug,
+        tenant_logo_url,
+        tenant_city,
+        tenant_state,
+        tenant_latitude,
+        tenant_longitude,
+        store_average_rating,
+        store_review_count,
+        item_status,
+        visibility
+      FROM mv_global_discovery
+      WHERE product_slug = $1
+        AND item_status = 'active'
+        AND visibility = 'public'
+    `;
+    
+    const queryParams: any[] = [productSlug];
+    
+    if (organizationId) {
+      // Join with tenants to filter by organization
+      locationQuery += ` AND tenant_id IN (SELECT id FROM tenants WHERE organization_id = $2)`;
+      queryParams.push(organizationId);
+    }
+    
+    if (includeOutOfStock === 'false') {
+      locationQuery += ` AND in_stock = true`;
+    }
+    
+    const discoveryResult = await pool.query(locationQuery, queryParams);
+    
+    if (discoveryResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'not_found',
+        message: 'Product not found in any location'
       });
     }
 
-    // If no UPC matches, try name/brand match
-    if (inventoryItems.length === 0) {
-      inventoryItems = await prisma.inventory_items.findMany({
-        ...inventoryQuery,
-        where: {
-          ...inventoryQuery.where,
-          OR: [
-            { name: { equals: globalProduct.name, mode: 'insensitive' } },
-            { title: { equals: globalProduct.name, mode: 'insensitive' } },
-            {
-              AND: [
-                { brand: { equals: globalProduct.brand || '', mode: 'insensitive' } },
-                { name: { contains: globalProduct.name, mode: 'insensitive' } }
-              ]
-            }
-          ]
-        }
-      });
-    }
+    // Transform discovery results to location availability
+    let locations = discoveryResult.rows.map((row: any) => {
+      let distance: number | null = null;
+      if (userLat !== null && userLng !== null && row.tenant_latitude && row.tenant_longitude) {
+        distance = calculateDistance(userLat, userLng, row.tenant_latitude, row.tenant_longitude);
+      }
 
-    // Transform to location availability
-    let locations = inventoryItems
-      .filter(item => item.tenants)
-      .map(item => {
-        const tenant = item.tenants;
-        const profile = tenant.tenant_business_profiles_list;
-        
-        // Handle Prisma Decimal type for lat/lng
-        let distance: number | null = null;
-        if (userLat !== null && userLng !== null && profile?.latitude && profile?.longitude) {
-          const lat = typeof profile.latitude === 'object' && 'toNumber' in profile.latitude 
-            ? profile.latitude.toNumber() 
-            : Number(profile.latitude);
-          const lng = typeof profile.longitude === 'object' && 'toNumber' in profile.longitude 
-            ? profile.longitude.toNumber() 
-            : Number(profile.longitude);
-          distance = calculateDistance(userLat, userLng, lat, lng);
-        }
-
-        return {
-          tenantId: tenant.id,
-          tenantName: profile?.business_name || tenant.name,
-          tenantSlug: tenant.slug,
-          tenantLogo: profile?.logo_url || null,
-          locationId: item.location_id,
-          address: profile?.address_line1 || '',
-          city: profile?.city || '',
-          distance: distance ?? 999,
-          stock: item.stock,
-          availability: item.availability,
-          priceCents: item.price_cents,
-          price: Number(item.price),
-          currency: item.currency,
-          sku: item.sku,
-          productName: item.name,
-          productSlug: slug,
-          universalSku: globalProduct.universal_sku,
-          isPreferred: preferredTenantId === tenant.id,
-          isNearest: false,
-          hasLowStock: item.stock > 0 && item.stock <= 5
-        };
-      });
+      return {
+        tenantId: row.tenant_id,
+        tenantName: row.tenant_name,
+        tenantSlug: row.tenant_slug,
+        tenantLogo: row.tenant_logo_url || null,
+        locationId: null,
+        address: '',
+        city: row.tenant_city || '',
+        distance: distance ?? 999,
+        stock: row.stock || 0,
+        availability: row.in_stock ? 'in_stock' : 'out_of_stock',
+        priceCents: row.current_price_cents || 0,
+        price: (row.current_price_cents || 0) / 100,
+        currency: 'USD',
+        sku: row.sku,
+        productName: row.product_name,
+        productSlug: row.product_slug,
+        universalSku: universalSku,
+        isPreferred: preferredTenantId === row.tenant_id,
+        isNearest: false,
+        hasLowStock: row.stock > 0 && row.stock <= 5,
+        isOnSale: row.is_on_sale,
+        discountPercentage: row.discount_percentage || 0
+      };
+    });
 
     // Filter by distance
     if (userLat !== null && userLng !== null) {
@@ -263,10 +230,11 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     locations = locations.slice(0, maxRes);
 
     // Build response
+    const firstRow = discoveryResult.rows[0];
     const response = {
-      productSlug: slug,
-      universalSku: globalProduct.universal_sku,
-      productName: globalProduct.name,
+      productSlug: productSlug,
+      universalSku: universalSku,
+      productName: firstRow?.product_name || slug,
       totalLocations: locations.length,
       inStockLocations: locations.filter(l => l.availability === 'in_stock').length,
       nearestAvailable: locations.find(l => l.isNearest && l.availability === 'in_stock'),
@@ -336,109 +304,110 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
       });
     }
 
-    // Re-query using slug - redirect to the slug endpoint logic
-    const slugQuery = {
-      slug: slugRegistry.product_slug,
-      ...(lat && { lat }),
-      ...(lng && { lng }),
-      maxDistance,
-      maxResults,
-      includeOutOfStock,
-      ...(organizationId && { organizationId }),
-      sortBy
-    };
+    const productSlug = slugRegistry.product_slug;
+    const universalSku = slugRegistry.universal_sku || slugRegistry.original_sku || sku;
 
-    // Get the global product
-    const globalProduct = await prisma.global_product_catalog.findFirst({
-      where: { product_slug: slugRegistry.product_slug, status: 'active' }
-    });
-
-    if (!globalProduct) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Product not found in global catalog'
-      });
-    }
-
-    // Continue with the same logic as the main endpoint
     const userLatVal = lat ? parseFloat(lat) : null;
     const userLngVal = lng ? parseFloat(lng) : null;
     const maxDist = parseInt(maxDistance);
     const maxRes = parseInt(maxResults);
 
-    // Find inventory items matching this product
-    let inventoryItems: any[] = [];
+    // Query mv_global_discovery for availability
+    const pool = require('../utils/db-pool').getDirectPool();
     
-    if (globalProduct.gtin_upc) {
-      inventoryItems = await prisma.inventory_items.findMany({
-        where: {
-          gtin: globalProduct.gtin_upc,
-          item_status: 'active',
-          visibility: 'public',
-          ...(organizationId && {
-            tenants: { organization_id: organizationId }
-          }),
-          ...(includeOutOfStock === 'false' && {
-            availability: 'in_stock'
-          })
-        },
-        include: {
-          tenants: { select: { id: true, name: true, slug: true } }
-        }
-      });
+    let locationQuery = `
+      SELECT 
+        inventory_item_id,
+        product_name,
+        product_slug,
+        sku,
+        current_price_cents,
+        list_price_cents,
+        sale_price_cents,
+        is_on_sale,
+        discount_percentage,
+        stock,
+        in_stock,
+        image_url,
+        tenant_id,
+        tenant_name,
+        tenant_slug,
+        tenant_logo_url,
+        tenant_city,
+        tenant_state,
+        tenant_latitude,
+        tenant_longitude,
+        store_average_rating,
+        store_review_count
+      FROM mv_global_discovery
+      WHERE product_slug = $1
+        AND item_status = 'active'
+        AND visibility = 'public'
+    `;
+    
+    const queryParams: any[] = [productSlug];
+    
+    if (organizationId) {
+      locationQuery += ` AND tenant_id IN (SELECT id FROM tenants WHERE organization_id = $2)`;
+      queryParams.push(organizationId);
+    }
+    
+    if (includeOutOfStock === 'false') {
+      locationQuery += ` AND in_stock = true`;
+    }
+    
+    const discoveryResult = await pool.query(locationQuery, queryParams);
+    
+    // Transform to location availability
+    let locations = discoveryResult.rows.map((row: any) => {
+      let distance: number | null = null;
+      if (userLatVal !== null && userLngVal !== null && row.tenant_latitude && row.tenant_longitude) {
+        distance = calculateDistance(userLatVal, userLngVal, row.tenant_latitude, row.tenant_longitude);
+      }
+
+      return {
+        tenantId: row.tenant_id,
+        tenantName: row.tenant_name,
+        tenantSlug: row.tenant_slug,
+        tenantLogo: row.tenant_logo_url || null,
+        distance: distance ?? 999,
+        stock: row.stock || 0,
+        availability: row.in_stock ? 'in_stock' : 'out_of_stock',
+        priceCents: row.current_price_cents || 0,
+        price: (row.current_price_cents || 0) / 100,
+        currency: 'USD',
+        sku: row.sku,
+        productName: row.product_name,
+        productSlug: row.product_slug,
+        universalSku: universalSku,
+        isOnSale: row.is_on_sale,
+        discountPercentage: row.discount_percentage || 0
+      };
+    });
+
+    // Filter by distance if user location provided
+    if (userLatVal !== null && userLngVal !== null) {
+      locations = locations.filter(l => l.distance <= maxDist);
     }
 
-    if (inventoryItems.length === 0) {
-      inventoryItems = await prisma.inventory_items.findMany({
-        where: {
-          OR: [
-            { name: { equals: globalProduct.name, mode: 'insensitive' } },
-            { title: { equals: globalProduct.name, mode: 'insensitive' } },
-            {
-              AND: [
-                { brand: { equals: globalProduct.brand || '', mode: 'insensitive' } },
-                { name: { contains: globalProduct.name, mode: 'insensitive' } }
-              ]
-            }
-          ],
-          item_status: 'active',
-          visibility: 'public',
-          ...(organizationId && {
-            tenants: { organization_id: organizationId }
-          }),
-          ...(includeOutOfStock === 'false' && {
-            availability: 'in_stock'
-          })
-        },
-        include: {
-          tenants: { select: { id: true, name: true, slug: true } }
-        }
-      });
+    // Sort
+    if (sortBy === 'distance' && userLatVal !== null && userLngVal !== null) {
+      locations.sort((a, b) => a.distance - b.distance);
+    } else if (sortBy === 'price') {
+      locations.sort((a, b) => a.priceCents - b.priceCents);
+    } else if (sortBy === 'stock') {
+      locations.sort((a, b) => b.stock - a.stock);
     }
 
-    // Build response
-    const locations = inventoryItems
-      .filter(item => item.tenants)
-      .map(item => ({
-        tenantId: item.tenants!.id,
-        tenantName: item.tenants!.name,
-        tenantSlug: item.tenants!.slug,
-        distance: 999,
-        stock: item.stock,
-        availability: item.availability,
-        priceCents: item.price_cents,
-        price: Number(item.price),
-        currency: item.currency,
-        sku: item.sku,
-        productName: item.name,
-        productSlug: slugRegistry.product_slug
-      }))
-      .slice(0, maxRes);
+    // Limit results
+    locations = locations.slice(0, maxRes);
+
+    const firstRow = discoveryResult.rows[0];
 
     return res.json({
-      productSlug: slugRegistry.product_slug,
-      universalSku: sku,
-      productName: globalProduct.name,
+      productSlug: productSlug,
+      universalSku: universalSku,
+      productName: firstRow?.product_name || sku,
       totalLocations: locations.length,
       inStockLocations: locations.filter(l => l.availability === 'in_stock').length,
       locations

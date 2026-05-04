@@ -69,16 +69,21 @@ router.get('/products/:id', async (req, res) => {
     const { SingleProductService } = await import('../services/SingleProductService');
     const productService = SingleProductService.getInstance();
 
-    // Check if this is a UUID or a product_slug
+    // Check ID format: UUID, legacy pid-*, or product_slug
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isLegacyId = /^(pid|tid|scid|iid)-/i.test(id); // Legacy inventory item IDs
     
     let product;
-    if (isUUID) {
-      // Standard UUID lookup
+    let lookupType: 'uuid' | 'legacy_id' | 'slug';
+    
+    if (isUUID || isLegacyId) {
+      // Direct ID lookup (UUID or legacy pid-* format)
       product = await productService.getProductById(id);
+      lookupType = isUUID ? 'uuid' : 'legacy_id';
     } else {
       // Product slug lookup - find product by slug
       product = await productService.getProductBySlug(id, tenant_id as string | undefined);
+      lookupType = 'slug';
     }
 
     if (!product) {
@@ -91,7 +96,7 @@ router.get('/products/:id', async (req, res) => {
 
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
     res.setHeader('X-Service-Source', 'SingleProductService');
-    res.setHeader('X-Lookup-Type', isUUID ? 'uuid' : 'slug');
+    res.setHeader('X-Lookup-Type', lookupType);
 
     res.json({
       success: true,
@@ -99,7 +104,7 @@ router.get('/products/:id', async (req, res) => {
       metadata: {
         productId: product.id,
         productSlug: product.productSlug,
-        lookupType: isUUID ? 'uuid' : 'slug',
+        lookupType: lookupType,
         cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });

@@ -43,6 +43,7 @@ import { locationAvailabilityService, LocationAvailability, MultiLocationAvailab
 
 interface LocationAvailabilitySectionProps {
   productSlug: string;
+  slugType?: string;
   productName: string;
   organizationId?: string;
   preferredTenantId?: string;
@@ -55,6 +56,7 @@ interface LocationAvailabilitySectionProps {
 
 export function LocationAvailabilitySection({
   productSlug,
+  slugType,
   productName,
   organizationId,
   preferredTenantId,
@@ -97,7 +99,7 @@ export function LocationAvailabilitySection({
 
       try {
         // Use smart fallback if enabled (provides backward compatibility)
-        const result = useSmartFallback 
+        const result = useSmartFallback && !slugType
           ? await locationAvailabilityService.getAvailabilityWithFallback(
               productSlug,
               userLocation || undefined,
@@ -191,22 +193,21 @@ export function LocationAvailabilitySection({
   }
 
   if (error) {
-    return (
-      <Alert color="red" icon={<IconAlertCircle size={16} />}>
-        {error}
-      </Alert>
-    );
+    // Silently fail - don't show error for this component
+    return null;
   }
 
-  if (!availability || availability.locations.length === 0) {
-    return (
-      <Alert color="gray" icon={<IconPackage size={16} />}>
-        No locations found with this product available
-      </Alert>
-    );
+  // Filter out the current/preferred tenant - only show OTHER locations
+  const otherLocations = availability?.locations.filter(
+    loc => loc.tenantId !== preferredTenantId
+  ) || [];
+
+  // Don't render if no other locations exist - this page IS the authoritative page
+  if (otherLocations.length === 0) {
+    return null;
   }
 
-  const summary = locationAvailabilityService.getAvailabilitySummary(availability.locations);
+  const summary = locationAvailabilityService.getAvailabilitySummary(otherLocations);
 
   return (
     <Card withBorder p="md">
@@ -232,17 +233,17 @@ export function LocationAvailabilitySection({
 
       <Collapse in={expanded}>
         <Stack gap="xs">
-          {availability.nearestAvailable && (
+          {availability?.nearestAvailable && availability?.nearestAvailable.tenantId !== preferredTenantId && (
             <Alert color="green" variant="light" icon={<IconCheck size={16} />}>
               <Group justify="space-between">
                 <Box>
                   <Text size="sm" fw={500}>Nearest Available</Text>
                   <Text size="xs" c="dimmed">
-                    {availability.nearestAvailable.tenantName} • {formatDistance(availability.nearestAvailable.distance)}
+                    {availability?.nearestAvailable.tenantName} • {formatDistance(availability?.nearestAvailable.distance)}
                   </Text>
                 </Box>
                 <Badge color="green">
-                  {availability.nearestAvailable.stock} in stock
+                  {availability?.nearestAvailable.stock} in stock
                 </Badge>
               </Group>
             </Alert>
@@ -250,7 +251,7 @@ export function LocationAvailabilitySection({
 
           <Divider my="xs" />
 
-          {availability.locations.map((location, index) => (
+          {otherLocations.map((location, index) => (
             <LocationCard
               key={`${location.tenantId}-${location.locationId || index}`}
               location={location}

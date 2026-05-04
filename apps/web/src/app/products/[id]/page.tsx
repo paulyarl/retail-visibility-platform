@@ -186,7 +186,7 @@ async function getStorefrontCategories(tenantId: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
-  // console.log(`product: `, product);
+  console.log(`generateMetadata product 1: `, product);
 
   if (!product) {
     return {
@@ -262,7 +262,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);
-  
+  console.log(`ProductPage product 2: `, product);
   if (!product) {
     notFound();
   }
@@ -619,6 +619,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   licenseType: product.licenseType,
                   accessDurationDays: product.accessDurationDays,
                   downloadLimit: product.downloadLimit,
+                  productSlug: product.productSlug,
                 } as any}
                 tenant={{
                   id: product.tenantId,

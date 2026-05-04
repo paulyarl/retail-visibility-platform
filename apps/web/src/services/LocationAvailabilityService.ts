@@ -95,6 +95,29 @@ class LocationAvailabilityService extends PublicApiSingleton {
     });
   }
 
+  /**
+   * Check if identifier is a valid product_slug format
+   * Product slugs must have lpc_ or upc_ prefix
+   */
+  isValidProductSlug(identifier: string): boolean {
+    return /^(lpc_|upc_)/i.test(identifier);
+  }
+
+  /**
+   * Detect the type of identifier
+   */
+  getIdentifierType(identifier: string): 'product_slug' | 'sku' | 'unknown' {
+    if (this.isValidProductSlug(identifier)) {
+      return 'product_slug';
+    }
+    // SKUs typically don't have the lpc_/upc_ prefix
+    // They could be universal_sku (UPC code) or original_sku (tenant-scoped)
+    if (identifier && identifier.length > 0) {
+      return 'sku';
+    }
+    return 'unknown';
+  }
+
   public static getInstance(): LocationAvailabilityService {
     if (!LocationAvailabilityService.instance) {
       LocationAvailabilityService.instance = new LocationAvailabilityService();
@@ -104,12 +127,19 @@ class LocationAvailabilityService extends PublicApiSingleton {
 
   /**
    * Get product availability across multiple locations
+   * Requires a valid product_slug (lpc_* or upc_* prefix)
    */
   async getProductAvailability(
     productSlug: string,
     userLocation?: UserLocation,
     options: LocationQueryOptions = {}
   ): Promise<MultiLocationAvailability | null> {
+    // Validate slug format before making API call
+    if (!this.isValidProductSlug(productSlug)) {
+      console.warn(`[LocationAvailabilityService] Invalid product_slug format: ${productSlug}. Expected lpc_* or upc_* prefix. Use getAvailabilityBySku() for SKU lookups.`);
+      return null;
+    }
+
     try {
       const {
         maxDistance = 50,
@@ -308,38 +338,30 @@ class LocationAvailabilityService extends PublicApiSingleton {
     };
   }
 
-  /**
-   * Smart availability lookup - tries slug first, then SKU as fallback
-   * Provides backward compatibility during migration
-   */
+  // /**
+  //  * Smart availability lookup - detects identifier type and routes to correct endpoint
+  //  * Product slugs (lpc_*/upc_*) go to /slug endpoint, SKUs go to /sku endpoint
+  //  */
+  
   async getAvailabilityWithFallback(
     identifier: string, // Can be slug or SKU
     userLocation?: UserLocation,
     options: LocationQueryOptions = {}
   ): Promise<MultiLocationAvailability | null> {
-    // First try as slug (new approach)
-    try {
-      const slugResult = await this.getProductAvailability(identifier, userLocation, options);
-      if (slugResult && slugResult.totalLocations > 0) {
-        console.log(`[LocationAvailabilityService] Found by slug: ${identifier}`);
-        return slugResult;
-      }
-    } catch (error) {
-      console.log(`[LocationAvailabilityService] Slug lookup failed for: ${identifier}`, error);
+    const identifierType = this.getIdentifierType(identifier);
+    console.log(`[LocationAvailabilityService] Identifier type: ${identifierType}`);
+    
+    if (identifierType === 'product_slug') {
+      // Use slug endpoint for product_slug format
+      console.log(`[LocationAvailabilityService] Using slug endpoint for: ${identifier}`);
+      return this.getProductAvailability(identifier, userLocation, options);
+    } else if (identifierType === 'sku') {
+      // Use SKU endpoint for SKU format
+      console.log(`[LocationAvailabilityService] Using SKU endpoint for: ${identifier}`);
+      return this.getAvailabilityBySku(identifier, userLocation, options);
     }
 
-    // Fallback to SKU lookup (legacy approach)
-    try {
-      const skuResult = await this.getAvailabilityBySku(identifier, userLocation, options);
-      if (skuResult && skuResult.totalLocations > 0) {
-        console.log(`[LocationAvailabilityService] Found by SKU fallback: ${identifier}`);
-        return skuResult;
-      }
-    } catch (error) {
-      console.log(`[LocationAvailabilityService] SKU fallback failed for: ${identifier}`, error);
-    }
-
-    console.log(`[LocationAvailabilityService] No availability found for: ${identifier}`);
+    console.log(`[LocationAvailabilityService] Unknown identifier type: ${identifier}`);
     return null;
   }
 }

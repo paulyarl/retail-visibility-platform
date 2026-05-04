@@ -940,6 +940,7 @@ interface Product {
   gtin?: string;
   mpn?: string;
   product_slug?: string; // New product slug field for simplified availability
+  productSlug?: string;
   
   // Nutrition & dietary
   nutritionFacts?: {
@@ -1020,9 +1021,11 @@ interface TierBasedLandingPageProps {
   fulfillmentPane?: React.ReactNode;
   slug?: string;
   currentUrl?: string;
+  productSlug?: string;
+  slugType?: string;
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl, productSlug, slugType }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1042,7 +1045,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // console.log(`[TierBasedLandingPage] Context payment: ${JSON.stringify(contextPayment, null, 2)}`);
 
   // Debug logging for variants
-  console.log('[TierBasedLandingPage] Product:', product);
+  // console.log('[TierBasedLandingPage] Product:', product);
   // console.log('[TierBasedLandingPage] Tenant:', tenant);
   // console.log('[TierBasedLandingPage] Product variants:', product.variants);
   // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
@@ -1471,7 +1474,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {tenant.organizationId && (
             <div className="mb-6">
               <LocationAvailabilitySection
-                productSlug={product.product_slug || product.sku || product.id}
+                productSlug={productSlug || product.product_slug || product.productSlug || product.sku || product.id}
+                slugType={slugType}
                 productName={product.name}
                 organizationId={tenant.organizationId}
                 preferredTenantId={product.tenantId}
