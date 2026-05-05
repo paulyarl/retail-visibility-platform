@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requirePlatformAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
+import { getDirectPool } from '../../utils/db-pool';
 
 const router = Router();
 
@@ -49,25 +50,26 @@ router.get('/stats', async (req: Request, res: Response) => {
       })
     ]);
 
+    // Use direct pool for raw queries to avoid Prisma type issues
+    const pool = getDirectPool();
+
     // Get total inventory value
-    const inventoryValue = await prisma.$queryRaw<{ total: bigint }[]>`
-      SELECT COALESCE(SUM(stock * price), 0) as total
+    const inventoryValueResult = await pool.query(`
+      SELECT COALESCE(SUM(stock * price_cents), 0) as total
       FROM inventory_items
       WHERE item_status = 'active'
-    `;
+    `);
+    const inventoryValue = inventoryValueResult.rows[0]?.total || 0;
 
     // Get in-transit items count
-    const inTransitItems = await prisma.$queryRaw<{ total: bigint }[]>`
+    const inTransitResult = await pool.query(`
       SELECT COALESCE(SUM(in_transit_quantity), 0) as total
       FROM location_inventory_pools
-    `;
+    `);
+    const inTransitItems = inTransitResult.rows[0]?.total || 0;
 
     // Get top products by stock
-    const topProducts = await prisma.$queryRaw<Array<{
-      product_slug: string;
-      name: string;
-      total_stock: bigint;
-    }>>`
+    const topProductsResult = await pool.query(`
       SELECT 
         product_slug,
         name,
@@ -77,40 +79,37 @@ router.get('/stats', async (req: Request, res: Response) => {
       GROUP BY product_slug, name
       ORDER BY total_stock DESC
       LIMIT 10
-    `;
+    `);
 
-    // Get category distribution
-    const categoryDistribution = await prisma.$queryRaw<Array<{
-      category: string;
-      product_count: bigint;
-      total_stock: bigint;
-    }>>`
+    // Get category distribution - use unnest for array access
+    const categoryDistributionResult = await pool.query(`
       SELECT 
-        category_path[1] as category,
-        COUNT(DISTINCT product_slug) as product_count,
-        SUM(stock) as total_stock
-      FROM inventory_items
-      WHERE item_status = 'active' AND array_length(category_path, 1) > 0
-      GROUP BY category_path[1]
+        cat.category as category,
+        COUNT(DISTINCT ii.product_slug) as product_count,
+        SUM(ii.stock) as total_stock
+      FROM inventory_items ii,
+           unnest(ii.category_path) WITH ORDINALITY AS cat(category, ordinality)
+      WHERE ii.item_status = 'active' AND cat.ordinality = 1
+      GROUP BY cat.category
       ORDER BY total_stock DESC
       LIMIT 20
-    `;
+    `);
 
     res.json({
       totalTenants,
       totalLocations,
       totalSKUs,
-      totalInventoryValue: Number(inventoryValue[0]?.total || 0),
+      totalInventoryValue: Number(inventoryValue),
       lowStockItems,
-      inTransitItems: Number(inTransitItems[0]?.total || 0),
+      inTransitItems: Number(inTransitItems),
       pendingTransfers,
       completedTransfersToday,
-      topProductsByStock: topProducts.map(p => ({
+      topProductsByStock: topProductsResult.rows.map((p: any) => ({
         product_slug: p.product_slug,
         name: p.name,
         total_stock: Number(p.total_stock)
       })),
-      categoryDistribution: categoryDistribution.map(c => ({
+      categoryDistribution: categoryDistributionResult.rows.map((c: any) => ({
         category: c.category,
         product_count: Number(c.product_count),
         total_stock: Number(c.total_stock)
@@ -133,39 +132,32 @@ router.get('/by-tenant', async (req: Request, res: Response) => {
     const limitNum = parseInt(limit as string);
     const offset = (pageNum - 1) * limitNum;
 
-    const tenants = await prisma.$queryRaw<Array<{
-      tenant_id: string;
-      tenant_name: string;
-      total_locations: bigint;
-      total_skus: bigint;
-      total_inventory_value: bigint;
-      low_stock_items: bigint;
-      pending_transfers: bigint;
-    }>>`
+    const pool = getDirectPool();
+
+    const tenantsResult = await pool.query(`
       SELECT 
         t.id as tenant_id,
         t.name as tenant_name,
-        COUNT(DISTINCT tl.id) as total_locations,
+        1 as total_locations,
         COUNT(DISTINCT ii.sku) as total_skus,
-        COALESCE(SUM(ii.stock * ii.price), 0) as total_inventory_value,
+        COALESCE(SUM(ii.stock * ii.price_cents), 0) as total_inventory_value,
         COUNT(CASE WHEN ii.stock <= 5 THEN 1 END) as low_stock_items,
         COUNT(DISTINCT CASE WHEN it.status = 'pending' THEN it.id END) as pending_transfers
       FROM tenants t
-      LEFT JOIN tenant_locations tl ON tl.tenant_id = t.id AND tl.is_active = true
       LEFT JOIN inventory_items ii ON ii.tenant_id = t.id AND ii.item_status = 'active'
       LEFT JOIN inventory_transfers it ON it.tenant_id = t.id AND it.status = 'pending'
       GROUP BY t.id, t.name
       ORDER BY total_inventory_value DESC
-      LIMIT ${limitNum}
-      OFFSET ${offset}
-    `;
+      LIMIT $1
+      OFFSET $2
+    `, [limitNum, offset]);
 
-    const totalResult = await prisma.$queryRaw<{ count: bigint }[]>`
+    const totalResult = await pool.query(`
       SELECT COUNT(*) as count FROM tenants
-    `;
+    `);
 
     res.json({
-      data: tenants.map(t => ({
+      data: tenantsResult.rows.map((t: any) => ({
         tenant_id: t.tenant_id,
         tenant_name: t.tenant_name,
         total_locations: Number(t.total_locations),
@@ -174,7 +166,7 @@ router.get('/by-tenant', async (req: Request, res: Response) => {
         low_stock_items: Number(t.low_stock_items),
         pending_transfers: Number(t.pending_transfers)
       })),
-      total: Number(totalResult[0]?.count || 0)
+      total: Number(totalResult.rows[0]?.count || 0)
     });
   } catch (error) {
     console.error('[AdminInventoryStats] Error getting tenant breakdown:', error);

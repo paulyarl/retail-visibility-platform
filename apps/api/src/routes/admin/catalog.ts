@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken, requirePlatformAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 import { parseSlugToJSON } from '../../lib/slug-generator';
+import { getDirectPool } from '../../utils/db-pool';
 
 const router = Router();
 
@@ -146,12 +147,9 @@ router.get('/stats', async (req: Request, res: Response) => {
       p.category_path.forEach(c => categorySet.add(c));
     });
 
-    // Get top adopted products via raw query
-    const topAdopted = await prisma.$queryRaw<Array<{
-      product_slug: string;
-      name: string;
-      adoption_count: bigint;
-    }>>`
+    // Get top adopted products via direct pool
+    const pool = getDirectPool();
+    const topAdoptedResult = await pool.query(`
       SELECT 
         gpc.product_slug,
         gpc.name,
@@ -162,7 +160,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       GROUP BY gpc.product_slug, gpc.name
       ORDER BY adoption_count DESC
       LIMIT 10
-    `;
+    `);
 
     res.json({
       totalProducts,
@@ -175,7 +173,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       merchantSourced,
       platformSourced,
       partnerSourced,
-      topAdoptedProducts: topAdopted.map(p => ({
+      topAdoptedProducts: topAdoptedResult.rows.map((p: any) => ({
         product_slug: p.product_slug,
         name: p.name,
         adoption_count: Number(p.adoption_count)
@@ -193,10 +191,8 @@ router.get('/stats', async (req: Request, res: Response) => {
  */
 router.get('/brands', async (req: Request, res: Response) => {
   try {
-    const brands = await prisma.$queryRaw<Array<{
-      brand: string | null;
-      product_count: bigint;
-    }>>`
+    const pool = getDirectPool();
+    const brandsResult = await pool.query(`
       SELECT 
         brand,
         COUNT(*) as product_count
@@ -204,9 +200,9 @@ router.get('/brands', async (req: Request, res: Response) => {
       WHERE brand IS NOT NULL AND brand != ''
       GROUP BY brand
       ORDER BY product_count DESC
-    `;
+    `);
 
-    res.json(brands.map(b => ({
+    res.json(brandsResult.rows.map((b: any) => ({
       brand: b.brand,
       product_count: Number(b.product_count)
     })));

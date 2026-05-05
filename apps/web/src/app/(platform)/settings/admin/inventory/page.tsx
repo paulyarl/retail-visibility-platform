@@ -339,17 +339,17 @@ export default function InventoryTransfersAdminPage() {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {lowStockAlerts.map((alert) => (
+                    {lowStockAlerts.map((alert: any) => (
                       <Table.Tr key={alert.id}>
-                        <Table.Td>{alert.tenant_name}</Table.Td>
-                        <Table.Td>{alert.location_name}</Table.Td>
-                        <Table.Td>{alert.product_name}</Table.Td>
+                        <Table.Td>{alert.tenants?.name || alert.tenant_name || '-'}</Table.Td>
+                        <Table.Td>{alert.location_name || '-'}</Table.Td>
+                        <Table.Td>{alert.name || alert.product_name}</Table.Td>
                         <Table.Td><code className="text-xs">{alert.sku}</code></Table.Td>
-                        <Table.Td>{alert.current_stock}</Table.Td>
-                        <Table.Td>{alert.threshold}</Table.Td>
+                        <Table.Td>{alert.stock ?? alert.current_stock}</Table.Td>
+                        <Table.Td>{alert.threshold || 5}</Table.Td>
                         <Table.Td>
-                          <Badge color={getAlertSeverityColor(alert.severity)}>
-                            {alert.severity.replace('_', ' ')}
+                          <Badge color={getAlertSeverityColor(alert.severity || 'low')}>
+                            {(alert.severity || 'low').replace('_', ' ')}
                           </Badge>
                         </Table.Td>
                       </Table.Tr>

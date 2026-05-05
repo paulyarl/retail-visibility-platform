@@ -36,9 +36,9 @@ router.get('/transfers', async (req: Request, res: Response) => {
       endDate
     } = req.query;
 
-    // For platform admin, we'll get transfers across all tenants or filter by specific tenant
     let transfers;
     if (tenantId) {
+      // Filter by specific tenant
       const result = await inventoryTransferService.getTransfers(tenantId as string, {
         status: status as string,
         sourceLocationId: sourceLocationId as string,
@@ -49,12 +49,24 @@ router.get('/transfers', async (req: Request, res: Response) => {
       });
       transfers = result;
     } else {
-      // Platform-wide view - would need to implement getAllTransfers method
-      // For now, return error suggesting to specify tenantId
-      return res.status(400).json({
-        success: false,
-        error: 'tenant_id_required',
-        message: 'Platform admin must specify tenant_id for transfers view'
+      // Platform-wide view - get all transfers
+      transfers = await prisma.inventory_transfers.findMany({
+        where: {
+          ...(status && { status: status as string }),
+          ...(sourceLocationId && { source_location_id: sourceLocationId as string }),
+          ...(targetLocationId && { target_location_id: targetLocationId as string }),
+          ...(sku && { sku: sku as string }),
+          ...(startDate && { initiated_at: { gte: new Date(startDate as string) } }),
+          ...(endDate && { initiated_at: { lte: new Date(endDate as string) } })
+        },
+        include: {
+          tenants_inventory_transfers_tenant_idTotenants: {
+            select: { id: true, name: true }
+          }
+        },
+        orderBy: { initiated_at: 'desc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string)
       });
     }
 
@@ -457,22 +469,39 @@ router.get('/alerts/low-stock', async (req: Request, res: Response) => {
       offset = 0
     } = req.query;
 
-    if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        error: 'missing_tenant_id',
-        message: 'Tenant ID is required'
+    let result;
+    if (tenantId) {
+      // Filter by specific tenant
+      result = await inventoryTransferService.getLowStockAlerts(
+        tenantId as string,
+        {
+          locationId: locationId as string,
+          limit: parseInt(limit as string),
+          offset: parseInt(offset as string)
+        }
+      );
+    } else {
+      // Platform-wide view - get all low stock items
+      result = await prisma.inventory_items.findMany({
+        where: {
+          item_status: 'active',
+          stock: { lte: 5, gt: 0 }
+        },
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          stock: true,
+          product_slug: true,
+          tenants: {
+            select: { id: true, name: true }
+          }
+        },
+        orderBy: { stock: 'asc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string)
       });
     }
-
-    const result = await inventoryTransferService.getLowStockAlerts(
-      tenantId as string,
-      {
-        locationId: locationId as string,
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string)
-      }
-    );
 
     res.json({
       success: true,
