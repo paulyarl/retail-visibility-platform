@@ -4,13 +4,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { Package, Ruler, Palette } from 'lucide-react';
 
 interface SpecificationsData {
-  weight?: string;
+  weight?: string | Record<string, string>;
   length?: string;
   width?: string;
   height?: string;
   color?: string;
   size?: string;
   material?: string;
+  [key: string]: string | Record<string, string> | undefined;
 }
 
 interface ProductSpecificationsProps {
@@ -19,6 +20,25 @@ interface ProductSpecificationsProps {
   warranty?: string;
   manufacturer?: string;
   className?: string;
+}
+
+// Helper to render a specification value (handles nested objects)
+function renderSpecValue(value: string | Record<string, string> | undefined): React.ReactNode {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    return (
+      <dl className="pl-2 space-y-1">
+        {Object.entries(value).map(([subKey, subValue]) => (
+          <div key={subKey} className="flex justify-between text-sm">
+            <dt className="text-neutral-600 dark:text-neutral-400 capitalize">{subKey.replace(/_/g, ' ')}</dt>
+            <dd className="text-neutral-800 dark:text-neutral-200">{subValue}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+  return null;
 }
 
 export default function ProductSpecifications({
@@ -56,25 +76,25 @@ export default function ProductSpecifications({
               {specifications.length && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Length</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.length}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.length)}</div>
                 </div>
               )}
               {specifications.width && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Width</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.width}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.width)}</div>
                 </div>
               )}
               {specifications.height && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Height</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.height}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.height)}</div>
                 </div>
               )}
               {specifications.weight && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Weight</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.weight}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.weight)}</div>
                 </div>
               )}
               {specifications.color && (
@@ -83,21 +103,31 @@ export default function ProductSpecifications({
                     <Palette className="w-3 h-3" />
                     Color
                   </div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.color}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.color)}</div>
                 </div>
               )}
               {specifications.size && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Size</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.size}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.size)}</div>
                 </div>
               )}
               {specifications.material && (
                 <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 col-span-2">
                   <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">Material</div>
-                  <div className="font-medium text-neutral-900 dark:text-white">{specifications.material}</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(specifications.material)}</div>
                 </div>
               )}
+              {/* Render any additional specifications not in the predefined list */}
+              {Object.entries(specifications)
+                .filter(([key]) => !['length', 'width', 'height', 'weight', 'color', 'size', 'material'].includes(key))
+                .filter(([, value]) => value)
+                .map(([key, value]) => (
+                  <div key={key} className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 col-span-2">
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1 capitalize">{key.replace(/_/g, ' ')}</div>
+                    <div className="font-medium text-neutral-900 dark:text-white">{renderSpecValue(value)}</div>
+                  </div>
+                ))}
             </div>
           </div>
         )}

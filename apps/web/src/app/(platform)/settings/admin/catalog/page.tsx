@@ -11,6 +11,7 @@ import AccessDenied from '@/components/AccessDenied';
 import { adminCatalogService, GlobalCatalogProduct, CatalogStats, ProductDetail } from '@/services/AdminCatalogSingletonService';
 
 export default function CatalogAdminPage() {
+  const [mounted, setMounted] = useState(false);
   const { hasAccess, loading: accessLoading } = useAccessControl(
     null,
     AccessPresets.PLATFORM_ADMIN_ONLY
@@ -21,11 +22,13 @@ export default function CatalogAdminPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ProductDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Filters
   const [slugType, setSlugType] = useState<string>('');
   const [status, setStatus] = useState<string>('active');
   const [brand, setBrand] = useState('');
+  const [category, setCategory] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState<string | null>('products');
@@ -34,7 +37,72 @@ export default function CatalogAdminPage() {
   const [brands, setBrands] = useState<Array<{ brand: string; product_count: number }>>([]);
   const [categories, setCategories] = useState<Array<{ category: string; product_count: number }>>([]);
 
-  const loadData = useCallback(async () => {
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Load data when access is granted
+  useEffect(() => {
+    if (!mounted || !hasAccess) return;
+    
+    let cancelled = false;
+    
+    async function fetchData() {
+      setLoading(true);
+      try {
+        console.log('[CatalogAdmin] Loading data...');
+        const [productsResult, statsResult, brandsResult, categoriesResult] = await Promise.all([
+          adminCatalogService.getProducts({
+            slugType: slugType as 'upc' | 'lpc' | undefined,
+            status: status as 'active' | 'inactive' | 'pending' | undefined,
+            brand: brand || undefined,
+            category: category || undefined,
+            search: search || undefined,
+            page,
+            limit: 50
+          }),
+          adminCatalogService.getCatalogStats(),
+          adminCatalogService.getBrands(),
+          adminCatalogService.getCategories()
+        ]);
+
+        if (cancelled) return;
+
+        console.log('[CatalogAdmin] Results:', { productsResult, statsResult, brandsResult, categoriesResult });
+
+        // Batch state updates
+        const newProducts = productsResult?.products || [];
+        const newStats = statsResult || null;
+        const newBrands = brandsResult || [];
+        const newCategories = categoriesResult || [];
+
+        console.log('[CatalogAdmin] Setting state - Products:', newProducts.length, 'Stats:', !!newStats);
+
+        setProducts(newProducts);
+        setStats(newStats);
+        setBrands(newBrands);
+        setCategories(newCategories);
+        setDataLoaded(true);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load catalog data:', error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    
+    fetchData();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, hasAccess, slugType, status, brand, category, search, page]);
+
+  // Manual reload function for filter button
+  const loadData = async () => {
     setLoading(true);
     try {
       const [productsResult, statsResult, brandsResult, categoriesResult] = await Promise.all([
@@ -42,6 +110,7 @@ export default function CatalogAdminPage() {
           slugType: slugType as 'upc' | 'lpc' | undefined,
           status: status as 'active' | 'inactive' | 'pending' | undefined,
           brand: brand || undefined,
+          category: category || undefined,
           search: search || undefined,
           page,
           limit: 50
@@ -51,30 +120,17 @@ export default function CatalogAdminPage() {
         adminCatalogService.getCategories()
       ]);
 
-      if (productsResult) {
-        setProducts(productsResult.products);
-      }
-      if (statsResult) {
-        setStats(statsResult);
-      }
-      if (brandsResult) {
-        setBrands(brandsResult);
-      }
-      if (categoriesResult) {
-        setCategories(categoriesResult);
-      }
+      setProducts(productsResult?.products || []);
+      setStats(statsResult || null);
+      setBrands(brandsResult || []);
+      setCategories(categoriesResult || []);
+      setDataLoaded(true);
     } catch (error) {
       console.error('Failed to load catalog data:', error);
     } finally {
       setLoading(false);
     }
-  }, [slugType, status, brand, search, page]);
-
-  useEffect(() => {
-    if (hasAccess) {
-      loadData();
-    }
-  }, [hasAccess, loadData]);
+  };
 
   const handleViewProduct = async (productSlug: string) => {
     setDetailLoading(true);
@@ -146,8 +202,17 @@ export default function CatalogAdminPage() {
     return <AccessDenied />;
   }
 
+  // Don't render until mounted (prevents hydration mismatch)
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <PageHeader
         title="Universal Product Catalog"
         description="Browse and manage the global product catalog"
@@ -269,7 +334,19 @@ export default function CatalogAdminPage() {
                   searchable
                   clearable
                 />
-                <Button onClick={loadData} loading={loading}>
+                <Select
+                  label="Category"
+                  placeholder="All categories"
+                  value={category}
+                  onChange={(value) => setCategory(value || '')}
+                  data={[
+                    { value: '', label: 'All' },
+                    ...categories.slice(0, 50).map(c => ({ value: c.category, label: `${c.category} (${c.product_count})` }))
+                  ]}
+                  searchable
+                  clearable
+                />
+                <Button onClick={loadData} loading={loading} variant='gradient' style={{ color: 'white' }}>
                   Apply Filters
                 </Button>
               </div>
@@ -308,7 +385,9 @@ export default function CatalogAdminPage() {
                         </Table.Td>
                         <Table.Td>{product.brand || '-'}</Table.Td>
                         <Table.Td>
-                          {product.category_path?.[0] || '-'}
+                          <span className="text-sm">
+                            {product.category_path?.join(' → ') || '-'}
+                          </span>
                         </Table.Td>
                         <Table.Td>
                           <code className="text-xs">{product.gtin_upc || '-'}</code>

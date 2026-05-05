@@ -450,7 +450,7 @@ export default function AdvancedSearch({
                   Clear All
                 </Button>
               )}
-              <Button onClick={handleSearch} disabled={loading}>
+              <Button onClick={handleSearch} disabled={loading} variant='gradient' style={{ color: 'white' }}>
                 Apply Filters
               </Button>
             </div>

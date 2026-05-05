@@ -473,7 +473,9 @@ export class ProductSingleton extends PublicApiSingleton {
       if (filters?.page) params.append('page', (filters.page || 1).toString());
       
       // Generate cache key based on filters
-      const cacheKey = `products-${JSON.stringify(filters || {})}`;
+      const cacheKey = `products-${params}`;
+      console.log(`params : ${params}`);
+      console.log(`filters : ${JSON.stringify(filters)}`);
       
       // Use the correct Public API endpoint with proper persistent caching
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
@@ -533,7 +535,7 @@ export class ProductSingleton extends PublicApiSingleton {
       transformedProducts.forEach((product: PublicProduct) => {
         this.products.set(`${product.id}-${product.tenantId}`, product);
       });
-      // console.log(`[ProductSingleton] Stored products:`, transformedProducts);
+      console.log(`[ProductSingleton] Stored products:`, transformedProducts);
       
       return transformedProducts;
     } catch (error) {

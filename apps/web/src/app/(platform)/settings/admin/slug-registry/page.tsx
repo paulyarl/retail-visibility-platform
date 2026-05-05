@@ -219,7 +219,7 @@ export default function SlugRegistryAdminPage() {
               ]}
               clearable
             />
-            <Button onClick={loadData} loading={loading}>
+            <Button onClick={loadData} loading={loading} variant='gradient' style={{ color: 'white' }}>
               Apply Filters
             </Button>
           </div>

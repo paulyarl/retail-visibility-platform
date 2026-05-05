@@ -5,6 +5,7 @@
  * Extends PublicApiSingleton for public product data access
  */
 
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface Product {
@@ -162,11 +163,16 @@ class ProductDataService extends PublicApiSingleton {
    */
   async fetchProduct(id: string): Promise<any> {
     try {
+      const cachekey = `product-data-${id}`;
+      console.log(`[ProductDataService] cachekey: ${cachekey}`);
       const response = await this.makeDefaultRequest<any>(
         `/api/public/products/${id}?include=variants,metadata,analytics,store`,
         {},
-        `product-data-${id}`,
-        this.cacheTTL
+        cachekey,
+        this.cacheTTL,{
+          context: AppContext.PRODUCT,
+          isolation: CacheIsolation.PRODUCT,
+        }
       );
       
       if (!response.success) {
@@ -175,6 +181,7 @@ class ProductDataService extends PublicApiSingleton {
       }
 
       const productData = response.data.data; // Fixed: product data is nested
+      // console.log(`[ProductDataService] productData: ${JSON.stringify(productData)}`);
       return productData;
     } catch (error) {
       console.error('[ProductDataService] Error in fetchProduct:', error);
@@ -187,10 +194,11 @@ class ProductDataService extends PublicApiSingleton {
    */
   async fetchTenantProfile(tenantId: string): Promise<any> {
     try {
+      const cachekey = `tenant-profile-${tenantId}`;
       const response = await this.makeDefaultRequest<any>(
         `/api/public/tenant/${tenantId}/profile`,
         {},
-        `tenant-profile-${tenantId}`,
+        cachekey,
         this.cacheTTL
       );
       

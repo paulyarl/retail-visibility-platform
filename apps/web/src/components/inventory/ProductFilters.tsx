@@ -775,7 +775,7 @@ export default function ProductFilters({ tenantId, onFilterChange, onClose }: Pr
 
   {/* Apply Button */}
   <div className="flex justify-end pt-4 border-t">
-    <Button onClick={applyFilters} className="w-full md:w-auto">
+    <Button onClick={applyFilters} className="w-full md:w-auto" variant='gradient' style={{ color: 'white' }}>
       Apply Filters
     </Button>
   </div>

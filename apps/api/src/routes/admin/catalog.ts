@@ -53,6 +53,7 @@ router.get('/products', async (req: Request, res: Response) => {
       where.brand = { equals: brand, mode: 'insensitive' };
     }
     if (category) {
+      // Category filter - matches any category in the category_path array
       where.category_path = { has: category as string };
     }
     if (hasUpc === 'true') {

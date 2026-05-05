@@ -52,7 +52,7 @@ router.get('/transfers', async (req: Request, res: Response) => {
       // Platform-wide view - get all transfers
       transfers = await prisma.inventory_transfers.findMany({
         where: {
-          ...(status && { status: status as string }),
+          ...(status && { status: status as any }),
           ...(sourceLocationId && { source_location_id: sourceLocationId as string }),
           ...(targetLocationId && { target_location_id: targetLocationId as string }),
           ...(sku && { sku: sku as string }),

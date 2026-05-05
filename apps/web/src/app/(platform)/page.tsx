@@ -934,7 +934,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   if (!user || !canManageTenantSettings(user, selectedTenantId)) return null;
                   return (
                     <Link href={`/t/${selectedTenantId}/settings/hours`} className="w-full sm:w-auto">
-                      <Button variant="secondary" size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
+                      <Button variant='gradient' style={{ color: 'white' }} size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
                         {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
                       </Button>
                     </Link>

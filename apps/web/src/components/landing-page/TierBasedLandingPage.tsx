@@ -1671,9 +1671,22 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 </div>
               )}
               {product.specifications && Object.entries(product.specifications).map(([key, value]) => (
-                <div key={key} className="flex justify-between py-2 border-b border-neutral-200">
+                <div key={key} className="py-2 border-b border-neutral-200">
                   <dt className="font-medium text-neutral-700 capitalize">{key.replace(/_/g, ' ')}</dt>
-                  <dd className="text-neutral-900">{String(value)}</dd>
+                  <dd className="text-neutral-900 mt-1">
+                    {typeof value === 'object' && value !== null ? (
+                      <dl className="pl-4 space-y-1">
+                        {Object.entries(value as Record<string, any>).map(([subKey, subValue]) => (
+                          <div key={subKey} className="flex justify-between text-sm">
+                            <dt className="text-neutral-600 capitalize">{subKey.replace(/_/g, ' ')}</dt>
+                            <dd className="text-neutral-800">{String(subValue)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      String(value)
+                    )}
+                  </dd>
                 </div>
               ))}
             </dl>

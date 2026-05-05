@@ -527,9 +527,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 if (!user || !canManageSettings) return null;
                 return (
                   <Link href={`/t/${tenantId}/settings/hours`} className="w-full sm:w-auto">
-                    <button className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap">
+                    <Button variant='gradient' style={{ color: 'white' }} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap">
                       {hoursStatus ? '⚙️ Manage Hours' : '➕ Set Hours'}
-                    </button>
+                    </Button>
                   </Link>
                 );
               })()}
