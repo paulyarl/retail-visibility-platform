@@ -197,14 +197,53 @@ export function LocationAvailabilitySection({
     return null;
   }
 
+  // Get the current/preferred tenant location for distance display
+  const currentLocation = availability?.locations.find(
+    loc => loc.tenantId === preferredTenantId
+  );
+
   // Filter out the current/preferred tenant - only show OTHER locations
   const otherLocations = availability?.locations.filter(
     loc => loc.tenantId !== preferredTenantId
   ) || [];
 
-  // Don't render if no other locations exist - this page IS the authoritative page
-  if (otherLocations.length === 0) {
+  // Don't render if no availability data at all
+  if (!availability || availability.locations.length === 0) {
     return null;
+  }
+
+  // If only the current location exists, show a simple distance display
+  if (otherLocations.length === 0 && currentLocation) {
+    const hasUserLocation = userLocation && currentLocation.distance < 999;
+    
+    return (
+      <Card withBorder p="md" className="bg-gradient-to-r from-blue-50 to-indigo-50">
+        <Group justify="space-between">
+          <Group>
+            <ThemeIcon color="blue" variant="light" size="lg">
+              <IconMapPin size={20} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={600} size="sm">Product Proximity</Text>
+              {hasUserLocation ? (
+                <Text size="xs" c="dimmed">
+                  {formatDistance(currentLocation.distance)} from you
+                </Text>
+              ) : (
+                <Text size="xs" c="dimmed">
+                  {currentLocation.city}{currentLocation.address ? `, ${currentLocation.address}` : ''}
+                </Text>
+              )}
+            </Box>
+          </Group>
+          {currentLocation.availability === 'in_stock' && (
+            <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>
+              In Stock
+            </Badge>
+          )}
+        </Group>
+      </Card>
+    );
   }
 
   const summary = locationAvailabilityService.getAvailabilitySummary(otherLocations);

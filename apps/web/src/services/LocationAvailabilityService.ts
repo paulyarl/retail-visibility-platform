@@ -349,19 +349,19 @@ class LocationAvailabilityService extends PublicApiSingleton {
     options: LocationQueryOptions = {}
   ): Promise<MultiLocationAvailability | null> {
     const identifierType = this.getIdentifierType(identifier);
-    console.log(`[LocationAvailabilityService] Identifier type: ${identifierType}`);
+    // console.log(`[LocationAvailabilityService] Identifier type: ${identifierType}`);
     
     if (identifierType === 'product_slug') {
       // Use slug endpoint for product_slug format
-      console.log(`[LocationAvailabilityService] Using slug endpoint for: ${identifier}`);
+      // console.log(`[LocationAvailabilityService] Using slug endpoint for: ${identifier}`);
       return this.getProductAvailability(identifier, userLocation, options);
     } else if (identifierType === 'sku') {
       // Use SKU endpoint for SKU format
-      console.log(`[LocationAvailabilityService] Using SKU endpoint for: ${identifier}`);
+      // console.log(`[LocationAvailabilityService] Using SKU endpoint for: ${identifier}`);
       return this.getAvailabilityBySku(identifier, userLocation, options);
     }
 
-    console.log(`[LocationAvailabilityService] Unknown identifier type: ${identifier}`);
+    // console.log(`[LocationAvailabilityService] Unknown identifier type: ${identifier}`);
     return null;
   }
 }

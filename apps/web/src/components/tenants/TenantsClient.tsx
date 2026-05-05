@@ -182,7 +182,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     const endIndex = startIndex + pageSize;
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
-  console.log(`[TenantsClient] paginatedTenants:`, paginatedTenants);
+  // console.log(`[TenantsClient] paginatedTenants:`, paginatedTenants);
 
   // Reset to page 1 when status filter changes (client-side filtering only)
   useEffect(() => {
@@ -278,12 +278,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       }
       
       const newTenant = responseData as Tenant;
-      console.log('[TenantsClient] Tenant created:', newTenant.id, newTenant.name);
+      // console.log('[TenantsClient] Tenant created:', newTenant.id, newTenant.name);
       
       // Immediately add the new tenant to the list for instant UI update
       setTenants(prev => {
         const updated = [...prev, newTenant];
-        console.log('[TenantsClient] Tenants after adding new one:', updated.length);
+        // console.log('[TenantsClient] Tenants after adding new one:', updated.length);
         return updated;
       });
       
@@ -304,7 +304,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         icon: <IconCheck size={16} />,
         autoClose: 4000,
       });
-      console.log('[TenantsClient] New tenant added successfully:', newTenant.name);
+      // console.log('[TenantsClient] New tenant added successfully:', newTenant.name);
       
       // If this was from onboarding flow, redirect to profile page
       if (hasOnboardingData) {

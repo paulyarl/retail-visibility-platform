@@ -83,7 +83,7 @@ class VariantsSingleton extends TenantApiSingleton {
         { method: 'GET' }
       ) as any;
 
-      console.log('[VariantsSingleton] Fetched variants for item:', itemId, response.variants?.length || 0);
+      // console.log('[VariantsSingleton] Fetched variants for item:', itemId, response.variants?.length || 0);
       
       return {
         success: true,
@@ -118,7 +118,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // Invalidate cache after creating variant
       this.invalidateCache(`/api/items/${itemId}/variants`);
 
-      console.log('[VariantsSingleton] Variant created successfully:', itemId);
+      // console.log('[VariantsSingleton] Variant created successfully:', itemId);
       
       return {
         success: true,
@@ -153,7 +153,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // Invalidate all variant caches after update
       this.clearCache();
 
-      console.log('[VariantsSingleton] Variant updated successfully:', variantId);
+      // console.log('[VariantsSingleton] Variant updated successfully:', variantId);
       
       return {
         success: true,
@@ -182,7 +182,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // Invalidate all variant caches after deletion
       this.clearCache();
 
-      console.log('[VariantsSingleton] Variant deleted successfully:', variantId);
+      // console.log('[VariantsSingleton] Variant deleted successfully:', variantId);
       
       return {
         success: true,
@@ -216,7 +216,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // Invalidate cache after bulk creation
       this.invalidateCache(`/api/items/${itemId}/variants`);
 
-      console.log('[VariantsSingleton] Bulk variants created successfully:', itemId, variants.length);
+      // console.log('[VariantsSingleton] Bulk variants created successfully:', itemId, variants.length);
       
       return {
         success: true,
@@ -251,7 +251,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // Invalidate all variant caches after bulk update
       this.clearCache();
 
-      console.log('[VariantsSingleton] Bulk variants updated successfully:', updates.length);
+      // console.log('[VariantsSingleton] Bulk variants updated successfully:', updates.length);
       
       return {
         success: true,
@@ -290,19 +290,19 @@ class VariantsSingleton extends TenantApiSingleton {
         }
       ) as any;
 
-      console.log('[VariantsSingleton] Raw API response type:', typeof response);
-      console.log('[VariantsSingleton] Raw API response keys:', response ? Object.keys(response) : 'null');
-      console.log('[VariantsSingleton] Raw API response:', JSON.stringify(response));
+      // console.log('[VariantsSingleton] Raw API response type:', typeof response);
+      // console.log('[VariantsSingleton] Raw API response keys:', response ? Object.keys(response) : 'null');
+      // console.log('[VariantsSingleton] Raw API response:', JSON.stringify(response));
 
       // Handle response - API may wrap response in "data" object
       const apiData = response.data || response;
-      console.log('[VariantsSingleton] apiData:', JSON.stringify(apiData));
-      console.log('[VariantsSingleton] apiData.variants:', JSON.stringify(apiData.variants));
+      // console.log('[VariantsSingleton] apiData:', JSON.stringify(apiData));
+      // console.log('[VariantsSingleton] apiData.variants:', JSON.stringify(apiData.variants));
       
       // Invalidate all variant caches after bulk operations
       this.clearCache();
 
-      console.log('[VariantsSingleton] Bulk variant operations completed:', operations.length);
+      // console.log('[VariantsSingleton] Bulk variant operations completed:', operations.length);
       
       const result = {
         success: apiData.success || false,
@@ -312,7 +312,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: `Bulk operations completed: ${apiData.success_count || 0} successful, ${apiData.error_count || 0} failed`,
       };
       
-      console.log('[VariantsSingleton] Returning result:', JSON.stringify(result));
+      // console.log('[VariantsSingleton] Returning result:', JSON.stringify(result));
       return result;
     } catch (error) {
       console.error('[VariantsSingleton] Error performing bulk variant operations:', error);
@@ -333,7 +333,7 @@ class VariantsSingleton extends TenantApiSingleton {
         { method: 'GET' }
       ) as any;
 
-      console.log('[VariantsSingleton] Variant stats fetched:', itemId);
+      // console.log('[VariantsSingleton] Variant stats fetched:', itemId);
       
       return {
         success: true,

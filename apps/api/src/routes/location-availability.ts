@@ -16,6 +16,32 @@ const router = Router();
 const EARTH_RADIUS_MILES = 3959;
 const EARTH_RADIUS_KM = 6371;
 
+// Location availability type
+interface LocationAvailabilityItem {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug?: string;
+  tenantLogo?: string | null;
+  locationId?: string | null;
+  address: string;
+  city: string;
+  distance: number;
+  stock: number;
+  availability: 'in_stock' | 'out_of_stock' | 'limited' | 'backordered';
+  priceCents: number;
+  price: number;
+  currency: string;
+  sku: string;
+  productName: string;
+  productSlug: string;
+  universalSku: string;
+  isPreferred?: boolean;
+  isNearest?: boolean;
+  hasLowStock?: boolean;
+  isOnSale?: boolean;
+  discountPercentage?: string | number;
+}
+
 // Validation schemas
 const availabilityQuerySchema = z.object({
   slug: z.string().min(1).optional(),
@@ -112,7 +138,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
 
     const productSlug = slugRegistry.product_slug;
     const universalSku = slugRegistry.universal_sku || slugRegistry.original_sku || slug;
-    console.log(`[LocationAvailability] Found slug registry for ${slug}: product_slug=${productSlug}`);
+    // console.log(`[LocationAvailability] Found slug registry for ${slug}: product_slug=${productSlug}`);
 
     // Query mv_global_discovery for availability across all tenants
     // This is the authoritative source for product availability
@@ -162,7 +188,16 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       locationQuery += ` AND in_stock = true`;
     }
     
+    // console.log(`[LocationAvailability] Query: ${locationQuery}`);
+    // console.log(`[LocationAvailability] Params:`, queryParams);
+    
     const discoveryResult = await pool.query(locationQuery, queryParams);
+    
+    // console.log(`[LocationAvailability] Found ${discoveryResult.rows.length} locations`);
+    // if (discoveryResult.rows.length > 0) {
+      // console.log(`[LocationAvailability] First row:`, JSON.stringify(discoveryResult.rows[0], null, 2));
+      // console.log(`[LocationAvailability] User location: lat=${userLat}, lng=${userLng}`);
+    // }
     
     if (discoveryResult.rows.length === 0) {
       return res.status(404).json({
@@ -172,7 +207,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     }
 
     // Transform discovery results to location availability
-    let locations = discoveryResult.rows.map((row: any) => {
+    let locations: LocationAvailabilityItem[] = discoveryResult.rows.map((row: any) => {
       let distance: number | null = null;
       if (userLat !== null && userLng !== null && row.tenant_latitude && row.tenant_longitude) {
         distance = calculateDistance(userLat, userLng, row.tenant_latitude, row.tenant_longitude);
@@ -359,7 +394,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
     const discoveryResult = await pool.query(locationQuery, queryParams);
     
     // Transform to location availability
-    let locations = discoveryResult.rows.map((row: any) => {
+    let locations: LocationAvailabilityItem[] = discoveryResult.rows.map((row: any) => {
       let distance: number | null = null;
       if (userLatVal !== null && userLngVal !== null && row.tenant_latitude && row.tenant_longitude) {
         distance = calculateDistance(userLatVal, userLngVal, row.tenant_latitude, row.tenant_longitude);
