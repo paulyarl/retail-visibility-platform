@@ -272,9 +272,9 @@ export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
  * Generates organization IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateOrganizationId(ownerId: string = 'oid'): string {
+export function generateOrganizationId(ownerId: string = 'org'): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `org-${ownerId}-${nanoid()}`;
+  return `org-${generateOwnerKey(ownerId)}-${nanoid()}`;
 }
 
 /**
@@ -336,9 +336,9 @@ export function generateInvoiceId(tenantId: string): string {
  * Generates subscription payment IDs
  * Format: spay-invoiceId-abc (16 chars)
  */
-export function generateSubscriptionPaymentId(invoiceId: string): string {
+export function generateSubscriptionPaymentId(invoiceId: string,tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `subpay-${invoiceId}-${nanoid()}`;
+  return `subpay-${generateTenantKey(tenantId)}-${invoiceId}-${nanoid()}`;
 }
 
 /**
@@ -354,18 +354,18 @@ export function generateTierPricingId(): string {
  * Generates order item IDs
  * Format: oiid-abc123 (12 chars)
  */
-export function generateOrderItemId(id: string): string {
+export function generateOrderItemId(id: string,tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `orderitem-${id}-${nanoid()}`;
+  return `orderitem-${generateTenantKey(tenantId)}-${id}-${nanoid()}`;
 }
 
 /**
  * Generates order item history IDs
  * Format: oih-abc123 (12 chars)
  */
-export function generateOrderItemHistoryId(id: string): string {
+export function generateOrderItemHistoryId(id: string,tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
-  return `orderhist-${id}-${nanoid()}`;
+  return `orderhist-${generateTenantKey(tenantId)}-${id}-${nanoid()}`;
 }
 
 /**
@@ -479,6 +479,32 @@ export function generateTenantKey(tenantId: string): string {
   let tempHash = Math.abs(hash);
   let key = '';
   for (let i = 0; i < 4; i++) {
+    key += chars[tempHash % chars.length];
+    tempHash = Math.floor(tempHash / chars.length);
+  }
+  
+  return key;
+}
+
+/**
+ * Generate an owner key from owner ID
+ * Converts owner ID to a 5-character alphanumeric key
+ */
+export function generateOwnerKey(ownerId: string): string {
+  if (!ownerId) return 'UNKNN';
+  
+  // Use a simple hash to create consistent 5-char key from owner ID
+  let hash = 0;
+  for (let i = 0; i < ownerId.length; i++) {
+    hash = ((hash << 5) - hash) + ownerId.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert hash to 5-character alphanumeric key
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tempHash = Math.abs(hash);
+  let key = '';
+  for (let i = 0; i < 5; i++) {
     key += chars[tempHash % chars.length];
     tempHash = Math.floor(tempHash / chars.length);
   }

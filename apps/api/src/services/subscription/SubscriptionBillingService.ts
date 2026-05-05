@@ -1288,7 +1288,7 @@ export class SubscriptionBillingService {
     });
 
     // Create payment record
-    const paymentId = generateSubscriptionPaymentId(id);
+    const paymentId = generateSubscriptionPaymentId(id, tenantId);
     await prisma.subscription_payments.create({
       data: {
         id: paymentId,

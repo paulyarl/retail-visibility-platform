@@ -5,7 +5,7 @@
  * Used by both CLI seeding script and Quick Start API endpoint.
  */
 
-import { generateItemId, generateQuickStart } from './id-generator';
+import { generateItemId,generateTenantItemId, generateQuickStart } from './id-generator';
 import { generateAutoSKU } from './sku-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 import { productCacheService } from '../services/ProductCacheService';
@@ -898,7 +898,7 @@ export async function generateQuickStartProducts(
         ? 'inactive' as const
         : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
-      const itemId = generateItemId();
+      const itemId = generateTenantItemId(tenant_id);
       
       // Build metadata with enriched AI content (following scanner enrichment pattern)
       const metadata: any = {};
@@ -995,7 +995,7 @@ export async function generateQuickStartProducts(
           
           const created = await prismaClient.inventory_items.create({ 
             data: {
-              id: generateItemId(),
+              id: generateTenantItemId(tenant_id),
               ...cleanData,
               updated_at: new Date(),
             }

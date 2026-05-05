@@ -190,7 +190,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       // Create order items
       await tx.order_items.createMany({
         data: calculatedItems.map((item) => ({
-          id: generateOrderItemId(newOrder.id),
+          id: generateOrderItemId(newOrder.id, tenant_id),
           order_id: newOrder.id,
           ...item,
           updated_at: new Date(),
@@ -201,7 +201,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       // Create initial status history
       await tx.order_status_history.create({
         data: {
-          id: generateOrderItemHistoryId(newOrder.id),
+          id: generateOrderItemHistoryId(newOrder.id, tenant_id),
           order_id: newOrder.id,
           from_status: null,
           to_status: 'draft',
@@ -435,7 +435,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       if (order_status && order_status !== currentOrder.order_status) {
         await tx.order_status_history.create({
           data: {
-            id: generateOrderItemHistoryId(id),
+            id: generateOrderItemHistoryId(id, user.userId),
             order_id: id,
             from_status: currentOrder.order_status,
             to_status: order_status,

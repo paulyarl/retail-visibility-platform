@@ -302,7 +302,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         // Line items
         order_items: {
           create: line_items.map((item, index) => ({
-            id: generateOrderItemId(orderId),
+            id: generateOrderItemId(orderId, tenant_id),
             sku: item.sku,
             name: item.name,
             description: item.description,

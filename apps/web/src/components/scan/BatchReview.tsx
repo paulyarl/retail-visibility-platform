@@ -39,11 +39,11 @@ export default function BatchReview({
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
 
   const filteredResults = showDuplicatesOnly
-    ? results.filter(r => r.status === 'duplicate')
-    : results;
+    ? results.filter(r => r?.status === 'duplicate')
+    : results.filter(r => r);
 
-  const duplicateCount = results.filter(r => r.status === 'duplicate').length;
-  const validCount = results.length - duplicateCount;
+  const duplicateCount = results.filter(r => r?.status === 'duplicate').length;
+  const validCount = filteredResults.length - duplicateCount;
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);

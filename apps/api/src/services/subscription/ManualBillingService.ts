@@ -255,7 +255,7 @@ export class ManualBillingService {
       }
 
       // Create payment record
-      const paymentId = generateSubscriptionPaymentId(data.invoiceId);
+      const paymentId = generateSubscriptionPaymentId(data.invoiceId, data.invoiceId);
       
       await prisma.subscription_payments.create({
         data: {
