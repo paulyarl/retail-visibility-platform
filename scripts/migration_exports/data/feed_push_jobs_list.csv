@@ -1,0 +1,3 @@
+id,tenant_id,sku,job_status,retry_count,max_retries,last_attempt,next_retry,error_message,error_code,payload,result,created_at,updated_at,completed_at
+fpid-2o7mi7,tid-yrkd470n,,queued,0,5,,,,,{},,2025-12-15 10:18:18.835+00,2025-12-15 10:18:18.833+00,
+fpid-u7pora,tid-yrkd470n,,queued,0,5,,,,,{},,2025-12-15 10:18:43.243+00,2025-12-15 10:18:43.241+00,

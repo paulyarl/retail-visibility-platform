@@ -1,0 +1,4 @@
+id,name,owner_id,created_at,updated_at,subscription_tier,subscription_status,trial_ends_at,subscription_ends_at,stripe_customer_id,stripe_subscription_id,max_locations,max_total_skus,metadata
+oid-uid-zqe5ns5k-kbknn0,NBA CREW,uid-zqe5ns5k,2026-03-06 11:35:35.629,2026-04-19 10:36:58.106,organization,active,2026-04-05 11:35:35.628,,,,4,2500,
+org_test_1766071990521,Demo Retail Chain,admin_test,2025-12-18 15:33:10.523,2026-04-27 12:17:25.846,trial_chain_starter,active,,,,,5,12500,
+org-KQJ4OXF3,Acme Chain,user-r7om5voh,2025-12-06 14:11:28.895,2026-05-01 11:18:53.507,chain_starter,active,2026-01-05 14:11:28.893,,,,5,2500,

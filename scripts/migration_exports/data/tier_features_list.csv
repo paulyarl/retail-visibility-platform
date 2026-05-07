@@ -1,0 +1,396 @@
+id,tier_id,feature_key,feature_name,is_enabled,is_inherited,metadata,created_at,updated_at
+tfid-qw5i3,tier_chain_professional,qr_codes_2048,Qr Codes 2048,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ywnz0,tier_chain_professional,image_gallery_10,Image Gallery 10,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-4gbad,tier_chain_professional,advanced_analytics,Advanced Analytics,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-alrq0,tier_chain_professional,hero_location,Hero Location,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-zq4no,tier_chain_professional,category_quick_start,Category Quick Start,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-nzz7j,tier_chain_professional,categories,Categories,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-tn1dq,tier_chain_professional,bulk_import,Bulk Import,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ub89w,tier_chain_professional,basic_search,Basic Search,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-rrj0x,tier_chain_professional,google_sync,Google Sync,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-z4q3x,tier_chain_professional,manual_barcode,Manual Barcode,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-eda9w,tier_chain_professional,manual_entry,Manual Entry,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ccxgj,tier_chain_professional,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-bfjvp,tier_chain_professional,clover_sync,Clover Sync,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-bnzgy,tier_chain_professional,square_sync,Square Sync,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-q2uj0,tier_chain_professional,propagation_brand,Propagation Brand,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-8yflq,tier_chain_professional,google_shopping,Google Shopping,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-e11fy,tier_chain_professional,google_merchant_center,Google Merchant Center,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-e0t9r,tier_chain_professional,basic_product_pages,Basic Product Pages,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-5qmx1,tier_chain_professional,qr_codes_512,Qr Codes 512,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-pjms7,tier_chain_professional,performance_analytics,Performance Analytics,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-0s4kd,tier_chain_professional,storefront,Storefront,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-6nnmn,tier_chain_professional,product_search,Product Search,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-m9ul2,tier_chain_professional,mobile_responsive,Mobile Responsive,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-cwnua,tier_chain_professional,enhanced_seo,Enhanced Seo,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ms2kt,tier_chain_professional,basic_categories,Basic Categories,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-2fhwy,tier_chain_professional,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-nm0jq,tier_chain_professional,barcode_scan,Barcode Scan,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-evuux,tier_chain_professional,gbp_integration,Gbp Integration,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-46kjp,tier_chain_professional,custom_branding,Custom Branding,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-rfb7y,tier_chain_professional,business_logo,Business Logo,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-bfcfo,tier_chain_professional,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ruavk,tier_chain_professional,image_gallery_5,Image Gallery 5,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-12skn,tier_chain_professional,interactive_maps,Interactive Maps,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-8tl56,tier_chain_professional,privacy_mode,Privacy Mode,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-b61v1,tier_chain_professional,custom_marketing_copy,Custom Marketing Copy,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-23ag2,tier_chain_professional,priority_support,Priority Support,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-79k7r,tier_chain_professional,chain_branding,Chain Branding,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-clus8,tier_chain_professional,franchise_management,Franchise Management,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-6jzhf,tier_chain_professional,chain_analytics,Chain Analytics,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-gvh8f,tier_chain_professional,regional_management,Regional Management,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-v1sd8,tier_chain_professional,chain_promotions,Chain Promotions,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-g7dbn,tier_chain_professional,master_catalog,Master Catalog,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-bd0vv,tier_chain_professional,location_templates,Location Templates,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-apj3q,tier_chain_professional,product_scanning,Product Scanning,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-4o9z7,tier_chain_professional,propagation,Propagation,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-5hpyj,tier_chain_professional,propagation_products,Propagation Products,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-8x96h,tier_chain_professional,propagation_hours,Propagation Hours,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-cl4s3,tier_chain_professional,propagation_categories,Propagation Categories,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-965cn,tier_chain_professional,bulk_operations,Bulk Operations,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-2yi85,tier_chain_professional,centralized_inventory,Centralized Inventory,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ph2n7,tier_chain_professional,multi_location,Multi Location,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-fnzrd,tier_chain_professional,organization_dashboard,Organization Dashboard,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-spm5t,tier_professional,google_shopping,Google Shopping,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-9g9ws,tier_professional,google_merchant_center,Google Merchant Center,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-io8s2,tier_professional,basic_product_pages,Basic Product Pages,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-agjuj,tier_professional,qr_codes_512,Qr Codes 512,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-89rnj,tier_professional,performance_analytics,Performance Analytics,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-px5v7,tier_professional,storefront,Storefront,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-utif9,tier_professional,product_search,Product Search,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-q9un3,tier_professional,mobile_responsive,Mobile Responsive,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-r151k,tier_professional,enhanced_seo,Enhanced Seo,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-3c043,tier_professional,basic_categories,Basic Categories,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-htfx5,tier_professional,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-uy0uo,tier_professional,product_scanning,Product Scanning,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-ajwbk,tier_professional,gbp_integration,Gbp Integration,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-jlez0,tier_professional,custom_branding,Custom Branding,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-ifxp9,tier_professional,business_logo,Business Logo,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-60v2q,tier_professional,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-sv0mk,tier_professional,image_gallery_5,Image Gallery 5,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-61cnj,tier_professional,interactive_maps,Interactive Maps,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-b7hw2,tier_professional,privacy_mode,Privacy Mode,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-nsg7b,tier_professional,custom_marketing_copy,Custom Marketing Copy,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-i29vp,tier_professional,priority_support,Priority Support,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-qr84e,tier_professional,square_sync,Square Sync,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-1fui5,tier_professional,clover_sync,Clover Sync,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-01mrx,tier_professional,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-cz56y,tier_professional,manual_entry,Manual Entry,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-7dfd8,tier_professional,manual_barcode,Manual Barcode,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-seb0q,tier_professional,google_sync,Google Sync,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-fv2s2,tier_professional,category_quick_start,Category Quick Start,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-1y02g,tier_professional,categories,Categories,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-r6gf1,tier_chain_professional,propagation_gbp_sync,Propagation Gbp Sync,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-ymie7,tier_chain_professional,propagation_profile,Propagation Profile,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-jdmr4,tier_chain_professional,propagation_flags,Propagation Flags,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-qusc5,tier_chain_professional,propagation_roles,Propagation Roles,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-44qnp,tier_professional,bulk_import,Bulk Import,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-humgk,tier_chain_professional,payment_client_credentials,Payment Client Credentials,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-5h5ge,tier_chain_professional,cross_location_reporting,Cross Location Reporting,t,f,,2026-04-19 19:28:23.191,2026-04-19 19:28:23.191
+tfid-bbmq1,tier_professional,basic_search,Basic Search,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-ih64j,tier_professional,barcode_scan,Barcode Scan,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-j7q3h,tier_professional,payment_client_credentials,Payment Client Credentials,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-swgx9,tier_professional,multi_location,Multi Location,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-rf5tw,tier_professional,bulk_operations,Bulk Operations,t,f,,2026-04-30 13:21:58.319,2026-04-30 13:21:58.319
+tfid-n04d0,tid-k1t8,storefront,Storefront,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-537ro,tid-k1t8,square_sync,Square Sync,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-z3ird,tid-k1t8,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-mvs4i,tid-k1t8,qr_codes_512,Qr Codes 512,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-ye3b4,tid-k1t8,product_search,Product Search,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-xbo44,tid-k1t8,performance_analytics,Performance Analytics,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-jo0xi,tid-k1t8,mobile_responsive,Mobile Responsive,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-6dpu1,tid-k1t8,manual_entry,Manual Entry,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-17nzr,tid-k1t8,manual_barcode,Manual Barcode,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-34h90,tid-k1t8,image_gallery_5,Image Gallery 5,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-tafvk,tid-k1t8,google_sync,Google Sync,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-ig68j,tid-k1t8,google_shopping,Google Shopping,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-nsg42,tid-k1t8,google_merchant_center,Google Merchant Center,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-pg7we,tid-k1t8,enhanced_seo,Enhanced Seo,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-oz891,tid-k1t8,clover_sync,Clover Sync,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-0o8hk,tid-k1t8,category_quick_start,Category Quick Start,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-m4kq8,tier_starter,barcode_scan,Barcode Scan,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-7rfuw,tier_starter,basic_categories,Basic Categories,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-wqz7b,tier_starter,basic_product_pages,Basic Product Pages,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-us6tj,tier_starter,basic_search,Basic Search,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-8xb1i,tier_starter,bulk_import,Bulk Import,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-u51eq,tier_starter,categories,Categories,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+inherited_1774444960859,tier_starter,category_quick_start,Category Quick Start,t,t,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-lsvbw,tier_starter,clover_sync,Clover Sync,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-w78su,tier_starter,enhanced_seo,Enhanced Seo,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-epbso,tier_starter,google_merchant_center,Google Merchant Center,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-adijt,tier_starter,google_shopping,Google Shopping,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-i5ujp,tier_starter,google_sync,Google Sync,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-pafa0,tier_starter,image_gallery_5,Image Gallery 5,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-zwzd5,tier_starter,manual_barcode,Manual Barcode,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-zftvn,tier_starter,manual_entry,Manual Entry,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-j1w4h,tier_starter,mobile_responsive,Mobile Responsive,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-jmeiw,tier_starter,performance_analytics,Performance Analytics,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-fd4qe,tier_starter,product_search,Product Search,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-tmoiu,tier_starter,qr_codes_512,Qr Codes 512,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-6rwkl,tier_starter,quick_start_wizard,Quick Start Wizard,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-gmzww,tier_starter,square_sync,Square Sync,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-s63k6,tier_starter,storefront,Storefront,t,f,,2026-03-25 13:27:54.614,2026-03-25 13:27:54.614
+tfid-6g6yj,tid-k1t8,categories,Categories,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-7g7gr,tid-k1t8,bulk_import,Bulk Import,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-c3dlz,tid-k1t8,basic_search,Basic Search,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-nnwp0,tid-k1t8,basic_product_pages,Basic Product Pages,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-0hg8g,tid-k1t8,basic_categories,Basic Categories,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-w323a,tid-k1t8,barcode_scan,Barcode Scan,t,f,,2026-04-30 13:22:35.706,2026-04-30 13:22:35.706
+tfid-14f3v,tier_enterprise,barcode_scan,Barcode Scan,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-f0jqt,tier_enterprise,bulk_operations,Bulk Operations,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-p6u81,tier_enterprise,multi_location,Multi Location,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-uby0u,tier_enterprise,google_shopping,Google Shopping,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-2ckpg,tier_enterprise,google_merchant_center,Google Merchant Center,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-juqa2,tier_enterprise,basic_product_pages,Basic Product Pages,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-zhguq,tier_enterprise,qr_codes_512,Qr Codes 512,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-e96qj,tier_enterprise,performance_analytics,Performance Analytics,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-9mls5,tier_enterprise,storefront,Storefront,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-gfnws,tier_enterprise,product_search,Product Search,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-jrjur,tier_enterprise,mobile_responsive,Mobile Responsive,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-oa728,tier_enterprise,enhanced_seo,Enhanced Seo,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-z1yem,tier_enterprise,basic_categories,Basic Categories,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-lxz1u,tier_enterprise,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-0uq5b,tier_enterprise,product_scanning,Product Scanning,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-jqhqi,tier_enterprise,gbp_integration,Gbp Integration,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-55ujj,tier_enterprise,custom_branding,Custom Branding,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-0xv5d,tier_enterprise,business_logo,Business Logo,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-5g28j,tier_enterprise,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-69udu,tier_enterprise,image_gallery_5,Image Gallery 5,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-tw6d5,tier_enterprise,interactive_maps,Interactive Maps,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-hhzh4,tier_enterprise,privacy_mode,Privacy Mode,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-3ub3y,tier_enterprise,custom_marketing_copy,Custom Marketing Copy,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-4rn3d,tier_enterprise,priority_support,Priority Support,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-y042s,tier_enterprise,qr_codes_2048,Qr Codes 2048,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-tnbf7,tier_enterprise,image_gallery_10,Image Gallery 10,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-a91dr,tier_enterprise,advanced_analytics,Advanced Analytics,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-u2k2k,tier_enterprise,payment_client_credentials,Payment Client Credentials,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-awnn7,tier_enterprise,square_sync,Square Sync,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-ngatx,tier_enterprise,clover_sync,Clover Sync,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-cyds3,tier_enterprise,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-obuao,tier_enterprise,manual_entry,Manual Entry,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-25pmm,tier_enterprise,manual_barcode,Manual Barcode,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-d0802,tier_enterprise,google_sync,Google Sync,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-9php5,tier_enterprise,basic_search,Basic Search,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-fej1w,tier_enterprise,bulk_import,Bulk Import,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-7pzps,tier_enterprise,categories,Categories,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-27fnd,tier_enterprise,category_quick_start,Category Quick Start,t,f,,2026-04-30 13:23:13.189,2026-04-30 13:23:13.189
+tfid-en23x,tier_google_only,google_shopping,Google Shopping,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-3conc,tier_google_only,google_merchant_center,Google Merchant Center,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-remio,tier_google_only,basic_product_pages,Basic Product Pages,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-u927q,tier_google_only,qr_codes_512,Qr Codes 512,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-gdvrf,tier_google_only,performance_analytics,Performance Analytics,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-87xcr,tier_google_only,quick_start_wizard,Quick Start Wizard,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-2o22t,tier_google_only,manual_barcode,Manual Barcode,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-0b5ql,tier_google_only,manual_entry,Manual Entry,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-4xp5w,tier_google_only,basic_search,Basic Search,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-0ng3v,tier_google_only,bulk_import,Bulk Import,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-qbdn5,tier_google_only,categories,Categories,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-jnpt4,tier_google_only,square_sync,Square Sync,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-7vo3r,tier_google_only,clover_sync,Clover Sync,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+new_1774444870112,tier_google_only,category_quick_start,Category Quick Start,t,f,,2026-03-25 13:22:10.342,2026-03-25 13:22:10.342
+tfid-ldkvg,tier_chain_starter,google_shopping,Google Shopping,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-gxdcw,tier_chain_starter,google_merchant_center,Google Merchant Center,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-90ysb,tier_chain_starter,basic_product_pages,Basic Product Pages,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-g0w0b,tier_chain_starter,qr_codes_512,Qr Codes 512,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-44eao,tier_chain_starter,performance_analytics,Performance Analytics,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-39fr2,tier_chain_starter,storefront,Storefront,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-to8bj,tier_chain_starter,product_search,Product Search,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-zn989,tier_chain_starter,mobile_responsive,Mobile Responsive,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-9nr65,tier_chain_starter,enhanced_seo,Enhanced Seo,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-6hrfw,tier_chain_starter,basic_categories,Basic Categories,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-8lem8,tier_chain_starter,chain_branding,Chain Branding,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-5ipqu,tier_chain_starter,franchise_management,Franchise Management,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-h2hdn,tier_chain_starter,chain_analytics,Chain Analytics,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-77m8o,tier_chain_starter,regional_management,Regional Management,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-r249s,tier_organization,google_merchant_center,Google Merchant Center,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-zl1mq,tier_organization,image_gallery_5,Image Gallery 5,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-6ow8a,tier_chain_starter,chain_promotions,Chain Promotions,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-i0moa,tier_chain_starter,master_catalog,Master Catalog,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-x0agc,tier_organization,interactive_maps,Interactive Maps,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-2bvff,tier_organization,mobile_responsive,Mobile Responsive,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-i88gs,tier_organization,performance_analytics,Performance Analytics,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-j8vfk,tier_organization,priority_support,Priority Support,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-5gaov,tier_organization,privacy_mode,Privacy Mode,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-zjzzb,tier_organization,product_scanning,Product Scanning,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-d5ty1,tier_organization,product_search,Product Search,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-gs9zs,tier_organization,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-atxzd,tier_organization,qr_codes_512,Qr Codes 512,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-jgeqe,tier_organization,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-81anu,tier_organization,propagation_products,Propagation Products,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-2i466,tier_organization,propagation_categories,Propagation Categories,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-fzzfa,tier_organization,propagation_gbp_sync,Propagation Gbp Sync,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-nbeqn,tier_organization,propagation_hours,Propagation Hours,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-ij7m9,tier_organization,propagation_profile,Propagation Profile,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-q5eqk,tier_organization,propagation_flags,Propagation Flags,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-hg784,tier_organization,propagation_roles,Propagation Roles,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-1c7km,tier_organization,propagation_brand,Propagation Brand,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-a72pa,tier_organization,hero_location,Hero Location,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-blvxw,tier_organization,category_quick_start,Category Quick Start,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-x5kso,tier_organization,categories,Categories,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-trlqd,tier_organization,bulk_import,Bulk Import,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-izmq4,tier_organization,basic_search,Basic Search,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-sf336,tier_organization,google_sync,Google Sync,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-yj7c2,tier_organization,manual_barcode,Manual Barcode,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-7tnhk,tier_organization,manual_entry,Manual Entry,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-w10z6,tier_organization,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-vdh9x,tier_organization,clover_sync,Clover Sync,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-k8ozg,tier_organization,square_sync,Square Sync,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-ukcte,tier_organization,payment_client_credentials,Payment Client Credentials,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-drfpc,tier_organization,google_shopping,Google Shopping,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-fd3t0,tier_organization,storefront,Storefront,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-u9sgg,tier_organization,barcode_scan,Barcode Scan,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-bqxi3,tier_organization,custom_branding,Custom Branding,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-zm377,tier_organization,unlimited_skus,Unlimited Skus,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-7tjyb,tier_organization,white_label,White Label,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-x5vnh,tier_organization,custom_domain,Custom Domain,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-051gt,tier_organization,api_access,Api Access,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-eq33q,tier_organization,advanced_analytics,Advanced Analytics,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-b6kjg,tier_organization,dedicated_account_manager,Dedicated Account Manager,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-af4rf,tier_organization,sla_guarantee,Sla Guarantee,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-u274q,tier_organization,multi_location,Multi Location,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-gq26p,tier_organization,centralized_inventory,Centralized Inventory,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-ogt4k,tier_organization,location_groups,Location Groups,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-uapjl,tier_organization,bulk_operations,Bulk Operations,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-c803u,tier_chain_enterprise,advanced_analytics,Advanced Analytics,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-9iumr,tier_chain_enterprise,dedicated_account_manager,Dedicated Account Manager,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-01vpz,tier_chain_enterprise,sla_guarantee,Sla Guarantee,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-h2d3u,tier_chain_enterprise,custom_integrations,Custom Integrations,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-sjc4z,tier_chain_enterprise,enterprise_sso,Enterprise Sso,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-qe56a,tier_chain_enterprise,basic_categories,Basic Categories,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-95wwh,tier_chain_enterprise,basic_product_pages,Basic Product Pages,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-4doup,tier_chain_enterprise,business_logo,Business Logo,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-mr3a7,tier_chain_enterprise,custom_marketing_copy,Custom Marketing Copy,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-44rof,tier_chain_enterprise,enhanced_seo,Enhanced Seo,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-xxm2j,tier_chain_enterprise,gbp_integration,Gbp Integration,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-53lae,tier_chain_enterprise,google_merchant_center,Google Merchant Center,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-868r4,tier_chain_enterprise,image_gallery_5,Image Gallery 5,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-cuw8y,tier_chain_enterprise,interactive_maps,Interactive Maps,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-ajoeu,tier_chain_enterprise,mobile_responsive,Mobile Responsive,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-r80yd,tier_chain_enterprise,performance_analytics,Performance Analytics,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-ogrvh,tier_chain_enterprise,priority_support,Priority Support,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-ruvr6,tier_chain_enterprise,privacy_mode,Privacy Mode,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-om0d2,tier_chain_enterprise,product_scanning,Product Scanning,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-svhi5,tier_chain_enterprise,product_search,Product Search,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-hwmbh,tier_chain_enterprise,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-kjlic,tier_chain_enterprise,qr_codes_512,Qr Codes 512,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-qv9f1,tier_chain_enterprise,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-vt54o,tier_chain_enterprise,chain_analytics,Chain Analytics,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-1zary,tier_chain_enterprise,chain_branding,Chain Branding,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-q4mg9,tier_chain_enterprise,chain_promotions,Chain Promotions,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-mad4x,tier_chain_enterprise,franchise_management,Franchise Management,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-7btdq,tier_chain_enterprise,location_templates,Location Templates,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-9pvz8,tier_chain_enterprise,master_catalog,Master Catalog,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-3k5b7,tier_chain_enterprise,regional_management,Regional Management,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-wzsyt,tier_chain_enterprise,propagation,Propagation,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-u8vc1,tier_chain_enterprise,basic_search,Basic Search,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-x6715,tier_chain_enterprise,bulk_import,Bulk Import,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-etty3,tier_chain_enterprise,bulk_operations,Bulk Operations,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-sh07n,tier_chain_enterprise,google_shopping,Google Shopping,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-dy74o,tier_organization,role_based_access,Role Based Access,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-nki82,tier_organization,cross_location_reporting,Cross Location Reporting,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-fn4qc,tier_organization,custom_pricing,Custom Pricing,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-ulh8r,tier_organization,basic_categories,Basic Categories,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-yvl5b,tier_organization,basic_product_pages,Basic Product Pages,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-fnplw,tier_organization,business_logo,Business Logo,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-04cvc,tier_organization,custom_marketing_copy,Custom Marketing Copy,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-yqu6b,tier_organization,enhanced_seo,Enhanced Seo,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+tfid-iof35,tier_organization,gbp_integration,Gbp Integration,t,f,,2026-04-30 13:23:48.842,2026-04-30 13:23:48.842
+inherited_1776624096253,tid-scqk,basic_product_pages,Basic Product Pages,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624102993,tid-scqk,basic_search,Basic Search,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624106140,tid-scqk,bulk_import,Bulk Import,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624107844,tid-scqk,categories,Categories,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624112216,tid-scqk,category_quick_start,Category Quick Start,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624110943,tid-scqk,clover_sync,Clover Sync,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624095077,tid-scqk,google_merchant_center,Google Merchant Center,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624094058,tid-scqk,google_shopping,Google Shopping,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624100610,tid-scqk,manual_barcode,Manual Barcode,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624101722,tid-scqk,manual_entry,Manual Entry,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624098302,tid-scqk,performance_analytics,Performance Analytics,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624097321,tid-scqk,qr_codes_512,Qr Codes 512,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624099552,tid-scqk,quick_start_wizard,Quick Start Wizard,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776624109800,tid-scqk,square_sync,Square Sync,t,t,,2026-04-19 18:47:07.67,2026-04-19 18:47:07.67
+inherited_1776626057056,tid-snks,storefront,Storefront,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626058520,tid-snks,square_sync,Square Sync,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626059648,tid-snks,quick_start_wizard,Quick Start Wizard,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626060759,tid-snks,qr_codes_512,Qr Codes 512,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626061880,tid-snks,product_search,Product Search,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626063269,tid-snks,performance_analytics,Performance Analytics,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626064517,tid-snks,mobile_responsive,Mobile Responsive,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626065729,tid-snks,manual_entry,Manual Entry,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626066958,tid-snks,manual_barcode,Manual Barcode,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626068105,tid-snks,image_gallery_5,Image Gallery 5,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626069443,tid-snks,google_sync,Google Sync,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626070592,tid-snks,google_shopping,Google Shopping,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626077955,tid-snks,google_merchant_center,Google Merchant Center,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626079348,tid-snks,enhanced_seo,Enhanced Seo,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626080656,tid-snks,clover_sync,Clover Sync,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626081824,tid-snks,category_quick_start,Category Quick Start,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626083019,tid-snks,categories,Categories,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626084374,tid-snks,bulk_import,Bulk Import,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626085635,tid-snks,basic_search,Basic Search,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626086862,tid-snks,basic_product_pages,Basic Product Pages,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626088238,tid-snks,basic_categories,Basic Categories,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+inherited_1776626089377,tid-snks,barcode_scan,Barcode Scan,t,t,,2026-04-19 19:15:05.422,2026-04-19 19:15:05.422
+tfid-90esh,tier_chain_starter,location_templates,Location Templates,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-drr2v,tier_chain_starter,image_gallery_5,Image Gallery 5,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-m5wk2,tier_chain_starter,propagation,Propagation,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-rwesy,tier_chain_starter,propagation_hours,Propagation Hours,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-wpyt1,tier_chain_starter,propagation_products,Propagation Products,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-cg7eo,tier_chain_starter,barcode_scan,Barcode Scan,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-8dwaf,tier_chain_starter,bulk_operations,Bulk Operations,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-stqak,tier_chain_starter,centralized_inventory,Centralized Inventory,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-10icq,tier_chain_starter,cross_location_reporting,Cross Location Reporting,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-be3kj,tier_chain_starter,multi_location,Multi Location,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-tvqpx,tier_chain_starter,organization_dashboard,Organization Dashboard,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-pwtxn,tier_chain_starter,propagation_categories,Propagation Categories,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-8p38k,tier_chain_starter,quick_start_wizard_full,Quick Start Wizard Full,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-1ww9l,tier_chain_starter,product_scanning,Product Scanning,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-gu3ow,tier_chain_starter,gbp_integration,Gbp Integration,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-8silz,tier_chain_starter,business_logo,Business Logo,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-k1om7,tier_chain_starter,qr_codes_1024,Qr Codes 1024,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-duj23,tier_chain_starter,qr_codes_2048,Qr Codes 2048,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-08wzz,tier_chain_starter,image_gallery_10,Image Gallery 10,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-lyt1f,tier_chain_starter,advanced_analytics,Advanced Analytics,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-hg5s7,tier_chain_starter,hero_location,Hero Location,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-94504,tier_chain_starter,category_quick_start,Category Quick Start,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-ijkmk,tier_chain_starter,categories,Categories,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-81in6,tier_chain_starter,bulk_import,Bulk Import,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-6iv4c,tier_chain_starter,basic_search,Basic Search,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-770hw,tier_chain_starter,google_sync,Google Sync,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-5j7x4,tier_chain_starter,manual_barcode,Manual Barcode,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-pv7df,tier_chain_starter,manual_entry,Manual Entry,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-arkgs,tier_chain_starter,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-0tepu,tier_chain_starter,clover_sync,Clover Sync,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-d60bt,tier_chain_starter,square_sync,Square Sync,t,f,,2026-04-19 19:28:09.025,2026-04-19 19:28:09.025
+tfid-phteh,tier_chain_enterprise,storefront,Storefront,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-dw77b,tier_chain_enterprise,barcode_scan,Barcode Scan,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-ll4w4,tier_chain_enterprise,custom_branding,Custom Branding,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-j3o8f,tier_chain_enterprise,unlimited_skus,Unlimited Skus,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-lf0pw,tier_chain_enterprise,white_label,White Label,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-m4per,tier_chain_enterprise,custom_domain,Custom Domain,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-4d8uk,tier_chain_enterprise,qr_codes_2048,Qr Codes 2048,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-n34e8,tier_chain_enterprise,image_gallery_10,Image Gallery 10,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-igqjm,tier_chain_enterprise,api_access,Api Access,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-hxpxk,tier_chain_enterprise,categories,Categories,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-xsx44,tier_chain_enterprise,category_quick_start,Category Quick Start,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-6fknb,tier_chain_enterprise,centralized_inventory,Centralized Inventory,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-e3uf2,tier_chain_enterprise,clover_sync,Clover Sync,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-zkphv,tier_chain_enterprise,google_sync,Google Sync,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-hg9yv,tier_chain_enterprise,hero_location,Hero Location,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-5hqty,tier_chain_enterprise,manual_barcode,Manual Barcode,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-3mlnv,tier_chain_enterprise,manual_entry,Manual Entry,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-cenpa,tier_chain_enterprise,multi_location,Multi Location,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-w11bv,tier_chain_enterprise,organization_dashboard,Organization Dashboard,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-5292b,tier_chain_enterprise,payment_client_credentials,Payment Client Credentials,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-lrwz0,tier_chain_enterprise,propagation_brand,Propagation Brand,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-41l0a,tier_chain_enterprise,propagation_categories,Propagation Categories,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-jm6oh,tier_chain_enterprise,propagation_flags,Propagation Flags,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-pomk7,tier_chain_enterprise,propagation_gbp_sync,Propagation Gbp Sync,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-nc5yz,tier_chain_enterprise,propagation_hours,Propagation Hours,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-6o714,tier_chain_enterprise,propagation_products,Propagation Products,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-kazn1,tier_chain_enterprise,propagation_profile,Propagation Profile,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-qynw8,tier_chain_enterprise,propagation_roles,Propagation Roles,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-y781b,tier_chain_enterprise,quick_start_wizard,Quick Start Wizard,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-ziog5,tier_chain_enterprise,square_sync,Square Sync,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-lai6s,tier_chain_enterprise,location_groups,Location Groups,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331
+tfid-d4m4t,tier_chain_enterprise,role_based_access,Role Based Access,t,f,,2026-04-19 19:29:19.331,2026-04-19 19:29:19.331

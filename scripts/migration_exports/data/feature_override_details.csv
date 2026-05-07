@@ -1,0 +1,6 @@
+id,override_id,detail_type,detail_key,detail_value,detail_numeric_value,detail_boolean_value,created_at
+758b8455-1320-402e-8a69-009724333d1b,sample-feature-1,feature,feature_name,Advanced Analytics,,,2026-03-13 17:24:11.186015+00
+b9895c82-da28-4201-9245-f189b1690bec,sample-pricing-1,pricing_field,billing_interval,monthly,299.99,,2026-03-13 17:24:11.186015+00
+4e9b3e2a-50b5-41b6-997d-1f651ff38933,sample-limits-1,limit_type,limit_name,skus,500.00,,2026-03-13 17:24:11.186015+00
+d1672423-41f4-419c-a7d5-9423d4b60b4d,sample-featured-1,featured_type,featured_name,seasonal,10.00,,2026-03-13 17:24:11.186015+00
+0db7f2d6-c746-496d-a8c3-4148d2d8e592,sample-tenant-limits-1,limit_type,limit_name,locations,5.00,,2026-03-13 17:24:11.186015+00

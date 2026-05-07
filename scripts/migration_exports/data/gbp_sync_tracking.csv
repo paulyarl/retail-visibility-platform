@@ -1,0 +1,2 @@
+id,tenant_id,field_category,field_name,local_value_hash,google_value_hash,local_updated_at,google_updated_at,last_sync_at,last_sync_direction,sync_status,conflict_detected_at,conflict_resolution,created_at,updated_at
+qsid-444SFG0Z,tid-m8ijkrnk,business_info,business_name,7e3b64b9b9c13e31a1218267306da01d,da3b76d56cb2a80c95d02a54cca77b6e,2026-01-23 16:22:02.658+00,2026-01-23 16:22:02.658+00,2026-01-23 16:22:02.658+00,push,pending_push,,,2026-01-23 16:22:02.66+00,2026-01-23 16:22:02.66+00

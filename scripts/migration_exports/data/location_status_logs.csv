@@ -1,0 +1,130 @@
+id,tenant_id,old_status,new_status,changed_by,reason,reopening_date,created_at,updated_at
+5,tid-lt2t1wzu,active,pending,uid-zqe5ns5k,,,2026-02-14 18:54:20.290171,2026-02-14 18:54:20.290171
+6,tid-lt2t1wzu,pending,active,uid-zqe5ns5k,,,2026-03-04 23:08:32.669739,2026-03-04 23:08:32.669739
+7,tid-a3813d7i,active,inactive,uid-li9gr,,,2026-04-07 15:15:57.119121,2026-04-07 15:15:57.119121
+8,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-07 15:23:33.724289,2026-04-07 15:23:33.724289
+9,tid-a3813d7i,inactive,active,uid-li9gr,,,2026-04-07 15:49:08.37426,2026-04-07 15:49:08.37426
+10,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-07 16:00:57.578178,2026-04-07 16:00:57.578178
+11,tid-fjwr30ib,active,inactive,uid-li9gr,,,2026-04-07 17:55:19.264177,2026-04-07 17:55:19.264177
+12,tid-fjwr30ib,inactive,active,uid-li9gr,,,2026-04-07 20:04:06.711573,2026-04-07 20:04:06.711573
+14,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-12 18:00:03.696448,2026-04-12 18:00:03.696448
+15,tid-zcp9a56y,active,pending,uid-li9gr,,,2026-04-12 18:01:00.216204,2026-04-12 18:01:00.216204
+16,tid-042hi7ju,active,pending,uid-li9gr,,,2026-04-12 18:01:11.391993,2026-04-12 18:01:11.391993
+17,tid-lt2t1wzu,active,pending,uid-li9gr,,,2026-04-12 18:01:22.532768,2026-04-12 18:01:22.532768
+18,tid-a3813d7i,active,pending,uid-li9gr,,,2026-04-12 18:01:38.734331,2026-04-12 18:01:38.734331
+19,tid-qki0mjdb,active,pending,uid-li9gr,,,2026-04-12 18:01:52.66048,2026-04-12 18:01:52.66048
+20,tid-8622qs2t,active,pending,uid-li9gr,,,2026-04-12 18:02:04.213241,2026-04-12 18:02:04.213241
+21,tid-mrsyk3w6,active,pending,uid-li9gr,,,2026-04-12 18:02:16.718939,2026-04-12 18:02:16.718939
+22,tid-m8ijkrnk,active,pending,uid-li9gr,,,2026-04-12 18:02:28.302809,2026-04-12 18:02:28.302809
+23,tid-r6cccpag,active,pending,uid-li9gr,,,2026-04-12 18:02:39.209034,2026-04-12 18:02:39.209034
+24,tid-veid875z,active,pending,uid-li9gr,,,2026-04-12 18:02:51.503821,2026-04-12 18:02:51.503821
+25,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-12 18:06:27.138001,2026-04-12 18:06:27.138001
+26,tid-veid875z,pending,inactive,uid-li9gr,,,2026-04-12 19:02:04.390038,2026-04-12 19:02:04.390038
+27,tid-veid875z,inactive,pending,uid-li9gr,,,2026-04-12 19:02:45.886287,2026-04-12 19:02:45.886287
+28,tid-veid875z,pending,inactive,uid-li9gr,,,2026-04-12 19:03:10.447433,2026-04-12 19:03:10.447433
+29,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-13 06:01:28.412249,2026-04-13 06:01:28.412249
+30,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-13 06:26:27.193296,2026-04-13 06:26:27.193296
+31,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-14 18:20:40.833248,2026-04-14 18:20:40.833248
+32,tid-042hi7ju,pending,active,uid-li9gr,,,2026-04-15 07:01:41.54095,2026-04-15 07:01:41.54095
+33,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-16 08:08:33.843367,2026-04-16 08:08:33.843367
+34,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-04-16 17:51:56.371624,2026-04-16 17:51:56.371624
+35,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-17 10:59:48.072827,2026-04-17 10:59:48.072827
+36,tid-042hi7ju,active,pending,uid-li9gr,,,2026-04-17 13:04:46.699442,2026-04-17 13:04:46.699442
+37,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-17 17:37:57.441472,2026-04-17 17:37:57.441472
+38,tid-m8ijkrnk,pending,active,uid-li9gr,,,2026-04-17 18:29:34.17848,2026-04-17 18:29:34.17848
+39,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-17 21:03:17.547398,2026-04-17 21:03:17.547398
+40,tid-m8ijkrnk,active,pending,uid-li9gr,,,2026-04-17 21:04:50.863069,2026-04-17 21:04:50.863069
+41,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-04-17 23:06:47.914758,2026-04-17 23:06:47.914758
+42,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-18 01:59:54.062234,2026-04-18 01:59:54.062234
+43,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-18 20:18:03.92789,2026-04-18 20:18:03.92789
+44,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-18 22:23:11.800346,2026-04-18 22:23:11.800346
+45,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-18 23:01:38.910141,2026-04-18 23:01:38.910141
+46,tid-zcp9a56y,pending,active,uid-li9gr,,,2026-04-19 04:24:17.690441,2026-04-19 04:24:17.690441
+47,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-04-19 04:24:57.697981,2026-04-19 04:24:57.697981
+48,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-19 04:39:16.476744,2026-04-19 04:39:16.476744
+49,tid-zcp9a56y,active,pending,uid-li9gr,,,2026-04-19 04:40:38.860491,2026-04-19 04:40:38.860491
+50,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-19 04:41:49.289474,2026-04-19 04:41:49.289474
+51,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-19 08:15:12.132614,2026-04-19 08:15:12.132614
+52,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-19 10:30:32.709165,2026-04-19 10:30:32.709165
+53,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-04-20 07:52:43.235972,2026-04-20 07:52:43.235972
+54,tid-042hi7ju,pending,active,uid-li9gr,,,2026-04-20 08:02:44.82308,2026-04-20 08:02:44.82308
+55,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-20 11:48:08.007756,2026-04-20 11:48:08.007756
+56,tid-042hi7ju,active,pending,uid-li9gr,,,2026-04-20 11:48:29.310807,2026-04-20 11:48:29.310807
+57,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-04-20 14:05:30.050447,2026-04-20 14:05:30.050447
+58,tid-fjwr30ib,pending,active,uid-li9gr,,,2026-04-20 17:50:35.150057,2026-04-20 17:50:35.150057
+59,tid-qki0mjdb,pending,active,uid-li9gr,,,2026-04-21 14:28:36.269342,2026-04-21 14:28:36.269342
+60,tid-qki0mjdb,active,pending,uid-li9gr,,,2026-04-25 03:32:45.62007,2026-04-25 03:32:45.62007
+61,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-04-25 03:34:34.319817,2026-04-25 03:34:34.319817
+62,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-25 03:40:00.818529,2026-04-25 03:40:00.818529
+63,tid-042hi7ju,pending,active,uid-li9gr,,,2026-04-25 11:10:40.732191,2026-04-25 11:10:40.732191
+64,tid-zcp9a56y,pending,active,uid-li9gr,,,2026-04-25 11:26:28.975466,2026-04-25 11:26:28.975466
+65,tid-jcvzufq2,pending,inactive,uid-li9gr,,,2026-04-26 21:48:36.409959,2026-04-26 21:48:36.409959
+66,tid-zcp9a56y,active,inactive,uid-li9gr,,,2026-04-26 21:48:55.382769,2026-04-26 21:48:55.382769
+67,tid-fjwr30ib,pending,inactive,uid-li9gr,,,2026-04-26 21:49:13.253074,2026-04-26 21:49:13.253074
+68,tid-042hi7ju,active,inactive,uid-li9gr,,,2026-04-26 21:49:34.563435,2026-04-26 21:49:34.563435
+69,tid-lt2t1wzu,pending,inactive,uid-li9gr,,,2026-04-26 21:49:56.774733,2026-04-26 21:49:56.774733
+70,tid-a3813d7i,pending,inactive,uid-li9gr,,,2026-04-26 21:50:18.53375,2026-04-26 21:50:18.53375
+71,tid-qki0mjdb,pending,inactive,uid-li9gr,,,2026-04-26 21:50:35.388158,2026-04-26 21:50:35.388158
+72,tid-8622qs2t,pending,inactive,uid-li9gr,,,2026-04-26 21:50:51.536173,2026-04-26 21:50:51.536173
+73,tid-mrsyk3w6,pending,inactive,uid-li9gr,,,2026-04-26 21:51:25.494331,2026-04-26 21:51:25.494331
+74,tid-m8ijkrnk,pending,inactive,uid-li9gr,,,2026-04-26 21:51:50.024,2026-04-26 21:51:50.024
+75,tid-r6cccpag,pending,inactive,uid-li9gr,,,2026-04-26 21:52:05.773195,2026-04-26 21:52:05.773195
+76,tid-zcp9a56y,inactive,active,uid-li9gr,,,2026-04-27 16:49:03.071356,2026-04-27 16:49:03.071356
+77,tid-042hi7ju,inactive,active,uid-li9gr,,,2026-04-27 18:36:10.611454,2026-04-27 18:36:10.611454
+78,tid-qki0mjdb,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 03:38:46.365,2026-04-28 03:38:46.365
+79,tid-qki0mjdb,active,active,subscription_status_service,Tier change: discovery -> discovery. payment_success,,2026-04-28 03:58:38.371,2026-04-28 03:58:38.371
+80,tid-qki0mjdb,active,active,subscription_status_service,Tier change: enterprise -> enterprise. payment_success,,2026-04-28 04:04:42.016,2026-04-28 04:04:42.016
+81,tid-qki0mjdb,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-28 04:26:51.067,2026-04-28 04:26:51.067
+82,tid-qki0mjdb,active,active,subscription_status_service,Tier change: storefront -> storefront. payment_success,,2026-04-28 05:29:20.772,2026-04-28 05:29:20.772
+83,tid-qki0mjdb,active,active,subscription_status_service,Tier change: storefront -> storefront. payment_success,,2026-04-28 05:29:20.807,2026-04-28 05:29:20.807
+84,tid-qki0mjdb,active,active,subscription_status_service,Tier change: discovery -> discovery. payment_success,,2026-04-28 05:30:36.786,2026-04-28 05:30:36.786
+85,tid-042hi7ju,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-28 05:33:50.752,2026-04-28 05:33:50.752
+86,tid-042hi7ju,active,active,subscription_status_service,Tier change: enterprise -> enterprise. payment_success,,2026-04-28 05:51:05.519,2026-04-28 05:51:05.519
+87,tid-042hi7ju,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-28 06:18:21.027,2026-04-28 06:18:21.027
+88,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:56:39.584,2026-04-28 06:56:39.584
+89,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:56:39.612,2026-04-28 06:56:39.612
+90,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:56:53.343,2026-04-28 06:56:53.343
+91,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:56:53.372,2026-04-28 06:56:53.372
+92,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:04.393,2026-04-28 06:57:04.393
+93,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:04.454,2026-04-28 06:57:04.454
+94,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:15.949,2026-04-28 06:57:15.949
+95,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:15.979,2026-04-28 06:57:15.979
+96,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:28.402,2026-04-28 06:57:28.402
+97,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 06:57:28.427,2026-04-28 06:57:28.427
+98,tid-042hi7ju,active,active,subscription_status_service,Tier change: storefront -> storefront. payment_success,,2026-04-28 07:11:32.677,2026-04-28 07:11:32.677
+99,tid-042hi7ju,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 07:13:22.963,2026-04-28 07:13:22.963
+100,tid-qki0mjdb,inactive,active,uid-li9gr,,,2026-04-28 09:21:39.369283,2026-04-28 09:21:39.369283
+101,tid-jcvzufq2,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-28 12:25:51.696,2026-04-28 12:25:51.696
+102,tid-m8ijkrnk,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-28 14:12:44.146,2026-04-28 14:12:44.146
+103,tid-m8ijkrnk,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-28 16:22:54.982,2026-04-28 16:22:54.982
+104,tid-jcvzufq2,inactive,pending,uid-li9gr,,,2026-04-29 01:28:11.703017,2026-04-29 01:28:11.703017
+105,tid-r6cccpag,inactive,active,uid-li9gr,,,2026-04-29 02:01:09.250662,2026-04-29 02:01:09.250662
+106,tid-fjwr30ib,inactive,active,uid-li9gr,,,2026-04-29 02:48:53.365364,2026-04-29 02:48:53.365364
+107,tid-zcp9a56y,active,pending,uid-li9gr,,,2026-04-29 10:33:31.092305,2026-04-29 10:33:31.092305
+108,tid-fjwr30ib,active,pending,uid-li9gr,,,2026-04-29 10:34:21.949224,2026-04-29 10:34:21.949224
+109,tid-042hi7ju,active,pending,uid-li9gr,,,2026-04-29 10:35:00.287347,2026-04-29 10:35:00.287347
+110,tid-lt2t1wzu,inactive,pending,uid-li9gr,,,2026-04-29 10:36:14.847516,2026-04-29 10:36:14.847516
+111,tid-m8ijkrnk,inactive,pending,uid-li9gr,,,2026-04-29 19:16:47.219397,2026-04-29 19:16:47.219397
+112,tid-r6cccpag,active,active,subscription_status_service,Tier change: commitment -> commitment. payment_success,,2026-04-29 22:47:37.542,2026-04-29 22:47:37.542
+113,tid-r6cccpag,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-04-29 22:55:17.791,2026-04-29 22:55:17.791
+114,tid-m8ijkrnk,pending,active,uid-4itao,,,2026-04-29 23:01:24.279941,2026-04-29 23:01:24.279941
+115,tid-qki0mjdb,active,pending,uid-li9gr,,,2026-04-30 02:01:28.32313,2026-04-30 02:01:28.32313
+116,tid-r6cccpag,active,pending,uid-li9gr,,,2026-04-30 02:02:23.855299,2026-04-30 02:02:23.855299
+117,tid-m8ijkrnk,active,pending,uid-li9gr,,,2026-04-30 02:06:06.479863,2026-04-30 02:06:06.479863
+118,tid-m8ijkrnk,pending,active,uid-li9gr,,,2026-04-30 05:50:43.618892,2026-04-30 05:50:43.618892
+119,tid-r6cccpag,pending,active,uid-li9gr,,,2026-04-30 06:07:45.944566,2026-04-30 06:07:45.944566
+120,tid-mrsyk3w6,inactive,active,uid-li9gr,,,2026-05-01 09:59:21.325635,2026-05-01 09:59:21.325635
+121,tid-042hi7ju,pending,active,uid-li9gr,,,2026-05-01 11:22:04.988906,2026-05-01 11:22:04.988906
+122,tid-mrsyk3w6,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-05-01 11:37:10.045,2026-05-01 11:37:10.045
+123,tid-8622qs2t,inactive,active,uid-li9gr,,,2026-05-01 21:29:16.096377,2026-05-01 21:29:16.096377
+124,tid-8622qs2t,active,active,subscription_status_service,Tier change: professional -> professional. payment_success,,2026-05-01 21:36:16.185,2026-05-01 21:36:16.185
+125,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-05-05 01:05:36.05769,2026-05-05 01:05:36.05769
+126,tid-jcvzufq2,active,pending,uid-li9gr,,,2026-05-05 18:36:13.812244,2026-05-05 18:36:13.812244
+127,tid-042hi7ju,active,pending,uid-li9gr,,,2026-05-05 18:36:45.572177,2026-05-05 18:36:45.572177
+128,tid-8622qs2t,active,pending,uid-li9gr,,,2026-05-05 18:37:07.411336,2026-05-05 18:37:07.411336
+129,tid-mrsyk3w6,active,pending,uid-li9gr,,,2026-05-05 18:37:18.085522,2026-05-05 18:37:18.085522
+130,tid-m8ijkrnk,active,pending,uid-li9gr,,,2026-05-05 18:37:28.497689,2026-05-05 18:37:28.497689
+131,tid-r6cccpag,active,pending,uid-li9gr,,,2026-05-05 18:37:37.872641,2026-05-05 18:37:37.872641
+132,tid-jcvzufq2,pending,active,uid-li9gr,,,2026-05-05 18:40:32.110829,2026-05-05 18:40:32.110829
+133,tid-zcp9a56y,pending,active,uid-li9gr,,,2026-05-05 18:40:44.526374,2026-05-05 18:40:44.526374
+134,tid-m8ijkrnk,pending,active,uid-li9gr,,,2026-05-05 18:40:57.698205,2026-05-05 18:40:57.698205

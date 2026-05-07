@@ -1,0 +1,10 @@
+id,tenant_id,user_id,template_id,status,device_type,scanned_count,committed_count,duplicate_count,metadata,started_at,completed_at,updated_at
+session-PZQG-34fkoyrg,tid-jcvzufq2,uid-li9gr,,completed,manual,1,1,0,{},2026-05-05 18:49:20.392+00,2026-05-06 14:18:03.817+00,2026-05-05 18:49:20.392+00
+session-ULCW-xjbk60nb,tid-m8ijkrnk,uid-li9gr,,active,camera,0,0,0,{},2026-05-06 14:56:22.2+00,,2026-05-06 14:56:22.2+00
+sid-undefined-q7tfxaww,tid-042hi7ju,uid-x7fhbagq,,completed,manual,1,1,0,{},2026-01-08 01:10:27.221+00,2026-01-08 01:12:19.104+00,2026-01-08 01:10:27.221+00
+sid-R4KG-ab05g38z,tid-042hi7ju,uid-li9gr,,completed,manual,1,1,0,{},2026-05-03 15:09:01.34+00,2026-05-03 15:49:54.769+00,2026-05-03 15:09:01.34+00
+sid-R4KG-gr57w1u1,tid-042hi7ju,uid-li9gr,,active,manual,0,0,0,{},2026-05-03 16:13:06.78+00,,2026-05-03 16:13:06.78+00
+sid-R4KG-xw89tlwl,tid-042hi7ju,uid-li9gr,,active,manual,1,0,0,{},2026-05-03 16:14:21.119+00,,2026-05-03 16:14:21.119+00
+sid-ULCW-5olqgqsr,tid-m8ijkrnk,uid-li9gr,,completed,manual,1,1,0,{},2026-05-03 21:09:04.909+00,2026-05-04 00:04:32.127+00,2026-05-03 21:09:04.909+00
+session-GPES-72pphmhh,tid-qki0mjdb,uid-li9gr,,completed,manual,1,1,0,{},2026-05-04 01:59:49.598+00,2026-05-04 02:12:00.528+00,2026-05-04 01:59:49.598+00
+session-GPES-gohec0hz,tid-qki0mjdb,uid-li9gr,,active,usb,0,0,0,{},2026-05-04 02:30:47.174+00,,2026-05-04 02:30:47.174+00

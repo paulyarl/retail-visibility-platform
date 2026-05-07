@@ -1,0 +1,1 @@
+id,invoice_id,payment_id,order_id,gateway,transaction_date,gross_amount_cents,platform_fee_cents,fee_percentage,description,created_at,metadata

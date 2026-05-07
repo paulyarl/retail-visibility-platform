@@ -1,0 +1,1 @@
+id,account_id,merchant_id,merchant_name,website_url,is_active,last_sync_at,sync_status,sync_error,created_at,updated_at,pickup_only,pickup_method,pickup_sla,fulfillment_mode

@@ -1,0 +1,5 @@
+id,order_id,tenant_id,scheduled_date,scheduled_time,fulfillment_method,time_slot_id,customer_name,customer_email,customer_phone,order_status,notes,created_at,updated_at
+schedule_1777697807530_ylbxrqxpc,oid-tid-042hi7ju-t2k3fg0l,tid-042hi7ju,2026-05-02,09:00:00,pickup,slot_1777695380249_d86q290ms,"",test.customer@example.com,+1234567890,completed,Order successfully picked up,2026-05-02 04:56:47.532,2026-05-02 04:56:52.39094
+sched-tid-042hi7ju-y9y36qoys,oid-tid-042hi7ju-xmzkr167,tid-042hi7ju,2026-05-02,09:00:00,pickup,slot_1777695380249_d86q290ms,"",test.customer@example.com,+1234567890,completed,Order successfully picked up,2026-05-02 05:27:51.561,2026-05-02 05:27:56.987019
+sched-R4KG-flnrjqlim,oid-R4KG-i1c87k2q,tid-042hi7ju,2026-05-02,09:00:00,pickup,slot_1777695380249_d86q290ms,"",test.customer@example.com,+1234567890,completed,Order successfully picked up,2026-05-02 05:57:35.75,2026-05-02 05:57:41.091288
+sched-R4KG-33nwvesr8,oid-R4KG-nyegr8iz,tid-042hi7ju,2026-05-02,09:00:00,pickup,slot_1777695380249_d86q290ms,"",test.customer@example.com,+1234567890,completed,Order successfully picked up,2026-05-02 06:15:28.094,2026-05-02 06:15:33.388733

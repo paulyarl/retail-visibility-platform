@@ -1,0 +1,17 @@
+id,tier_id,can_browse_global_catalog,can_add_from_global_catalog,can_override_global_inclusion,can_remove_from_global_catalog,can_edit_global_catalog,default_global_inclusion,can_opt_out_global_inclusion,catalog_visibility_level,max_catalog_products,created_at
+tcp-tid-scqk,tid-scqk,t,t,f,f,f,t,f,public,100,2026-04-30 19:51:03.102093
+tcp-tid-snks,tid-snks,t,t,f,f,f,t,f,public,250,2026-04-30 19:51:03.102093
+tcp-tid-k1t8,tid-k1t8,t,t,t,f,f,t,t,public,500,2026-04-30 19:51:03.102093
+tcp-tier_professional,tier_professional,t,t,t,f,f,f,t,public,750,2026-04-30 19:51:03.102093
+tcp-tier_enterprise,tier_enterprise,t,t,t,f,f,f,t,public,1500,2026-04-30 19:51:03.102093
+tcp-tier_organization,tier_organization,t,t,t,f,f,f,t,organization,1000,2026-04-30 19:51:03.102093
+tcp-tier_chain_starter,tier_chain_starter,t,t,t,f,f,f,t,organization,2000,2026-04-30 19:51:03.102093
+tcp-tier_chain_professional,tier_chain_professional,t,t,t,f,f,f,t,organization,5000,2026-04-30 19:51:03.102093
+tcp-tier_chain_enterprise,tier_chain_enterprise,t,t,t,t,t,f,t,organization,7000,2026-04-30 19:51:03.102093
+tcp-tid-vcun,tid-vcun,t,t,f,f,f,t,f,public,,2026-04-30 19:51:03.102093
+tcp-tid-oepx,tid-oepx,t,t,f,f,f,t,f,public,,2026-04-30 19:51:03.102093
+tcp-tier_trial_google_only,tier_trial_google_only,t,t,f,f,f,t,f,public,100,2026-04-30 19:51:03.102093
+tcp-tid-h4s5,tid-h4s5,t,t,f,f,f,t,f,public,,2026-04-30 19:51:03.102093
+tcp-tier_trial_professional,tier_trial_professional,t,t,f,f,f,t,f,public,500,2026-04-30 19:51:03.102093
+tcp-tier_trial_chain_starter,tier_trial_chain_starter,t,t,f,f,f,t,f,public,2000,2026-04-30 19:51:03.102093
+tcp-tier_trial_starter,tier_trial_starter,t,t,f,f,f,t,f,public,250,2026-04-30 19:51:03.102093

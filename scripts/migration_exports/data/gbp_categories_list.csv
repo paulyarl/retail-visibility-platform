@@ -1,0 +1,11 @@
+id,name,display_name,is_active,created_at,updated_at
+gcid:african-grocery-store,African Grocery Store,African Grocery Store,t,2025-12-22 20:42:18.979995+00,2026-04-01 16:07:06.633699+00
+gcid:african-goods-store,African Goods Store,African Goods Store,t,2025-12-22 21:48:57.085744+00,2026-04-01 16:07:06.671896+00
+gcid:grocery_store,Grocery store,Grocery store,t,2026-01-02 07:48:36.961646+00,2026-01-07 14:47:28.927155+00
+gcid:indian-grocery-store,Indian Grocery Store,Indian Grocery Store,t,2026-04-03 12:48:46.597984+00,2026-04-03 12:48:46.597984+00
+gcid:convenience-store,Convenience Store,Convenience Store,t,2026-03-25 16:31:02.505625+00,2026-04-03 12:48:46.643383+00
+gcid:indian-sweets-shop,Indian Sweets Shop,Indian Sweets Shop,t,2026-04-03 12:48:46.683287+00,2026-04-03 12:48:46.683287+00
+gcid:convenience_store,Convenience store,Convenience store,t,2026-01-02 07:48:37.033655+00,2026-01-07 14:47:28.995344+00
+gcid:grocery-store,Grocery Store,Grocery Store,t,2025-12-15 19:41:23.130004+00,2026-04-03 12:48:46.717029+00
+gcid:asian-grocery-store,Asian Grocery Store,Asian Grocery Store,t,2026-03-03 10:15:29.358016+00,2026-03-03 10:15:29.358016+00
+gcid:fresh-food-market,Fresh Food Market,Fresh Food Market,t,2026-03-03 10:15:29.423571+00,2026-03-03 10:15:29.423571+00
