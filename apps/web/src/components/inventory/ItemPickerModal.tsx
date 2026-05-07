@@ -165,7 +165,7 @@ export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }:
                       )}
                       {item.price != null && (
                         <span className="text-xs text-green-600 font-medium">
-                          ${((item.price ?? 0) / 100).toFixed(2)}
+                          ${(item.price! / 100).toFixed(2)}
                         </span>
                       )}
                     </div>
