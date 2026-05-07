@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-01-23T08:03:16.220Z",
+  "testData": {
+    "tenant": "tid-m8ijkrnk",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc2ODkxODMwOCwiZXhwIjoxODAwNDU0MzA4fQ.-Swkbx8_UOF_4rpBKhs5XvJauNgu0ef6IR_buNbYz64",
+    "userId": "uid-zqe5ns5k",
+    "email": "platform@rvp.com",
+    "role": "PLATFORMFORM_ADMIN"
+  },
+  "results": {
+    "passed": 8,
+    "failed": 0,
+    "total": 8,
+    "tests": [
+      {
+        "name": "UniversalSingleton Base Class",
+        "status": "passed",
+        "duration": 2,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "SecurityMonitoringService Implementation",
+        "status": "passed",
+        "duration": 1,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "RateLimitingService Implementation",
+        "status": "passed",
+        "duration": 1,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "BehaviorTrackingService Implementation",
+        "status": "passed",
+        "duration": 1,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "TenantProfileService Implementation",
+        "status": "passed",
+        "duration": 0,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Cache Implementation Check",
+        "status": "passed",
+        "duration": 1,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Authentication Features Check",
+        "status": "passed",
+        "duration": 0,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Encryption Features Check",
+        "status": "passed",
+        "duration": 0,
+        "error": null,
+        "details": {}
+      }
+    ],
+    "startTime": 1769155396207
+  },
+  "totalDuration": 13,
+  "summary": {
+    "totalTests": 8,
+    "passed": 8,
+    "failed": 0,
+    "successRate": 100,
+    "averageTestDuration": 1.625
+  },
+  "recommendations": [
+    "🎉 All singleton services are properly implemented!",
+    "🚀 Ready to move to integration testing with real API",
+    "📊 Consider adding performance benchmarks"
+  ]
+}

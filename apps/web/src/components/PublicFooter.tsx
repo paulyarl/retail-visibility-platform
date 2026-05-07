@@ -22,7 +22,8 @@ export default function PublicFooter() {
                 alt={settings.platformName || 'Platform Logo'}
                 width={150}
                 height={40}
-                className="h-10 w-auto object-contain mb-4"
+                className="object-contain mb-4"
+                style={{ width: 'auto', height: 'auto' }}
               />
             ) : (
               <h3 className="text-lg font-bold text-neutral-900 mb-4">
@@ -63,11 +64,6 @@ export default function PublicFooter() {
               <li>
                 <Link href="/features#pricing" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Pricing
-                </Link>
-              </li>
-              <li>
-                <Link href="/settings/subscription" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
-                  Subscription
                 </Link>
               </li>
             </ul>

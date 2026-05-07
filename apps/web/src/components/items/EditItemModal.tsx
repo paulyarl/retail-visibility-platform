@@ -1,44 +1,202 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
-import CategorySelector from './CategorySelector';
+import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import CategoryAssignmentModal from './CategoryAssignmentModal';
+import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
+import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
+import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig';
+import ProductVariants, { ProductVariant } from './ProductVariants';
+import { Item } from '@/services/itemsDataService';
+import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
+import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
 
-interface Item {
-  id: string;
-  sku: string;
-  name: string;
-  brand?: string;
-  manufacturer?: string;
-  price: number;
-  stock?: number;
-  description?: string;
-  status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing';
-  categoryPath?: string[];
+// Helper component to display category name by ID using CategorySingleton for caching
+function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
+  const [categoryName, setCategoryName] = useState<string>('Loading...');
+  const [fullCategoryPath, setFullCategoryPath] = useState<string>('');
+  const { state, actions } = useCategorySingleton();
+
+  useEffect(() => {
+    async function loadCategoryName() {
+      if (!categoryId) {
+        setCategoryName('No category');
+        return;
+      }
+
+      // First try to find in tenant categories (using CategorySingleton)
+      if (state.categories.length > 0) {
+        const category = actions.getCategoryById(categoryId);
+        if (category) {
+          setCategoryName(category.name);
+          return;
+        }
+      } else {
+        // Load tenant categories if not already loaded
+        try {
+          await actions.fetchCategories({
+            includeChildren: true,
+            includeProductCount: false
+          });
+          
+          const category = actions.getCategoryById(categoryId);
+          if (category) {
+            setCategoryName(category.name);
+            return;
+          }
+        } catch (error) {
+          console.error('[EditItemModal CategoryNameDisplay] Error loading tenant categories:', error);
+        }
+      }
+
+      // If not found in tenant categories, try Google taxonomy
+      try {
+        const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+        const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
+        
+        if (data && data.path && Array.isArray(data.path)) {
+          const pathString = data.path.join(' > ');
+          const finalCategoryName = data.path[data.path.length - 1]; // Get last element
+          setCategoryName(finalCategoryName);
+          setFullCategoryPath(pathString); // Store full path separately
+          return;
+        }
+      } catch (error) {
+        console.error('[EditItemModal CategoryNameDisplay] Error fetching Google taxonomy:', error);
+      }
+
+      // If still not found, show unknown category
+      setCategoryName('Unknown category');
+    }
+
+    loadCategoryName();
+  }, [categoryId, state.categories.length]);
+
+  return (
+    <div className="space-y-1">
+      <div className="font-medium">{categoryName}</div>
+      <div className="text-xs text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded inline-block">ID: {categoryId}</div>
+      {fullCategoryPath && categoryName !== 'Unknown category' && categoryName !== 'Loading...' && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+          Path: {fullCategoryPath}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface EditItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: Item | null;
-  onSave: (item: Item) => Promise<void>;
+  onSave: (item: Item) => Promise<Item>; // Return the saved item
+  onItemUpdated?: () => void; // Callback to refresh item data
 }
 
-export default function EditItemModal({ isOpen, onClose, item, onSave }: EditItemModalProps) {
+export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpdated }: EditItemModalProps) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [manufacturer, setManufacturer] = useState('');
+  const [condition, setCondition] = useState<'new' | 'used' | 'refurbished'>('new');
+  const [mpn, setMpn] = useState('');
   const [price, setPrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
+  const [enhancedDescription, setEnhancedDescription] = useState('');
+  const [features, setFeatures] = useState('');
+  const [specifications, setSpecifications] = useState('');
   const [status, setStatus] = useState<'draft' | 'active' | 'archived'>('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [tenantCategoryId, setTenantCategoryId] = useState<string>('');
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [gatewaySelection, setGatewaySelection] = useState<{
+    gateway_type: string | null;
+    gateway_id: string | null;
+  }>({ gateway_type: null, gateway_id: null });
+  const [productType, setProductType] = useState<ProductType>('physical');
+  const [digitalProductData, setDigitalProductData] = useState<DigitalProductData>({
+    deliveryMethod: 'direct_download',
+    assets: [],
+    licenseType: 'personal',
+    accessDurationDays: null,
+    downloadLimit: null,
+  });
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [originalVariants, setOriginalVariants] = useState<any[]>([]); // Track original variants for change detection
+  const [attributeTypes, setAttributeTypes] = useState<string[]>(['size', 'color']); // Initialize with defaults
+  const [variantsLoading, setVariantsLoading] = useState(false);
+
+  // Initialize VariantsSingleton
+  const tenantId = getTenantIdFromUrl();
+  const { actions: variantsActions } = useVariantsSingleton(tenantId || '');
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
+
+  // Helper function to detect variant changes using simple in/out comparison
+  const detectVariantChanges = () => {
+    const changes: Array<{
+      action: 'update' | 'delete' | 'create';
+      variantId?: string;
+      data?: any;
+    }> = [];
+
+    // Get IDs of original and current variants
+    const originalIds = new Set(originalVariants.map(v => v.id));
+    const currentIds = new Set(variants.map(v => v.id));
+
+    // DELETE: variants that were in original but not in current
+    originalIds.forEach(id => {
+      if (!currentIds.has(id)) {
+        changes.push({
+          action: 'delete',
+          variantId: id
+        });
+      }
+    });
+
+    // CREATE: variants that are in current but have no ID (new)
+    variants.forEach(variant => {
+      if (!variant.id) {
+        changes.push({
+          action: 'create',
+          data: {
+            variant_name: variant.variant_name,
+            sku: variant.sku,
+            price_cents: variant.price_cents,
+            sale_price_cents: variant.sale_price_cents,
+            stock: variant.stock,
+            attributes: variant.attributes
+          }
+        });
+      }
+    });
+
+    // UPDATE: variants that exist in both but may have changed data
+    variants.forEach(variant => {
+      if (variant.id && originalIds.has(variant.id)) {
+        changes.push({
+          action: 'update',
+          variantId: variant.id,
+          data: {
+            variant_name: variant.variant_name,
+            sku: variant.sku,
+            price_cents: variant.price_cents,
+            sale_price_cents: variant.sale_price_cents,
+            stock: variant.stock,
+            attributes: variant.attributes
+          }
+        });
+      }
+    });
+
+    return changes;
+  };
 
   // Simple analytics logger
   function logQa(event: string, payload?: Record<string, any>) {
@@ -56,6 +214,19 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
     }
   }
 
+  // Extract unique attribute types from variants
+  const extractAttributeTypes = (variants: any[]): string[] => {
+    const attributeTypes = new Set<string>();
+    variants.forEach(variant => {
+      if (variant.attributes && typeof variant.attributes === 'object') {
+        Object.keys(variant.attributes).forEach(key => {
+          attributeTypes.add(key.toLowerCase());
+        });
+      }
+    });
+    return Array.from(attributeTypes).sort();
+  };
+
   // Initialize form when item changes
   useEffect(() => {
     if (item) {
@@ -63,15 +234,155 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       setName(item.name || '');
       setBrand(item.brand || '');
       setManufacturer(item.manufacturer || '');
+      setCondition(((item as any).condition === 'brand_new' ? 'new' : (item as any).condition) || 'new');
+      setMpn((item as any).mpn || '');
       setPrice(item.price ? item.price.toFixed(2) : '');
+      setSalePrice((item as any).salePriceCents ? ((item as any).salePriceCents / 100).toFixed(2) : '');
       setStock(item.stock?.toString() || '');
       setDescription(item.description || '');
+      // Extract enriched fields from metadata
+      const metadata = (item as any).metadata || {};
+      setEnhancedDescription(metadata.enhancedDescription || '');
+      setFeatures(Array.isArray(metadata.features) ? metadata.features.join('\n') : '');
+      setSpecifications(metadata.specifications ? JSON.stringify(metadata.specifications, null, 2) : '');
       // Map 'inactive' to 'archived' since we no longer have an Inactive button
-      const mappedStatus = item.status === 'inactive' ? 'archived' : item.status;
+      const currentStatus = item.itemStatus || item.status || 'draft';
+      const mappedStatus = currentStatus === 'inactive' ? 'archived' : currentStatus;
       setStatus((mappedStatus === 'draft' || mappedStatus === 'active' || mappedStatus === 'archived') ? mappedStatus : 'draft');
-      setCategoryPath(item.categoryPath || []);
+      setTenantCategoryId(item.tenantCategoryId || '');
+      setGatewaySelection({
+        gateway_type: (item as any).payment_gateway_type || null,
+        gateway_id: (item as any).payment_gateway_id || null
+      });
+      
+      // Load product type and digital product data
+      setProductType((item as any).product_type || 'physical');
+      if ((item as any).product_type === 'digital' || (item as any).product_type === 'hybrid') {
+        setDigitalProductData({
+          deliveryMethod: (item as any).digital_delivery_method || 'direct_download',
+          assets: (item as any).digital_assets || [],
+          licenseType: (item as any).license_type || 'personal',
+          accessDurationDays: (item as any).access_duration_days || null,
+          downloadLimit: (item as any).download_limit || null,
+        });
+      }
+    } else {
+      // Reset form for new item creation
+      setSku('');
+      setName('');
+      setBrand('');
+      setManufacturer('');
+      setCondition('new');
+      setMpn('');
+      setPrice('');
+      setSalePrice('');
+      setStock('0'); // Will be updated when product type changes
+      setDescription('');
+      setEnhancedDescription('');
+      setFeatures('');
+      setSpecifications('');
+      setStatus('active');
+      setTenantCategoryId('');
+      setGatewaySelection({ gateway_type: null, gateway_id: null });
+      setProductType('physical');
+      setDigitalProductData({
+        deliveryMethod: 'direct_download',
+        assets: [],
+        licenseType: 'personal',
+        accessDurationDays: null,
+        downloadLimit: null,
+      });
+      setHasVariants(false); // Reset variants state
+      setVariants([]); // Reset variants array
+      setOriginalVariants([]); // Reset original variants tracking
+      setVariantsLoading(false); // Reset loading state
+      setSaving(false); // Reset saving state
+      setError(null); // Reset error state
+      setShowCategorySelector(false); // Reset category selector state
     }
   }, [item]);
+
+  // Initialize variants state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Reset transient states when modal opens
+      setSaving(false);
+      setError(null);
+      setShowCategorySelector(false);
+      
+      if (item) {
+        // Load variants if item has them
+        setHasVariants((item as any).has_variants || false);
+        
+        // First, try to use variants from the item prop (from complete endpoint)
+        const itemVariants = (item as any).variants;
+        if (itemVariants && Array.isArray(itemVariants) && itemVariants.length > 0) {
+          console.log('[EditItemModal] Using variants from item prop:', itemVariants.length);
+          setVariants(itemVariants);
+          setOriginalVariants(JSON.parse(JSON.stringify(itemVariants))); // Deep copy for comparison
+          setHasVariants(true);
+          setVariantsLoading(false);
+          // Extract attribute types from loaded variants
+          const extractedTypes = extractAttributeTypes(itemVariants);
+          if (extractedTypes.length > 0) {
+            console.log('[EditItemModal] Extracted attribute types:', extractedTypes);
+            setAttributeTypes(extractedTypes);
+          }
+        } else if (item.id && tenantId) {
+          // Fallback: fetch variants via API if not available in item prop
+          setVariantsLoading(true);
+          console.log('[EditItemModal] Fetching variants via API for item:', item.id);
+          variantsActions.fetchItemVariants(item.id)
+            .then(result => {
+              if (result.success && result.variants) {
+                setVariants(result.variants);
+                setOriginalVariants(JSON.parse(JSON.stringify(result.variants))); // Deep copy for comparison
+                // Update has_variants flag based on actual variants found
+                setHasVariants(result.variants.length > 0);
+                // Extract attribute types from loaded variants
+                const extractedTypes = extractAttributeTypes(result.variants);
+                if (extractedTypes.length > 0) {
+                  console.log('[EditItemModal] Extracted attribute types from API:', extractedTypes);
+                  setAttributeTypes(extractedTypes);
+                }
+              } else {
+                console.log('No variants found for item:', item.id);
+                setVariants([]);
+                setHasVariants(false);
+                setAttributeTypes(['size', 'color']); // Reset to defaults
+              }
+            })
+            .catch(err => {
+              console.error('Error fetching variants:', err);
+              setVariants([]);
+              setHasVariants(false);
+              setAttributeTypes(['size', 'color']); // Reset to defaults
+            })
+            .finally(() => {
+              setVariantsLoading(false);
+            });
+        } else {
+          setVariants([]);
+          setVariantsLoading(false);
+          setAttributeTypes(['size', 'color']); // Reset to defaults
+        }
+      }
+    }
+  }, [isOpen, item, tenantId, variantsActions]);
+
+  // Auto-adjust stock quantity for digital products
+  useEffect(() => {
+    // Only auto-adjust for new items (not editing existing)
+    if (item) return;
+    
+    if (productType === 'digital' || productType === 'hybrid') {
+      // Digital products have unlimited availability
+      setStock('9999');
+    } else if (productType === 'physical') {
+      // Reset to 0 for physical products
+      setStock('0');
+    }
+  }, [productType, item]);
 
   // Keyboard shortcuts when modal open and flag enabled
   useEffect(() => {
@@ -108,25 +419,160 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
       return;
     }
 
+    // Auto-generate SKU if empty
+    let finalSku = sku.trim();
+    if (!finalSku) {
+      const tenantId = getTenantIdFromUrl();
+      finalSku = generateSKU({
+        tenantKey: tenantId ? generateTenantKey(tenantId) : undefined,
+        productType: productType,
+        deliveryMethod: productType === 'digital' || productType === 'hybrid' 
+          ? digitalProductData.deliveryMethod 
+          : undefined,
+        accessControl: productType === 'digital' || productType === 'hybrid'
+          ? digitalProductData.licenseType
+          : undefined,
+      });
+      setSku(finalSku); // Update the form field
+    }
+
     setSaving(true);
     setError(null);
 
     try {
+      // Build metadata with enriched fields
+      const metadata: any = {};
+      if (enhancedDescription.trim()) metadata.enhancedDescription = enhancedDescription.trim();
+      if (features.trim()) {
+        metadata.features = features.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+      }
+      if (specifications.trim()) {
+        try {
+          metadata.specifications = JSON.parse(specifications);
+        } catch (e) {
+          // If JSON parsing fails, treat as key-value pairs
+          const specs: any = {};
+          specifications.split('\n').forEach(line => {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+              specs[key.trim()] = valueParts.join(':').trim();
+            }
+          });
+          if (Object.keys(specs).length > 0) metadata.specifications = specs;
+        }
+      }
+
       const updatedItem = {
-        ...item,
-        sku: sku.trim(),
+        ...(item || {}),
+        sku: finalSku,
         name: name.trim(),
         brand: brand.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
-        price: price ? parseFloat(price) : undefined,
-        stock: stock ? parseInt(stock) : undefined,
+        condition: condition,
+        mpn: mpn.trim() || undefined,
+        price_cents: price ? Math.round(parseFloat(price) * 100) : 0, // Convert dollars to cents
+        price: price ? parseFloat(price) : undefined, // Keep for display
+        sale_price_cents: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
+        stock: stock ? parseInt(stock) : 0,
         description: description.trim() || undefined,
-        status,
-        itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API
-        categoryPath,
-      } as Item;
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
+        item_status: status === 'draft' ? 'active' : status, // Also send snake_case version for backend
+        tenantCategoryId: tenantCategoryId || null,
+        tenantId: getTenantIdFromUrl() || undefined, // Ensure tenantId is included
+        payment_gateway_type: gatewaySelection.gateway_type,
+        payment_gateway_id: gatewaySelection.gateway_id,
+        // Include variants data only when creating new item with variants
+        // For existing items, variants are handled separately to avoid conflicts
+        ...(!item?.id && hasVariants && variants.length > 0 ? {
+          has_variants: true,
+          variants: variants.map(v => ({
+            variant_name: v.variant_name,
+            sku: v.sku || '', // Will be auto-generated if empty
+            price_cents: v.price_cents,
+            stock: v.stock,
+            attributes: v.attributes
+          }))
+        } : {
+          has_variants: hasVariants
+        }),
+        // Digital product fields
+        product_type: productType,
+        ...(productType === 'digital' || productType === 'hybrid' ? {
+          digital_delivery_method: digitalProductData.deliveryMethod,
+          digital_assets: digitalProductData.assets,
+          license_type: digitalProductData.licenseType,
+          access_duration_days: digitalProductData.accessDurationDays,
+          download_limit: digitalProductData.downloadLimit,
+        } : {}),
+      } as Item & {
+        has_variants?: boolean;
+        variants?: Array<{
+          variant_name: string;
+          sku: string;
+          price_cents: number;
+          stock: number;
+          attributes: Record<string, string>;
+        }>;
+        product_type?: string;
+        digital_delivery_method?: string;
+        digital_assets?: any[];
+        license_type?: string;
+        access_duration_days?: number;
+        download_limit?: number;
+      };
 
-      await onSave(updatedItem);
+      const savedItem = await onSave(updatedItem);
+
+      // Update local state with the response from PUT to show instant changes
+      if (savedItem) {
+        // Update the item data in the modal to reflect the saved state
+        // Note: Since item is passed as prop, we'll update through callback
+        console.log('[EditItemModal] Item saved successfully:', savedItem.id, 'has_variants:', savedItem.has_variants);
+      }
+
+      // Save variants if enabled and item has been created (only for existing items or if variants weren't included in creation)
+      if (hasVariants && variants.length > 0 && updatedItem.id && !item?.id) {
+        // Skip variant creation for new items - variants were included in the initial request
+        console.log('[EditItemModal] Variants included in item creation, skipping separate variant creation');
+      } else if (hasVariants && updatedItem.id) {
+        try {
+          const tenantId = getTenantIdFromUrl();
+          if (tenantId) {
+            // Detect all variant changes (add, update, delete)
+            const variantOperations = detectVariantChanges();
+            console.log('[EditItemModal] Detected variant changes:', variantOperations);
+
+            if (variantOperations.length > 0) {
+              // Use enhanced bulk operations endpoint
+              const result = await variantsActions.bulkVariantOperations(variantOperations, updatedItem.id);
+              if (!result.success) {
+                throw new Error(result.error || 'Failed to update variants');
+              }
+              console.log('[EditItemModal] Variant operations completed:', result);
+              
+              // Update local variant state with the newly created/updated variants
+              if (result.variants && result.variants.length > 0) {
+                console.log('[EditItemModal] Updating local variant state with:', result.variants);
+                setVariants(result.variants);
+                setOriginalVariants(JSON.parse(JSON.stringify(result.variants)));
+              }
+            } else {
+              console.log('[EditItemModal] No variant changes detected');
+            }
+          }
+        } catch (err: any) {
+          console.error('[EditItemModal] Variant operations error:', err);
+          setError(err.message || 'Failed to update variants');
+          return;
+        }
+      }
+
+      // Notify parent that item was updated (especially important when variants were created)
+      if (onItemUpdated) {
+        onItemUpdated();
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save item');
@@ -143,6 +589,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
@@ -216,17 +663,82 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
+        {/* Product Type Selector */}
+        <ProductTypeSelector
+          value={productType}
+          onChange={setProductType}
+          disabled={saving}
+        />
+
+        {/* Digital Product Configuration */}
+        {(productType === 'digital' || productType === 'hybrid') && (
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Digital Product Settings
+            </h3>
+            <DigitalProductConfig
+              value={digitalProductData}
+              onChange={setDigitalProductData}
+              disabled={saving}
+            />
+          </div>
+        )}
+
+        {/* Product Variants Section */}
+        <div className="border-t pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Product Variations
+              </h3>
+              <p className="text-sm text-neutral-600 mt-1">
+                Offer different options like sizes, colors, or configurations
+              </p>
+            </div>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasVariants}
+                onChange={(e) => setHasVariants(e.target.checked)}
+                disabled={saving}
+                className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+              />
+              <span className="ml-2 text-sm font-medium text-neutral-700">
+                Enable Variants
+              </span>
+            </label>
+          </div>
+          
+          {hasVariants && (
+            <ProductVariants
+              parentItemId={item?.id}
+              tenantId={getTenantIdFromUrl() || ''}
+              variants={variants}
+              onChange={setVariants}
+              disabled={saving}
+              attributeTypes={attributeTypes}
+              onAttributeTypesChange={setAttributeTypes}
+            />
+          )}
+        </div>
+
         {/* SKU Field */}
         <div>
           <Input
-            label="SKU"
+            label="SKU (Optional)"
             value={sku}
             onChange={(e) => setSku(e.target.value)}
-            placeholder="e.g., SKU-001"
+            placeholder="Leave empty to auto-generate"
             disabled={saving}
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Unique product identifier
+            {sku.trim() ? (
+              'Unique product identifier'
+            ) : (
+              <span className="text-blue-600">
+                ✨ Will auto-generate with tenant prefix, product type, delivery method, and access control
+              </span>
+            )}
           </p>
         </div>
 
@@ -245,67 +757,119 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
-        {/* Brand Field */}
+      {/* Brand Field */}
+      <Input
+        label="Brand"
+        value={brand}
+        onChange={(e) => setBrand(e.target.value)}
+        placeholder="e.g., Nike, Apple, Local Farms..."
+        disabled={saving}
+        helperText="Product brand or maker"
+      />
+
+      {/* Manufacturer Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
+        <Input
+          label="Manufacturer"
+          value={manufacturer}
+          onChange={(e) => setManufacturer(e.target.value)}
+          placeholder="e.g., Nike Inc., Apple Inc..."
+          disabled={saving}
+          helperText="Company that manufactures the product (optional)"
+        />
+      )}
+
+      {/* Condition Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
         <div>
-          <Input
-            label="Brand"
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            placeholder="e.g., Fresh Farms"
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Condition
+          </label>
+          <select
+            value={condition}
+            onChange={(e) => setCondition(e.target.value as 'new' | 'used' | 'refurbished')}
             disabled={saving}
-          />
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
+          >
+            <option value="new">New</option>
+            <option value="used">Used</option>
+            <option value="refurbished">Refurbished</option>
+          </select>
           <p className="text-xs text-neutral-500 mt-1">
-            Brand name (optional)
+            Product condition (required by Google Shopping)
           </p>
         </div>
+      )}
 
-        {/* Manufacturer Field */}
+      {/* MPN Field - Only for Physical/Hybrid */}
+      {productType !== 'digital' && (
+        <Input
+          label="MPN (Manufacturer Part Number)"
+          value={mpn}
+          onChange={(e) => setMpn(e.target.value)}
+          placeholder="e.g., SKU123, PART-456..."
+          disabled={saving}
+          helperText="Manufacturer's part number (optional, helps with Google Shopping)"
+        />
+      )}
+
+      {/* List Price Field */}
+      <div>
+        <Input
+          label="List Price (Regular Price)"
+          type="number"
+          step="0.01"
+          min="0"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          placeholder="e.g., 12.99"
+          disabled={saving}
+        />
+        <p className="text-xs text-neutral-500 mt-1">
+          Regular price in dollars
+        </p>
+      </div>
+
+        {/* Sale Price Field */}
         <div>
           <Input
-            label="Manufacturer"
-            value={manufacturer}
-            onChange={(e) => setManufacturer(e.target.value)}
-            placeholder="e.g., Local Beekeepers Co."
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Supplier or manufacturer name (optional)
-          </p>
-        </div>
-
-        {/* Price Field */}
-        <div>
-          <Input
-            label="Price"
+            label="Sale Price (Optional)"
             type="number"
-            step="0.5"
+            step="0.01"
             min="0"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="e.g., 12.99"
+            value={salePrice}
+            onChange={(e) => setSalePrice(e.target.value)}
+            placeholder="e.g., 9.99"
             disabled={saving}
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Price in dollars (e.g., 12.99)
+            Discounted price (leave empty if not on sale)
           </p>
+          {salePrice && price && parseFloat(salePrice) >= parseFloat(price) && (
+            <p className="text-xs text-red-600 mt-1">
+              ⚠️ Sale price must be less than list price
+            </p>
+          )}
         </div>
 
-        {/* Stock Field */}
-        <div>
-          <Input
-            label="Stock Quantity"
-            type="number"
-            step="1.0"
-            min="0"
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            placeholder="e.g., 100"
-            disabled={saving}
-          />
-          <p className="text-xs text-neutral-500 mt-1">
-            Available quantity in inventory
-          </p>
-        </div>
+        {/* Stock Field - Only for physical and hybrid products */}
+        {productType !== 'digital' && (
+          <div>
+            <Input
+              label="Stock Quantity"
+              type="number"
+              step="1.0"
+              min="0"
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              placeholder="e.g., 100"
+              disabled={saving}
+            />
+            <p className="text-xs text-neutral-500 mt-1">
+              Available quantity in inventory
+            </p>
+          </div>
+        )}
 
         {/* Description Field */}
         <div>
@@ -317,18 +881,106 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g., Premium organic honey sourced from local beekeepers..."
             disabled={saving}
-            rows={4}
+            rows={3}
             className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Product description for landing page (optional, not sent to Google Shopping)
+            Short 1-2 sentence description
           </p>
+        </div>
+
+        {/* Enhanced Description Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Enhanced Description <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={enhancedDescription}
+            onChange={(e) => setEnhancedDescription(e.target.value)}
+            placeholder="Detailed 2-3 paragraph marketing description..."
+            disabled={saving}
+            rows={5}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Detailed marketing copy for product pages (optional)
+          </p>
+        </div>
+
+        {/* Key Features Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Key Features <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={features}
+            onChange={(e) => setFeatures(e.target.value)}
+            placeholder="One feature per line&#10;Another great feature&#10;Third amazing feature"
+            disabled={saving}
+            rows={4}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed font-mono text-sm"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            One feature per line - displayed with checkmarks
+          </p>
+        </div>
+
+        {/* Specifications Field */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
+            Specifications <span className="text-neutral-400">(AI-generated)</span>
+          </label>
+          <textarea
+            value={specifications}
+            onChange={(e) => setSpecifications(e.target.value)}
+            placeholder='JSON format:&#10;{&#10;  "size": "12 oz",&#10;  "weight": "1.5 lbs",&#10;  "material": "Glass"&#10;}'
+            disabled={saving}
+            rows={6}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed font-mono text-sm"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            JSON format or key:value pairs (one per line)
+          </p>
+        </div>
+
+        {/* Photo Section - Enhanced with PhotoSingleton */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Product Photos
+          </label>
+          <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-3">
+              Photo management available on item detail page after saving
+            </p>
+            {item?.imageUrl ? (
+              <div className="space-y-2">
+                <div className="aspect-square w-32 mx-auto bg-white dark:bg-neutral-900 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <p className="text-xs text-center text-neutral-600 dark:text-neutral-400">
+                  Primary photo
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <svg className="w-12 h-12 mx-auto text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-neutral-500">No photos yet</p>
+                <p className="text-xs text-neutral-400 mt-1">Add photos after creating the item</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Category Section */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-2">
-            Google Product Category
+            Product Category (Google Shopping)
           </label>
           <div className="space-y-3">
             {/* Current Category Display */}
@@ -339,12 +991,15 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                     Current Category
                   </p>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    {categoryPath.length > 0 ? (
+                    {item?.tenantCategory ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
-                        {categoryPath.join(' › ')}
+                        {typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || ''}
+                        {item.tenantCategory.googleCategoryId && (
+                          <span className="text-xs">({item.tenantCategory.googleCategoryId})</span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-neutral-500 italic">No category assigned</span>
@@ -354,11 +1009,34 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
               </div>
             </div>
 
+            {/* Selected Category Display - Shows pending change */}
+            {tenantCategoryId && tenantCategoryId !== (item?.tenantCategoryId || '') && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800 animate-pulse">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-200">
+                      Selected Category (pending save)
+                    </p>
+                    <div className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      <div className="border border-green-300 dark:border-green-700 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+                        <CategoryNameDisplay categoryId={tenantCategoryId} />
+                      </div>
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      ✓ Click "Save Changes" to apply this category
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Category Selection */}
             <div>
               <Button
-                type="button"
-                variant="secondary"
+                type="button"                
                 onClick={() => setShowCategorySelector(!showCategorySelector)}
                 disabled={saving}
                 className="w-full"
@@ -366,26 +1044,23 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                 <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                {showCategorySelector ? 'Hide Category Selection' : 'Change Category'}
+                Change Category
               </Button>
-
-              {showCategorySelector && (
-                <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <CategorySelector
-                    currentCategory={categoryPath}
-                    onCategorySelect={(newCategory) => {
-                      setCategoryPath(newCategory);
-                      setShowCategorySelector(false);
-                    }}
-                    onCancel={() => setShowCategorySelector(false)}
-                  />
-                </div>
-              )}
             </div>
           </div>
           <p className="text-xs text-neutral-500 mt-2">
-            Required for Google Shopping sync. Choose the most specific category that fits your product.
+            Assign a Google Product Category for Google Shopping sync. Categories help organize your products and ensure proper placement on Google.
           </p>
+        </div>
+
+        {/* Payment Gateway Section */}
+        <div>
+          <PaymentGatewaySelector
+            tenantId={getTenantIdFromUrl() || ''}
+            value={gatewaySelection}
+            onChange={setGatewaySelection}
+            disabled={saving}
+          />
         </div>
 
         {/* Current Values Display - Only show when editing existing item */}
@@ -402,12 +1077,12 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                 <p><span className="font-medium">Manufacturer:</span> {item.manufacturer}</p>
               )}
               {item.price !== undefined && (
-                <p><span className="font-medium">Price:</span> ${item.price.toFixed(2)}</p>
+                <p><span className="font-medium">Price:</span> ${(item.price ?? 0).toFixed(2)}</p>
               )}
               {item.stock !== undefined && (
                 <p><span className="font-medium">Stock:</span> {item.stock}</p>
               )}
-              <p><span className="font-medium">Category:</span> {item.categoryPath && item.categoryPath.length > 0 ? item.categoryPath.join(' › ') : 'None'}</p>
+              <p><span className="font-medium">Category:</span> {item.tenantCategory ? (typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || '') : 'None'}</p>
               {item.description && (
                 <p><span className="font-medium">Description:</span> {item.description.substring(0, 100)}{item.description.length > 100 ? '...' : ''}</p>
               )}
@@ -478,5 +1153,18 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         </Button>
       </ModalFooter>
     </Modal>
+
+    {/* Category Assignment Modal */}
+    {showCategorySelector && item && (
+      <CategoryAssignmentModal
+        item={item}
+        onSave={async (itemId, categoryId) => {
+          setTenantCategoryId(categoryId);
+          setShowCategorySelector(false);
+        }}
+        onClose={() => setShowCategorySelector(false)}
+      />
+    )}
+  </>
   );
 }

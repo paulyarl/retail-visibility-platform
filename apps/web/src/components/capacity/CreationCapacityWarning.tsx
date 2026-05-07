@@ -39,7 +39,7 @@ export default function CreationCapacityWarning({
   // Check for maintenance/freeze state (highest priority)
   const isFrozen = usage.internalStatus === 'frozen';
   const isMaintenance = usage.internalStatus === 'maintenance';
-  const isTrialExpired = usage.status === 'expired' && usage.tier === 'google_only';
+  const isTrialExpired = usage.status === 'expired' && (usage.tier === 'google_only' || usage.tier === 'discovery');
 
   // Show maintenance/freeze warning if applicable (overrides capacity warnings)
   if (isFrozen || isMaintenance || isTrialExpired) {

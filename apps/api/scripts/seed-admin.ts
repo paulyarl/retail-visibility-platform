@@ -3,9 +3,9 @@
  * Run with: doppler run --config local -- npx tsx scripts/seed-admin.ts
  */
 
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, user_role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { generateUserId } from '../src/lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -15,42 +15,43 @@ async function seedAdmin() {
   const adminData = {
     email: 'admin@rvp.com',
     password: 'Admin123!',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: UserRole.ADMIN,
+    first_name: 'Admin',
+    last_name: 'User',
+    role: user_role.PLATFORM_ADMIN,
   };
 
   try {
-    // Check if admin already exists
-    const existingAdmin = await prisma.user.findUnique({
+    // Check if admin already exists and delete it
+    const existingAdmin = await prisma.users.findUnique({
       where: { email: adminData.email },
     });
 
     if (existingAdmin) {
-      console.log('⚠️  Admin user already exists!');
+      console.log('🗑️  Deleting existing admin user...');
       console.log('   Email:', existingAdmin.email);
       console.log('   ID:', existingAdmin.id);
-      console.log('   Role:', existingAdmin.role);
-      console.log('\n✅ You can log in with:');
-      console.log('   Email:', adminData.email);
-      console.log('   Password:', adminData.password);
-      return;
+      
+      await prisma.users.delete({
+        where: { email: adminData.email },
+      });
+      
+      console.log('✅ Existing admin deleted\n');
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(adminData.password, 12);
 
     // Create admin user
-    const admin = await prisma.user.create({
+    const admin = await prisma.users.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateUserId(),
         email: adminData.email,
-        passwordHash,
-        firstName: adminData.firstName,
-        lastName: adminData.lastName,
+        password_hash: passwordHash,
+        first_name: adminData.first_name,
+        last_name: adminData.last_name,
         role: adminData.role,
-        emailVerified: true, // Auto-verify admin
-        updatedAt: new Date(),
+        email_verified: true, // Auto-verify admin
+        updated_at: new Date(),
       },
     });
 

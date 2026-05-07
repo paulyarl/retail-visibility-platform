@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyGet, proxyPut, proxyPatch, proxyDelete } from '@/lib/api-proxy';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const res = await proxyGet(req, `/items/${id}`);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] GET /items/:id error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    // Get item using service with automatic caching
+    const item = await itemsService.getItem(id);
+    
+    if (!item) {
+      return NextResponse.json({ 
+        error: 'item_not_found',
+        message: 'Item not found' 
+      }, { status: 404 });
+    }
+    
+    return NextResponse.json(item);
+  } catch (error) {
+    console.error('[Items API GET] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to fetch item' 
+    }, { status: 500 });
   }
 }
 
@@ -17,12 +29,33 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
     const body = await req.json();
-    const res = await proxyPut(req, `/items/${id}`, body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] PUT /items/:id error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    // Extract tenant_id from body or query
+    const tenantId = body.tenant_id || (new URL(req.url).searchParams.get('tenant_id'));
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
+    }
+
+    // Update item using service with automatic cache invalidation
+    const updatedItem = await itemsService.updateItem(id, body, tenantId);
+    
+    if (!updatedItem) {
+      return NextResponse.json({ 
+        error: 'update_failed',
+        message: 'Failed to update item' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(updatedItem);
+  } catch (error) {
+    console.error('[Items API PUT] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to update item' 
+    }, { status: 500 });
   }
 }
 
@@ -30,29 +63,65 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
-    const url = new URL(req.url);
-    const queryString = url.searchParams.toString();
-    const path = `/items/${id}${queryString ? `?${queryString}` : ''}`;
-    const res = await proxyPatch(req, path, body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] PATCH /items/:id error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    // Extract tenant_id from body or query
+    const tenantId = body.tenant_id || (new URL(req.url).searchParams.get('tenant_id'));
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
+    }
+
+    // PATCH is same as PUT for items - use updateItem method
+    const updatedItem = await itemsService.updateItem(id, body, tenantId);
+    
+    if (!updatedItem) {
+      return NextResponse.json({ 
+        error: 'update_failed',
+        message: 'Failed to update item' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(updatedItem);
+  } catch (error) {
+    console.error('[Items API PATCH] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to update item' 
+    }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const res = await proxyDelete(req, `/items/${id}`);
-    if (res.status === 204) {
-      return new NextResponse(null, { status: 204 });
+    
+    // Extract tenant_id from query
+    const tenantId = new URL(req.url).searchParams.get('tenant_id');
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
     }
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] DELETE /items/:id error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+
+    // Delete item using service with automatic cache invalidation
+    const success = await itemsService.deleteItem(id, tenantId);
+    
+    if (!success) {
+      return NextResponse.json({ 
+        error: 'delete_failed',
+        message: 'Failed to delete item' 
+      }, { status: 400 });
+    }
+    
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('[Items API DELETE] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to delete item' 
+    }, { status: 500 });
   }
 }

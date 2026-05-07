@@ -140,7 +140,13 @@ export async function exchangeCodeForToken(code: string): Promise<{
     throw new Error(`Failed to exchange code for token: ${error}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    merchant_id?: string;
+    merchantId?: string;
+  };
   
   // Extract merchant ID from response
   // Clover returns merchant_id in the token response
@@ -148,7 +154,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_in: data.expires_in,
-    merchant_id: data.merchant_id || data.merchantId
+    merchant_id: data.merchant_id || data.merchantId || '',
   };
 }
 
@@ -182,18 +188,28 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     throw new Error(`Failed to refresh token: ${error}`);
   }
 
-  return await response.json();
+  return await response.json() as {
+    access_token: string;
+    expires_in?: number;
+  };
 }
 
 /**
- * Encrypt token for storage (simple encryption, use proper encryption in production)
+ * Encrypt token for storage
  */
 export function encryptToken(token: string): string {
   const secret = process.env.CLOVER_TOKEN_ENCRYPTION_KEY || 'default-encryption-key-change-in-production';
-  const cipher = crypto.createCipher('aes-256-cbc', secret);
+  // Create a 32-byte key from the secret (for AES-256)
+  const key = crypto.scryptSync(secret, 'salt', 32);
+  // Generate a random 16-byte IV
+  const iv = crypto.randomBytes(16);
+
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
   let encrypted = cipher.update(token, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+
+  // Return IV + encrypted data (IV is needed for decryption)
+  return iv.toString('hex') + ':' + encrypted;
 }
 
 /**
@@ -201,8 +217,15 @@ export function encryptToken(token: string): string {
  */
 export function decryptToken(encryptedToken: string): string {
   const secret = process.env.CLOVER_TOKEN_ENCRYPTION_KEY || 'default-encryption-key-change-in-production';
-  const decipher = crypto.createDecipher('aes-256-cbc', secret);
-  let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
+  // Create a 32-byte key from the secret (for AES-256)
+  const key = crypto.scryptSync(secret, 'salt', 32);
+
+  // Extract IV and encrypted data
+  const [ivHex, encrypted] = encryptedToken.split(':');
+  const iv = Buffer.from(ivHex, 'hex');
+
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
 }

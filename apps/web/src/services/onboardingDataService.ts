@@ -1,5 +1,5 @@
 import { BusinessProfile, normalizePhoneInput } from '@/lib/validation/businessProfile';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 /**
  * Service for handling onboarding data operations
@@ -11,47 +11,12 @@ export class OnboardingDataService {
    */
   async fetchTenantData(tenantId: string): Promise<Partial<BusinessProfile>> {
     try {
-      const [tenant, profile] = await Promise.all([
-        this.fetchTenant(tenantId),
-        this.fetchProfile(tenantId),
-      ]);
-
-      return this.mergeData(tenant, profile);
+      const mergedData = await platformHomeService.getOnboardingTenantData(tenantId);
+      return mergedData;
     } catch (error) {
       console.error('[OnboardingDataService] Failed to fetch tenant data:', error);
       return {};
     }
-  }
-
-  /**
-   * Fetch tenant basic info
-   */
-  private async fetchTenant(tenantId: string): Promise<any> {
-    try {
-      const response = await api.get(`/api/tenants/${tenantId}`);
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.error('[OnboardingDataService] Failed to fetch tenant:', error);
-    }
-    return null;
-  }
-
-  /**
-   * Fetch tenant profile
-   */
-  private async fetchProfile(tenantId: string): Promise<any> {
-    try {
-      const response = await api.get(`/api/tenant/profile?tenantId=${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        return data?.data || data || null;
-      }
-    } catch (error) {
-      console.error('[OnboardingDataService] Failed to fetch profile:', error);
-    }
-    return null;
   }
 
   /**
@@ -79,13 +44,16 @@ export class OnboardingDataService {
   }
 
   /**
-   * Sanitize data - treat whitespace-only strings as empty
+   * Sanitize data - treat whitespace-only strings as empty, convert null to empty string
    */
   sanitizeData(data: Partial<BusinessProfile>): Partial<BusinessProfile> {
     const sanitized: Partial<BusinessProfile> = {};
     
     for (const [key, value] of Object.entries(data)) {
-      if (typeof value === 'string' && value.trim() === '') {
+      // Convert null to empty string for string fields
+      if (value === null) {
+        sanitized[key as keyof BusinessProfile] = '' as any;
+      } else if (typeof value === 'string' && value.trim() === '') {
         sanitized[key as keyof BusinessProfile] = '' as any;
       } else {
         sanitized[key as keyof BusinessProfile] = value as any;
@@ -111,22 +79,31 @@ export class OnboardingDataService {
       email: '',
       website: '',
       contact_person: '',
+      logo_url: '',
+      business_description: '',
+      hours: null,
+      social_links: {},
+      seo_tags: [],
+      latitude: null,
+      longitude: null,
+      admin_email: '',
       ...data,
+      // Don't default slug - only send if explicitly set
     };
   }
 
   /**
    * Save business profile
    */
-  async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<void> {
-    const response = await api.post('/api/tenant/profile', {
-      tenantId: tenantId,
-      ...data,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.error || 'Failed to save business profile');
+  async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<Partial<BusinessProfile>> {
+    try {
+      // Sanitize data to convert null values to empty strings
+      const sanitizedData = this.sanitizeData(data);
+      const result = await platformHomeService.saveOnboardingProfile(tenantId, sanitizedData);
+      return result as Partial<BusinessProfile>;
+    } catch (error) {
+      // Error will be caught and displayed in UI
+      throw error;
     }
   }
 }

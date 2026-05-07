@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { api, API_BASE_URL } from '@/lib/api'
+import { tenantCategoriesService } from '@/services/TenantCategoriesService'
 
 type Category = {
   id: string
@@ -46,80 +46,83 @@ export default function AssignCategoryModal({
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const url = `${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`;
-        const res = await api.get(url)
-        const data = await res.json()
-        console.log('[AssignCategoryModal] Categories response:', data)
-        if (data.success && Array.isArray(data.data)) {
-          setCategories(data.data)
-        } else {
-          console.warn('[AssignCategoryModal] Unexpected response format:', data)
+        const categoriesData = await tenantCategoriesService.getTenantCategories(tenantId);
+        
+        if (categoriesData) {
+          console.log('[AssignCategoryModal] Categories response:', categoriesData)
+          setCategories(categoriesData)
+          
+          setRecentIds(categoriesData.slice(0, 30).map(cat => cat.id))
         }
-      } catch (e) {
-        console.error('[AssignCategoryModal] Failed to fetch categories:', e)
+      } catch (err) {
+        console.error('[AssignCategoryModal] Error fetching categories:', err)
+        setError('Failed to load categories')
       }
     }
-    if (tenantId) {
-      fetchCategories()
-    }
+
+    fetchCategories()
   }, [tenantId])
 
-  // Load recent categories from localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('recent_category_ids')
-      if (raw) setRecentIds(JSON.parse(raw))
-    } catch {}
-  }, [])
+    setSelectedCategoryId(currentCategory || '')
+  }, [currentCategory])
 
   useEffect(() => {
-    if (!taxQuery || taxQuery.trim().length < 2) {
-      setTaxResults([])
-      return
-    }
     let active = true
     const t = setTimeout(async () => {
       try {
         setTaxLoading(true)
-        const res = await api.get(`api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
-        if (res.ok) {
-          const data = await res.json()
-          if (active) setTaxResults(data.results || [])
+        
+        const filteredCategories = categories.filter(cat => 
+          cat.name.toLowerCase().includes(taxQuery.toLowerCase())
+        )
+        
+        if (active) {
+          setTaxResults(filteredCategories.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            path: [cat.name]
+          })).slice(0, 8))
         }
+      } catch (err) {
+        console.error('[AssignCategoryModal] Error searching categories:', err)
       } finally {
-        setTaxLoading(false)
+        if (active) setTaxLoading(false)
       }
     }, 300)
-    return () => {
-      active = false
-      clearTimeout(t)
-    }
-  }, [taxQuery])
 
-  async function handleSave() {
+    return () => { active = false }
+  }, [taxQuery, categories])
+
+  const handleSave = async () => {
     if (!selectedCategoryId) {
       setError('Please select a category')
       return
     }
+
+    setSaving(true)
+    setError(null)
     try {
-      setSaving(true)
-      setError(null)
-      const url = `${API_BASE_URL}/api/v1/tenants/${tenantId}/items/${itemId}/category`
-      const res = await api.patch(url, { tenantCategoryId: selectedCategoryId })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to assign category')
+      // Update item category using ItemsSingletonService
+      const { itemsService } = await import('@/services/ItemsSingletonService')
+      const updatedItem = await itemsService.updateItem(itemId, { 
+        tenantCategoryId: selectedCategoryId 
+      }, tenantId)
+      
+      if (!updatedItem) {
+        throw new Error('Failed to assign category')
       }
-      // persist recent category
-      try {
-        const next = [selectedCategoryId, ...recentIds.filter(id => id !== selectedCategoryId)].slice(0, 8)
-        setRecentIds(next)
-        localStorage.setItem('recent_category_ids', JSON.stringify(next))
-      } catch {}
+      
+      // Store recent category ID in localStorage
+      const recentIds = JSON.parse(localStorage.getItem('recent_category_ids') || '[]')
+      const next = [selectedCategoryId, ...recentIds.filter((id: string) => id !== selectedCategoryId)].slice(0, 30)
+      localStorage.setItem('recent_category_ids', JSON.stringify(next))
+      
       onSave()
       onClose()
-    } catch (e: any) {
-      setError(e?.message || 'Failed to assign category')
+    } catch (err) {
+      console.error('[AssignCategoryModal] Error assigning category:', err)
+      setError(err instanceof Error ? err.message : 'Failed to assign category')
     } finally {
       setSaving(false)
     }
@@ -130,7 +133,7 @@ export default function AssignCategoryModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
           <div>
-            <h3 className="text-lg font-semibold">Assign Category</h3>
+            <h3 className="text-lg font-semibold">Assign A Category</h3>
             <p className="text-sm text-gray-600 mt-1">{itemName}</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

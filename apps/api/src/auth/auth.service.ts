@@ -1,8 +1,10 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { UserRole } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
+import { user_role } from '@prisma/client';
 import { prisma } from '../prisma';
 import { JWTPayload } from '../middleware/auth';
+import { generateSessionId, generateUserId } from '../lib/id-generator';
 
 // JWT configuration
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
@@ -42,8 +44,10 @@ export class AuthService {
 
   /**
    * Generate JWT access token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   generateAccessToken(payload: JWTPayload): string {
+    console.warn('[DEPRECATED] generateAccessToken called - migrate to Auth0 authentication');
     const token = jwt.sign(payload, JWT_ACCESS_SECRET, {
       expiresIn: JWT_ACCESS_EXPIRY,
     });
@@ -52,8 +56,10 @@ export class AuthService {
 
   /**
    * Generate JWT refresh token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   generateRefreshToken(payload: JWTPayload): string {
+    console.warn('[DEPRECATED] generateRefreshToken called - migrate to Auth0 authentication');
     return jwt.sign(payload, JWT_REFRESH_SECRET, {
       expiresIn: JWT_REFRESH_EXPIRY,
     });
@@ -61,15 +67,19 @@ export class AuthService {
 
   /**
    * Verify JWT access token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   verifyAccessToken(token: string): JWTPayload {
+    console.warn('[DEPRECATED] verifyAccessToken called - migrate to Auth0 authentication');
     return jwt.verify(token, JWT_ACCESS_SECRET) as JWTPayload;
   }
 
   /**
    * Verify JWT refresh token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   verifyRefreshToken(token: string): JWTPayload {
+    console.warn('[DEPRECATED] verifyRefreshToken called - migrate to Auth0 authentication');
     return jwt.verify(token, JWT_REFRESH_SECRET) as JWTPayload;
   }
 
@@ -78,7 +88,7 @@ export class AuthService {
    */
   async register(data: RegisterData) {
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
     });
 
@@ -90,26 +100,26 @@ export class AuthService {
     const passwordHash = await this.hashPassword(data.password);
 
     // Create user using snake_case Prisma fields, then map to camelCase DTO
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
-        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: generateUserId(),
         email: data.email.toLowerCase(),
-        passwordHash: passwordHash,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: UserRole.USER,
-        updatedAt: new Date(),
+        password_hash: passwordHash,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        role: user_role.USER,
+        updated_at: new Date(),
       },
     });
 
     return {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      first_name: user.first_name,
+      last_name: user.last_name,
       role: user.role,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
+      email_verified: user.email_verified,
+      created_at: user.created_at,
     };
   }
 
@@ -117,11 +127,33 @@ export class AuthService {
    * Login user
    */
   async login(data: LoginData) {
+    // Rate limiting: Check recent login attempts for this user
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentLogins = await prisma.user_sessions_list.count({
+      where: {
+        users: { email: data.email.toLowerCase() },
+        created_at: { gte: oneHourAgo },
+      },
+    });
+
+    const maxLoginsPerHour = 5;
+    if (recentLogins >= maxLoginsPerHour) {
+      throw new Error(`Too many login attempts. Maximum ${maxLoginsPerHour} logins per hour allowed.`);
+    }
+
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: data.email.toLowerCase() },
       include: {
-        userTenants: true,
+        user_tenants: {
+          include: {
+            tenants: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -130,18 +162,18 @@ export class AuthService {
     }
 
     // Check if user is active
-    if (!user.isActive) {
+    if (!user.is_active) {
       throw new Error('Account is deactivated');
     }
 
     // Verify password
-    const isValidPassword = await this.verifyPassword(data.password, user.passwordHash);
+    const isValidPassword = await this.verifyPassword(data.password, user.password_hash);
     if (!isValidPassword) {
       throw new Error('Invalid email or password');
     }
 
     // Get tenant IDs
-    const tenantIds = user.userTenants.map((ut) => ut.tenantId);
+    const tenantIds = user.user_tenants.map((ut) => ut.tenant_id);
 
     // Create JWT payload
     const payload: JWTPayload = {
@@ -149,6 +181,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantIds,
+      id: undefined
     };
 
     // Generate tokens
@@ -156,17 +189,20 @@ export class AuthService {
     const refreshToken = this.generateRefreshToken(payload);
 
     // Update last login
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() },
+      data: { last_login: new Date() },
     });
 
-    // Create session
-    await prisma.userSession.create({
+    // Generate token hash for session tracking
+    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+
+    // Create session with token hash so middleware can find/update it
+    await prisma.user_sessions_list.create({
       data: {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        user_id: user.id,
+        token_hash: tokenHash,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
 
@@ -175,13 +211,13 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        first_name: user.first_name,
+        last_name: user.last_name,
         role: user.role,
-        emailVerified: user.emailVerified,
-        tenants: user.userTenants.map((ut) => ({
-          id: ut.tenantId,
-          name: 'Unknown',
+        email_verified: user.email_verified,
+        tenants: user.user_tenants.map((ut) => ({
+          id: ut.tenant_id,
+          name: ut.tenants?.name || ut.tenant_id,
           role: ut.role,
         })),
       },
@@ -198,22 +234,22 @@ export class AuthService {
       const payload = this.verifyRefreshToken(refreshToken);
 
       // Verify user still exists and is active
-      const user = await prisma.user.findUnique({
+      const user = await prisma.users.findUnique({
         where: { id: payload.userId },
         select: {
           id: true,
           email: true,
           role: true,
-          isActive: true,
-          userTenants: {
+          is_active: true,
+          user_tenants: {
             select: {
-              tenantId: true,
+              tenant_id: true,
             },
           },
         },
       });
 
-      if (!user || !user.isActive) {
+      if (!user || !user.is_active) {
         throw new Error('Invalid refresh token');
       }
 
@@ -222,7 +258,8 @@ export class AuthService {
         userId: user.id,
         email: user.email,
         role: user.role,
-        tenantIds: user.userTenants.map((ut) => ut.tenantId),
+        tenantIds: user.user_tenants.map((ut) => ut.tenant_id),
+        id: undefined
       };
 
       const accessToken = this.generateAccessToken(newPayload);
@@ -240,17 +277,23 @@ export class AuthService {
     // Get user by ID
     
     // First get user without relations to avoid Prisma relation issues
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        first_name: true,
+        last_name: true,
+        business_name: true,
+        business_type: true,
+        phone: true,
         role: true,
-        emailVerified: true,
-        lastLogin: true,
-        createdAt: true,
+        email_verified: true,
+        last_login: true,
+        created_at: true,
+        picture: true,
+        auth0_id: true,
+        onboarding_completed: true,
       },
     });
 
@@ -258,14 +301,20 @@ export class AuthService {
       throw new Error('User not found');
     }
 
-    // Get user tenants separately to avoid relation issues
-    let userTenants: { tenantId: string; role: any }[] = [];
+    // Get user tenants with tenant names and organization info
+    let userTenants: { tenant_id: string; role: any; tenants: { name: string; organization_id: string | null } }[] = [];
     try {
-      userTenants = await prisma.userTenant.findMany({
-        where: { userId: userId },
+      userTenants = await prisma.user_tenants.findMany({
+        where: { user_id: userId },
         select: {
-          tenantId: true,
+          tenant_id: true,
           role: true,
+          tenants: {
+            select: {
+              name: true,
+              organization_id: true,
+            },
+          },
         },
       });
     } catch (tenantError) {
@@ -275,15 +324,23 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      business_name: user.business_name,
+      business_type: user.business_type,
+      phone: user.phone,
       role: user.role,
-      emailVerified: user.emailVerified,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      tenants: userTenants.map((ut: { tenantId: string; role: any }) => ({
-        id: ut.tenantId,
+      email_verified: user.email_verified,
+      last_login: user.last_login,
+      created_at: user.created_at,
+      picture: user.picture,
+      auth0_id: user.auth0_id,
+      onboarding_completed: user.onboarding_completed,
+      tenants: userTenants.map((ut) => ({
+        id: ut.tenant_id,
+        name: ut.tenants?.name || ut.tenant_id,
         role: ut.role,
+        organization_id: ut.tenants?.organization_id,
       })),
     };
   }
@@ -293,9 +350,9 @@ export class AuthService {
    */
   async logout(userId: string) {
     // Deactivate all user sessions
-    await prisma.userSession.updateMany({
-      where: { userId: userId, isActive: true },
-      data: { isActive: false },
+    await prisma.user_sessions_list.updateMany({
+      where: { user_id: userId, is_active: true },
+      data: { is_active: false },
     });
 
     return { message: 'Logged out successfully' };

@@ -21,6 +21,8 @@ interface MapCardSettingsProps {
   onSave: (settings: { displayMap: boolean; privacyMode: 'precise' | 'neighborhood' }) => Promise<void>;
 }
 
+
+
 export default function MapCardSettings({
   businessProfile,
   displayMap: initialDisplayMap,
@@ -166,8 +168,7 @@ export default function MapCardSettings({
 
           {/* Save Button */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
-            <Button
-              variant="primary"
+            <Button              
               onClick={handleSave}
               disabled={!hasChanges || saving}
               loading={saving}

@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { CachedTenantService, CachedTenantData } from '@/lib/cache/cached-tenant-service';
 import { 
   resolveTier, 
   ResolvedTier, 
@@ -56,118 +59,119 @@ export interface UseTenantTierReturn {
  * Resolves effective tier from organization and tenant levels
  */
 export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
-  const [tier, setTier] = useState<ResolvedTier | null>(null);
-  const [usage, setUsage] = useState<TenantUsage | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [canSupport, setCanSupport] = useState(false);
-  const [userRole, setUserRole] = useState<UserTenantRole | null>(null);
-  const [userData, setUserData] = useState<any>(null);
+  // Use AuthContext instead of fetching /auth/me independently
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  
+  const userData = useMemo(() => authUser || null, [authUser]);
+  const userRole = useMemo(() => {
+    if (!userData || !tenantId) return null;
+    const userTenant = userData.tenants.find(t => t.id === tenantId);
+    return userTenant?.role || null;
+  }, [userData, tenantId]);
+  
+  const canSupport = useMemo(() => {
+    return canBypassTierRestrictions(userData) || canBypassRoleRestrictions(userData);
+  }, [userData]);
 
-  const fetchTierData = async () => {
-    if (!tenantId) {
-      setLoading(false);
-      return;
-    }
+  // Helper function to map API tier response to TierInfo format
+  const mapApiTierToTierInfo = (apiTier: any): TierInfo => {
+    return {
+      id: apiTier.tier_key || apiTier.tierKey,
+      name: apiTier.display_name || apiTier.displayName || apiTier.name,
+      level: mapTierKeyToLevel(apiTier.tier_key || apiTier.tierKey),
+      source: 'tenant', // Default to tenant, will be overridden if needed
+      features: apiTier.tier_features_list || apiTier.features || [],
+      limits: apiTier.limits || {}
+    };
+  };
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Check user's platform role and tenant role
-      const userResponse = await api.get('auth/me');
-      if (userResponse.ok) {
-        const userDataResponse = await userResponse.json();
-        setUserData(userDataResponse.user);  // Store for emergency bypass
-        
-        // Level 0: Platform bypass using centralized utility
-        const hasSupportAccess = canBypassTierRestrictions(userDataResponse.user);
-        setCanSupport(hasSupportAccess);
-        
-        // Platform viewer gets read-only access to all tenants
-        const isPlatformViewer = userDataResponse.user?.role === 'PLATFORM_VIEWER';
-        
-        // Get user's role on this specific tenant
-        // Platform admins bypass role checks, so skip this call
-        if (!hasSupportAccess && userDataResponse.user?.id && tenantId) {
-          // Find the user's role for this tenant from the already-loaded user data
-          const userTenant = userDataResponse.user.tenants?.find((t: any) => t.id === tenantId);
-          if (userTenant) {
-            setUserRole(userTenant.role as UserTenantRole);
-          } else if (isPlatformViewer) {
-            // Platform viewers act as VIEWER role on any tenant
-            setUserRole('VIEWER');
-          }
-        } else if (isPlatformViewer) {
-          // Platform viewers act as VIEWER role on any tenant
-          setUserRole('VIEWER');
-        }
-        
-        // Platform admins and support bypass tier checks, but still fetch tier data for display
-        // The bypass happens in canAccess() and checkFeature() functions
-      }
-
-      // Fetch tenant and organization tier data in parallel (Next.js API routes)
-      const [tenantResponse, usageResponse] = await Promise.all([
-        api.get(`/api/tenants/${tenantId}/tier`),
-        api.get(`/api/tenants/${tenantId}/usage`)
-      ]);
-
-      let organizationTier: TierInfo | null = null;
-      let tenantTier: TierInfo | null = null;
-      let isChain = false;
-
-      // Process tenant tier response
-      if (tenantResponse.ok) {
-        const tierData = await tenantResponse.json();
-        
-        organizationTier = tierData.organizationTier || null;
-        tenantTier = tierData.tenantTier || null;
-        isChain = tierData.isChain || false;
-      }
-
-      // Process usage response
-      let usageData: TenantUsage = {
-        products: 0,
-        locations: 0,
-        users: 0,
-        apiCalls: 0,
-        storageGB: 0
-      };
-
-      if (usageResponse.ok) {
-        const usage = await usageResponse.json();
-        usageData = {
-          products: usage.products || 0,
-          locations: usage.locations || 0,
-          users: usage.users || 0,
-          apiCalls: usage.apiCalls || 0,
-          storageGB: usage.storageGB || 0
-        };
-      }
-
-      // Resolve effective tier using middleware
-      const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
-
-      setTier(resolvedTier);
-      setUsage(usageData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load tier data';
-      setError(errorMessage);
-      console.error('[useTenantTier] Error:', err);
-    } finally {
-      setLoading(false);
+  // Helper function to map tier keys to levels
+  const mapTierKeyToLevel = (tierKey: string): TierInfo['level'] => {
+    switch (tierKey) {
+      case 'google_only': return 'discovery';
+      case 'starter': return 'discovery';
+      case 'discovery': return 'discovery';
+      case 'storefront': return 'storefront';
+      case 'commitment': return 'commitment';
+      
+      case 'professional': return 'professional';
+      case 'enterprise': return 'enterprise';
+      case 'organization': return 'enterprise';
+      case 'chain_starter': return 'chain_starter';
+      case 'chain_professional': return 'chain_professional';
+      case 'chain_enterprise': return 'chain_enterprise';
+      default: return 'discovery';
     }
   };
 
-  // Auto-fetch when tenantId changes
-  useEffect(() => {
-    fetchTierData();
-  }, [tenantId]);
+  // Use CachedTenantService for persistent local storage caching
+  const { data: tenantData, isLoading: tenantLoading, error: tenantError, refetch } = useQuery({
+    queryKey: ['tenant', tenantId, 'cached-data', !!authUser],
+    queryFn: async (): Promise<CachedTenantData | null> => {
+      if (!tenantId) return null;
+
+      try {
+        const data = await CachedTenantService.getTenantData(tenantId, true);
+        return data;
+      } catch (error) {
+        console.error('[useTenantTier] Failed to fetch tenant data:', error);
+        throw error;
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - local storage handles longer-term caching
+    gcTime: 15 * 60 * 1000, // 15 minutes
+    enabled: !!tenantId, // Only run when tenantId is available
+  });
+
+  // Extract tier and usage data from cached tenant data
+  const tierData = useMemo(() => {
+    if (!tenantData) return null;
+
+    // Reconstruct tier data from cached format
+    const { tenant, tier: tierInfo } = tenantData;
+
+    // Guard against missing tierInfo
+    if (!tierInfo) return null;
+
+    let organizationTier: TierInfo | null = null;
+    let tenantTier: TierInfo | null = null;
+    let isChain = false;
+
+    // The new TenantTier interface has different structure
+    if (tierInfo.effective) {
+      tenantTier = mapApiTierToTierInfo(tierInfo.effective);
+    }
+    isChain = false; // Not available in new structure
+
+    const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
+
+    return {
+      tier: resolvedTier,
+      isChain
+    };
+  }, [tenantData]);
+
+  const usageData = useMemo(() => {
+    if (!tenantData?.usage) return null;
+
+    return {
+      products: tenantData.usage.items || 0,
+      locations: 1, // Not available in new structure
+      users: 0, // Not available in new structure
+      apiCalls: 0, // Not available in new structure
+      storageGB: tenantData.usage.storage || 0
+    };
+  }, [tenantData]);
+
+  // Extract data from React Query results
+  const tier = tierData?.tier || null;
+  const usage = usageData || null;
+  const loading = authLoading || tenantLoading;
+  const error = tenantError ? (tenantError instanceof Error ? tenantError.message : String(tenantError)) : null;
 
   // EMERGENCY: Feature name mapping to fix frontend/backend conflicts
   const EMERGENCY_FEATURE_MAPPING: Record<string, string> = {
-    'product_scanning': 'barcode_scan',  // Map frontend name to backend
+    'barcode_scan': 'product_scanning',  // Map frontend name to backend
     'quick_start_wizard_full': 'quick_start_wizard',  // Normalize variants
     'propagation': 'propagation_products',  // Default propagation to products
   };
@@ -234,29 +238,29 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       
       // Professional tier features
       'barcode_scan': {
-        tier: 'professional',
-        badge: 'PRO+',
+        tier: 'discovery',
+        badge: 'DISCOVERY+',
         tooltip: 'Requires Professional tier or higher - Upgrade for barcode scanning',
-        color: 'bg-gradient-to-r from-purple-600 to-pink-600'
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       'quick_start_wizard': { 
-        tier: 'professional', 
-        badge: 'PRO+', 
-        tooltip: 'Requires Professional tier or higher - Upgrade for Quick Start wizard',
-        color: 'bg-gradient-to-r from-purple-600 to-pink-600'
+        tier: 'discovery', 
+        badge: 'DISCOVERY+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for Quick Start wizard',
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       
       // Starter tier features
       'storefront': { 
-        tier: 'starter', 
-        badge: 'STARTER+', 
-        tooltip: 'Requires Starter tier or higher - Upgrade for public storefront',
-        color: 'bg-blue-600'
+        tier: 'storefront', 
+        badge: 'STOREFRONT+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for public storefront',
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       'category_quick_start': { 
-        tier: 'starter', 
-        badge: 'STARTER+', 
-        tooltip: 'Requires Starter tier or higher - Upgrade for category quick start',
+        tier: 'discovery', 
+        badge: 'DISCOVERY+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for category quick start',
         color: 'bg-blue-600'
       },
     };
@@ -409,12 +413,15 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     };
   };
 
+  // Combined loading state
+  // const loading = authLoading || tierLoading;
+
   return {
     tier,
     usage,
     loading,
     error,
-    refresh: fetchTierData,
+    refresh: async () => { await refetch(); }, // Return Promise<void>
     // Level 1: Legacy tier-only checks (backward compatibility)
     hasFeature: checkFeature,
     getFeaturesByCategory: getFeatures,

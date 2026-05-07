@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, AnimatedCard, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
+import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { clearCachesWithConfirmation } from '@/utils/clearAllCaches';
+import { TenantContextSwitcher } from '@/components/admin/TenantContextSwitcher';
 
 type AdminSection = {
   title: string;
@@ -26,6 +30,8 @@ type AdminGroup = {
   sections: AdminSection[];
 };
 
+
+
 export default function AdminDashboardPage() {
   // Use centralized access control - platform admins only
   const {
@@ -37,61 +43,24 @@ export default function AdminDashboardPage() {
     AccessPresets.PLATFORM_ADMIN_ONLY
   );
 
-  const [stats, setStats] = useState({
-    totalTenants: 0,
-    totalUsers: 0,
-  });
-  const [syncStats, setSyncStats] = useState({
-    totalRuns: 0,
-    successRate: 0,
-    outOfSyncCount: 0,
-    failedRuns: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [syncLoading, setSyncLoading] = useState(true);
+  // Use admin dashboard data hook - only fetches tenants and sync stats
+  const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminDashboardData();
 
+  // Track admin panel access
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        // Fetch real tenant count
-        const tenantsRes = await api.get('/api/tenants');
-        const tenants = await tenantsRes.json();
-        
-        setStats({
-          totalTenants: Array.isArray(tenants) ? tenants.length : 0,
-          totalUsers: 2, // TODO: Fetch from users API when available
-        });
-      } catch (error) {
-        console.error('Failed to load stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadStats();
-  }, []);
-
-  useEffect(() => {
-    const loadSyncStats = async () => {
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await api.get(`${apiBaseUrl}/api/admin/sync-stats`);
-        if (res.ok) {
-          const data = await res.json();
-          setSyncStats(data.stats || {
-            totalRuns: 0,
-            successRate: 0,
-            outOfSyncCount: 0,
-            failedRuns: 0,
-          });
+    if (hasAccess && isPlatformAdmin) {
+      trackBehaviorClient({
+        entityType: 'admin',
+        entityId: 'platform_admin_dashboard',
+        entityName: 'Platform Admin Dashboard',
+        pageType: 'admin_panel',
+        context: {
+          isAdmin: true,
+          isPlatformAdmin
         }
-      } catch (error) {
-        console.error('Failed to load sync stats:', error);
-      } finally {
-        setSyncLoading(false);
-      }
-    };
-    loadSyncStats();
-  }, []);
+      });
+    }
+  }, [hasAccess, isPlatformAdmin]);
 
   const adminGroups: AdminGroup[] = [
     {
@@ -99,9 +68,23 @@ export default function AdminDashboardPage() {
       description: 'Customize platform appearance and communications',
       sections: [
         {
+          title: 'Platform Ticker',
+          description: 'Manage platform-wide notifications and announcements with scheduling',
+          href: '/settings/admin/ticker',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          ),
+          color: 'bg-teal-500',
+          stats: 'Platform communications',
+          badge: 'NEW',
+        },
+        {
           title: 'Branding',
           description: 'Customize platform logo, name, and appearance',
-          href: '/settings/admin/branding',
+          href: '/admin/branding',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -112,16 +95,29 @@ export default function AdminDashboardPage() {
           stats: 'Customize appearance',
         },
         {
-          title: 'Email Management',
-          description: 'Configure email addresses for different request types',
-          href: '/settings/admin/emails',
+          title: 'Subdomain Management',
+          description: 'Monitor subdomain usage, adoption rates, and manage rate limiting',
+          href: '/settings/admin/subdomain',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
             </svg>
           ),
-          color: 'bg-pink-500',
-          stats: '8 categories',
+          color: 'bg-indigo-500',
+          stats: 'Custom domains',
+          badge: 'NEW',
+        },
+        {
+          title: 'Payment Settings',
+          description: 'Configure platform-wide minimum payment amounts for all payment gateways',
+          href: '/settings/admin/payment',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          color: 'bg-green-500',
+          stats: 'Payment configuration',
           badge: 'NEW',
         },
       ],
@@ -130,19 +126,7 @@ export default function AdminDashboardPage() {
       title: 'Feature Flags & Overrides',
       description: 'Control feature rollout and custom tenant access',
       sections: [
-        {
-          title: 'Tier & Feature Matrix',
-          description: 'Live view of all tiers and their feature access',
-          href: '/settings/admin/tier-matrix',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-          ),
-          color: 'bg-cyan-500',
-          stats: 'Visual tier reference',
-          badge: 'NEW',
-        },
+       
         {
           title: 'Feature Overrides',
           description: 'Grant or revoke tier features for specific tenants',
@@ -152,13 +136,13 @@ export default function AdminDashboardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           ),
-          color: 'bg-amber-500',
-          stats: 'Custom access control',
+          color: 'bg-orange-500',
+          stats: 'Tenant customization',
         },
         {
           title: 'Feature Flags (DB)',
           description: 'Database-backed flags with tenant override support',
-          href: '/settings/admin/platform-flags',
+          href: '/admin/platform-flags',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
@@ -170,7 +154,7 @@ export default function AdminDashboardPage() {
         {
           title: 'Feature Flags (Legacy)',
           description: 'localStorage-based flags for backward compatibility',
-          href: '/settings/admin/features',
+          href: '/admin/features',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
@@ -182,20 +166,124 @@ export default function AdminDashboardPage() {
       ],
     },
     {
+      title: 'Tier Management',
+      description: 'Control feature rollout and custom tenant access',
+      sections: [
+        {
+          title: 'Tier & Feature Matrix',
+          description: 'Live view of all tiers and their feature access',
+          href: '/admin/tier-matrix',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+          ),
+          color: 'bg-cyan-500',
+          stats: 'Visual tier reference',
+          badge: 'NEW',
+        },
+        
+        {
+          title: 'Tier Management',
+          description: 'Manage tenant subscription tiers and billing',
+          href: '/admin/tiers',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: `${tenants?.total || 0} tenants`,
+        },
+        {
+          title: 'Tier System',
+          description: 'Manage tier definitions and features (CRUD)',
+          href: '/admin/tier-system',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Database-driven',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'Security & Compliance',
+      description: 'Monitor platform security and manage threats',
+      sections: [
+        {
+          title: 'Security Dashboard',
+          description: 'Platform-wide security monitoring and threat detection',
+          href: '/admin/security',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          color: 'bg-red-500',
+          stats: 'Threat monitoring',
+          badge: 'NEW',
+        },
+        {
+          title: 'Platform Settings',
+          description: 'Rate limiting controls, security configurations, and platform-wide settings',
+          href: '/admin/platform',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          color: 'bg-purple-500',
+          stats: 'Rate limiting & security',
+          badge: 'NEW',
+        },
+        {
+          title: 'Branding',
+          description: 'Customize platform logo, name, and appearance',
+          href: '/settings/admin/branding',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2V5a2 2 0 00-2-2h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293H9a2 2 0 00-2 2v12a4 4 0 004 4z" />
+            </svg>
+          ),
+          color: 'bg-blue-500',
+          stats: 'Platform identity',
+        },
+        {
+          title: 'Sentry Monitoring',
+          description: 'Error tracking, performance monitoring, and release health',
+          href: '/admin/sentry',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-orange-500',
+          stats: 'Error tracking',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
       title: 'User & Access Management',
       description: 'Manage platform users and their permissions',
       sections: [
         {
           title: 'User Management',
           description: 'Manage users, permissions, and access',
-          href: '/settings/admin/users',
+          href: '/admin/users',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           ),
           color: 'bg-purple-500',
-          stats: `${stats.totalUsers} users`,
+          stats: `2 users`,
         },
       ],
     },
@@ -213,7 +301,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-green-500',
-          stats: `${stats.totalTenants} tenants`,
+          stats: `${tenants?.total || 0} tenants`,
         },
         {
           title: 'Organizations',
@@ -260,6 +348,19 @@ export default function AdminDashboardPage() {
           stats: 'Approve requests',
           badge: 'NEW',
         },
+        {
+          title: 'Account Deletion Requests',
+          description: 'Review and manage user account deletion requests with 30-day grace period',
+          href: '/settings/admin/deletion-requests',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          ),
+          color: 'bg-red-500',
+          stats: 'GDPR compliance',
+          badge: 'NEW',
+        },
       ],
     },
     {
@@ -267,7 +368,7 @@ export default function AdminDashboardPage() {
       description: 'Manage product categories and data organization',
       sections: [
         {
-          title: 'Categories',
+          title: 'Product Categories',
           description: 'Manage product categories and hierarchies',
           href: '/admin/categories',
           icon: (
@@ -277,6 +378,38 @@ export default function AdminDashboardPage() {
           ),
           color: 'bg-purple-500',
           stats: 'Product organization',
+          badge: 'NEW',
+        },
+        {
+          title: 'Platform Categories',
+          description: 'Manage directory categories for all stores',
+          href: '/admin/platform-categories',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: '57 categories',
+          badge: 'P4',
+        },
+      ],
+    },
+    {
+      title: 'Featured Products',
+      description: 'Monitor featured products across all tenants',
+      sections: [
+        {
+          title: 'Featured Products Overview',
+          description: 'View all featured products, statistics, and tier usage',
+          href: '/admin/featured-products',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: 'Platform-wide analytics',
           badge: 'NEW',
         },
       ],
@@ -295,7 +428,7 @@ export default function AdminDashboardPage() {
             </svg>
           ),
           color: 'bg-cyan-500',
-          stats: syncLoading ? 'Loading...' : `${syncStats.successRate}% success rate`,
+          stats: adminDataLoading ? 'Loading...' : `${syncStats?.successRate || 0}% success rate`,
           badge: 'M3',
         },
       ],
@@ -320,23 +453,10 @@ export default function AdminDashboardPage() {
       ],
     },
     {
-      title: 'Developer Tools',
+      title: 'Quick Start Tools',
       description: 'Testing and development utilities for platform admins',
       sections: [
-        {
-          title: 'Admin Control Panel',
-          description: 'Create test chains, seed data, and manage development tools',
-          href: '/admin/tools',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          ),
-          color: 'bg-red-500',
-          stats: 'Test data & chains',
-          badge: 'ADMIN',
-        },
+        
         {
           title: 'Product Quick Start',
           description: 'Generate 50 sample products instantly for testing',
@@ -363,6 +483,27 @@ export default function AdminDashboardPage() {
           stats: '5-30 categories',
           badge: 'NEW',
         },
+      ],
+    },
+    {
+      title: 'Developer Tools',
+      description: 'Testing and development utilities for platform admins',
+      sections: [
+        {
+          title: 'Admin Control Panel',
+          description: 'Create test chains, seed data, and manage development tools',
+          href: '/admin/tools',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          color: 'bg-red-500',
+          stats: 'Test data & chains',
+          badge: 'ADMIN',
+        },
+        
       ],
     },
     {
@@ -428,32 +569,6 @@ export default function AdminDashboardPage() {
           badge: 'INFO',
         },
         {
-          title: 'Tier Management',
-          description: 'Manage tenant subscription tiers and billing',
-          href: '/settings/admin/tier-management',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-          color: 'bg-amber-500',
-          stats: `${stats.totalTenants} tenants`,
-        },
-        {
-          title: 'Tier System',
-          description: 'Manage tier definitions and features (CRUD)',
-          href: '/settings/admin/tier-system',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          ),
-          color: 'bg-indigo-500',
-          stats: 'Database-driven',
-          badge: 'NEW',
-        },
-        {
           title: 'Billing Dashboard',
           description: 'View SKU usage, limits, and billing status',
           href: '/admin/billing',
@@ -471,7 +586,7 @@ export default function AdminDashboardPage() {
   ];
 
   // Access control checks
-  if (accessLoading || loading) {
+  if (accessLoading || adminDataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <Spinner size="lg" />
@@ -497,25 +612,36 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="Admin Dashboard"
         description="Platform administration and configuration"
-        icon={Icons.Admin}
-        backLink={{
-          href: '/tenants',
-          label: 'Back to Tenants'
-        }}
+        icon={Icons.Settings}
       />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* System Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar with Tenant Context */}
+          <div className="lg:col-span-1 space-y-6">
+            <TenantContextSwitcher 
+              onTenantChange={(tenantId) => {
+                // Clear any cached data when switching tenants
+                clearCachesWithConfirmation();
+                // Optionally redirect to tenant's subscription page
+                window.location.href = `/t/${tenantId}/settings/subscription`;
+              }}
+            />
+          </div>
+          
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* System Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <AnimatedCard delay={0} hover={false}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Tenants</p>
-                  {loading ? (
+                  {adminDataLoading ? (
                     <Spinner size="sm" className="mt-2" />
                   ) : (
-                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stats.totalTenants}</p>
+                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{tenants?.total || 0}</p>
                   )}
                 </div>
                 <div className="h-12 w-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -532,10 +658,10 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Users</p>
-                  {loading ? (
+                  {adminDataLoading ? (
                     <Spinner size="sm" className="mt-2" />
                   ) : (
-                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stats.totalUsers}</p>
+                    <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">2</p> // TODO: Add user count to cached admin data
                   )}
                 </div>
                 <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -695,6 +821,55 @@ export default function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Cache Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cache Management</CardTitle>
+            <CardDescription>Clear application caches to resolve data issues</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="h-6 w-6 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Clear All Caches</h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      This will clear all cached data including directory listings, user preferences, product data, and session data. Use this when experiencing data inconsistencies or after cache system updates.
+                    </p>
+                    <div className="mt-3">
+                      <Button 
+                        variant="outline" 
+                        color="amber"
+                        onClick={clearCachesWithConfirmation}
+                        className="text-sm"
+                      >
+                        Clear All Caches
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p><strong>Cache types cleared:</strong></p>
+                <ul className="mt-1 space-y-1">
+                  <li>• Directory listings and search results</li>
+                  <li>• User preferences and session data</li>
+                  <li>• Product data and inventory</li>
+                  <li>• API responses and computed values</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,55 +1,80 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { computeStoreStatus, getTodaySpecialHours } from "@/lib/hours-utils";
+import { useEffect, useState, useRef } from "react";
+import { getTodaySpecialHours } from "@/lib/hours-utils";
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { tenantManagementService } from "@/services/TenantManagementService";
 
 interface HoursPreviewProps {
-  apiBase: string;
   tenantId: string;
 }
 
-export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
-  const [status, setStatus] = useState<{ isOpen: boolean; label: string } | null>(null);
-  const [specialHours, setSpecialHours] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+
+export default function HoursPreview({ tenantId }: HoursPreviewProps) {
+  const { status, loading } = useStoreStatus(tenantId, false); // Private scope
+  const [specialHours, setSpecialHours] = useState<any[] | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    const fetchAndCompute = async () => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Fetch special hours using TenantManagementService
+  useEffect(() => {
+    const fetchSpecialHours = async () => {
       try {
-        setLoading(true);
-        const res = await fetch(`${apiBase}/public/tenant/${tenantId}/profile`, { cache: 'no-store' });
-        if (!res.ok) {
-          setStatus(null);
-          setSpecialHours([]);
-          return;
-        }
-        const data = await res.json();
-        const hours = data?.hours;
-        
-        if (hours) {
-          const computed = computeStoreStatus(hours);
-          setStatus(computed);
-          const todaySpecial = getTodaySpecialHours(hours);
-          setSpecialHours(todaySpecial);
+        const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        if (!mountedRef.current) return;
+        //console.log(`${HoursPreview.name}: Special hours for tenant ${tenantId}:`, data);
+        if (data && Array.isArray(data)) {
+          // Create a mock hours object for getTodaySpecialHours
+          const mockHours = {
+            special: data.map((override: any) => ({
+              date: override.date,
+              open: override.open,
+              close: override.close,
+              isClosed: override.isClosed,
+              note: override.note
+            }))
+          };
+          const todaySpecial = getTodaySpecialHours(mockHours);
+          if (mountedRef.current) {
+            setSpecialHours(todaySpecial);
+          }
+        } else if (data && data.overrides && Array.isArray(data.overrides)) {
+          // Handle case where data is an object with overrides array
+          const mockHours = {
+            special: data.overrides.map((override: any) => ({
+              date: override.date,
+              open: override.open,
+              close: override.close,
+              isClosed: override.isClosed,
+              note: override.note
+            }))
+          };
+          const todaySpecial = getTodaySpecialHours(mockHours);
+          if (mountedRef.current) {
+            setSpecialHours(todaySpecial);
+          }
         } else {
-          setStatus(null);
-          setSpecialHours([]);
+          // No special hours data or invalid format
+          if (mountedRef.current) {
+            setSpecialHours(null);
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch hours:', error);
-        setStatus(null);
-        setSpecialHours([]);
-      } finally {
-        setLoading(false);
+        console.error('Failed to fetch special hours:', error);
+        if (mountedRef.current) {
+          setSpecialHours(null);
+        }
       }
     };
 
-    fetchAndCompute();
-    
-    // Refresh every 30 seconds to keep preview accurate
-    const interval = setInterval(fetchAndCompute, 30000);
-    return () => clearInterval(interval);
-  }, [apiBase, tenantId]);
+    fetchSpecialHours();
+  }, [tenantId]);
 
   if (loading) {
     return (
@@ -90,17 +115,40 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
   }
 
   const isOpen = status.isOpen;
-  const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
-  const statusText = isOpen ? 'Open' : 'Closed';
-  const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
-  const bgGradient = isOpen 
-    ? 'from-green-50 to-emerald-50 border-green-200' 
-    : 'from-red-50 to-rose-50 border-red-200';
+  const statusType = status.status; // 'open' | 'closed' | 'opening-soon' | 'closing-soon'
+  
+  // Determine colors based on status type
+  let dotColor = 'bg-gray-500';
+  let statusText = 'Unknown';
+  let statusColor = 'text-gray-700';
+  let bgGradient = 'from-gray-50 to-gray-100 border-gray-200';
+  
+  if (statusType === 'open') {
+    dotColor = 'bg-green-500';
+    statusText = 'Open';
+    statusColor = 'text-green-700';
+    bgGradient = 'from-green-50 to-emerald-50 border-green-200';
+  } else if (statusType === 'closed') {
+    dotColor = 'bg-red-500';
+    statusText = 'Closed';
+    statusColor = 'text-red-700';
+    bgGradient = 'from-red-50 to-rose-50 border-red-200';
+  } else if (statusType === 'opening-soon') {
+    dotColor = 'bg-yellow-500';
+    statusText = 'Opening Soon';
+    statusColor = 'text-yellow-700';
+    bgGradient = 'from-yellow-50 to-amber-50 border-yellow-200';
+  } else if (statusType === 'closing-soon') {
+    dotColor = 'bg-orange-500';
+    statusText = 'Closing Soon';
+    statusColor = 'text-orange-700';
+    bgGradient = 'from-orange-50 to-amber-50 border-orange-200';
+  }
 
   return (
     <div className={`bg-gradient-to-br ${bgGradient} border-2 rounded-xl p-6 sticky top-6`}>
       <div className="flex items-center gap-3 mb-4">
-        <div className={`w-10 h-10 ${isOpen ? 'bg-green-500' : 'bg-red-500'} rounded-full flex items-center justify-center`}>
+        <div className={`w-10 h-10 ${dotColor} rounded-full flex items-center justify-center`}>
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -121,7 +169,7 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Storefront</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+          <span className={`inline-block w-3 h-2.5 rounded-full ${dotColor}`}></span>
           <span className={`font-bold ${statusColor}`}>{statusText}</span>
           <span className="text-gray-400">•</span>
           <span className="text-sm text-gray-900">{status.label}</span>
@@ -137,7 +185,7 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Dashboard</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+          <span className={`inline-block w-3 h-2.5 rounded-full ${dotColor}`}></span>
           <span className={`font-bold ${statusColor}`}>{statusText}</span>
           <span className="text-gray-400">•</span>
           <span className="text-sm text-gray-900">{status.label}</span>
@@ -145,7 +193,7 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
       </div>
 
       {/* Special Hours - Today & Upcoming */}
-      {specialHours.length > 0 && (() => {
+      {specialHours && specialHours.length > 0 && (() => {
         const todayHours = specialHours.filter(sh => sh.label === 'today');
         const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
         

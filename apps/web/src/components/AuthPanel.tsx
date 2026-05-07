@@ -5,6 +5,8 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { Button, Input, Alert } from '@/components/ui';
 
+
+
 export default function AuthPanel() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);

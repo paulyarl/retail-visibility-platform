@@ -25,19 +25,20 @@
  * - VIEWER: Read-only tenant access
  */
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../auth/auth.service';
-import { prisma } from '../prisma';
-import jwt from 'jsonwebtoken';
-import { UserTenantRole, UserRole } from '@prisma/client';
+// import { prisma } from '../prisma'; // Commented out to avoid circular dependencies
+import * as jwt from 'jsonwebtoken';
+import { user_tenant_role, user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
+import { authService } from '../auth/auth.service';
 
 // JWT Payload interface
 // Note: Universal transform middleware makes both userId and userId available
 export interface JWTPayload {
+  id: string | undefined;
   userId?: string; // Added by universal transform middleware
   user_id?: string; // JWT token contains this
   email: string;
-  role: UserRole;
+  role: user_role;
   tenantIds: string[];
 }
 
@@ -67,7 +68,7 @@ const toCamel = (str: string): string => {
 /**
  * Transform object to have BOTH naming conventions
  */
-const makeBothConventionsAvailable = (obj: any): any => {
+export const makeBothConventionsAvailable = (obj: any): any => {
   if (obj === null || obj === undefined) return obj;
   
   if (Array.isArray(obj)) {
@@ -102,39 +103,73 @@ const makeBothConventionsAvailable = (obj: any): any => {
 };
 
 /**
- * Middleware to authenticate JWT token
+ * Middleware to authenticate via Auth0 session
+ * Migrated from legacy JWT Bearer tokens to Auth0 cookie-based authentication
  */
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
-    const authHeader = req.headers['authorization'];
-    console.log('[Auth Middleware] Authorization header:', authHeader ? 'PRESENT' : 'MISSING');
-    
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log('[Auth Middleware] Token extracted:', token ? 'PRESENT' : 'MISSING');
+    // Check for Auth0 session headers (set by web app from cookies)
+    const auth0Id = req.headers['x-auth0-id'] as string;
+    const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
-    if (!token) {
-      console.log('[Auth Middleware] No token found, returning 401');
-      return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
+    if (!auth0Id && !auth0Email) {
+      return res.status(401).json({ error: 'authentication_required', message: 'No Auth0 session provided' });
     }
 
-    console.log('[Auth Middleware] Verifying token...');
-    const payload = authService.verifyAccessToken(token);
+    const { prisma } = await import('../prisma');
     
-    // Apply universal transform to JWT payload to ensure both naming conventions
-    const transformedPayload = makeBothConventionsAvailable(payload);
+    let user = null;
     
-    req.user = transformedPayload;
-    next();
+    // Try by auth0_id first (most reliable)
+    if (auth0Id) {
+      user = await prisma.users.findUnique({
+        where: { auth0_id: auth0Id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          auth0_id: true,
+          user_tenants: {
+            select: { tenant_id: true }
+          }
+        }
+      });
+    }
+    
+    // Fallback to email lookup
+    if (!user && auth0Email) {
+      user = await prisma.users.findUnique({
+        where: { email: auth0Email.toLowerCase() },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          auth0_id: true,
+          user_tenants: {
+            select: { tenant_id: true }
+          }
+        }
+      });
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'user_not_found', message: 'User not found in platform' });
+    }
+
+    // Build JWT-like payload from user data
+    const payload: JWTPayload = {
+      id: user.id,
+      userId: user.id,
+      user_id: user.id,
+      email: user.email,
+      role: user.role as user_role,
+      tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+    };
+    
+    req.user = makeBothConventionsAvailable(payload);
+    return next();
   } catch (error) {
-    console.log('[Auth Middleware] Token verification failed:', error);
-    if (error instanceof Error) {
-      if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'token_expired', message: 'Token has expired' });
-      }
-      if (error.name === 'JsonWebTokenError') {
-        return res.status(401).json({ error: 'invalid_token', message: 'Invalid token' });
-      }
-    }
+    console.error('[AUTH] Auth0 authentication failed:', error);
     return res.status(401).json({ error: 'authentication_failed', message: 'Authentication failed' });
   }
 }
@@ -147,7 +182,7 @@ export const requireAuth = authenticateToken;
 /**
  * Middleware to check if user has required role
  */
-export function authorize(...roles: UserRole[]) {
+export function authorize(...roles: user_role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
@@ -245,11 +280,11 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
   try {
     const { prisma } = await import('../prisma');
     const userId = req.user.userId || req.user.user_id;
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: userId!, // Now guaranteed to be string
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: userId!, // Now guaranteed to be string
+          tenant_id: tenantId as string,
         },
       },
       select: { id: true },
@@ -270,8 +305,9 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
 
 /**
  * Optional authentication - adds user to request if token is valid, but doesn't require it
+ * Supports both JWT tokens and Auth0 session headers
  */
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -279,6 +315,81 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
     if (token) {
       const payload = authService.verifyAccessToken(token);
       req.user = payload;
+      return next();
+    }
+
+    // Also check for Auth0 session headers (set by web app from cookies)
+    const auth0Id = req.headers['x-auth0-id'] as string;
+    const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+
+    if (auth0Id || auth0Email) {
+      const { prisma } = await import('../prisma');
+      
+      let user = null;
+      
+      // Try by auth0_id first (most reliable)
+      if (auth0Id) {
+        user = await prisma.users.findUnique({
+          where: { auth0_id: auth0Id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+      
+      // Fallback to email lookup
+      if (!user && auth0Email) {
+        user = await prisma.users.findUnique({
+          where: { email: auth0Email.toLowerCase() },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+
+      if (user) {
+        const payload: JWTPayload = {
+          id: user.id,
+          userId: user.id,
+          user_id: user.id,
+          email: user.email,
+          role: user.role as user_role,
+          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+        };
+        
+        req.user = makeBothConventionsAvailable(payload);
+        
+        // Track session for Auth0 authenticated users
+        const { trackSession } = await import('./session-tracker');
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+                          req.socket.remoteAddress ||
+                          'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        const auth0SessionId = req.cookies?.auth0_session || req.cookies?.appSession;
+        
+        trackSession({
+          userId: user.id,
+          auth0SessionId,
+          ipAddress,
+          userAgent,
+          userRole: user.role,
+          req,
+        }).catch(err => {
+          console.error('[optionalAuth] Error tracking session:', err);
+        });
+      }
     }
   } catch (error) {
     // Silently fail - authentication is optional
@@ -292,12 +403,12 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function getTenantId(req: Request): string | null {
   return (
-    req.params.tenantId ||
-    req.params.id ||
-    (req.query.tenantId as string) ||
-    (req.query.tenant_id as string) ||
-    req.body.tenantId ||
-    req.body.tenant_id ||
+    req.params?.tenantId ||
+    req.params?.id ||
+    (req.query?.tenantId as string) ||
+    (req.query?.tenant_id as string) ||
+    req.body?.tenantId ||
+    req.body?.tenant_id ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
@@ -352,11 +463,11 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
   try {
     const { prisma } = await import('../prisma');
     const userId = req.user.userId || req.user.user_id;
-    const userTenant = await prisma.userTenant.findUnique({
+    const userTenant = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: userId!, // Now guaranteed to be string
-          tenantId: tenantId as string,
+        user_id_tenant_id: {
+          user_id: userId!, // Now guaranteed to be string
+          tenant_id: tenantId as string,
         },
       },
       select: {
@@ -373,7 +484,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
     }
 
     // Must be OWNER or ADMIN role within the tenant to manage settings
-    if (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN) {
+    if (userTenant.role !== user_tenant_role.OWNER && userTenant.role !== user_tenant_role.ADMIN) {
       return res.status(403).json({ 
         error: 'owner_or_admin_required', 
         message: 'Only tenant owners/admins can manage feature flags' 
@@ -462,11 +573,11 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
   
   // Check if user is OWNER or ADMIN of this tenant
   const userId = req.user.userId || req.user.user_id;
-  const userTenant = await prisma.userTenant.findUnique({
+  const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      userId_tenantId: {
-        userId: userId!, // Now guaranteed to be string
-        tenantId: tenantId
+      user_id_tenant_id: {
+        user_id: userId!, // Now guaranteed to be string
+        tenant_id: tenantId
       }
     },
     select: {
@@ -474,7 +585,7 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
     }
   });
 
-  if (!userTenant || (userTenant.role !== UserTenantRole.OWNER && userTenant.role !== UserTenantRole.ADMIN)) {
+  if (!userTenant || (userTenant.role !== user_tenant_role.OWNER && userTenant.role !== user_tenant_role.ADMIN)) {
     return res.status(403).json({
       error: 'tenant_admin_required',
       message: 'Tenant owner or administrator access required for this operation',

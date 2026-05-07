@@ -23,8 +23,8 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/content', // Google Merchant API (replaces deprecated Content API)
   'https://www.googleapis.com/auth/business.manage', // Google Business Profile
   'openid',
-  'email',
-  'profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
 /**
@@ -111,7 +111,13 @@ export async function exchangeCodeForTokens(code: string): Promise<{
       return null;
     }
 
-    return await response.json();
+    return await response.json() as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      scope: string;
+      token_type: string;
+    } | null;
   } catch (error) {
     console.error('[OAuth] Token exchange error:', error);
     return null;
@@ -147,7 +153,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
       return null;
     }
 
-    return await response.json();
+    return await response.json() as {
+      access_token: string;
+      expires_in: number;
+      scope: string;
+      token_type: string;
+    } | null;
   } catch (error) {
     console.error('[OAuth] Token refresh error:', error);
     return null;
@@ -175,7 +186,12 @@ export async function getUserInfo(accessToken: string): Promise<{
       return null;
     }
 
-    return await response.json();
+    return await response.json() as {
+      id: string;
+      email: string;
+      name: string;
+      picture: string;
+    } | null;
   } catch (error) {
     console.error('[OAuth] User info error:', error);
     return null;

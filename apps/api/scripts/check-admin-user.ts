@@ -7,7 +7,7 @@ async function checkAdminUser() {
     console.log('🔍 Checking admin user...');
     
     // Simple check without relations first
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: 'admin@rvp.com' }
     });
     
@@ -20,19 +20,19 @@ async function checkAdminUser() {
     console.log('   ID:', user.id);
     console.log('   Email:', user.email);
     console.log('   Role:', user.role);
-    console.log('   First Name:', user.firstName);
-    console.log('   Last Name:', user.lastName);
-    console.log('   Email Verified:', user.emailVerified);
+    console.log('   First Name:', user.first_name);
+    console.log('   Last Name:', user.last_name);
+    console.log('   Email Verified:', user.email_verified);
     
     // Try to get user tenants separately
     try {
-      const userTenants = await prisma.userTenant.findMany({
+      const userTenants = await prisma.user_tenants.findMany({
         where: { userId: user.id }
       });
       console.log('   Tenant Count:', userTenants.length);
       
       if (userTenants.length > 0) {
-        console.log('   Tenant IDs:', userTenants.map(ut => ut.tenantId));
+        console.log('   Tenant IDs:', userTenants.map(ut => ut.tenant_id));
       } else {
         console.log('   ⚠️  No tenants associated with this user');
         console.log('   💡 This is normal for PLATFORM_ADMIN users');

@@ -1,17 +1,43 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import Image from 'next/image';
-import { Pagination } from '@/components/ui';
-import Link from 'next/link';
+// import Image from 'next/image';
+// import { Pagination } from '@/components/ui';
+// import Link from 'next/link';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
-import TenantMapSection from '@/components/tenant/TenantMapSection';
+// import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
-import ProductSearch from '@/components/storefront/ProductSearch';
-import ProductDisplay from '@/components/storefront/ProductDisplay';
-import CategorySidebar from '@/components/storefront/CategorySidebar';
-import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
+// import ProductSearch from '@/components/storefront/ProductSearch';
+// import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
+// import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+// import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
+// import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
+// import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
+// import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
+// import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
+// import StorefrontActions from '@/components/products/StorefrontActions';
+// import { StorefrontRecommendations } from './StorefrontClient';
+import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
+// import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
+// import { getCategoryUrl } from '@/utils/slug';
+// import StorefrontMap from '@/components/storefront/StorefrontMap';
+// import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
+import { trackStorefrontView } from '@/utils/behaviorTracking';
+// import LastViewed from '@/components/directory/LastViewed';
+// import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
+// import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
+// import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
+import { tenantPublicService } from '@/services/TenantPublicService';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
+// import  storefrontService  from '@/services/StorefrontService';
+// import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import StorefrontClientWrapper from './StorefrontClientWrapper';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
+// import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
+// import ProductDataService from '@/services/ProductDataService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -25,15 +51,72 @@ interface Product {
   description?: string;
   price: number;
   currency: string;
+  slug: string;
+  category: string;
+  subcategory: string;
+  tags: string[];
+  attributes: Record<string, any>;
   stock: number;
   imageUrl?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
+  payment_gateway_type?: string | null;
+  has_active_payment_gateway?: boolean;
+  // product display attributes
+  product_rating?: number;
+  product_review_count?: number;
+  product_helpful_count?: number;
+  product_review_approved?: number;
+
+  // Enhanced fields from new API
+  imageGallery?: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt?: string;
+    caption?: string;
+    variant_id?: string;
+    createdAt: string;
+    isPrimary: boolean;
+  }>;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    variant_name: string;
+    price_cents: number;
+    sale_price_cents?: number;
+    stock: number;
+    image_url?: string;
+    attributes: Record<string, any>;
+    sort_order: number;
+    is_active: boolean;
+    is_on_sale: boolean;
+    discount_percentage: number;
+  }>;
+  hasVariants?: boolean;
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
 }
 
 interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  socialLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+
+  hasActivePaymentGateway?: boolean;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -43,12 +126,23 @@ interface Tenant {
     logo_url?: string;
     banner_url?: string;
     business_description?: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      linkedin?: string;
+    };
   };
 }
 
 interface PlatformSettings {
   platformName?: string;
   logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  tertiaryColor?: string;
+  accentColor?: string;
 }
 
 interface Category {
@@ -57,127 +151,246 @@ interface Category {
   slug: string;
   count: number;
   googleCategoryId: string | null;
+  category_type?: string;
+  is_primary?: boolean;
+  color?: string;
+  icon?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  isDeleted?: boolean;
+  isPublished?: boolean;
+  isHidden?: boolean;
+  isDraft?: boolean;
+  isInactive?: boolean;
 }
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; search?: string; category?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string }>;
 }
 
-async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string) {
+interface StorefrontDetailPageProps extends PageProps {
+  tenant?: Tenant;
+  products?: Product[];
+  categories?: Category[];
+  totalProducts?: number;
+  currentPage?: number;
+  totalPages?: number;
+  hasMore?: boolean;
+  businessHours?: any;
+  platformSettings?: PlatformSettings;
+  slug?: string;
+}
+
+
+async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    // console.log(`[getTenantWithProducts] Resolving tenant ID for slug: ${tenantId}`);
+    const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
+    // console.log(`[getTenantWithProducts] Resolved tenant ID: ${idResolvedBySlug}`);
 
-    // Fetch tenant basic info
-    const tenantRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}`, {
-      cache: 'no-store',
-    });
-
-    if (!tenantRes.ok) {
-      return null;
-    }
-
-    const tenant: Tenant & { access?: { storefront: boolean } } = await tenantRes.json();
-
-    // Fetch business profile
-    let hasHours = false;
-    let businessHours: any = null;
-    try {
-      const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/profile`, {
-        cache: 'no-store',
-      });
-      if (profileRes.ok) {
-        const businessProfile = await profileRes.json();
-        tenant.metadata = {
-          ...tenant.metadata,
-          businessName: businessProfile.business_name,
-          phone: businessProfile.phone_number,
-          email: businessProfile.email,
-          website: businessProfile.website,
-          address: businessProfile.address_line1 
-            ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
-            : undefined,
-          logo_url: businessProfile.logo_url,
-          business_description: businessProfile.business_description,
-        };
-        // Detect hours presence for branding evaluation
-        const hours = (businessProfile as any)?.hours;
-        businessHours = hours ?? null;
-        if (hours) {
-          if (Array.isArray(hours)) {
-            hasHours = hours.length > 0;
-          } else if (typeof hours === 'object') {
-            hasHours = Object.keys(hours).length > 0;
+    const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
+    
+    // Extract business hours data from API response
+    const rawBusinessHours = hoursResponse?.data || hoursResponse;
+    
+    // Transform business hours data to handle periods format
+    let businessHours = null;
+    if (rawBusinessHours) {
+      if (rawBusinessHours.periods && Array.isArray(rawBusinessHours.periods)) {
+        const { periods, timezone } = rawBusinessHours;
+        const hours: any = { timezone };
+        
+        // Convert periods to day-based format for BusinessHoursDisplay
+        periods.forEach((period: any) => {
+          const dayName = period.day?.toUpperCase();
+          if (dayName && !hours[dayName]) {
+            hours[dayName] = {
+              open: period.open,
+              close: period.close
+            };
           }
-        }
+        });
+        
+        // Include periods array for BusinessHoursDisplay to handle multiple periods
+        hours.periods = periods;
+        businessHours = hours;
+      } else {
+        // Already in day-based format
+        businessHours = rawBusinessHours;
       }
-    } catch (e) {
-      console.error('Failed to fetch business profile:', e);
+    }
+    
+    // Fetch full shop details using the resolved tenant ID
+
+    const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
+    const directoryData = tenant?.directoryData;
+
+    // Fetch shop info from MV only if tenant is active (MV excludes non-active tenants)
+    let shopInfo: any = null;
+    const isActiveTenant = !tenant?.locationStatus || tenant.locationStatus === 'active';
+    if (directoryData?.is_published && isActiveTenant) {
+      shopInfo = await publicDirectoryService.getShopInfoById(idResolvedBySlug);
     }
 
-    // Fetch map location using utility
-    const mapLocation = await getTenantMapLocation(tenantId);
+    // }
 
-    // Fetch categories with counts
+
+    
+    // console.log('[TenantPage] Shop info response:', shopInfo);
+
+    const tenantData = (tenant as any)?.data || tenant;
+    // API returns { success: true, shop: {...} }
+    const shopData = shopInfo?.success ? shopInfo.shop : null;
+
+    if (shopData) {
+      tenantData.metadata = {
+        ...tenantData.metadata,
+        businessName: shopData.business_name || tenantData.name,
+        phone: shopData.phone || null,
+        email: shopData.email || null,
+        website: shopData.website || null,
+        address: shopData.address && shopData.city && shopData.state && shopData.zip_code
+          ? `${shopData.address}, ${shopData.city}, ${shopData.state} ${shopData.zip_code}`
+          : null,
+        logo_url: shopData.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
+        business_description: shopData.description || null,
+        defaultGatewayType: shopData.default_gateway_type || null,
+        hasActivePaymentGateway: shopData.has_active_payment_gateway || false,
+        isActive: shopData.is_active || false,
+        isFeatured: shopData.is_featured || false,
+        isArchived: shopData.is_archived || false,
+        isDeleted: shopData.is_deleted || false,
+        isPublished: shopData.is_published || false,
+        isHidden: shopData.is_hidden || false,
+        isDraft: shopData.is_draft || false,
+        isInactive: shopData.is_inactive || false,
+
+      };
+      
+    } else {
+      console.log('[TenantPage] No shop data found');
+     // console.log('[TenantPage] Raw shopInfo:', shopInfo);
+    }
+
+    const hasLogo = !!tenantData.metadata?.logo_url;
+    const hasBranding = hasLogo || !!businessHours;
+    const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
+
+    // Fetch map location using utility (use resolved tenant ID)
+    const mapLocation = await getTenantMapLocation(idResolvedBySlug);
+
+    // Fetch categories with counts using singleton service (use resolved tenant ID)
     let categories: Category[] = [];
+    let productCategories: Category[] = [];
+    let storeCategories: Category[] = [];
     let uncategorizedCount = 0;
     try {
-      const categoriesRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/categories`, {
-        cache: 'no-store',
-      });
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        categories = categoriesData.categories || [];
-        uncategorizedCount = categoriesData.uncategorizedCount || 0;
-      }
+      // Get product counts per category from storefront singleton service
+      const storefrontData = await storefrontSingletonService.getStorefrontCategories(idResolvedBySlug);
+      const storefrontCategories = storefrontData.categories || [];
+      uncategorizedCount = storefrontData.uncategorizedCount || 0;
+
+      // Convert storefront categories to the expected format
+      categories = storefrontCategories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        count: parseInt(cat.productCount) || 0, // API returns productCount as string
+        googleCategoryId: cat.googleCategoryId,
+        category_type: 'platform', // All storefront categories are platform categories
+        isActive: cat.isActive || false,
+        isFeatured: cat.isFeatured || false,
+        isArchived: cat.isArchived || false,
+        isDeleted: cat.isDeleted || false,
+        isPublished: cat.isPublished || false,
+        isHidden: cat.isHidden || false,
+        isDraft: cat.isDraft || false,
+        isInactive: cat.isInactive || false,
+      }));
+
+      // All categories are product categories for storefront
+      productCategories = categories;
+      storeCategories = [];
     } catch (e) {
       console.error('Failed to fetch categories:', e);
     }
 
-    // Fetch products for this tenant with optional search and category filter
+    // Fetch products using singleton service (use resolved tenant ID)
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
     const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
-    const productsRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/items?page=${page}&limit=${limit}${searchParam}${categoryParam}`, {
-      cache: 'no-store',
-    });
-
-    const productsData = productsRes.ok ? await productsRes.json() : { items: [], pagination: { totalItems: 0 } };
+    
+    let productsData;
+    if (featured) {
+      // Use the featured products API when filtering by featured type
+      productsData = await storefrontSingletonService.getFeaturedProducts(idResolvedBySlug, {
+        limit,
+        search
+      });
+      // console.log('[TenantPage] Featured products data:', productsData);
+    } else {
+      // Use regular products API for general browsing
+      productsData = await storefrontSingletonService.getStorefrontProducts(idResolvedBySlug, {
+        page,
+        limit,
+        search,
+        category
+      });
+      // console.log('[TenantPage] Products data:', productsData);
+    }
     // Handle both old (array) and new (paginated object) response formats
-    const rawProducts = productsData.items 
+    const rawProducts = productsData.items
       ? (Array.isArray(productsData.items) ? productsData.items : [])
       : (Array.isArray(productsData) ? productsData : []);
-    
-    // Transform products: convert priceCents to price
-    const products: Product[] = rawProducts.map((p: any) => ({
+
+    // console.log('[TenantPage] Raw products:', rawProducts);
+
+    // Deduplicate products by ID to prevent React key conflicts
+    const uniqueRawProducts = rawProducts.filter((product, index, arr) => 
+      arr.findIndex(p => p.id === product.id) === index
+    );
+
+    // Transform products: convert priceCents to price and include payment gateway fields
+    const products: Product[] = uniqueRawProducts.map((p: any) => ({
       ...p,
       price: typeof p.price === 'number' ? p.price : (typeof p.priceCents === 'number' ? p.priceCents / 100 : 0),
       title: p.title || p.name,
       currency: p.currency || 'USD',
+      payment_gateway_type: p.defaultGatewayType ?? null, // From MV (camelCase from API)
+      has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
+      isActive: p.isActive ?? false,
+      isFeatured: p.isFeatured ?? false,
+      isArchived: p.isArchived ?? false,
+      isAvailable: p.isAvailable ?? false,
+      isDeleted: p.isDeleted ?? false,
+      isPublished: p.isPublished ?? false,
+      isHidden: p.isHidden ?? false,
+      isDraft: p.isDraft ?? false,
+      isInactive: p.isInactive ?? false,
     }));
-    
-    const total = productsData.pagination?.totalItems || productsData.total || products.length;
 
-    // Fetch platform settings for footer
-    let platformSettings: PlatformSettings = {};
+    // console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
+    // console.log(`${featured ? 'Featured' : 'Regular'} Products Data:`, productsData);
+
+    const total = featured 
+      ? ('count' in productsData ? productsData.count : 0) || products.length // Featured API uses count field
+      : ('pagination' in productsData ? productsData.pagination?.totalItems : ('total' in productsData ? productsData.total : 0)) || products.length;
+
+    // Fetch platform settings for footer using singleton service
+    let platformSettings: any = {};
     try {
-      const settingsRes = await fetch(`${apiBaseUrl}/platform-settings`, {
-        cache: 'no-store',
-      });
-      if (settingsRes.ok) {
-        platformSettings = await settingsRes.json();
-      }
+      platformSettings = await platformSettingsService.getPlatformSettings();
     } catch (e) {
       console.error('Failed to fetch platform settings:', e);
     }
 
-    const hasLogo = !!tenant.metadata?.logo_url;
-    const hasBranding = hasLogo || hasHours;
-    const storeStatus = computeStoreStatus(businessHours);
-    
     // Find current category name if filtering
-    const currentCategory = category ? categories.find(c => c.slug === category) : null;
-    
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory };
+    const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -209,24 +422,137 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
+export default async function TenantStorefrontPage({ params, searchParams }: StorefrontDetailPageProps) {
   const { id } = await params;
-  const { page: pageParam, search, category } = await searchParams;
+  // console.log(`[TenantStorefrontPage] id:`, id);
+  const { page: pageParam, search, category, products_only, featured, view } = await searchParams;
+  // console.log(`[TenantStorefrontPage] searchParams:`, searchParams);
   const currentPage = parseInt(pageParam || '1', 10);
+  // console.log(`[TenantStorefrontPage] currentPage:`, currentPage);
   
-  const data = await getTenantWithProducts(id, currentPage, 12, search, category);
+  
+  // Check if products_only mode is enabled
+  const isProductsOnly = products_only === 'true';
+  // console.log(`[TenantStorefrontPage] isProductsOnly:`, isProductsOnly);
+
+  const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
+  // console.log('[TenantStorefrontPage] data:', data); 
 
   if (!data) {
     notFound();
   }
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, uncategorizedCount, currentCategory } = data as any;
+  // Helper function to get featured type display name
+  const getFeaturedTypeName = (type: string) => {
+    switch (type) {
+      case 'store_selection': return 'Featured Products';
+      case 'new_arrival': return 'New Arrivals';
+      case 'seasonal': return 'Seasonal Specials';
+      case 'sale': return 'Sale Items';
+      case 'staff_pick': return 'Staff Picks';
+      case 'best_seller': return 'Best Sellers';
+      case 'trending': return 'Trending Items';
+      case 'clearance': return 'Clearance Items';
+      case 'recommended': return 'Recommended Items';
+      case 'featured': return 'Featured Items';
+      
+      default: return 'Products';
+    }
+  };
+
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
-  const totalPages = Math.ceil(total / limit);
+  // console.log('[TenantPage Main] Store Categories:', storeCategories);
+  // console.log('[TenantPage Main] Product Categories:', productCategories);
   
+  // console.log('[TenantPage Main] Current Category:', currentCategory);
+
+  // console.log('[TenantPage Main] Resolved Tenant ID:', resolvedTenantId);
+  // console.log('[TenantPage Main] Tenant:', tenant);
+  // console.log('[TenantPage Main] Products:', products);
+
+
+  // Log what data we're passing to StorefrontClientWrapper
+  // console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
+  // console.log('[TenantPage Main] Tenant phone:', tenant.metadata?.phone);
+  // console.log('[TenantPage Main] Tenant email:', tenant.metadata?.email);
+  // console.log('[TenantPage Main] Tenant address:', tenant.metadata?.address);
+  // console.log('[TenantPage Main] Business hours:', businessHours);
+
+  // Track storefront view for recommendations (fire and forget)
+  // console.log('[TenantPage Main] Tracking storefront view');
+  // console.log('[TenantPage Main] Category:', category);
+  // console.log('[TenantPage Main] Current Category:', currentCategory);
+  if (category && currentCategory) {
+    // Track category browse on storefront
+    import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
+      trackCategoryBrowse(currentCategory.id || category, currentCategory.slug || category).catch(err =>
+        console.error('Failed to track category browse:', err)
+      );
+    });
+  } else {
+    // Track general storefront view
+    trackStorefrontView(id, storeCategories || []).catch(err =>
+      console.error('Failed to track storefront view:', err)
+    );
+  }
+  const totalPages = Math.ceil(total / limit);
+
+  // API base URL for additional calls
+ // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+  // Fetch directory publish status and actual slug using singleton services
+  let directoryPublished = tenant?.hasDirectory||false;
+  let tenantSlug = tenant?.slug||id;
+
+  // try {
+  //   // Use tenant directory service to get the actual slug from the API
+  //  console.log('[TenantPage] Calling getTenantSlug...');
+  //  console.log(`[TenantPage] Tenant ID: ${tenant?.id}`);
+  //  console.log(`[TenantPage] Tenant slug: ${tenant?.slug}`);
+  //  console.log(`[TenantPage] Tenant: ${JSON.stringify(tenant)}`);
+    // const apiSlug = await tenantDirectoryService.getTenantSlug(id);
+  // const apiSlug = tenant?.slug;
+  //  console.log('[TenantPage] API slug:', apiSlug);
+
+    // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
+    // directoryPublished = tenant.hasPublishedDirectory ?? false;
+
+    // Use API slug if available, otherwise generate from business name or use tenant ID
+    // tenantSlug = apiSlug || data.tenant?.slug || id;
+    // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
+  // } catch (e) {
+    // Directory page doesn't exist or error - store is not published
+    // console.warn('[TenantPage] Directory service failed:', e);
+    // directoryPublished = false;
+    // Fallback to generated slug
+    // tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  // }
+
+  // Find primary store category for header badge
+  // console.log('[TenantPage] Store Categories:', storeCategories);
+  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
+  // console.log('[TenantPage] Primary Store Category:', primaryStoreCategory);
+
+  // Get GBP categories from tenant metadata (always available regardless of directory publish status)
+  const primaryGBPCategory = tenant?.primary_category || tenant?.metadata?.gbp_categories?.primary || tenant?.metadata?.gbpCategories?.primary;
+  const secondaryGBPCategories = tenant?.secondary_categories || tenant?.metadata?.gbp_categories?.secondary || tenant?.metadata?.gbpCategories?.secondary || [];
+
+  // Fetch total product count for "All Products" using singleton service
+  let totalAllProducts = 0;
+  try {
+    totalAllProducts = await storefrontSingletonService.getTotalProductCount(id);
+  } catch (e) {
+    console.error('Failed to fetch total product count:', e);
+    // Fallback to current total if available
+    totalAllProducts = total || 0;
+  }
+
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';
+  // console.log('[TenantPage Main] Tier:', tier);
   const features = getLandingPageFeatures(tier);
+  // console.log('[TenantPage Main] Features:', features);
 
   // Location status check: Show closed banner if location is not active
   if (tenant.storefrontMessage) {
@@ -307,468 +633,42 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      {/* Header with Business Name and Logo */}
-      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center gap-6">
-            {tenant.metadata?.logo_url && (
-              <div className="relative w-24 h-24 shrink-0">
-                <Image
-                  src={tenant.metadata.logo_url}
-                  alt={businessName}
-                  fill
-                  className="object-contain rounded-lg"
-                />
-              </div>
-            )}
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
-                {businessName}
-              </h1>
-              {storeStatus && (
-                <p className="text-neutral-600 dark:text-neutral-400 mt-2 flex items-center gap-2">
-                  <span className={`inline-block w-2 h-2 rounded-full ${storeStatus.isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  {storeStatus.label}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Banner Hero Section (if banner exists) */}
-      {tenant.metadata?.banner_url && (
-        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden">
-              <Image
-                src={tenant.metadata.banner_url}
-                alt={`${businessName} banner`}
-                fill
-                className="object-cover"
-                priority
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Products Section with Sidebar */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Category Sidebar - Desktop */}
-          {categories.length > 0 && (
-            <aside className="hidden lg:block lg:col-span-1">
-              <CategorySidebar 
-                tenantId={id} 
-                categories={categories} 
-                totalProducts={total} 
-              />
-            </aside>
-          )}
-
-          {/* Main Content */}
-          <div className={categories.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
-            {/* Mobile Category Dropdown */}
-            {categories.length > 0 && (
-              <CategoryMobileDropdown 
-                tenantId={id} 
-                categories={categories} 
-                totalProducts={total} 
-              />
-            )}
-
-            {/* Header with Search and Category Context */}
-            <div className="mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <div>
-                  <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
-                    {currentCategory ? currentCategory.name : 'All Products'} ({total})
-                  </h2>
-                  {(search || currentCategory) && (
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                      {currentCategory && !search && `Showing all ${currentCategory.name.toLowerCase()} products`}
-                      {search && !currentCategory && `Results for "${search}"`}
-                      {search && currentCategory && `Results for "${search}" in ${currentCategory.name}`}
-                    </p>
-                  )}
-                </div>
-                {totalPages > 1 && (
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    Page {currentPage} of {totalPages}
-                  </p>
-                )}
-              </div>
-              
-              {/* Search Box */}
-              <div className="max-w-md">
-                <ProductSearch tenantId={id} />
-              </div>
-            </div>
-
-        {products.length === 0 ? (
-          <div className="text-center py-12 space-y-6">
-            <p className="text-neutral-600 dark:text-neutral-400 text-lg">
-              {currentCategory && search 
-                ? `No products found matching "${search}" in ${currentCategory.name}.`
-                : currentCategory
-                ? `No products in ${currentCategory.name} yet.`
-                : search 
-                ? `No products found matching "${search}". Try a different search term.`
-                : 'No products available at this time.'}
-            </p>
-            {currentCategory && (
-              <Link
-                href={`/tenant/${id}`}
-                className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline"
-              >
-                ← View all products
-              </Link>
-            )}
-            {!hasBranding && (
-              <div className="mx-auto max-w-2xl p-5 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-                <div className="flex items-start gap-3">
-                  <svg className="h-6 w-6 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-                  </svg>
-                  <div className="text-left">
-                    <p className="font-medium">Set your store branding and add products to populate this page automatically.</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={`/t/${id}/settings/branding`}
-                        className="inline-flex items-center px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1 no-underline"
-                        style={{ color: 'white' }}
-                      >
-                        Edit Branding
-                      </a>
-                      <a
-                        href={`/t/${id}/items`}
-                        className="inline-flex items-center px-3 py-1.5 rounded border border-primary-300 bg-white text-primary-700 text-sm hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-1 dark:bg-neutral-900 dark:text-primary-300 dark:border-primary-700 dark:hover:bg-neutral-800"
-                      >
-                        Add Products
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Product Display with Grid/List Toggle */}
-            <ProductDisplay products={products} tenantId={id} />
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-12">
-                {currentPage > 1 && (
-                  <Link
-                    href={`/tenant/${id}?page=${currentPage - 1}`}
-                    className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    ← Previous
-                  </Link>
-                )}
-                
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-
-                  return (
-                    <Link
-                      key={pageNum}
-                      href={`/tenant/${id}?page=${pageNum}`}
-                      className={`px-4 py-2 rounded-lg transition-colors ${
-                        pageNum === currentPage
-                          ? 'bg-primary-600 text-white'
-                          : 'border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      {pageNum}
-                    </Link>
-                  );
-                })}
-
-                {currentPage < totalPages && (
-                  <Link
-                    href={`/tenant/${id}?page=${currentPage + 1}`}
-                    className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-                  >
-                    Next →
-                  </Link>
-                )}
-              </div>
-            )}
-          </>
-        )}
-          </div>
-        </div>
-      </main>
-
-      {/* Map Section - How to Get There */}
-      {tenant.metadata?.address && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Find Us</h2>
-            <div className="w-full h-64 sm:h-80 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
-              <iframe
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-                src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(tenant.metadata.address)}`}
-                title="Store Location"
-              />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.metadata.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-                Get Directions
-              </a>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.metadata.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors text-sm font-medium"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                View on Google Maps
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tier-Based Footer */}
-      <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Business Info & Contact */}
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                {businessName}
-              </h3>
-              
-              {/* Contact Information */}
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Contact Information
-                </h4>
-                <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
-                {/* Phone */}
-                {tenant.metadata?.phone && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <a href={`tel:${tenant.metadata.phone}`} className="hover:underline">
-                      {tenant.metadata.phone}
-                    </a>
-                  </p>
-                )}
-
-                {/* Email */}
-                {tenant.metadata?.email && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <a href={`mailto:${tenant.metadata.email}`} className="hover:underline">
-                      {tenant.metadata.email}
-                    </a>
-                  </p>
-                )}
-
-                {/* Address - Required for NAP */}
-                {tenant.metadata?.address && (
-                  <p className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>{tenant.metadata.address}</span>
-                  </p>
-                )}
-                </div>
-              </div>
-
-              {/* Business Description */}
-              {tenant.metadata?.business_description && (
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mt-4">
-                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                    <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    About Us
-                  </h4>
-                  <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                    {tenant.metadata.business_description}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Business Hours - Own Column */}
-            {businessHours && (
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Hours
-                </h3>
-                <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                  <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                      <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Business Hours
-                    </h4>
-                    <div className="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                        const dayHours = businessHours[day];
-                        const formatTime = (time24: string): string => {
-                          if (!time24) return "";
-                          const [h, m] = time24.split(":").map(Number);
-                          const period = h >= 12 ? "PM" : "AM";
-                          const hour12 = h % 12 || 12;
-                          return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-                        };
-                        return (
-                          <div key={day} className="flex justify-between">
-                            <span className="font-medium">{day}</span>
-                            <span>
-                              {dayHours ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}` : 'Closed'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Special Hours - Today & Upcoming */}
-                    {(() => {
-                      const specialHours = getTodaySpecialHours(businessHours);
-                      if (specialHours.length === 0) return null;
-                      
-                      const todayHours = specialHours.filter(sh => sh.label === 'today');
-                      const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
-                      
-                      const formatTime = (time24: string): string => {
-                        if (!time24) return "";
-                        const [h, m] = time24.split(":").map(Number);
-                        const period = h >= 12 ? "PM" : "AM";
-                        const hour12 = h % 12 || 12;
-                        return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-                      };
-                      
-                      const formatDate = (dateStr: string): string => {
-                        const date = new Date(dateStr + 'T00:00:00');
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                      };
-                      
-                      return (
-                        <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                          <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                            <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
-                            Special Hours
-                          </h4>
-                          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-                            {/* Today's Special Hours */}
-                            {todayHours.map((sh, idx) => (
-                              <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
-                                <div className="flex justify-between items-start">
-                                  <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
-                                  <span className="text-amber-800 dark:text-amber-200">
-                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
-                                  </span>
-                                </div>
-                                {sh.note && (
-                                  <span className="text-xs text-amber-700 dark:text-amber-300 italic">{sh.note}</span>
-                                )}
-                              </div>
-                            ))}
-                            
-                            {/* Upcoming Special Hours */}
-                            {upcomingHours.map((sh, idx) => (
-                              <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                <div className="flex justify-between items-start">
-                                  <span className="font-medium text-blue-900 dark:text-blue-100">
-                                    {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
-                                  </span>
-                                  <span className="text-blue-800 dark:text-blue-200">
-                                    {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
-                                  </span>
-                                </div>
-                                {sh.note && (
-                                  <span className="text-xs text-blue-700 dark:text-blue-300 italic">{sh.note}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Links */}
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                Quick Links
-              </h3>
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mb-4">
-                <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                  <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Links Information
-                </h4>
-                <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
-                  <Link href={`/tenant/${id}`} className="block text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                    All Products
-                  </Link>
-                  {tenant.metadata?.website && (
-                    <a href={tenant.metadata.website} target="_blank" rel="noopener noreferrer" className="block text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400">
-                      Visit Website
-                    </a>
-                  )}
-                </div>
-              </div>
-              
-            </div>
-          </div>
-
-          {/* Platform Branding (unless Enterprise with removal) */}
-          {!features.removePlatformBranding && (
-            <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-center text-sm text-neutral-500">
-              <p>Powered by {platformSettings?.platformName || 'Visible Shelf'} ⚡</p>
-            </div>
-          )}
-        </div>
-      </footer>
-    </div>
+    <ProductSingletonProvider>
+      <TenantPaymentProvider tenantId={resolvedTenantId || tenant.id || id}>
+        <StorefrontClientWrapper 
+          tenantId={resolvedTenantId || tenant.id || id}
+          tenant={tenant}
+          platformSettings={platformSettings}
+          mapLocation={mapLocation}
+          hasBranding={hasBranding}
+          storeStatus={storeStatus}
+          categories={categories}
+          productCategories={productCategories}
+          storeCategories={storeCategories}
+          uncategorizedCount={uncategorizedCount}
+          businessName={businessName}
+          businessHours={businessHours}
+          search={search}
+          category={category}
+          featured={featured}
+          view={view}
+          isProductsOnly={isProductsOnly} 
+          directoryPublished={directoryPublished}
+          tenantSlug={tenantSlug}
+          primaryGBPCategory={primaryGBPCategory}
+          secondaryGBPCategories={secondaryGBPCategories}
+          tier={tier}
+          features={features}
+          totalAllProducts={totalAllProducts}
+          fullWidthLayout={false} // Default to constrained layout
+          products={products}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={total}
+          locationStatus={tenant?.locationStatus}
+          statusInfo={tenant?.statusInfo}
+        />
+      </TenantPaymentProvider>
+    </ProductSingletonProvider>
   );
 }

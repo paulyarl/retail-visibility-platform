@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "RVP - Latency by Region",
+    "title": "Visible Shelf - Latency by Region",
     "description": "Request latency grouped by tenant region (REQ-2025-904)",
     "panels": [
       {

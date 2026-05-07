@@ -1,34 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+// Force Node.js runtime (not edge) for proper env var access
+export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   try {
-    // Forward auth headers
-    const authHeader = req.headers.get('authorization');
-    const cookieHeader = req.headers.get('cookie');
-    
-    const headers: HeadersInit = {};
-    if (authHeader) headers['Authorization'] = authHeader;
-    if (cookieHeader) headers['Cookie'] = cookieHeader;
-    
-    const res = await fetch(`${API_BASE_URL}/platform-settings`, { headers });
-    if (!res.ok) {
-      // Return default settings for any non-OK response (no error logging)
-      return NextResponse.json({
-        platformName: 'Visible Shelf',
-        logoUrl: null,
-        faviconUrl: null,
-        primaryColor: '#3b82f6',
-        secondaryColor: '#8b5cf6',
-      });
-    }
-    const data = await res.json();
-    return NextResponse.json(data);
+    // Use singleton service for cached platform settings
+    const settings = await platformSettingsService.getPlatformSettings();
+    return NextResponse.json(settings);
   } catch (error) {
-    // Only log actual network/parsing errors, not expected 404s
-    console.error('Unexpected error fetching branding settings:', error);
-    // Return default settings on error
+    console.error('[Branding Route] Error fetching platform settings:', error);
     return NextResponse.json({
       platformName: 'Visible Shelf',
       logoUrl: null,
@@ -43,30 +25,28 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     
-    // Forward auth headers
-    const authHeader = request.headers.get('authorization');
-    const cookieHeader = request.headers.get('cookie');
-    
-    const headers: HeadersInit = {};
-    if (authHeader) headers['Authorization'] = authHeader;
-    if (cookieHeader) headers['Cookie'] = cookieHeader;
-    
-    // Forward the form data to the backend API
-    const res = await fetch(`${API_BASE_URL}/platform-settings`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const error = await res.json();
-      return NextResponse.json(error, { status: res.status });
+    // Convert FormData to JSON object
+    const settings: Record<string, any> = {};
+    for (const [key, value] of formData.entries()) {
+      settings[key] = value;
     }
-
-    const data = await res.json();
-    return NextResponse.json(data);
+    
+    // Use singleton service to update settings
+    const updatedSettings = await platformSettingsService.updatePlatformSettings(settings);
+    
+    if (!updatedSettings) {
+      return NextResponse.json(
+        { error: 'Failed to update platform settings' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(updatedSettings);
   } catch (error) {
-    console.error('Error updating branding settings:', error);
-    return new NextResponse('Internal server error', { status: 500 });
+    console.error('[Branding Route] Error updating platform settings:', error);
+    return NextResponse.json(
+      { error: 'Failed to update platform settings' },
+      { status: 500 }
+    );
   }
 }

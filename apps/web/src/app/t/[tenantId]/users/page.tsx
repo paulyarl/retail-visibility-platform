@@ -1,3 +1,4 @@
+import { Button } from '@mantine/core';
 import SetTenantId from "@/components/client/SetTenantId";
 import LegacyUsersPage from "@/app/tenants/[id]/users/page";
 

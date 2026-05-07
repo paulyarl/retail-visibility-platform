@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useDirectoryListing } from '@/hooks/directory/useDirectoryListing';
-import DirectoryCategorySelector from './DirectoryCategorySelector';
+import DirectoryCategorySelectorAdapter from './DirectoryCategorySelectorAdapter';
 import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
+import DirectoryPhotoGallery from './DirectoryPhotoGallery';
+import { Button } from '@mantine/core';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
 }
 
 export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPanelProps) {
-  const { listing, loading, error, publish, unpublish, updateSettings } = useDirectoryListing(tenantId);
+  const { listing, loading, error, publish, unpublish, updateSettings, syncProfile } = useDirectoryListing(tenantId);
   
   const [seoDescription, setSeoDescription] = useState('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
@@ -61,11 +63,26 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     try {
       setIsSaving(true);
       setSaveMessage('');
+      
+      // Store the initial published state
+      const wasPublished = listing?.isPublished || false;
+      
       await publish();
-      setSaveMessage('Listing published successfully!');
-      setTimeout(() => setSaveMessage(''), 3000);
-    } catch (err) {
-      setSaveMessage('Failed to publish listing');
+      
+      // Check if the listing actually became published
+      // This is more reliable than checking the error state
+      const isNowPublished = listing?.isPublished || false;
+      
+      if (!wasPublished && isNowPublished) {
+        setSaveMessage('Listing published successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      }
+    } catch (err: any) {
+      // This catch block is only for unexpected errors
+      // Validation errors are handled by the hook and displayed via the error state
+      const errorMessage = err?.message || 'Failed to publish listing';
+      setSaveMessage(errorMessage);
+      setTimeout(() => setSaveMessage(''), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -80,6 +97,26 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (err) {
       setSaveMessage('Failed to unpublish listing');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncProfile = async () => {
+    try {
+      setIsSaving(true);
+      setSaveMessage('');
+      
+      const result = await syncProfile();
+      
+      if (result.success) {
+        setSaveMessage('Profile synced successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(result.message || 'Failed to sync profile');
+      }
+    } catch (err) {
+      setSaveMessage('Failed to sync profile');
     } finally {
       setIsSaving(false);
     }
@@ -106,13 +143,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p className="text-red-800 dark:text-red-200">{error}</p>
-      </div>
-    );
-  }
+  // Don't return early for error - let the page render with error message inline
+  // Only return early if there's no listing data at all
 
   if (!listing) {
     return (
@@ -123,13 +155,17 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   }
 
   const canPublish = !!primaryCategory && !!listing.businessProfile?.businessName;
+  
+  // Determine what's blocking publication
+  const missingBusinessName = !listing.businessProfile?.businessName;
+  const missingPrimaryCategory = !primaryCategory;
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-gray-900">
             Directory Listing
           </h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -161,11 +197,11 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Categories
             </h3>
-            <DirectoryCategorySelector
-              primaryCategory={primaryCategory}
-              secondaryCategories={secondaryCategories}
-              onPrimaryCategoryChange={setPrimaryCategory}
-              onSecondaryCategoriesChange={setSecondaryCategories}
+            <DirectoryCategorySelectorAdapter
+              primary={primaryCategory}
+              secondary={secondaryCategories}
+              onPrimaryChange={setPrimaryCategory}
+              onSecondaryChange={setSecondaryCategories}
             />
           </div>
 
@@ -233,38 +269,146 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             </p>
           </div>
 
+          {/* Photo Gallery */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Store Gallery
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Add up to 10 photos to showcase your business on the directory page
+            </p>
+            {listing && (
+              <DirectoryPhotoGallery
+                listing={listing}
+                tenantId={tenantId}
+                onUpdate={() => {
+                  // Refresh the listing preview when photos change
+                  // The useDirectoryListing hook should automatically refresh
+                }}
+              />
+            )}
+          </div>
+
+          {/* Profile Sync */}
+          {listing.isPublished && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Sync from Profile
+                  </h4>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                    Update logo, business name, and contact info from your profile to the directory listing.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSyncProfile}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isSaving ? 'Syncing...' : 'Sync Now'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-3">
-            <button
+            <Button
               onClick={handleSave}
               disabled={isSaving}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+            </Button>
             {listing.isPublished ? (
-              <button
+              <Button
                 onClick={handleUnpublish}
                 disabled={isSaving}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="outlined"
               >
                 Unpublish
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 onClick={handlePublish}
                 disabled={isSaving || !canPublish}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!canPublish ? 'Select a primary category to publish' : ''}
+                variant="filled" 
+                style={{ color: 'white' }}
+                title={
+                  !canPublish 
+                    ? missingBusinessName && missingPrimaryCategory
+                      ? 'Complete business profile and select primary category'
+                      : missingBusinessName
+                      ? 'Add business name in profile settings'
+                      : 'Select a primary category'
+                    : ''
+                }
               >
                 Publish
-              </button>
+              </Button>
             )}
           </div>
 
-          {!canPublish && (
-            <p className="text-sm text-amber-600 dark:text-amber-400">
-              ⚠️ Complete your business profile and select a primary category to publish
+          {/* Publication Requirements Alert */}
+          {(!canPublish && !listing.isPublished) || error ? (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-lg mt-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Complete these requirements to publish your listing
+                  </h3>
+                  <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                    <ul className="list-disc list-inside space-y-1">
+                      {missingBusinessName && (
+                        <li>
+                          <strong>Business Name:</strong> Add your business name in{' '}
+                          <a 
+                            href={`/t/${tenantId}/settings/tenant`}
+                            className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                          >
+                            Business Profile Settings
+                          </a>
+                        </li>
+                      )}
+                      {missingPrimaryCategory && (
+                        <li>
+                          <strong>Primary Category:</strong> Select a primary category below
+                        </li>
+                      )}
+                      {error && error.includes('city') && (
+                        <li>
+                          <strong>City & State:</strong> Add your business location in{' '}
+                          <a 
+                            href={`/t/${tenantId}/settings/tenant`}
+                            className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                          >
+                            Business Profile Settings
+                          </a>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-3">
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
+
+          {saveMessage && (
+            <p className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>
+              {saveMessage}
             </p>
           )}
         </div>

@@ -55,7 +55,7 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
               href={item.href}
               className={[
                 isMobile ? 'block px-3 py-3 rounded-md text-base font-medium transition-colors' : 'block px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                active ? 'bg-blue-600 !text-white dark:!text-white' : 'text-gray-700 hover:text-blue-700 hover:bg-blue-50 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:bg-blue-900/20',
+                active ? 'bg-blue-600 !text-white dark:!text-white' : 'text-gray-700 hover:text-blue-700 hover:bg-blue-50 dark:text-gray-800 dark:hover:text-blue-400 dark:hover:bg-blue-900/20',
               ].join(' ')}
               aria-current={active ? 'page' : undefined}
             >
@@ -64,15 +64,23 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
           )
         })}
         {/* Page-specific quick links */}
-        {pathname && pathname.startsWith(`/t/${tenantId}/profile-completeness`) && (
+        {pathname && (pathname.startsWith(`/t/${tenantId}/profile-completeness`) || pathname.startsWith(`/t/${tenantId}/onboarding`)) && (
           <>
             <div className="border-t border-gray-200 my-2" />
             <Link
-              href={`/t/${tenantId}/settings/hours`}
+              href={`/t/${tenantId}/settings/tenant`}
               className={isMobile ? "block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
             >
-              Business Hours
+              Edit Profile
             </Link>
+            {pathname.startsWith(`/t/${tenantId}/profile-completeness`) && (
+              <Link
+                href={`/t/${tenantId}/settings/hours`}
+                className={isMobile ? "block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
+              >
+                Store Hours
+              </Link>
+            )}
           </>
         )}
         <div className="border-t border-gray-200 my-2" />

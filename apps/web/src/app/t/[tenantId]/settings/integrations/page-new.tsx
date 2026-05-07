@@ -7,6 +7,9 @@ import { useSquareIntegration } from '@/hooks/useSquareIntegration';
 import { CloverConnectionCard } from '@/components/clover';
 import { SquareConnectionCard } from '@/components/square';
 
+
+
+
 export default function IntegrationsPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;

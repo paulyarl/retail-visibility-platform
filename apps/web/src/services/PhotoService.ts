@@ -1,0 +1,322 @@
+/**
+ * Photo Service - Authenticated API Pattern
+ * 
+ * Handles item and variant photo operations including uploads, deletions, and reordering
+ * Extends AuthenticatedApiSingleton for consistent authentication and caching
+ */
+
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+
+// Photo Data Interfaces
+export interface Photo {
+  id: string;
+  itemId: string;
+  variantId?: string | null;
+  url: string;
+  thumbnailUrl?: string;
+  displayOrder: number;
+  position: number;
+  isPrimary: boolean;
+  altText?: string;
+  alt?: string | null;
+  caption?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PhotoUploadResult {
+  success: boolean;
+  photo?: Photo;
+  error?: string;
+  message?: string;
+}
+
+export interface PhotoDeleteResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+}
+
+export interface PhotoReorderResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+  updatedPhotos?: Photo[];
+}
+
+class PhotoService extends TenantApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  private static instance: PhotoService;
+
+  // TTL constants for different data types
+  private readonly PHOTOS_TTL = 10 * 60 * 1000; // 10 minutes for photos
+  private readonly UPLOAD_TTL = 2 * 60 * 1000; // 2 minutes for upload operations
+
+  private constructor() {
+    super('photo-service');
+  }
+
+  static getInstance(): PhotoService {
+    if (!PhotoService.instance) {
+      PhotoService.instance = new PhotoService();
+    }
+    return PhotoService.instance;
+  }
+
+  /**
+   * Fetch photos for a specific item
+   * Uses the /api/photos/item/:itemId endpoint
+   */
+  async fetchItemPhotos(itemId: string): Promise<Photo[]> {
+    const response = await this.makeDefaultRequest<{ photos: Photo[] }>(
+      `/api/items/${itemId}/photos`,
+      {},
+      `item-photos-${itemId}`,
+      this.PHOTOS_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to fetch item photos:', response.error);
+      return [];
+    }
+
+    return response.data?.photos || [];
+  }
+
+  /**
+   * Fetch photos for a specific variant
+   * Uses the /api/photos/variant/:variantId endpoint
+   */
+  async fetchVariantPhotos(variantId: string): Promise<Photo[]> {
+    const response = await this.makeDefaultRequest<{ photos: Photo[] }>(
+      `/photos/variant/${variantId}`,
+      {},
+      `variant-photos-${variantId}`,
+      this.PHOTOS_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to fetch variant photos:', response.error);
+      return [];
+    }
+
+    return response.data?.photos || [];
+  }
+
+  /**
+   * Upload a photo for an item
+   * Uses the /api/photos/upload/item/:itemId endpoint
+   */
+  async uploadItemPhoto(itemId: string, file: File, isPrimary: boolean = false): Promise<PhotoUploadResult> {
+    // For file uploads, we need to use FormData and a different approach
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('isPrimary', isPrimary.toString());
+
+    const response = await this.makeDefaultRequest<PhotoUploadResult>(
+      `/photos/upload/item/${itemId}`,
+      {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header for FormData - browser sets it automatically with boundary
+      },
+      `upload-item-${itemId}`,
+      this.UPLOAD_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to upload item photo:', response.error);
+      return { success: false, error: 'Upload failed' };
+    }
+
+    // Invalidate item photos cache after successful upload
+    if (response.data?.success) {
+      await this.invalidateCache(`item-photos-${itemId}`);
+    }
+
+    return response.data || { success: false, error: 'Upload failed' };
+  }
+
+  /**
+   * Upload a photo for a variant
+   * Uses the /api/photos/upload/variant/:variantId endpoint
+   */
+  async uploadVariantPhoto(variantId: string, file: File, isPrimary: boolean = false): Promise<PhotoUploadResult> {
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('isPrimary', isPrimary.toString());
+
+    const response = await this.makeDefaultRequest<PhotoUploadResult>(
+      `/photos/upload/variant/${variantId}`,
+      {
+        method: 'POST',
+        body: formData,
+      },
+      `upload-variant-${variantId}`,
+      this.UPLOAD_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to upload variant photo:', response.error);
+      return { success: false, error: 'Upload failed' };
+    }
+
+    // Invalidate variant photos cache after successful upload
+    if (response.data?.success) {
+      await this.invalidateCache(`variant-photos-${variantId}`);
+    }
+
+    return response.data || { success: false, error: 'Upload failed' };
+  }
+
+  /**
+   * Delete a photo
+   * Uses the /api/photos/:photoId endpoint
+   */
+  async deletePhoto(photoId: string, itemId: string): Promise<PhotoDeleteResult> {
+    const response = await this.makeDefaultRequest<PhotoDeleteResult>(
+      `/photos/${photoId}`,
+      {
+        method: 'DELETE',
+      },
+      `delete-photo-${photoId}`,
+      this.UPLOAD_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to delete photo:', response.error);
+      return { success: false, error: 'Delete failed' };
+    }
+
+    // Invalidate item photos cache after successful deletion
+    if (response.data?.success) {
+      await this.invalidateCache(`item-photos-${itemId}`);
+    }
+
+    return response.data || { success: false, error: 'Delete failed' };
+  }
+
+  /**
+   * Reorder photos for an item
+   * Uses the /api/photos/reorder/:itemId endpoint
+   */
+  async reorderPhotos(itemId: string, photoIds: string[]): Promise<PhotoReorderResult> {
+    const response = await this.makeDefaultRequest<PhotoReorderResult>(
+      `/photos/reorder/${itemId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ photoIds }),
+      },
+      `reorder-photos-${itemId}`,
+      this.UPLOAD_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to reorder photos:', response.error);
+      return { success: false, error: 'Reorder failed' };
+    }
+
+    // Invalidate item photos cache after successful reordering
+    if (response.data?.success) {
+      await this.invalidateCache(`item-photos-${itemId}`);
+    }
+
+    return response.data || { success: false, error: 'Reorder failed' };
+  }
+
+  /**
+   * Set a photo as primary
+   * Uses the /api/photos/:photoId/primary endpoint
+   */
+  async setPrimaryPhoto(photoId: string, itemId: string): Promise<PhotoReorderResult> {
+    const response = await this.makeDefaultRequest<PhotoReorderResult>(
+      `/photos/${photoId}/primary`,
+      {
+        method: 'PATCH',
+      },
+      `set-primary-${photoId}`,
+      this.UPLOAD_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to set primary photo:', response.error);
+      return { success: false, error: 'Set primary failed' };
+    }
+
+    // Invalidate item photos cache after successful update
+    if (response.data?.success) {
+      await this.invalidateCache(`item-photos-${itemId}`);
+    }
+
+    return response.data || { success: false, error: 'Set primary failed' };
+  }
+
+  /**
+   * Get photo by ID
+   * Uses the /api/photos/:photoId endpoint
+   */
+  async getPhotoById(photoId: string): Promise<Photo | null> {
+    const response = await this.makeDefaultRequest<Photo>(
+      `/photos/${photoId}`,
+      {},
+      `photo-${photoId}`,
+      this.PHOTOS_TTL
+    );
+
+    if (!response.success) {
+      console.error('[PhotoService] Failed to fetch photo:', response.error);
+      return null;
+    }
+
+    return response.data || null;
+  }
+
+  /**
+   * Invalidate item photos cache
+   */
+  async invalidateItemCache(itemId: string): Promise<void> {
+    await this.invalidateCache(`item-photos-${itemId}`);
+  }
+
+  /**
+   * Invalidate variant photos cache
+   */
+  async invalidateVariantCache(variantId: string): Promise<void> {
+    await this.invalidateCache(`variant-photos-${variantId}`);
+  }
+
+  /**
+   * Clear all photo-related cache
+   */
+  async clearAllCache(): Promise<void> {
+    // This would need to be implemented based on cache key patterns
+    // For now, we'll clear common patterns
+    const patterns = [
+      'item-photos-',
+      'variant-photos-',
+      'photo-',
+      'upload-item-',
+      'upload-variant-',
+      'delete-photo-',
+      'reorder-photos-',
+      'set-primary-'
+    ];
+
+    for (const pattern of patterns) {
+      // This is a simplified approach - in practice you'd want to track cache keys
+      try {
+        await this.invalidateCache(pattern);
+      } catch (error) {
+        // Ignore cache invalidation errors
+      }
+    }
+  }
+}
+
+// Export singleton instance
+export const photoService = PhotoService.getInstance();

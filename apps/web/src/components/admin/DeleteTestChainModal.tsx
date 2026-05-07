@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Trash2, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface DeleteTestChainModalProps {
   onClose: () => void;
@@ -27,18 +28,7 @@ export default function DeleteTestChainModal({ onClose }: DeleteTestChainModalPr
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await fetch(`${apiUrl}/api/admin/tools/test-chains/${organizationId}?confirm=true`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to delete test chain');
-      }
-
+      const data = await adminUsersService.deleteTestChain(organizationId);
       setResult(data);
       setSuccess(true);
     } catch (err: any) {

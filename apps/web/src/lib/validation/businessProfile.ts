@@ -81,15 +81,17 @@ export const businessProfileSchema = z.object({
     .or(z.literal('')),
   
   logo_url: z.string()
-    .url('Logo must be a valid URL')
     .trim()
+    .refine((val) => val === '' || val.startsWith('http'), 'Logo must be a valid URL')
     .optional()
+    .or(z.null().transform(() => ''))
     .or(z.literal('')),
   
   business_description: z.string()
     .max(1000, 'Business description must be less than 1000 characters')
     .trim()
     .optional()
+    .or(z.null().transform(() => ''))
     .or(z.literal('')),
   
   hours: z.record(z.string(), z.string()).optional().nullable(),
@@ -99,9 +101,122 @@ export const businessProfileSchema = z.object({
   // Geocoding fields for map display
   latitude: z.number().min(-90).max(90).optional().nullable(),
   longitude: z.number().min(-180).max(180).optional().nullable(),
+  
+  // Slug field for URL customization
+  slug: z.string()
+    .min(2, 'Slug must be at least 2 characters')
+    .max(100, 'Slug must be less than 100 characters')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only')
+    .optional(),
 });
 
-export type BusinessProfile = z.infer<typeof businessProfileSchema>;
+export type BusinessProfile = {
+  business_name: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state?: string;
+  postal_code: string;
+  country_code: string;
+  phone_number?: string;
+  email?: string;
+  website?: string;
+  contact_person?: string;
+  admin_email?: string;
+  logo_url?: string;
+  banner_url?: string;
+  business_description?: string;
+  hours?: Record<string, string> | null;
+  social_links?: Record<string, string> | null;
+  seo_tags?: string[] | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  slug?: string;
+  tenant_id?: string;
+};
+
+// Onboarding schema - only validates fields shown on the StoreIdentityStep form
+// This excludes optional fields like logo_url, business_description that may be null
+export const onboardingProfileSchema = z.object({
+  business_name: z.string()
+    .min(2, 'Business name must be at least 2 characters')
+    .max(100, 'Business name must be less than 100 characters')
+    .trim(),
+  
+  address_line1: z.string({ message: 'Address is required' })
+    .min(5, 'Address must be at least 5 characters')
+    .max(200, 'Address must be less than 200 characters')
+    .trim(),
+  
+  address_line2: z.string({ message: 'Address line 2 must be a string' })
+    .max(200, 'Address line 2 must be less than 200 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  city: z.string({ message: 'City is required' })
+    .min(2, 'City must be at least 2 characters')
+    .max(100, 'City must be less than 100 characters')
+    .trim(),
+  
+  state: z.string({ message: 'State must be a string' })
+    .max(100, 'State must be less than 100 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  postal_code: z.string({ message: 'Postal code is required' })
+    .min(3, 'Postal code must be at least 3 characters')
+    .max(20, 'Postal code must be less than 20 characters')
+    .trim(),
+  
+  country_code: z.string({ message: 'Country is required' })
+    .length(2, 'Country code must be 2 characters (ISO 3166)')
+    .toUpperCase(),
+  
+  phone_number: z.string({ message: 'Phone number is required' })
+    .min(1, 'Phone number is required')
+    .trim(),
+  
+  email: z.string({ message: 'Email must be a string' })
+    .refine((val) => !val || emailRegex.test(val), 'Please enter a valid email address')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  website: z.string({ message: 'Website must be a string' })
+    .refine((val) => !val || websiteRegex.test(val), 'Website must use HTTPS (e.g., https://www.example.com)')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  contact_person: z.string({ message: 'Contact person must be a string' })
+    .min(2, 'Contact person name must be at least 2 characters')
+    .max(100, 'Contact person name must be less than 100 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  slug: z.string()
+    .min(2, 'Slug must be at least 2 characters')
+    .max(100, 'Slug must be less than 100 characters')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only')
+    .optional(),
+  
+  // Map coordinates - required for proper business location display
+  latitude: z.number({ message: 'Latitude is required - click "Get Coordinates" to populate' }),
+  
+  longitude: z.number({ message: 'Longitude is required - click "Get Coordinates" to populate' }),
+});
+
+import { externalApiService } from '@/services/ExternalApiService';
 
 // Helper to geocode an address using Google Geocoding API
 export async function geocodeAddress(address: {
@@ -113,38 +228,9 @@ export async function geocodeAddress(address: {
   country_code: string;
 }): Promise<{ latitude: number; longitude: number } | null> {
   try {
-    const fullAddress = [
-      address.address_line1,
-      address.address_line2,
-      address.city,
-      address.state,
-      address.postal_code,
-      address.country_code,
-    ]
-      .filter(Boolean)
-      .join(', ');
-
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error('Geocoding API request failed');
-    }
-
-    const data = await response.json();
-
-    if (data.status === 'OK' && data.results && data.results.length > 0) {
-      const location = data.results[0].geometry.location;
-      return {
-        latitude: location.lat,
-        longitude: location.lng,
-      };
-    }
-
-    return null;
+    return await externalApiService.geocodeAddress(address);
   } catch (error) {
-    console.error('Geocoding error:', error);
+    console.error('[BusinessProfile] Failed to geocode address:', error);
     return null;
   }
 }

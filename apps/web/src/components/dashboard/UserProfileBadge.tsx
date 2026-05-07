@@ -88,9 +88,18 @@ export default function UserProfileBadge({ profile, compact = false }: UserProfi
     <div className="bg-white rounded-lg border border-neutral-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold text-lg">
-          {profile.name.charAt(0).toUpperCase()}
-        </div>
+        {profile.picture ? (
+          <img 
+            src={profile.picture} 
+            alt={profile.name}
+            className="w-12 h-12 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold text-lg">
+            {profile.name.charAt(0).toUpperCase()}
+          </div>
+        )}
 
         {/* Info */}
         <div className="flex-1 min-w-0">

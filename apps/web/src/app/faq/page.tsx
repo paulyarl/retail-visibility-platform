@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
+
 
 const faqs = [
   {
@@ -255,11 +257,11 @@ export default function FAQPage() {
                   Features
                 </button>
               </Link>
-              <Link href="/login">
+              <a href="/auth/login">
                 <button className="text-neutral-600 hover:text-neutral-900 text-sm font-medium">
                   Sign In
                 </button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -291,30 +293,30 @@ export default function FAQPage() {
                   const isOpen = openQuestion === questionId;
 
                   return (
-                    <Card key={questionId} className="border-2 border-neutral-200 hover:border-primary-300 transition-colors">
+                    <Card withBorder padding="lg" radius="md" className="border-2 border-neutral-200 hover:border-primary-300 transition-colors">
                       <button
                         onClick={() => toggleQuestion(questionId)}
                         className="w-full text-left"
                       >
-                        <CardHeader className="cursor-pointer">
+                        <div className="cursor-pointer pb-4">
                           <div className="flex items-start justify-between gap-4">
-                            <CardTitle className="text-lg font-semibold text-neutral-900 pr-8">
+                            <h3 className="text-lg font-semibold text-neutral-900 pr-8">
                               {faq.question}
-                            </CardTitle>
+                            </h3>
                             <div className={`flex-shrink-0 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}>
                               <svg className="w-6 h-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                               </svg>
                             </div>
                           </div>
-                        </CardHeader>
+                        </div>
                       </button>
                       {isOpen && (
-                        <CardContent>
+                        <div className="pt-4 border-t border-neutral-200">
                           <p className="text-neutral-700 leading-relaxed">
                             {faq.answer}
                           </p>
-                        </CardContent>
+                        </div>
                       )}
                     </Card>
                   );
@@ -340,11 +342,11 @@ export default function FAQPage() {
                 Contact Support
               </button>
             </Link>
-            <Link href="/login">
+            <a href="/auth/signup">
               <button className="bg-transparent text-white border-2 border-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-primary-600 transition-colors">
                 Start Free Trial
               </button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>

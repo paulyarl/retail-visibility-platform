@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Badge, AnimatedCard, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api, API_BASE_URL } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { tenantManagementService } from '@/services/TenantManagementService';
+import { organizationsService } from '@/services/OrganizationsSingletonService';
 
 type PropagationSection = {
   title: string;
@@ -27,6 +29,9 @@ type PropagationGroup = {
   sections: PropagationSection[];
 };
 
+
+
+
 export default function PropagationControlPanel() {
   const params = useParams();
   const tenantId = params.tenantId as string;
@@ -39,6 +44,7 @@ export default function PropagationControlPanel() {
     organizationData,
     tenantData,
     isPlatformAdmin: userIsPlatformAdmin,
+    refetch: refetchAccessControl,
   } = useAccessControl(
     tenantId,
     AccessPresets.CHAIN_PROPAGATION,
@@ -105,18 +111,10 @@ export default function PropagationControlPanel() {
       setPropagating(true);
       setShowBusinessHoursModal(false);
 
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/business-hours/propagate`, {
-        includeSpecialHours
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to propagate business hours');
-      }
-
-      const result = await res.json();
-      const summary = `Regular hours: ${result.data.regularHoursUpdated}, Special hours: ${result.data.specialHoursCreated + result.data.specialHoursUpdated}`;
-      showToast('success', `Successfully propagated business hours to ${result.data.totalLocations} locations (${summary})`);
+      const result = await tenantManagementService.propagateBusinessHours(tenantId, includeSpecialHours);
+      
+      const summary = `Regular hours: ${result.regularHoursUpdated}, Special hours: ${result.specialHoursCreated + result.specialHoursUpdated}`;
+      showToast('success', `Successfully propagated business hours to ${result.totalLocations} locations (${summary})`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate business hours');
     } finally {
@@ -129,18 +127,10 @@ export default function PropagationControlPanel() {
       setPropagating(true);
       setShowFeatureFlagsModal(false);
 
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/feature-flags/propagate`, {
-        mode: featureFlagsMode
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to propagate feature flags');
-      }
-
-      const result = await res.json();
-      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`;
-      showToast('success', `Successfully propagated ${result.data.totalFlags} feature flags to ${result.data.totalLocations} locations (${summary})`);
+      const result = await tenantManagementService.propagateFeatureFlags(tenantId, featureFlagsMode);
+      
+      const summary = `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`;
+      showToast('success', `Successfully propagated ${result.totalFlags} feature flags to ${result.totalLocations} locations (${summary})`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate feature flags');
     } finally {
@@ -153,18 +143,10 @@ export default function PropagationControlPanel() {
       setPropagating(true);
       setShowUserRolesModal(false);
 
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/user-roles/propagate`, {
-        mode: userRolesMode
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to propagate user roles');
-      }
-
-      const result = await res.json();
-      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`;
-      showToast('success', `Successfully propagated ${result.data.totalUsers} user roles to ${result.data.totalLocations} locations (${summary})`);
+      const result = await tenantManagementService.propagateUserRoles(tenantId, userRolesMode);
+      
+      const summary = `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`;
+      showToast('success', `Successfully propagated ${result.totalUsers} user roles to ${result.totalLocations} locations (${summary})`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate user roles');
     } finally {
@@ -177,15 +159,9 @@ export default function PropagationControlPanel() {
       setPropagating(true);
       setShowBrandAssetsModal(false);
 
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/brand-assets/propagate`);
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to propagate brand assets');
-      }
-
-      const result = await res.json();
-      showToast('success', `Successfully propagated brand assets to ${result.data.totalLocations} locations (${result.data.updated} updated)`);
+      const result = await tenantManagementService.propagateBrandAssets(tenantId);
+      
+      showToast('success', `Successfully propagated brand assets to ${result.totalLocations} locations (${result.updated} updated)`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate brand assets');
     } finally {
@@ -198,15 +174,9 @@ export default function PropagationControlPanel() {
       setPropagating(true);
       setShowBusinessProfileModal(false);
 
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/business-profile/propagate`);
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to propagate business profile');
-      }
-
-      const result = await res.json();
-      showToast('success', `Successfully propagated business profile to ${result.data.totalLocations} locations (${result.data.updated} updated)`);
+      const result = await tenantManagementService.propagateBusinessProfile(tenantId);
+      
+      showToast('success', `Successfully propagated business profile to ${result.totalLocations} locations (${result.updated} updated)`);
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate business profile');
     } finally {
@@ -532,39 +502,12 @@ export default function PropagationControlPanel() {
                       
                       if (confirm(`Set ${organizationInfo.tenants.find(t => t.id === newHeroId)?.name} as the hero location?`)) {
                         try {
-                          const res = await api.put(`${API_BASE_URL}/organizations/${organizationInfo.id}/hero-location`, {
-                            tenantId: newHeroId
-                          });
+                          await tenantManagementService.updateOrganizationHeroLocation(organizationInfo.id, newHeroId);
                           
-                          if (res.ok) {
-                            // Reload organization info
-                            const tenantRes = await api.get(`${API_BASE_URL}/tenants/${tenantId}`);
-                            if (tenantRes.ok) {
-                              const tenantData = await tenantRes.json();
-                              if (tenantData.organizationId) {
-                                const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenantData.organizationId}`);
-                                if (orgRes.ok) {
-                                  const orgData = await orgRes.json();
-                                  const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
-                                    id: t.id,
-                                    name: t.name,
-                                    isHero: t.metadata?.isHeroLocation === true
-                                  })) || [];
-                                  
-                                  setOrganizationInfo({
-                                    id: orgData.id,
-                                    name: orgData.name,
-                                    tenants: tenantsWithHeroFlag
-                                  });
-                                  
-                                  alert('✅ Hero location updated successfully!');
-                                }
-                              }
-                            }
-                          } else {
-                            const error = await res.json();
-                            alert(`❌ Failed to set hero location: ${error.message || 'Unknown error'}`);
-                          }
+                          // Refetch access control data to get updated organization info
+                          await refetchAccessControl();
+                          
+                          alert('✅ Hero location updated successfully!');
                         } catch (err) {
                           alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
                         }

@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface BadgeProps {
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'secondary' | 'outline' | 'destructive';
   children: React.ReactNode;
   className?: string;
 }
@@ -19,6 +19,9 @@ export function Badge({
     warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     error: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
     info: 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100',
+    secondary: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+    outline: 'border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-300',
+    destructive: 'bg-red-500 text-white',
   };
   
   return (

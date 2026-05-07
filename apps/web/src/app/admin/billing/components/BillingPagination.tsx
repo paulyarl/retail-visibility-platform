@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui';
+import { Button } from '@mantine/core';
 
 interface BillingPaginationProps {
   currentPage: number;

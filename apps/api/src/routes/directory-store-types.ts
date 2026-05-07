@@ -3,6 +3,12 @@ import { storeTypeDirectoryService } from '../services/store-type-directory.serv
 
 const router = Router();
 
+// Debug middleware to log all requests to this router
+router.use((req, res, next) => {
+  console.log(`[STORE-TYPES-ROUTER] ${req.method} ${req.path} - Original URL: ${req.originalUrl}`);
+  next();
+});
+
 /**
  * GET /api/directory/store-types
  * 
@@ -14,9 +20,11 @@ const router = Router();
  * - lng: Longitude for location filtering (optional)
  * - radius: Maximum distance in miles (optional, default: 25)
  */
-router.get('/store-types', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
+  console.log('[STORE-TYPES] GET / route hit - fetching store types');
   try {
     const { lat, lng, radius } = req.query;
+    console.log('[STORE-TYPES] Query params:', { lat, lng, radius });
 
     // Parse location parameters if provided
     const location =
@@ -28,12 +36,15 @@ router.get('/store-types', async (req: Request, res: Response) => {
         : undefined;
 
     const radiusMiles = radius ? parseFloat(radius as string) : 25;
+    console.log('[STORE-TYPES] Parsed params:', { location, radiusMiles });
 
     // Get store types
+    console.log('[STORE-TYPES] About to call getStoreTypes...');
     const storeTypes = await storeTypeDirectoryService.getStoreTypes(
       location,
       radiusMiles
     );
+    console.log('[STORE-TYPES] Got store types:', storeTypes?.length || 0);
 
     res.json({
       success: true,
@@ -42,11 +53,44 @@ router.get('/store-types', async (req: Request, res: Response) => {
         totalCount: storeTypes.length,
       },
     });
-  } catch (error) {
-    console.error('Error fetching store types:', error);
+  } catch (error: any) {
+    console.error('[STORE-TYPES] Error fetching store types:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch store types',
+      error: 'failed_to_fetch_store_types',
+      message: error?.message,
+    });
+  }
+});
+
+/**
+ * GET /api/directory/store-type-counts
+ * 
+ * Get store type counts for all store types
+ * Returns a mapping of store type slug to store count
+ */
+router.get('/store-type-counts', async (req: Request, res: Response) => {
+  try {
+    // Get store types with counts
+    const storeTypes = await storeTypeDirectoryService.getStoreTypes();
+
+    // Convert to simple mapping of slug -> count
+    const storeTypeCounts: Record<string, number> = {};
+    storeTypes.forEach(storeType => {
+      storeTypeCounts[storeType.slug] = storeType.storeCount;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        storeTypeCounts,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching store type counts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch store type counts',
     });
   }
 });
@@ -59,16 +103,34 @@ router.get('/store-types', async (req: Request, res: Response) => {
  * Path params:
  * - typeSlug: Store type slug (e.g., "electronics-store", "clothing-store")
  */
-router.get('/store-types/:typeSlug', async (req: Request, res: Response) => {
+router.get('/:typeSlug', async (req: Request, res: Response) => {
   try {
     const { typeSlug } = req.params;
 
     const storeType = await storeTypeDirectoryService.getStoreTypeDetails(typeSlug);
 
+    // If store type not found, return empty result instead of 404
+    // This allows the frontend to handle zero-store categories gracefully
     if (!storeType) {
-      return res.status(404).json({
-        success: false,
-        error: 'Store type not found',
+      return res.json({
+        success: true,
+        data: { 
+          storeType: {
+            id: typeSlug,
+            name: typeSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            slug: typeSlug,
+            storeCount: 0,
+            totalProducts: 0,
+            avgRating: 0,
+            uniqueLocations: 0,
+            cities: [],
+            states: [],
+            featuredStoreCount: 0,
+            syncedStoreCount: 0,
+            firstStoreAdded: null,
+            lastStoreUpdated: null,
+          }
+        },
       });
     }
 
@@ -101,13 +163,13 @@ router.get('/store-types/:typeSlug', async (req: Request, res: Response) => {
  * - limit: Maximum number of stores to return (optional, default: 50)
  */
 router.get(
-  '/store-types/:typeSlug/stores',
+  '/:typeSlug/stores',
   async (req: Request, res: Response) => {
     try {
       const { typeSlug } = req.params;
       const { lat, lng, radius, limit } = req.query;
 
-      console.log(`[API] Fetching stores for store type: ${typeSlug}`);
+      //console.log(`[API] Fetching stores for store type: ${typeSlug}`);
 
       // Parse location parameters if provided
       const location =

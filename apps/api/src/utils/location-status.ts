@@ -13,13 +13,14 @@ export type UserRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER'
 
 /**
  * Status transition rules - defines which status changes are allowed
+ * All transitions are allowed except to the current status
  */
 export const STATUS_TRANSITIONS: Record<LocationStatus, LocationStatus[]> = {
-  pending: ['active', 'archived'],
-  active: ['inactive', 'closed', 'archived'],
-  inactive: ['active', 'closed', 'archived'],
-  closed: ['archived'],
-  archived: ['active'], // Cannot transition from archived
+  pending: ['active', 'inactive', 'closed', 'archived'],
+  active: ['pending', 'inactive', 'closed', 'archived'],
+  inactive: ['pending', 'active', 'closed', 'archived'],
+  closed: ['pending', 'active', 'inactive', 'archived'],
+  archived: ['pending', 'active', 'inactive', 'closed'],
 };
 
 /**
@@ -256,6 +257,10 @@ export function getStorefrontMessage(
         message: 'This location is permanently closed. Thank you for your patronage over the years.',
       };
     case 'pending':
+      return {
+        title: 'Pending',
+        message: 'New location being set up. Available soon.',
+      };
     case 'archived':
       return {
         title: 'Location Not Available',

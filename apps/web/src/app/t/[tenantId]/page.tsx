@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+
+
+
 export default function TenantScopedDashboardPage() {
   const params = useParams<{ tenantId: string }>();
   const router = useRouter();

@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import GBPCategoryCard from '@/components/settings/GBPCategoryCard';
-import PageHeader from '@/components/PageHeader';
-import { api } from '@/lib/api';
-import { Spinner } from '@/components/ui';
+import { Container, Title, Text, Stack, Group, Breadcrumbs, Anchor, Alert, Card, Grid, Loader } from '@mantine/core';
+import { gbpCategoryService } from '@/services/GBPCategoryService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { IconInfoCircle, IconCheck, IconRocket, IconTarget, IconLink, IconAlertTriangle, IconBulb } from '@tabler/icons-react';
+
 
 export default function GBPCategoryPage() {
   const params = useParams();
@@ -26,11 +27,8 @@ export default function GBPCategoryPage() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const response = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setProfile(data);
-        }
+        const profileData = await gbpCategoryService.getTenantGBPCategoryProfile(tenantId);
+        setProfile(profileData);
       } catch (error) {
         console.error('[GBPCategoryPage] Failed to load profile:', error);
       } finally {
@@ -46,9 +44,11 @@ export default function GBPCategoryPage() {
   // Access control checks
   if (accessLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
-        <Spinner size="lg" />
-      </div>
+      <Container size="xl" py="xl">
+        <Group justify="center">
+          <Loader size="lg" />
+        </Group>
+      </Container>
     );
   }
 
@@ -65,129 +65,181 @@ export default function GBPCategoryPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" />
-      </div>
+      <Container size="xl" py="xl">
+        <Group justify="center">
+          <Loader size="lg" />
+        </Group>
+      </Container>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-gray-600 mb-4">
-        <Link href={`/t/${tenantId}/settings`} className="hover:text-gray-900">Settings</Link>
-        {' '}/{' '}
-        <span className="text-gray-900 font-medium">GBP Business Category</span>
-      </nav>
+    <Container size="xl" py="md">
+      <Stack gap="lg">
+        {/* Breadcrumb */}
+        <Breadcrumbs>
+          <Anchor component={Link} href={`/t/${tenantId}/settings`}>
+            Settings
+          </Anchor>
+          <Text>GBP Business Category</Text>
+        </Breadcrumbs>
 
-      <PageHeader
-        title="Google Business Profile Category"
-        description="Manage your primary business category for Google Business Profile"
-      />
+        {/* Page Header */}
+        <div>
+          <Title order={1}>Google Business Profile Category</Title>
+          <Text c="dimmed">
+            Manage your primary business category for Google Business Profile
+          </Text>
+        </div>
 
-      {/* Clarification Card */}
-      <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          What's the difference?
-        </h4>
-        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-          <strong>Business Category</strong> (this page) describes your store type for Google Business Profile 
-          (e.g., "Grocery store", "Clothing store"). <strong>Product Categories</strong> organize 
-          individual items you sell (e.g., "Dairy", "Produce", "Men's Apparel").
-        </p>
-        <Link 
-          href={`/t/${tenantId}/categories`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 underline"
-        >
-          Manage Product Categories
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      </div>
+        {/* Clarification Card */}
+        <Alert color="blue" icon={<IconInfoCircle size={16} />}>
+          <Stack gap="xs">
+            <Text fw={500}>What's the difference?</Text>
+            <Text size="sm">
+              <strong>Business Category</strong> (this page) describes your store type for Google Business Profile 
+              (e.g., "Grocery store", "Clothing store"). <strong>Product Categories</strong> organize 
+              individual items you sell (e.g., "Dairy", "Produce", "Men's Apparel").
+            </Text>
+            <Anchor component={Link} href={`/t/${tenantId}/categories`} size="sm" fw={500}>
+              Manage Product Categories
+              <IconLink size={12} style={{ marginLeft: '4px' }} />
+            </Anchor>
+          </Stack>
+        </Alert>
 
-      <div className="mt-6 space-y-6">
+        {/* Main Category Card */}
         <GBPCategoryCard
           tenantId={tenantId}
-          initialCategory={
+          initialPrimary={
             profile?.gbpCategoryId && profile?.gbpCategoryName
               ? { id: profile.gbpCategoryId, name: profile.gbpCategoryName }
               : null
           }
+          initialSecondary={profile?.gbpSecondaryCategories || []}
           syncStatus={profile?.gbpCategorySyncStatus}
-          lastMirrored={profile?.gbpCategoryLastMirrored}
+          lastSynced={profile?.gbpCategoryLastMirrored}
         />
 
         {/* Quick Start Guide */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">
-            🚀 Quick Start: Popular Retail Categories
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Food & Beverage</h4>
-              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                <li>• Grocery store</li>
-                <li>• Convenience store</li>
-                <li>• Supermarket</li>
-                <li>• Liquor store</li>
-                <li>• Specialty food store</li>
-              </ul>
-            </div>
+        <Card shadow="sm" padding="lg" withBorder bg="blue.0">
+          <Stack gap="lg">
+            <Group gap="sm">
+              <IconRocket size={20} />
+              <Title order={3}>🚀 Quick Start Guide</Title>
+            </Group>
             
-            <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">General Retail</h4>
-              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                <li>• Clothing store</li>
-                <li>• Shoe store</li>
-                <li>• Electronics store</li>
-                <li>• Furniture store</li>
-                <li>• Hardware store</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Health & Beauty</h4>
-              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                <li>• Pharmacy</li>
-                <li>• Beauty supply store</li>
-                <li>• Cosmetics store</li>
-                <li>• Health and beauty shop</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Specialty Stores</h4>
-              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                <li>• Book store</li>
-                <li>• Pet store</li>
-                <li>• Toy store</li>
-                <li>• Sporting goods store</li>
-                <li>• Gift shop</li>
-              </ul>
-            </div>
-          </div>
+            {/* How It Works */}
+            <Card padding="md" withBorder bg="white">
+              <Group gap="sm" mb="md">
+                <IconCheck size={16} color="blue" />
+                <Text fw={500}>How It Works</Text>
+              </Group>
+              <Stack gap="sm" pl={30}>
+                <Group gap="sm">
+                  <Text c="blue" fw={500}>1.</Text>
+                  <Text size="sm"><strong>Select Primary Category:</strong> Choose from dropdown or search for your main business type (required)</Text>
+                </Group>
+                <Group gap="sm">
+                  <Text c="blue" fw={500}>2.</Text>
+                  <Text size="sm"><strong>Add Secondary Categories:</strong> Add up to 9 additional categories that describe your business (optional)</Text>
+                </Group>
+                <Group gap="sm">
+                  <Text c="blue" fw={500}>3.</Text>
+                  <Text size="sm"><strong>Save & Sync:</strong> Your categories automatically sync to your directory listing</Text>
+                </Group>
+                <Group gap="sm">
+                  <Text c="blue" fw={500}>4.</Text>
+                  <Text size="sm"><strong>View Mappings:</strong> See which directory categories your GBP categories map to</Text>
+                </Group>
+              </Stack>
+            </Card>
 
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Search Tips
-            </h4>
-            <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
-              <li>• <strong>Be specific:</strong> "Grocery store" is better than just "store"</li>
-              <li>• <strong>Use common terms:</strong> Search for how customers would describe your business</li>
-              <li>• <strong>Primary activity:</strong> Choose the category that best represents your main business</li>
-              <li>• <strong>Type at least 2 characters</strong> to see search results</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+            {/* Popular Categories */}
+            <div>
+              <Text fw={500} mb="md">Popular Retail Categories</Text>
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack gap="xs">
+                    <Text c="blue" size="sm" fw={500}>Food & Beverage</Text>
+                    <Text size="sm" c="dimmed">
+                      • Grocery store<br />
+                      • Convenience store<br />
+                      • Supermarket<br />
+                      • Liquor store
+                    </Text>
+                  </Stack>
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack gap="xs">
+                    <Text c="blue" size="sm" fw={500}>General Retail</Text>
+                    <Text size="sm" c="dimmed">
+                      • Clothing store<br />
+                      • Electronics store<br />
+                      • Furniture store<br />
+                      • Hardware store
+                    </Text>
+                  </Stack>
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack gap="xs">
+                    <Text c="blue" size="sm" fw={500}>Health & Beauty</Text>
+                    <Text size="sm" c="dimmed">
+                      • Pharmacy<br />
+                      • Beauty supply store<br />
+                      • Cosmetics store
+                    </Text>
+                  </Stack>
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack gap="xs">
+                    <Text c="blue" size="sm" fw={500}>Specialty Stores</Text>
+                    <Text size="sm" c="dimmed">
+                      • Book store<br />
+                      • Pet store<br />
+                      • Toy store<br />
+                      • Sporting goods store
+                    </Text>
+                  </Stack>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            {/* Tips & Best Practices */}
+            <Card padding="md" withBorder bg="white">
+              <Group gap="sm" mb="md">
+                <IconBulb size={16} color="blue" />
+                <Text fw={500}>Tips & Best Practices</Text>
+              </Group>
+              <Stack gap="sm" pl={30}>
+                <Group gap="sm">
+                  <Text c="blue">💡</Text>
+                  <Text size="sm"><strong>Primary First:</strong> Your primary category is most important for Google search results</Text>
+                </Group>
+                <Group gap="sm">
+                  <IconTarget size={12} color="blue" />
+                  <Text size="sm"><strong>Be Specific:</strong> "Grocery store" is better than just "store"</Text>
+                </Group>
+                <Group gap="sm">
+                  <Text c="blue">🔍</Text>
+                  <Text size="sm"><strong>Can't Find It?</strong> Click "🔍 Can't find it? Search" to search thousands of categories</Text>
+                </Group>
+                <Group gap="sm">
+                  <IconLink size={12} color="blue" />
+                  <Text size="sm"><strong>Check Mappings:</strong> After saving, see which directory categories your store will appear in</Text>
+                </Group>
+                <Group gap="sm">
+                  <IconAlertTriangle size={12} color="blue" />
+                  <Text size="sm"><strong>Unmapped Warning:</strong> If a category shows "unmapped", your store won't appear in that directory category page</Text>
+                </Group>
+              </Stack>
+            </Card>
+          </Stack>
+        </Card>
+      </Stack>
+    </Container>
   );
 }

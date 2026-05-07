@@ -31,6 +31,10 @@ export async function getTenantContext(): Promise<TenantContextShape> {
   }
 
   // Fallback: x-tenant-id header from API proxy/requests
+  // console.log(`Getting tenant context from header: ${hdrs.get('x-tenant-id')}`);
   const fallbackTenant = hdrs.get('x-tenant-id');
+  
+  // console.log(`Returning tenant hdrs: ${JSON.stringify(hdrs)}`);
+  // console.log(`Returning tenant context: ${fallbackTenant}`);
   return { tenantId: fallbackTenant, tenantSlug: null, aud: null };
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 // Stub GBP category data until real GBP API is wired
 // Note: Real GBP has 4,000+ categories that are mostly universal (not region-specific)
@@ -57,57 +58,22 @@ const STUB_GBP_CATEGORIES = [
   { id: 'gcid:auto_parts_store', name: 'Auto parts store', path: ['Automotive', 'Auto parts store'] },
   { id: 'gcid:car_repair', name: 'Car repair', path: ['Automotive', 'Car repair'] },
   { id: 'gcid:gas_station', name: 'Gas station', path: ['Automotive', 'Gas station'] },
-  
-  // Services
-  { id: 'gcid:dry_cleaner', name: 'Dry cleaner', path: ['Services', 'Dry cleaner'] },
-  { id: 'gcid:laundromat', name: 'Laundromat', path: ['Services', 'Laundromat'] },
-  { id: 'gcid:florist', name: 'Florist', path: ['Services', 'Florist'] },
 ];
 
 /**
- * GET /api/gbp/categories?query=...
- * Search GBP business categories
- * Feature-gated by FF_TENANT_GBP_CATEGORY_SYNC
+ * GET /api/gbp/categories
+ * Search GBP categories from platform_categories table
+ * Proxies to backend API
  */
 export async function GET(request: NextRequest) {
   try {
-    // Feature gate - check with tenant ID from header or query param
-    const tenantId = request.headers.get('x-tenant-id') || 
-                     new URL(request.url).searchParams.get('tenantId') || 
-                     undefined;
-    
-    // For now, allow if feature is enabled globally or for specific tenant
-    // In production, this would check user permissions
-    const featureEnabled = isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenantId);
-    
-    if (!featureEnabled) {
-      console.log('[GBP Categories API] Feature not enabled for tenant:', tenantId);
-      return NextResponse.json(
-        { error: 'GBP category sync not enabled' },
-        { status: 403 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query') || '';
-    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const tenantId = searchParams.get('tenantId') || '';
 
-    // Filter stub data by query
-    const filtered = query
-      ? STUB_GBP_CATEGORIES.filter(
-          (cat) =>
-            cat.name.toLowerCase().includes(query.toLowerCase()) ||
-            cat.path.some((p) => p.toLowerCase().includes(query.toLowerCase()))
-        )
-      : STUB_GBP_CATEGORIES;
-
-    const results = filtered.slice(0, limit);
-
-    return NextResponse.json({
-      items: results,
-      totalCount: filtered.length,
-      // TODO: Add nextPageToken when real GBP API is integrated
-    });
+    const categories = await googleIntegrationService.getCategories(query, limit, tenantId);
+    return NextResponse.json({ categories });
   } catch (error) {
     console.error('[GBP Categories API] Error:', error);
     return NextResponse.json(

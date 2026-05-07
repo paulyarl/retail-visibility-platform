@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
-import { api } from '@/lib/api';
+import { userManagementService } from '@/services/UserManagementService';
+
 
 function AccessDeniedContent() {
   const searchParams = useSearchParams();
@@ -20,13 +21,31 @@ function AccessDeniedContent() {
       url: window.location.href,
     });
 
+    // Ensure auth token is available in cookie for proxy
+    const ensureAuthTokenCookie = () => {
+      try {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+          const isSecure = window.location.protocol === 'https:';
+          const cookieString = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`;
+          document.cookie = cookieString;
+          console.log('[Access Denied] Set auth token cookie for proxy:', cookieString.substring(0, 50) + '...');
+        } else {
+          console.log('[Access Denied] No access token found in localStorage');
+        }
+      } catch (error) {
+        console.error('[Access Denied] Failed to set auth token cookie:', error);
+      }
+    };
+
+    // Set the cookie immediately
+    ensureAuthTokenCookie();
+
     // Fetch current user info for debugging
     const fetchUser = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await api.get(`${apiBaseUrl}/auth/me`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await userManagementService.getUser();
+        if (data) {
           const user = data.user || data;
           setUserEmail(user.email);
           

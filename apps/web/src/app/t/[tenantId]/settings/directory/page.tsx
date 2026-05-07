@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { Button } from '@mantine/core';
 import DirectorySettingsPanel from '@/components/directory/DirectorySettingsPanel';
 
 export default async function DirectorySettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {

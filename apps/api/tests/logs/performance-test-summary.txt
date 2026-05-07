@@ -1,0 +1,11 @@
+
+Test Summary for performance
+===============================
+Total Tests: 5
+Passed: 4
+Failed: 1
+Duration: 445ms
+Success Rate: 80.00%
+
+Failed Tests:
+- testConcurrentAccess: Concurrent access failed

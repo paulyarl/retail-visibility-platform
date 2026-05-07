@@ -4,6 +4,9 @@ import Link from 'next/link';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
+
+
+
 export default function TermsPage() {
   const { settings } = usePlatformSettings();
   const platformName = settings?.platformName || 'Visible Shelf';
@@ -16,9 +19,9 @@ export default function TermsPage() {
           <Link href="/" className="text-2xl font-bold text-neutral-900 hover:text-primary-600 transition-colors">
             {platformName}
           </Link>
-          <Link href="/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
+          <a href="/auth/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
             Sign In
-          </Link>
+          </a>
         </div>
       </header>
 

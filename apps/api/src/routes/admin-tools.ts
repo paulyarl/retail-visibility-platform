@@ -31,9 +31,10 @@ const router = Router();
 const createChainSchema = z.object({
   name: z.string().min(1),
   size: z.enum(['small', 'medium', 'large']),
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+  scenario: z.string().optional().default('grocery'), // Any of the 19 business types
   seedProducts: z.boolean().optional().default(true),
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false),
 });
 
 router.post('/test-chains', async (req, res) => {
@@ -110,13 +111,14 @@ const createTenantSchema = z.object({
   name: z.string().min(1),
   city: z.string().optional(),
   state: z.string().optional(),
-  subscription_tier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional().default('professional'),
+  subscription_tier: z.enum(['trial', 'google_only','discovery', 'starter', 'storefront', 'commitment', 'professional', 'chain_starter', 'chain_professional', 'chain_enterprise']).optional().default('professional'),
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
   organizationId: z.string().optional(), // Required for organization tier
   ownerId: z.string().optional(), // Link to user as owner
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']).optional().default('general'),
-  productCount: z.number().int().min(0).max(100).optional().default(0),
+  seedProducts: z.boolean().optional().default(true),
+  scenario: z.string().optional().default('grocery'), // Any of the 19 business types
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false),
 });
 
 router.post('/tenants', validateTierAssignment, validateSKULimits, async (req, res) => {
@@ -166,27 +168,38 @@ router.delete('/tenants/:tenantId', async (req, res) => {
     console.log('[Admin Tools] Deleting test tenant:', tenantId);
 
     // Delete all products for this tenant
-    const deletedProducts = await prisma.InventoryItem.deleteMany({
-      where: { tenantId },
+    const deletedProducts = await prisma.inventory_items.deleteMany({
+      where: { tenant_id: tenantId },
     });
 
     // Delete all categories for this tenant
-    const deletedCategories = await prisma.tenantCategory.deleteMany({
-      where: { tenantId },
+    const deletedCategories = await prisma.directory_category.deleteMany({
+      where: { tenantId: tenantId },
+    });
+
+    // Delete directory-related data
+    const deletedFeaturedListings = await prisma.directory_featured_listings_list.deleteMany({
+      where: { tenant_id: tenantId },
+    });
+
+    const deletedDirectorySettings = await prisma.directory_settings_list.deleteMany({
+      where: { tenant_id: tenantId },
     });
 
     // Delete the tenant
-    const deletedTenant = await prisma.tenant.delete({
+    const deletedTenant = await prisma.tenants.delete({
       where: { id: tenantId },
     });
 
-    console.log(`[Audit] Admin deleted test tenant: ${tenantId} (${deletedProducts.count} products, ${deletedCategories.count} categories)`);
+    console.log(`[Audit] Admin deleted test tenant: ${tenantId} (${deletedProducts.count} products, ${deletedCategories.count} categories, ${deletedDirectorySettings.count} directory listings)`);
 
     res.json({
       success: true,
       tenantId,
       deletedProducts: deletedProducts.count,
       deletedCategories: deletedCategories.count,
+      deletedDirectoryListings: deletedDirectorySettings.count,
+      deletedFeaturedListings: deletedFeaturedListings.count,
       message: 'Test tenant deleted successfully',
     });
   } catch (error: any) {
@@ -295,11 +308,11 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
     }
 
     const [active, total] = await Promise.all([
-      prisma.scanSessions.count({
-        where: { tenantId, status: 'active' },
+      prisma.scan_results_list.count({
+        where: { tenant_id: tenantId, status: 'active' },
       }),
-      prisma.scanSessions.count({
-        where: { tenantId },
+      prisma.scan_sessions_list.count({
+        where: { tenant_id: tenantId },
       }),
     ]);
 
@@ -334,14 +347,14 @@ router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
     const { tenantId } = parsed.data;
 
     // Close all active sessions for this tenant
-    const result = await prisma.scanSessions.updateMany({
+    const result = await prisma.scan_sessions_list.updateMany({
       where: {
-        tenantId,
+        tenant_id: tenantId,
         status: 'active',
       },
       data: {
         status: 'cancelled',
-        completedAt: new Date(),
+        completed_at: new Date(),
       },
     });
 

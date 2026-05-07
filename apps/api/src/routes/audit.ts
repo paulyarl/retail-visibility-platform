@@ -30,9 +30,9 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.auditLog.findMany({
+    const logs = await prisma.audit_log.findMany({
       where,
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { occurred_at: 'desc' },
       take: query.limit + 1,
       skip: query.cursor ? 1 : 0,
       cursor: query.cursor ? { id: query.cursor } : undefined,
@@ -55,7 +55,7 @@ router.get('/admin/audit', requireAdmin, async (req, res) => {
 // GET /admin/audit/:id - Get single audit log
 router.get('/admin/audit/:id', requireAdmin, async (req, res) => {
   try {
-    const log = await prisma.auditLog.findUnique({
+    const log = await prisma.audit_log.findUnique({
       where: { id: req.params.id },
     });
 
@@ -83,9 +83,9 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
       if (query.until) where.occurredAt.lte = new Date(query.until);
     }
 
-    const logs = await prisma.auditLog.findMany({
+    const logs = await prisma.audit_log.findMany({
       where,
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { occurred_at: 'desc' },
       take: 10000, // Max export size
     });
 
@@ -93,14 +93,14 @@ router.get('/admin/exports/audit.csv', requireAdmin, async (req, res) => {
     const headers = ['id', 'occurredAt', 'actorType', 'actorId', 'tenantId', 'entityType', 'entityId', 'action', 'requestId'];
     const rows = logs.map(log => [
       log.id,
-      log.occurredAt.toISOString(),
-      log.actorType,
-      log.actorId,
-      log.tenantId,
-      log.entityType,
-      log.entityId,
+      log.occurred_at.toISOString(),
+      log.actor_type,
+      log.actor_id,
+      log.tenant_id,
+      log.entity_type,
+      log.entity_id,
       log.action,
-      log.requestId || '',
+      log.request_id || '',
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');

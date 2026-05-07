@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CloverStatus } from '@/components/clover';
+import { cloverIntegrationService } from '@/services/CloverIntegrationSingletonService';
 
 interface CloverIntegrationData {
   enabled: boolean;
@@ -62,13 +63,12 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       setLoading(true);
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/status`);
+      const responseData = await cloverIntegrationService.getCloverStatus(tenantId);
       
-      if (!res.ok) {
+      if (!responseData) {
         throw new Error('Failed to fetch integration status');
       }
       
-      const responseData = await res.json();
       setData(responseData);
     } catch (err: any) {
       console.error('Failed to fetch Clover status:', err);
@@ -83,27 +83,17 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/enable`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      await cloverIntegrationService.enableCloverDemo(tenantId);
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to enable demo mode');
-      }
-      
-      const responseData = await res.json();
+      // Refresh data to show updated status
+      await refresh();
       
       // Show success message
       if (typeof window !== 'undefined') {
-        alert(`Demo mode enabled! ${responseData.itemsImported} items imported.`);
+        console.log('Clover demo mode enabled successfully');
       }
-      
-      // Refresh status
-      await refresh();
     } catch (err: any) {
-      console.error('Failed to enable demo:', err);
+      console.error('Failed to enable demo mode:', err);
       setError(err.message);
       throw err;
     }
@@ -122,22 +112,11 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/demo/disable`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keepItems: false })
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to disable demo mode');
-      }
-      
-      const responseData = await res.json();
+      await cloverIntegrationService.disableCloverDemo(tenantId);
       
       // Show success message
       if (typeof window !== 'undefined') {
-        alert(`Demo mode disabled. ${responseData.itemsDeleted} items removed.`);
+        alert('Demo mode disabled successfully.');
       }
       
       // Refresh status
@@ -155,14 +134,11 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       setError(null);
       
       // Fetch authorization URL
-      const res = await fetch(`/api/integrations/${tenantId}/clover/oauth/authorize`);
+      const responseData = await cloverIntegrationService.getCloverOAuthAuthorize(tenantId);
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to initiate OAuth flow');
+      if (!responseData) {
+        throw new Error('Failed to initiate OAuth flow');
       }
-      
-      const responseData = await res.json();
       
       // Redirect to Clover authorization page
       if (typeof window !== 'undefined' && responseData.authorizationUrl) {
@@ -188,15 +164,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to disconnect');
-      }
+      await cloverIntegrationService.disconnectClover(tenantId);
       
       // Show success message
       if (typeof window !== 'undefined') {
@@ -217,15 +185,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/clover/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to sync');
-      }
+      await cloverIntegrationService.syncClover(tenantId);
       
       // Show success message
       if (typeof window !== 'undefined') {

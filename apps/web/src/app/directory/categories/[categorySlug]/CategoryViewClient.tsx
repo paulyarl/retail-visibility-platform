@@ -1,17 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Map, Grid3x3, List, ArrowLeft } from 'lucide-react';
+import { Map, Grid3x3, List, ArrowLeft, Package } from 'lucide-react';
 import Link from 'next/link';
 import DirectorySearch from '@/components/directory/DirectorySearch';
-import DirectoryGrid from '@/components/directory/DirectoryGrid';
-import DirectoryList from '@/components/directory/DirectoryList';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
+import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
+import { DirectoryList } from '@/components/directory/DirectoryList';
+import { Pagination } from '@/components/ui';
+import { Button } from '@mantine/core';
+import { useSearchParams } from 'next/navigation';
+import { slugsMatch } from '@/utils/slug';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
-// Dynamically import map to avoid SSR issues
-const DirectoryMap = dynamic(() => import('@/components/directory/DirectoryMap'), {
+// Dynamically import Google Maps to avoid SSR issues
+const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
   ssr: false,
   loading: () => <div className="w-full h-[600px] bg-gray-100 rounded-lg flex items-center justify-center">Loading map...</div>
 });
@@ -24,9 +32,13 @@ interface DirectoryListing {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
   phone?: string;
+  latitude?: number;
+  longitude?: number;
   logoUrl?: string;
   primaryCategory?: string;
+  gbpPrimaryCategoryName?: string;
   ratingAvg: number;
   ratingCount: number;
   productCount: number;
@@ -54,6 +66,8 @@ interface Category {
   slug: string;
   googleCategoryId: string | null;
   storeCount: number;
+  primaryStoreCount?: number;
+  secondaryStoreCount?: number;
   productCount: number;
 }
 
@@ -73,10 +87,35 @@ export default function CategoryViewClient({
 }: CategoryViewClientProps) {
   const { settings } = usePlatformSettings();
   const [data, setData] = useState<DirectoryResponse | null>(null);
+  // console.log(`CategoryViewClient: ${categorySlug}`, data);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
+  
+  // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+
+  // Load saved view mode after hydration
+  useEffect(() => {
+    const saved = localStorage.getItem('directory-view-mode');
+    if (saved && ['grid', 'list', 'map'].includes(saved)) {
+      setViewMode(saved as 'grid' | 'list' | 'map');
+    }
+  }, []);
+
+  // Save view mode to localStorage when it changes
+  const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
+    setViewMode(mode);
+    localStorage.setItem('directory-view-mode', mode);
+  };
+  
+  // Helper to format slug into readable name
+  const formatCategoryName = (slug: string) => {
+    return decodeURIComponent(slug)
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   // Fetch category info and stores
   useEffect(() => {
@@ -86,57 +125,45 @@ export default function CategoryViewClient({
 
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        
+        // Decode URL-encoded slug (e.g., health-%26-beauty -> health-&-beauty)
+        const decodedSlug = decodeURIComponent(categorySlug);
 
-        // 1. Fetch all categories to get current category info
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
-        if (categoriesRes.ok) {
-          const catData = await categoriesRes.json();
-          const currentCat = catData.data?.categories?.find((c: Category) => c.slug === categorySlug);
-          setCategory(currentCat || null);
+        // 1. Fetch category info from directory categories API
+        const catData = await recommendationsService.getDirectoryCategories();
+        if (catData) {
+          // Use centralized slug matching for robust comparison
+          const currentCat = catData.categories?.find((c: any) => 
+            slugsMatch(c.slug, decodedSlug)
+          );
+          if (currentCat) {
+            setCategory({
+              id: currentCat.id,
+              name: currentCat.name,
+              slug: currentCat.slug,
+              googleCategoryId: currentCat.google_category_id,
+              storeCount: currentCat.store_count,
+              primaryStoreCount: currentCat.primary_store_count || 0,
+              secondaryStoreCount: currentCat.secondary_store_count || 0,
+              productCount: currentCat.total_products,
+            });
+          }
         }
 
-        // 2. Fetch stores in this category
-        const params = new URLSearchParams();
-        if (searchParams.lat) params.set('lat', searchParams.lat);
-        if (searchParams.lng) params.set('lng', searchParams.lng);
-        if (searchParams.radius) params.set('radius', searchParams.radius);
+        // 2. Fetch stores in this category using directory categories API
+        const storesData = await recommendationsService.getStoresByCategory(decodedSlug);
 
-        const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/categories/${categorySlug}/stores?${params}`
-        );
-
-        if (!storesRes.ok) {
+        if (!storesData) {
           throw new Error('Failed to fetch stores');
         }
 
-        const storesData = await storesRes.json();
-
-        // 3. Transform to DirectoryResponse format
-        const stores = storesData.data?.stores || [];
+        // 3. Transform to DirectoryResponse format (categories API returns stores directly)
         setData({
-          listings: stores.map((store: any) => ({
-            id: store.id,
-            tenantId: store.id,
-            businessName: store.name,
-            slug: store.slug,
-            address: store.address,
-            city: store.city,
-            state: store.state,
-            postalCode: store.postalCode,
-            latitude: store.latitude,
-            longitude: store.longitude,
-            productCount: store.productCount,
-            // Default values for required fields
-            ratingAvg: 0,
-            ratingCount: 0,
-            isFeatured: false,
-            subscriptionTier: 'trial',
-            useCustomWebsite: false,
-          })),
-          pagination: {
+          listings: storesData.stores || [],
+          pagination: storesData.pagination || {
             page: 1,
-            limit: stores.length,
-            totalItems: stores.length,
+            limit: 12,
+            totalItems: 0,
             totalPages: 1,
           },
         });
@@ -157,6 +184,9 @@ export default function CategoryViewClient({
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      {/* Client-side category tracking */}
+      <CategoryBrowseTracker categoryId={category?.id || categorySlug} categorySlug={categorySlug} />
+
       {/* Page Title Section */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
         <div className="container mx-auto px-4 py-6">
@@ -166,27 +196,38 @@ export default function CategoryViewClient({
               Directory
             </Link>
             <span>›</span>
-            <span className="font-semibold text-neutral-900 dark:text-white">{category?.name || categorySlug}</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">{category?.name || formatCategoryName(categorySlug)}</span>
           </nav>
 
           {/* Title */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || categorySlug}</h1>
+              <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || formatCategoryName(categorySlug)}</h1>
               <span className="text-2xl">🏷️</span>
             </div>
-            <Link
-              href="/directory"
-              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/directory/categories"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                <span className="hidden sm:inline">All Categories</span>
+              </Link>
+              <Link
+                href="/directory"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Link>
+            </div>
           </div>
 
-          <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-            {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
-          </p>
+          <div className="flex items-center gap-4 mt-2 text-sm">
+            <p className="text-neutral-600 dark:text-neutral-400">
+              {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
+            </p>
+          </div>
         </div>
       </div>
 
@@ -223,7 +264,7 @@ export default function CategoryViewClient({
           {/* View Toggle */}
           <div className="flex gap-2">
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleViewModeChange('grid')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'grid'
                   ? 'bg-blue-600 text-white'
@@ -234,7 +275,7 @@ export default function CategoryViewClient({
               <span className="hidden sm:inline">Grid</span>
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => handleViewModeChange('list')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'list'
                   ? 'bg-blue-600 text-white'
@@ -245,7 +286,7 @@ export default function CategoryViewClient({
               <span className="hidden sm:inline">List</span>
             </button>
             <button
-              onClick={() => setViewMode('map')}
+              onClick={() => handleViewModeChange('map')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                 viewMode === 'map'
                   ? 'bg-blue-600 text-white'
@@ -264,6 +305,7 @@ export default function CategoryViewClient({
             listings={data?.listings || []}
             loading={loading}
             pagination={data?.pagination}
+            categorySlug={categorySlug}
           />
         )}
 
@@ -275,11 +317,19 @@ export default function CategoryViewClient({
         )}
 
         {viewMode === 'map' && (
-          <DirectoryMap
-            listings={data?.listings || []}
-          />
+          <>
+            {/* {console.log('[CategoryViewClient] Map listings:', data?.listings?.slice(0, 3)?.map(l => ({ id: l.id, businessName: l.businessName, logoUrl: l.logoUrl })))} */}
+            <DirectoryMapGoogle
+              listings={data?.listings || []} // Use the already-filtered listings
+              useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues
+              filters={{}}
+            />
+          </>
         )}
       </div>
+
+                  {/* Platform Branding Footer */}
+                  <PoweredByFooter />
     </div>
   );
 }

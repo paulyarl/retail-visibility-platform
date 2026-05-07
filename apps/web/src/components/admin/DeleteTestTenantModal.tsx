@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface DeleteTestTenantModalProps {
   onClose: () => void;
@@ -30,20 +32,8 @@ export default function DeleteTestTenantModal({ onClose }: DeleteTestTenantModal
 
   const fetchTenants = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-      const response = await fetch(`${apiUrl}/tenants`, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTenants(Array.isArray(data) ? data : []);
-      }
+      const data = await platformHomeService.getTenants();
+      setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch tenants:', err);
     } finally {
@@ -67,23 +57,7 @@ export default function DeleteTestTenantModal({ onClose }: DeleteTestTenantModal
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-      const response = await fetch(`${apiUrl}/api/admin/tools/tenants/${selectedTenantId}?confirm=true`, {
-        method: 'DELETE',
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to delete tenant');
-      }
-
+      const data = await adminUsersService.deleteTestTenant(selectedTenantId);
       setDeletedInfo(data);
       setSuccess(true);
     } catch (err: any) {

@@ -1,62 +1,38 @@
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
-  const base = process.env.API_BASE_URL || 'http://localhost:4000';
-
-  // Preserve query parameters (e.g. includeArchived, status) when proxying to the API
-  const url = new URL(req.url);
-  const query = url.searchParams.toString();
-  const upstreamUrl = `${base}/api/tenants${query ? `?${query}` : ''}`;
-
-  console.log('[API Proxy] Fetching tenants from:', upstreamUrl);
-  
-  // Forward Authorization header from client to backend
-  const authHeader = req.headers.get('authorization');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+  try {
+    // Preserve query parameters (e.g. includeArchived, status) when proxying to the API
+    const url = new URL(req.url);
+    const query = url.searchParams.toString();
+    
+    // Get tenants using the singleton service
+    const tenants = await platformHomeService.getTenants();
+    
+    return NextResponse.json(tenants);
+  } catch (error) {
+    console.error('[API Proxy] Error response:', error);
+    return NextResponse.json({ error: 'upstream_failed' }, { status: 500 });
   }
-  
-  const res = await fetch(upstreamUrl, { headers });
-  
-  console.log('[API Proxy] Response status:', res.status);
-  
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('[API Proxy] Error response:', text);
-    return NextResponse.json({ error: 'upstream_failed', status: res.status, body: text }, { status: res.status });
-  }
-  
-  const data = await res.json();
-  return NextResponse.json(data);
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
     
-    // Forward Authorization header from client to backend
-    const authHeader = req.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-    
-    const res = await fetch(`${base}/api/tenants`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
+    // Create tenant using the singleton service
+    const tenant = await platformHomeService.createTenant({
+      name: body.name,
+      slug: body.slug,
+      city: body.city,
+      state: body.state,
+      country_code: body.country_code || body.country
     });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (_e) {
+    
+    return NextResponse.json(tenant, { status: 201 });
+  } catch (error) {
+    console.error('[API Proxy] Error creating tenant:', error);
     return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
   }
 }

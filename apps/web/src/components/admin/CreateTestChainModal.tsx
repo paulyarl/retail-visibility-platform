@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { X, Building2, Loader2, CheckCircle2, Copy } from 'lucide-react';
+import { BusinessTypeSelector, BUSINESS_TYPES } from '@/components/quick-start';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface CreateTestChainModalProps {
   onClose: () => void;
@@ -10,9 +12,10 @@ interface CreateTestChainModalProps {
 export default function CreateTestChainModal({ onClose }: CreateTestChainModalProps) {
   const [name, setName] = useState('Demo Retail Chain');
   const [size, setSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [scenario, setScenario] = useState<'grocery' | 'fashion' | 'electronics' | 'general'>('grocery');
+  const [scenario, setScenario] = useState<string>('grocery');
   const [seedProducts, setSeedProducts] = useState(true);
   const [createAsDrafts, setCreateAsDrafts] = useState(true);
+  const [generateImages, setGenerateImages] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,27 +27,14 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await fetch(`${apiUrl}/api/admin/tools/test-chains`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Send cookies for authentication
-        body: JSON.stringify({
-          name,
-          size,
-          scenario,
-          seedProducts,
-          createAsDrafts,
-        }),
+      const data = await adminUsersService.createTestChain({
+        name,
+        size,
+        scenario,
+        seedProducts,
+        createAsDrafts,
+        generateImages,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to create test chain');
-      }
 
       setResult(data);
       setSuccess(true);
@@ -75,7 +65,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                     Test Chain Created!
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {result.tenants.length} locations ready to use
+                    {result.tenants?.length || 0} locations ready to use
                   </p>
                 </div>
               </div>
@@ -94,7 +84,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-900 mb-1">
                     Organization ID
                   </div>
                   <div className="font-mono text-sm text-gray-900 dark:text-white">
@@ -146,8 +136,8 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             </div>
 
             {/* Stats */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
                 Total Products Created
               </div>
               <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -203,7 +193,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Chain Name
             </label>
             <input
@@ -217,7 +207,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
 
           {/* Size */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Size
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -229,7 +219,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     size === s
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-900 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -237,27 +227,22 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
               ))}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {size === 'small' && '1 location, 200-400 SKUs'}
-              {size === 'medium' && '3 locations, 600-1200 SKUs'}
-              {size === 'large' && '5 locations, 1500-2500 SKUs'}
+              {size === 'small' && '1 location, ~25 SKUs'}
+              {size === 'medium' && '3 locations, ~75 SKUs total'}
+              {size === 'large' && '5 locations, ~125 SKUs total'}
             </p>
           </div>
 
-          {/* Scenario */}
+          {/* Scenario - Using shared BusinessTypeSelector with all 19 types */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-900 mb-2">
               Business Type
             </label>
-            <select
+            <BusinessTypeSelector
               value={scenario}
-              onChange={(e) => setScenario(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="grocery">Grocery Store</option>
-              <option value="fashion">Fashion Boutique</option>
-              <option value="electronics">Electronics Store</option>
-              <option value="general">General Store</option>
-            </select>
+              onChange={(typeId) => setScenario(typeId)}
+              variant="dropdown"
+            />
           </div>
 
           {/* Options */}
@@ -269,22 +254,35 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
                 onChange={(e) => setSeedProducts(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-gray-700 dark:text-gray-900">
                 Seed with products
               </span>
             </label>
             {seedProducts && (
-              <label className="flex items-center gap-2 ml-6">
-                <input
-                  type="checkbox"
-                  checked={createAsDrafts}
-                  onChange={(e) => setCreateAsDrafts(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Create as drafts (inactive)
-                </span>
-              </label>
+              <>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={createAsDrafts}
+                    onChange={(e) => setCreateAsDrafts(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-900">
+                    Create as drafts (inactive)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 ml-6">
+                  <input
+                    type="checkbox"
+                    checked={generateImages}
+                    onChange={(e) => setGenerateImages(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-900">
+                    Generate AI images
+                  </span>
+                </label>
+              </>
             )}
           </div>
 
@@ -293,7 +291,7 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-lg transition-colors"
+              className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-900 font-semibold py-3 px-6 rounded-lg transition-colors"
             >
               Cancel
             </button>

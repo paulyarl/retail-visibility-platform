@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { generateSessionId } from '../lib/id-generator';
 import {
   enrichmentCacheHit,
   enrichmentCacheMiss,
@@ -11,11 +12,23 @@ import {
 // Rate limiting state (in-memory, consider Redis for production)
 const rateLimitState = new Map<string, { count: number; resetAt: number }>();
 
-interface EnrichmentResult {
+export interface CategorySuggestion {
+  suggestedName: string; // Suggested category name from enrichment
+  googleCategoryId?: string; // Google category ID if available
+  categoryPath: string[]; // Full path for display
+  existingTenantCategory?: {
+    id: string;
+    name: string;
+    googleCategoryId?: string | null;
+  };
+}
+
+export interface EnrichmentResult {
   name?: string;
   description?: string;
   brand?: string;
-  categoryPath?: string[];
+  categoryPath?: string[]; // Legacy - for display only
+  categorySuggestion?: CategorySuggestion; // New - for merchant approval
   priceCents?: number;
   imageUrl?: string;
   imageThumbnailUrl?: string;
@@ -39,6 +52,79 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX_REQUESTS = 500; // 500 requests per hour per provider
 
 export class BarcodeEnrichmentService {
+  /**
+   * Check if tenant has a category matching the enrichment data
+   */
+  private async findMatchingTenantCategory(
+    tenantId: string,
+    categoryPath: string[],
+    googleCategoryId?: string
+  ) {
+    if (!categoryPath || categoryPath.length === 0) return null;
+
+    // Try to match by Google category ID first (most accurate)
+    if (googleCategoryId) {
+      const byGoogleId = await prisma.directory_category.findFirst({
+        where: {
+          tenantId,
+          googleCategoryId,
+        },
+        select: {
+          id: true,
+          name: true,
+          googleCategoryId: true,
+        },
+      });
+      if (byGoogleId) return byGoogleId;
+    }
+
+    // Try to match by name similarity
+    const categoryName = categoryPath[categoryPath.length - 1]; // Use most specific category
+    const byName = await prisma.directory_category.findFirst({
+      where: {
+        tenantId,
+        name: {
+          contains: categoryName,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        googleCategoryId: true,
+      },
+    });
+    
+    return byName;
+  }
+
+  /**
+   * Enrich with category suggestion for merchant approval
+   * This wraps the main enrich method and adds category matching
+   */
+  async enrichWithCategorySuggestion(barcode: string, tenantId: string): Promise<EnrichmentResult> {
+    // Get base enrichment data
+    const enrichmentResult = await this.enrich(barcode, tenantId);
+    
+    // If enrichment has category data, check for tenant category match
+    if (enrichmentResult.categoryPath && enrichmentResult.categoryPath.length > 0) {
+      const existingCategory = await this.findMatchingTenantCategory(
+        tenantId,
+        enrichmentResult.categoryPath
+      );
+      
+      // Build category suggestion
+      const suggestedName = enrichmentResult.categoryPath[enrichmentResult.categoryPath.length - 1];
+      enrichmentResult.categorySuggestion = {
+        suggestedName,
+        categoryPath: enrichmentResult.categoryPath,
+        existingTenantCategory: existingCategory || undefined,
+      };
+    }
+    
+    return enrichmentResult;
+  }
+
   /**
    * Main enrichment method with fallback chain
    */
@@ -149,7 +235,35 @@ export class BarcodeEnrichmentService {
       throw new Error(`UPC Database API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      success: boolean;
+      title?: string;
+      description?: string;
+      brand?: string;
+      category?: string;
+      msrp?: string;
+      images?: string[];
+      ean?: string;
+      asin?: string;
+      isbn?: string;
+      mpn?: string;
+      model?: string;
+      elid?: string;
+      weight?: string;
+      length?: string;
+      width?: string;
+      height?: string;
+      color?: string;
+      size?: string;
+      material?: string;
+      currency?: string;
+      lowest_recorded_price?: string;
+      highest_recorded_price?: string;
+      offers?: any[];
+      features?: string[];
+      warranty?: string;
+      manufacturer?: string;
+    };
 
     if (!data.success || !data.title) {
       return null;
@@ -157,12 +271,12 @@ export class BarcodeEnrichmentService {
 
     return {
       name: data.title || 'Unknown Product',
-      description: data.description || null,
+      description: data.description || undefined,
       brand: data.brand || 'Unknown',
       categoryPath: data.category ? [data.category] : [], 
       priceCents: data.msrp ? Math.round(parseFloat(data.msrp) * 100) : undefined,
-      imageUrl: data.images?.[0] || null,
-      imageThumbnailUrl: data.images?.[0] || null,
+      imageUrl: data.images?.[0] || undefined,
+      imageThumbnailUrl: data.images?.[0] || undefined,
       metadata: {
         // Identifiers
         upc: barcode,
@@ -227,7 +341,10 @@ export class BarcodeEnrichmentService {
       throw new Error(`Open Food Facts API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      status: number;
+      product?: any;
+    };
 
     if (data.status !== 1 || !data.product) {
       return null; // Product not found or incomplete
@@ -395,7 +512,7 @@ export class BarcodeEnrichmentService {
    */
   private async getFromDatabase(barcode: string): Promise<EnrichmentResult | null> {
     try {
-      const cached = await prisma.barcodeEnrichment.findUnique({
+      const cached = await prisma.barcode_enrichment.findUnique({
         where: { barcode },
       });
 
@@ -404,11 +521,11 @@ export class BarcodeEnrichmentService {
       }
 
       // Update fetch count and last fetched timestamp
-      await prisma.barcodeEnrichment.update({
+      await prisma.barcode_enrichment.update({
         where: { barcode },
         data: {
-          fetchCount: { increment: 1 },
-          lastFetchedAt: new Date(),
+          fetch_count: { increment: 1 },
+          last_fetched_at: new Date(),
         },
       });
 
@@ -417,10 +534,10 @@ export class BarcodeEnrichmentService {
         name: cached.name || undefined,
         brand: cached.brand || undefined,
         description: cached.description || undefined,
-        categoryPath: cached.categoryPath || undefined,
-        priceCents: cached.priceCents || undefined,
-        imageUrl: cached.imageUrl || undefined,
-        imageThumbnailUrl: cached.imageThumbnailUrl || undefined,
+        categoryPath: cached.category_path || undefined,
+        priceCents: cached.price_cents || undefined,
+        imageUrl: cached.image_url || undefined,
+        imageThumbnailUrl: cached.image_thumbnail_url || undefined,
         metadata: (cached.metadata as Record<string, any>) || undefined,
         source: cached.source as any,
       };
@@ -432,34 +549,36 @@ export class BarcodeEnrichmentService {
 
   private async saveToDatabase(barcode: string, data: EnrichmentResult): Promise<void> {
     try {
-      await prisma.barcodeEnrichment.upsert({
+      await prisma.barcode_enrichment.upsert({
         where: { barcode },
         create: {
+          id: generateSessionId('platform'), // Generate ID for new records
           barcode,
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          categoryPath: data.categoryPath || [],
-          priceCents: data.priceCents || null,
-          imageUrl: data.imageUrl || null,
-          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          category_path: data.categoryPath || [],
+          price_cents: data.priceCents || null,
+          image_url: data.imageUrl || null,
+          image_thumbnail_url: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
-          lastFetchedAt: new Date(),
-          fetchCount: 1,
+          last_fetched_at: new Date(),
+          fetch_count: 1,
+          updated_at: new Date(), // Required field for create
         } as any,
         update: {
           name: data.name || null,
           brand: data.brand || null,
           description: data.description || null,
-          categoryPath: data.categoryPath || [],
-          priceCents: data.priceCents || null,
-          imageUrl: data.imageUrl || null,
-          imageThumbnailUrl: data.imageThumbnailUrl || null,
+          category_path: data.categoryPath || [],
+          price_cents: data.priceCents || null,
+          image_url: data.imageUrl || null,
+          image_thumbnail_url: data.imageThumbnailUrl || null,
           metadata: data.metadata ? data.metadata : undefined,
           source: data.source,
-          lastFetchedAt: new Date(),
-          fetchCount: { increment: 1 },
+          last_fetched_at: new Date(),
+          fetch_count: { increment: 1 },
         },
       });
     } catch (error) {
@@ -506,14 +625,15 @@ export class BarcodeEnrichmentService {
     error?: string
   ): Promise<void> {
     try {
-      await prisma.barcodeLookupLog.create({
+      await prisma.barcode_lookup_log.create({
         data: {
-          tenantId,
+          id: generateSessionId(tenantId), // Generate ID for new records
+          tenant_id: tenantId, // Correct field name
           barcode,
           provider: provider || 'unknown',
           status,
           response: response || undefined,
-          latencyMs: Math.round(latencyMs),
+          latency_ms: Math.round(latencyMs), // Correct field name
           error: error || undefined,
         } as any,
       });
@@ -550,13 +670,13 @@ export class BarcodeEnrichmentService {
   getRateLimitStats() {
     const stats: Record<string, any> = {};
     
-    for (const [provider, state] of rateLimitState.entries()) {
+    Array.from(rateLimitState.entries()).forEach(([provider, state]) => {
       stats[provider] = {
         count: state.count,
         remaining: RATE_LIMIT_MAX_REQUESTS - state.count,
         resetAt: new Date(state.resetAt).toISOString(),
       };
-    }
+    });
 
     return stats;
   }

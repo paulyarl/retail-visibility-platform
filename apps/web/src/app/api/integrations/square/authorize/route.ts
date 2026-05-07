@@ -55,15 +55,13 @@ function buildAuthorizationUrl(state: string): string {
   const environment = process.env.SQUARE_ENVIRONMENT || 'sandbox';
   const baseUrl = environment === 'production'
     ? 'https://connect.squareup.com/oauth2/authorize'
-    : 'https://connect.squareupsandbox.com/oauth2/authorize';
+    : 'https://squareupsandbox.com/oauth2/authorize';
 
   const params = new URLSearchParams({
     client_id: process.env.SQUARE_APPLICATION_ID!,
     scope: [
-      'ITEMS_READ',
-      'ITEMS_WRITE',
-      'INVENTORY_READ',
-      'INVENTORY_WRITE',
+      'PAYMENTS_READ',
+      'PAYMENTS_WRITE',
       'MERCHANT_PROFILE_READ',
     ].join(' '),
     session: 'false',

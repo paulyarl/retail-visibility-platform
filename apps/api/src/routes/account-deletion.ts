@@ -1,0 +1,373 @@
+/**
+ * Account Deletion Request Routes
+ * Handles account deletion requests with 30-day grace period
+ */
+
+import { Router } from 'express';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { basePrisma } from '../prisma';
+import { Prisma } from '@prisma/client';
+import { getDirectPool } from '../utils/db-pool';
+import bcrypt from 'bcryptjs';
+
+const router = Router();
+
+/**
+ * POST /api/gdpr/delete
+ * Request account deletion (30-day grace period)
+ */
+router.post('/delete', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { reason, confirmation, password, preserveData = false } = req.body;
+
+    // Validate confirmation
+    if (confirmation !== 'DELETE') {
+      return res.status(400).json({ 
+        error: 'Invalid confirmation',
+        message: 'Please type DELETE to confirm' 
+      });
+    }
+
+    // Verify password
+    const user = await basePrisma.$queryRaw<any[]>`
+      SELECT password_hash FROM users WHERE id = ${userId}
+    `;
+
+    if (!user || user.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user[0].password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        error: 'Invalid password',
+        message: 'Password verification failed' 
+      });
+    }
+
+    // Check for existing pending request
+    const existingRequest = await basePrisma.$queryRaw<any[]>`
+      SELECT id FROM account_deletion_requests
+      WHERE user_id = ${userId} AND status = 'pending'
+    `;
+
+    if (existingRequest && existingRequest.length > 0) {
+      return res.status(409).json({ 
+        error: 'Request already exists',
+        message: 'You already have a pending deletion request' 
+      });
+    }
+
+    // Create deletion request
+    const [deletionRequest] = await basePrisma.$queryRaw<any[]>`
+      INSERT INTO account_deletion_requests (
+        user_id,
+        reason,
+        status,
+        preserve_data,
+        requested_at,
+        scheduled_deletion_date,
+        ip_address,
+        user_agent
+      ) VALUES (
+        ${userId},
+        ${reason || null},
+        'pending',
+        ${preserveData},
+        NOW(),
+        NOW() + INTERVAL '30 days',
+        ${req.ip || null},
+        ${req.headers['user-agent'] || null}
+      )
+      RETURNING 
+        id,
+        user_id as "userId",
+        reason,
+        status,
+        preserve_data as "preserveData",
+        requested_at as "requestedAt",
+        scheduled_deletion_date as "scheduledDeletionDate"
+    `;
+
+    const message = preserveData
+      ? 'Account deletion scheduled. Your business data (tenants, products, photos) will be preserved for historical purposes. Personal information will be removed in 30 days.'
+      : 'Account deletion scheduled. All data will be permanently deleted in 30 days. You can cancel anytime during this period.';
+
+    res.json({
+      success: true,
+      data: deletionRequest,
+      message
+    });
+  } catch (error) {
+    console.error('[POST /api/gdpr/delete] Error:', error);
+    res.status(500).json({ error: 'Failed to request account deletion' });
+  }
+});
+
+/**
+ * GET /api/gdpr/delete/status
+ * Get current deletion request status
+ */
+router.get('/delete/status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const [deletionRequest] = await basePrisma.$queryRaw<any[]>`
+      SELECT 
+        id,
+        user_id as "userId",
+        reason,
+        status,
+        requested_at as "requestedAt",
+        scheduled_deletion_date as "scheduledDeletionDate",
+        cancelled_at as "cancelledAt",
+        completed_at as "completedAt"
+      FROM account_deletion_requests
+      WHERE user_id = ${userId} AND status = 'pending'
+      ORDER BY requested_at DESC
+      LIMIT 1
+    `;
+
+    res.json({
+      success: true,
+      data: deletionRequest || null
+    });
+  } catch (error) {
+    console.error('[GET /api/gdpr/delete/status] Error:', error);
+    res.status(500).json({ error: 'Failed to get deletion status' });
+  }
+});
+
+/**
+ * DELETE /api/gdpr/delete
+ * Cancel pending deletion request
+ */
+router.delete('/delete', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await basePrisma.$executeRaw`
+      UPDATE account_deletion_requests
+      SET 
+        status = 'cancelled',
+        cancelled_at = NOW(),
+        updated_at = NOW()
+      WHERE user_id = ${userId} AND status = 'pending'
+    `;
+
+    if (result === 0) {
+      return res.status(404).json({ 
+        error: 'No pending request',
+        message: 'No pending deletion request found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Account deletion request cancelled successfully'
+    });
+  } catch (error) {
+    console.error('[DELETE /api/gdpr/delete] Error:', error);
+    res.status(500).json({ error: 'Failed to cancel deletion request' });
+  }
+});
+
+/**
+ * GET /api/admin/deletion-requests
+ * Get all deletion requests (admin only)
+ */
+router.get('/admin/deletion-requests', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status, limit = '50', offset = '0' } = req.query;
+
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100); // Max 100
+    const offsetNum = Math.max(parseInt(offset as string) || 0, 0);
+
+    // Use direct database connection instead of Prisma
+    const pool = getDirectPool();
+    const client = await pool.connect();
+
+    try {
+      // Build query with status filter if provided
+      let whereClause = '';
+      let params: any[] = [];
+
+      if (status && status !== 'all') {
+        whereClause = 'WHERE dr.status = $1';
+        params.push(status);
+      }
+
+      // Main query
+      const queryText = `
+        SELECT
+          dr.id,
+          dr.user_id as "userId",
+          dr.reason,
+          dr.status,
+          dr.requested_at as "requestedAt",
+          dr.scheduled_deletion_date as "scheduledDeletionDate",
+          dr.cancelled_at as "cancelledAt",
+          dr.completed_at as "completedAt",
+          dr.ip_address as "ipAddress",
+          dr.admin_notes as "adminNotes",
+          dr.cancelled_by_admin as "cancelledByAdmin",
+          u.email as "userEmail",
+          u.first_name as "userFirstName",
+          u.last_name as "userLastName",
+          u.created_at as "userCreatedAt"
+        FROM account_deletion_requests dr
+        JOIN users u ON dr.user_id::text = u.id::text
+        ${whereClause}
+        ORDER BY dr.requested_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+
+      const requests = await client.query(queryText, [...params, limitNum, offsetNum]);
+
+      // Count query
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM account_deletion_requests dr
+        ${whereClause}
+      `;
+
+      const countResult = await client.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].count);
+
+      res.json({
+        success: true,
+        data: requests.rows,
+        total
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('[GET /api/admin/deletion-requests] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch deletion requests' });
+  }
+});
+
+/**
+ * GET /api/admin/deletion-requests/stats
+ * Get deletion request statistics (admin only)
+ */
+router.get('/admin/deletion-requests/stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Use direct database connection instead of Prisma
+    const pool = getDirectPool();
+    const client = await pool.connect();
+
+    try {
+      // Get stats
+      const statsQuery = `
+        SELECT
+          COUNT(*) as "totalCount",
+          COUNT(*) FILTER (WHERE status = 'pending') as "pendingCount",
+          COUNT(*) FILTER (WHERE status = 'cancelled') as "cancelledCount",
+          COUNT(*) FILTER (WHERE status = 'completed') as "completedCount",
+          COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '7 days') as "last7Days",
+          COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '30 days') as "last30Days",
+          COUNT(*) FILTER (WHERE scheduled_deletion_date <= NOW() + INTERVAL '7 days' AND status = 'pending') as "expiringIn7Days"
+        FROM account_deletion_requests
+      `;
+
+      const statsResult = await client.query(statsQuery);
+      const stats = statsResult.rows[0];
+
+      // Get top reasons
+      const topReasonsQuery = `
+        SELECT
+          reason,
+          COUNT(*) as count
+        FROM account_deletion_requests
+        WHERE reason IS NOT NULL AND reason != ''
+        GROUP BY reason
+        ORDER BY count DESC
+        LIMIT 10
+      `;
+
+      const topReasonsResult = await client.query(topReasonsQuery);
+      const topReasons = topReasonsResult.rows;
+
+      res.json({
+        success: true,
+        data: {
+          ...stats,
+          pendingCount: Number(stats.pendingCount),
+          cancelledCount: Number(stats.cancelledCount),
+          completedCount: Number(stats.completedCount),
+          last7Days: Number(stats.last7Days),
+          last30Days: Number(stats.last30Days),
+          expiringIn7Days: Number(stats.expiringIn7Days),
+          topReasons: topReasons.map(r => ({
+            reason: r.reason,
+            count: Number(r.count)
+          }))
+        }
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('[GET /api/admin/deletion-requests/stats] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch deletion stats' });
+  }
+});
+
+/**
+ * PUT /api/admin/deletion-requests/:id
+ * Update deletion request (admin only)
+ */
+router.put('/admin/deletion-requests/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminNotes, action } = req.body;
+    const adminUserId = req.user?.user_id || req.user?.userId;
+
+    if (action === 'cancel') {
+      // Admin cancels the deletion request
+      await basePrisma.$executeRaw`
+        UPDATE account_deletion_requests
+        SET 
+          status = 'cancelled',
+          cancelled_at = NOW(),
+          cancelled_by_admin = true,
+          admin_user_id = ${adminUserId},
+          admin_notes = ${adminNotes || null},
+          updated_at = NOW()
+        WHERE id = ${id}
+      `;
+    } else {
+      // Just update admin notes
+      await basePrisma.$executeRaw`
+        UPDATE account_deletion_requests
+        SET 
+          admin_notes = ${adminNotes},
+          updated_at = NOW()
+        WHERE id = ${id}
+      `;
+    }
+
+    res.json({
+      success: true,
+      message: 'Deletion request updated successfully'
+    });
+  } catch (error) {
+    console.error('[PUT /api/admin/deletion-requests/:id] Error:', error);
+    res.status(500).json({ error: 'Failed to update deletion request' });
+  }
+});
+
+export default router;

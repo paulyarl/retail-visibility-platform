@@ -3,9 +3,16 @@
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { api, API_BASE_URL } from '@/lib/api'
+import { API_BASE_URL } from '@/lib/api'
+import { Button } from '@mantine/core';
 import { Pagination } from '@/components/ui'
 import { ContextBadges } from '@/components/ContextBadges'
+import { QuickStartCategoryModal } from '@/components/quick-start'
+import { CategoryEditModal, type CategoryFormData } from '@/components/categories'
+import { tenantCategoriesService } from '@/services/TenantCategoriesService'
+import { tenantManagementService } from '@/services/TenantManagementService'
+import { tenantInfoService } from '@/services/TenantInfoService'
+import { organizationsService } from '@/services/OrganizationsSingletonService'
 
 interface Category {
   id: string
@@ -27,6 +34,92 @@ interface AlignmentStatus {
   status: string
 }
 
+// Component to display Google category ID with lookup utility
+function GoogleCategoryPath({ googleCategoryId }: { googleCategoryId: string }) {
+  const [showLookup, setShowLookup] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(googleCategoryId)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-1.5 text-gray-600">
+        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+        </svg>
+        <span className="font-medium text-green-700">Google ID:</span>
+        <button
+          onClick={handleCopy}
+          className="font-mono text-gray-700 hover:text-green-700 hover:underline transition-colors"
+          title="Click to copy ID"
+        >
+          {googleCategoryId}
+        </button>
+        {copied && (
+          <span className="text-green-600 font-medium">✓ Copied</span>
+        )}
+      </div>
+      <button
+        onClick={() => setShowLookup(!showLookup)}
+        className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+        title="Lookup category path"
+      >
+        {showLookup ? 'Hide path' : 'Show path'}
+      </button>
+      {showLookup && (
+        <GoogleCategoryLookup googleCategoryId={googleCategoryId} />
+      )}
+    </div>
+  )
+}
+
+// Separate component for the lookup that fetches from public endpoint
+function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }) {
+  const [path, setPath] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchPath() {
+      try {
+        // Use the TenantCategoriesService for Google taxonomy
+        const taxonomyData = await tenantCategoriesService.getGoogleTaxonomyById(googleCategoryId)
+        if (taxonomyData && taxonomyData.path) {
+          const pathString = Array.isArray(taxonomyData.path) ? taxonomyData.path.join(' > ') : taxonomyData.path
+          setPath(pathString)
+        }
+      } catch (error) {
+        console.error('Failed to fetch Google category path:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPath()
+  }, [googleCategoryId])
+
+  if (loading) {
+    return (
+      <span className="text-gray-500 italic">Loading...</span>
+    )
+  }
+
+  if (!path) {
+    return (
+      <span className="text-orange-600">Path not found</span>
+    )
+  }
+
+  return (
+    <span className="text-gray-700 italic">→ {path}</span>
+  )
+}
+
+
+
+
 export default function CategoriesPage() {
   const params = useParams()
   const tenantId = params.tenantId as string
@@ -42,22 +135,13 @@ export default function CategoriesPage() {
 
   // Filter state
   const [filterUnmapped, setFilterUnmapped] = useState(false)
+  const [includeInactive, setIncludeInactive] = useState(true) // Show all categories by default for management
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Edit modal state
+  // Edit modal state (using shared CategoryEditModal)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selected, setSelected] = useState<Category | null>(null)
-  const [formName, setFormName] = useState('')
-  const [formSort, setFormSort] = useState<number>(0)
-  const [formGoogleId, setFormGoogleId] = useState<string>('')
-  const [saving, setSaving] = useState(false)
   const [isCreate, setIsCreate] = useState(false)
-
-  // Taxonomy search state
-  const [taxQuery, setTaxQuery] = useState('')
-  const [taxResults, setTaxResults] = useState<Array<{ id: string; name: string; path: string[] }>>([])
-  const [taxLoading, setTaxLoading] = useState(false)
-  const [showTaxResults, setShowTaxResults] = useState(false)
 
   // Propagation state
   const [propagating, setPropagating] = useState(false)
@@ -70,6 +154,20 @@ export default function CategoriesPage() {
   } | null>(null)
   const [selectedHeroId, setSelectedHeroId] = useState<string>('')
   const [propagateMode, setPropagateMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update')
+
+  // Guide collapse state
+  const [isGuideExpanded, setIsGuideExpanded] = useState(false)
+  const [isQuickStartExpanded, setIsQuickStartExpanded] = useState(false)
+
+  // Quick Start modal state
+  const [showQuickStartModal, setShowQuickStartModal] = useState(false)
+  
+  // Track newly created category IDs (from Quick Start) to show "New" badge
+  const [newCategoryIds, setNewCategoryIds] = useState<Set<string>>(new Set())
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Toasts
   const [toast, setToast] = useState<{ type: 'success'|'error'|'info'; message: string } | null>(null)
@@ -107,9 +205,10 @@ export default function CategoriesPage() {
     return filteredCategories.slice(startIndex, endIndex)
   }, [filteredCategories, currentPage, pageSize])
 
-  // Reset to page 1 when filter or search changes
+  // Reset to page 1 and clear selection when filter or search changes
   useEffect(() => {
     setCurrentPage(1)
+    setSelectedIds(new Set())
   }, [filterUnmapped, searchQuery])
 
   useEffect(() => {
@@ -117,31 +216,28 @@ export default function CategoriesPage() {
       try {
         setLoading(true)
         
-        // Fetch categories
-        const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-        if (!catRes.ok) throw new Error('Failed to fetch categories')
-        const catData = await catRes.json()
-        setCategories(catData.data || [])
+        // Fetch categories using TenantCategoriesService (include inactive for management)
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId, includeInactive)
+        setCategories(categories)
 
-        // Fetch alignment status
-        const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-        if (!statusRes.ok) throw new Error('Failed to fetch alignment status')
-        const statusData = await statusRes.json()
-        setAlignmentStatus(statusData.data)
+        // Fetch alignment status using TenantCategoriesService
+        const alignmentStatus = await tenantCategoriesService.getAlignmentStatus(tenantId)
+        setAlignmentStatus(alignmentStatus)
 
-        // Check if this is a hero location and get organization info
-        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`)
-        if (tenantRes.ok) {
-          const tenantData = await tenantRes.json()
+        // Get tenant info using the correct endpoint that includes organization data
+        const tenantData = await tenantInfoService.getTenantInfo(tenantId)
+        console.log('[Categories] Tenant data with organization:', tenantData);
+        if (tenantData) {
           const metadata = tenantData.metadata || {}
           const isHero = metadata.isHeroLocation === true
           setIsHeroLocation(isHero)
           
           // If tenant has an organization, fetch organization details
-          if (tenantData.organizationId) {
-            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenantData.organizationId}`)
-            if (orgRes.ok) {
-              const orgData = await orgRes.json()
+          if (tenantData.organization_id) {
+            console.log('[Categories] Loading organization data for:', tenantData.organization_id);
+            const orgData = await organizationsService.getOrganizationById(tenantData.organization_id)
+            if (orgData) {
+              console.log('[Categories] Organization data loaded:', orgData);
               const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
                 id: t.id,
                 name: t.name,
@@ -157,43 +253,82 @@ export default function CategoriesPage() {
               // Pre-select current tenant if it's hero, or find existing hero
               const currentHero = tenantsWithHeroFlag.find((t: any) => t.isHero)
               setSelectedHeroId(currentHero?.id || tenantId)
+            } else {
+              console.log('[Categories] Failed to load organization data');
             }
+          } else {
+            console.log('[Categories] Tenant has no organizationId');
           }
         }
 
         setError(null)
       } catch (err) {
+        console.error('[Categories] Error loading data:', err);
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
 
+    // Debug: Check current state
+    console.log('[Categories] Current state:', {
+      organizationInfo: organizationInfo ? 'loaded' : 'null',
+      categoriesLength: categories.length,
+      loading,
+      error
+    });
+
     if (tenantId) {
       fetchData()
     }
-  }, [tenantId])
+  }, [tenantId, includeInactive])
 
   function openEdit(cat: Category) {
     setSelected(cat)
-    setFormName(cat.name)
-    setFormSort(cat.sortOrder)
-    setFormGoogleId(cat.googleCategoryId || '')
-    setTaxQuery('')
-    setTaxResults([])
     setIsCreate(false)
     setIsModalOpen(true)
   }
 
   function openCreate() {
     setSelected(null)
-    setFormName('')
-    setFormSort(0)
-    setFormGoogleId('')
-    setTaxQuery('')
-    setTaxResults([])
     setIsCreate(true)
     setIsModalOpen(true)
+  }
+  
+  // Handler for shared CategoryEditModal
+  async function handleSaveCategory(data: CategoryFormData) {
+    if (isCreate || !selected) {
+      // Create new category using TenantCategoriesService
+      const created = await tenantCategoriesService.createCategory(tenantId, data)
+      if (!created) throw new Error('Failed to create category')
+      
+      // Align if Google category provided
+      if (data.googleCategoryId) {
+        const aligned = await tenantCategoriesService.alignCategory(tenantId, created.id, data.googleCategoryId)
+        if (!aligned) throw new Error('Failed to align category')
+      }
+      
+      // Add created category directly to state for instant display
+      setCategories(prev => [...prev, created])
+      showToast('success', 'Category created')
+    } else {
+      // Update existing category using TenantCategoriesService
+      const updated = await tenantCategoriesService.updateCategory(tenantId, selected.id, data)
+      if (!updated) throw new Error('Failed to update category')
+
+      // Align if Google category changed
+      if (data.googleCategoryId && data.googleCategoryId !== (selected.googleCategoryId || '')) {
+        const aligned = await tenantCategoriesService.alignCategory(tenantId, selected.id, data.googleCategoryId)
+        if (!aligned) throw new Error('Failed to align category')
+      }
+      
+      // Update category in state for instant display
+      setCategories(prev => prev.map(c => c.id === selected.id ? { ...c, ...updated } : c))
+      showToast('success', 'Changes saved')
+    }
+
+    setIsModalOpen(false)
+    setSelected(null)
   }
 
   function openPropagateModal() {
@@ -205,30 +340,16 @@ export default function CategoriesPage() {
       showToast('error', 'Please select a hero location first')
       return
     }
-
-    // Validate that the selected tenant is actually a hero location
-    const selectedTenant = organizationInfo?.tenants.find(t => t.id === selectedHeroId)
-    if (!selectedTenant?.isHero) {
-      showToast('error', 'The selected location is not set as a hero location. Please select the hero location or set one in Organization Settings.')
-      return
-    }
-
     try {
       setPropagating(true)
       setShowPropagateModal(false)
       
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${selectedHeroId}/categories/propagate`, {
-        mode: propagateMode
-      })
+      const success = await tenantCategoriesService.propagateCategories(selectedHeroId, propagateMode)
       
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.message || error.error || 'Failed to propagate categories')
+      if (!success) {
+        throw new Error('Failed to propagate categories')
       }
-
-      const result = await res.json()
-      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`
-      showToast('success', `Successfully propagated ${result.data.totalCategories} categories to ${result.data.totalLocations} locations (${summary})`)
+      showToast('success', `Successfully propagated categories`)
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate categories')
     } finally {
@@ -236,94 +357,136 @@ export default function CategoriesPage() {
     }
   }
 
-  async function saveEdit() {
-    try {
-      setSaving(true)
-      if (isCreate || !selected) {
-        // Create
-        const postRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`, { name: formName, slug: formName.toLowerCase().replace(/\s+/g, '-'), sortOrder: formSort })
-        if (!postRes.ok) throw new Error('Failed to create category')
-        const created = await postRes.json()
-        // Align if provided
-        if (formGoogleId) {
-          const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { googleCategoryId: formGoogleId })
-          if (!alignRes.ok) throw new Error('Failed to align category')
-        }
-        showToast('success', 'Category created')
-      } else {
-        // Update core fields
-        const putRes = await api.put(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}`, { name: formName, sortOrder: formSort })
-        if (!putRes.ok) throw new Error('Failed to update category')
-
-        // Align if a googleCategoryId is provided
-        if (formGoogleId && formGoogleId !== (selected.googleCategoryId || '')) {
-          const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { googleCategoryId: formGoogleId })
-          if (!alignRes.ok) throw new Error('Failed to align category')
-        }
-        showToast('success', 'Changes saved')
-      }
-
-      // Refresh data
-      const [catRes, statusRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-      ])
-      const catData = await catRes.json()
-      const statusData = await statusRes.json()
-      setCategories(catData.data || [])
-      setAlignmentStatus(statusData.data)
-
-      setIsModalOpen(false)
-      setSelected(null)
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save changes')
-      showToast('error', e?.message || 'Failed to save changes')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function deleteCategory(cat: Category) {
     if (!confirm(`Delete category "${cat.name}"? This is a soft delete and may be blocked if it has dependencies.`)) return
     try {
-      const res = await api.delete(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${cat.id}`)
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || 'Failed to delete category')
+      const success = await tenantCategoriesService.deleteCategory(tenantId, cat.id)
+      if (!success) {
+        throw new Error('Failed to delete category')
       }
-      // Refresh
-      const [catRes, statusRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-      ])
-      const catData = await catRes.json()
-      const statusData = await statusRes.json()
-      setCategories(catData.data || [])
-      setAlignmentStatus(statusData.data)
+      
+      // Refresh categories using TenantCategoriesService
+      const categories = await tenantCategoriesService.getTenantCategories(tenantId)
+      setCategories(categories)
       showToast('success', 'Category deleted')
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to delete category')
     }
   }
 
-  // Debounced taxonomy search
-  useEffect(() => {
-    if (!taxQuery || taxQuery.trim().length < 2) { setTaxResults([]); return }
-    let active = true
-    const t = setTimeout(async () => {
-      try {
-        setTaxLoading(true)
-        const res = await api.get(`${API_BASE_URL}/api/categories/search?q=${encodeURIComponent(taxQuery)}&limit=8`)
-        if (res.ok) {
-          const data = await res.json()
-          if (active) setTaxResults(data.results || [])
-        }
-      } finally {
-        setTaxLoading(false)
+  // Bulk delete function
+  async function bulkDeleteCategories() {
+    if (selectedIds.size === 0) return
+    
+    const count = selectedIds.size
+    if (!confirm(`Delete ${count} selected ${count === 1 ? 'category' : 'categories'}? This is a soft delete and may be blocked if they have dependencies.`)) return
+    
+    setBulkDeleting(true)
+    try {
+      const categoryIds = Array.from(selectedIds)
+      const result = await tenantCategoriesService.bulkDeleteCategories(tenantId, categoryIds)
+      
+      const succeeded = result.success.length
+      const failed = result.failed.length
+      
+      // Refresh data using TenantCategoriesService
+      const [categories, alignmentStatus] = await Promise.all([
+        tenantCategoriesService.getTenantCategories(tenantId),
+        tenantCategoriesService.getAlignmentStatus(tenantId)
+      ])
+      setCategories(categories)
+      setAlignmentStatus(alignmentStatus)
+      
+      // Clear selection
+      setSelectedIds(new Set())
+      
+      if (failed === 0) {
+        showToast('success', `Successfully deleted ${succeeded} ${succeeded === 1 ? 'category' : 'categories'}`)
+      } else {
+        showToast('error', `Deleted ${succeeded}, failed ${failed}. Some categories may have dependencies.`)
       }
-    }, 300)
-    return () => { active = false; clearTimeout(t) }
-  }, [taxQuery])
+    } catch (err: any) {
+      showToast('error', err?.message || 'Failed to delete categories')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  // Toggle selection for a single category
+  function toggleSelection(id: string) {
+    const newSelection = new Set(selectedIds)
+    if (newSelection.has(id)) {
+      newSelection.delete(id)
+    } else {
+      newSelection.add(id)
+    }
+    setSelectedIds(newSelection)
+  }
+
+  // Toggle select all on current page
+  function toggleSelectAll() {
+    if (selectedIds.size === paginatedCategories.length && paginatedCategories.every(cat => selectedIds.has(cat.id))) {
+      // Deselect all on current page
+      const newSelection = new Set(selectedIds)
+      paginatedCategories.forEach(cat => newSelection.delete(cat.id))
+      setSelectedIds(newSelection)
+    } else {
+      // Select all on current page
+      const newSelection = new Set(selectedIds)
+      paginatedCategories.forEach(cat => newSelection.add(cat.id))
+      setSelectedIds(newSelection)
+    }
+  }
+
+  // Check if all on current page are selected
+  const allPageSelected = paginatedCategories.length > 0 && paginatedCategories.every(cat => selectedIds.has(cat.id))
+  const somePageSelected = paginatedCategories.some(cat => selectedIds.has(cat.id)) && !allPageSelected
+
+  // Debounced taxonomy search
+  // Quick Start handler - used by shared QuickStartCategoryModal
+  const handleQuickStart = async (businessType: string, categoryCount: number) => {
+    try {
+      // Get existing category IDs before quick start
+      const existingIds = new Set(categories.map(c => c.id))
+      
+      const newCategories = await tenantCategoriesService.quickStartCategories(tenantId, businessType, categoryCount)
+      
+      if (newCategories.length > 0) {
+        // Add new category IDs to highlight
+        const newIds = new Set<string>()
+        newCategories.forEach((cat: Category) => {
+          if (!existingIds.has(cat.id)) {
+            newIds.add(cat.id)
+          }
+        })
+        setNewCategoryIds(newIds)
+        
+        // Refresh categories list
+        const categoriesData = await tenantCategoriesService.getTenantCategories(tenantId, includeInactive)
+        setCategories(categoriesData)
+        
+        // Refresh alignment status
+        const alignmentData = await tenantCategoriesService.getAlignmentStatus(tenantId)
+        setAlignmentStatus(alignmentData)
+        
+        // Clear "New" badges after 30 seconds
+        if (newIds.size > 0) {
+          setTimeout(() => setNewCategoryIds(new Set()), 30000)
+        }
+        
+        const createdCount = newCategories.length
+        const totalCount = categoriesData.length
+        showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
+      } else {
+        showToast('error', 'Failed to create categories')
+      }
+    } catch (err: any) {
+      console.error('Failed to create categories:', err)
+      showToast('error', err?.message || 'Failed to create categories')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -353,7 +516,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto dark:text-neutral-800">
       {/* Context Badges */}
       <ContextBadges 
         tenant={{ id: tenantId, name: '' }}
@@ -381,47 +544,10 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Store Guide */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1 a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          <div className="flex-1">
-            <h4 className="text-sm font-semibold text-blue-900 mb-2">📚 Product Categories Guide</h4>
-            <div className="space-y-2 text-sm text-blue-800">
-              <div>
-                <strong>💡 Why create categories?</strong>
-                <p>Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
-              </div>
-              <div>
-                <strong>🎯 How to use:</strong>
-                <ol className="list-decimal list-inside ml-2 space-y-1">
-                  <li>Create categories here (e.g., "Hot Coffee", "Pastries", "Sandwiches")</li>
-                  <li>Align each category to Google's Product Taxonomy for better matching</li>
-                  <li>Assign categories to your products on the{' '}
-                    <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
-                      Items page
-                    </a>
-                  </li>
-                  <li>If you're part of a chain, propagate to other locations</li>
-                </ol>
-              </div>
-              <div className="bg-blue-100 rounded p-2 mt-2">
-                <strong>🔍 Note:</strong> These are <strong>product categories</strong> (unlimited). Your <strong>business category</strong> (e.g., "Coffee Shop") is managed separately at{' '}
-                <a href={`/t/${tenantId}/settings/gbp-category`} className="underline font-medium hover:text-blue-900">
-                  Business Category Settings
-                </a>.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Alignment Status Card */}
       {alignmentStatus && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Alignment Status</h2>
+          <h2 className="text-lg font-semibold mb-4 dark:text-neutral-700">Alignment Status</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-600">Total Categories</p>
@@ -449,6 +575,136 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
+
+      {/* Product Categories Guide */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <button
+          onClick={() => setIsGuideExpanded(!isGuideExpanded)}
+          className="w-full flex items-start gap-3 text-left hover:bg-blue-100/50 rounded-lg p-2 -m-2 transition-colors"
+        >
+          <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1 a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-blue-900">📚 Product Categories Guide</h4>
+            <p className="text-xs text-blue-700 mt-0.5">Click to {isGuideExpanded ? 'hide' : 'show'} detailed guide</p>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-blue-600 shrink-0 transition-transform ${isGuideExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {isGuideExpanded && (
+          <div className="mt-4 pl-8">
+            <div className="space-y-4 text-sm">
+              {/* What are Product Categories */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-2">💡 What are Product Categories?</h4>
+                <p className="text-blue-800">
+                  Product categories help organize your inventory and improve visibility in Google Business Profile and Google Merchant Center. 
+                  These are different from <strong>business categories</strong> (which define what type of business you are).
+                </p>
+              </div>
+
+              {/* Getting Started */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-900 mb-2">🚀 Getting Started</h4>
+                <ul className="list-disc list-inside space-y-1 text-green-800">
+                  <li><strong>Quick Start:</strong> Get pre-selected categories for your business type (grocery, fashion, etc.)</li>
+                  <li><strong>Import from Google:</strong> Search and select from 6000+ Google taxonomy categories</li>
+                  <li><strong>Create Custom:</strong> Add your own categories for unique products</li>
+                </ul>
+              </div>
+
+              {/* Best Practices */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-900 mb-2">✅ Best Practices</h4>
+                <ul className="list-disc list-inside space-y-1 text-amber-800">
+                  <li>Start with <strong>Quick Start</strong> to get a solid foundation</li>
+                  <li>Use <strong>Google categories</strong> when possible for better SEO</li>
+                  <li>Keep category names <strong>clear and specific</strong></li>
+                  <li>Organize products into categories to improve customer browsing</li>
+                </ul>
+              </div>
+
+              {/* Why create categories */}
+              <div>
+                <strong>💡 Why create categories?</strong>
+                <p className="mt-1">Organize your products and improve visibility in Google Business Profile and Google Merchant Center. Well-categorized products perform better in search results and shopping ads.</p>
+              </div>
+              
+              {/* Single Source of Truth */}
+              <div className="bg-blue-100 rounded p-3">
+                <strong className="text-blue-900">🎯 Single Source of Truth</strong>
+                <p className="mt-1">Categories created here appear <strong>consistently everywhere</strong>:</p>
+                <ul className="list-disc list-inside ml-2 mt-1 space-y-0.5">
+                  <li><strong>Storefront sidebar</strong> - Customers browse by category</li>
+                  <li><strong>Product cards</strong> - Category badges on each item</li>
+                  <li><strong>Directory listing</strong> - Category filters for discovery</li>
+                  <li><strong>Items page</strong> - Assign products to your categories</li>
+                </ul>
+              </div>
+
+              {/* How it works */}
+              <div>
+                <strong>🔄 How it works:</strong>
+                <ol className="list-decimal list-inside ml-2 space-y-1">
+                  <li><strong>Create categories here</strong> (e.g., "Hot Coffee", "Pastries", "Sandwiches")</li>
+                  <li><strong>Optionally map to Google</strong> taxonomy for SEO & sync</li>
+                  <li><strong>Assign to products</strong> on the{' '}
+                    <a href={`/t/${tenantId}/items`} className="underline font-medium hover:text-blue-900">
+                      Items page
+                    </a>
+                  </li>
+                  <li><strong>Categories appear</strong> automatically on all public pages</li>
+                </ol>
+              </div>
+
+              {/* Important note */}
+              <div className="bg-purple-50 border border-purple-200 rounded p-2">
+                <strong className="text-purple-900">ℹ️ Important:</strong>
+                <p className="mt-1">Products can <strong>only use categories you create here</strong>. They don't have direct access to Google's 6000+ categories. You control your category structure and optionally map to Google for sync purposes.</p>
+              </div>
+
+              {/* Category Types Explained */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <h4 className="font-semibold text-neutral-900 mb-2">🔍 Category Types Explained</h4>
+                <div className="space-y-3 text-neutral-700">
+                  <div>
+                    <strong className="text-blue-700">Product Categories</strong> (This Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Organize products/services (e.g., "Hot Coffee", "Pastries")</li>
+                      <li>Unlimited categories</li>
+                      <li>Syncs to GBP for product visibility</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-purple-700">Business Categories</strong> (Different Page):
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Define business type (e.g., "Coffee Shop", "Restaurant")</li>
+                      <li>1 primary + ~9 additional max</li>
+                      <li>Managed at Settings → Google Business Profile</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Note about business category */}
+              <div className="bg-blue-100 rounded p-2">
+                <strong>🔍 Note:</strong> These are <strong>product categories</strong> (unlimited). Your <strong>business category</strong> (e.g., "Coffee Shop") is managed separately at{' '}
+                <a href={`/t/${tenantId}/settings/gbp-category`} className="underline font-medium hover:text-blue-900">
+                  Business Category Settings
+                </a>.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Categories List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -509,8 +765,64 @@ export default function CategoriesPage() {
                 )}
               </button>
             )}
+
+            {/* Include Inactive Toggle */}
+            <button
+              onClick={() => setIncludeInactive(!includeInactive)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex-shrink-0 ${
+                includeInactive
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+              }`}
+              title={includeInactive ? 'Show only active categories' : 'Show all categories including inactive'}
+            >
+              <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                {includeInactive ? (
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                )}
+              </svg>
+              {includeInactive ? 'All Categories' : 'Active Only'}
+            </button>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            {/* Bulk Actions */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 font-medium">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={bulkDeleteCategories}
+                  disabled={bulkDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {bulkDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Selected
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-800 underline"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
             {organizationInfo && categories.length > 0 && (
               <button
                 onClick={openPropagateModal}
@@ -537,6 +849,12 @@ export default function CategoriesPage() {
               </button>
             )}
             <button
+              onClick={() => setShowQuickStartModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              ⚡ Quick Start
+            </button>
+            <button
               onClick={openCreate}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
             >
@@ -550,18 +868,59 @@ export default function CategoriesPage() {
               No categories found. Create your first category to get started.
             </div>
           ) : (
-            paginatedCategories.map((cat) => (
-              <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-medium text-gray-900">{cat.name}</h3>
+            <>
+              {/* Select All Header */}
+              {paginatedCategories.length > 0 && (
+                <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      ref={input => {
+                        if (input) input.indeterminate = somePageSelected
+                      }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Select all on this page ({paginatedCategories.length})
+                    </span>
+                  </label>
+                </div>
+              )}
+              {paginatedCategories.map((cat) => (
+                <div key={cat.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(cat.id)}
+                      onChange={() => toggleSelection(cat.id)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className={`font-medium ${cat.isActive === false ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{cat.name}</h3>
+                      {cat.isActive === false && (
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-300">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          Inactive
+                        </span>
+                      )}
+                      {newCategoryIds.has(cat.id) && (
+                        <span className="inline-flex items-center gap-1 text-xs text-white bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-1 rounded-full font-semibold animate-pulse shadow-sm">
+                          ✨ New
+                        </span>
+                      )}
                       {cat.googleCategoryId ? (
                         <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          Mapped
+                          Mapped to Google
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded">
@@ -572,22 +931,26 @@ export default function CategoriesPage() {
                         </span>
                       )}
                     </div>
+                    {cat.googleCategoryId && (
+                      <GoogleCategoryPath googleCategoryId={cat.googleCategoryId} />
+                    )}
                   </div>
-                  <button
-                    onClick={() => openEdit(cat)}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => deleteCategory(cat)}
-                    className="ml-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-                  >
-                    Delete
-                  </button>
+                    <button
+                      onClick={() => openEdit(cat)}
+                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteCategory(cat)}
+                      className="ml-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </div>
         {categories.length > 0 && (
@@ -635,11 +998,27 @@ export default function CategoriesPage() {
       )}
 
       {/* Quick Start Guide */}
-      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mt-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
-            🚀 Quick Start: Common Product Categories
-          </h3>
+          <button
+            onClick={() => setIsQuickStartExpanded(!isQuickStartExpanded)}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
+              🚀 Quick Start: Common Product Categories
+            </h3>
+            <p className="text-xs text-purple-700 dark:text-purple-300">
+              Click to {isQuickStartExpanded ? 'hide' : 'show'} examples
+            </p>
+            <svg 
+              className={`w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0 transition-transform ${isQuickStartExpanded ? 'rotate-180' : ''}`}
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           {categories.length > 0 && (
             <Link href={`/t/${tenantId}/categories/quick-start`}>
               <button className="text-sm bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all">
@@ -649,7 +1028,9 @@ export default function CategoriesPage() {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {isQuickStartExpanded && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
           <div>
             <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Food & Grocery</h4>
             <ul className="space-y-1 text-sm text-purple-700 dark:text-purple-300">
@@ -703,7 +1084,7 @@ export default function CategoriesPage() {
             </ul>
           </div>
 
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-700">
+          <div className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm rounded-lg p-4 border border-primary-200 dark:border-primary-800">
             <h4 className="font-medium text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -728,6 +1109,8 @@ export default function CategoriesPage() {
             </p>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -783,81 +1166,24 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Edit Modal */}
-      {isModalOpen && (selected || isCreate) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{isCreate ? 'Create Category' : 'Edit Category'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-                <input
-                  type="number"
-                  value={formSort}
-                  onChange={(e) => setFormSort(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Google Category</label>
-                <div className="relative">
-                  <input
-                    placeholder="Search taxonomy by name (e.g. Electronics)"
-                    value={taxQuery}
-                    onChange={(e) => { setTaxQuery(e.target.value); setShowTaxResults(true) }}
-                    onFocus={() => setShowTaxResults(true)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {showTaxResults && (taxResults.length > 0 || taxLoading) && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-auto">
-                      {taxLoading && <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>}
-                      {taxResults.map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => { setFormGoogleId(r.id); setTaxQuery(r.path.join(' > ')); setShowTaxResults(false) }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                        >
-                          <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                          <div className="text-xs text-gray-600">{r.path.join(' > ')}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">Selected ID: {formGoogleId || 'none'}</p>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Edit Modal - Using shared CategoryEditModal */}
+      <CategoryEditModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelected(null)
+        }}
+        onSave={handleSaveCategory}
+        category={selected ? {
+          id: selected.id,
+          name: selected.name,
+          slug: selected.slug,
+          sortOrder: selected.sortOrder,
+          googleCategoryId: selected.googleCategoryId || undefined,
+        } : null}
+        isCreate={isCreate}
+        apiBaseUrl={API_BASE_URL}
+      />
 
       {/* Propagate Modal */}
       {showPropagateModal && organizationInfo && (
@@ -1009,6 +1335,13 @@ export default function CategoriesPage() {
         </div>
       )}
 
+      {/* Quick Start Modal - Using shared component */}
+      <QuickStartCategoryModal
+        isOpen={showQuickStartModal}
+        onClose={() => setShowQuickStartModal(false)}
+        onGenerate={handleQuickStart}
+      />
+
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-lg text-white ${toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`}>
@@ -1018,3 +1351,4 @@ export default function CategoriesPage() {
     </div>
   )
 }
+

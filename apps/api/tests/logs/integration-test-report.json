@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-01-23T08:05:44.498Z",
+  "testData": {
+    "tenant": "tid-m8ijkrnk",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc2ODkxODMwOCwiZXhwIjoxODAwNDU0MzA4fQ.-Swkbx8_UOF_4rpBKhs5XvJauNgu0ef6IR_buNbYz64",
+    "userId": "uid-zqe5ns5k",
+    "email": "platform@rvp.com",
+    "role": "PLATFORMFORM_ADMIN"
+  },
+  "results": {
+    "passed": 6,
+    "failed": 2,
+    "total": 8,
+    "tests": [
+      {
+        "name": "Authentication Flow Test",
+        "status": "passed",
+        "duration": 169,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Security Monitoring Service Integration",
+        "status": "passed",
+        "duration": 180,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Rate Limiting Service Integration",
+        "status": "passed",
+        "duration": 112,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Behavior Tracking Service Integration",
+        "status": "passed",
+        "duration": 103,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Tenant Profile Service Integration",
+        "status": "passed",
+        "duration": 149,
+        "error": null,
+        "details": {}
+      },
+      {
+        "name": "Cache Performance Test",
+        "status": "failed",
+        "duration": 149,
+        "error": "Cache not working properly",
+        "details": {}
+      },
+      {
+        "name": "Encryption Features Test",
+        "status": "failed",
+        "duration": 112,
+        "error": "Encrypted data retrieval failed",
+        "details": {}
+      },
+      {
+        "name": "Load Handling Test",
+        "status": "passed",
+        "duration": 106,
+        "error": null,
+        "details": {}
+      }
+    ],
+    "startTime": 1769155543404
+  },
+  "totalDuration": 1094,
+  "summary": {
+    "totalTests": 8,
+    "passed": 6,
+    "failed": 2,
+    "successRate": 75,
+    "averageTestDuration": 136.75
+  }
+}

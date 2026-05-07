@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import TenantFlagsService from '@/services/TenantFlagsService';
 
 type FlagRow = { 
   id: string; 
@@ -21,6 +22,8 @@ type EffectiveRow = {
   tenantSources: { tenant_db: boolean; tenant_override?: boolean };
 };
 
+
+
 export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
   const [rows, setRows] = useState<FlagRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,28 +36,48 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/tenant-flags/${tenantId}`, { cache: "no-store", credentials: 'include' });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-        setRows(j.data || []);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
-      }
+      // MIGRATION: Using TenantFlagsService instead of direct fetch
+      const tenantFlags = await TenantFlagsService.getTenantFlags(tenantId);
+      
+      // Transform service data to component format
+      const transformedRows: FlagRow[] = tenantFlags.map(flag => ({
+        id: flag.id,
+        flag: flag.flag,
+        enabled: flag.value === true || flag.value === 'true' || flag.value === '1',
+        description: flag.description || null,
+        rollout: null, // Add if needed from service
+        _isPlatformInherited: false, // Add logic if needed
+      }));
+      
+      setRows(transformedRows);
 
       // Load effective statuses
-      const e = await fetch(`/api/admin/effective-flags/${encodeURIComponent(tenantId)}`, { cache: 'no-store', credentials: 'include' });
-      const ect = e.headers.get('content-type') || '';
-      if (ect.includes('application/json')) {
-        const ej = await e.json();
-        if (!e.ok || !ej?.success) throw new Error(ej?.error || `HTTP ${e.status}`);
-        const map: Record<string, EffectiveRow> = {};
-        for (const it of (ej.data || [])) map[it.flag] = it;
-        setEffective(map);
-      }
+      // MIGRATION: Using TenantFlagsService instead of direct fetch
+      const effectiveFlags = await TenantFlagsService.getEffectiveFlags(tenantId);
+      
+      // Transform effective flags to component format
+      const transformedEffective: Record<string, EffectiveRow> = {};
+      effectiveFlags.forEach(effective => {
+        transformedEffective[effective.flag] = {
+          flag: effective.flag,
+          tenantId,
+          effectiveOn: effective.value === true || effective.value === 'true' || effective.value === '1',
+          effectiveSource: effective.source === 'PLATFORM_DEFAULT' ? 'platform_db' : 'override',
+          sources: { 
+            platform_env: false, 
+            platform_db: effective.source === 'PLATFORM_DEFAULT', 
+            allow_override: effective.isOverridden 
+          },
+          tenantEffectiveOn: effective.value === true || effective.value === 'true' || effective.value === '1',
+          tenantEffectiveSource: effective.source === 'TENANT_OVERRIDE' ? 'tenant_override' : 'tenant_db',
+          tenantSources: { 
+            tenant_db: effective.source === 'TENANT_OVERRIDE', 
+            tenant_override: effective.source === 'TENANT_OVERRIDE' 
+          },
+        };
+      });
+      
+      setEffective(transformedEffective);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
@@ -66,21 +89,16 @@ export default function AdminTenantFlags({ tenantId }: { tenantId: string }) {
     setSaving(flag);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/tenant-flags/${tenantId}/${encodeURIComponent(flag)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: next.enabled, description: next.description ?? null, rollout: next.rollout ?? null }),
-        credentials: 'include',
+      // MIGRATION: Using TenantFlagsService instead of direct fetch
+      const result = await TenantFlagsService.upsertTenantFlag(tenantId, flag, {
+        value: next.enabled,
+        description: next.description ?? undefined,
       });
-      const ct = r.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await r.json();
-        if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      } else {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-        throw new Error(`Unexpected response: ${text?.slice(0, 200)}`);
+      
+      if (!result) {
+        throw new Error('Failed to update tenant flag');
       }
+      
       await load();
     } catch (e: any) {
       setError(e?.message || String(e));

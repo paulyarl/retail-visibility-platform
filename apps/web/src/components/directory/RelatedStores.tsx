@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import StoreCard from './StoreCard';
+import Link from 'next/link';
+import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
+import { directoryService } from '@/services/DirectorySingletonService';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 interface RelatedStore {
   id: string;
@@ -22,6 +25,7 @@ interface RelatedStore {
   subscriptionTier: string;
   useCustomWebsite: boolean;
   website?: string;
+  businessHours?: any;
 }
 
 interface RelatedStoresProps {
@@ -29,6 +33,8 @@ interface RelatedStoresProps {
   title?: string;
   limit?: number;
 }
+
+
 
 export default function RelatedStores({ 
   currentSlug, 
@@ -45,15 +51,46 @@ export default function RelatedStores({
       setError(null);
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${apiUrl}/api/directory/${currentSlug}/related?limit=${limit}`);
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch related stores');
+        // Resolve identifier to slug if it looks like an ID (not a URL-friendly slug)
+        // Slugs typically contain hyphens and lowercase letters, IDs are often alphanumeric without hyphens
+        let resolvedSlug = currentSlug;
+        const looksLikeId = /^[a-zA-Z0-9]{8,}$/.test(currentSlug) || currentSlug.startsWith('tid-') || currentSlug.startsWith('t-');
+        
+        if (looksLikeId) {
+          const resolved = await publicDirectoryService.resolveBySlug(currentSlug);
+          if (resolved) {
+            resolvedSlug = resolved.slug || currentSlug;
+          }
         }
+        
+        const data = await directoryService.getRelatedStores(resolvedSlug, limit);
+        
+        // Ensure data is always an array
+        const dataArray = Array.isArray(data) ? data : [];
+        
+        // Map API response to expected format (snake_case to camelCase)
+        const mappedStores = dataArray.map((store: any) => ({
+          id: store.id,
+          tenantId: store.tenantId,
+          businessName: store.business_name || store.businessName,
+          slug: store.slug,
+          address: store.address,
+          city: store.city,
+          state: store.state,
+          phone: store.phone,
+          logoUrl: store.logo_url || store.logoUrl,
+          primaryCategory: store.primary_category || store.primaryCategory,
+          ratingAvg: store.rating_avg || store.ratingAvg || 0,
+          ratingCount: store.rating_count || store.ratingCount || 0,
+          distance: store.distance,
+          isVerified: store.is_verified || store.isVerified,
+          isFeatured: store.is_featured || store.isFeatured,
+          productCount: store.product_count || store.productCount || 0,
+          subscriptionTier: store.subscription_tier || store.subscriptionTier || 'basic',
+          useCustomWebsite: store.use_custom_website || store.useCustomWebsite || false
+        }));
 
-        const data = await res.json();
-        setStores(data.related || []);
+        setStores(mappedStores);
       } catch (err) {
         console.error('Error fetching related stores:', err);
         setError('Failed to load related stores');
@@ -78,9 +115,17 @@ export default function RelatedStores({
   return (
     <div className="bg-white border-t">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          {title}
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {title}
+          </h2>
+          <Link
+            href="/directory"
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Browse All Stores →
+          </Link>
+        </div>
 
         {loading ? (
           // Loading skeleton
@@ -98,10 +143,11 @@ export default function RelatedStores({
           // Store grid
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stores.map((store, index) => (
-              <StoreCard
-                key={store.id}
+              <UnifiedStoreCard
+                key={`${store.tenantId}-${store.primaryCategory || 'general'}-${index}`}
                 listing={store}
-                index={index}
+                viewMode="grid"
+                linkType="directory"
               />
             ))}
           </div>
@@ -121,5 +167,6 @@ export default function RelatedStores({
     </div>
   );
 }
+
 
 export { RelatedStores };

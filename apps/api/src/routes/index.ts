@@ -7,6 +7,7 @@ import { mountAdminRoutes } from './mounts/admin-routes';
 import { mountIntegrationRoutes } from './mounts/integration-routes';
 import { mountDirectoryRoutes } from './mounts/directory-routes';
 import { mountDashboardRoutes } from './mounts/dashboard-routes';
+import performanceApi from './performance-api';
 
 /**
  * Mount minimal routes (always enabled)
@@ -28,15 +29,51 @@ export function mountMinimalRoutes(app: Express) {
 export function mountAllRoutes(app: Express) {
   console.log('🚀 Mounting ALL routes for full functionality...');
   
-  // Core authentication (always first)
-  mountAuthRoutes(app);
+  try {
+    // Core authentication (always first)
+    mountAuthRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting auth routes:', error);
+  }
   
-  // All feature routes
-  mountCoreRoutes(app);
-  mountDashboardRoutes(app);
-  mountAdminRoutes(app);
-  mountIntegrationRoutes(app);
-  mountDirectoryRoutes(app);
+  try {
+    // All feature routes
+    mountCoreRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting core routes:', error);
+  }
+  
+  try {
+    mountDashboardRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting dashboard routes:', error);
+  }
+  
+  try {
+    mountAdminRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting admin routes:', error);
+  }
+  
+  try {
+    mountIntegrationRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting integration routes:', error);
+  }
+  
+  try {
+    mountDirectoryRoutes(app);
+  } catch (error) {
+    console.error('❌ Error mounting directory routes:', error);
+  }
+  
+  try {
+    // Performance monitoring and optimization routes
+    app.use('/api/admin/performance', performanceApi);
+    console.log('✅ Performance routes mounted');
+  } catch (error) {
+    console.error('❌ Error mounting performance routes:', error);
+  }
   
   console.log('✅ ALL routes mounted - full functionality enabled');
 }

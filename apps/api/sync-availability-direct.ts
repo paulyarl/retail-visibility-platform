@@ -20,7 +20,7 @@ async function syncAvailability() {
 
     // Find items that are out of sync
     const outOfSync = items.filter(item => {
-      const expectedAvailability = item.stock > 0 ? 'inStock' : 'outOfStock';
+      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
       return item.availability !== expectedAvailability;
     });
 
@@ -30,7 +30,7 @@ async function syncAvailability() {
       // Show first 10 out-of-sync items
       outOfSync.slice(0, 10).forEach(item => {
         console.log(`   - SKU: ${item.sku}`);
-        console.log(`     Stock: ${item.stock}, Current: ${item.availability}, Expected: ${item.stock > 0 ? 'inStock' : 'outOfStock'}`);
+        console.log(`     Stock: ${item.stock}, Current: ${item.availability}, Expected: ${item.stock > 0 ? 'in_stock' : 'out_of_stock'}`);
       });
       
       if (outOfSync.length > 10) {
@@ -46,7 +46,7 @@ async function syncAvailability() {
         outOfSync.map(item =>
           prisma.InventoryItem.update({
             where: { id: item.id },
-            data: { availability: item.stock > 0 ? 'inStock' : 'outOfStock' },
+            data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
           })
         )
       );

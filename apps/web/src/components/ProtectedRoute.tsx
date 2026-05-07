@@ -9,6 +9,8 @@ interface ProtectedRouteProps {
   requiredRole?: 'ADMIN' | 'OWNER' | 'USER';
 }
 
+
+
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -16,7 +18,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       // Redirect to login if not authenticated
-      router.push('/login');
+      router.push('/auth/login');
     }
   }, [isLoading, isAuthenticated, router]);
 

@@ -39,12 +39,12 @@ export async function validateTenantCreation(
   const errors: TenantValidationError[] = [];
 
   // 1. Check for duplicate tenant name by same owner
-  const duplicateName = await prisma.tenant.findFirst({
+  const duplicateName = await prisma.tenants.findFirst({
     where: {
       name: tenantName,
-      userTenants: {
+      user_tenants: {
         some: {
-          userId,
+          user_id: userId,
           role: 'OWNER',
         },
       },
@@ -122,10 +122,10 @@ async function checkDuplicateAddress(
   const normalizedCity = city.trim().toLowerCase();
   const normalizedState = state.trim().toUpperCase();
 
-  // Check TenantBusinessProfile table
-  const existingProfile = await prisma.tenantBusinessProfile.findFirst({
+  // Check tenant_business_profiles_list table
+  const existingProfile = await prisma.tenant_business_profiles_list.findFirst({
     where: {
-      businessLine1: {
+      address_line1: {
         contains: normalizedAddress,
         mode: 'insensitive',
       },
@@ -145,7 +145,7 @@ async function checkDuplicateAddress(
       }),
     },
     include: {
-      tenant: {
+      tenants: {
         select: {
           id: true,
           name: true,
@@ -156,13 +156,13 @@ async function checkDuplicateAddress(
 
   if (existingProfile) {
     return {
-      id: existingProfile.tenant.id,
-      name: existingProfile.tenant.name,
+      id: existingProfile.tenants.id,
+      name: existingProfile.tenants.name,
     };
   }
 
   // Also check legacy metadata (for backwards compatibility)
-  const tenantsWithMetadata = await prisma.tenant.findMany({
+  const tenantsWithMetadata = await prisma.tenants.findMany({
     where: {
       AND: [
         { metadata: { not: Prisma.JsonNull } },
@@ -213,13 +213,13 @@ async function checkDuplicateBusinessAtAddress(
   const normalizedCity = city.trim().toLowerCase();
   const normalizedState = state.trim().toUpperCase();
 
-  const existingProfile = await prisma.tenantBusinessProfile.findFirst({
+  const existingProfile = await prisma.tenant_business_profiles_list.findFirst({
     where: {
-      businessName: {
+      business_name: {
         equals: normalizedBusinessName,
         mode: 'insensitive',
       },
-      businessLine1: {
+      address_line1: {
         contains: normalizedAddress,
         mode: 'insensitive',
       },
@@ -233,7 +233,7 @@ async function checkDuplicateBusinessAtAddress(
       },
     },
     include: {
-      tenant: {
+      tenants: {
         select: {
           id: true,
           name: true,
@@ -244,8 +244,8 @@ async function checkDuplicateBusinessAtAddress(
 
   if (existingProfile) {
     return {
-      id: existingProfile.tenant.id,
-      name: existingProfile.tenant.name,
+      id: existingProfile.tenants.id,
+      name: existingProfile.tenants.name,
     };
   }
 
@@ -285,12 +285,12 @@ export async function checkDuplicateTenantName(
   userId: string,
   tenantName: string
 ): Promise<boolean> {
-  const existing = await prisma.tenant.findFirst({
+  const existing = await prisma.tenants.findFirst({
     where: {
       name: tenantName,
-      userTenants: {
+      user_tenants: {
         some: {
-          userId,
+          user_id: userId,
           role: 'OWNER',
         },
       },
@@ -304,15 +304,15 @@ export async function checkDuplicateTenantName(
  * Get all tenants owned by user (for duplicate checking)
  */
 export async function getUserOwnedTenants(userId: string) {
-  return await prisma.userTenant.findMany({
+  return await prisma.user_tenants.findMany({
     where: {
-      userId,
+      user_id: userId,
       role: 'OWNER',
     },
     include: {
-      tenant: {
+      tenants: {
         include: {
-          tenantBusinessProfile: true,
+          tenant_business_profiles_list: true,
         },
       },
     },

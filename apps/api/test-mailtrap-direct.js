@@ -6,7 +6,7 @@ async function testMailtrapDirect() {
   
   const apiToken = process.env.MAILTRAP_API_TOKEN;
   const fromEmail = process.env.MAILTRAP_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@rvp-platform.com';
-  const fromName = process.env.MAILTRAP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'RVP Platform';
+  const fromName = process.env.MAILTRAP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'Visible Shelf Platform';
   
   console.log('Configuration:');
   console.log('   API Token:', apiToken ? '✅ Set' : '❌ Missing');
@@ -68,7 +68,7 @@ async function testMailtrapDirect() {
           email: 'test@example.com',
         },
       ],
-      subject: 'Test Email from RVP Platform',
+      subject: 'Test Email from Visible Shelf Platform',
       html: '<h1>Test Email</h1><p>If you received this, Mailtrap integration is working!</p>',
       text: 'Test Email\n\nIf you received this, Mailtrap integration is working!',
       category: 'Integration Test',

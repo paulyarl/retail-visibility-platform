@@ -17,6 +17,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
+import { scanAnalyticsService } from '@/services/ScanAnalyticsService';
 
 interface Analytics {
   totalScanned: number;
@@ -42,6 +43,9 @@ interface Analytics {
   };
 }
 
+
+
+
 export default function TenantInsightsPage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
@@ -58,14 +62,9 @@ export default function TenantInsightsPage() {
 
   const loadAnalytics = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiBaseUrl}/api/scan/tenant/${tenantId}/analytics`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setAnalytics(data.analytics);
+      const analytics = await scanAnalyticsService.getTenantAnalytics(tenantId);
+      if (analytics) {
+        setAnalytics(analytics);
       }
     } catch (error) {
       console.error('Failed to load analytics:', error);
@@ -81,14 +80,9 @@ export default function TenantInsightsPage() {
     setPreviewResult(null);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiBaseUrl}/api/scan/preview/${previewBarcode}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setPreviewResult(data);
+      const result = await scanAnalyticsService.previewProduct(previewBarcode);
+      if (result) {
+        setPreviewResult(result);
       }
     } catch (error) {
       console.error('Failed to preview:', error);
@@ -106,7 +100,7 @@ export default function TenantInsightsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Context Badges */}
         <ContextBadges 

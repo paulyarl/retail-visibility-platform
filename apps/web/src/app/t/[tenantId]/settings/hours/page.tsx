@@ -1,50 +1,22 @@
-import React from "react";
-import { cookies } from "next/headers";
+"use client";
+
+import React, { useState, use } from "react";
+import { Button } from '@mantine/core';
 import HoursEditor from "@/components/hours/HoursEditor";
 import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";
 import TimezonePicker from "@/components/hours/TimezonePicker";
 import HoursPreview from "@/components/hours/HoursPreview";
+import { useParams } from 'next/navigation';
 
-export default async function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
-  const { tenantId } = await params;
-  
-  // Check if business hours feature is enabled via feature flag system
-  // Use effective-flags endpoint to check platform + tenant inheritance
-  const serverApiBase = process.env.API_BASE_URL || "http://localhost:4000";
-  const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
-  let isEnabled = false;
-  
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ACCESS_TOKEN')?.value || cookieStore.get('access_token')?.value;
-    
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    const res = await fetch(`${serverApiBase}/api/admin/effective-flags/${tenantId}`, {
-      cache: 'no-store',
-      headers
-    });
-    if (res.ok) {
-      const data = await res.json();
-      // Check if FF_TENANT_GBP_HOURS_SYNC is effectively enabled (platform or tenant)
-      const hoursFlag = data.data?.find((f: any) => f.flag === 'FF_TENANT_GBP_HOURS_SYNC');
-      isEnabled = hoursFlag?.tenantEffectiveOn === true;
-    }
-  } catch (e) {
-    console.error('Failed to check hours flag:', e);
-  }
-  
-  if (!isEnabled) {
-    return (
-      <div className="p-6 text-sm text-gray-500">
-        Business Hours is not enabled for this tenant. Enable the <strong>FF_TENANT_GBP_HOURS_SYNC</strong> flag in Admin → Tenant Flags.
-      </div>
-    );
-  }
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
+
+export default function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = use(params);
+  const [currentTimezone, setCurrentTimezone] = useState<string | undefined>();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -63,13 +35,16 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
             >
               Business Profile
             </a>
-            <SyncStateBadge apiBase={clientApiBase} tenantId={tenantId} />
+            <SyncStateBadge tenantId={tenantId} />
           </div>
         </div>
       </div>
 
       {/* Timezone */}
-      <TimezonePicker tenantId={tenantId} apiBase={clientApiBase} />
+      <TimezonePicker 
+        tenantId={tenantId} 
+        onTimezoneChange={setCurrentTimezone}
+      />
 
       {/* Helpful Reminder */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -90,11 +65,14 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
           {/* Regular Hours Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-              <h2 className="text-xl font-bold text-gray-900">Business Hours</h2>
+              <h2 className="text-xl font-bold text-gray-900">Store Hours</h2>
               <p className="text-sm text-gray-600 mt-1">Set your weekly operating schedule</p>
             </div>
             <div className="p-6">
-              <HoursEditor apiBase={clientApiBase} tenantId={tenantId} />
+              <HoursEditor 
+                tenantId={tenantId} 
+                timezone={currentTimezone}
+              />
             </div>
           </div>
 
@@ -105,14 +83,14 @@ export default async function HoursSettingsPage({ params }: { params: Promise<{ 
               <p className="text-sm text-gray-600 mt-1">Manage holiday and exception hours</p>
             </div>
             <div className="p-6">
-              <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />
+              <SpecialHoursCalendar tenantId={tenantId} />
             </div>
           </div>
         </div>
 
         {/* Right Column: Live Preview (1/3 width, sticky) */}
         <div className="lg:col-span-1">
-          <HoursPreview apiBase={clientApiBase} tenantId={tenantId} />
+          <HoursPreview tenantId={tenantId} />
         </div>
       </div>
     </div>

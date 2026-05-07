@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { getTenantOrganizationsSingleton } from '@/lib/singletons/TenantOrganizationsSingleton';
+import { organizationsService } from '@/services/OrganizationsSingletonService';
 
 interface Tenant {
   id: string;
@@ -50,12 +51,17 @@ export default function PropagateItemModal({
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/api/organizations/${organizationId}`);
-      if (!res.ok) throw new Error('Failed to load organization');
+      // Use singleton for cached organization data
+      const singleton = getTenantOrganizationsSingleton(currentTenantId);
+      await singleton.fetchOrganizations();
       
-      const data = await res.json();
+      const state = singleton.getState();
+      const organization = state.organizations.find(org => org.id === organizationId);
+      
+      if (!organization) throw new Error('Organization not found');
+      
       // Filter out current tenant
-      const otherTenants = data.tenants.filter((t: Tenant) => t.id !== currentTenantId);
+      const otherTenants = organization.tenants.filter((t: any) => t.id !== currentTenantId);
       setTenants(otherTenants);
     } catch (err: any) {
       console.error('Failed to load tenants:', err);
@@ -89,18 +95,16 @@ export default function PropagateItemModal({
     setResult(null);
 
     try {
-      const res = await api.post(`/api/organizations/${organizationId}/items/propagate`, {
+      const data = await organizationsService.propagateItems(organizationId, {
         sourceItemId: itemId,
         targetTenantIds: selectedTenantIds,
         mode,
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to propagate item');
+      if (!data) {
+        throw new Error('Failed to propagate item');
       }
 
-      const data = await res.json();
       setResult(data);
       
       if (data.summary.created > 0 || data.summary.updated > 0) {

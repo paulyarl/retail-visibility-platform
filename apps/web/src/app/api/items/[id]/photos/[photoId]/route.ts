@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PUT(
   req: NextRequest,
@@ -6,20 +7,15 @@ export async function PUT(
 ) {
   try {
     const { id, photoId } = await params;
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
-
-    // Create headers object with ONLY essential headers
-    // Do NOT forward other headers to avoid conflicts with Express body parser
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    // Add Authorization if present
-    const auth = req.headers.get('authorization');
-    if (auth) {
-      headers['Authorization'] = auth;
+    
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
     // Read and parse the request body
     let body;
@@ -33,9 +29,8 @@ export async function PUT(
       }, { status: 400 });
     }
 
-    const res = await fetch(url, {
+    const res = await authenticatedFetch(`/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`, accessToken, {
       method: 'PUT',
-      headers,
       body: JSON.stringify(body),
     });
 
@@ -63,10 +58,17 @@ export async function DELETE(
 ) {
   try {
     const { id, photoId } = await params;
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const url = `${base}/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`;
+    
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
 
-    const res = await fetch(url, {
+    const res = await authenticatedFetch(`/items/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`, accessToken, {
       method: 'DELETE',
     });
 

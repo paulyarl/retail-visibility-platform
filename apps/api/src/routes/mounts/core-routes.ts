@@ -17,6 +17,20 @@ import userRoutes from '../users';
 import tenantUserRoutes from '../tenant-users';
 import platformSettingsRoutes from '../platform-settings';
 import platformStatsRoutes from '../platform-stats';
+import businessHoursRoutes from '../business-hours';
+import taxonomyRoutes from '../taxonomy';
+import analyticsRoutes from '../analytics';
+import tenantsRoutes from '../tenants';
+import tenantTierRoutes from '../tenant-tier';
+import paymentGatewaysRoutes from '../payment-gateways';
+import digitalDownloadsRoutes from '../digital-downloads';
+import shopCategoriesRoutes from '../shop-categories';
+import tenantLogoRoutes from '../tenant-logo';
+import globalCatalogRoutes from '../global-catalog';
+import catalogSlugsRoutes from '../catalog-slugs';
+import catalogAdoptionRoutes from '../catalog-adoption';
+import locationAvailabilityRoutes from '../location-availability';
+import crossTenantProductsRoutes from '../cross-tenant-products';
 
 /**
  * Mount core business routes
@@ -31,7 +45,7 @@ export function mountCoreRoutes(app: Express) {
   // Mount v3.5 routes
   app.use(auditRoutes);
   app.use(policyRoutes);
-  app.use(billingRoutes);
+  app.use('/api', billingRoutes);
   app.use('/subscriptions', subscriptionRoutes);
   app.use('/api/categories', authenticateToken, categoryRoutes);
   app.use('/performance', performanceRoutes);
@@ -40,9 +54,37 @@ export function mountCoreRoutes(app: Express) {
   app.use('/upgrade-requests', upgradeRequestsRoutes);
   app.use('/permissions', permissionRoutes);
   app.use('/users', userRoutes);
-  app.use('/api/tenants', tenantUserRoutes);
+  app.use('/api/user', userRoutes);
+  
+  // IMPORTANT: Mount public tier routes BEFORE authenticated tenant routes
+  // This allows /api/tenants/:id/tier/public to work without auth
+  app.use('/api', tenantTierRoutes);
+  
+  // IMPORTANT: Mount payment gateways WITHOUT global auth middleware
+  // Individual routes handle their own authentication (public vs authenticated)
+  app.use('/api/tenants', paymentGatewaysRoutes);
+  
+  // IMPORTANT: Mount digital downloads WITHOUT auth - uses access tokens for security
+  app.use('/api/download', digitalDownloadsRoutes);
+  
+  app.use('/api/tenants', authenticateToken, tenantsRoutes);
+  app.use('/api/tenants', authenticateToken, tenantUserRoutes);
   app.use(platformSettingsRoutes);
   app.use('/api/platform-stats', platformStatsRoutes);
+  app.use('/api', businessHoursRoutes);
+  app.use('/api/taxonomy', taxonomyRoutes);
+  app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/shop-categories', shopCategoriesRoutes);
+  app.use('/api/public/tenant', tenantLogoRoutes);
+  
+  // Global catalog routes (public access for browsing)
+  app.use('/api/catalog', globalCatalogRoutes);
+  app.use('/api/catalog/slugs', catalogSlugsRoutes);
+  app.use('/api/catalog', catalogAdoptionRoutes);
+  app.use('/api/catalog/availability', locationAvailabilityRoutes);
+  
+  // Cross-tenant product routes (leverage product_slug for platform-wide queries)
+  app.use('/api/cross-tenant', crossTenantProductsRoutes);
 
   console.log('✅ Core business routes mounted');
 }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(
   request: NextRequest,
@@ -8,18 +7,18 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get('access_token')?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/feature-overrides/${id}`, {
+    const response = await authenticatedFetch(`/api/admin/feature-overrides/${id}`, accessToken, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
     });
 
     const data = await response.json();
@@ -39,20 +38,20 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get('access_token')?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/feature-overrides/${id}`, {
+    const response = await authenticatedFetch(`/api/admin/feature-overrides/${id}`, accessToken, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(body),
     });
 
@@ -73,18 +72,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get('access_token')?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/feature-overrides/${id}`, {
+    const response = await authenticatedFetch(`/api/admin/feature-overrides/${id}`, accessToken, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
     });
 
     const data = await response.json();

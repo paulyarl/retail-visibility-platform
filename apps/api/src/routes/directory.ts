@@ -87,8 +87,8 @@ router.get('/search', async (req, res) => {
       (Array.isArray(featuresParam) ? featuresParam : [featuresParam]) : 
       [];
 
-    // Build query
-    let query = Prisma.sql`
+    // Build query components separately to avoid SQL template issues
+    const selectFields = Prisma.sql`
       SELECT 
         id,
         tenantId as "tenantId",
@@ -116,19 +116,22 @@ router.get('/search', async (req, res) => {
     `;
 
     // Add distance calculation if lat/lng provided
-    if (lat && lng) {
-      query = Prisma.sql`${query},
+    const distanceField = lat && lng ? Prisma.sql`,
         calculate_distance_miles(
           ${Number(lat)}, ${Number(lng)}, 
           latitude, longitude
         ) as distance
-      `;
-    }
+    ` : Prisma.sql``;
 
-    query = Prisma.sql`${query}
-      FROM directory_listings
-      WHERE is_published = true
+    const baseQuery = Prisma.sql`
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
+        AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
+
+    // Combine query parts
+    let query = Prisma.sql`${selectFields}${distanceField} ${baseQuery}`;
 
     // Full-text search
     if (q) {
@@ -196,10 +199,10 @@ router.get('/search', async (req, res) => {
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM
       
       query = Prisma.sql`${query}
-        AND business_hours IS NOT NULL
-        AND business_hours->>${dayOfWeek}->>'isOpen' = 'true'
-        AND business_hours->>${dayOfWeek}->>'open' <= ${currentTime}
-        AND business_hours->>${dayOfWeek}->>'close' >= ${currentTime}
+        AND business_hours_list IS NOT NULL
+        AND business_hours_list->>${dayOfWeek}->>'isOpen' = 'true'
+        AND business_hours_list->>${dayOfWeek}->>'open' <= ${currentTime}
+        AND business_hours_list->>${dayOfWeek}->>'close' >= ${currentTime}
       `;
     }
 
@@ -239,13 +242,16 @@ router.get('/search', async (req, res) => {
     const listings = await prisma.$queryRaw(query) as any;
 
     // Get total count for pagination
-    let countQuery = Prisma.sql`
+    const countBaseQuery = Prisma.sql`
       SELECT COUNT(*) as total
-      FROM directory_listings
-      WHERE is_published = true
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
+        AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
 
     // Apply same filters to count
+    let countQuery = countBaseQuery;
     if (q) {
       countQuery = Prisma.sql`${countQuery}
         AND to_tsvector('english', 
@@ -292,6 +298,7 @@ router.get('/search', async (req, res) => {
  * GET /api/directory/categories
  * Get list of available business categories
  */
+/*
 router.get('/categories', async (req, res) => {
   try {
     // Return predefined list of business categories
@@ -325,6 +332,7 @@ router.get('/categories', async (req, res) => {
     return res.status(500).json({ error: 'failed_to_get_categories' });
   }
 });
+*/
 
 /**
  * GET /api/directory/locations
@@ -334,15 +342,17 @@ router.get('/locations', async (req, res) => {
   try {
     const result = await prisma.$queryRaw<Array<{ city: string; state: string; count: bigint }>>`
       SELECT 
-        city,
-        state,
+        dll.city,
+        dll.state,
         COUNT(*) as count
-      FROM directory_listings
-      WHERE is_published = true
-        AND city IS NOT NULL
-        AND state IS NOT NULL
-      GROUP BY city, state
-      ORDER BY count DESC, city ASC
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      WHERE dll.is_published = true
+        AND (business_hours IS NULL OR business_hours::text != 'null')
+        AND dll.city IS NOT NULL
+        AND dll.state IS NOT NULL
+      GROUP BY dll.city, dll.state
+      ORDER BY count DESC, dll.city ASC
       LIMIT 100
     `;
 
@@ -361,52 +371,215 @@ router.get('/locations', async (req, res) => {
 });
 
 /**
- * GET /api/directory/:slug
- * Get single directory listing by slug
+ * GET /api/directory/tenant/:identifier
+ * Get directory slug by tenant identifier (tenant-id, slug, or auto-id)
  */
+router.get('/tenant/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    //console.log(`[Directory] Tenant slug request for identifier: ${identifier}`);
+
+    // Use the universal identifier resolver to get tenant ID
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      //console.log(`[Directory] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Directory] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    // Use direct database connection to avoid Prisma enum validation issues
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    
+    const query = `
+      SELECT slug
+      FROM directory_listings_list dll
+      WHERE dll.tenant_id = $1
+        AND dll.is_published = true
+      LIMIT 1
+    `;
+    
+    const result = await pool.query(query, [resolvedTenant.id]);
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'directory_listing_not_found',
+        message: 'No published directory listing found for this tenant'
+      });
+    }
+
+    return res.json({ 
+      slug: result.rows[0].slug,
+      tenantId: resolvedTenant.id,
+      identifierType: resolvedTenant.type
+    });
+  } catch (error: any) {
+    console.error('[GET /api/directory/tenant/:identifier] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_directory_slug' });
+  }
+});
+
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
+    console.log('[DIRECTORY] /:slug route hit with identifier:', slug);
 
-    const result = await prisma.$queryRaw<Array<any>>`
-      SELECT 
-        id,
-        tenantId as "tenantId",
-        business_name as "businessName",
-        slug,
-        address,
-        city,
-        state,
-        zip_code as "zipCode",
-        phone,
-        email,
-        website,
-        latitude,
-        longitude,
-        primary_category as "primaryCategory",
-        secondary_categories as "secondaryCategories",
-        logo_url as "logoUrl",
-        description,
-        business_hours as "businessHours",
-        rating_avg as "ratingAvg",
-        rating_count as "ratingCount",
-        product_count as "productCount",
-        is_featured as "isFeatured",
-        subscription_tier as "subscriptionTier",
-        use_custom_website as "useCustomWebsite",
-        map_privacy_mode as "mapPrivacyMode",
-        display_map as "displayMap"
-      FROM directory_listings
-      WHERE slug = ${slug}
-        AND is_published = true
+    // Use a direct database connection instead of Prisma raw query
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    
+    // Try both tenant_id and slug lookups - database will determine which matches
+    // This future-proofs against tenant ID format changes
+    const query = `
+      SELECT * FROM directory_listings_list 
+      WHERE (tenant_id = $1 OR slug = $1) AND is_published = true 
       LIMIT 1
     `;
+    
+    console.log('[DIRECTORY] Querying by tenant_id OR slug:', slug);
+    const result = await pool.query(query, [slug]);
+    console.log('[DIRECTORY] Query result rows:', result.rows.length);
 
-    if (result.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'listing_not_found' });
     }
 
-    return res.json(result[0]);
+    const listing = result.rows[0];
+    
+    // Transform primary_category and secondary_categories into categories array
+    const categories = [];
+    
+    if (listing.primary_category) {
+      try {
+        // Handle both string and object formats
+        let primary;
+        if (typeof listing.primary_category === 'string') {
+          try {
+            // Try to parse as JSON first
+            primary = JSON.parse(listing.primary_category);
+          } catch {
+            // If not JSON, treat as plain string (category name)
+            primary = { name: listing.primary_category };
+          }
+        } else {
+          primary = listing.primary_category;
+        }
+        
+        if (primary && primary.name) {
+          // Generate slug from name if id not present
+          const slug = primary.id 
+            ? primary.id.replace('gcid:', '').replace(/_/g, '-')
+            : primary.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+          
+          categories.push({
+            id: primary.id || `gcid:${slug}`,
+            name: primary.name,
+            slug: slug,
+            isPrimary: true
+          });
+        }
+      } catch (e) {
+        console.error('[Directory] Error parsing primary category:', e);
+      }
+    }
+    
+    if (listing.secondary_categories) {
+      try {
+        let secondary;
+        if (typeof listing.secondary_categories === 'string') {
+          try {
+            // Try to parse as JSON
+            secondary = JSON.parse(listing.secondary_categories);
+          } catch {
+            // If not JSON, wrap in array
+            secondary = [listing.secondary_categories];
+          }
+        } else {
+          secondary = listing.secondary_categories;
+        }
+        
+        if (Array.isArray(secondary)) {
+          secondary.forEach((cat: any) => {
+            // Handle both string and object formats
+            const categoryData = typeof cat === 'string' ? { name: cat } : cat;
+            
+            if (categoryData && categoryData.name) {
+              const slug = categoryData.id 
+                ? categoryData.id.replace('gcid:', '').replace(/_/g, '-')
+                : categoryData.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+              
+              categories.push({
+                id: categoryData.id || `gcid:${slug}`,
+                name: categoryData.name,
+                slug: slug,
+                isPrimary: false
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error('[Directory] Error parsing secondary categories:', e);
+      }
+    }
+    
+    // Add categories array to the response
+    listing.categories = categories;
+
+    // Transform the listing to match the expected response format
+    const transformedListing = {
+      id: listing.id,
+      tenantId: listing.tenant_id,
+      businessName: listing.business_name,
+      slug: listing.slug,
+      address: listing.address,
+      city: listing.city,
+      state: listing.state,
+      zipCode: listing.zip_code,
+      phone: listing.phone,
+      email: listing.email,
+      website: listing.website,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      primaryCategory: listing.primary_category,
+      secondaryCategories: listing.secondary_categories,
+      logoUrl: listing.logo_url,
+      description: listing.description,
+      businessHours: listing.business_hours,
+      ratingAvg: listing.rating_avg,
+      ratingCount: listing.rating_count,
+      productCount: listing.product_count,
+      isFeatured: listing.is_featured,
+      subscriptionTier: listing.subscription_tier,
+      useCustomWebsite: listing.use_custom_website,
+      isPublished: listing.is_published,
+      createdAt: listing.created_at,
+      updatedAt: listing.updated_at,
+      keywords: listing.keywords,
+      categories: categories // Add the transformed categories array
+    };
+
+    return res.json(transformedListing);
   } catch (error: any) {
     console.error('[GET /api/directory/:slug] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_listing' });

@@ -24,9 +24,9 @@ router.get('/admin/policy-history', requireAdmin, async (req, res) => {
   try {
     const { scope } = req.query;
     
-    const history = await prisma.sKUBillingPolicyHistory.findMany({
+    const history = await prisma.sku_billing_policy_histories_list.findMany({
       where: scope ? { scope: scope as string } : undefined,
-      orderBy: { effectiveFrom: 'desc' },
+      orderBy: { effective_from: 'desc' },
       take: 100,
     });
 
@@ -39,7 +39,7 @@ router.get('/admin/policy-history', requireAdmin, async (req, res) => {
 // GET /admin/policy-history/:id - Get single policy version
 router.get('/admin/policy-history/:id', requireAdmin, async (req, res) => {
   try {
-    const version = await prisma.sKUBillingPolicyHistory.findUnique({
+    const version = await prisma.sku_billing_policy_histories_list.findUnique({
       where: { id: req.params.id },
     });
 
@@ -62,13 +62,13 @@ router.post('/admin/policy-history', requireAdmin, async (req, res) => {
     const effectiveFrom = body.effectiveFrom ? new Date(body.effectiveFrom) : new Date();
     
     // Check for overlaps
-    const overlapping = await prisma.sKUBillingPolicyHistory.findFirst({
+    const overlapping = await prisma.sku_billing_policy_histories_list.findFirst({
       where: {
         scope: body.scope,
-        effectiveFrom: { lte: effectiveFrom },
+        effective_from: { lte: effectiveFrom },
         OR: [
-          { effectiveTo: null },
-          { effectiveTo: { gt: effectiveFrom } },
+          { effective_to: null },
+          { effective_to: { gt: effectiveFrom } },
         ],
       },
     });
@@ -78,7 +78,7 @@ router.post('/admin/policy-history', requireAdmin, async (req, res) => {
     }
 
     // Create new version
-    const version = await prisma.sKUBillingPolicyHistory.create({
+    const version = await prisma.sku_billing_policy_histories_list.create({
       data: {
         scope: body.scope,
         effectiveFrom,
@@ -106,10 +106,10 @@ router.patch('/admin/policy-history/:id', requireAdmin, async (req, res) => {
   try {
     const { effectiveTo, notes } = req.body;
     
-    const version = await prisma.sKUBillingPolicyHistory.update({
+    const version = await prisma.sku_billing_policy_histories_list.update({
       where: { id: req.params.id },
       data: {
-        effectiveTo: effectiveTo ? new Date(effectiveTo) : undefined,
+        effective_to: effectiveTo ? new Date(effectiveTo) : undefined,
         note: notes,
       },
     });
@@ -123,7 +123,7 @@ router.patch('/admin/policy-history/:id', requireAdmin, async (req, res) => {
 // DELETE /admin/policy-history/:id - Delete policy version
 router.delete('/admin/policy-history/:id', requireAdmin, async (req, res) => {
   try {
-    await prisma.sKUBillingPolicyHistory.delete({
+    await prisma.sku_billing_policy_histories_list.delete({
       where: { id: req.params.id },
     });
 
@@ -182,8 +182,8 @@ router.get('/admin/policy/effective', requireAdmin, async (req, res) => {
 // GET /admin/exports/policy-snapshot.json - Export policy snapshot
 router.get('/admin/exports/policy-snapshot.json', requireAdmin, async (req, res) => {
   try {
-    const history = await prisma.sKUBillingPolicyHistory.findMany({
-      orderBy: { effectiveFrom: 'desc' },
+    const history = await prisma.sku_billing_policy_histories_list.findMany({
+      orderBy: { effective_from: 'desc' },
     });
 
     const snapshot = {

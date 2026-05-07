@@ -9,6 +9,11 @@ ignoredBuiltDependencies:
   - prisma
 
 onlyBuiltDependencies:
+  - '@newrelic/fn-inspect'
+  - '@newrelic/native-metrics'
+  - '@sentry/cli'
   - '@tailwindcss/oxide'
+  - aws-sdk
+  - protobufjs
   - sharp
   - unrs-resolver

@@ -32,6 +32,9 @@ const toCamel = (str: string): string => {
 const makeBothConventionsAvailable = (obj: any): any => {
   if (obj === null || obj === undefined) return obj;
   
+  // Don't transform Date objects - they should remain as dates
+  if (obj instanceof Date) return obj;
+  
   if (Array.isArray(obj)) {
     return obj.map(makeBothConventionsAvailable);
   }
@@ -106,6 +109,10 @@ export const UNIVERSAL_FIELD_MAPPINGS = {
 const enhancedMakeBothAvailable = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
   
+  if (obj instanceof Date) {
+    return obj;
+  }
+  
   if (Array.isArray(obj)) {
     return obj.map(enhancedMakeBothAvailable);
   }
@@ -128,7 +135,7 @@ const enhancedMakeBothAvailable = (obj: any): any => {
   
   // Recursively enhance nested objects
   for (const [key, value] of Object.entries(enhanced)) {
-    if (value && typeof value === 'object') {
+    if (value && typeof value === 'object' && !(value instanceof Date)) {
       enhanced[key] = enhancedMakeBothAvailable(value);
     }
   }

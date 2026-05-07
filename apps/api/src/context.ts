@@ -5,6 +5,10 @@ import { Flags } from "./config";
 export type RequestCtx = {
   region: string;
   tenantId?: string;
+  ip?: string;
+  userAgent?: string;
+  userId?: string;
+  correlationId?: string;
 };
 
 export async function setRequestContext(req: Request, _res: Response, next: NextFunction) {

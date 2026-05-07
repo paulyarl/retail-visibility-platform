@@ -6,18 +6,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Butto
 import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
-import { api } from '@/lib/api';
+import { tenantUserService, type User } from '@/services/TenantUserService';
 
-type TenantUser = {
-  id: string;
-  email: string;
-  name: string;
-  platformRole: 'ADMIN' | 'OWNER' | 'USER';
-  tenantRole: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
-  isActive: boolean;
-  lastLogin: string;
-  addedAt: string;
-};
+
+
+type TenantUser = User;
 
 export default function TenantUsersPage() {
   const params = useParams();
@@ -51,11 +44,10 @@ export default function TenantUsersPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get(`/api/tenants/${tenantId}/users`);
-      const data = await res.json();
+      const data = await tenantUserService.getTenantUsers(tenantId);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load users');
+      if (!data) {
+        throw new Error('Failed to load users');
       }
 
       setUsers(Array.isArray(data) ? data : []);
@@ -77,15 +69,13 @@ export default function TenantUsersPage() {
       setAdding(true);
       setError(null);
 
-      const res = await api.post(`/api/tenants/${tenantId}/users`, {
+      const data = await tenantUserService.addTenantUser(tenantId, {
         email: addEmail.trim(),
         role: addRole,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to add user');
+      if (!data) {
+        throw new Error('Failed to add user');
       }
 
       setSuccess(`User ${addEmail} added successfully`);
@@ -110,14 +100,10 @@ export default function TenantUsersPage() {
       setChangingRole(true);
       setError(null);
 
-      const res = await api.put(`/api/tenants/${tenantId}/users/${selectedUser.id}`, {
-        role: newRole,
-      });
+      const data = await tenantUserService.updateTenantUserRole(tenantId, selectedUser.id, newRole);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to change role');
+      if (!data) {
+        throw new Error('Failed to change role');
       }
 
       setSuccess(`Role updated successfully`);
@@ -135,22 +121,17 @@ export default function TenantUsersPage() {
   };
 
   const handleRemoveUser = async (user: TenantUser) => {
-    if (!confirm(`Are you sure you want to remove ${user.name} from this tenant?`)) {
+    if (!confirm(`Are you sure you want to remove ${user.name || 'Unknown'} from this tenant?`)) {
       return;
     }
 
     try {
       setError(null);
-      const res = await api.delete(`/api/tenants/${tenantId}/users/${user.id}`);
+      await tenantUserService.removeTenantUser(tenantId, user.id);
 
-      if (res.status === 204 || res.ok) {
-        setSuccess(`User removed successfully`);
-        await loadUsers();
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const data = await res.json();
-        throw new Error(data.message || data.error || 'Failed to remove user');
-      }
+      setSuccess(`User removed successfully`);
+      await loadUsers();
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('[Tenant Users] Remove error:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove user');
@@ -159,7 +140,7 @@ export default function TenantUsersPage() {
 
   const openChangeRoleModal = (user: TenantUser) => {
     setSelectedUser(user);
-    setNewRole(user.tenantRole);
+    setNewRole(user.role as 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER');
     setShowRoleModal(true);
   };
 
@@ -273,18 +254,18 @@ export default function TenantUsersPage() {
                       <div className="flex items-center gap-4 flex-1">
                         <div className="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
                           <span className="text-primary-600 font-semibold text-lg">
-                            {user.name.charAt(0).toUpperCase()}
+                            {(user.name || 'Unknown').charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-neutral-900">{user.name}</p>
-                            {getRoleBadge(user.tenantRole)}
+                            <p className="font-medium text-neutral-900">{user.name || 'Unknown'}</p>
+                            {getRoleBadge(user.role)}
                             {!user.isActive && <Badge variant="default">Inactive</Badge>}
                           </div>
                           <p className="text-sm text-neutral-600">{user.email}</p>
                           <p className="text-xs text-neutral-500 mt-1">
-                            Last login: {user.lastLogin} • Added: {new Date(user.addedAt).toLocaleDateString()}
+                            Added: {new Date(user.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

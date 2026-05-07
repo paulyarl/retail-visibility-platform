@@ -2,13 +2,82 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
-import { generateQuickStartProducts } from '../lib/quick-start';
 import { validateOrganizationTier, validateOrganizationLimits, validateOrganizationTierChange } from '../middleware/organization-validation';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
+import { generateItemId, generateTenantItemId,generateOrganizationId, generatePhotoId, generateProductCatId, generateTenantId, generateUserTenantId,generateVariantId } from '../lib/id-generator';
+import { propagateVariants } from '../utils/variant-propagation';
+import { ensureGlobalCatalogEntry, hasGlobalCatalogEntry } from '../utils/global-catalog-sync';
+import { authenticateToken } from '../middleware/auth';
+import { user_tenant_role } from '@prisma/client';
+import TierService from '../services/TierService';
 
 const router = Router();
+
+/**
+ * Ensure a directory category exists for a target tenant.
+ * If the source item has a category, check if it exists for the target tenant.
+ * If not, create it based on the source category.
+ * Returns the target tenant's category ID (or null if no category).
+ */
+async function ensureCategoryForTargetTenant(
+  sourceCategoryId: string | null,
+  targetTenantId: string
+): Promise<string | null> {
+  console.log(`[organizations: sourceCategoryId] ${sourceCategoryId} `);
+  if (!sourceCategoryId) {
+    return null;
+  }
+
+  // Get the source category details
+  const sourceCategory = await prisma.directory_category.findUnique({
+    where: { id: sourceCategoryId },
+  });
+  
+  console.log(`[organizations: sourceCategoryId] ${sourceCategoryId} `);
+
+  if (!sourceCategory) {
+    console.log(`[Propagation] Source category ${sourceCategoryId} not found, skipping category assignment`);
+    return null;
+  }
+
+  // Check if a category with the same slug already exists for the target tenant
+  let targetCategory = await prisma.directory_category.findFirst({
+    where: {
+      tenantId: targetTenantId,
+      slug: sourceCategory.slug,
+    },
+  });
+  
+  console.log(`[organizations: targetCategory] ${targetCategory} `);
+
+  if (targetCategory) {
+    console.log(`[Propagation] Using existing category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
+    return targetCategory.id;
+  }
+
+  // Create a new category for the target tenant
+  targetCategory = await prisma.directory_category.create({
+    data: {
+      id: generateProductCatId(targetTenantId),
+      tenantId: targetTenantId,
+      name: sourceCategory.name,
+      slug: sourceCategory.slug,
+      parentId: sourceCategory.parentId,
+      googleCategoryId: sourceCategory.googleCategoryId,
+      isActive: true,
+      sortOrder: sourceCategory.sortOrder,
+      updatedAt: new Date(),
+    },
+  });
+  
+  console.log(`[organizations: targetCategory] ${targetCategory} :  ${sourceCategory} `);
+  
+
+  console.log(`[Propagation] Created category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
+  return targetCategory.id;
+}
 
 /**
  * Middleware to check if user can perform support actions (admin/support)
@@ -16,12 +85,29 @@ const router = Router();
  */
 function requireSupportActions(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
+  /* console.log('[requireSupportActions] Checking user:', {
+    userId: user?.userId,
+    role: user?.role,
+    tenantIds: user?.tenantIds,
+    hasUser: !!user
+  }); */
+
   if (!user || !canPerformSupportActions(user)) {
+    /* console.log('[requireSupportActions] Access denied for user:', {
+      userId: user?.userId,
+      role: user?.role,
+      canPerform: canPerformSupportActions(user)
+    }); */
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Platform admin or support access required for organization management',
     });
   }
+/* 
+  console.log('[requireSupportActions] Access granted for user:', {
+    userId: user?.userId,
+    role: user?.role
+  }); */
   next();
 }
 
@@ -41,35 +127,121 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 // GET /organizations - List all organizations
-// Permission: Platform support (view-only operation)
-router.get('/', requireSupportActions, async (req, res) => {
+// Permission: Authenticated users (filtered by access)
+// - Platform admins see all organizations
+// - Other users see only organizations where they are members
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const organizations = await prisma.organization.findMany({
-      include: {
-        Tenant: {
-          select: {
-            id: true,
-            name: true,
-            _count: {
-              select: {
-                inventoryItems: true,
+    const user = (req as any).user;
+    const isPlatformAdminUser = isPlatformAdmin(user) || canPerformSupportActions(user);
+
+    // Type for organizations with tenants included for stats
+    type TenantWithCount = { id: string; name: string; _count: { inventory_items: number } };
+    type OrgWithTenants = Awaited<ReturnType<typeof prisma.organizations_list.findMany>>[number] & {
+      tenants: TenantWithCount[];
+    };
+
+    let organizations: OrgWithTenants[];
+
+    if (isPlatformAdminUser) {
+      // Platform admins/support see all organizations
+      organizations = await prisma.organizations_list.findMany({
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              _count: {
+                select: {
+                  inventory_items: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { created_at: 'desc' },
+      });
+    } else {
+      // Regular users see only organizations where they are members
+      // Find tenants where the user is a member
+      const userTenants = await prisma.tenants.findMany({
+        where: {
+          OR: [
+            {
+              user_tenants: {
+                some: {
+                  user_id: user.userId,
+                  role: {
+                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                  }
+                }
+              }
+            },
+            {
+              created_by: user.userId
+            }
+          ]
+        },
+        select: {
+          organization_id: true
+        }
+      });
+
+      // Get unique organization IDs (filter out nulls)
+      const orgIds = [...new Set(userTenants.map(t => t.organization_id).filter((id): id is string => id !== null))];
+
+      if (orgIds.length === 0) {
+        // User is not a member of any organization
+        return res.json([]);
+      }
+
+      organizations = await prisma.organizations_list.findMany({
+        where: {
+          id: { in: orgIds }
+        },
+        include: {
+          tenants: {
+            where: {
+              OR: [
+                {
+                  user_tenants: {
+                    some: {
+                      user_id: user.userId,
+                      role: {
+                        in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                      }
+                    }
+                  }
+                },
+                {
+                  created_by: user.userId
+                }
+              ]
+            },
+            select: {
+              id: true,
+              name: true,
+              _count: {
+                select: {
+                  inventory_items: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    }
 
     // Calculate stats for each organization
     const orgsWithStats = organizations.map(org => {
-      const totalSKUs = org.Tenant.reduce((sum, t) => sum + t._count.inventoryItems, 0);
+      const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.inventory_items, 0);
       return {
         ...org,
         stats: {
-          totalLocations: org.Tenant.length,
+          totalLocations: org.tenants.length,
           totalSKUs,
-          utilizationPercent: (totalSKUs / org.maxTotalSKUs) * 100,
+          utilizationPercent: (totalSKUs / org.max_total_skus) * 100,
         },
       };
     });
@@ -87,32 +259,186 @@ router.get('/', requireSupportActions, async (req, res) => {
 });
 
 // GET /organizations/:id - Get single organization
-// Permission: Platform support (view-only operation)
-router.get('/:id', requireSupportActions, async (req, res) => {
+// Permission: Organization members can read their own organization data
+// Supports both organization IDs and tenant IDs (with fallback)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const organization = await prisma.organization.findUnique({
-      where: { id: req.params.id },
+    const user = (req as any).user;
+    const id = req.params.id;
+    
+    let organization = null;
+    let isTenantLookup = false;
+
+    // First try to find as organization ID (traditional approach)
+    organization = await prisma.organizations_list.findUnique({
+      where: { id: id },
       include: {
-        Tenant: {
+        tenants: true
+      }
+    });
+
+    // If not found as organization, try as tenant ID
+    if (!organization) {
+      isTenantLookup = true;
+      
+      // Platform admins can access any tenant's organization
+      if (!isPlatformAdmin(user)) {
+        // For non-admin users, verify access to this tenant
+        const tenant = await prisma.tenants.findFirst({
+          where: {
+            id: id,
+            OR: [
+              {
+                user_tenants: {
+                  some: {
+                    user_id: user.userId,
+                    role: {
+                      in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                    }
+                  }
+                }
+              },
+              {
+                created_by: user.userId
+              }
+            ]
+          },
           select: {
             id: true,
             name: true,
-            metadata: true,
-            _count: {
-              select: {
-                inventoryItems: true,
-              },
-            },
-          },
-        },
-      },
-    });
+            organization_id: true
+          }
+        });
 
-    if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+        if (!tenant) {
+          return res.status(404).json({ 
+            error: 'not_found',
+            message: 'Organization or tenant not found, or access denied' 
+          });
+        }
+
+        // If tenant has no organization, return appropriate response
+        if (!tenant.organization_id) {
+          return res.json({
+            message: 'Tenant is not part of an organization',
+            tenant: {
+              id: tenant.id,
+              name: tenant.name
+            },
+            organization: null
+          });
+        }
+
+        // Get the organization using the tenant's organization_id
+        organization = await prisma.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          include: {
+            tenants: {
+              where: {
+                user_tenants: {
+                  some: {
+                    user_id: user.userId,
+                    role: {
+                      in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+      } else {
+        // Platform admin: get tenant directly and lookup organization
+        const tenant = await prisma.tenants.findFirst({
+          where: { id: id },
+          select: {
+            id: true,
+            name: true,
+            organization_id: true
+          }
+        });
+
+        if (!tenant) {
+          return res.status(404).json({ 
+            error: 'not_found',
+            message: 'Tenant not found' 
+          });
+        }
+
+        // If tenant has no organization, return appropriate response
+        if (!tenant.organization_id) {
+          return res.json({
+            message: 'Tenant is not part of an organization',
+            tenant: {
+              id: tenant.id,
+              name: tenant.name
+            },
+            organization: null
+          });
+        }
+
+        // Get the organization using the tenant's organization_id (no access restrictions for admins)
+        organization = await prisma.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          include: {
+            tenants: true // Include all tenants for platform admin
+          }
+        });
+      }
     }
 
-    res.json(organization);
+    if (!organization) {
+      return res.status(404).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
+    }
+
+    // Verify user access (skip for tenant lookup since we already verified)
+    if (!isTenantLookup) {
+      // Verify user is a member of this organization
+      const userTenants = await prisma.tenants.findMany({
+        where: {
+          organization_id: organization.id,
+          user_tenants: {
+            some: {
+              user_id: user.userId,
+              role: {
+                in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+              }
+            }
+          }
+        },
+        select: { id: true }
+      });
+
+      // Also check if user created any tenants in this organization
+      const userCreatedTenants = await prisma.tenants.findMany({
+        where: {
+          organization_id: organization.id,
+          created_by: user.userId
+        },
+        select: { id: true }
+      });
+
+      if (userTenants.length === 0 && userCreatedTenants.length === 0 && !isPlatformAdmin(user)) {
+        return res.status(403).json({ 
+          error: 'Forbidden', 
+          message: 'You must be a member of this organization to view its data' 
+        });
+      }
+    }
+
+    // Add context about how the organization was found
+    const response = {
+      ...organization,
+      _lookup: {
+        type: isTenantLookup ? 'tenant_id' : 'organization_id',
+        originalId: id
+      }
+    };
+
+    res.json(response);
   } catch (error: any) {
     // If the database is temporarily unreachable (e.g., Supabase paused), return a helpful error
     if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {
@@ -128,7 +454,7 @@ router.get('/:id', requireSupportActions, async (req, res) => {
 const createOrgSchema = z.object({
   name: z.string().min(1),
   ownerId: z.string().min(1).optional(), // Optional - defaults to authenticated user
-  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).default('chain_starter'),
+  subscriptionTier: z.string().min(1).default('chain_starter'), // Validated by middleware against database
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).default('trial'),
   maxLocations: z.number().int().positive().default(5),
   maxTotalSKUs: z.number().int().positive().default(2500),
@@ -150,17 +476,17 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
       return res.status(400).json({ error: 'owner_id_required', message: 'ownerId must be provided or user must be authenticated' });
     }
 
-    const organization = await prisma.organization.create({
+    const organization = await prisma.organizations_list.create({
       data: {
-        id: crypto.randomUUID(),
+        id: generateOrganizationId(ownerId),
         name: parsed.data.name,
-        ownerId,
-        subscriptionTier: parsed.data.subscriptionTier,
-        subscriptionStatus: parsed.data.subscriptionStatus,
-        maxLocations: parsed.data.maxLocations,
-        maxTotalSKUs: parsed.data.maxTotalSKUs,
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        updatedAt: new Date(),
+        owner_id: ownerId,
+        subscription_tier: parsed.data.subscriptionTier,
+        subscription_status: parsed.data.subscriptionStatus,
+        max_locations: parsed.data.maxLocations,
+        max_total_skus: parsed.data.maxTotalSKUs,
+        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        updated_at: new Date(),
       },
     });
 
@@ -175,9 +501,13 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
 const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
   maxLocations: z.number().int().positive().optional(),
+  max_locations: z.number().int().positive().optional(),
   maxTotalSKUs: z.number().int().positive().optional(),
-  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
+  max_total_skus: z.number().int().positive().optional(),
+  subscriptionTier: z.string().min(1).optional(), // Validated by middleware against database
+  subscription_tier: z.string().min(1).optional(), // Validated by middleware against database
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
+  subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
 });
 
 // PUT /organizations/:id - Update organization
@@ -189,9 +519,18 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const organization = await prisma.organization.update({
+    // Transform camelCase input to snake_case for Prisma
+    const updateData: any = {};
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.maxLocations !== undefined) updateData.max_locations = parsed.data.maxLocations;
+    if (parsed.data.maxTotalSKUs !== undefined) updateData.max_total_skus = parsed.data.maxTotalSKUs;
+    if (parsed.data.subscriptionTier !== undefined) updateData.subscription_tier = parsed.data.subscriptionTier;
+    if (parsed.data.subscriptionStatus !== undefined) updateData.subscription_status = parsed.data.subscriptionStatus;
+    updateData.updated_at = new Date();
+
+    const organization = await prisma.organizations_list.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: updateData,
     });
 
     res.json(organization);
@@ -201,18 +540,73 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
   }
 });
 
+// PUT /organizations/:id/self-update - Update own organization
+// Permission: Organization owner can update their own organization settings
+router.put('/:id/self-update', authenticateToken, async (req, res) => {
+  try {
+    const parsed = updateOrgSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    // Verify user owns this organization
+    const organization = await prisma.organizations_list.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found', message: 'Organization not found' });
+    }
+
+    // Check if user is the owner or a platform admin
+    const userId = req.user?.userId || req.user?.user_id;
+    const isOwner = organization.owner_id === userId;
+    const isPlatformAdmin = req.user?.role === 'PLATFORM_ADMIN' || req.user?.role === 'ADMIN';
+
+    if (!isOwner && !isPlatformAdmin) {
+      return res.status(403).json({ 
+        error: 'access_denied', 
+        message: 'Only organization owners can update organization settings' 
+      });
+    }
+
+    // Transform camelCase input to snake_case for Prisma
+    const updateData: any = {};
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.maxLocations !== undefined) updateData.max_locations = parsed.data.maxLocations;
+    if (parsed.data.max_locations !== undefined) updateData.max_locations = parsed.data.max_locations;
+    if (parsed.data.maxTotalSKUs !== undefined) updateData.max_total_skus = parsed.data.maxTotalSKUs;
+    if (parsed.data.max_total_skus !== undefined) updateData.max_total_skus = parsed.data.max_total_skus;
+    if (parsed.data.subscriptionTier !== undefined) updateData.subscription_tier = parsed.data.subscriptionTier;
+    if (parsed.data.subscription_tier !== undefined) updateData.subscription_tier = parsed.data.subscription_tier;
+    if (parsed.data.subscriptionStatus !== undefined) updateData.subscription_status = parsed.data.subscriptionStatus;
+    if (parsed.data.subscription_status !== undefined) updateData.subscription_status = parsed.data.subscription_status;
+    updateData.updated_at = new Date();
+
+    const updatedOrganization = await prisma.organizations_list.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    res.json(updatedOrganization);
+  } catch (error: any) {
+    console.error('[Organizations] Self-update error:', error);
+    res.status(500).json({ error: 'failed_to_update_organization' });
+  }
+});
+
 // DELETE /organizations/:id - Delete organization
 // Permission: Platform admin only (destructive operation)
 router.delete('/:id', requirePlatformAdmin, async (req, res) => {
   try {
     // First, unlink all tenants from this organization
-    await prisma.tenant.updateMany({
-      where: { organizationId: req.params.id },
-      data: { organizationId: null },
+    await prisma.tenants.updateMany({
+      where: { organization_id: req.params.id },
+      data: { organization_id: null},
     });
 
     // Then delete the organization
-    await prisma.organization.delete({
+    await prisma.organizations_list.delete({
       where: { id: req.params.id },
     });
 
@@ -237,10 +631,10 @@ router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: parsed.data.tenantId },
       data: {
-        organization: {
+        organizations_list: {
           connect: { id: req.params.id },
         },
       },
@@ -257,9 +651,9 @@ router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
 // Permission: Platform admin only (modifies org structure)
 router.delete('/:id/tenants/:tenantId', requirePlatformAdmin, async (req, res) => {
   try {
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: req.params.tenantId },
-      data: { organizationId: null },
+      data: { organization_id: null },
     });
 
     res.json(tenant);
@@ -284,7 +678,7 @@ const propagateSchema = z.object({
 
 // POST /organizations/:id/items/propagate - Propagate item to tenants
 // Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
+router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -293,22 +687,71 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
 
     const { sourceItemId, targetTenantIds, mode, overrides } = parsed.data;
 
-    // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    // Verify organization exists and get tier info
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: {
+        tenants: {
           select: { id: true },
         },
       },
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
+    }
+
+    // Check if organization has required tier for propagation (dynamic validation)
+    const orgTier = organization.subscription_tier || 'chain_starter';
+    const minTierForPropagation = await TierService.getMinimumTierForFeature('propagation');
+    if (!minTierForPropagation) {
+      return res.status(403).json({
+        error: 'feature_not_available',
+        message: 'Propagation feature is not available in current configuration',
+        currentTier: orgTier
+      });
+    }
+
+    // Get all valid tiers and check if current tier meets or exceeds minimum requirement
+    const allTiers = await TierService.getAllTiers();
+    const validTiers = allTiers
+      .filter(tier => tier.is_active)
+      .map(tier => tier.tier_key)
+      .filter(tierKey => {
+        // Check if this tier is equal to or higher than the minimum tier
+        const tier = allTiers.find(t => t.tier_key === tierKey);
+        const minTier = allTiers.find(t => t.tier_key === minTierForPropagation);
+        if (!minTier) return false;
+        
+        // Compare by sort_order (lower number = higher tier)
+        return (tier?.sort_order || 999) <= (minTier?.sort_order || 999);
+      });
+
+    if (!validTiers.includes(orgTier)) {
+      return res.status(403).json({
+        error: 'insufficient_tier',
+        message: `Propagation requires ${minTierForPropagation} tier or higher`,
+        currentTier: orgTier,
+        minimumTier: minTierForPropagation,
+        availableTiers: validTiers
+      });
+    }
+
+    // Check if organization has 2+ locations
+    if (organization.tenants.length < 2) {
+      return res.status(403).json({
+        error: 'insufficient_locations',
+        message: 'Propagation requires 2 or more locations',
+        currentLocations: organization.tenants.length,
+        requiredLocations: 2
+      });
     }
 
     // Verify all target tenants belong to this organization
-    const orgTenantIds = organization.Tenant.map(t => t.id);
+    const orgTenantIds = organization.tenants.map(t => t.id);
     const invalidTenants = targetTenantIds.filter(id => !orgTenantIds.includes(id));
     if (invalidTenants.length > 0) {
       return res.status(400).json({ 
@@ -318,20 +761,31 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
       });
     }
 
-    // Get source item
-    const sourceItem = await prisma.InventoryItem.findUnique({
+    // Get source item with slug registry
+    const sourceItem = await prisma.inventory_items.findUnique({
       where: { id: sourceItemId },
       include: {
-        photoAsset: true,
+        photo_assets: true,
       },
     });
 
+    // Get source item's slug registry entry if exists
+    const sourceSlugRegistry = sourceItem ? await prisma.product_slug_registry.findFirst({
+      where: {
+        tenant_id: sourceItem.tenant_id,
+        original_sku: sourceItem.sku,
+      },
+    }) : null;
+
     if (!sourceItem) {
-      return res.status(404).json({ error: 'source_item_not_found' });
+      return res.status(400).json({ 
+        error: 'source_item_not_found',
+        message: 'Source item not found'
+      });
     }
 
     // Verify source item's tenant is in this organization
-    if (!orgTenantIds.includes(sourceItem.tenantId)) {
+    if (!orgTenantIds.includes(sourceItem.tenant_id)) {
       return res.status(400).json({ 
         error: 'source_item_not_in_organization',
         message: 'Source item does not belong to this organization',
@@ -349,72 +803,130 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     for (const tenantId of targetTenantIds) {
       try {
         // Skip if it's the source tenant
-        if (tenantId === sourceItem.tenantId) {
+        if (tenantId === sourceItem.tenant_id) {
           results.skipped.push({ tenantId, reason: 'source_tenant' });
           continue;
         }
 
         // Check if SKU already exists for this tenant
-        const existing = await prisma.InventoryItem.findFirst({
+        const existing = await prisma.inventory_items.findFirst({
           where: {
-            tenantId,
+            tenant_id: tenantId,
             sku: sourceItem.sku,
           },
         });
 
         // Handle based on mode
         if (existing) {
+          console.log(`[Organizations] Found existing item: ${existing.id}, has_variants=${existing.has_variants}, sku=${existing.sku}`);
+          console.log(`[Organizations] Source item has_variants=${sourceItem.has_variants} vs existing has_variants=${existing.has_variants}`);
           if (mode === 'create_only') {
             results.skipped.push({ tenantId, reason: 'sku_already_exists' });
             continue;
           }
           
+          // Ensure category exists for target tenant before updating
+          const targetCategoryId = await ensureCategoryForTargetTenant(
+            sourceItem.directory_category_id,
+            tenantId
+          );
+          
           // Update mode - update existing item
-          const updatedItem = await prisma.InventoryItem.update({
+          const updatedItem = await prisma.inventory_items.update({
             where: { id: existing.id },
             data: {
               name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+              price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
               stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl, 
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
+              image_url: sourceItem.image_url, 
               metadata: sourceItem.metadata as any,
+              marketing_description: sourceItem.marketing_description,
+              image_gallery: sourceItem.image_gallery,
+              custom_cta: sourceItem.custom_cta as any,
+              social_links: sourceItem.social_links as any,
+              custom_branding: sourceItem.custom_branding as any,
+              custom_sections: sourceItem.custom_sections as any,
+              landing_page_theme: sourceItem.landing_page_theme,
+              audit_log_id: sourceItem.audit_log_id,
               availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
+              brand: sourceItem.brand,
+              category_path: sourceItem.category_path,
+              directory_category_id: targetCategoryId,
               condition: sourceItem.condition,
               currency: sourceItem.currency,
+              description: sourceItem.description,
+              eligibility_reason: sourceItem.eligibility_reason,
               gtin: sourceItem.gtin,
-              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+              item_status: overrides?.itemStatus || sourceItem.item_status,
+              location_id: sourceItem.location_id,
+              merchant_name: sourceItem.merchant_name,
               mpn: sourceItem.mpn,
+              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+              sync_status: sourceItem.sync_status,
+              synced_at: sourceItem.synced_at,
+              title: sourceItem.title,
               visibility: overrides?.visibility || sourceItem.visibility,
               manufacturer: sourceItem.manufacturer,
               source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
+              enrichment_status: sourceItem.enrichment_status,
+              enriched_at: sourceItem.enriched_at,
+              enriched_by: sourceItem.enriched_by,
+              enriched_from_barcode: sourceItem.enriched_from_barcode,
+              missing_images: sourceItem.missing_images,
+              missing_description: sourceItem.missing_description,
+              missing_specs: sourceItem.missing_specs,
+              missing_brand: sourceItem.missing_brand,
+              sale_price_cents: sourceItem.sale_price_cents,
+              payment_gateway_type: sourceItem.payment_gateway_type,
+              payment_gateway_id: sourceItem.payment_gateway_id,
+              product_type: sourceItem.product_type,
+              digital_delivery_method: sourceItem.digital_delivery_method,
+              digital_assets: sourceItem.digital_assets as any,
+              access_duration_days: sourceItem.access_duration_days,
+              download_limit: sourceItem.download_limit,
+              license_type: sourceItem.license_type,
+              has_variants: sourceItem.has_variants,
+              is_featured: sourceItem.is_featured,
+              featured_at: sourceItem.featured_at,
+              featured_until: sourceItem.featured_until,
+              featured_priority: sourceItem.featured_priority,
+              featured_type: sourceItem.featured_type,
             },
           });
 
+          // Update slug registry entry if exists
+          if (sourceSlugRegistry) {
+            await prisma.product_slug_registry.upsert({
+              where: {
+                product_slug: sourceSlugRegistry.product_slug,
+              },
+              update: {
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+              },
+              create: {
+                id: `psr-${generateTenantItemId(tenantId)}`,
+                product_slug: sourceSlugRegistry.product_slug,
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+                created_at: new Date(),
+              },
+            });
+          }
+
           // Delete old photos and copy new ones
-          await prisma.photoAsset.deleteMany({
+          await prisma.photo_assets.deleteMany({
             where: { inventoryItemId: existing.id },
           });
 
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-                tenantId,
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                id: generatePhotoId(tenantId,updatedItem.id),
+                tenantId: tenantId,
                 inventoryItemId: updatedItem.id,
                 url: photo.url,
                 width: photo.width,
@@ -428,6 +940,100 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
             });
           }
 
+          // Ensure global catalog entry exists for availability system
+          try {
+            const hasGlobalEntry = await hasGlobalCatalogEntry(sourceItem.sku);
+            if (!hasGlobalEntry) {
+              console.log(`[Organizations] Creating global catalog entry for SKU: ${sourceItem.sku}`);
+              
+              // Fetch variants if source item has them
+              let variants: Array<{
+                sku: string;
+                variant_name: string;
+                price_cents: number | null;
+                attributes: Record<string, any> | null;
+              }> = [];
+              if (sourceItem.has_variants) {
+                const rawVariants = await prisma.product_variants.findMany({
+                  where: { parent_item_id: sourceItem.id },
+                  select: {
+                    sku: true,
+                    variant_name: true,
+                    price_cents: true,
+                    attributes: true
+                  },
+                  orderBy: [
+                    { sort_order: 'asc' },
+                    { created_at: 'asc' }
+                  ]
+                });
+                  
+                // Cast JsonValue to expected type
+                variants = rawVariants.map(v => ({
+                  sku: v.sku,
+                  variant_name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || null
+                }));
+              }
+              
+              await ensureGlobalCatalogEntry({
+                id: existing.id,
+                tenant_id: tenantId,
+                sku: sourceItem.sku,
+                name: sourceItem.name,
+                description: sourceItem.description || undefined,
+                brand: sourceItem.brand || undefined,
+                category_path: sourceItem.category_path || undefined,
+                gtin: sourceItem.gtin || undefined,
+                price_cents: sourceItem.price_cents || undefined,
+                image_url: sourceItem.image_url || undefined,
+                has_variants: sourceItem.has_variants || false,
+                variants: variants.map(v => ({
+                  sku: v.sku,
+                  name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || {}
+                }))
+              });
+              console.log(`[Organizations] Global catalog entry created for SKU: ${sourceItem.sku} with ${variants.length} variants`);
+            } else {
+              console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
+            }
+          } catch (error) {
+            console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+            // Don't fail the propagation, just log the error
+          }
+
+          // Propagate variants if source item has them
+          if (sourceItem.has_variants) {
+            console.log(`[Organizations] UPDATE MODE: Propagating variants for source ${sourceItem.id} -> existing ${existing.id} (tenant: ${tenantId})`);
+            console.log(`[Organizations] UPDATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+            console.log(`[Organizations] UPDATE MODE: Existing parent item ID: ${existing.id}`);
+            
+            const variantResult = await propagateVariants(
+              sourceItem.id,
+              tenantId,
+              undefined, // newItemId is not provided for update mode
+              existing.id,
+              sourceItem.directory_category_id,
+              'update'
+            );
+            
+            console.log(`[Organizations] UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+            
+            if (variantResult.errors.length > 0) {
+              console.error(`[Organizations] Variant propagation errors for ${updatedItem.id}:`, variantResult.errors);
+            }
+            
+            // Verify the parent item still has has_variants set correctly after update
+            const verifyParent = await prisma.inventory_items.findUnique({
+              where: { id: existing.id },
+              select: { id: true, has_variants: true, sku: true }
+            });
+            console.log(`[Organizations] UPDATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
+          }
+
           results.updated.push(tenantId);
           continue;
         }
@@ -438,51 +1044,109 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
           continue;
         }
 
+        // Ensure category exists for target tenant before creating
+        const targetCategoryId = await ensureCategoryForTargetTenant(
+          sourceItem.directory_category_id,
+          tenantId
+        );
+
         // Create mode - create new item
-        const newItem = await prisma.InventoryItem.create({
+        const newItem = await prisma.inventory_items.create({
           data: {
-            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            updatedAt: new Date(),
-            tenantId,
+            id: generateTenantItemId(tenantId),
+            tenant_id: tenantId,
             sku: sourceItem.sku,
             name: sourceItem.name,
-            title: sourceItem.title,
-            brand: sourceItem.brand,
-            description: sourceItem.description,
-            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-            priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
+            price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
             stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-            imageUrl: sourceItem.imageUrl,
-            imageGallery: sourceItem.imageGallery,
-            marketingDescription: sourceItem.marketingDescription,
+            image_url: sourceItem.image_url,
             metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
             availability: sourceItem.availability,
-            categoryPath: sourceItem.categoryPath,
+            brand: sourceItem.brand,
+            category_path: sourceItem.category_path,
+            directory_category_id: targetCategoryId,            
             condition: sourceItem.condition,
             currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
             gtin: sourceItem.gtin,
-            itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
+            item_status: overrides?.itemStatus || sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
             mpn: sourceItem.mpn,
+            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
             visibility: overrides?.visibility || sourceItem.visibility,
             manufacturer: sourceItem.manufacturer,
             source: sourceItem.source,
-            enrichmentStatus: sourceItem.enrichmentStatus,
-            enrichedAt: sourceItem.enrichedAt,
-            enrichedBy: sourceItem.enrichedBy,
-            enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-            missingImages: sourceItem.missingImages,
-            missingDescription: sourceItem.missingDescription,
-            missingSpecs: sourceItem.missingSpecs,
-            missingBrand: sourceItem.missingBrand,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
+            sale_price_cents: sourceItem.sale_price_cents,
+            payment_gateway_type: sourceItem.payment_gateway_type,
+            payment_gateway_id: sourceItem.payment_gateway_id,
+            product_type: sourceItem.product_type,
+            digital_delivery_method: sourceItem.digital_delivery_method,
+            digital_assets: sourceItem.digital_assets as any,
+            access_duration_days: sourceItem.access_duration_days,
+            download_limit: sourceItem.download_limit,
+            license_type: sourceItem.license_type,
+            has_variants: sourceItem.has_variants,
+            is_featured: sourceItem.is_featured,
+            featured_at: sourceItem.featured_at,
+            featured_until: sourceItem.featured_until,
+            featured_priority: sourceItem.featured_priority,
+            featured_type: sourceItem.featured_type,
           },
         });
 
+        // Create slug registry entry if source has one
+        if (sourceSlugRegistry) {
+          await prisma.product_slug_registry.upsert({
+            where: {
+              product_slug: sourceSlugRegistry.product_slug,
+            },
+            update: {
+              universal_sku: sourceSlugRegistry.universal_sku,
+              slug_hash: sourceSlugRegistry.slug_hash,
+              tenant_id: tenantId,
+              original_sku: sourceItem.sku,
+            },
+            create: {
+              id: `psr-${generateTenantItemId(tenantId)}`,
+              product_slug: sourceSlugRegistry.product_slug,
+              universal_sku: sourceSlugRegistry.universal_sku,
+              slug_hash: sourceSlugRegistry.slug_hash,
+              tenant_id: tenantId,
+              original_sku: sourceItem.sku,
+              created_at: new Date(),
+            },
+          });
+        }
+
         // Copy photos if any
-        if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-          await prisma.photoAsset.createMany({
-            data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-              tenantId,
+        if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+          await prisma.photo_assets.createMany({
+            data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+              id: generatePhotoId(tenantId,newItem.id),
+              tenantId: tenantId,
               inventoryItemId: newItem.id,
               url: photo.url,
               width: photo.width,
@@ -494,6 +1158,35 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
               caption: photo.caption,
             })),
           });
+        }
+
+        // Propagate variants if source item has them
+        if (sourceItem.has_variants) {
+          console.log(`[Organizations] Propagating variants for source ${sourceItem.id} -> target ${newItem.id} (tenant: ${tenantId})`);
+          console.log(`[Organizations] Source item has_variants: ${sourceItem.has_variants}`);
+          console.log(`[Organizations] Target parent item ID: ${newItem.id}`);
+          
+          const variantResult = await propagateVariants(
+            sourceItem.id,
+            tenantId,
+            newItem.id,
+            undefined, // newItemId is provided for create mode
+            sourceItem.directory_category_id,
+            'create'
+          );
+          
+          console.log(`[Organizations] Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+          
+          if (variantResult.errors.length > 0) {
+            console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+          }
+          
+          // Verify the parent item still has has_variants set correctly
+          const verifyParent = await prisma.inventory_items.findUnique({
+            where: { id: newItem.id },
+            select: { id: true, has_variants: true, sku: true }
+          });
+          console.log(`[Organizations] Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
         }
 
         results.created.push(tenantId);
@@ -525,6 +1218,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
 const propagateBulkSchema = z.object({
   sourceItemIds: z.array(z.string()).min(1),
   targetTenantIds: z.array(z.string()).min(1),
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_only'),
   overrides: z.object({
     price: z.number().optional(),
     stock: z.number().int().optional(),
@@ -534,32 +1228,81 @@ const propagateBulkSchema = z.object({
 });
 
 // POST /organizations/:id/items/propagate-bulk - Bulk propagate items
-// Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
+// Permission: Authenticated user with propagation rights (tier validation done inline)
+router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const { sourceItemIds, targetTenantIds, overrides } = parsed.data;
+    const { sourceItemIds, targetTenantIds, mode, overrides } = parsed.data;
 
-    // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    // Verify organization exists and get tier info
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: {
+        tenants: {
           select: { id: true },
         },
       },
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
+    }
+
+    // Check if organization has required tier for propagation (dynamic validation)
+    const orgTier = organization.subscription_tier || 'chain_starter';
+    const minTierForPropagation = await TierService.getMinimumTierForFeature('propagation');
+    if (!minTierForPropagation) {
+      return res.status(403).json({
+        error: 'feature_not_available',
+        message: 'Propagation feature is not available in current configuration',
+        currentTier: orgTier
+      });
+    }
+
+    // Get all valid tiers and check if current tier meets or exceeds minimum requirement
+    const allTiers = await TierService.getAllTiers();
+    const validTiers = allTiers
+      .filter(tier => tier.is_active)
+      .map(tier => tier.tier_key)
+      .filter(tierKey => {
+        // Check if this tier is equal to or higher than the minimum tier
+        const tier = allTiers.find(t => t.tier_key === tierKey);
+        const minTier = allTiers.find(t => t.tier_key === minTierForPropagation);
+        if (!minTier) return false;
+        
+        // Compare by sort_order (lower number = higher tier)
+        return (tier?.sort_order || 999) <= (minTier?.sort_order || 999);
+      });
+
+    if (!validTiers.includes(orgTier)) {
+      return res.status(403).json({
+        error: 'insufficient_tier',
+        message: `Propagation requires ${minTierForPropagation} tier or higher`,
+        currentTier: orgTier,
+        minimumTier: minTierForPropagation,
+        availableTiers: validTiers
+      });
+    }
+
+    // Check if organization has 2+ locations
+    if (organization.tenants.length < 2) {
+      return res.status(403).json({
+        error: 'insufficient_locations',
+        message: 'Propagation requires 2 or more locations',
+        currentLocations: organization.tenants.length,
+        requiredLocations: 2
+      });
     }
 
     // Verify all target tenants belong to this organization
-    const orgTenantIds = organization.Tenant.map(t => t.id);
+    const orgTenantIds = organization.tenants.map(t => t.id);
     const invalidTenants = targetTenantIds.filter(id => !orgTenantIds.includes(id));
     if (invalidTenants.length > 0) {
       return res.status(400).json({ 
@@ -570,21 +1313,109 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     }
 
     // Get all source items
-    const sourceItems = await prisma.InventoryItem.findMany({
+    const sourceItems = await prisma.inventory_items.findMany({
       where: { 
         id: { in: sourceItemIds },
       },
-      include: {
-        photoAsset: true,
+      select: {
+        id: true,
+        tenant_id: true,
+        sku: true,
+        name: true,
+        price_cents: true,
+        stock: true,
+        image_url: true,
+        metadata: true,
+        marketing_description: true,
+        image_gallery: true,
+        custom_cta: true,
+        social_links: true,
+        custom_branding: true,
+        custom_sections: true,
+        landing_page_theme: true,
+        audit_log_id: true,
+        availability: true,
+        brand: true,
+        category_path: true,
+        directory_category_id: true,
+        condition: true,
+        currency: true,
+        description: true,
+        eligibility_reason: true,
+        gtin: true,
+        item_status: true,
+        location_id: true,
+        merchant_name: true,
+        mpn: true,
+        price: true,
+        quantity: true,
+        sync_status: true,
+        synced_at: true,
+        title: true,
+        visibility: true,
+        manufacturer: true,
+        source: true,
+        enrichment_status: true,
+        enriched_at: true,
+        enriched_by: true,
+        enriched_from_barcode: true,
+        missing_images: true,
+        missing_description: true,
+        missing_specs: true,
+        missing_brand: true,
+        sale_price_cents: true,
+        payment_gateway_type: true,
+        payment_gateway_id: true,
+        product_type: true,
+        digital_delivery_method: true,
+        digital_assets: true,
+        access_duration_days: true,
+        download_limit: true,
+        license_type: true,
+        has_variants: true,
+        is_featured: true,
+        featured_at: true,
+        featured_until: true,
+        featured_priority: true,
+        featured_type: true,
+        photo_assets: {
+          select: {
+            id: true,
+            url: true,
+            width: true,
+            height: true,
+            contentType: true,
+            bytes: true,
+            position: true,
+            alt: true,
+            caption: true,
+          },
+        },
       },
     });
 
+    // Get all source slug registry entries
+    const sourceSlugRegistries = await prisma.product_slug_registry.findMany({
+      where: {
+        tenant_id: { in: sourceItems.map(item => item.tenant_id) },
+        original_sku: { in: sourceItems.map(item => item.sku) },
+      },
+    });
+
+    // Create a map for quick lookup
+    const slugRegistryMap = new Map(
+      sourceSlugRegistries.map(registry => [`${registry.tenant_id}-${registry.original_sku}`, registry])
+    );
+
     if (sourceItems.length === 0) {
-      return res.status(404).json({ error: 'no_source_items_found' });
+      return res.status(400).json({ 
+        error: 'no_source_items_found',
+        message: 'No source items found'
+      });
     }
 
     // Verify all source items belong to this organization
-    const invalidSourceItems = sourceItems.filter(item => !orgTenantIds.includes(item.tenantId));
+    const invalidSourceItems = sourceItems.filter(item => !orgTenantIds.includes(item.tenant_id));
     if (invalidSourceItems.length > 0) {
       return res.status(400).json({ 
         error: 'source_items_not_in_organization',
@@ -595,6 +1426,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     // Propagate each item to each target tenant
     const results = {
       created: [] as Array<{ item_id: string; tenantId: string; sku: string }>,
+      updated: [] as Array<{ item_id: string; tenantId: string; sku: string }>,
       skipped: [] as Array<{ item_id: string; tenantId: string; sku: string; reason: string }>,
       errors: [] as Array<{ item_id: string; tenantId: string; sku: string; error: string }>,
     };
@@ -603,7 +1435,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
       for (const tenantId of targetTenantIds) {
         try {
           // Skip if it's the source tenant
-          if (tenantId === sourceItem.tenantId) {
+          if (tenantId === sourceItem.tenant_id) {
             results.skipped.push({ 
               item_id: sourceItem.id, 
               tenantId, 
@@ -614,66 +1446,359 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
           }
 
           // Check if SKU already exists for this tenant
-          const existing = await prisma.InventoryItem.findFirst({
+          const existing = await prisma.inventory_items.findFirst({
             where: {
-              tenantId,
+              tenant_id: tenantId,
               sku: sourceItem.sku,
             },
           });
 
+          // Handle based on mode
           if (existing) {
-            results.skipped.push({ 
+            if (mode === 'create_only') {
+              results.skipped.push({ 
+                item_id: sourceItem.id, 
+                tenantId, 
+                sku: sourceItem.sku,
+                reason: 'sku_already_exists' 
+              });
+              continue;
+            }
+            
+            // Ensure category exists for target tenant before updating
+            const targetCategoryId = await ensureCategoryForTargetTenant(
+              sourceItem.directory_category_id,
+              tenantId
+            );
+
+            // Update slug registry entry if exists
+            const sourceSlugRegistry = slugRegistryMap.get(`${sourceItem.tenant_id}-${sourceItem.sku}`);
+            if (sourceSlugRegistry) {
+              await prisma.product_slug_registry.upsert({
+                where: {
+                  product_slug: sourceSlugRegistry.product_slug,
+                },
+                update: {
+                  tenant_id: tenantId,
+                  original_sku: sourceItem.sku,
+                },
+                create: {
+                  id: `psr-${generateTenantItemId(tenantId)}`,
+                  product_slug: sourceSlugRegistry.product_slug,
+                  universal_sku: sourceSlugRegistry.universal_sku,
+                  slug_hash: sourceSlugRegistry.slug_hash,
+                  tenant_id: tenantId,
+                  original_sku: sourceItem.sku,
+                  created_at: new Date(),
+                },
+              });
+            }
+            
+            // Update mode - update existing item
+            const updatedItem = await prisma.inventory_items.update({
+              where: { id: existing.id },
+              data: {
+                name: sourceItem.name,
+                price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
+                stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+                image_url: sourceItem.image_url, 
+                metadata: sourceItem.metadata as any,
+                marketing_description: sourceItem.marketing_description,
+                image_gallery: sourceItem.image_gallery,
+                custom_cta: sourceItem.custom_cta as any,
+                social_links: sourceItem.social_links as any,
+                custom_branding: sourceItem.custom_branding as any,
+                custom_sections: sourceItem.custom_sections as any,
+                landing_page_theme: sourceItem.landing_page_theme,
+                audit_log_id: sourceItem.audit_log_id,
+                availability: sourceItem.availability,
+                brand: sourceItem.brand,
+                category_path: sourceItem.category_path,
+                directory_category_id: targetCategoryId,
+                condition: sourceItem.condition,
+                currency: sourceItem.currency,
+                description: sourceItem.description,
+                eligibility_reason: sourceItem.eligibility_reason,
+                gtin: sourceItem.gtin,
+                item_status: overrides?.itemStatus || sourceItem.item_status,
+                location_id: sourceItem.location_id,
+                merchant_name: sourceItem.merchant_name,
+                mpn: sourceItem.mpn,
+                price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+                quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+                sync_status: sourceItem.sync_status,
+                synced_at: sourceItem.synced_at,
+                title: sourceItem.title,
+                visibility: overrides?.visibility || sourceItem.visibility,
+                manufacturer: sourceItem.manufacturer,
+                source: sourceItem.source,
+                enrichment_status: sourceItem.enrichment_status,
+                enriched_at: sourceItem.enriched_at,
+                enriched_by: sourceItem.enriched_by,
+                enriched_from_barcode: sourceItem.enriched_from_barcode,
+                missing_images: sourceItem.missing_images,
+                missing_description: sourceItem.missing_description,
+                missing_specs: sourceItem.missing_specs,
+                missing_brand: sourceItem.missing_brand,
+                sale_price_cents: sourceItem.sale_price_cents,
+                payment_gateway_type: sourceItem.payment_gateway_type,
+                payment_gateway_id: sourceItem.payment_gateway_id,
+                product_type: sourceItem.product_type,
+                digital_delivery_method: sourceItem.digital_delivery_method,
+                digital_assets: sourceItem.digital_assets as any,
+                access_duration_days: sourceItem.access_duration_days,
+                download_limit: sourceItem.download_limit,
+                license_type: sourceItem.license_type,
+                has_variants: sourceItem.has_variants,
+                is_featured: sourceItem.is_featured,
+                featured_at: sourceItem.featured_at,
+                featured_until: sourceItem.featured_until,
+                featured_priority: sourceItem.featured_priority,
+                featured_type: sourceItem.featured_type,
+                updated_at: new Date(),
+              },
+            });
+
+            // Delete old photos and copy new ones
+            await prisma.photo_assets.deleteMany({
+              where: { inventoryItemId: existing.id },
+            });
+
+            if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+              await prisma.photo_assets.createMany({
+                data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                  id: generatePhotoId(tenantId, updatedItem.id),
+                  tenantId: tenantId,
+                  inventoryItemId: updatedItem.id,
+                  url: photo.url,
+                  width: photo.width,
+                  height: photo.height,
+                  contentType: photo.contentType,
+                  bytes: photo.bytes,
+                  position: photo.position !== undefined ? photo.position : index,
+                  alt: photo.alt,
+                  caption: photo.caption,
+                })),
+              });
+            }
+
+            // Ensure global catalog entry exists for availability system
+            try {
+              const hasGlobalEntry = await hasGlobalCatalogEntry(sourceItem.sku);
+              if (!hasGlobalEntry) {
+                console.log(`[Organizations] Creating global catalog entry for SKU: ${sourceItem.sku}`);
+                
+                // Fetch variants if source item has them
+                let variants: Array<{
+                  sku: string;
+                  variant_name: string;
+                  price_cents: number | null;
+                  attributes: Record<string, any> | null;
+                }> = [];
+                if (sourceItem.has_variants) {
+                  const rawVariants = await prisma.product_variants.findMany({
+                    where: { parent_item_id: sourceItem.id },
+                    select: {
+                      sku: true,
+                      variant_name: true,
+                      price_cents: true,
+                      attributes: true
+                    },
+                    orderBy: [
+                      { sort_order: 'asc' },
+                      { created_at: 'asc' }
+                    ]
+                  });
+                  
+                  // Cast JsonValue to expected type
+                  variants = rawVariants.map(v => ({
+                    sku: v.sku,
+                    variant_name: v.variant_name,
+                    price_cents: v.price_cents,
+                    attributes: (v.attributes as Record<string, any>) || null
+                  }));
+                }
+                
+                await ensureGlobalCatalogEntry({
+                  id: existing.id,
+                  tenant_id: tenantId,
+                  sku: sourceItem.sku,
+                  name: sourceItem.name,
+                  description: sourceItem.description || undefined,
+                  brand: sourceItem.brand || undefined,
+                  category_path: sourceItem.category_path || undefined,
+                  gtin: sourceItem.gtin || undefined,
+                  price_cents: sourceItem.price_cents || undefined,
+                  image_url: sourceItem.image_url || undefined,
+                  has_variants: sourceItem.has_variants || false,
+                  variants: variants.map(v => ({
+                    sku: v.sku,
+                    name: v.variant_name,
+                    price_cents: v.price_cents,
+                    attributes: (v.attributes as Record<string, any>) || {}
+                  }))
+                });
+                console.log(`[Organizations] Global catalog entry created for SKU: ${sourceItem.sku} with ${variants.length} variants`);
+              } else {
+                console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
+              }
+            } catch (error) {
+              console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+              // Don't fail the propagation, just log the error
+            }
+
+            // Propagate variants if source item has them (MISSING IN BULK UPDATE!)
+            if (sourceItem.has_variants) {
+              console.log(`[Organizations] BULK UPDATE MODE: Propagating variants for source ${sourceItem.id} -> existing ${existing.id} (tenant: ${tenantId})`);
+              console.log(`[Organizations] BULK UPDATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+              console.log(`[Organizations] BULK UPDATE MODE: Existing parent item ID: ${existing.id}`);
+              
+              const variantResult = await propagateVariants(
+                sourceItem.id,
+                tenantId,
+                undefined, // newItemId is not provided for update mode
+                existing.id,
+                sourceItem.directory_category_id,
+                'update'
+              );
+              
+              console.log(`[Organizations] BULK UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+              
+              if (variantResult.errors.length > 0) {
+                console.error(`[Organizations] BULK UPDATE MODE: Variant propagation errors for ${existing.id}:`, variantResult.errors);
+              }
+              
+              // Verify the parent item still has has_variants set correctly after update
+              const verifyParent = await prisma.inventory_items.findUnique({
+                where: { id: existing.id },
+                select: { id: true, has_variants: true, sku: true }
+              });
+              console.log(`[Organizations] BULK UPDATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
+            }
+
+            results.updated.push({ 
               item_id: sourceItem.id, 
               tenantId, 
-              sku: sourceItem.sku,
-              reason: 'sku_already_exists' 
+              sku: sourceItem.sku
             });
             continue;
           }
 
-          // Create the item for this tenant
-          const newItem = await prisma.InventoryItem.create({
-            data: {
-              tenantId,
+          // Item doesn't exist - check if mode allows creation
+          if (mode === 'update_only') {
+            results.skipped.push({ 
+              item_id: sourceItem.id, 
+              tenantId, 
               sku: sourceItem.sku,
-              name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.priceCents,
-              stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl,
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
-              metadata: sourceItem.metadata as any,
-              availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
-              condition: sourceItem.condition,
-              currency: sourceItem.currency,
-              gtin: sourceItem.gtin,
-              itemStatus: overrides?.itemStatus || sourceItem.itemStatus,
-              mpn: sourceItem.mpn,
-              visibility: overrides?.visibility || sourceItem.visibility,
-              manufacturer: sourceItem.manufacturer,
-              source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
+              reason: 'item_not_found' 
+            });
+            continue;
+          }
+
+          // Ensure category exists for target tenant before creating
+          const targetCategoryId = await ensureCategoryForTargetTenant(
+            sourceItem.directory_category_id,
+            tenantId
+          );
+
+          // Create the item for this tenant
+          const newItem = await prisma.inventory_items.create({
+            data: {
+              id: generateTenantItemId(tenantId),
+              tenant_id: tenantId,
+            sku: sourceItem.sku,
+            name: sourceItem.name,
+            price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
+            stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+            image_url: sourceItem.image_url,
+            metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
+            availability: sourceItem.availability,
+            brand: sourceItem.brand,
+            category_path: sourceItem.category_path,
+            directory_category_id: targetCategoryId,            
+            condition: sourceItem.condition,
+            currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
+            gtin: sourceItem.gtin,
+            item_status: overrides?.itemStatus || sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
+            mpn: sourceItem.mpn,
+            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
+            visibility: overrides?.visibility || sourceItem.visibility,
+            manufacturer: sourceItem.manufacturer,
+            source: sourceItem.source,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
+            sale_price_cents: sourceItem.sale_price_cents,
+            payment_gateway_type: sourceItem.payment_gateway_type,
+            payment_gateway_id: sourceItem.payment_gateway_id,
+            product_type: sourceItem.product_type,
+            digital_delivery_method: sourceItem.digital_delivery_method,
+            digital_assets: sourceItem.digital_assets as any,
+            access_duration_days: sourceItem.access_duration_days,
+            download_limit: sourceItem.download_limit,
+            license_type: sourceItem.license_type,
+            has_variants: sourceItem.has_variants,
+            is_featured: sourceItem.is_featured,
+            featured_at: sourceItem.featured_at,
+            featured_until: sourceItem.featured_until,
+            featured_priority: sourceItem.featured_priority,
+            featured_type: sourceItem.featured_type,
             } as any,
           });
 
+          // Create slug registry entry if source has one
+          const sourceSlugRegistry = slugRegistryMap.get(`${sourceItem.tenant_id}-${sourceItem.sku}`);
+          if (sourceSlugRegistry) {
+            await prisma.product_slug_registry.upsert({
+              where: {
+                product_slug: sourceSlugRegistry.product_slug,
+              },
+              update: {
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+              },
+              create: {
+                id: `psr-${generateTenantItemId(tenantId)}`,
+                product_slug: sourceSlugRegistry.product_slug,
+                universal_sku: sourceSlugRegistry.universal_sku,
+                slug_hash: sourceSlugRegistry.slug_hash,
+                tenant_id: tenantId,
+                original_sku: sourceItem.sku,
+                created_at: new Date(),
+              },
+            });
+          }
+
           // Copy photos if any
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
-                tenantId,
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                 id: generatePhotoId(tenantId,newItem.id),
+                tenantId: tenantId,
                 inventoryItemId: newItem.id,
                 url: photo.url,
                 width: photo.width,
@@ -685,6 +1810,35 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
                 caption: photo.caption,
               })),
             });
+          }
+
+          // Propagate variants if source item has them
+          if (sourceItem.has_variants) {
+            console.log(`[Organizations] BULK CREATE MODE: Propagating variants for source ${sourceItem.id} -> target ${newItem.id} (tenant: ${tenantId})`);
+            console.log(`[Organizations] BULK CREATE MODE: Source item has_variants: ${sourceItem.has_variants}`);
+            console.log(`[Organizations] BULK CREATE MODE: Target parent item ID: ${newItem.id}`);
+            
+            const variantResult = await propagateVariants(
+              sourceItem.id,
+              tenantId,
+              newItem.id,
+              undefined, // newItemId is provided for bulk create mode
+              sourceItem.directory_category_id,
+              'create'
+            );
+            
+            console.log(`[Organizations] BULK CREATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
+            
+            if (variantResult.errors.length > 0) {
+              console.error(`[Organizations] BULK CREATE MODE: Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+            }
+            
+            // Verify the parent item still has has_variants set correctly
+            const verifyParent = await prisma.inventory_items.findUnique({
+              where: { id: newItem.id },
+              select: { id: true, has_variants: true, sku: true }
+            });
+            console.log(`[Organizations] BULK CREATE MODE: Parent item verification: ${verifyParent?.id}, has_variants=${verifyParent?.has_variants}`);
           }
 
           results.created.push({ 
@@ -711,6 +1865,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
       summary: {
         totalOperations: sourceItems.length * targetTenantIds.length,
         created: results.created.length,
+        updated: results.updated.length,
         skipped: results.skipped.length,
         errors: results.errors.length,
       },
@@ -727,8 +1882,8 @@ const setHeroLocationSchema = z.object({
 });
 
 // PUT /organizations/:id/hero-location - Set hero location
-// Permission: Platform admin only (critical org configuration)
-router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
+// Permission: Organization member (can manage their own organization settings)
+router.put('/:id/hero-location', authenticateToken, requireSupportActions, async (req, res) => {
   try {
     const parsed = setHeroLocationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -738,19 +1893,22 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     const { tenantId } = parsed.data;
 
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: true,
+        tenants: true,
       },
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Verify tenant belongs to this organization
-    const tenant = organization.Tenant.find(t => t.id === tenantId);
+    const tenant = organization.tenants.find(t => t.id === tenantId);
     if (!tenant) {
       return res.status(400).json({ 
         error: 'tenant_not_in_organization',
@@ -761,8 +1919,8 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     // Update all tenants in a single transaction - clear all hero flags and set the new one
     // Note: Use basePrisma for transactions to avoid retry wrapper issues
     await basePrisma.$transaction(
-      organization.Tenant.map(t => 
-        basePrisma.tenant.update({
+      organization.tenants.map(t => 
+        basePrisma.tenants.update({
           where: { id: t.id },
           data: {
             metadata: {
@@ -775,7 +1933,7 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
     );
 
     // Get the updated tenant for response
-    const updatedTenant = await prisma.tenant.findUnique({
+    const updatedTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
     });
 
@@ -795,19 +1953,22 @@ router.put('/:id/hero-location', requirePlatformAdmin, async (req, res) => {
 router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
   try {
     // Verify organization exists
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
-        Tenant: true,
+        tenants: true,
       },
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Find hero location
-    const heroTenant = organization.Tenant.find(t => {
+    const heroTenant = organization.tenants.find(t => {
       const metadata = t.metadata as any;
       return metadata?.isHeroLocation === true;
     });
@@ -820,9 +1981,9 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Get all items from hero location
-    const heroItems = await prisma.InventoryItem.findMany({
-      where: { tenantId: heroTenant.id },
-      include: { photoAsset: true },
+    const heroItems = await prisma.inventory_items.findMany({
+      where: { tenant_id: heroTenant.id },
+      include: { photo_assets: true },
     });
 
     if (heroItems.length === 0) {
@@ -833,7 +1994,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     }
 
     // Get all other tenants (excluding hero)
-    const targetTenants = organization.Tenant.filter(t => t.id !== heroTenant.id);
+    const targetTenants = organization.tenants.filter(t => t.id !== heroTenant.id);
 
     if (targetTenants.length === 0) {
       return res.status(400).json({ 
@@ -853,9 +2014,9 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
       for (const targetTenant of targetTenants) {
         try {
           // Check if SKU already exists for this tenant
-          const existing = await prisma.InventoryItem.findFirst({
+          const existing = await prisma.inventory_items.findFirst({
             where: {
-              tenantId: targetTenant.id,
+              tenant_id: targetTenant.id,
               sku: sourceItem.sku,
             },
           });
@@ -871,49 +2032,62 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
           }
 
           // Create the item for this tenant
-          const newItem = await prisma.InventoryItem.create({
+          const newItem = await prisma.inventory_items.create({
             data: {
-              id: crypto.randomUUID(),
-              tenantId: targetTenant.id,
-              sku: sourceItem.sku,
-              name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: sourceItem.price,
-              priceCents: sourceItem.priceCents,
-              stock: sourceItem.stock,
-              quantity: sourceItem.quantity,
-              imageUrl: sourceItem.imageUrl, 
-              imageGallery: sourceItem.imageGallery,
-              marketingDescription: sourceItem.marketingDescription,
-              metadata: sourceItem.metadata as any,
-              availability: sourceItem.availability,
-              categoryPath: sourceItem.categoryPath,
-              condition: sourceItem.condition,
-              currency: sourceItem.currency,
-              gtin: sourceItem.gtin,
-              itemStatus: sourceItem.itemStatus,
-              mpn: sourceItem.mpn,
-              visibility: sourceItem.visibility,
-              manufacturer: sourceItem.manufacturer,
-              source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichmentStatus,
-              enrichedAt: sourceItem.enrichedAt,
-              enrichedBy: sourceItem.enrichedBy,
-              enrichedFromBarcode: sourceItem.enrichedFromBarcode,
-              missingImages: sourceItem.missingImages,
-              missingDescription: sourceItem.missingDescription,
-              missingSpecs: sourceItem.missingSpecs,
-              missingBrand: sourceItem.missingBrand,
-              updatedAt: new Date(),
+              id: generateTenantItemId(targetTenant.id),
+              tenant_id: targetTenant.id,
+            sku: sourceItem.sku,
+            name: sourceItem.name,
+            price_cents: sourceItem.price_cents,
+            stock: sourceItem.stock,
+            image_url: sourceItem.image_url,
+            metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
+            availability: sourceItem.availability,
+            brand: sourceItem.brand,
+            category_path: sourceItem.category_path,
+            directory_category_id: sourceItem.directory_category_id,            
+            condition: sourceItem.condition,
+            currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
+            gtin: sourceItem.gtin,
+            item_status:  sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
+            mpn: sourceItem.mpn,
+            price:sourceItem.price,
+            quantity: sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
+            visibility: sourceItem.visibility,
+            manufacturer: sourceItem.manufacturer,
+            source: sourceItem.source,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
             },
           });
 
           // Copy photos if any
-          if (sourceItem.photoAsset && sourceItem.photoAsset.length > 0) {
-            await prisma.photoAsset.createMany({
-              data: sourceItem.photoAsset.map((photo: any, index: number) => ({
+          if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+            await prisma.photo_assets.createMany({
+              data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                id: generatePhotoId(targetTenant.id,newItem.id),
                 tenantId: targetTenant.id,
                 inventoryItemId: newItem.id,
                 url: photo.url,
@@ -947,12 +2121,12 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
 
     res.json({
       success: true,
-      heroLocation: {
+      hero_location: {
         tenantId: heroTenant.id,
         tenantName: heroTenant.name,
         itemCount: heroItems.length,
       },
-      targetLocations: targetTenants.length,
+      target_locations: targetTenants.length,
       results,
       summary: {
         totalOperations: heroItems.length * targetTenants.length,
@@ -968,3 +2142,4 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
 });
 
 export default router;
+

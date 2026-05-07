@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { isFeatureEnabled } from '@/lib/featureFlags';
-import { Modal, ModalFooter, Button, Input, Alert, ConfirmDialog } from '@/components/ui';
+import { Modal, ModalFooter, Input, Alert, ConfirmDialog } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import SubscriptionStateBanner from '@/components/subscription/SubscriptionStateBanner';
@@ -16,6 +17,8 @@ import { useItemsActions } from '@/hooks/useItemsActions';
 import { useItemsForm } from '@/hooks/useItemsForm';
 import { useItemsViewMode } from '@/hooks/useItemsViewMode';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { StockUpdateService } from '@/services/stockUpdateService';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 // Components
 import ItemsHeader from './ItemsHeader';
@@ -40,6 +43,7 @@ import SyncStatusIndicator from './SyncStatusIndicator';
 
 // Types
 import { Item } from '@/services/itemsDataService';
+import { api } from '@/lib/api';
 
 interface ItemsClientProps {
   initialItems?: Item[];
@@ -57,6 +61,8 @@ interface ItemsClientProps {
  * 
  * Down from 1,586 lines to ~300 lines of clean code
  */
+
+
 export default function ItemsClient({
   initialItems = [],
   initialTenantId = '',
@@ -107,12 +113,15 @@ export default function ItemsClient({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch(`/api/tenants/${initialTenantId}/categories`);
-        if (response.ok) {
-          const data = await response.json();
-          setCategories(data.categories || []);
-          setUncategorizedCount(data.uncategorizedCount || 0);
-        }
+        const categories = await tenantCategoriesService.getTenantCategories(initialTenantId);
+        const transformedCategories = categories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          count: 0 // Count not available in new structure
+        }));
+        setCategories(transformedCategories || []);
+        setUncategorizedCount(0); // Not available in new structure
       } catch (error) {
         console.error('Failed to fetch categories:', error);
       }
@@ -217,10 +226,12 @@ export default function ItemsClient({
 
   const handleUpdate = async (itemId: string, data: Partial<Item>) => {
     try {
-      await updateItem(itemId, data);
+      const updatedItem = await updateItem(itemId, data);
       closeEditModal();
+      return updatedItem; // Return the updated item
     } catch (error) {
       console.error('[ItemsClient] Update failed:', error);
+      throw error; // Re-throw to handle in modal
     }
   };
 
@@ -248,17 +259,38 @@ export default function ItemsClient({
     }
   };
 
-  const handleCategoryAssign = async (itemId: string, categoryId: string, categoryPath: string[]) => {
+  const handleCategoryAssign = async (itemId: string, categoryId: string) => {
     try {
-      // Update the item with the new category path
-      await updateItem(itemId, { categoryPath });
+      const updateData = { tenantCategoryId: categoryId };
+      
+      // Update the item with the tenant category ID
+      await updateItem(itemId, updateData);
 
       closeCategoryModal();
-      refresh(); // Refresh the items list
     } catch (error) {
       console.error('[ItemsClient] Category assignment failed:', error);
-      // Show error to user
-      alert(error instanceof Error ? error.message : 'Failed to assign category');
+    }
+  };
+
+  const handleStockUpdate = async (itemId: string, newStock: number) => {
+    try {
+      console.log('[ItemsClient] Updating stock for item:', itemId, 'to:', newStock);
+      
+      // Use the StockUpdateService middleware
+      await StockUpdateService.getInstance().updateStock(itemId, newStock, {
+        tenantId: initialTenantId,
+        onSuccess: (updatedStock) => {
+          console.log('[ItemsClient] Stock update successful:', updatedStock);
+          // Refresh the items data to show updated stock
+          refresh();
+        },
+        onError: (error) => {
+          console.error('[ItemsClient] Stock update failed:', error);
+        }
+      });
+    } catch (error) {
+      console.error('[ItemsClient] Stock update error:', error);
+      throw error;
     }
   };
 
@@ -327,7 +359,9 @@ export default function ItemsClient({
   };
 
   const handleStatusToggle = (item: Item) => {
-    const newStatus = item.status === 'active' ? 'archived' : 'active';
+    // Fix: Use itemStatus instead of status (correct field name)
+    const currentStatus = item.itemStatus || item.status || 'active';
+    const newStatus = currentStatus === 'active' ? 'archived' : 'active';
     
     // Only confirm when archiving (blocks sync)
     if (newStatus === 'archived') {
@@ -341,7 +375,7 @@ export default function ItemsClient({
             console.log('[ItemsClient] Toggling status:', {
               itemId: item.id,
               itemName: item.name,
-              from: item.status,
+              from: currentStatus,
               to: newStatus,
             });
             
@@ -381,7 +415,7 @@ export default function ItemsClient({
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900" suppressHydrationWarning>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800" suppressHydrationWarning>
       <PageHeader
         title="Inventory"
         description="Manage what's on your shelf and make it visible online"
@@ -488,6 +522,7 @@ export default function ItemsClient({
                     onPropagate={canPropagate ? openPropagateModal : undefined}
                     onVisibilityToggle={handleVisibilityToggle}
                     onStatusToggle={handleStatusToggle}
+                    onStockUpdate={handleStockUpdate}
                     tenantId={initialTenantId}
                   />
                 ) : (
@@ -501,6 +536,7 @@ export default function ItemsClient({
                     onPropagate={canPropagate ? openPropagateModal : undefined}
                     onVisibilityToggle={handleVisibilityToggle}
                     onStatusToggle={handleStatusToggle}
+                    onStockUpdate={handleStockUpdate}
                     tenantId={initialTenantId}
                   />
                 )}
@@ -526,8 +562,9 @@ export default function ItemsClient({
         item={editingItem}
         onSave={async (data) => {
           if (editingItem) {
-            await handleUpdate(editingItem.id, data);
+            return await handleUpdate(editingItem.id, data);
           }
+          throw new Error('No item being edited');
         }}
         onClose={closeEditModal}
       />
@@ -538,6 +575,7 @@ export default function ItemsClient({
           productUrl={`/tenant/${initialTenantId}/product/${qrItem.id}`}
           productName={qrItem.name}
           onClose={closeQRModal}
+          tenantId={initialTenantId}
         />
       )}
 

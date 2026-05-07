@@ -367,7 +367,7 @@ export async function createSquareSyncService(tenantId: string): Promise<SquareS
 
   // Create Square client
   const squareClient = createSquareClient({
-    access_token: integration.accessToken,
+    access_token: integration.access_token,
     mode: integration.mode as 'sandbox' | 'production',
   });
 

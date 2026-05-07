@@ -1,9 +1,31 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
+
 
 export default function CapacityAlertsPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent SSR issues by only rendering after mount
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="h-64 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
@@ -13,14 +35,8 @@ export default function CapacityAlertsPage() {
       />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Coming Soon</CardTitle>
-              <CardDescription>
-                This feature is currently under development
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="text-center py-12">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4">
                   <svg className="w-8 h-8 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,7 +76,7 @@ export default function CapacityAlertsPage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       </div>

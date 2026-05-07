@@ -9,6 +9,7 @@ import tenantLimitsRoutes from '../tenant-limits';
 import promotionRoutes from '../promotion';
 import businessHoursRoutes from '../business-hours';
 import quickStartRoutes from '../quick-start';
+import cacheStatsRoutes from '../cache-stats';
 import feedJobsRoutes from '../feed-jobs';
 import feedbackRoutes from '../feedback';
 import tenantCategoriesRoutes from '../tenant-categories';
@@ -29,11 +30,10 @@ export function mountDashboardRoutes(app: Express) {
   console.log('📊 Mounting dashboard routes...');
 
   // Dashboard routes
-  app.use('/api', dashboardRoutes); // Mount dashboard routes under /api prefix
-  console.log('✅ Dashboard routes mounted');
+  app.use('/api/dashboard', dashboardRoutes);
+  console.log('✅ Dashboard route mounted');
   
-  // Consolidated dashboard endpoint (reduces 4 calls to 1)
-  app.use('/api', dashboardConsolidatedRoutes);
+  app.use('/api/dashboard', dashboardConsolidatedRoutes);
   console.log('✅ Consolidated dashboard route mounted');
   
   app.use('/api', promotionRoutes); // Promotion endpoints
@@ -42,7 +42,7 @@ export function mountDashboardRoutes(app: Express) {
   app.use('/api', businessHoursRoutes); // Business hours management
   console.log('✅ Business hours routes mounted');
   
-  app.use('/api', tenantTierRoutes); // Tenant tier and usage endpoints
+  // Note: tenantTierRoutes now mounted in core-routes.ts to ensure public endpoints work
   app.use('/api/tenant-limits', tenantLimitsRoutes); // Tenant creation limits
   console.log('✅ Tenant limits routes mounted');
 
@@ -51,10 +51,11 @@ export function mountDashboardRoutes(app: Express) {
   app.use('/api/feedback', feedbackRoutes);
   app.use('/api/v1/tenants', authenticateToken, checkTenantAccess, tenantCategoriesRoutes);
   app.use('/api/v1', quickStartRoutes);
+  app.use('/api/v1', cacheStatsRoutes); // Cache statistics
   app.use('/api', feedValidationRoutes);
 
   // Category scaffolds (M3 start)
-  app.use(categoriesPlatformRoutes);
+  app.use('/api/platform', categoriesPlatformRoutes);
   app.use(categoriesTenantRoutes);
   app.use(categoriesMirrorRoutes);
   app.use(mirrorAdminRoutes);

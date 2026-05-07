@@ -24,7 +24,7 @@ export interface TierLimits {
 export interface TierInfo {
   id: string;
   name: string;
-  level: 'starter' | 'growth' | 'pro' | 'enterprise' | 'custom';
+  level: 'discovery' | 'storefront' | 'commitment'| 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
@@ -34,6 +34,8 @@ export interface ResolvedTier {
   effective: TierInfo;
   organization?: TierInfo;
   tenant?: TierInfo;
+  organizationName?: string;
+  organizationId?: string;
   isChain: boolean;
   canUpgrade: boolean;
   upgradeOptions?: string[];
@@ -48,9 +50,27 @@ export function resolveTier(
   tenantTier: TierInfo | null,
   isChain: boolean
 ): ResolvedTier {
+  // Helper function to map tier levels to resolver format
+  const mapTierLevel = (tierId: string): TierInfo['level'] => {
+    switch (tierId) {
+      case 'google_only': return 'discovery';
+      case 'discovery': return 'discovery';
+      case 'storefront': return 'storefront';
+      case 'commitment': return 'commitment';
+      case 'professional': return 'professional';
+      case 'enterprise': return 'enterprise';
+      case 'organization': return 'enterprise'; // Map organization to enterprise level
+      case 'chain_starter': return 'chain_starter';
+      case 'chain_professional': return 'chain_professional';
+      case 'chain_enterprise': return 'chain_enterprise';
+      default: return 'discovery';
+    }
+  };
+
   // For chains: organization tier is primary, tenant can have overrides
   if (isChain && organizationTier) {
     const effectiveTier = mergeTiers(organizationTier, tenantTier);
+    effectiveTier.level = mapTierLevel(effectiveTier.id);
     
     return {
       effective: effectiveTier,
@@ -64,6 +84,7 @@ export function resolveTier(
 
   // For individual tenants: tenant tier is primary
   if (tenantTier) {
+    tenantTier.level = mapTierLevel(tenantTier.id);
     return {
       effective: tenantTier,
       tenant: tenantTier,
@@ -75,6 +96,7 @@ export function resolveTier(
 
   // Fallback to organization tier if available
   if (organizationTier) {
+    organizationTier.level = mapTierLevel(organizationTier.id);
     return {
       effective: organizationTier,
       organization: organizationTier,
@@ -88,7 +110,7 @@ export function resolveTier(
     effective: getDefaultTier(),
     isChain: false,
     canUpgrade: true,
-    upgradeOptions: ['growth', 'pro']
+    upgradeOptions: ['storefront', 'commitment']
   };
 }
 
@@ -169,7 +191,7 @@ function getHigherTierLevel(
   level1: TierInfo['level'],
   level2: TierInfo['level']
 ): TierInfo['level'] {
-  const hierarchy: TierInfo['level'][] = ['starter', 'growth', 'pro', 'enterprise', 'custom'];
+  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'professional', 'enterprise', 'custom'];
   const index1 = hierarchy.indexOf(level1);
   const index2 = hierarchy.indexOf(level2);
   return index1 > index2 ? level1 : level2;
@@ -179,7 +201,7 @@ function getHigherTierLevel(
  * Gets available upgrade options for a tier level
  */
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
-  const allTiers: TierInfo['level'][] = ['starter', 'growth', 'pro', 'enterprise'];
+  const allTiers: TierInfo['level'][] = ['discovery', 'commitment', 'storefront', 'professional', 'enterprise'];
   const currentIndex = allTiers.indexOf(currentLevel);
   return allTiers.slice(currentIndex + 1);
 }
@@ -189,9 +211,9 @@ function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
  */
 function getDefaultTier(): TierInfo {
   return {
-    id: 'starter',
-    name: 'Starter',
-    level: 'starter',
+    id: 'storefront',
+    name: 'Storefront',
+    level: 'storefront',
     source: 'tenant',
     features: [
       {
@@ -225,13 +247,28 @@ function getDefaultTier(): TierInfo {
 export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boolean {
   // Safety check for undefined features
   if (!resolvedTier?.effective?.features) {
-    return false;
+    // Fallback to static tier features if API doesn't provide features
+    const { checkTierFeature } = require('./tier-features');
+    const tierKey = resolvedTier?.effective?.id || 'starter';
+    return checkTierFeature(tierKey, featureId);
   }
-  // Check both id and featureKey for compatibility with backend
+
+  // Check both id and featureKey/feature_key for compatibility with backend
   // If enabled is undefined, treat as true (feature exists = enabled)
-  return resolvedTier.effective.features.some(
-    f => (f.id === featureId || (f as any).featureKey === featureId) && (f.enabled !== false)
+  const hasApiFeature = resolvedTier.effective.features.some(
+    f => (f.id === featureId || (f as any).featureKey === featureId || (f as any).feature_key === featureId) && (f.enabled !== false)
   );
+
+  // If API features include this feature, use that result
+  if (hasApiFeature) {
+    return true;
+  }
+
+  // API features exist but don't include this feature - check static tier features
+  // This handles cases where API doesn't include inherited features
+  const { checkTierFeature } = require('./tier-features');
+  const tierKey = resolvedTier?.effective?.id || 'starter';
+  return checkTierFeature(tierKey, featureId);
 }
 
 /**

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface LocationPageProps {
   params: {
@@ -39,16 +40,7 @@ async function getLocationListings(city: string, state: string, page: number = 1
   const limit = 12;
   
   try {
-    const res = await fetch(
-      `${apiUrl}/api/directory/search?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&page=${page}&limit=${limit}`,
-      { next: { revalidate: 300 } }
-    );
-
-    if (!res.ok) {
-      return null;
-    }
-
-    return await res.json();
+    return await recommendationsService.searchByLocation(city, state, page, limit);
   } catch (error) {
     console.error('Error fetching location listings:', error);
     return null;
@@ -57,16 +49,10 @@ async function getLocationListings(city: string, state: string, page: number = 1
 
 // Get nearby locations for suggestions
 async function getNearbyLocations(currentCity: string, currentState: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/directory/locations`, {
-      next: { revalidate: 3600 },
-    });
-
-    if (!res.ok) return [];
-
-    const data = await res.json();
+    const data = await recommendationsService.getLocations();
+    
+    if (!data) return [];
     
     // Filter out current location and limit to 6
     return data.locations

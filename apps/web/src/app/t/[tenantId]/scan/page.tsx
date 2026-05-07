@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Flags } from '@/lib/flags';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { TierGate } from '@/components/tier/TierGate';
+import { Button } from '@mantine/core';
 
 interface ScanSession {
   id: string;
@@ -19,6 +22,7 @@ interface ScanSession {
   duplicateCount: number;
   startedAt: string;
   completedAt?: string;
+  committed?: string; // Date when session was committed (maps to completedAt)
 }
 
 export default function TenantScanPage() {
@@ -31,9 +35,9 @@ export default function TenantScanPage() {
   const hasScannerAccess = canAccess('barcode_scan', 'canEdit');
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
   
-  
   const [sessions, setSessions] = useState<ScanSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('manual'); // Default to manual for all tiers
   const [rateLimitError, setRateLimitError] = useState(false);
@@ -47,15 +51,11 @@ export default function TenantScanPage() {
 
   const loadSessions = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/scan/my-sessions?tenantId=${tenantId}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.sessions || []);
-      }
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
+      const data = await itemsSingletonService.getMyScanSessions(tenantId);
+      setSessions(data.sessions || []);
+    } catch (err) {
+      console.error('[ScanPage] Failed to load sessions:', err);
+      setError('Failed to load scan sessions');
     } finally {
       setLoading(false);
     }
@@ -75,46 +75,39 @@ export default function TenantScanPage() {
     try {
       setCreating(true);
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
-      const response = await api.post(`${apiBaseUrl}/api/scan/start`, {
-        tenantId,
-        deviceType: selectedDevice,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const data = await itemsSingletonService.startScanSession(tenantId, selectedDevice);
         setRateLimitError(false);
-        router.push(`/t/${tenantId}/scan/${data.session.id}`);
-      } else {
-        const error = await response.json();
-        if (error.error === 'rate_limit_exceeded') {
+        
+        if (data && data.session && data.session.id) {
+          router.push(`/t/${tenantId}/scan/${data.session.id}`);
+        } else {
+          console.error('Invalid session response:', data);
+          alert('Failed to start session: Invalid response from server');
+        }
+      } catch (error) {
+        console.error('Failed to start session:', error);
+        if (error instanceof Error && error.message === 'rate_limit_exceeded') {
           setRateLimitError(true);
         } else {
-          alert(`Failed to start session: ${error.error || 'Unknown error'}`);
+          alert('Failed to start scanning session');
         }
+      } finally {
+        setCreating(false);
       }
     } catch (error) {
       console.error('Failed to start session:', error);
-      alert('Failed to start scanning session');
-    } finally {
       setCreating(false);
     }
   };
 
   const cancelSession = async (sessionId: string) => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.delete(`${apiBaseUrl}/api/scan/${sessionId}`);
-
-      if (response.ok) {
-        await loadSessions(); // Refresh the list
-      } else {
-        alert('Failed to cancel session');
-      }
-    } catch (error) {
-      console.error('Failed to cancel session:', error);
-      alert('Failed to cancel session');
+      await itemsSingletonService.cancelScanSession(sessionId);
+      await loadSessions(); // Refresh the list
+    } catch (err) {
+      console.error('[ScanPage] Failed to cancel session:', err);
+      setError('Failed to cancel session');
     }
   };
 
@@ -125,21 +118,11 @@ export default function TenantScanPage() {
 
     try {
       setCleaningUp(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      const response = await api.post(`${apiBaseUrl}/api/scan/cleanup-my-sessions`, {
-        tenantId,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ Cleaned up ${data.cleaned} active sessions. You can now start a new scan.`);
-        setRateLimitError(false);
-        await loadSessions();
-      } else {
-        const error = await response.json();
-        alert(`Failed to cleanup sessions: ${error.message || 'Unknown error'}`);
-      }
+      await itemsSingletonService.cleanupMyScanSessions(tenantId);
+      alert(`✅ Cleaned up active sessions. You can now start a new scan.`);
+      setRateLimitError(false);
+      await loadSessions();
     } catch (error) {
       console.error('Failed to cleanup sessions:', error);
       alert('Failed to cleanup sessions');
@@ -167,6 +150,10 @@ export default function TenantScanPage() {
         title="Barcode Products"
         description="Scan or enter barcodes to quickly add products with auto-filled details"
         icon={Icons.Inventory}
+        backLink={{
+          href: `/t/${tenantId}/items`,
+          label: 'Back to Items'
+        }}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -195,18 +182,18 @@ export default function TenantScanPage() {
         )}
 
         {/* Start New Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Start New Scanning Session</CardTitle>
-            <CardDescription>
-              Choose your scanning method and begin adding products
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="p-6 rounded-lg">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Start New Scanning Session</h3>
+              <p className="text-sm text-neutral-600 mt-1">
+                Choose your scanning method and begin adding products
+              </p>
+            </div>
             <div className="space-y-4">
               {/* Device Selection */}
               <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-700 mb-3">
                   Scanning Method
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -224,7 +211,7 @@ export default function TenantScanPage() {
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">USB Scanner</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">USB Scanner</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Fast and reliable
                       </p>
@@ -252,7 +239,7 @@ export default function TenantScanPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">Camera</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">Camera</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Use device camera
                       </p>
@@ -278,7 +265,7 @@ export default function TenantScanPage() {
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      <p className="font-medium text-neutral-900 dark:text-white">Manual Entry</p>
+                      <p className="font-medium text-neutral-900 dark:text-black">Manual Entry</p>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Type barcodes
                       </p>
@@ -324,6 +311,8 @@ export default function TenantScanPage() {
                 <Button
                   onClick={startNewSession}
                   disabled={creating || !Flags.SKU_SCANNING}
+                  variant='gradient'
+                  style={{color:'white',hover:{color:'indigo'},fontWeight:'bold'}}
                   loading={creating}
                   className="px-6"
                 >
@@ -331,7 +320,7 @@ export default function TenantScanPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Best Practices Warning */}
@@ -361,17 +350,17 @@ export default function TenantScanPage() {
         )}
 
         {/* Recent Sessions */}
-        <Card>
-          <CardHeader>
+        <Card className="p-6 rounded-lg">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recent Sessions</CardTitle>
-                <CardDescription>
+                <h3 className="text-lg font-semibold">Recent Sessions</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   {sessions.length > 0 
                     ? `Showing ${Math.min((currentPage - 1) * sessionsPerPage + 1, sessions.length)}-${Math.min(currentPage * sessionsPerPage, sessions.length)} of ${sessions.length} sessions`
                     : 'View and manage your scanning sessions'
                   }
-                </CardDescription>
+                </p>
               </div>
               <button
                 onClick={loadSessions}
@@ -384,33 +373,32 @@ export default function TenantScanPage() {
                 Refresh
               </button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="text-center py-12">
-                <svg className="w-16 h-16 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-neutral-600 dark:text-neutral-400">No scanning sessions yet</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-500 mt-1">
-                  Start a new session to begin scanning products
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {sessions
-                    .slice((currentPage - 1) * sessionsPerPage, currentPage * sessionsPerPage)
-                    .map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
-                    >
-                      <div 
+            <div>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="w-16 h-16 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-neutral-600 dark:text-neutral-400">No scanning sessions yet</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-500 mt-1">
+                    Start a new session to begin scanning products
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {sessions
+                      .slice((currentPage - 1) * sessionsPerPage, currentPage * sessionsPerPage)
+                      .map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
+                      >
+                        <div 
                         className="flex-1 cursor-pointer"
                         onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
                       >
@@ -423,7 +411,7 @@ export default function TenantScanPage() {
                             {session.deviceType}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-300">
+                        <div className="flex items-center gap-4 text-sm text-neutral-700 dark:text-neutral-700">
                           <span>{session.scannedCount} scanned</span>
                           <span>{session.committedCount} committed</span>
                           {session.duplicateCount > 0 && (
@@ -461,7 +449,7 @@ export default function TenantScanPage() {
                     <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -476,7 +464,7 @@ export default function TenantScanPage() {
                     <button
                       onClick={() => setCurrentPage(p => Math.min(Math.ceil(sessions.length / sessionsPerPage), p + 1))}
                       disabled={currentPage >= Math.ceil(sessions.length / sessionsPerPage)}
-                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       Next
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -487,7 +475,8 @@ export default function TenantScanPage() {
                 )}
               </>
             )}
-          </CardContent>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

@@ -1,20 +1,25 @@
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, SlidersHorizontal, X, MapPin, Navigation } from 'lucide-react';
+import { Filter, SlidersHorizontal, X, MapPin, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface DirectoryFiltersProps {
-  categories: Array<{ name: string; count: number }>;
+  categories: Array<{ name: string; slug: string; count: number }>;
+  storeTypes?: Array<{ name: string; slug: string; storeCount: number }>;
   locations: Array<{ city: string; state: string; count: number }>;
 }
 
-export default function DirectoryFilters({ categories, locations }: DirectoryFiltersProps) {
+
+
+export default function DirectoryFilters({ categories, storeTypes = [], locations }: DirectoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
   const [showFilters, setShowFilters] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // Desktop collapse state
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedStoreType, setSelectedStoreType] = useState(searchParams.get('storeType') || '');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('city') || '');
   const [zipCode, setZipCode] = useState(searchParams.get('zip') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
@@ -24,6 +29,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   // Count active filters
   const activeFilters = [
     selectedCategory,
+    selectedStoreType,
     selectedLocation,
     zipCode,
     searchQuery,
@@ -65,6 +71,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
     
     if (searchQuery) params.set('q', searchQuery);
     if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedStoreType) params.set('storeType', selectedStoreType);
     if (zipCode) {
       params.set('zip', zipCode);
       // Auto-sort by distance when ZIP is provided
@@ -87,6 +94,7 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
   // Clear all filters
   const clearFilters = () => {
     setSelectedCategory('');
+    setSelectedStoreType('');
     setSelectedLocation('');
     setZipCode('');
     setSortBy('relevance');
@@ -97,7 +105,41 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
 
   return (
     <div className="bg-white border-b sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        {/* Collapsible Header - Desktop */}
+        <div className="hidden lg:flex items-center justify-between">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="font-medium">Filters</span>
+            {activeFilters > 0 && (
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                {activeFilters}
+              </span>
+            )}
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 ml-1" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-1" />
+            )}
+          </button>
+          
+          {/* Quick filter summary when collapsed */}
+          {!isExpanded && activeFilters > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>{activeFilters} {activeFilters === 1 ? 'filter' : 'filters'} active</span>
+              <button
+                onClick={clearFilters}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Mobile Filter Toggle */}
         <div className="flex items-center gap-4 lg:hidden">
           <button
@@ -114,8 +156,8 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
           </button>
         </div>
 
-        {/* Desktop Filters - Always Visible */}
-        <div className={`${showFilters ? 'block' : 'hidden'} lg:block mt-4 lg:mt-0`}>
+        {/* Desktop Filters - Collapsible */}
+        <div className={`${showFilters ? 'block' : 'hidden'} ${isExpanded ? 'lg:block' : 'lg:hidden'} mt-4`}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div>
@@ -143,9 +185,30 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat.name} value={cat.name}>
+                  {categories.map((cat, index) => (
+                    <option key={`${cat.slug}-${index}`} value={cat.slug}>
                       {cat.name} ({cat.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Store Type Filter - Only show if store types are provided */}
+            {storeTypes.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Store Type
+                </label>
+                <select
+                  value={selectedStoreType}
+                  onChange={(e) => setSelectedStoreType(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Store Types</option>
+                  {storeTypes.map((type, index) => (
+                    <option key={`${type.slug}-${index}`} value={type.slug}>
+                      {type.name} ({type.storeCount})
                     </option>
                   ))}
                 </select>
@@ -287,5 +350,6 @@ export default function DirectoryFilters({ categories, locations }: DirectoryFil
     </div>
   );
 }
+
 
 export { DirectoryFilters };

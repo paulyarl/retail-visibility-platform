@@ -6,7 +6,7 @@ const router = Router()
 
 // GET /api/admin/platform-flags
 router.get('/platform-flags', requirePlatformUser, async (_req, res) => {
-  const rows = await prisma.platformFeatureFlags.findMany({ orderBy: { flag: 'asc' } })
+  const rows = await prisma.platform_feature_flags_list.findMany({ orderBy: { flag: 'asc' } })
   res.json({ success: true, data: rows })
 })
 
@@ -19,7 +19,7 @@ router.put('/platform-flags/:flag', requirePlatformAdmin, async (req, res) => {
     rollout?: string | null;
     allowTenantOverride?: boolean;
   }
-  const row = await prisma.platformFeatureFlags.upsert({
+  const row = await prisma.platform_feature_flags_list.upsert({
     where: { flag },
     update: { 
       enabled: !!enabled,
@@ -47,7 +47,7 @@ router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, 
     // If value is null, we're clearing the override (setting to platform default)
     if (value === null) {
       // Just update the platform flag's enabled state
-      const row = await prisma.platformFeatureFlags.update({
+      const row = await prisma.platform_feature_flags_list.update({
         where: { flag },
         data: { enabled: false }
       })
@@ -55,7 +55,7 @@ router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, 
     }
     
     // Otherwise, force the flag to the specified value
-    const row = await prisma.platformFeatureFlags.upsert({
+    const row = await prisma.platform_feature_flags_list.upsert({
       where: { flag },
       update: { enabled: !!value },
       create: { 
@@ -83,19 +83,19 @@ router.delete('/platform-flags', requirePlatformAdmin, async (req, res) => {
   
   try {
     // Check usage: count tenant overrides
-    const tenantUsage = await prisma.tenantFeatureFlags.count({
+    const tenantUsage = await prisma.tenant_feature_flags_list.count({
       where: { flag }
     })
     
     // Delete tenant flags first (cascade)
     if (tenantUsage > 0) {
-      await prisma.tenantFeatureFlags.deleteMany({
+      await prisma.tenant_feature_flags_list.deleteMany({
         where: { flag }
       })
     }
     
     // Delete platform flag
-    const deleted = await prisma.platformFeatureFlags.delete({
+    const deleted = await prisma.platform_feature_flags_list.delete({
       where: { flag }
     })
     

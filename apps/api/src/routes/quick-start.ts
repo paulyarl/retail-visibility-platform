@@ -9,11 +9,12 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
-import { UserRole } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
+import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const router = Router();
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 /**
- * Check rate limit for quick start
+ * Check rate limit for quick start (read-only, does not consume)
  * Limit: 1 quick start per tenant per 24 hours
  */
 function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number } {
@@ -33,6 +34,17 @@ function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number 
     return { allowed: false, resetAt: limit.resetAt };
   }
 
+  return { allowed: true };
+}
+
+/**
+ * Consume rate limit for quick start (call after successful quick start)
+ * Sets the 24-hour cooldown
+ */
+function consumeRateLimit(tenantId: string): void {
+  const now = Date.now();
+  const key = `quick-start:${tenantId}`;
+  
   // Set new rate limit (24 hours)
   const resetAt = now + 24 * 60 * 60 * 1000;
   rateLimitStore.set(key, { count: 1, resetAt });
@@ -43,8 +55,6 @@ function checkRateLimit(tenantId: string): { allowed: boolean; resetAt?: number 
       rateLimitStore.delete(k);
     }
   }
-
-  return { allowed: true };
 }
 
 /**
@@ -77,16 +87,42 @@ router.get('/scenarios', async (req, res) => {
  * - createAsDrafts: boolean (default: true)
  */
 const quickStartSchema = z.object({
-  scenario: z.enum(['grocery', 'fashion', 'electronics', 'general']),
-  productCount: z.number().int().min(1).max(100),
+  scenario: z.enum([
+    'grocery',
+    'pharmacy',
+    'fashion', 
+    'electronics',
+    'home_garden',
+    'health_beauty',
+    'sports_outdoors',
+    'toys_games',
+    'automotive',
+    'books_media',
+    'pet_supplies',
+    'office_supplies',
+    'jewelry',
+    'baby_kids',
+    'arts_crafts',
+    'hardware_tools',
+    'furniture',
+    'restaurant',
+    'general'
+  ]),
+  productCount: z.number().int().min(5).max(200).default(50),
   assignCategories: z.boolean().optional().default(true),
   createAsDrafts: z.boolean().optional().default(true),
+  generateImages: z.boolean().optional().default(false), // NEW: Generate AI images
+  imageQuality: z.enum(['standard', 'hd']).optional().default('standard'), // NEW: Image quality
+  textModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for text/product generation
+  imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard'), validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard_full'), validateSKULimits, async (req, res) => {
   try {
+    console.log('[Quick Start] POST request received');
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;
+    console.log('[Quick Start] Tenant ID:', tenantId, 'User ID:', userId);
 
     // Verify user is authenticated
     if (!userId) {
@@ -102,11 +138,11 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     const userCanPerformSupport = canPerformSupportActions(user);
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { 
         id: true,
-        organizationId: true,
+        organization_id: true,
       },
     });
 
@@ -123,11 +159,11 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     // Check tenant-level permissions (owner or admin)
     else {
       const { prisma: prismaClient } = await import('../prisma');
-      const userTenant = await prismaClient.userTenant.findUnique({
+      const userTenant = await prismaClient.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId,
-            tenantId,
+          user_id_tenant_id: {
+            user_id:userId,
+            tenant_id:tenantId,
           },
         },
       });
@@ -135,13 +171,13 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
 
       // If not tenant owner/admin, check org ownership (legacy)
-      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
-        const organization = await prismaClient.organization.findUnique({
-          where: { id: tenant.organizationId },
-          select: { ownerId: true },
+      if (!isTenantOwnerOrAdmin && tenant.organization_id) {
+        const organization = await prismaClient.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          select: { owner_id: true },
         });
 
-        if (!organization || organization.ownerId !== userId) {
+        if (!organization || organization.owner_id !== userId) {
           return res.status(403).json({
             error: 'Forbidden',
             message: 'You do not have permission to use Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
@@ -157,16 +193,59 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     // If tenant has no organization, allow any authenticated user (for backwards compatibility)
     // TODO: In production, all tenants should belong to an organization
 
-    // Validate request body
-    const parsed = quickStartSchema.safeParse(req.body);
+    // Validate request body - handle both camelCase and snake_case due to universal transform middleware
+    console.log('[Quick Start] Request body:', req.body);
+    
+    // Handle case where body might be nested or stringified
+    let parsedBody = req.body;
+    
+    // Check if the actual data is in req.body.body (nested structure)
+    if (req.body && typeof req.body.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body.body);
+      } catch (e) {
+        console.log('[Quick Start] Failed to parse nested stringified body:', e);
+        return res.status(400).json({
+          error: 'Invalid request body',
+          message: 'Request body must be valid JSON',
+        });
+      }
+    } else if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body);
+      } catch (e) {
+        console.log('[Quick Start] Failed to parse stringified body:', e);
+        return res.status(400).json({
+          error: 'Invalid request body',
+          message: 'Request body must be valid JSON',
+        });
+      }
+    }
+    
+    // Normalize the request body to handle both naming conventions
+    const normalizedBody = {
+      scenario: parsedBody.scenario,
+      productCount: parsedBody.productCount || parsedBody.product_count,
+      assignCategories: parsedBody.assignCategories || parsedBody.assign_categories,
+      createAsDrafts: parsedBody.createAsDrafts || parsedBody.create_as_drafts,
+      generateImages: parsedBody.generateImages || parsedBody.generate_images,
+      imageQuality: parsedBody.imageQuality || parsedBody.image_quality,
+      textModel: parsedBody.textModel || parsedBody.text_model,
+      imageModel: parsedBody.imageModel || parsedBody.image_model,
+    };
+    
+    console.log('[Quick Start] Normalized body:', normalizedBody);
+    
+    const parsed = quickStartSchema.safeParse(normalizedBody);
     if (!parsed.success) {
+      console.log('[Quick Start] Validation errors:', parsed.error.issues);
       return res.status(400).json({
         error: 'Invalid request',
         details: parsed.error.issues,
       });
     }
 
-    const { scenario, productCount, assignCategories, createAsDrafts} = parsed.data;
+    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality, textModel, imageModel } = quickStartSchema.parse(normalizedBody);
 
     // Check rate limit (platform support bypasses - they're helping multiple customers)
     // Tenant owners/admins are subject to rate limits on their own tenant
@@ -183,8 +262,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
     }
 
     // Check if tenant already has products (warn if > 10)
-    const existingProductCount = await prisma.InventoryItem.count({
-      where: { tenantId },
+    const existingProductCount = await prisma.inventory_items.count({
+      where: { tenant_id:tenantId },
     });
 
     if (existingProductCount > 10) {
@@ -194,6 +273,14 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
 
     // Generate products
     console.log(`[Quick Start] Generating ${productCount} ${scenario} products for tenant ${tenantId}`);
+    if (generateImages) {
+      console.log(`[Quick Start] ⏳ This may take 2-3 minutes. AI is generating products with images (${imageQuality} quality)...`);
+      console.log(`[Quick Start] 💡 Images: Using ${imageModel === 'google' ? 'Google Imagen 3' : 'OpenAI DALL-E 3'} for professional product photography`);
+      console.log(`[Quick Start] 💡 Text: Using ${textModel === 'google' ? 'Google Gemini' : 'OpenAI GPT-4'} for product generation`);
+    } else {
+      console.log(`[Quick Start] ⏳ This may take 30-60 seconds. AI is generating realistic products with detailed descriptions...`);
+      console.log(`[Quick Start] 💡 Text: Using ${textModel === 'google' ? 'Google Gemini' : 'OpenAI GPT-4'} for product generation`);
+    }
     
     const result = await generateQuickStartProducts({
       tenant_id: tenantId,
@@ -201,9 +288,18 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       productCount,
       assignCategories,
       createAsDrafts,
-    });
+      generateImages,
+      imageQuality,
+      textModel,
+      imageModel,
+    }, prisma);
 
     console.log(`[Quick Start] Success:`, result);
+
+    // Consume rate limit after successful quick start (only for non-support users)
+    if (!userCanPerformSupport) {
+      consumeRateLimit(tenantId);
+    }
 
     res.json({
       success: true,
@@ -247,15 +343,15 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     const user = (req as any).user;
     const userIsPlatformAdmin = isPlatformAdmin(user);
     const userCanPerformSupport = canPerformSupportActions(user);
-    const userIsPlatformViewer = user.role === UserRole.PLATFORM_VIEWER;
+    const userIsPlatformViewer = user.role === user_role.PLATFORM_VIEWER;
     const userCanView = canViewAllTenants(user);
 
     // Check rate limit (admin/support bypass this - they're helping customers)
     const rateLimit = userCanPerformSupport ? { allowed: true } : checkRateLimit(tenantId);
     
     // Check existing product count
-    const productCount = await prisma.InventoryItem.count({
-      where: { tenantId },
+    const productCount = await prisma.inventory_items.count({
+      where: { tenant_id:tenantId },
     });
 
     // Configurable product limit (default: 500, allows testing multiple scenarios)
@@ -296,7 +392,27 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
  * Generate starter categories for a tenant
  */
 const categoryQuickStartSchema = z.object({
-  businessType: z.enum(['grocery', 'fashion', 'electronics', 'general']),
+  businessType: z.enum([
+    'grocery',
+    'fashion', 
+    'electronics',
+    'home_garden',
+    'health_beauty',
+    'sports_outdoors',
+    'toys_games',
+    'automotive',
+    'books_media',
+    'pet_supplies',
+    'office_supplies',
+    'jewelry',
+    'baby_kids',
+    'arts_crafts',
+    'hardware_tools',
+    'furniture',
+    'restaurant',
+    'pharmacy',
+    'general'
+  ]),
   categoryCount: z.number().int().min(5).max(30).optional().default(15),
 });
 
@@ -319,11 +435,11 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const userCanPerformSupport = canPerformSupportActions(user);
 
     // Verify tenant exists and user has access
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { 
         id: true,
-        organizationId: true,
+        organization_id: true,
       },
     });
 
@@ -340,11 +456,11 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     // Check tenant-level permissions (owner or admin)
     else {
       const { prisma: prismaClient } = await import('../prisma');
-      const userTenant = await prismaClient.userTenant.findUnique({
+      const userTenant = await prismaClient.user_tenants.findUnique({
         where: {
-          userId_tenantId: {
-            userId,
-            tenantId,
+          user_id_tenant_id: {
+            user_id:userId,
+            tenant_id:tenantId,
           },
         },
       });
@@ -352,13 +468,13 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       const isTenantOwnerOrAdmin = userTenant && (userTenant.role === 'OWNER' || userTenant.role === 'ADMIN');
 
       // If not tenant owner/admin, check org ownership (legacy)
-      if (!isTenantOwnerOrAdmin && tenant.organizationId) {
-        const organization = await prismaClient.organization.findUnique({
-          where: { id: tenant.organizationId },
-          select: { ownerId: true },
+      if (!isTenantOwnerOrAdmin && tenant.organization_id) {
+        const organization = await prismaClient.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          select: { owner_id: true },
         });
 
-        if (!organization || organization.ownerId !== userId) {
+        if (!organization || organization.owner_id !== userId) {
           return res.status(403).json({
             error: 'Forbidden',
             message: 'You do not have permission to use Category Quick Start. Only platform support, tenant owners, or tenant admins can use this feature.',
@@ -384,8 +500,8 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     const { businessType, categoryCount } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
-    const existingCategoryCount = await prisma.tenantCategory.count({
-      where: { tenantId },
+    const existingCategoryCount = await prisma.directory_category.count({
+      where: { tenantId: tenantId },
     });
 
     // Platform admin/support bypass category limit (viewer cannot create)
@@ -395,6 +511,105 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
         message: 'You already have 50+ categories. Category Quick Start is designed for new stores.',
       });
     }
+
+    // Define taxonomy branches for each business type
+    // These are the root paths in the Google Product Taxonomy hierarchy
+    const taxonomyBranches: Record<string, string[][]> = {
+      grocery: [
+        ['Food, Beverages & Tobacco', 'Food Items'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      fashion: [
+        ['Apparel & Accessories', 'Clothing'],
+        ['Apparel & Accessories', 'Shoes'],
+        ['Apparel & Accessories', 'Clothing Accessories'],
+      ],
+      electronics: [
+        ['Electronics', 'Computers'],
+        ['Electronics', 'Audio'],
+        ['Electronics', 'Cameras & Optics'],
+        ['Electronics', 'Communications'],
+      ],
+      home_garden: [
+        ['Home & Garden', 'Home Decor'],
+        ['Home & Garden', 'Kitchen & Dining'],
+        ['Home & Garden', 'Furniture'],
+        ['Home & Garden', 'Lawn & Garden'],
+      ],
+      health_beauty: [
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Bath & Body'],
+      ],
+      sports_outdoors: [
+        ['Sporting Goods', 'Exercise & Fitness'],
+        ['Sporting Goods', 'Outdoor Recreation'],
+        ['Sporting Goods', 'Athletics'],
+      ],
+      toys_games: [
+        ['Toys & Games', 'Toys'],
+        ['Toys & Games', 'Games'],
+        ['Toys & Games', 'Puzzles'],
+      ],
+      automotive: [
+        ['Vehicles & Parts', 'Vehicle Parts & Accessories'],
+        ['Vehicles & Parts', 'Motor Vehicle Care & Cleaning'],
+      ],
+      books_media: [
+        ['Media', 'Books'],
+        ['Media', 'Music & Sound Recordings'],
+        ['Media', 'DVDs & Videos'],
+      ],
+      pet_supplies: [
+        ['Animals & Pet Supplies', 'Pet Supplies'],
+        ['Animals & Pet Supplies', 'Pet Food'],
+      ],
+      office_supplies: [
+        ['Office Supplies', 'General Office Supplies'],
+        ['Office Supplies', 'Paper Products'],
+        ['Office Supplies', 'Presentation Supplies'],
+      ],
+      jewelry: [
+        ['Apparel & Accessories', 'Jewelry'],
+        ['Apparel & Accessories', 'Watches'],
+      ],
+      baby_kids: [
+        ['Baby & Toddler', 'Baby Care'],
+        ['Baby & Toddler', 'Baby Toys & Activity Equipment'],
+        ['Baby & Toddler', 'Baby Transport'],
+      ],
+      arts_crafts: [
+        ['Arts & Entertainment', 'Hobbies & Creative Arts'],
+        ['Arts & Entertainment', 'Party & Celebration'],
+      ],
+      hardware_tools: [
+        ['Hardware', 'Building Materials'],
+        ['Hardware', 'Power & Hand Tools'],
+        ['Hardware', 'Plumbing'],
+      ],
+      furniture: [
+        ['Furniture', 'Living Room Furniture'],
+        ['Furniture', 'Bedroom Furniture'],
+        ['Furniture', 'Office Furniture'],
+      ],
+      restaurant: [
+        ['Food, Beverages & Tobacco', 'Food Items', 'Prepared Foods'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      pharmacy: [
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Vitamins & Supplements'],
+      ],
+      general: [
+        ['Home & Garden'],
+        ['Health & Beauty'],
+        ['Sporting Goods'],
+        ['Toys & Games'],
+        ['Office Supplies'],
+        ['Arts & Entertainment'],
+      ],
+    };
 
     // Generate categories based on business type with Google taxonomy alignment
     const categoryTemplates: Record<string, Array<{ name: string; searchTerm: string }>> = {
@@ -470,15 +685,86 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     // Limit to requested count
     const categories = allCategories.slice(0, categoryCount);
 
+    // Fetch existing categories to avoid duplicates
+    const existingCategories = await prisma.directory_category.findMany({
+      where: { tenantId: tenantId },
+      select: { name: true, slug: true },
+    });
+
+    const existingNames = new Set(existingCategories.map(c => c.name.toLowerCase()));
+    const existingSlugs = new Set(existingCategories.map(c => c.slug));
+
+    // Filter out categories that already exist (by name)
+    const categoriesToCreate = categories.filter(cat => {
+      const nameExists = existingNames.has(cat.name.toLowerCase());
+      if (nameExists) {
+        console.log(`[Category Quick Start] Skipping duplicate category: "${cat.name}"`);
+      }
+      return !nameExists;
+    });
+
+    if (categoriesToCreate.length === 0) {
+      return res.json({
+        success: true,
+        categoriesCreated: 0,
+        categories: [],
+        message: 'All categories already exist. No new categories were created.',
+      });
+    }
+
+    console.log(`[Category Quick Start] Creating ${categoriesToCreate.length} new categories (${categories.length - categoriesToCreate.length} duplicates skipped)`);
+
     // Import Google taxonomy functions
-    const { suggestCategories, getCategoryById } = await import('../lib/google/taxonomy');
+    const { suggestCategories, getCategoryById, selectRandomFromBranch } = await import('../lib/google/taxonomy');
+
+    // NEW: Use hierarchical branch-based generation if branches are defined
+    const branches = taxonomyBranches[businessType];
+    let hierarchicalCategories: Array<{ node: any; name: string }> = [];
+    
+    if (branches && branches.length > 0) {
+      console.log(`[Category Quick Start] Using hierarchical branch generation for ${businessType}`);
+      
+      // Distribute category count across branches
+      const perBranch = Math.ceil(categoriesToCreate.length / branches.length);
+      
+      for (const branch of branches) {
+        const branchCategories = selectRandomFromBranch(branch, perBranch, {
+          minDepth: 1,
+          maxDepth: 3,
+          diversify: true,
+        });
+        
+        // Use the last part of the path as the friendly name
+        hierarchicalCategories.push(...branchCategories.map(node => ({
+          node,
+          name: node.path[node.path.length - 1], // Use leaf name
+        })));
+      }
+      
+      // Trim to requested count
+      hierarchicalCategories = hierarchicalCategories.slice(0, categoriesToCreate.length);
+      
+      console.log(`[Category Quick Start] Generated ${hierarchicalCategories.length} hierarchical categories from ${branches.length} branches`);
+    }
 
     // Create categories with Google taxonomy alignment
     const createdCategories = await Promise.all(
-      categories.map(async (cat, index) => {
-        // Use live Google taxonomy to find best matching category
-        const suggestions = suggestCategories(cat.searchTerm, 1);
-        const googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+      categoriesToCreate.map(async (cat, index) => {
+        let googleCategoryId: string | null = null;
+        let categoryName = cat.name;
+        
+        // Use hierarchical category if available
+        if (hierarchicalCategories[index]) {
+          const hierarchical = hierarchicalCategories[index];
+          googleCategoryId = hierarchical.node.id;
+          categoryName = hierarchical.name;
+          
+          console.log(`[Category Quick Start] Using hierarchical category: "${categoryName}" (${hierarchical.node.path.join(' > ')})`);
+        } else {
+          // Fallback to keyword matching
+          const suggestions = suggestCategories(cat.searchTerm, 1);
+          googleCategoryId = suggestions.length > 0 ? suggestions[0].id : null;
+        }
         
         // Log the mapping for transparency
         if (googleCategoryId) {
@@ -488,14 +774,42 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
           console.warn(`[Category Quick Start] No Google category found for "${cat.name}" (search: ${cat.searchTerm})`);
         }
 
-        return prisma.tenantCategory.create({
+        // Generate slug from final category name
+        const slug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        
+        // Check if a category with this slug already exists (handles Clover demo duplicates)
+        const existingBySlug = await prisma.directory_category.findFirst({
+          where: { tenantId, slug }
+        });
+        
+        if (existingBySlug) {
+          console.log(`[Category Quick Start] Found existing category by slug "${slug}": ${existingBySlug.id} - updating with Google taxonomy if missing`);
+          
+          // Update existing category with Google taxonomy ID if it doesn't have one
+          if (!existingBySlug.googleCategoryId && googleCategoryId) {
+            await prisma.directory_category.update({
+              where: { id: existingBySlug.id },
+              data: { 
+                googleCategoryId,
+                updatedAt: new Date()
+              }
+            });
+            console.log(`[Category Quick Start] Updated existing category "${existingBySlug.name}" with Google taxonomy ID: ${googleCategoryId}`);
+          }
+          
+          return existingBySlug; // Return existing instead of creating duplicate
+        }
+
+        return prisma.directory_category.create({
           data: {
+            id: generateProductCatId(tenantId),
             tenantId,
-            name: cat.name,
-            slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            name: categoryName, // Use the hierarchical or template name
+            slug,
             googleCategoryId,
             sortOrder: index,
             isActive: true,
+          updatedAt: new Date(),
           } as any,
         });
       })
@@ -503,10 +817,17 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
 
     console.log(`[Category Quick Start] Created ${createdCategories.length} categories for tenant ${tenantId}`);
 
+    const duplicatesSkipped = categories.length - categoriesToCreate.length;
+    const responseMessage = duplicatesSkipped > 0
+      ? `Created ${createdCategories.length} new categories. Skipped ${duplicatesSkipped} duplicate${duplicatesSkipped === 1 ? '' : 's'}.`
+      : undefined;
+
     res.json({
       success: true,
       categoriesCreated: createdCategories.length,
+      duplicatesSkipped,
       categories: createdCategories.map(c => ({ id: c.id, name: c.name })),
+      ...(responseMessage && { message: responseMessage }),
     });
   } catch (error: any) {
     console.error('[Category Quick Start] Error:', error);

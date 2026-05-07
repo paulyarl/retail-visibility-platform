@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
+import { authenticateToken, requireTenantOwner } from '../middleware/auth';
+import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
@@ -21,7 +23,7 @@ const updateUpgradeRequestSchema = z.object({
 });
 
 // GET /upgrade-requests - List all upgrade requests with filters
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status, page = '1', limit = '20', tenantId } = req.query;
     
@@ -40,17 +42,17 @@ router.get('/', async (req, res) => {
       }
     }
     if (tenantId) {
-      where.tenantId = tenantId;
+      where.tenant_id = tenantId;
     }
 
     const [requests, total] = await Promise.all([
-      prisma.upgradeRequests.findMany({
+      prisma.upgrade_requests.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         skip,
         take: limitNum,
       }),
-      prisma.upgradeRequests.count({ where }),
+      prisma.upgrade_requests.count({ where }),
     ]);
 
     res.json({
@@ -71,7 +73,7 @@ router.get('/', async (req, res) => {
 // GET /upgrade-requests/:id - Get single upgrade request
 router.get('/:id', async (req, res) => {
   try {
-    const request = await prisma.upgradeRequests.findUnique({
+    const request = await prisma.upgrade_requests.findUnique({
       where: { id: req.params.id },
     });
 
@@ -87,7 +89,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /upgrade-requests - Create new upgrade request
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const parsed = createUpgradeRequestSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -97,8 +99,16 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const request = await prisma.upgradeRequests.create({
-      data: parsed.data as any,
+    const request = await prisma.upgrade_requests.create({
+      data: {
+        id: generateQuickStart("upgrade"),
+        tenant_id: parsed.data.tenantId,
+        business_name: parsed.data.business_name,
+        current_tier: parsed.data.currentTier,
+        requested_tier: parsed.data.requestedTier,
+        notes: parsed.data.notes,
+        updated_at: new Date(),
+      },
     });
 
     // TODO: Send email notification to admin
@@ -127,15 +137,15 @@ router.patch('/:id', async (req, res) => {
     };
 
     if (parsed.data.adminNotes !== undefined) {
-      updateData.adminNotes = parsed.data.adminNotes;
+      updateData.admin_notes = parsed.data.adminNotes;
     }
 
     if (parsed.data.processedBy) {
-      updateData.processedBy = parsed.data.processedBy;
-      updateData.processedAt = new Date();
+      updateData.processed_by = parsed.data.processedBy;
+      updateData.processed_at = new Date();
     }
 
-    const request = await prisma.upgradeRequests.update({
+    const request = await prisma.upgrade_requests.update({
       where: { id: req.params.id },
       data: updateData,
     });
@@ -143,14 +153,14 @@ router.patch('/:id', async (req, res) => {
     // If status is 'complete', update the tenant's subscription tier
     if (parsed.data.status === 'complete') {
       try {
-        await prisma.tenant.update({
-          where: { id: request.tenantId },
+        await prisma.tenants.update({
+          where: { id: request.tenant_id },
           data: { 
-            subscriptionTier: request.requestedTier,
-            subscriptionStatus: 'active',
+            subscription_tier: request.requested_tier,
+            subscription_status: 'active',
           },
         });
-        console.log(`[Upgrade Request] Updated tenant ${request.tenantId} to tier ${request.requestedTier}`);
+        console.log(`[Upgrade Request] Updated tenant ${request.tenant_id} to tier ${request.requested_tier}`);
       } catch (tenantError) {
         console.error('[Upgrade Request] Failed to update tenant tier:', tenantError);
         // Don't fail the request update, but log the error
@@ -167,7 +177,7 @@ router.patch('/:id', async (req, res) => {
 // DELETE /upgrade-requests/:id - Delete upgrade request
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.upgradeRequests.delete({
+    await prisma.upgrade_requests.delete({
       where: { id: req.params.id },
     });
 

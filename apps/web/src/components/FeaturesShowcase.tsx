@@ -468,7 +468,7 @@ function HeroFeatureCard({ feature }: any) {
         <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">{feature.title}</h3>
         <p className="text-base sm:text-lg md:text-xl mb-2">{feature.description}</p>
         <p className="text-sm sm:text-base md:text-lg text-white/80 mb-4 sm:mb-6">💰 {feature.subtext}</p>
-        <Link href={`/signup?feature=${feature.id}`}>
+        <Link href={`/auth/signup?feature=${feature.id}`}>
           <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100">
             Try This Feature Now →
           </Button>
@@ -536,7 +536,7 @@ function DetailedFeatureCard({ feature }: any) {
         <p className="text-base sm:text-lg md:text-xl mb-2 sm:mb-3">{feature.description}</p>
         <p className="text-sm sm:text-base md:text-lg text-white/80 mb-4 sm:mb-6">💰 {feature.subtext}</p>
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <Link href={`/signup?feature=${feature.id}`} className="w-full sm:w-auto">
+          <Link href={`/auth/signup?feature=${feature.id}`} className="w-full sm:w-auto">
             <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100 w-full sm:w-auto">
               Try This Feature →
             </Button>

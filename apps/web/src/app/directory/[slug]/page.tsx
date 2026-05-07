@@ -1,85 +1,512 @@
-import { Metadata } from 'next';
+'use client';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, use } from 'react';
+import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
+import DirectoryActions from '@/components/directory/DirectoryActions';
+import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
+import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
+import { computeStoreStatus } from '@/lib/hours-utils';
+import StoreDirectoryCategories from '@/components/directory/StoreDirectoryCategories';
+import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
+import StoreViewTracker from '@/components/tracking/StoreViewTracker';
+import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
+import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
+import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
+import SmartProductCard from '@/components/products/SmartProductCard';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { externalApiService } from '@/services/ExternalApiService';
+import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { tenantPublicService } from '@/services/TenantPublicService';
+
+// tenant public data
+import { directoryService } from '@/services/DirectorySingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
+
+// recommendation data
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
+import LastViewed from '@/components/directory/LastViewed';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
+
+// tenant private data
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+
+// platform branding
+import { PoweredByFooter } from '@/components/PoweredByFooter';
+
+// shopping cart
+import { useMultiCart } from '@/hooks/useMultiCart';
+import { useRouter } from 'next/navigation';
+
+// store status
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 interface StoreDetailPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
-async function getStoreListing(slug: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
+async function getConsolidatedDirectoryData(identifier: string) {
   try {
-    const res = await fetch(`${apiUrl}/api/directory/${slug}`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      return null;
+    // First, try to load as a slug (most common case)
+    try {
+      const data = await directoryService.getDirectoryConsolidated(identifier);
+    //  let tenantLogo; 
+      
+      // Check if data has listing property - if not, might be tenant ID case
+      if (!data?.listing) {
+        // More flexible pattern - tenant IDs start with 'tid-' followed by alphanumeric characters
+        const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
+        
+        if (isTenantId) {
+          // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
+          const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
+          
+          if (resolvedSlug) {
+            // console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
+            const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
+            // console.log(`[Directory] Resolved data:`, resolvedData);
+         //   tenantlogo = await publicTenantInfoService.getTenantLogoFromDiscovery(identifier);
+            return resolvedData;
+          } else {
+            // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+            return null;
+          }
+        } else {
+          return data; // Return original data (will trigger 404)
+        }
+      }
+      
+      return data;
+    } catch (slugError) {
+      // If slug fails, check if it might be a tenant ID and try resolution
+      const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
+      
+      if (isTenantId) {
+        // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
+        const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
+        // console.log(`[Directory] Resolved tenant ID to slug: ${resolvedSlug}`);
+        
+        if (!resolvedSlug) {
+          // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+          return null;
+        }
+        
+        const data = await directoryService.getDirectoryConsolidated(resolvedSlug);
+        // console.log(`[Directory] Resolved data:`, data);
+        return data;
+      } else {
+        throw slugError;
+      }
     }
-
-    const data = await res.json();
-    return data.listing;
   } catch (error) {
-    console.error('Error fetching store:', error);
+    console.error(`[Directory] Error fetching consolidated directory data for ${identifier}:`, error);
     return null;
   }
 }
 
-export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const listing = await getStoreListing(slug);
-
-  if (!listing) {
-    return {
-      title: 'Store Not Found',
-    };
+async function getStorefrontCategories(tenantId: string) {
+  try {
+    const data = await directoryService.getStorefrontCategories(tenantId);
+    return data;
+  } catch (error) {
+    console.error('Error fetching storefront categories:', error);
+    return { categories: [], uncategorizedCount: 0 };
   }
-
-  const title = `${listing.business_name} - ${listing.city}, ${listing.state}`;
-  const description = listing.description || 
-    `Visit ${listing.business_name} in ${listing.city}, ${listing.state}. ${listing.product_count || 0} products available.`;
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title,
-      description,
-      type: 'website',
-      images: listing.logo_url ? [listing.logo_url] : [],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: listing.logo_url ? [listing.logo_url] : [],
-    },
-  };
 }
 
-export default async function StoreDetailPage({ params }: StoreDetailPageProps) {
-  const { slug } = await params;
-  const listing = await getStoreListing(slug);
-
-  if (!listing) {
-    notFound();
+async function getActualProductCount(tenantId: string) {
+  try {
+    const count = await directoryService.getStorefrontProductCount(tenantId);
+    return count;
+  } catch (error) {
+    console.error('Error fetching actual product count:', error);
+    return 0;
   }
+}
 
+async function getBusinessProfile(tenantId: string) {
+  try {
+    const profile = await directoryService.getBusinessProfile(tenantId);
+    return profile;
+  } catch (error) {
+    console.error('Error fetching business profile:', error);
+    return null;
+  }
+}
+
+async function getBusinessHours(tenantId: string) {
+  try {
+    const data = await directoryService.getBusinessHours(tenantId);
+    if (!data || !data.success || !data.data) return null;
+    
+    const hoursData = data.data;
+    
+    // Handle both response formats: periods array or day-based object
+    if (hoursData.periods && Array.isArray(hoursData.periods)) {
+      const { periods, timezone } = hoursData;
+      const hours: any = { timezone };
+      
+      // Convert periods to day-based format for BusinessHoursDisplay
+      periods.forEach((period: any) => {
+        const dayName = period.day?.toUpperCase(); // Keep uppercase for BusinessHoursDisplay
+        if (dayName && !hours[dayName]) {
+          hours[dayName] = {
+            open: period.open,
+            close: period.close
+          };
+        }
+      });
+      
+      // Include periods array for BusinessHoursDisplay to handle multiple periods
+      if (periods.length > 0) {
+        hours.periods = periods;
+      }
+      
+      return hours;
+    } else {
+      // Assume data is already in day-based format
+      return hoursData;
+    }
+  } catch (error) {
+    console.error('Error fetching business hours:', error);
+    return null;
+  }
+}
+
+async function getFeaturedProducts(tenantId: string, limit: number = 6) {
+  try {
+    // Use the featured products endpoint with store_selection type for directory
+    const items = await directoryService.getFeaturedProducts(tenantId, limit);
+    return items;
+  } catch (error) {
+    console.error('Error fetching featured products:', error);
+    return [];
+  }
+}
+
+async function getRelatedProducts(categorySlug: string, excludeTenantId: string, limit: number = 6) {
+  try {
+    // First, get stores in the same category (from directory MV)
+    const storesData = await directoryService.getStoresByCategoryForProducts(categorySlug, 10);
+    const otherStores = storesData
+      .filter((l: any) => l.tenant_id !== excludeTenantId)
+      .slice(0, 3); // Get 3 other stores
+
+    // Now fetch products from those stores using storefront_products MV
+    const productPromises = otherStores.map(async (store: any) => {
+      try {
+        const productsData = await directoryService.getStorefrontProducts(store.tenant_id, 2);
+        return productsData.map((p: any) => ({
+          ...p,
+          storeName: store.business_name,
+          storeSlug: store.slug,
+        }));
+      } catch (error) {
+        return [];
+      }
+    });
+
+    const allProducts = (await Promise.all(productPromises)).flat();
+    return allProducts.slice(0, limit);
+  } catch (error) {
+    console.error('Error fetching related products:', error);
+    return [];
+  }
+}
+
+// NEW: Track store view for recommendations
+async function trackStoreView(tenantId: string, categories: any[] = []) {
+  try {
+    // Get user location (reuse existing logic)
+    const location = await getUserLocation();
+    
+    // Get primary category for context
+    const primaryCategory = categories.find((c: any) => c.isPrimary) || categories[0];
+    
+    await recommendationsService.trackRecommendations({
+      entityType: 'store',
+      entityId: tenantId,
+      entityName: '', // Will be populated by API
+      context: {
+        category_id: primaryCategory?.id,
+        category_slug: primaryCategory?.slug,
+        categories: categories.map((c: any) => ({ id: c.id, slug: c.slug }))
+      },
+      locationLat: location?.latitude,
+      locationLng: location?.longitude,
+      referrer: typeof document !== 'undefined' ? document.referrer : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        pageType: 'directory_detail'
+      });
+  } catch (error) {
+    console.error('Error tracking store view:', error);
+    // Don't throw - tracking failures shouldn't break the page
+  }
+}
+
+// NEW: Get store recommendations
+async function getStoreRecommendations(tenantId: string, categorySlug?: string) {
+  try {
+    // Get user location
+    const location = await getUserLocation();
+    
+    const params: any = {};
+    if (categorySlug) params.category = categorySlug;
+    if (location) {
+      params.lat = location.latitude.toString();
+      params.lng = location.longitude.toString();
+    }
+    
+    const response = await recommendationsService.getStorefrontRecommendations(tenantId, params);
+    
+    if (!response) return { recommendations: [] };
+    
+    return response;
+  } catch (error) {
+    console.error('Error getting recommendations:', error);
+    return { recommendations: [] };
+  }
+}
+
+// NEW: Get user location (reuse from DirectoryClient)
+async function getUserLocation(): Promise<{
+  latitude: number;
+  longitude: number;
+  city: string;
+  state: string;
+} | null> {
+  try {
+    // Try browser geolocation first
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          enableHighAccuracy: true
+        });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      
+      // Reverse geocoding to get city/state
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      const address = data.address || {};
+      const city = address.city || address.town || address.village || 'Unknown';
+      const state = address.state || 'Unknown';
+      
+      return { latitude, longitude, city, state };
+    }
+  } catch (error) {
+    console.warn('Geolocation failed, falling back to IP-based location');
+  }
+  
+  // Fallback to IP-based location
+  try {
+    // Get user context for unique cache key to prevent cross-contamination
+    const getUserIdFromContext = () => {
+      if (typeof window !== 'undefined') {
+        const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+        if (userId) return userId;
+        
+        const cookies = document.cookie.split(';');
+        const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
+        if (userIdCookie) return userIdCookie.split('=')[1]?.trim();
+      }
+      return null;
+    };
+    
+    const getSessionIdFromContext = () => {
+      if (typeof window !== 'undefined') {
+        let sessionId = sessionStorage.getItem('sessionId');
+        if (!sessionId) {
+          sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          sessionStorage.setItem('sessionId', sessionId);
+        }
+        return sessionId;
+      }
+      return null;
+    };
+    
+    const userId = getUserIdFromContext();
+    const sessionId = getSessionIdFromContext();
+    const userContext = userId || sessionId || 'anonymous';
+    const cacheKey = `ip-geolocation-${userContext}`;
+    
+    const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
+    
+    if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
+      console.warn('Invalid location data received from external API');
+      return null;
+    }
+    
+    return {
+      latitude: ipLocation.latitude,
+      longitude: ipLocation.longitude,
+      city: ipLocation.city || 'Unknown',
+      state: ipLocation.region || 'Unknown'
+    };
+  } catch (error) {
+    console.warn('Failed to get IP location:', error);
+    return null;
+  }
+}
+
+export default function StoreDetailPage({ params }: StoreDetailPageProps) {
+  const [loading, setLoading] = useState(true);
+  const [consolidatedData, setConsolidatedData] = useState<any>(null);
+  // console.log(`[Directory] consolidatedData:`, consolidatedData);
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  // const businessProfile = tempbusinessProfile?.data;
+  // console.log(`[Directory] tempbusinessProfile:`, tempbusinessProfile);
+  // console.log(`[Directory] businessProfile:`, businessProfile);
+  const [businessHours, setBusinessHours] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [storefrontCategories, setStorefrontCategories] = useState<any>({ categories: [], uncategorizedCount: 0 });
+  // console.log(`[Directory] storefrontCategories:`, storefrontCategories);
+  const [actualProductCount, setActualProductCount] = useState<number>(0);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  // console.log(`[Directory] tenantInfo:`, tenantInfo);
+  const [slugForRelated, setSlugForRelated] = useState<string>('');
+  
+  const router = useRouter();
+  const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
+  const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { slug: identifier } = await params;
+        // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
+        const data = await getConsolidatedDirectoryData(identifier);
+        // console.log(`[Directory] Consolidated data 2:`, data);
+
+        if (!data?.listing) {
+          notFound();
+          return;
+        }
+        
+        setConsolidatedData(data);
+        
+        // Fetch tenant logo
+        const logo = await publicTenantInfoService.getTenantLogoFromDiscovery(data.listing.tenantId);
+        setTenantLogo(logo);
+        
+        // Get primary category for additional data fetching
+        const primaryCategory = data.listing.categories?.find((c: any) => c.isPrimary) || data.listing.categories?.[0];
+
+        // Fetch remaining data that's not in the consolidated endpoint
+        const [
+          profile,
+          hours,
+          related,
+          categories,
+          productCount
+        ] = await Promise.all([
+          getBusinessProfile(data.listing.tenantId),
+          getBusinessHours(data.listing.tenantId),
+          primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
+          getStorefrontCategories(data.listing.tenantId),
+          getActualProductCount(data.listing.tenantId)
+        ]);
+        
+        setBusinessProfile(profile?.data);
+        setBusinessHours(hours);
+        setRelatedProducts(related);
+        setStorefrontCategories(categories);
+        setActualProductCount(productCount);
+        
+        // Fetch tenant info for status panel
+        const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
+        setTenantInfo(info);
+        
+        // Resolve slug for RelatedStores using publicDirectoryService
+        const idResolvedBySlug = await publicDirectoryService.resolveBySlug(identifier);
+        setSlugForRelated(idResolvedBySlug || identifier);
+        
+        // Track user behavior for recommendations (fire and forget, don't await)
+        trackStoreView(data.listing.tenantId, data.listing.categories).catch(err => 
+          console.error('Failed to track store view:', err)
+        );
+        
+      } catch (error) {
+        console.error('Error fetching store data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [params]);
+  
+  if (loading || !consolidatedData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  const listing = consolidatedData.listing;
+  const featuredProductsRaw = consolidatedData.featuredProducts || [];
+  // TODO: Remove this temporary logging once we confirm the data is being fetched correctly
+  // console.log('[Directory Page] Featured products raw data:', featuredProductsRaw);
+  const storeTypes = consolidatedData.storeTypes || [];
+  const categoryCounts = consolidatedData.categoryCounts || [];
+  const recommendations = consolidatedData.recommendations || [];
+  const paymentGatewayStatus = consolidatedData.paymentGatewayStatus || { hasActiveGateway: false, defaultGatewayType: null };
+
+  // Deduplicate featured products by ID to prevent React key conflicts
+  const featuredProducts = featuredProductsRaw.filter((product: any, index: number, arr: any[]) => {
+    const productId = product.id || product.inventory_item_id;
+    return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
+  });
+  
+  // Compute store status from business hours data
+  const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
+  
   const fullAddress = [
     listing.address,
     listing.city,
     listing.state,
-    listing.zip_code,
+    listing.zipCode,
   ].filter(Boolean).join(', ');
 
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
-  const currentUrl = `${baseUrl}/directory/${slug}`;
+  const resolvedParams = use(params);
+  const { slug: identifier } = resolvedParams;
+  const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const currentUrl = `${baseUrl}/directory/${identifier}`;
+  console.log(`Directory listing CurrentUrl: ${currentUrl}`);
+  console.log(`Directory listing CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);
+
+  // Server-side check: show panel for google_only tier, non-active status, or subscription issues
+  const showStatusPanel = tenantInfo ? (
+    tenantInfo.subscriptionTier === 'google_only' || 
+    tenantInfo.subscriptionTier === 'discovery' ||
+    (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
+    (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
+    tenantInfo.showSubscriptionPanel === true
+  ) : false;
+
+ // Handle view cart
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
 
   return (
     <>
@@ -89,183 +516,451 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         items={[
           { name: 'Home', url: baseUrl },
           { name: 'Directory', url: `${baseUrl}/directory` },
-          { name: listing.business_name, url: currentUrl },
+          { name: listing.businessName, url: currentUrl },
         ]}
       />
 
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link 
-            href="/directory"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Directory
-          </Link>
-        </div>
-      </div>
+      {/* Client-side store tracking */}
+      <StoreViewTracker tenantId={listing.tenantId} storeName={listing.businessName} categories={listing.categories} />
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Store Header */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-start gap-6">
-                {listing.logo_url && (
-                  <img
-                    src={listing.logo_url}
-                    alt={listing.business_name}
-                    className="w-24 h-24 rounded-lg object-cover"
-                  />
-                )}
-                <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    {listing.business_name}
-                  </h1>
-                  {listing.primary_category && (
-                    <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                      {listing.primary_category}
-                    </span>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header with Visit Storefront Banner */}
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <Link 
+              href="/directory"
+              className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Directory
+            </Link>
+            
+            
+            {/* Status Panel or Visit Storefront Hero Banner */}
+            {showStatusPanel && tenantInfo ? (
+              <div className="mt-4">
+                <StorefrontStatusPanel tenantInfo={tenantInfo} />
+              </div>
+            ) : (
+              <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                    Shop {listing.businessName}
+                  </h2>
+                  <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
+                    Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
+                  </p>
+                  <Link
+                    href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md"
+                  >
+                    <Globe className="w-5 h-5" />
+                    Visit Storefront
+                  </Link>
+                   { storefrontCategories.categories.length > 0 && (
+                      <div className="mt-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
+                        </span>
+                      </div>
+                    )}
+                </div>
+                
+                <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
+
+                  
+               {/* Hours Badge - Status */}
+                      <HoursStatusBadge status={hoursStatus} size='lg' /> 
+                      
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            {/* Main Content Column */}
+            <div className="space-y-6">
+              {/* Store Header */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-start gap-6">
+                  {tenantLogo?.toString() || listing.logoUrl ? (
+                    <img
+                      src={tenantLogo?.toString() || listing.logoUrl}
+                      alt={listing.businessName}
+                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : null}
+                  <div className="flex-1">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      {listing.businessName}
+                    </h1>
+                
+                    {/* GBP Categories - Clean badges below store name */}
+                    {listing.categories && listing.categories.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        {listing.categories
+                          .sort((a: any, b: any) => {
+                            if (a.isPrimary && !b.isPrimary) return -1;
+                            if (!a.isPrimary && b.isPrimary) return 1;
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((category: any, index: number) => (
+                            <Link
+                              key={category.id || index}
+                              href={`/directory/categories/${category.slug}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                category.isPrimary
+                                  ? 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                              }`}
+                              title={`Browse all ${category.name} stores`}
+                            >
+                              <span className="text-base">
+                                {category.name === 'Grocery store' && '🏪'}
+                                {category.name === 'Electronics store' && '🛍️'}
+                                {category.name === 'Shoe store' && '👟'}
+                                {category.name === 'Supermarket' && '🛒'}
+                                {category.name === 'Clothing store' && '👕'}
+                                {category.name === 'Hardware store' && '🔧'}
+                                {category.name === 'Restaurant' && '🍽️'}
+                                {category.name === 'Pharmacy' && '💊'}
+                                {category.name === 'Bookstore' && '📚'}
+                                {category.name === 'Pet store' && '🐕'}
+                                {category.name === 'Specialty food store' && '🍱'}
+                                {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store', 'Specialty food store'].includes(category.name) && '🏢'}
+                              </span>
+                              <span>{category.name}</span>
+                            </Link>
+                          ))}
+                      </div>
+                    )}
+                     <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+                
+                    {/* Keywords */}
+                    { listing.keywords && listing.keywords.length > 0 && (
+                      <div className="mt-3">
+                        <DirectoryKeywordTags keywords={listing.keywords} />
+                      </div>
+                    )}
+                
+                   
+                  </div>
+                </div>
+
+                {/* Action Buttons - Clean inline layout */}
+                <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                  {/* Visit Storefront - Left side */}
+                  <a
+                    href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Products"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span className="hidden lg:inline">Products</span>
+                  </a>
+              
+                   {showStatusPanel && (
+                 
+                  <a
+                    href={`/shops/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View Store in Shops"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                  </svg>
+                    <span className="hidden lg:inline">Shop</span>
+                  </a>
                   )}
-                  {listing.product_count > 0 && (
-                    <p className="text-gray-600 mt-2">
-                      {listing.product_count} products available
-                    </p>
+
+                  
+                
+				  
+                  <a
+                    onClick={() => {
+                    const reviewsSection = document.getElementById('hours-section');
+                    if (reviewsSection) {
+                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Hours"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                    <span className="hidden lg:inline">Hours</span>
+                  </a>
+				  
+                 
+                  
+                  {/* Share/Print Actions - Right side */}
+                  {!showStatusPanel && (
+                  <DirectoryActions 
+                    listing={{
+                      business_name: listing.businessName,
+                      slug: listing.slug,
+                      tenantId: listing.tenantId,
+                      id: listing.id
+                    }}
+                    currentUrl={currentUrl}
+                  />
                   )}
                 </div>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Share"
-                >
-                  <Share2 className="w-5 h-5 text-gray-600" />
-                </button>
               </div>
 
-              {listing.description && (
-                <p className="mt-6 text-gray-700 leading-relaxed">
-                  {listing.description}
-                </p>
+              {/* Featured Products - hidden when status panel shows */}
+              {!showStatusPanel && featuredProducts.length > 0 && (
+                <TenantPaymentProvider tenantId={listing.tenantId}>
+                   <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
+                      <Link
+                        href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        View All Products →
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {(() => {
+                        // console.log('[Directory Page] Mapping featured products:', featuredProducts);
+                        return featuredProducts.map((product: any) => (
+                          <SmartProductCard
+                            key={`directory-featured-${product.id}`}
+                            tenantId={listing.tenantId}
+                            product={{
+                            id: product.id,
+                            sku: product.sku || product.id,
+                            name: product.name || product.title,
+                            title: product.title || product.name,
+                            brand: product.brand,
+                            description: product.description,
+                            priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                            salePriceCents: product.salePriceCents,
+                            stock: product.stock || 999,
+                            imageUrl: product.imageUrl || product.image_url,
+                            tenantId: listing.tenantId,
+                            availability: product.availability || 'in_stock',
+                            tenantCategory: product.tenantCategory,
+                            productCategory: product.category_name,
+                            has_variants: product.has_variants,
+                            // Use fresh payment gateway status from consolidated data instead of inconsistent context
+                            payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
+                          }}
+                          tenantName={listing.businessName}
+                          tenantLogo={tenantLogo?.toString() || listing.logoUrl}
+                          defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
+                          variant="featured"
+                          showCategory={true}
+                          showDescription={true}
+                          
+                        />
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                </TenantPaymentProvider>
+              )}
+
+              {/* Business Description - Brief Trust Building */}
+              { (businessProfile?.business_description || businessProfile?.businessDescription) && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
+                  <div className="prose prose-gray max-w-none">
+                    <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
+                      {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200 
+                        ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
+                        : (businessProfile.business_description || businessProfile.businessDescription)
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+
+              {/* Photo Gallery - Visual Proof */}
+              { !showStatusPanel && (
+                <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
+              )}
+             
+
+              {/* Product Categories - Browse More */}
+              {!showStatusPanel && storefrontCategories.categories.length > 0 && (
+                <div className="space-y-4">
+                  <ProductCategoriesCollapsible
+                    categories={storefrontCategories.categories}
+                    tenantId={listing.tenantId}
+                    uncategorizedCount={storefrontCategories.uncategorizedCount}
+                  />
+                  {/* QR Code - under categories */}
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={listing.tenantId}
+                    label="Scan to Share"
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                    size={200}
+                    showDownload={true}
+                    className="mt-4"
+                    pageType="directory"
+                  />
+                </div>
+              )}
+              
+
+              {/* Store Ratings and Reviews - Social Proof */}
+               <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+              {<StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
+            </div>
+           
+            {/* Right Column - Contact Info */}
+            { !showStatusPanel && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Contact
+                </h2>
+                <div>
+                            <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} initialExpanded={true} />
+                             <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+                          </div>
+                
+                  
+                  {/* Social Links */}
+                  {(businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
+                    <div className="pt-3 border-t border-neutral-200 dark:border-neutral-600 mt-3">
+                      <h2 className="text-lg font-semibold text-neutral-500 dark:text-neutral-400 mb-3">Follow Us</h2>
+                      <div className="flex flex-wrap gap-4">
+                        {businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook && (
+                          <a
+                            href={businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors"
+                            title="Facebook"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                            </svg>
+                          </a>
+                        )}
+                        {businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram && (
+                          <a
+                            href={businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-pink-600 hover:text-pink-700 transition-colors"
+                            title="Instagram"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.162c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                            </svg>
+                          </a>
+                        )}
+                        {businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter && (
+                          <a
+                            href={businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-400 hover:text-blue-500 transition-colors"
+                            title="Twitter/X"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
+                            </svg>
+                          </a>
+                        )}
+                        {businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin && (
+                          <a
+                            href={businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-700 hover:text-blue-800 transition-colors"
+                            title="LinkedIn"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0C9.958 0 0 9.958 0 22.225c0 12.268 9.958 22.225 22.225 22.225s22.225-9.958 22.225-22.225C44.45 9.958 34.492 0 22.225 0zM14.818 30.055a.5.5 0 01-.5.5h-4.263a.5.5 0 01-.5-.5V14.218a.5.5 0 01.5-.5h4.263a.5.5 0 01.5.5v15.837zM10.555 11.685a2.555 2.555 0 11-5.11 0 2.555 2.555 0 015.11 0zM32.408 30.055a.5.5 0 01-.5.5h-4.263a.5.5 0 01-.5-.5V20.218a4.894 4.894 0 00-1.685-.578 4.685 4.685 0 00-1.938.245 3.654 3.654 0 00-1.563 1.5 3.654 3.654 0 00-.245 1.563v7.107a.5.5 0 01-.5.5h-4.263a.5.5 0 01-.5-.5v-15.837a.5.5 0 01.5-.5h4.263a.5.5 0 01.5.5v.5c1.5-1.5 3.5-2 5.5-1.5 2 0 4 .5 5.5 2v-.5a.5.5 0 01.5-.5h4.263a.5.5 0 01.5.5v10.837z" />
+                            </svg>
+                          </a>
+                        )}
+                        {businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube && (
+                          <a
+                            href={businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
+                            title="YouTube"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M23.498 6.186c-.885-1.76-3.11-1.76-3.996 0L9.84 19.91c-.78 1.552.195 3.496 1.998 3.496h18.324c1.803 0 2.777-1.944 1.998-3.496L23.498 6.186zM24 29.5c-5.247 0-9.5-4.253-9.5-9.5s4.253-9.5 9.5-9.5 9.5 4.253 9.5 9.5-4.253 9.5-9.5 9.5zm0-15c-3.038 0-5.5 2.462-5.5 5.5s2.462 5.5 5.5 5.5 5.5-2.462 5.5-5.5-2.462-5.5-5.5-5.5z" />
+                            </svg>
+                          </a>
+                        )}
+                        {businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok && (
+                          <a
+                            href={businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-gray-700 hover:text-gray-800 transition-colors"
+                            title="TikTok"
+                          >
+                            <svg className="h-20 w-20" fill="currentColor" viewBox="0 0 48 48">
+                              <path d="M24 4.5c11.046 0 20 8.954 20 20s-8.954 20-20 20S4 35.546 4 24.5 12.954 4.5 24 4.5zm0 36c8.837 0 16-7.163 16-16s-7.163-16-16-16-16 7.163-16 16 7.163 16 16 16zm-4.5-22.5v15c0 .414.336.75.75.75s.75-.336.75-.75v-5.25h3c.414 0 .75-.336.75-.75s-.336-.75-.75-.75h-3V18h3c.414 0 .75-.336.75-.75s-.336-.75-.75-.75h-3.75c-.414 0-.75.336-.75.75v7.5h-1.5V18zm7.5 0v15c0 .414.336.75.75.75s.75-.336.75-.75V18h3.75c.414 0 .75-.336.75-.75s-.336-.75-.75-.75H27zm-15-3v15c0 .414.336.75.75.75s.75-.336.75-.75V15h3.75c.414 0 .75-.336.75-.75s-.336-.75-.75-.75H12zm30 0v15c0 .414.336.75.75.75s.75-.336.75-.75V15h3.75c.414 0 .75-.336.75-.75s-.336-.75-.75-.75H42z" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              )}
+
+              {/* Business Hours - Collapsible */}
+              {!showStatusPanel && businessHours && (
+                <>
+                  <BusinessHoursCollapsible businessHours={businessHours} />
+                  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                </>
+              )}
+ 
+              {/* Map Location */}
+              {!showStatusPanel && listing.address && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Our Location
+                  </h2>
+                  <GoogleMapEmbed address={listing.address} />
+                </div>
               )}
             </div>
-
-            {/* Visit Store Button */}
-            {listing.website && (
-              <a
-                href={listing.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-3 px-6 rounded-lg font-medium transition-colors"
-              >
-                Visit Store Website
-              </a>
-            )}
-          </div>
-
-          {/* Right Column - Contact & Hours */}
-          <div className="space-y-6">
-            {/* Contact Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Contact Information
-              </h2>
-              <div className="space-y-4">
-                {fullAddress && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Address</p>
-                      <p className="text-sm text-gray-600">{fullAddress}</p>
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-700 mt-1 inline-block"
-                      >
-                        Get Directions →
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {listing.phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Phone</p>
-                      <a
-                        href={`tel:${listing.phone}`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        {listing.phone}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {listing.email && (
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Email</p>
-                      <a
-                        href={`mailto:${listing.email}`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        {listing.email}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {listing.website && (
-                  <div className="flex items-start gap-3">
-                    <Globe className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Website</p>
-                      <a
-                        href={listing.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-700 break-all"
-                      >
-                        {listing.website.replace(/^https?:\/\//, '')}
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Business Hours */}
-            {listing.business_hours && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Business Hours
-                </h2>
-                <div className="space-y-2">
-                  {Object.entries(listing.business_hours).map(([day, hours]: [string, any]) => (
-                    <div key={day} className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-900 capitalize">{day}</span>
-                      <span className="text-gray-600">
-                        {hours.closed ? 'Closed' : `${hours.open} - ${hours.close}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
-      </div>
 
       {/* Related Stores */}
-      <RelatedStores currentSlug={slug} />
+      {!showStatusPanel && (
+      <RelatedStores 
+        currentSlug={slugForRelated} 
+        limit={3}
+        title="Similar Stores"
+      />
+      )}
+
+      {/* Recently Viewed */}
+      <LastViewed />
+
+            {/* Platform Branding Footer */}
+            <PoweredByFooter />
     </>
   );
 }
+

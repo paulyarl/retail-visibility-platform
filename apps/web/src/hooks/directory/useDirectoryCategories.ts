@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { categoriesService } from '@/services/CategoriesSingletonService';
 
 export interface DirectoryCategory {
   name: string;
@@ -25,28 +26,16 @@ export function useDirectoryCategories(): DirectoryCategoriesHook {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/directory/categories');
+        // Use the singleton service instead of direct fetch to leverage caching
+        const categoriesData = await categoriesService.getCategories(false); // Don't include children for directory listing
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch categories');
-        }
-
-        const result = await response.json();
-        
-        // Handle different response formats
-        // New format: { success: true, data: { categories: [...] } }
-        // Old format: { categories: [...] }
-        const categoriesData = result.success 
-          ? (result.data?.categories || [])
-          : (result.categories || []);
-        
-        // Map to expected format if needed
+        // Map to expected format
         const mappedCategories = categoriesData.map((cat: any) => ({
           name: cat.name || '',
           slug: cat.slug || cat.name?.toLowerCase().replace(/\s+/g, '-') || '',
-          count: cat.storeCount || cat.count || 0,
+          count: cat.storeCount || cat.productCount || 0,
         }));
-        
+
         setCategories(mappedCategories);
       } catch (err) {
         console.error('Error fetching categories:', err);

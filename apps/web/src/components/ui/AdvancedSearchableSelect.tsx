@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Input } from './Input';
 import { Badge } from './Badge';
 
+
+
 export interface SelectOption {
   value: string;
   label: string;
@@ -31,6 +33,7 @@ interface AdvancedSearchableSelectProps {
   groupBy?: 'state' | 'city' | 'region' | 'group' | null;
   onFavoriteToggle?: (value: string) => void;
 }
+
 
 export function AdvancedSearchableSelect({
   options,

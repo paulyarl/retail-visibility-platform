@@ -7,6 +7,9 @@ import PageHeader from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
+
+
+
 interface StatusInfo {
   status: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   label: string;

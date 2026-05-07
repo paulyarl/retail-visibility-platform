@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PUT(
   req: NextRequest,
@@ -6,14 +7,18 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const url = `${base}/items/${encodeURIComponent(id)}/photos/reorder`;
+    
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
 
-    const res = await fetch(url, {
+    const res = await authenticatedFetch(`/items/${encodeURIComponent(id)}/photos/reorder`, accessToken, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: req.body,
       // @ts-expect-error - duplex is a new fetch feature
       duplex: 'half',

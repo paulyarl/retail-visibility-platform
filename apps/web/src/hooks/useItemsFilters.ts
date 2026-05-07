@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Item } from '@/services/itemsDataService';
 import { itemsDataService } from '@/services/itemsDataService';
 
-export type StatusFilter = 'all' | 'active' | 'inactive' | 'syncing' | 'draft' | 'archived';
+export type StatusFilter = 'all' | 'active' | 'inactive' | 'syncing' | 'draft' | 'archived' | 'trashed';
 export type VisibilityFilter = 'all' | 'public' | 'private';
 export type CategoryFilter = 'all' | 'assigned' | 'unassigned' | string;
 
@@ -56,7 +56,7 @@ export function useItemsFilters(): UseItemsFiltersReturn {
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(item => item.status === statusFilter);
+      filtered = filtered.filter(item => (item.itemStatus || item.status) === statusFilter);
     }
 
     // Apply visibility filter

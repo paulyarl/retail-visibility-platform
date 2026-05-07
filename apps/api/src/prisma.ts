@@ -2,7 +2,10 @@ import { PrismaClient } from '@prisma/client';
 import { createFlexiblePrisma } from './lib/prisma-flexible';
 
 // Ensure a single PrismaClient in dev (nodemon hot reload safe)
-const globalForPrisma = global as unknown as { prisma?: PrismaClient };
+const globalForPrisma = global as unknown as { 
+  prisma?: PrismaClient;
+  basePrisma?: PrismaClient;
+};
 
 // Use DATABASE_URL directly without modification
 // SSL and connection params should be set in the environment variable itself
@@ -13,23 +16,20 @@ const getDatabaseUrl = () => {
 // Production-grade Prisma configuration for Vercel serverless
 // Configure Prisma with connection pooling and retry logic
 // Export basePrisma for use in transactions (avoids retry wrapper issues)
-export const basePrisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+// CRITICAL: Reuse existing client to prevent connection pool exhaustion
+export const basePrisma = globalForPrisma.basePrisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   datasources: {
     db: {
       url: getDatabaseUrl(),
     },
   },
-  // Critical for serverless: prevent connection exhaustion
-  // https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
-  // @ts-ignore - connection_limit is valid but not in types
-  __internal: {
-    engine: {
-      connection_limit: 3, // Increased from 1 to handle concurrent requests
-      pool_timeout: 30, // Increased from default 10s to 30s
-    },
-  },
 });
+
+// Store in global for hot reload reuse
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.basePrisma = basePrisma;
+}
 
 // Enhanced retry logic for production reliability
 async function withRetry<T>(
@@ -53,7 +53,10 @@ async function withRetry<T>(
         error.message?.includes("Can't reach database server") ||
         error.message?.includes('Connection refused') ||
         error.message?.includes('ECONNREFUSED') ||
-        error.message?.includes('connection pool');
+        error.message?.includes('connection pool') ||
+        error.message?.includes('forcibly closed by the remote host') ||
+        error.message?.includes('ConnectionReset') ||
+        error.message?.includes('An existing connection was forcibly closed');
       
       if (isConnectionError && attempt < maxRetries) {
         // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
@@ -106,15 +109,13 @@ const basePrismaWithRetry = new Proxy(basePrisma, {
 // export const prisma = createFlexiblePrisma(basePrismaWithRetry);
 export const prisma = basePrismaWithRetry;
 
-// Graceful shutdown for production
-if (process.env.NODE_ENV === 'production') {
-  // Vercel serverless functions should disconnect after each request
-  // This is handled automatically, but we ensure cleanup on process exit
-  process.on('beforeExit', async () => {
-    await basePrisma.$disconnect();
-  });
-} else {
-  // Development: reuse connection
+// Graceful shutdown
+process.on('beforeExit', async () => {
+  await basePrisma.$disconnect();
+});
+
+// Store wrapped client in global for hot reload reuse
+if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = basePrismaWithRetry;
 }
 
@@ -127,4 +128,42 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     console.error('[Database Health] Connection check failed:', error);
     return false;
   }
+}
+
+// Connection validation and recovery
+export async function validateAndRecoverConnection(): Promise<boolean> {
+  try {
+    // Test connection with a simple query
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error: any) {
+    console.warn('[Database Recovery] Connection validation failed, attempting recovery:', error.message);
+    
+    // If connection is broken, disconnect and reconnect
+    try {
+      await basePrisma.$disconnect();
+      console.log('[Database Recovery] Disconnected from database');
+      
+      // Wait a moment before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Test reconnection
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('[Database Recovery] Successfully reconnected to database');
+      return true;
+    } catch (reconnectError) {
+      console.error('[Database Recovery] Reconnection failed:', reconnectError);
+      return false;
+    }
+  }
+}
+
+// Periodic connection validation (run every 5 minutes in development)
+if (process.env.NODE_ENV === 'development') {
+  setInterval(async () => {
+    const isHealthy = await validateAndRecoverConnection();
+    if (!isHealthy) {
+      console.warn('[Database Health] Periodic check failed - connection may be unstable');
+    }
+  }, 5 * 60 * 1000); // 5 minutes
 }

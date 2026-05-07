@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  try {
+    // Get rate limit configurations from database
+    const configs = await prisma.rate_limit_configurations.findMany({
+      orderBy: { route_type: 'asc' },
+      select: {
+        route_type: true,
+        max_requests: true,
+        window_minutes: true,
+        enabled: true,
+      }
+    });
+
+    // If no configs in DB, return defaults
+    if (configs.length === 0) {
+      return NextResponse.json([
+        { route_type: 'auth', max_requests: 20, window_minutes: 1, enabled: true },
+        { route_type: 'admin', max_requests: 20, window_minutes: 1, enabled: true },
+        { route_type: 'strict', max_requests: 20, window_minutes: 1, enabled: true },
+        { route_type: 'standard', max_requests: 100, window_minutes: 1, enabled: true },
+        { route_type: 'exempt', max_requests: 1000, window_minutes: 1, enabled: false },
+      ]);
+    }
+
+    return NextResponse.json(configs);
+  } catch (error) {
+    console.error('Error fetching rate limit configurations:', error);
+    // Return defaults on error
+    return NextResponse.json([
+      { route_type: 'auth', max_requests: 20, window_minutes: 1, enabled: true },
+      { route_type: 'admin', max_requests: 20, window_minutes: 1, enabled: true },
+      { route_type: 'strict', max_requests: 20, window_minutes: 1, enabled: true },
+      { route_type: 'standard', max_requests: 100, window_minutes: 1, enabled: true },
+      { route_type: 'exempt', max_requests: 1000, window_minutes: 1, enabled: false },
+    ]);
+  }
+}

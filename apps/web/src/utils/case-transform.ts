@@ -131,15 +131,3 @@ export const safeTransformToCamel = <T = any>(obj: any): T => {
   
   return transformed as T;
 };
-
-// Type definitions for common transformations
-export interface BusinessProfile {
-  businessName?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  phoneNumber?: string;
-  websiteUrl?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  mapPrivacyMode?: string;
-}

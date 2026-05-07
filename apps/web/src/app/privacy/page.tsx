@@ -4,6 +4,7 @@ import Link from 'next/link';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
+
 export default function PrivacyPage() {
   const { settings } = usePlatformSettings();
   const platformName = settings?.platformName || 'Visible Shelf';
@@ -16,9 +17,9 @@ export default function PrivacyPage() {
           <Link href="/" className="text-2xl font-bold text-neutral-900 hover:text-primary-600 transition-colors">
             {platformName}
           </Link>
-          <Link href="/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
+          <a href="/auth/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
             Sign In
-          </Link>
+          </a>
         </div>
       </header>
 
@@ -52,7 +53,7 @@ export default function PrivacyPage() {
                 and buyer contact details), when those integrations are enabled.
               </li>
               <li>Usage data (feature usage, performance metrics, error logs).</li>
-              <li>Billing details processed via our payment provider (e.g. Stripe).</li>
+              <li>Billing details processed via our payment providers (Square, PayPal).</li>
             </ul>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">2. How We Use Your Information</h2>

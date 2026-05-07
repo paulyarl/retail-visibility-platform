@@ -1,28 +1,36 @@
-/**
- * Authenticated API client
- * Automatically includes JWT token in requests
- * Works with both Next.js API routes (/api/*) and direct backend calls
- */
+import { getDeviceInfoHeader } from './device-info';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:4000';
 
 /**
- * Get access token from localStorage or cookies
+ * Request deduplication cache
+ * Prevents duplicate GET requests within a short time window
  */
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  // Try localStorage first (legacy)
-  const localToken = localStorage.getItem('access_token');
-  if (localToken) return localToken;
-  
-  // Fall back to cookie (current auth system)
-  return getCookie('auth_token');
+interface CachedRequest {
+  promise: Promise<Response>;
+  timestamp: number;
+}
+
+const requestCache = new Map<string, CachedRequest>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes for proper caching
+
+function getCacheKey(url: string): string {
+  // Auth0 uses HTTP-only cookies, so no token in cache key
+  return url;
+}
+
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, cached] of requestCache.entries()) {
+    if (now - cached.timestamp > CACHE_TTL_MS) {
+      requestCache.delete(key);
+    }
+  }
 }
 
 function getLastTenantId(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('lastTenantId');
+  return localStorage.getItem('lastTenantId') || localStorage.getItem('current_tenant_id');
 }
 
 function getCookie(name: string): string | null {
@@ -32,33 +40,60 @@ function getCookie(name: string): string | null {
 }
 
 /**
- * Make an authenticated API request with centralized auth handling.
- * - Injects bearer token from localStorage
- * - On 401: clears token and redirects to /login?next=
+ * Get Auth0 ID from cookie for API authentication
+ */
+function getAuth0Id(): string | null {
+  return getCookie('auth0_id');
+}
+
+/**
+ * Get Auth0 email from cookie for API authentication
+ */
+function getAuth0Email(): string | null {
+  return getCookie('auth0_email');
+}
+
+/**
+ * Make an authenticated API request with Auth0 session handling.
+ * - Uses HTTP-only cookies for authentication (managed by Auth0 SDK)
+ * - On 401: redirects to Auth0 login
+ * - Deduplicates identical GET requests within cache window
  * Supports both relative URLs (/api/tenants) and absolute URLs (http://...)
  */
 export async function apiRequest(
   endpoint: string,
-  options: RequestInit & { skipAuthRedirect?: boolean } = {}
+  options: RequestInit & { skipAuthRedirect?: boolean; skipCache?: boolean; skipAuth?: boolean } = {}
 ): Promise<Response> {
-  const token = getAccessToken();
   const tenantId = getLastTenantId();
   const csrf = getCookie('csrf');
   
   const method = (options.method || 'GET').toString().toUpperCase();
   const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  const isGet = method === 'GET';
+  
   // Start with any provided headers, but avoid adding headers that trigger CORS preflight unnecessarily
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
+
+  // Add Auth0 headers for API authentication (read from non-HTTP-only cookies)
+  const auth0Id = getAuth0Id();
+  const auth0Email = getAuth0Email();
+  if (auth0Id) headers['x-auth0-id'] = auth0Id;
+  if (auth0Email) headers['x-auth0-email'] = auth0Email;
+
+  // Add device info header for session tracking
+  if (typeof window !== 'undefined') {
+    try {
+      headers['x-device-info'] = getDeviceInfoHeader();
+    } catch (error) {
+      console.warn('[API] Failed to add device info header:', error);
+    }
+  }
+
   // Only set Content-Type when sending a body on non-GET methods
   if (isWrite && options.body && !('Content-Type' in headers)) {
     headers['Content-Type'] = 'application/json';
-  }
-
-  // Add Authorization header if token exists
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
   }
 
   // Attach tenant and CSRF headers on write operations
@@ -69,11 +104,45 @@ export async function apiRequest(
 
   // Handle relative URLs (Next.js API routes) and absolute URLs
   // - Absolute http(s): use as-is
-  // - Leading '/': use as-is (hit Next.js API/proxy routes)
-  // - Bare path: prefix with API_BASE_URL
-  const url = endpoint.startsWith('http') || endpoint.startsWith('/')
+  // - /api/*: backend API calls (prefix with API_BASE_URL)
+  // - /public/*: backend API calls (prefix with API_BASE_URL)
+  // - Other / paths: Next.js API routes (use as-is)
+  const url = endpoint.startsWith('http')
     ? endpoint
-    : `${API_BASE_URL}/${endpoint}`;
+    : endpoint.startsWith('/api/') || endpoint.startsWith('/public/')
+    ? `${API_BASE_URL}${endpoint}`
+    : endpoint;
+  
+  // Request deduplication for GET requests
+  // Skip cache for write operations or if explicitly disabled
+  if (isGet && !options.skipCache) {
+    cleanExpiredCache();
+    const cacheKey = getCacheKey(url);
+    const cached = requestCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      // Return cloned response from cache (Response can only be read once)
+      return cached.promise.then(resp => resp.clone());
+    }
+    
+    // Create the request promise and cache it
+    const requestPromise = executeRequest(url, options, headers);
+    requestCache.set(cacheKey, { promise: requestPromise, timestamp: Date.now() });
+    return requestPromise.then(resp => resp.clone());
+  }
+  
+  return executeRequest(url, options, headers);
+}
+
+/**
+ * Execute the actual fetch request with retry logic
+ * Auth0 session is passed via HTTP-only cookies (credentials: 'include')
+ */
+async function executeRequest(
+  url: string,
+  options: RequestInit & { skipAuthRedirect?: boolean },
+  headers: Record<string, string>
+): Promise<Response> {
 
   // Simple retry/backoff for 429/5xx (max 2 retries), but skip if x-no-retry header is set
   const shouldRetry = !headers['x-no-retry'];
@@ -84,7 +153,7 @@ export async function apiRequest(
     resp = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include', // Include cookies for cross-origin requests
+      credentials: 'include', // Include cookies for Auth0 session (HTTP-only)
     });
     if (attempt >= maxRetries) break;
     if (resp.status === 429 || (resp.status >= 500 && resp.status <= 599)) {
@@ -96,15 +165,16 @@ export async function apiRequest(
     break;
   }
   
-  // Centralized 401 handling (non-destructive)
+  // Centralized 401 handling - redirect to Auth0 login
   if (resp.status === 401 && typeof window !== 'undefined' && !(options as any).skipAuthRedirect) {
     try {
       const pathname = window.location.pathname;
       const alreadyRedirecting = sessionStorage.getItem('auth_redirecting') === '1';
-      if (!alreadyRedirecting && pathname !== '/login') {
+      if (!alreadyRedirecting && pathname !== '/login' && pathname !== '/auth/login') {
         sessionStorage.setItem('auth_redirecting', '1');
-        const next = encodeURIComponent(pathname + window.location.search);
-        window.location.href = `/login?next=${next}`;
+        // Redirect to Auth0 login with return path
+        const returnTo = encodeURIComponent(pathname + window.location.search);
+        window.location.href = `/auth/login?returnTo=${returnTo}`;
       }
     } catch {}
   }
@@ -116,30 +186,34 @@ export async function apiRequest(
  * Convenience methods
  */
 export const api = {
-  get: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  get: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'GET' }),
 
-  post: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  post: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
-    apiRequest(endpoint, {
+  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) => {
+    console.log('[api.put] Endpoint:', endpoint, 'Data:', data);
+    const body = data ? JSON.stringify(data) : undefined;
+    console.log('[api.put] Body:', body);
+    return apiRequest(endpoint, {
       ...options,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
-    }),
+      body,
+    });
+  },
 
-  patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  delete: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  delete: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'DELETE' }),
 };

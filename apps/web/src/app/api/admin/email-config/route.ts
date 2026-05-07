@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(req: NextRequest) {
   try {
-    // Forward auth headers
-    const authHeader = req.headers.get('authorization');
-    const cookieHeader = req.headers.get('cookie');
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
     
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) headers['Authorization'] = authHeader;
-    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
     
-    const response = await fetch(`${API_BASE_URL}/admin/email-config`, {
+    const { accessToken } = authResult;
+
+    const response = await authenticatedFetch('/admin/email-config', accessToken, {
       method: 'GET',
-      headers,
     });
 
     if (!response.ok) {
@@ -37,20 +34,18 @@ export async function GET(req: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-
-    // Forward auth headers
-    const authHeader = request.headers.get('authorization');
-    const cookieHeader = request.headers.get('cookie');
     
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) headers['Authorization'] = authHeader;
-    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
 
-    const response = await fetch(`${API_BASE_URL}/admin/email-config`, {
+    const response = await authenticatedFetch('/admin/email-config', accessToken, {
       method: 'PUT',
-      headers,
       body: JSON.stringify(body),
     });
 

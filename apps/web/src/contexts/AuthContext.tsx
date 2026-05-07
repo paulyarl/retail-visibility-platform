@@ -1,20 +1,39 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
+import { SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
 
 // User type
+
+// Force edge runtime to prevent prerendering issues
+export const runtime = 'edge';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
+
 export interface User {
   id: string;
   email: string;
   firstName?: string;
   lastName?: string;
+  businessName?: string;
+  businessType?: string;
+  phone?: string;
   role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
   emailVerified: boolean;
   tenants: {
     id: string;
     name: string;
     role: 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER';
+    organizationId?: string;
   }[];
+  // Auth0 profile fields
+  picture?: string;
+  auth0Id?: string;
+  onboardingCompleted?: boolean;
 }
 
 // Auth context type
@@ -22,250 +41,220 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
-  currentTenantId: string | null;
+  login: () => void;
+  register: () => void;
+  logout: () => void;
   switchTenant: (tenantId: string) => void;
+  currentTenantId: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// AuthContext Singleton Class - simplified for Auth0 session management
+class AuthContextSingleton extends ApiSystemSingleton {
+  private static instance: AuthContextSingleton;
+  private context: React.Context<AuthContextType | undefined>;
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  private constructor() {
+    super('auth-context', {
+      enableCache: true,
+      enableEncryption: true,
+      enablePrivateCache: true,
+      authenticationLevel: 'authenticated',
+      defaultTTL: 60 * 60 * 1000, // 1 hour
+      enableMetrics: true,
+      enableLogging: false
+    });
+    
+    // Create React context
+    this.context = createContext<AuthContextType | undefined>(undefined);
+  }
 
-// Token management
-const TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const TENANT_KEY = 'current_tenant_id';
+  static getInstance(): AuthContextSingleton {
+    if (!AuthContextSingleton.instance) {
+      AuthContextSingleton.instance = new AuthContextSingleton();
+    }
+    return AuthContextSingleton.instance;
+  }
+
+  // Get the React context
+  getContext(): React.Context<AuthContextType | undefined> {
+    return this.context;
+  }
+
+  // Helper method to clear cached auth data
+  async clearCachedAuthUser(): Promise<void> {
+    await this.clearCachedUserData('auth_user_cache');
+  }
+}
+
+// Create singleton instance
+const authContextSingleton = AuthContextSingleton.getInstance();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
 
-  // Get tokens from localStorage
-  const getAccessToken = () => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
-  };
+  // Track fetch errors to prevent infinite retry loops
+  const fetchErrorRef = React.useRef(false);
 
-  const getRefreshToken = () => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  };
-
-  const setTokens = (accessToken: string, refreshToken: string) => {
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    // Also set a non-HttpOnly cookie for SSR guard
+  // Fetch current user - checks Auth0 session via API
+  const fetchUser = useCallback(async (forceRefresh = false) => {
     try {
-      document.cookie = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax`;
-    } catch {}
-  };
+      // Only check authentication if we're in an admin context, tenant context, or have authentication tokens
+      const isAdminContext = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+      const isTenantContext = typeof window !== 'undefined' && (
+        window.location.pathname.startsWith('/t/') || 
+        window.location.pathname.startsWith('/dashboard') ||
+        window.location.pathname.startsWith('/tenants') ||
+        window.location.pathname.startsWith('/settings') ||
+        window.location.pathname.startsWith('/onboarding')
+      );
 
-  const clearTokens = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TENANT_KEY);
-    try {
-      // Expire cookie
-      document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-    } catch {}
-  };
+      // Check for Auth0 cookies (non-HTTP-only) that indicate user might be authenticated
+      const hasAuthCookies = typeof window !== 'undefined' && 
+        (document.cookie.includes('auth0_email=') || 
+         document.cookie.includes('auth0_id=') ||
+         document.cookie.includes('auth0.')); // Also check for auth0 session cookies
 
-  // Fetch current user
-  const fetchUser = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
+      // Skip auth check if no auth cookies present - prevents 401 errors
+      // This applies to all contexts, not just public pages
+      if (!hasAuthCookies && !forceRefresh) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        credentials: 'include',
-      });
+      // Always bypass cache to ensure fresh auth state
+      // This is critical after Auth0 login redirects back to the app
+      const sessionInfo = await securitySingletonService.getSessionInfo(true);
 
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        
-        // Set current tenant if not set
-        if (!currentTenantId && data.user && data.user.tenants && data.user.tenants.length > 0) {
-          const savedTenantId = localStorage.getItem(TENANT_KEY);
-          const tenantExists = data.user.tenants.find((t: any) => t.id === savedTenantId);
-          setCurrentTenantId(tenantExists ? savedTenantId : data.user.tenants[0].id);
+      if (sessionInfo.isAuthenticated && sessionInfo.user) {
+        // Transform service user to context format
+        const transformedUser: User = {
+          id: sessionInfo.user.id,
+          email: sessionInfo.user.email,
+          firstName: sessionInfo.user.firstName,
+          lastName: sessionInfo.user.lastName,
+          businessName: sessionInfo.user.businessName,
+          businessType: sessionInfo.user.businessType,
+          phone: sessionInfo.user.phone,
+          emailVerified: sessionInfo.user.emailVerified,
+          role: sessionInfo.user.role || 'USER',
+          tenants: sessionInfo.user.tenants || (sessionInfo.user.tenant ? [{
+            id: sessionInfo.user.tenant.id,
+            name: sessionInfo.user.tenant.name,
+            role: 'OWNER',
+            organizationId: sessionInfo.user.tenant.organizationId
+          }] : []),
+          picture: sessionInfo.user.picture,
+          auth0Id: sessionInfo.user.auth0Id,
+          onboardingCompleted: sessionInfo.user.onboardingCompleted,
+        };
+
+        setUser(transformedUser);
+        fetchErrorRef.current = false; // Clear error on success
+
+        // Set current tenant if available
+        if (transformedUser.tenants && transformedUser.tenants.length > 0 && !currentTenantId) {
+          setCurrentTenantId(transformedUser.tenants[0].id);
+          localStorage.setItem('current_tenant_id', transformedUser.tenants[0].id);
         }
-      } else if (response.status === 401) {
-        // Token expired, try to refresh
-        await refreshToken();
       } else {
-        // Do not clear tokens on transient/non-401 errors
         setUser(null);
       }
     } catch (error) {
-      console.error('[AuthContext] Failed to fetch user:', error);
-      // Keep tokens; treat as unauthenticated view until next successful call
+      console.warn('[AuthContext] fetchUser error:', error);
+      fetchErrorRef.current = true; // Mark as errored to prevent retry loop
       setUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenantId]);
+  }, []); // Remove currentTenantId - it's only used for setting, not fetching
 
-  // Refresh access token
-  const refreshToken = useCallback(async () => {
-    const refresh = getRefreshToken();
-    if (!refresh) {
-      clearTokens();
-      setUser(null);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
-        try { document.cookie = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax`; } catch {}
-        await fetchUser();
-      } else {
-        // Only clear tokens if refresh endpoint explicitly says unauthorized
-        if (response.status === 401) {
-          clearTokens();
-        }
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('[AuthContext] Failed to refresh token:', error);
-      clearTokens();
-      setUser(null);
-    }
-  }, [fetchUser]);
-
-  // Login
-  const login = async (email: string, password: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Login failed');
-      }
-
-      const data = await response.json();
-      console.log('[AuthContext] Login response:', { 
-        hasAccessToken: !!data.accessToken, 
-        hasRefreshToken: !!data.refreshToken,
-        hasUser: !!data.user 
-      });
-      
-      setTokens(data.accessToken, data.refreshToken);
-      setUser(data.user);
-      
-      console.log('[AuthContext] Tokens saved to localStorage');
-      
-      // Set current tenant
-      if (data.user && data.user.tenants && data.user.tenants.length > 0) {
-        setCurrentTenantId(data.user.tenants[0].id);
-        localStorage.setItem(TENANT_KEY, data.user.tenants[0].id);
-      }
-    } catch (error) {
-      // Don't log to console - error will be caught and displayed in UI
-      throw error;
+  // Login - redirects to Auth0 login
+  const login = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/login';
     }
   };
 
-  // Register
-  const register = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password, firstName, lastName }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
-      }
-
-      // After registration, automatically log in
-      await login(email, password);
-    } catch (error) {
-      // Don't log to console - error will be caught and displayed in UI
-      throw error;
+  // Register - redirects to Auth0 signup
+  const register = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/signup';
     }
   };
 
-  // Logout
-  const logout = async () => {
-    const token = getAccessToken();
-    
-    if (token) {
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        });
-      } catch (error) {
-        console.error('[AuthContext] Logout request failed:', error);
+  // Logout - redirects to Auth0 logout
+  const logout = () => {
+    try {
+      // Clear local state
+      setUser(null);
+      setCurrentTenantId(null);
+      localStorage.removeItem('current_tenant_id');
+      
+      // Clear cached auth data
+      authContextSingleton.clearCachedAuthUser().catch(() => {});
+      
+      // Clear auth0 cookies - these are used for API authentication
+      if (typeof window !== 'undefined') {
+        // Clear auth0_id cookie
+        document.cookie = 'auth0_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        // Clear auth0_email cookie
+        document.cookie = 'auth0_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        
+        // Redirect to Auth0 logout (handled by Auth0 SDK middleware)
+        window.location.href = '/auth/logout';
+      }
+    } catch (error) {
+      console.error('[AuthContext] Logout failed:', error);
+      // Still redirect to Auth0 logout even if local clear fails
+      if (typeof window !== 'undefined') {
+        // Still try to clear cookies
+        document.cookie = 'auth0_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'auth0_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        window.location.href = '/auth/logout';
       }
     }
-
-    clearTokens();
-    setUser(null);
-    setCurrentTenantId(null);
   };
 
   // Switch tenant
   const switchTenant = (tenantId: string) => {
     if (user?.tenants.find(t => t.id === tenantId)) {
       setCurrentTenantId(tenantId);
-      localStorage.setItem(TENANT_KEY, tenantId);
+      localStorage.setItem('current_tenant_id', tenantId);
     }
   };
 
   // Load user on mount
+  const hasFetchedRef = React.useRef(false);
+  
   useEffect(() => {
-    fetchUser();
+    // Only fetch once on mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchUser();
+    }
   }, [fetchUser]);
 
-  // Setup token refresh interval (refresh 1 minute before expiry)
+  // Re-fetch auth state when navigating to a protected page
+  const pathname = usePathname();
+  
   useEffect(() => {
-    if (!user) return;
-
-    const interval = setInterval(() => {
-      refreshToken();
-    }, 14 * 60 * 1000); // Refresh every 14 minutes (tokens expire in 15 minutes)
-
-    return () => clearInterval(interval);
-  }, [user, refreshToken]);
+    if (!pathname) return;
+    
+    const isProtected = pathname.startsWith('/admin') ||
+      pathname.startsWith('/t/') ||
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/tenants') ||
+      pathname.startsWith('/settings') ||
+      pathname.startsWith('/onboarding');
+    
+    // Only fetch if protected, no user, and no previous fetch error (prevents infinite loop on auth failure)
+    if (isProtected && !user && hasFetchedRef.current && !fetchErrorRef.current) {
+      fetchUser();
+    }
+  }, [pathname, user, fetchUser]);
 
   const value: AuthContextType = {
     user,
@@ -274,17 +263,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     register,
     logout,
-    refreshToken,
     currentTenantId,
     switchTenant,
   };
 
+  const AuthContext = authContextSingleton.getContext();
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// Export the context for external use if needed
+export { authContextSingleton as AuthContextSingleton };
+
 // Hook to use auth context
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = useContext(authContextSingleton.getContext());
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

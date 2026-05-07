@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui';
 
+
+
 export interface Step {
   id: string;
   title: string;
@@ -13,6 +15,7 @@ interface ProgressStepsProps {
   steps: Step[];
   currentStep: number;
 }
+
 
 export default function ProgressSteps({ steps, currentStep }: ProgressStepsProps) {
   return (

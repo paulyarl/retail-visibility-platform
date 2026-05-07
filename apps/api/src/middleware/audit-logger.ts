@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { randomUUID } from 'crypto';
+import { generateQuickStart } from '../lib/id-generator';
 
 /**
  * Middleware to log all write operations to audit_log table
@@ -40,11 +41,11 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const user = req.user;
 
     // Determine entity type and action from path
-    let entityType: 'inventoryItem' | 'tenant' | 'policy' | 'oauth' | 'other' = 'other';
+    let entityType: 'inventory_item' | 'tenant' | 'policy' | 'oauth' | 'other' = 'other';
     let action: 'create' | 'update' | 'delete' | 'sync' | 'policyApply' | 'oauthConnect' | 'oauthRefresh' = 'update';
 
     if (path.includes('/inventory') || path.includes('/items')) {
-      entityType = 'inventoryItem';
+      entityType = 'inventory_item';
       if (req.method === 'POST') action = 'create';
       if (req.method === 'DELETE') action = 'delete';
       if (req.method === 'PUT' || req.method === 'PATCH') action = 'update';
@@ -64,18 +65,18 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const entityId = idMatch ? idMatch[1] : 'unknown';
 
     // Create audit log entry
-    await prisma.auditLog.create({
+    await prisma.audit_log.create({ 
       data: {
-        id: randomUUID(),
-        tenantId: (user as any)?.tenantId || 'system',
-        actorId: (user as any)?.id || 'anonymous',
-        actorType: user ? 'user' : 'system',
-        entityType: entityType,
-        entityId: entityId,
+        id: generateQuickStart("auditid"),
+        tenant_id: (user as any)?.tenantId || 'system', 
+        actor_id: (user as any)?.id || 'anonymous',
+        actor_type: user ? 'user' : 'system',
+        entity_type: entityType,
+        entity_id: entityId,
         action,
-        requestId: requestId,
+        request_id: requestId,
         ip: req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown',
-        userAgent: (req.headers['user-agent'] as string) || null,
+        user_agent: (req.headers['user-agent'] as string) || null,
         diff: {
           method: req.method,
           path: req.path,

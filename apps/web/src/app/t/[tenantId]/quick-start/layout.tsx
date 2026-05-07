@@ -10,6 +10,10 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+
+
+
 
 export default function QuickStartLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -18,7 +22,7 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch tenant tier
+    // Fetch tenant tier using the tier endpoint which resolves effective tier (including org tier)
     const fetchTier = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -29,14 +33,17 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
           headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}`, {
+        // Use /tier endpoint which properly resolves effective tier from org + tenant
+        //const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier`, {
+        const res = await api.get(`${apiUrl}/api/tenants/${tenantId}/tier`, {
           headers,
           credentials: 'include',
         });
         
         if (res.ok) {
           const data = await res.json();
-          setTier(data.subscriptionTier || 'trial');
+          // Use effective tier which considers organization tier for chains
+          setTier(data.tier || data.subscriptionTier || 'trial');
         }
       } catch (err) {
         console.error('Failed to fetch tenant tier:', err);
@@ -51,7 +58,7 @@ export default function QuickStartLayout({ children }: { children: React.ReactNo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     );

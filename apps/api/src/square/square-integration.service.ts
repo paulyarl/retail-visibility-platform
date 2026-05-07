@@ -81,7 +81,7 @@ export class SquareIntegrationService {
 
       // Revoke access token
       try {
-        await this.getOAuthService().revokeToken(integration.accessToken);
+        await this.getOAuthService().revokeToken(integration.access_token);
         console.log(`[SquareIntegration] Token revoked for tenant ${tenantId}`);
       } catch (error) {
         console.warn('[SquareIntegration] Token revocation failed (may already be revoked):', error);
@@ -110,15 +110,15 @@ export class SquareIntegrationService {
       }
 
       // Check if token needs refresh
-      if (integration.tokenExpiresAt && integration.refreshToken) {
-        const expiresAt = new Date(integration.tokenExpiresAt);
+      if (integration.token_expires_at && integration.refresh_token) {
+        const expiresAt = new Date(integration.token_expires_at);
         const now = new Date();
         const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
 
         // Refresh if expiring within 24 hours
         if (hoursUntilExpiry < 24 && hoursUntilExpiry > 0) {
           console.log(`[SquareIntegration] Token expiring soon for tenant ${tenantId}, refreshing...`);
-          await this.refreshToken(integration.id, integration.refreshToken);
+          await this.refreshToken(integration.id, integration.refresh_token);
           
           // Get updated integration
           return await squareIntegrationRepository.getIntegrationByTenantId(tenantId);
@@ -185,7 +185,7 @@ export class SquareIntegrationService {
       }
 
       const squareClient = createSquareClient({
-        access_token: integration.accessToken,
+        access_token: integration.access_token,
         mode: integration.mode as 'sandbox' | 'production',
       });
 

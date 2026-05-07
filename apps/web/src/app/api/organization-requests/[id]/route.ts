@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyGet, proxyPatch, proxyDelete } from '@/lib/api-proxy';
+import { organizationService } from '@/services/OrganizationService';
 
 // GET /api/organization-requests/[id] - Get a specific request
 export async function GET(
@@ -8,13 +8,25 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const res = await proxyGet(request, `/organization-requests/${id}`);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Get organization request using service with automatic caching
+    const orgRequest = await organizationService.getOrganizationRequest(id);
+    
+    if (!orgRequest) {
+      return NextResponse.json({ 
+        error: 'request_not_found',
+        message: 'Organization request not found' 
+      }, { status: 404 });
+    }
+    
+    return NextResponse.json(orgRequest);
   } catch (error) {
-    console.error('[Organization Request] GET error:', error);
+    console.error('[Organization Request API GET] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch organization request' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch organization request' 
+      },
       { status: 500 }
     );
   }
@@ -28,13 +40,25 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const res = await proxyPatch(request, `/organization-requests/${id}`, body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Update organization request using service with automatic cache invalidation
+    const updatedRequest = await organizationService.updatePendingRequest(id, body);
+    
+    if (!updatedRequest) {
+      return NextResponse.json({ 
+        error: 'update_failed',
+        message: 'Failed to update organization request' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(updatedRequest);
   } catch (error) {
-    console.error('[Organization Request] PATCH error:', error);
+    console.error('[Organization Request API PATCH] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to update organization request' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to update organization request' 
+      },
       { status: 500 }
     );
   }
@@ -47,13 +71,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const res = await proxyDelete(request, `/organization-requests/${id}`);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Delete organization request using service with automatic cache invalidation
+    await organizationService.deletePendingRequest(id);
+    
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('[Organization Request] DELETE error:', error);
+    console.error('[Organization Request API DELETE] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete organization request' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to delete organization request' 
+      },
       { status: 500 }
     );
   }

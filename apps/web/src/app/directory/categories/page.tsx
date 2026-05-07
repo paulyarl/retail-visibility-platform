@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import AllCategoriesClient from './AllCategoriesClient';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,9 @@ export default function AllCategoriesPage() {
       }
     >
       <AllCategoriesClient />
+
+            {/* Platform Branding Footer */}
+            <PoweredByFooter />
     </Suspense>
   );
 }

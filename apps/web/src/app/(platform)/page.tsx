@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
+import { Card, Button } from '@mantine/core';
+import { Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
+import { hoursStatusService } from '@/services/HoursStatusService';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { tenantPublicService } from '@/services/TenantPublicService';
+import { platformPublicService } from '@/services/PlatformPublicService';
 import Image from "next/image";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
@@ -18,8 +24,38 @@ import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
 import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
+import { Badge as MantineBadge } from '@mantine/core';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+
 
 export default function PlatformHomePage() {
+  // Prevent SSR rendering of Mantine components
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+    
+    // Track landing page view
+    trackBehaviorClient({
+      entityType: 'platform',
+      entityId: 'platform_home',
+      entityName: 'Platform Home',
+      pageType: 'platform_home'
+    });
+  }, []);
+  
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
   return <Home embedded />;
 }
 
@@ -28,8 +64,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const router = useRouter();
   
-  // Use optimized dashboard data hook
-  const { data: dashboardData, loading, error } = useDashboardData(isAuthenticated, authLoading);
+  // Use consolidated platform dashboard hook
+  const { data: platformData, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
   
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -50,31 +86,61 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     storefrontsLiveFormatted: '0',
     platformUptime: 99.9,
     platformUptimeFormatted: '99.9%',
+    // Additional fields for authenticated users
+    totalUsers: 0,
+    activeUsers: 0,
+    systemHealth: null,
+    growthMetrics: null
   });
   
-  // Extract stats from dashboard data
-  const stats = {
-    total: dashboardData?.stats?.totalItems || 0,
-    active: dashboardData?.stats?.activeItems || 0,
-    syncIssues: dashboardData?.stats?.syncIssues || 0,
-    locations: dashboardData?.stats?.locations || 0,
-    isChain: dashboardData?.isChain || false,
-    organizationName: dashboardData?.organizationName || null,
-  };
-  const selectedTenantId = dashboardData?.tenant?.id || null;
+  // Extract stats from platform stats state (after it's loaded)
+  const stats = useMemo(() => ({
+    total: platformStats.productsListed || 0,
+    active: Math.floor(platformStats.productsListed * 0.9) || 0, // Estimate active items
+    syncIssues: 0, // Platform doesn't have sync issues
+    locations: platformStats.activeRetailers || 0,
+    isChain: false, // Platform view shows all tenants
+    organizationName: null, // Platform view
+  }), [platformStats.productsListed, platformStats.activeRetailers]);
+  //console.log('Platform stats:', stats);
+  const selectedTenantId = null; // Platform view doesn't have selected tenant
   
-  // Fetch public platform stats for visitors
+  // Fetch platform stats for all users (public and authenticated)
   useEffect(() => {
-    if (!isAuthenticated && !authLoading) {
+    if (!authLoading) {
       const fetchPlatformStats = async () => {
         try {
-          // Call backend API directly (public endpoint, no auth needed)
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          const response = await fetch(`${API_BASE_URL}/api/platform-stats`);
-          if (response.ok) {
-            const data = await response.json();
-            setPlatformStats(data);
+          let statsData;
+          
+          if (isAuthenticated) {
+            // Authenticated users get full data from platform dashboard
+            const { platformDashboardService } = await import('@/services/PlatformDashboardSingletonService');
+            const dashboardData = await platformDashboardService.getPlatformDashboard();
+          //  console.log('Platform dashboardData:', dashboardData);
+            statsData = dashboardData?.stats;
+          //  console.log('About to setPlatformStats with data:', statsData);
+          } else {
+            // Public users get limited data from public service
+            statsData = await platformPublicService.getPlatformStats();
+         //   console.log('Platform statsData:', statsData);
           }
+          
+          // Transform to match expected state format
+          setPlatformStats({
+            activeRetailers: (statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0,
+            activeRetailersFormatted: ((statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0).toLocaleString(),
+            productsListed: (statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0,
+            productsListedFormatted: ((statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0).toLocaleString(),
+            storefrontsLive: (statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5),
+            storefrontsLiveFormatted: ((statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5)).toLocaleString(),
+            platformUptime: (statsData as any).platformUptime || 99.9,
+            platformUptimeFormatted: (statsData as any).platformUptimeFormatted || '99.9%',
+            // Add additional data for authenticated users
+            totalUsers: (statsData as any).totalUsers || 0,
+            activeUsers: (statsData as any).activeUsers || 0,
+            systemHealth: (statsData as any).systemHealth || null,
+            growthMetrics: (statsData as any).growthMetrics || null
+          });
         } catch (error) {
           // Silently fail - platform stats are non-critical for user experience
           console.warn('[Platform Stats] Failed to load public stats, using defaults');
@@ -98,13 +164,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           }
         }
 
-        // Fetch from public endpoint (no auth needed for reading)
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${API_BASE_URL}/api/public/features-showcase-config`);
-        if (response.ok) {
-          const data = await response.json();
-          setShowcaseMode(data.mode || 'hybrid');
-        }
+        // Use platformPublicService for consistent caching and metrics
+        const config = await platformPublicService.getFeaturesShowcaseConfig();
+        // Map config mode to expected ShowcaseMode type
+        const modeMap: Record<string, ShowcaseMode> = {
+          'hybrid': 'hybrid',
+          'featured': 'grid',
+          'recent': 'slider',
+          'trending': 'tabs'
+        };
+        setShowcaseMode(modeMap[config.mode] || 'hybrid');
       } catch (error) {
         // Silently fail - showcase config is non-critical, defaults to 'hybrid'
         console.warn('[Showcase Config] Failed to load config, using hybrid mode');
@@ -119,11 +188,17 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     const fetchHours = async () => {
       try {
         if (!selectedTenantId) { setHoursInfo(null); return; }
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${API_BASE_URL}/public/tenant/${selectedTenantId}/profile`, { cache: 'no-store' });
-        if (!res.ok) { setHoursInfo(null); return; }
-        const prof = await res.json();
-        const hours = prof?.hours;
+        
+        // Use TenantPublicService for tenant profile data
+        const profile = await tenantPublicService.getPublicTenantProfile(selectedTenantId);
+        
+        if (!profile) { 
+          setHoursInfo(null); 
+          return; 
+        }
+        
+
+        const hours = profile?.hours;
         let hasHours = false;
         if (Array.isArray(hours)) hasHours = hours.length > 0;
         else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).filter(k => k !== 'timezone' && k !== 'special').length > 0;
@@ -146,14 +221,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       if (!selectedTenantId) return;
       
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const tenantRes = await api.get(`${apiBaseUrl}/api/tenants/${selectedTenantId}`);
-        if (tenantRes.ok) {
-          const tenantInfo = await tenantRes.json();
+        // Use appropriate service based on authentication state
+        const tenantInfo = isAuthenticated 
+          ? await platformHomeService.getTenant(selectedTenantId)
+          : await tenantPublicService.getPublicTenantInfo(selectedTenantId);
+          
+        if (tenantInfo) {
           setTenantData({
             name: tenantInfo.name,
-            logoUrl: tenantInfo.metadata?.logo_url,
-            bannerUrl: tenantInfo.metadata?.banner_url,
+            logoUrl: tenantInfo.logoUrl,
+            bannerUrl: tenantInfo.bannerUrl,
           });
         }
       } catch (error) {
@@ -189,6 +266,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const listingsCount = useCountUp(stats.active);
   const syncIssuesCount = useCountUp(stats.syncIssues);
   const locationsCount = useCountUp(stats.locations);
+  // console.log(`Selected TenantId: ${selectedTenantId}`);
+  const { status: hoursStatus } = useStoreStatus(selectedTenantId || undefined, false); // Public scope
+  
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {!embedded && (
@@ -202,7 +282,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     alt={settings.platformName || 'Platform Logo'}
                     width={150}
                     height={40}
-                    className="h-8 sm:h-10 w-auto object-contain cursor-pointer"
+                    className="object-contain cursor-pointer"
+                    loading="eager"
+                    priority
                   />
                 </Link>
               ) : (
@@ -227,15 +309,14 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     size="sm"
                     onClick={async () => {
                       await logout();
-                      router.push('/');
                     }}
                   >
                     Sign Out
                   </Button>
                 ) : (
-                  <Link href="/login">
+                  <a href="/auth/login">
                     <Button variant="secondary" size="sm">Sign In</Button>
-                  </Link>
+                  </a>
                 )}
               </div>
 
@@ -269,15 +350,14 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     onClick={async () => {
                       setMobileMenuOpen(false);
                       await logout();
-                      router.push('/');
                     }}
                   >
                     Sign Out
                   </Button>
                 ) : (
-                  <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                  <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="secondary" className="w-full" size="md">Sign In</Button>
-                  </Link>
+                  </a>
                 )}
               </div>
             )}
@@ -302,6 +382,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 priority
               />
             </div>
+            
           </div>
         )}
 
@@ -316,11 +397,20 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   fill
                   className="object-contain rounded-lg"
                 />
+                {/* Hours Badge - Status */}
+          <HoursStatusBadge status={hoursStatus} />
+			
               </div>
             )}
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
-                {isAuthenticated ? (tenantData?.name ? `${tenantData.name} Dashboard` : 'Welcome to Your Dashboard') : 'Platform Overview'}
+                {isAuthenticated 
+                  ? (user?.firstName 
+                      ? `Welcome, ${user.firstName}!` 
+                      : (user?.businessName 
+                          ? `${user.businessName} Dashboard` 
+                          : 'Welcome to Your Dashboard'))
+                  : 'Platform Overview'}
               </h2>
               <p className="text-sm sm:text-base text-neutral-600 mt-1">
                 {isAuthenticated 
@@ -428,6 +518,85 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               </AnimatedCard>
             </div>
 
+            {/* Additional badges for authenticated users */}
+            {isAuthenticated && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6">
+                <AnimatedCard delay={0.4} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Total Users</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.6, type: "spring" }}
+                      >
+                        {platformStats.totalUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">registered users</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.5} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Users</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.7, type: "spring" }}
+                      >
+                        {platformStats.activeUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">currently active</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.6} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">System Health</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.8, type: "spring" }}
+                      >
+                        {(platformStats.systemHealth as any)?.database === 'healthy' && 
+                         (platformStats.systemHealth as any)?.cache === 'healthy' && 
+                         (platformStats.systemHealth as any)?.api === 'healthy' ? 'Healthy' : 'Issues'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">system status</p>
+                    </div>
+                    <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      (platformStats.systemHealth as any)?.database === 'healthy' && 
+                      (platformStats.systemHealth as any)?.cache === 'healthy' && 
+                      (platformStats.systemHealth as any)?.api === 'healthy' 
+                        ? 'bg-success' 
+                        : 'bg-warning'
+                    }`}>
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+              </div>
+            )}
+
             {/* Mission Statement - For visitors */}
             <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">
               <motion.div
@@ -496,13 +665,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <Link href="/register" className="w-full sm:w-auto">
-                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
+                <a href="/auth/signup" className="w-full sm:w-auto">
+                  <Button variant="primary" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Start Free Trial →
                   </Button>
-                </Link>
+                </a>
                 <Link href="/features" className="w-full sm:w-auto">
-                  <Button variant="secondary" size="lg" className="w-full sm:w-auto">
+                  <Button variant="secondary" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Learn More
                   </Button>
                 </Link>
@@ -749,6 +918,10 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                           </>
                         );
                       })() : <span className="text-sm sm:text-base text-neutral-900">Hours configured</span>}
+
+
+                        {/* Hours Badge - Status */}
+           <HoursStatusBadge status={hoursStatus} />
                     </div>
                   ) : (
                     <p className="text-sm sm:text-base text-neutral-500">
@@ -761,7 +934,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   if (!user || !canManageTenantSettings(user, selectedTenantId)) return null;
                   return (
                     <Link href={`/t/${selectedTenantId}/settings/hours`} className="w-full sm:w-auto">
-                      <Button variant="secondary" size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
+                      <Button variant='gradient' style={{ color: 'white' }} size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
                         {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
                       </Button>
                     </Link>
@@ -777,158 +950,178 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           {isAuthenticated ? (
             <>
             <AnimatedCard delay={0.4} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
-                <CardDescription className="text-sm">Get started with common tasks</CardDescription>
-              </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              {selectedTenantId && (
-                <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
-                  <Button variant="primary" className="w-full justify-start" size="md">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                  <div className="flex-1">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Get started with common tasks</p>
+                  </div>
+                </div>
+                <div className="space-y-2 sm:space-y-3">
+                {selectedTenantId && (
+                  <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
+                    <Button variant="primary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      View Your Storefront
+                    </Button>
+                  </Link>
+                )}
+                <Link href={scopedLinks.tenants} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    View Your Storefront
+                    Manage Locations
                   </Button>
                 </Link>
-              )}
-              <Link href={scopedLinks.tenants} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Manage Locations
-                </Button>
-              </Link>
-              <Link href={scopedLinks.items} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  View Inventory
-                </Button>
-              </Link>
-              <Link href={scopedLinks.createItem} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add New Product
-                </Button>
-              </Link>
-            </CardContent>
+                <Link href={scopedLinks.items} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    View Inventory
+                  </Button>
+                </Link>
+                <Link href={scopedLinks.createItem} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add New Product
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </AnimatedCard>
 
           <AnimatedCard delay={0.5} hover={false}>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Getting Started</CardTitle>
-              <CardDescription className="text-sm">Set up your Visible Shelf</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
-                  1
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <div className="flex-1">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Getting Started</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set up your Visible Shelf</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
-                </div>
-              </Link>
-              <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
-                  2
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
-                </div>
-              </Link>
-              <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
-                  3
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
-                </div>
-              </Link>
-            </CardContent>
+              </div>
+              <div className="space-y-3 sm:space-y-4">
+                <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
+                    1
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
+                  </div>
+                </Link>
+                <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                    2
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
+                  </div>
+                </Link>
+                <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                    3
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
           </AnimatedCard>
           </>
           ) : (
             // Visitor Quick Actions
             <>
               <AnimatedCard delay={0.4} hover={false}>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Why Choose Us?</CardTitle>
-                  <CardDescription className="text-sm">Everything you need to succeed online</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why Choose Us?</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Everything you need to succeed online</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                      </svg>
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
-                    </div>
-                  </div>
-                </CardContent>
+                </div>
               </AnimatedCard>
 
               <AnimatedCard delay={0.5} hover={false}>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Get Started Today</CardTitle>
-                  <CardDescription className="text-sm">Join retailers already using our platform</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4">
-                  <Link href="/register" className="block">
-                    <Button variant="primary" className="w-full justify-start" size="md">
-                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                      </svg>
-                      Create Free Account
-                    </Button>
-                  </Link>
-                  <Link href="/login" className="block">
-                    <Button variant="secondary" className="w-full justify-start" size="md">
-                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
-                      Sign In
-                    </Button>
-                  </Link>
-                  <div className="pt-3 sm:pt-4 border-t border-neutral-200">
-                    <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
-                    <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
-                      Contact our team →
-                    </Link>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Get Started Today</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Join retailers already using our platform</p>
+                    </div>
                   </div>
-                </CardContent>
+                  <div className="space-y-3 sm:space-y-4">
+                    <a href="/auth/signup" className="block">
+                      <Button variant="primary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Create Free Account
+                      </Button>
+                    </a>
+                    <a href="/auth/login" className="block">
+                      <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                        Sign In
+                      </Button>
+                    </a>
+                    <div className="pt-3 sm:pt-4 border-t border-neutral-200">
+                      <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
+                      <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
+                        Contact our team →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </AnimatedCard>
             </>
           )}
@@ -1024,18 +1217,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           </div>
         </AnimatedCard>
 
-        {/* Value Showcase - Only show when user has products */}
-        {!loading && stats.total > 0 && (
+        {/* Value Showcase - Only show to authenticated users with products */}
+        {isAuthenticated && !loading && stats.total > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Storefront Status */}
             <AnimatedCard delay={0.6} hover={false}>
-              <CardHeader>
+              <div className="p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-base sm:text-lg flex-1 min-w-0">Your Storefront</CardTitle>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0">Your Storefront</h3>
                   <Badge variant="success" className="flex-shrink-0">Live</Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1056,15 +1247,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </Link>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
 
             {/* Google Integration Status */}
             <AnimatedCard delay={0.7} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Google Integration</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Google Integration</h3>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1078,20 +1267,18 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   </div>
                   <Link href={scopedLinks.settingsTenant}>
-                    <Button variant="secondary" className="w-full" size="md">
+                    <Button variant="secondary" className="w-full" size="md" style={{ color: 'white' }}>
                       Manage Integration →
                     </Button>
                   </Link>
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
 
             {/* Actionable Insights */}
             <AnimatedCard delay={0.8} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Action Items</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Action Items</h3>
                 <div className="space-y-2 sm:space-y-3">
                   {stats.syncIssues > 0 && (
                     <div className="flex items-start gap-2 p-3 bg-warning-50 rounded-lg">
@@ -1099,7 +1286,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need Google sync</p>
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need sync</p>
                         <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
                           Review sync status →
                         </Link>
@@ -1128,7 +1315,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
           </div>
         )}

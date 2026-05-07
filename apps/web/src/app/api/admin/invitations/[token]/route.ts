@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params;
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/api/admin/invitations/${token}`, {
+    // Public endpoint - no authentication required for invitation lookup
+    const res = await authenticatedFetch(`/api/admin/invitations/${token}`, null, {
       method: 'GET',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
     });
     
     const data = await res.json();

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton } from '@/components/ui';
 
+
+
 export interface MapCardProps {
   businessName: string;
   addressLine1: string;
@@ -19,6 +21,7 @@ export interface MapCardProps {
   onToggleDisplay?: (enabled: boolean) => void;
   editable?: boolean;
 }
+
 
 export default function MapCard({
   businessName,

@@ -1,8 +1,12 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
+import { tenantManagementService } from "@/services/TenantManagementService";
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 
 type Period = { day: string; open: string; close: string };
+type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
 
 // Convert 24-hour to 12-hour format
 function to12Hour(time24: string): string {
@@ -25,23 +29,170 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
-export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
+// Parse time string (HH:MM) to minutes since midnight
+function parseTimeToMinutes(time: string): number | null {
+  if (!time) return null;
+  const parts = time.split(':');
+  if (parts.length !== 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+// Convert profile hours format to business hours periods format
+function convertProfileHoursToPeriods(profileHours: Record<string, string>): Period[] {
+  const dayMap: Record<string, string> = {
+    'monday': 'MONDAY',
+    'tuesday': 'TUESDAY', 
+    'wednesday': 'WEDNESDAY',
+    'thursday': 'THURSDAY',
+    'friday': 'FRIDAY',
+    'saturday': 'SATURDAY',
+    'sunday': 'SUNDAY'
+  };
+
+  const periods: Period[] = [];
+
+  Object.entries(profileHours).forEach(([day, hours]) => {
+    const dayName = dayMap[day.toLowerCase()];
+    if (!dayName) return;
+
+    if (hours.toLowerCase() === 'closed') {
+      // Skip closed days for now, or handle as needed
+      return;
+    }
+
+    // Parse "9:00 AM - 5:00 PM" format
+    const match = hours.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+    if (match) {
+      const openTime = to24Hour(match[1]);
+      const closeTime = to24Hour(match[2]);
+      
+      if (openTime && closeTime) {
+        periods.push({
+          day: dayName,
+          open: openTime,
+          close: closeTime
+        });
+      }
+    }
+  });
+
+  return periods;
+}
+
+// Convert business hours periods format back to profile hours format
+function convertPeriodsToProfileHours(periods: Period[]): Record<string, string> {
+  const dayMap: Record<string, string> = {
+    'MONDAY': 'monday',
+    'TUESDAY': 'tuesday', 
+    'WEDNESDAY': 'wednesday',
+    'THURSDAY': 'thursday',
+    'FRIDAY': 'friday',
+    'SATURDAY': 'saturday',
+    'SUNDAY': 'sunday'
+  };
+
+  const profileHours: Record<string, string> = {};
+
+  // Initialize all days as closed
+  Object.values(dayMap).forEach(day => {
+    profileHours[day] = 'Closed';
+  });
+
+  // Convert periods to profile format
+  periods.forEach(period => {
+    const dayName = dayMap[period.day];
+    if (!dayName) return;
+
+    const openTime = to12Hour(period.open);
+    const closeTime = to12Hour(period.close);
+    
+    if (openTime && closeTime) {
+      profileHours[dayName] = `${openTime} - ${closeTime}`;
+    }
+  });
+
+  return profileHours;
+}
+
+
+
+export default function HoursEditor({ tenantId, timezone: externalTimezone }: { tenantId: string; timezone?: string }) {
   const [timezone, setTimezone] = useState("America/New_York");
   const [periods, setPeriods] = useState<Period[]>([]);
+  const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  // Use external timezone if provided, otherwise use internal state
+  const currentTimezone = externalTimezone || timezone;
+
+  // Use centralized status hook instead of local calculation
+  const { status: currentStatus } = useStoreStatus(tenantId, false); // Private scope
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Sync with external timezone changes
+  useEffect(() => {
+    if (externalTimezone) {
+      setTimezone(externalTimezone);
+    }
+  }, [externalTimezone]);
 
   useEffect(() => {
     const load = async () => {
-      const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours`, { cache: "no-store" });
-      if (r.ok) {
-        const j = await r.json();
-        setTimezone(j?.data?.timezone || "America/New_York");
-        setPeriods(Array.isArray(j?.data?.periods) ? j.data.periods : []);
+      try {
+        // Load regular business hours
+        const hoursData = await tenantManagementService.getBusinessHours(tenantId);
+        if (!mountedRef.current) return;
+        setTimezone(hoursData?.timezone || "America/New_York");
+        
+        let businessHoursPeriods = Array.isArray(hoursData?.periods) ? hoursData.periods : [];
+        
+        // If no business hours exist, check profile for hours data and sync it
+        if (businessHoursPeriods.length === 0) {
+          try {
+            const profileData = await platformHomeService.getOnboardingTenantData(tenantId);
+            if (profileData?.hours && typeof profileData.hours === 'object') {
+              console.log('[HoursEditor] Syncing profile hours to business hours:', profileData.hours);
+              const convertedPeriods = convertProfileHoursToPeriods(profileData.hours);
+              
+              if (convertedPeriods.length > 0) {
+                // Save the converted periods to business hours
+                await tenantManagementService.updateBusinessHours(tenantId, {
+                  timezone: hoursData?.timezone || "America/New_York",
+                  periods: convertedPeriods
+                });
+                businessHoursPeriods = convertedPeriods;
+                console.log('[HoursEditor] Successfully synced profile hours to business hours');
+              }
+            }
+          } catch (syncError) {
+            console.warn('[HoursEditor] Failed to sync profile hours:', syncError);
+          }
+        }
+        
+        setPeriods(businessHoursPeriods);
+        
+        // Load special hours
+        const specialData = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        if (!mountedRef.current) return;
+        setSpecialHours(Array.isArray(specialData?.overrides) ? specialData.overrides : []);
+      } catch (error) {
+        console.error('Failed to load business hours:', error);
       }
     };
     load();
-  }, [apiBase, tenantId]);
+  }, [tenantId]);
 
   const add = () => setPeriods([...periods, { day: "MONDAY", open: "09:00", close: "17:00" }]);
   const update = (i: number, k: keyof Period, v: string) => {
@@ -59,72 +210,67 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
     // Validate that open time is before close time for each period
     const invalidPeriods = periods.filter(p => {
       if (!p.open || !p.close) return false;
-      return p.open >= p.close;
+      const openMinutes = parseTimeToMinutes(p.open);
+      const closeMinutes = parseTimeToMinutes(p.close);
+      return openMinutes !== null && closeMinutes !== null && openMinutes >= closeMinutes;
     });
 
     if (invalidPeriods.length > 0) {
-      setMsg("✗ Opening time must be before closing time");
+      setMsg("✗ Invalid hours: close time must be after open time");
       setTimeout(() => setMsg(null), 3000);
       return;
     }
 
-    // Check for duplicate days with overlapping times
-    const dayGroups = periods.reduce((acc, p) => {
-      if (!acc[p.day]) acc[p.day] = [];
-      acc[p.day].push(p);
-      return acc;
-    }, {} as Record<string, Period[]>);
-
-    for (const [day, dayPeriods] of Object.entries(dayGroups)) {
-      if (dayPeriods.length > 1) {
-        // Check for overlaps
-        for (let i = 0; i < dayPeriods.length; i++) {
-          for (let j = i + 1; j < dayPeriods.length; j++) {
-            const p1 = dayPeriods[i];
-            const p2 = dayPeriods[j];
-            // Check if periods overlap: p1.open < p2.close AND p2.open < p1.close
-            if (p1.open < p2.close && p2.open < p1.close) {
-              setMsg(`✗ Overlapping hours on ${day.charAt(0) + day.slice(1).toLowerCase()}`);
-              setTimeout(() => setMsg(null), 3000);
-              return;
-            }
-          }
-        }
-      }
-    }
-
     setSaving(true);
     setMsg(null);
-    const r = await fetch(`${apiBase}/api/tenant/${tenantId}/business-hours`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timezone, periods }),
-    });
-    setSaving(false);
-    setMsg(r.ok ? "✓ Saved" : "✗ Failed");
-    setTimeout(() => setMsg(null), 2000);
+    try {
+      // Save to business hours table
+      await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
+      
+      // Also sync back to profile for consistency
+      try {
+        const profileHours = convertPeriodsToProfileHours(periods);
+        await platformHomeService.saveOnboardingProfile(tenantId, { hours: profileHours });
+        console.log('[HoursEditor] Successfully synced business hours back to profile');
+      } catch (profileSyncError) {
+        console.warn('[HoursEditor] Failed to sync hours back to profile:', profileSyncError);
+        // Don't fail the entire save if profile sync fails
+      }
+      
+      setSaving(false);
+      setMsg("✓ Saved");
+      setTimeout(() => setMsg(null), 2000);
+    } catch (error) {
+      console.error('Failed to save business hours:', error);
+      setSaving(false);
+      setMsg("✗ Failed");
+      setTimeout(() => setMsg(null), 2000);
+    }
   };
 
-  // Calculate current status
-  const now = new Date();
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone }).toUpperCase();
-  const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: timezone });
-  const todayPeriod = periods.find(p => p.day === currentDay);
-  const isOpen = todayPeriod && currentTime >= todayPeriod.open && currentTime < todayPeriod.close;
+  // Calculate current status - using centralized hook
+  const statusType = currentStatus?.status || 'closed';
+  const statusMessage = currentStatus?.label || 'Closed';
 
   return (
     <div className="space-y-4">
       {/* Current Status Badge */}
       <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
-        <span className={`inline-block w-3 h-3 rounded-full ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+        <span className={`inline-block w-3 h-3 rounded-full ${
+          statusType === 'open' ? 'bg-green-500' :
+          statusType === 'closed' ? 'bg-red-500' :
+          statusType === 'opening-soon' ? 'bg-yellow-500' :
+          statusType === 'closing-soon' ? 'bg-orange-500' :
+          'bg-gray-500' // fallback
+        }`}></span>
         <span className="font-medium text-gray-900">
-          {isOpen ? `Open now • Closes at ${to12Hour(todayPeriod!.close)}` : 'Closed'}
+          {statusMessage}
         </span>
       </div>
 
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <span className="w-32">Timezone</span>
-        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{timezone}</span>
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{currentTimezone}</span>
         <span className="ml-2 text-gray-500">Manage timezone above.</span>
       </div>
       
@@ -141,9 +287,9 @@ export default function HoursEditor({ apiBase, tenantId }: { apiBase: string; te
           const hasDuplicate = periods.filter((other, j) => i !== j && p.day === other.day).length > 0;
           
           return (
-            <div key={i} className={`flex gap-2 items-center flex-wrap p-2 rounded-lg ${isInvalid || hasOverlap ? 'bg-red-50 border border-red-200' : hasDuplicate ? 'bg-amber-50 border border-amber-200' : ''}`}>
+            <div key={i} className={`flex gap-2 items-center flex-wrap p-2 rounded-lg dark:bg-neutral-600 ${isInvalid || hasOverlap ? 'bg-red-50 border border-red-200' : hasDuplicate ? 'bg-amber-50 border border-amber-200' : ''}`}>
               <select 
-                className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium" 
+                className="border border-gray-300 px-3 py-2 rounded-lg w-40 font-medium dark:text-neutral-500 dark:bg-neutral-400" 
                 value={p.day} 
                 onChange={(e) => update(i, "day", e.target.value)}
               >

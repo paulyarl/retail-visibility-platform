@@ -5,6 +5,8 @@ import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/u
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ interface EditBusinessProfileModalProps {
   profile: BusinessProfile | Partial<BusinessProfile> | null;
   onSave?: (profile: BusinessProfile) => void;
 }
+
+
 
 export default function EditBusinessProfileModal({ 
   isOpen, 
@@ -25,9 +29,10 @@ export default function EditBusinessProfileModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [pastedLogoUrl, setPastedLogoUrl] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
   const [geocoding, setGeocoding] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
@@ -40,6 +45,49 @@ export default function EditBusinessProfileModal({
       setLogoPreview(profile?.logo_url || null);
     }
   }, [isOpen, profile]);
+
+  // Fetch and optimize pasted logo URL
+  const optimizePastedLogoUrl = async (url: string) => {
+    try {
+      setUploadingLogo(true);
+      setError(null);
+
+      // Fetch the image from URL using service with caching
+      const { imageFetchService } = await import('@/services/ImageFetchService');
+      const file = await imageFetchService.fetchExternalImageAsFile(url, 'logo.png');
+      
+      if (!file) {
+        throw new Error('Failed to fetch image from URL');
+      }
+
+      // Use centralized image upload middleware
+      const result = await uploadImage(file, ImageUploadPresets.logo);
+
+      // Get tenant ID from localStorage
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+      if (!tenantId) {
+        setError('No tenant selected');
+        return null;
+      }
+
+      // Upload logo using service with automatic cache invalidation
+      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+      
+      if (!uploadResult.success) {
+        setError(uploadResult.error || 'Upload failed');
+        return null;
+      }
+
+      // Return the optimized URL
+      return uploadResult.data?.url || uploadResult.data?.dataUrl;
+    } catch (err: any) {
+      console.error('Failed to optimize pasted logo URL:', err);
+      setError(err.message || 'Failed to fetch and optimize logo from URL');
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // Handle logo file upload
   const handleLogoUpload = async (file: File) => {
@@ -58,27 +106,16 @@ export default function EditBusinessProfileModal({
         return;
       }
 
-      // Upload to server
-      const body = JSON.stringify({ 
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-
-      const payload = await res.json();
-      if (!res.ok) {
-        setError(payload?.error || "Upload failed");
+      // Upload logo using service with automatic cache invalidation
+      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+      
+      if (!uploadResult.success) {
+        setError(uploadResult.error || 'Upload failed');
         return;
       }
 
       // Update form data with uploaded URL
-      const uploadedUrl = payload.url;
+      const uploadedUrl = uploadResult.data?.url || uploadResult.data?.dataUrl;
       if (uploadedUrl) {
         handleChange('logo_url', uploadedUrl);
         setLogoPreview(uploadedUrl);
@@ -91,58 +128,37 @@ export default function EditBusinessProfileModal({
     }
   };
 
-  // Fetch and optimize pasted logo URL
-  const optimizePastedLogoUrl = async (url: string) => {
+  // Upload logo from pasted URL
+  const handleUploadLogoFromUrl = async () => {
+    if (!pastedLogoUrl.trim()) return;
+
     try {
       setUploadingLogo(true);
       setError(null);
-
-      // Fetch the image from the URL
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch image from URL');
-      }
-
-      const blob = await response.blob();
-      
-      // Convert blob to File
-      const file = new File([blob], 'logo.png', { type: blob.type || 'image/png' });
-
-      // Use centralized image upload middleware
-      const result = await uploadImage(file, ImageUploadPresets.logo);
 
       // Get tenant ID from localStorage
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
       if (!tenantId) {
         setError('No tenant selected');
-        return null;
+        return;
       }
 
-      // Upload to server
-      const body = JSON.stringify({ 
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-
-      const payload = await res.json();
-      if (!res.ok) {
-        setError(payload?.error || "Upload failed");
-        return null;
+      // Upload logo using service with automatic cache invalidation
+      const result = await platformHomeService.uploadTenantLogo(tenantId, pastedLogoUrl, 'image/*');
+      
+      if (!result.success) {
+        setError(result.error || 'Upload failed');
+        return;
       }
 
-      // Return the optimized URL
-      return payload.url;
-    } catch (err: any) {
-      console.error('Failed to optimize pasted logo URL:', err);
-      setError(err.message || 'Failed to fetch and optimize logo from URL');
-      return null;
+      // Update form with new logo URL
+      setFormData(prev => ({ ...prev, logo_url: result.data?.logo_url || result.data?.dataUrl }));
+      setLogoPreview(result.data?.logo_url || result.data?.dataUrl);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('[EditBusinessProfile] Error uploading logo from URL:', err);
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploadingLogo(false);
     }
@@ -268,13 +284,17 @@ export default function EditBusinessProfileModal({
         website: formData.website ? formData.website : undefined,
         contact_person: formData.contact_person ? formData.contact_person : undefined,
         admin_email: (formData as any).admin_email ? (formData as any).admin_email : undefined,
-        logo_url: formData.logo_url !== undefined ? formData.logo_url : undefined,
-        business_description: formData.business_description ? formData.business_description : undefined,
+        logo_url: formData.logo_url || undefined,
+        business_description: formData.business_description || undefined,
         phone_number: formData.phone_number ? formData.phone_number : undefined,
         email: formData.email ? formData.email : undefined,
+        // Include social links if they exist
+        social_links: formData.social_links && Object.keys(formData.social_links).length > 0 ? formData.social_links : undefined,
         // Explicitly include coordinates if they exist
         latitude: formData.latitude !== undefined && formData.latitude !== null ? formData.latitude : undefined,
         longitude: formData.longitude !== undefined && formData.longitude !== null ? formData.longitude : undefined,
+        // Include slug if selected
+        slug: (formData as any).slug || undefined,
       };
       const validatedData = businessProfileSchema.parse(normalized);
       
@@ -359,6 +379,48 @@ export default function EditBusinessProfileModal({
             required
           />
 
+          {/* City and State - moved before slug selector */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="City"
+              placeholder="e.g., New York"
+              value={formData.city || ''}
+              onChange={(e) => handleChange('city', e.target.value)}
+              onBlur={() => handleBlur('city')}
+              error={errors.city}
+              required
+            />
+            
+            <Input
+              label="State / Province"
+              placeholder="e.g., NY"
+              value={formData.state || ''}
+              onChange={(e) => handleChange('state', e.target.value)}
+              onBlur={() => handleBlur('state')}
+              error={errors.state}
+            />
+          </div>
+
+          {/* Info box explaining why location helps */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Tip:</strong> Adding your city and state helps generate better URL options that are easier to find in search results.
+            </p>
+          </div>
+
+          {/* Slug Pattern Selector */}
+          <SlugPatternSelector
+            businessName={formData.business_name || ''}
+            location={{
+              city: formData.city,
+              state: formData.state,
+              country: formData.country_code,
+            }}
+            tenantId={typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined}
+            selectedSlug={(formData as any).slug || ''}
+            onSlugSelect={(slug) => handleChange('slug' as any, slug)}
+          />
+
           {/* Address Line 1 */}
           <Input
             label="Address Line 1"
@@ -380,37 +442,16 @@ export default function EditBusinessProfileModal({
             error={errors.address_line2}
           />
 
-          {/* City, State, Postal Code */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="City"
-              placeholder="e.g., New York"
-              value={formData.city || ''}
-              onChange={(e) => handleChange('city', e.target.value)}
-              onBlur={() => handleBlur('city')}
-              error={errors.city}
-              required
-            />
-            
-            <Input
-              label="State / Province"
-              placeholder="e.g., NY"
-              value={formData.state || ''}
-              onChange={(e) => handleChange('state', e.target.value)}
-              onBlur={() => handleBlur('state')}
-              error={errors.state}
-            />
-            
-            <Input
-              label="Postal Code"
-              placeholder="e.g., 10001"
-              value={formData.postal_code || ''}
-              onChange={(e) => handleChange('postal_code', e.target.value)}
-              onBlur={() => handleBlur('postal_code')}
-              error={errors.postal_code}
-              required
-            />
-          </div>
+          {/* Postal Code */}
+          <Input
+            label="Postal Code"
+            placeholder="e.g., 10001"
+            value={formData.postal_code || ''}
+            onChange={(e) => handleChange('postal_code', e.target.value)}
+            onBlur={() => handleBlur('postal_code')}
+            error={errors.postal_code}
+            required
+          />
 
           {/* Country */}
           <Select
@@ -510,6 +551,84 @@ export default function EditBusinessProfileModal({
             helperText="Optional - Primary contact for this location"
           />
 
+          {/* Social Links (Optional) */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Social Links
+            </label>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+              Optional - Connect your social media profiles for better SEO and customer engagement
+            </p>
+
+            {/* Facebook */}
+            <Input
+              label="Facebook"
+              placeholder="https://facebook.com/yourpage"
+              value={(formData.social_links as any)?.facebook || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  facebook: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Facebook page URL"
+            />
+
+            {/* Instagram */}
+            <Input
+              label="Instagram"
+              placeholder="https://instagram.com/yourhandle"
+              value={(formData.social_links as any)?.instagram || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  instagram: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Instagram profile URL"
+            />
+
+            {/* Twitter/X */}
+            <Input
+              label="Twitter/X"
+              placeholder="https://twitter.com/yourhandle"
+              value={(formData.social_links as any)?.twitter || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  twitter: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your Twitter/X profile URL"
+            />
+
+            {/* LinkedIn */}
+            <Input
+              label="LinkedIn"
+              placeholder="https://linkedin.com/company/yourcompany"
+              value={(formData.social_links as any)?.linkedin || ''}
+              onChange={(e) => {
+                const currentLinks = formData.social_links || {};
+                handleChange('social_links', {
+                  ...currentLinks,
+                  linkedin: e.target.value
+                });
+              }}
+              onBlur={() => handleBlur('social_links')}
+              error={errors.social_links}
+              helperText="Your LinkedIn company page URL"
+            />
+          </div>
+
           {/* Logo URL (Professional+ Tier) - with upload option */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -554,6 +673,27 @@ export default function EditBusinessProfileModal({
                   {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
                 </div>
               </label>
+            </div>
+
+            {/* URL Paste Input */}
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  placeholder="Or paste logo URL: https://example.com/logo.png"
+                  value={pastedLogoUrl}
+                  onChange={(e) => setPastedLogoUrl(e.target.value)}
+                  disabled={uploadingLogo}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleUploadLogoFromUrl}
+                disabled={!pastedLogoUrl.trim() || uploadingLogo}
+                className="px-4 py-2 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
+              >
+                {uploadingLogo ? 'Uploading...' : 'Upload from URL'}
+              </button>
             </div>
 
             {/* Manual URL Input */}
@@ -619,7 +759,7 @@ export default function EditBusinessProfileModal({
             Cancel
           </Button>
           <Button type="submit" disabled={saving} loading={saving}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving...' : 'Save Changes'} 
           </Button>
         </ModalFooter>
       </form>

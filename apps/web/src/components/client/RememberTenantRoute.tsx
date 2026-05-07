@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+
+
 export default function RememberTenantRoute({ tenantId }: { tenantId: string }) {
   const pathname = usePathname();
   useEffect(() => {

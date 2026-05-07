@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function POST(
   req: NextRequest,
@@ -8,19 +9,17 @@ export async function POST(
     const { id: tenantId } = await context.params;
     const body = await req.json();
     
-    // Get auth token from cookies
-    const token = req.cookies.get('access_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'unauthorized', message: 'Authentication required' }, { status: 401 });
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/api/tenant/${encodeURIComponent(tenantId)}/banner`, {
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch(`/api/tenant/${encodeURIComponent(tenantId)}/banner`, accessToken, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify(body),
     });
     

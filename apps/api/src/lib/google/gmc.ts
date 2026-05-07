@@ -8,18 +8,20 @@
 
 import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
 import { prisma } from '../../prisma';
+import { generateQuickStart } from '../id-generator';
 
-// Merchant API v1beta (replaces deprecated Content API v2.1)
-const GMC_API_BASE = 'https://merchantapi.googleapis.com';
-const MERCHANT_API_VERSION = 'v1beta';
+// Content API for Shopping v2.1 (stable, widely used)
+const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
+const CONTENT_API_VERSION = 'v2.1';
+const MERCHANT_API_VERSION = 'v2.1';
 
 /**
  * Get valid access token (refresh if expired)
  */
 async function getValidAccessToken(account_id: string): Promise<string | null> {
   try {
-    const tokenRecord = await prisma.googleOauthTokens.findUnique({
-      where: { accountId: account_id },
+    const tokenRecord = await prisma.google_oauth_tokens_list.findUnique({
+      where: { account_id: account_id },
     });
 
     if (!tokenRecord) {
@@ -29,11 +31,11 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 
     // Check if token is expired
     const now = new Date();
-    if (tokenRecord.expiresAt <= now) {
+    if (tokenRecord.expires_at <= now) {
       console.log('[GMC] Token expired, refreshing...');
       
       // Decrypt refresh token
-      const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
       
       // Get new access token
       const newTokens = await refreshAccessToken(refreshToken);
@@ -44,13 +46,13 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 
       // Update in database
       const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.googleOauthTokens.update({
-        where: { accountId: account_id }, 
+      await prisma.google_oauth_tokens_list.update({
+        where: { account_id: account_id }, 
         data: {
-          accessTokenEncrypted: encryptToken(newTokens.access_token),
-          expiresAt: newExpiresAt,
+          access_token_encrypted: encryptToken(newTokens.access_token),
+          expires_at: newExpiresAt,
           scopes: newTokens.scope.split(' '),
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       });
 
@@ -58,7 +60,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
     }
 
     // Token still valid
-    return decryptToken(tokenRecord.accessTokenEncrypted);
+    return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
     console.error('[GMC] Error getting valid token:', error);
     return null;
@@ -66,8 +68,8 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 }
 
 /**
- * List merchant accounts
- * Uses Merchant API accounts.list endpoint
+ * List merchant accounts using Content API authinfo endpoint
+ * This returns all merchant accounts the authenticated user has access to
  */
 export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   try {
@@ -76,8 +78,8 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
       throw new Error('No valid access token');
     }
 
-    // Merchant API uses accounts.list instead of authinfo
-    const response = await fetch(`${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts`, {
+    // Content API authinfo endpoint returns all accounts the user has access to
+    const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -90,8 +92,18 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
       return [];
     }
 
-    const data = await response.json();
-    return data.accounts || [];
+    const data = await response.json() as { accountIdentifiers?: any[] };
+    console.log('[GMC] authinfo response:', JSON.stringify(data, null, 2));
+    
+    // authinfo returns accountIdentifiers array with accountId
+    const accountIds = data.accountIdentifiers || [];
+    
+    // Return formatted accounts
+    return accountIds.map((acc: any) => ({
+      accountId: acc.aggregatorId || acc.merchantId,
+      name: `Merchant ${acc.aggregatorId || acc.merchantId}`,
+      accountName: `Merchant Account ${acc.aggregatorId || acc.merchantId}`,
+    }));
   } catch (error) {
     console.error('[GMC] Error listing merchant accounts:', error);
     return [];
@@ -165,7 +177,7 @@ export async function listProducts(
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { products?: any[] };
     return data.products || [];
   } catch (error) {
     console.error('[GMC] Error listing products:', error);
@@ -232,36 +244,36 @@ export async function syncMerchantAccount(
 
     // Upsert merchant link (schema has no composite unique on [account_id, merchant_id])
     // Find existing by (account_id, merchant_id), then update by id; else create
-    const existing = await prisma.googleMerchantLinks.findFirst({
-      where: { accountId: account_id, merchantId: merchantId }, 
+    const existing = await prisma.google_merchant_links_list.findFirst({
+      where: { account_id: account_id, merchant_id: merchantId }, 
       select: { id: true },
     });
 
     if (existing) {
-      await prisma.googleMerchantLinks.update({
+      await prisma.google_merchant_links_list.update({
         where: { id: existing.id },
         data: {
-          merchantName: merchantName, 
-          websiteUrl: websiteUrl,
-          lastSyncAt: new Date(),
-          syncStatus: 'success',
-          syncError: null,
-          updatedAt: new Date(),
+          merchant_name: merchantName, 
+          website_url: websiteUrl,
+          last_sync_at: new Date(),
+          sync_status: 'success',
+          sync_error: null,
+          updated_at: new Date(),
         },
       });
     } else {
-      await prisma.googleMerchantLinks.create({
+      await prisma.google_merchant_links_list.create({
         data: {
-          id: `gmc_link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          accountId: account_id,
-          merchantId: merchantId,
-          merchantName: merchantName,
-          websiteUrl: websiteUrl,
-          isActive: true,
-          lastSyncAt: new Date(),
-          syncStatus: 'success', 
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          id: generateQuickStart("gmcid"),
+          account_id: account_id,
+          merchant_id: merchantId,
+          merchant_name: merchantName,
+          website_url: websiteUrl,
+          is_active: true,
+          last_sync_at: new Date(),
+          sync_status: 'success', 
+          created_at: new Date(),
+          updated_at: new Date(),
         },
       });
     }
@@ -272,12 +284,12 @@ export async function syncMerchantAccount(
     console.error('[GMC] Error syncing merchant account:', error);
     
     // Update sync status to error
-    await prisma.googleMerchantLinks.updateMany({
-      where: { accountId: account_id, merchantId: merchantId },
+    await prisma.google_merchant_links_list.updateMany({
+      where: { account_id: account_id, merchant_id: merchantId },
       data: {
-        syncStatus: 'error',
-        syncError: error instanceof Error ? error.message : 'Unknown error',
-        updatedAt: new Date(),
+        sync_status: 'error',
+        sync_error: error instanceof Error ? error.message : 'Unknown error',
+        updated_at: new Date(),
       },
     });
     
@@ -319,7 +331,7 @@ export async function getProductStats(
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as { products?: any[] };
     const products = data.products || [];
 
     const stats = {

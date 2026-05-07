@@ -1,6 +1,7 @@
 'use client';
 
-import { Square, ExternalLink, RefreshCw, Settings, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { Square, ExternalLink, RefreshCw, Settings, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SquareStatusBadge, SquareStatus } from './SquareStatusBadge';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,15 @@ export function SquareConnectionCard({
             </div>
           </div>
           
-          <SquareStatusBadge status={status} size="md" />
+          <div className="flex items-center gap-3">
+            <SquareStatusBadge status={status} size="md" />
+            <Link
+              href={`/t/${tenantId}/settings/integrations/square`}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+            >
+              Manage <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
 

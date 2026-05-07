@@ -7,6 +7,7 @@
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { getDirectPool } from '../utils/db-pool';
 
 interface GBPCategory {
   categoryId: string;
@@ -26,13 +27,28 @@ export class GBPCategorySyncService {
   private readonly API_BASE = 'https://mybusiness.googleapis.com/v4';
   
   /**
+   * Refresh directory_category_products materialized view after GBP category changes
+   * Ensures MV stays in sync with GBP category updates
+   */
+  private async refreshDirectoryMV(): Promise<void> {
+    try {
+      const pool = getDirectPool();
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
+      console.log('[GBPCategorySync] Refreshed directory_category_products MV after GBP category changes');
+    } catch (error) {
+      console.error('[GBPCategorySync] Failed to refresh MV:', error);
+      // Don't throw error - this is non-critical
+    }
+  }
+  
+  /**
    * Get any valid Google OAuth access token with business.manage scope.
    * Uses the shared google_oauth_tokens table and refreshes tokens when expired.
    */
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
-      const tokenRecord = await prisma.googleOauthTokens.findFirst({
-        orderBy: { createdAt: 'desc' },
+      const tokenRecord = await prisma.google_oauth_tokens_list.findFirst({
+        orderBy: { created_at: 'desc' },
       });
 
       if (!tokenRecord) {
@@ -41,10 +57,10 @@ export class GBPCategorySyncService {
       }
 
       const now = new Date();
-      if (tokenRecord.expiresAt <= now) {
+      if (tokenRecord.expires_at <= now) {
         console.log('[GBPCategorySync] Token expired, refreshing for GBP categories...');
 
-        const refreshToken = decryptToken(tokenRecord.refreshTokenEncrypted);
+        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
@@ -53,11 +69,11 @@ export class GBPCategorySyncService {
         }
 
         const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-        await prisma.googleOauthTokens.update({
-          where: { accountId: tokenRecord.accountId },
+        await prisma.google_oauth_tokens_list.update({
+          where: { account_id: tokenRecord.account_id },
           data: {
-            accessTokenEncrypted: encryptToken(newTokens.access_token),
-            expiresAt: newExpiresAt,
+            access_token_encrypted: encryptToken(newTokens.access_token),
+            expires_at: newExpiresAt,
             scopes: newTokens.scope.split(' '),
           },
         });
@@ -65,7 +81,7 @@ export class GBPCategorySyncService {
         return newTokens.access_token;
       }
 
-      return decryptToken(tokenRecord.accessTokenEncrypted);
+      return decryptToken(tokenRecord.access_token_encrypted);
     } catch (error) {
       console.error('[GBPCategorySync] Error getting valid access token:', error);
       return null;
@@ -77,37 +93,57 @@ export class GBPCategorySyncService {
    */
   private async getAccessToken(): Promise<string | null> {
     try {
-      // Check for platform-level Google Business OAuth integration
-      const oauthIntegration = await prisma.$queryRaw<any[]>`
-        SELECT access_token, refresh_token, expires_at, scopes
+      console.log('[GBPCategorySync] Looking for OAuth integration...');
+      
+      // Use direct pool to avoid Prisma ARRAY type issues
+      const pool = getDirectPool();
+      const result = await pool.query(`
+        SELECT access_token, refresh_token, "expiresAt"
         FROM oauth_integrations
         WHERE provider = 'google_business'
-          AND tenantId IS NULL
-          AND is_active = true
+          AND tenant_id IS NULL
+          AND "isActive" = true
         ORDER BY created_at DESC
         LIMIT 1
-      `;
+      `);
 
-      if (!oauthIntegration || oauthIntegration.length === 0) {
-        console.log('[GBPCategorySync] No Google Business OAuth integration found');
-        return null;
+      console.log('[GBPCategorySync] Query result:', result.rows?.length || 0, 'rows');
+
+      if (!result.rows || result.rows.length === 0) {
+        console.log('[GBPCategorySync] No Google Business OAuth integration found, trying google_oauth_tokens_list...');
+        // Fallback to google_oauth_tokens_list table
+        return this.getAnyValidAccessToken();
       }
 
-      const integration = oauthIntegration[0];
-      const tokens = JSON.parse(integration.access_token);
+      const integration = result.rows[0];
+      console.log('[GBPCategorySync] Found integration, expiresAt:', integration.expiresAt);
+      console.log('[GBPCategorySync] Has refresh_token:', !!integration.refresh_token);
+      console.log('[GBPCategorySync] access_token length:', integration.access_token?.length || 0);
+      
+      // access_token might be JSON string or plain token
+      let accessToken: string;
+      try {
+        const tokens = JSON.parse(integration.access_token);
+        accessToken = tokens.access_token;
+        console.log('[GBPCategorySync] Parsed JSON token, length:', accessToken?.length || 0);
+      } catch {
+        // Not JSON, use as-is
+        accessToken = integration.access_token;
+        console.log('[GBPCategorySync] Using raw token, length:', accessToken?.length || 0);
+      }
 
-      // Check if token is expired (use expires_at from database or calculate from expires_in)
+      // Check if token is expired
       const now = new Date();
-      const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
+      const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null;
+      console.log('[GBPCategorySync] Token expiry check - now:', now.toISOString(), 'expiresAt:', expiresAt?.toISOString());
       
       if (expiresAt && expiresAt <= now) {
         console.log('[GBPCategorySync] Token expired, attempting refresh...');
         
         // Try to refresh token if we have a refresh token
-        if (tokens.refresh_token || integration.refresh_token) {
+        if (integration.refresh_token) {
           try {
-            const refreshToken = tokens.refresh_token || integration.refresh_token;
-            const newAccessToken = await this.refreshAccessToken(refreshToken);
+            const newAccessToken = await this.refreshAccessToken(integration.refresh_token);
             return newAccessToken;
           } catch (refreshError) {
             console.error('[GBPCategorySync] Token refresh failed:', refreshError);
@@ -119,7 +155,8 @@ export class GBPCategorySyncService {
         return null;
       }
 
-      return tokens.access_token;
+      console.log('[GBPCategorySync] Returning valid access token');
+      return accessToken;
     } catch (error) {
       console.error('[GBPCategorySync] Failed to get access token:', error);
       return null;
@@ -241,12 +278,16 @@ export class GBPCategorySyncService {
           throw new Error(`Google API error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data = await response.json() as {
+          categories?: any[];
+          totalCategoryCount?: number;
+          nextPageToken?: string;
+        };
 
         if (data.categories) {
           categories.push(...data.categories.map((cat: any) => ({
             categoryId: cat.name || '',
-            display_name: cat.displayName || '',
+            display_name: cat.display_name || '',
             serviceTypes: cat.serviceTypes || [],
             moreHoursTypes: cat.moreHoursTypes || []
           })));
@@ -287,8 +328,8 @@ export class GBPCategorySyncService {
       const latest = await this.fetchLatestCategories();
       
       // Get current categories from database
-      const current = await prisma.gbpCategories.findMany({
-        where: { isActive: true }
+      const current = await prisma.gbp_categories_list.findMany({
+        where: { is_active: true }
       });
 
       // Detect changes
@@ -318,34 +359,34 @@ export class GBPCategorySyncService {
       try {
         switch (change.type) {
           case 'new':
-            await prisma.gbpCategories.create({
+            await prisma.gbp_categories_list.create({
               data: {
                 id: change.categoryId,
-                name: change.newData.displayName,
-                displayName: change.newData.displayName,
-                isActive: true
+                name: change.newData.display_name,
+                display_name: change.newData.display_name,
+                is_active: true
               } as any
             });
             applied++;
             break;
 
           case 'updated':
-            await prisma.gbpCategories.update({
+            await prisma.gbp_categories_list.update({
               where: { id: change.categoryId },
               data: {
-                displayName: change.newData.displayName,
-                updatedAt: new Date()
+                display_name: change.newData.display_name,
+                updated_at: new Date()
               }
             });
             applied++;
             break;
 
           case 'deleted':
-            await prisma.gbpCategories.update({
+            await prisma.gbp_categories_list.update({
               where: { id: change.categoryId },
               data: {
-                isActive: false,
-                updatedAt: new Date()
+                is_active: false,
+                updated_at: new Date()
               }
             });
             applied++;
@@ -405,29 +446,29 @@ export class GBPCategorySyncService {
 
         for (const category of hardcodedCategories) {
           // Check if category exists
-          const existing = await tx.gbpCategories.findUnique({
+          const existing = await tx.gbp_categories_list.findUnique({
             where: { id: category.id },
-            select: { id: true, displayName: true }
+            select: { id: true, display_name: true }
           });
 
           if (!existing) {
             // Create new category
-            await tx.gbpCategories.create({
+            await tx.gbp_categories_list.create({
               data: {
                 id: category.id,
                 name: category.name,
-                displayName: category.display_name,
-                isActive: true
+                display_name: category.display_name,
+                is_active: true
               } as any
             });
             upserted++;
-          } else if (existing.displayName !== category.display_name) { 
+          } else if (existing.display_name !== category.display_name) { 
             // Update existing category if displayName changed
-            await tx.gbpCategories.update({
+            await tx.gbp_categories_list.update({
               where: { id: category.id },
               data: {
-                displayName: category.display_name,
-                updatedAt: new Date()
+                display_name: category.display_name,
+                updated_at: new Date()
               }
             });
             upserted++;
@@ -438,6 +479,12 @@ export class GBPCategorySyncService {
       });
 
       console.log(`[GBPCategorySync] Successfully seeded/updated ${result} GBP categories`);
+      
+      // Refresh MV to sync with GBP category changes
+      if (result > 0) {
+        await this.refreshDirectoryMV();
+      }
+      
       return result;
 
     } catch (error) {
@@ -449,19 +496,19 @@ export class GBPCategorySyncService {
 
       for (const category of hardcodedCategories) {
         try {
-          await prisma.gbpCategories.upsert({
+          await prisma.gbp_categories_list.upsert({
             where: { id: category.id },
             update: {
-              displayName: category.display_name,
-              updatedAt: new Date()
+              display_name: category.display_name,
+              updated_at: new Date()
             },
             create: {
               id: category.id,
               name: category.name,
-              displayName: category.display_name,
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date()
+              display_name: category.display_name,
+              is_active: true,
+              created_at: new Date(),
+              updated_at: new Date()
             }
           });
           seeded++;
@@ -471,6 +518,12 @@ export class GBPCategorySyncService {
       }
 
       console.log(`[GBPCategorySync] Fallback seeding completed: ${seeded}/${hardcodedCategories.length} categories`);
+      
+      // Refresh MV to sync with GBP category changes
+      if (seeded > 0) {
+        await this.refreshDirectoryMV();
+      }
+      
       return seeded;
     }
   }

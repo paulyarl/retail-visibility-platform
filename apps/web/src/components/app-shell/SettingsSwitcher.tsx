@@ -7,6 +7,8 @@ import { isPlatformUser } from "@/lib/auth/access-control";
 
 type SettingsScope = "platform" | "tenant";
 
+
+
 export default function SettingsSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
@@ -63,12 +65,12 @@ export default function SettingsSwitcher() {
 
   return (
     <div className="inline-flex items-center gap-2">
-      <label htmlFor="settings-switcher" className="text-xs text-neutral-500">
+      <label htmlFor="settings-switcher" className="text-xs text-neutral-500 dark:text-neutral-800">
         Settings
       </label>
       <select
         id="settings-switcher"
-        className="px-2 py-1 border border-neutral-300 rounded-md text-sm bg-white hover:bg-neutral-50 transition-colors cursor-pointer"
+        className="px-2 py-1 border border-neutral-300 rounded-md text-sm bg-white hover:bg-neutral-500 transition-colors cursor-pointer dark:bg-neutral-700"
         value={currentScope}
         onChange={(e) => onChange(e.target.value as SettingsScope)}
         suppressHydrationWarning

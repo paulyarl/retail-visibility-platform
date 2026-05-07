@@ -17,7 +17,7 @@ export function requireFlag(opts: { flag: string; scope: FlagScope; tenantParam?
         // Platform scope: use effective platform status (overrides/env/db)
         const eff = await getEffectivePlatform(flag)
         if (eff.effectiveOn) return next()
-        return res.status(404).json({ error: 'not_enabled' })
+        return res.status(400).json({ error: 'not_enabled' })
       }
 
       // Tenant scope: check platform settings, then tenant flag (with override support)
@@ -28,7 +28,7 @@ export function requireFlag(opts: { flag: string; scope: FlagScope; tenantParam?
       const effTenant = await getEffectiveTenant(flag, String(tenantId))
       if (!effTenant.tenantEffectiveOn) {
         const reason = effTenant.tenantEffectiveSource === 'blocked' ? 'platform_disabled' : 'tenant_not_enabled'
-        return res.status(404).json({ error: reason })
+        return res.status(400).json({ error: reason })
       }
       return next()
     } catch (_e) {

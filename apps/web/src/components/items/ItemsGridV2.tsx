@@ -28,6 +28,8 @@ type ItemsGridV2Props = {
   showPropagateButton?: boolean;
 };
 
+
+
 export default function ItemsGridV2({ 
   items, 
   onEdit, 

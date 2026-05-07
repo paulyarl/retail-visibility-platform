@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticatedFetch } from '@/utils/apiAuth';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params;
     const body = await req.json();
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/api/admin/invitations/${token}/accept`, {
+    // Public endpoint - no authentication required for accepting invitation
+    const res = await authenticatedFetch(`/api/admin/invitations/${token}/accept`, null, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(body),
     });
     

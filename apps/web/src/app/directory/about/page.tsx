@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: 'Discover how our zero-effort directory automatically connects customers with local merchants through the power of automation.',
 };
 
+
 export default function AboutDirectoryPage() {
   return <AboutDirectoryClient />;
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Building2, UserCheck, Loader2, AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 
 interface TenantAssignment {
   tenantId: string;
@@ -82,20 +82,15 @@ export default function ManageUserTenantsModal({
   const loadUserTenants = async () => {
     if (!user) return;
     
+    setLoadingTenants(true);
     try {
-      setLoadingTenants(true);
-      // Add cache-busting timestamp to ensure fresh data
-      const timestamp = Date.now();
-      const response = await api.get(`/api/admin/users/${user.id}/tenants?t=${timestamp}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        console.log('[Modal] Loaded tenant assignments:', data.tenants);
-        setTenantAssignments(data.tenants || []);
-      } else {
-        console.error('[Modal] Failed to load tenant assignments:', data);
-        setError(data.error || 'Failed to load tenant assignments');
-      }
+      const data = await adminSecurityMonitoringService.getUserTenants(user.id);
+      const transformedAssignments = (data || []).map((assignment: any) => ({
+        tenantId: assignment.tenant_id,
+        tenantName: assignment.tenantName,
+        role: assignment.role,
+      }));
+      setTenantAssignments(transformedAssignments);
     } catch (err) {
       console.error('Failed to load user tenants:', err);
     } finally {
@@ -105,17 +100,10 @@ export default function ManageUserTenantsModal({
 
   const loadAvailableTenants = async () => {
     try {
-      const response = await api.get('/api/admin/tenants');
-      const data = await response.json();
-      
-      if (response.ok) {
-        console.log('[Modal] Loaded available tenants:', data.tenants);
-        setAvailableTenants(data.tenants || []);
-      } else {
-        console.error('[Modal] Failed to load available tenants:', data);
-      }
-    } catch (err) {
-      console.error('Failed to load available tenants:', err);
+      const tenants = await adminSecurityMonitoringService.getAvailableTenants();
+      setAvailableTenants(tenants);
+    } catch (error) {
+      console.error('Failed to load available tenants:', error);
     }
   };
 
@@ -127,14 +115,13 @@ export default function ManageUserTenantsModal({
     setSuccess('');
 
     try {
-      const response = await api.post(`/api/admin/users/${user.id}/tenants`, {
-        tenantId: newTenantId,
+      const response = await adminSecurityMonitoringService.assignTenantToUser(user.id, {
+        tenant_id: newTenantId,
         role: newRole,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to assign tenant');
+      if (!response) {
+        throw new Error('Failed to assign tenant');
       }
 
       setSuccess('✅ Tenant assigned successfully!');
@@ -162,11 +149,10 @@ export default function ManageUserTenantsModal({
     setSuccess('');
 
     try {
-      const response = await api.delete(`/api/admin/users/${user.id}/tenants/${tenantId}`);
+      const response = await adminSecurityMonitoringService.removeTenantFromUser(user.id, tenantId);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to remove tenant assignment');
+      if (!response) {
+        throw new Error('Failed to remove tenant assignment');
       }
 
       setSuccess('✅ Tenant assignment removed!');
@@ -192,13 +178,12 @@ export default function ManageUserTenantsModal({
     setSuccess('');
 
     try {
-      const response = await api.patch(`/api/admin/users/${user.id}/tenants/${tenantId}`, {
+      const response = await adminSecurityMonitoringService.updateUserTenantRole(user.id, tenantId, {
         role: newRole,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update role');
+      if (!response) {
+        throw new Error('Failed to update role');
       }
 
       setSuccess('✅ Role updated successfully!');

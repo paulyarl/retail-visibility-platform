@@ -1,34 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyGet } from '@/lib/api-proxy';
+import { tenantDashboardService } from '@/services/TenantDashboardService';
 
 /**
  * Dashboard API - Optimized endpoint for home page
- * Proxies to backend dashboard API
+ * Uses TenantDashboardService for cached dashboard operations
  */
 export async function GET(request: NextRequest) {
   try {
-    console.log('[Next.js Dashboard API] Received request');
-    console.log('[Next.js Dashboard API] Headers:', Object.fromEntries(request.headers.entries()));
-    
     // Extract tenantId from query params
     const { searchParams } = new URL(request.url);
     const tenantId = searchParams.get('tenantId');
 
     if (!tenantId) {
-      return NextResponse.json({ error: 'tenantId required' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
     }
 
-    // Proxy to backend dashboard API
-    const backendUrl = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
-    console.log('[Next.js Dashboard API] Proxying to:', backendUrl);
-    const response = await proxyGet(request, backendUrl);
+    // Get dashboard data using service with automatic caching
+    const dashboardData = await tenantDashboardService.getTenantDashboard(tenantId);
 
-    console.log('[Next.js Dashboard API] Backend response status:', response.status);
-    return response;
+    if (!dashboardData) {
+      return NextResponse.json({ 
+        error: 'dashboard_not_found',
+        message: 'Unable to fetch dashboard data' 
+      }, { status: 404 });
+    }
+
+    return NextResponse.json(dashboardData);
   } catch (error) {
     console.error('[Dashboard API] Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch dashboard data' 
+      },
       { status: 500 }
     );
   }

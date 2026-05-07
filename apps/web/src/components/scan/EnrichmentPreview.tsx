@@ -1,14 +1,56 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
-import { useState } from 'react';
-import CategorySelector from '@/components/items/CategorySelector';
+import { useState, useEffect } from 'react';
+import CategoryAssignmentModal from '@/components/items/CategoryAssignmentModal';
+import { Item } from '@/services/itemsDataService';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
+
+// Helper component to display category name by ID
+function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; tenantId?: string }) {
+  const [categoryName, setCategoryName] = useState<string>('Loading...');
+
+  useEffect(() => {
+    async function fetchCategory() {
+      // console.log(`[EnrichmentPreview] Fetching category for tenant: ${tenantId}, category: ${categoryId}`);
+      if (!tenantId) return;
+      
+      try {
+        // console.log(`[EnrichmentPreview] Fetching categories for tenant: ${tenantId}`);
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId);
+        // console.log(`[EnrichmentPreview] Received categories:`, categories);
+        const category = categories.find((c: any) => c.id === categoryId);
+        if (category) {
+          setCategoryName(category.name);
+          if (category.googleCategoryId) {
+            setCategoryName(`${category.name} (${category.googleCategoryId})`);
+          }
+        }
+      } catch (error) {
+        console.log(`[EnrichmentPreview] Error fetching category: ${error}`);
+        setCategoryName('Unknown category');
+      }
+    }
+    fetchCategory();
+  }, [categoryId, tenantId]);
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+      <span>{categoryName}</span>
+      <Badge variant="success" className="text-xs">Assigned</Badge>
+    </div>
+  );
+}
 
 interface EnrichmentData {
   name?: string;
   description?: string;
   brand?: string;
   categoryPath?: string[];
+  tenantCategoryId?: string;
   priceCents?: number;
   metadata?: Record<string, any>;
   source?: string;
@@ -28,6 +70,7 @@ interface EnrichmentPreviewProps {
   isLoading?: boolean;
   onEdit?: (field: string, value: any) => void;
   editable?: boolean;
+  tenantId?: string;
 }
 
 export default function EnrichmentPreview({
@@ -38,8 +81,10 @@ export default function EnrichmentPreview({
   isLoading = false,
   onEdit,
   editable = false,
+  tenantId,
 }: EnrichmentPreviewProps) {
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  // console.log(`[EnrichmentPreview] tenantId: ${tenantId}`)
 
   const hasErrors = validation.some(v => v.severity === 'error');
   const hasWarnings = validation.some(v => v.severity === 'warning');
@@ -89,11 +134,9 @@ export default function EnrichmentPreview({
     setShowCategorySelector(false);
   };
 
-  const handleCategoryCancel = () => {
-    setShowCategorySelector(false);
-  };
-
+  
   return (
+
     <Card className="w-full">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -228,19 +271,13 @@ export default function EnrichmentPreview({
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Category {!enrichment?.categoryPath?.length && <span className="text-red-500">*</span>}
+                  Category {!enrichment?.tenantCategoryId && <span className="text-red-500">*</span>}
                 </label>
                 {editable && onEdit ? (
                   <div className="space-y-2">
-                    {enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
+                    {enrichment?.tenantCategoryId ? (
                       <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                        <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                          <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                          <span>{enrichment.categoryPath.join(' > ')}</span>
-                          <Badge variant="success" className="text-xs">Assigned</Badge>
-                        </div>
+                        <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} tenantId={tenantId} />
                         <button
                           type="button"
                           onClick={() => setShowCategorySelector(true)}
@@ -268,14 +305,8 @@ export default function EnrichmentPreview({
                     )}
                   </div>
                 ) : (
-                  enrichment?.categoryPath && enrichment.categoryPath.length > 0 ? (
-                    <div className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                      <span>{enrichment.categoryPath.join(' > ')}</span>
-                      <Badge variant="success" className="text-xs">Suggested</Badge>
-                    </div>
+                  enrichment?.tenantCategoryId ? (
+                    <CategoryNameDisplay categoryId={enrichment.tenantCategoryId} tenantId={tenantId} />
                   ) : (
                     <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <p className="font-medium">Category Required</p>
@@ -305,12 +336,27 @@ export default function EnrichmentPreview({
                   </label>
                   <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 space-y-1">
                     {Object.entries(enrichment.metadata).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between text-sm">
+                      <div key={key} className="text-sm">
                         <span className="text-neutral-600 dark:text-neutral-400 capitalize">
                           {key.replace(/_/g, ' ')}:
                         </span>
-                        <span className="text-neutral-900 dark:text-white font-medium">
-                          {String(value)}
+                        <span className="text-neutral-900 dark:text-white font-medium ml-2">
+                          {value === null ? (
+                            <span className="text-neutral-400 italic">Not available</span>
+                          ) : typeof value === 'object' ? (
+                            Object.keys(value as Record<string, any>).length === 0 ? (
+                              <span className="text-neutral-400 italic">None</span>
+                            ) : (
+                              <span className="pl-2">
+                                {Object.entries(value as Record<string, any>)
+                                  .filter(([, v]) => v !== null && v !== undefined)
+                                  .map(([k, v]) => `${k}: ${v}`)
+                                  .join(', ')}
+                              </span>
+                            )
+                          ) : (
+                            String(value)
+                          )}
                         </span>
                       </div>
                     ))}
@@ -344,33 +390,32 @@ export default function EnrichmentPreview({
         </div>
       </CardContent>
 
-      {/* Category Selector Modal */}
-      {showCategorySelector && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-                Select Category
-              </h3>
-              <button
-                onClick={handleCategoryCancel}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              <CategorySelector
-                currentCategory={enrichment?.categoryPath || []}
-                onCategorySelect={handleCategorySelect}
-                onCancel={handleCategoryCancel}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Category Assignment Modal */}
+      {showCategorySelector && enrichment && (
+        // console.log('[EnrichmentPreview] Showing category selector', { enrichment, tenantId }),
+        <CategoryAssignmentModal
+          item={{
+            id: 'temp-scan-item',
+            sku: sku || barcode,
+            name: enrichment.name || 'Scanned Item',
+            description: enrichment.description,
+            brand: enrichment.brand,
+            price: null,
+            stock: 0,
+            status: 'active' as const,
+            visibility: 'private' as const,
+            categoryPath: enrichment.categoryPath,
+            tenantCategoryId: enrichment.tenantCategoryId,
+            tenantId: tenantId || '',
+          }}
+          onSave={async (itemId: string, categoryId: string) => {
+            if (onEdit) {
+              onEdit('tenantCategoryId', categoryId);
+            }
+            setShowCategorySelector(false);
+          }}
+          onClose={() => setShowCategorySelector(false)}
+        />
       )}
     </Card>
   );

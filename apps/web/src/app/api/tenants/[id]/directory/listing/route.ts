@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 
 export async function GET(
   request: NextRequest,
@@ -9,28 +8,50 @@ export async function GET(
   const { id } = await params;
   
   try {
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    // Use TenantDirectorySingletonService for automatic caching and error handling
+    const listing = await tenantDirectoryService.getDirectoryListing(id);
+    
+    if (!listing) {
+      return NextResponse.json(
+        { error: 'Directory listing not found' },
+        { status: 400 }
+      );
     }
-    
-    // Forward request to backend API
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/directory/listing`, {
-      method: 'GET',
-      headers,
-    });
-    
-    const data = await response.json();
-    
-    return NextResponse.json(data, { status: response.status });
+
+    return NextResponse.json(listing);
   } catch (error) {
-    console.error('[Directory Listing Proxy] Error:', error);
+    console.error('[Directory Listing API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch directory listing' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  
+  try {
+    const body = await request.json();
+    
+    // Use TenantDirectorySingletonService for automatic caching and error handling
+    const listing = await tenantDirectoryService.createDirectoryListing(id, body);
+    
+    if (!listing) {
+      return NextResponse.json(
+        { error: 'Failed to create directory listing' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(listing, { status: 201 });
+  } catch (error) {
+    console.error('[Directory Listing API] Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create directory listing' },
       { status: 500 }
     );
   }
@@ -44,26 +65,20 @@ export async function PUT(
   
   try {
     const body = await request.json();
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    
+    // Use TenantDirectorySingletonService for automatic caching and error handling
+    const listing = await tenantDirectoryService.updateDirectoryListing(id, body);
+    
+    if (!listing) {
+      return NextResponse.json(
+        { error: 'Failed to update directory listing' },
+        { status: 500 }
+      );
     }
-    
-    // Forward request to backend API
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/directory/listing`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-    
-    const data = await response.json();
-    
-    return NextResponse.json(data, { status: response.status });
+
+    return NextResponse.json(listing);
   } catch (error) {
-    console.error('[Directory Listing Proxy] Error:', error);
+    console.error('[Directory Listing API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to update directory listing' },
       { status: 500 }
@@ -79,79 +94,49 @@ export async function PATCH(
   
   try {
     const body = await request.json();
-    const authHeader = request.headers.get('authorization');
-    const csrfToken = request.headers.get('x-csrf-token');
-    const tenantId = request.headers.get('x-tenant-id');
     
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    // Use TenantDirectorySingletonService for automatic caching and error handling
+    const listing = await tenantDirectoryService.patchDirectoryListing(id, body);
+    
+    if (!listing) {
+      return NextResponse.json(
+        { error: 'Failed to patch directory listing' },
+        { status: 500 }
+      );
     }
-    if (csrfToken) {
-      headers['x-csrf-token'] = csrfToken;
-    }
-    if (tenantId) {
-      headers['x-tenant-id'] = tenantId;
-    }
-    
-    // Forward request to backend API
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/directory/listing`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(body),
-    });
-    
-    const data = await response.json();
-    
-    return NextResponse.json(data, { status: response.status });
+
+    return NextResponse.json(listing);
   } catch (error) {
-    console.error('[Directory Listing PATCH Proxy] Error:', error);
+    console.error('[Directory Listing API] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to update directory listing' },
+      { error: 'Failed to patch directory listing' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const url = new URL(request.url);
-  const action = url.searchParams.get('action');
   
   try {
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    // Use TenantDirectorySingletonService for automatic caching and error handling
+    const success = await tenantDirectoryService.deleteDirectoryListing(id);
+    
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to delete directory listing' },
+        { status: 500 }
+      );
     }
-    
-    let endpoint = `${API_BASE_URL}/api/tenants/${id}/directory`;
-    if (action === 'publish') {
-      endpoint += '/publish';
-    } else if (action === 'unpublish') {
-      endpoint += '/unpublish';
-    }
-    
-    // Forward request to backend API
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-    });
-    
-    const data = await response.json();
-    
-    return NextResponse.json(data, { status: response.status });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[Directory Listing Proxy] Error:', error);
+    console.error('[Directory Listing API] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to perform action' },
+      { error: 'Failed to delete directory listing' },
       { status: 500 }
     );
   }

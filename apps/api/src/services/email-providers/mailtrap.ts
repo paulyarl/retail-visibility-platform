@@ -7,8 +7,8 @@ export class MailtrapEmailProvider implements EmailProvider {
 
   constructor() {
     this.apiToken = process.env.MAILTRAP_API_TOKEN || '';
-    this.fromEmail = process.env.MAILTRAP_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@yourplatform.com';
-    this.fromName = process.env.MAILTRAP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'RVP Platform';
+    this.fromEmail = process.env.MAILTRAP_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@visibleshelf.store';
+    this.fromName = process.env.MAILTRAP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'Visible Shelf Platform';
   }
 
   async sendEmail(params: SendEmailParams): Promise<EmailResult> {
@@ -43,11 +43,11 @@ export class MailtrapEmailProvider implements EmailProvider {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as { message?: string };
         throw new Error(`Mailtrap API error: ${response.status} - ${errorData.message || response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { message_id?: string };
       
       return {
         success: true,

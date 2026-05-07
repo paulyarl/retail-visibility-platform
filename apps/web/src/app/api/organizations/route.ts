@@ -1,52 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-function buildAuthHeaders(req: Request): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  const cookie = req.headers.get('cookie') || ''
-  let auth = req.headers.get('authorization') || undefined
-  if (!auth) {
-    const jar = Object.fromEntries(cookie.split(';').map(p => p.trim()).filter(Boolean).map(kv => {
-      const i = kv.indexOf('=')
-      return i === -1 ? [kv, ''] : [kv.slice(0, i), decodeURIComponent(kv.slice(1 + i))]
-    })) as Record<string, string>
-    const token = jar['ACCESS_TOKEN'] || jar['access_token'] || jar['token'] || jar['auth_token']
-    if (token) auth = `Bearer ${token}`
-  }
-  if (auth) headers['Authorization'] = auth
-  if (cookie) headers['Cookie'] = cookie
-  return headers
-}
+import AdminOrganizationsService from '@/services/AdminOrganizationsService';
 
 export async function GET(req: NextRequest) {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const headers = buildAuthHeaders(req);
-    const res = await fetch(`${base}/api/organizations`, {
-      headers,
-      cache: 'no-store',
+    // Extract query parameters for pagination and filtering
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const searchQuery = searchParams.get('search') || undefined;
+    const isActive = searchParams.get('isActive') ? searchParams.get('isActive') === 'true' : undefined;
+    
+    // MIGRATION: Using AdminOrganizationsService instead of direct fetch
+    const result = await AdminOrganizationsService.getOrganizations({
+      page,
+      limit,
+      search: searchQuery,
+      isActive,
     });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] GET /organizations error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    return NextResponse.json(result);
+    
+  } catch (error) {
+    console.error('Error fetching organizations:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch organizations' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const headers = buildAuthHeaders(req);
-    const res = await fetch(`${base}/api/organizations`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    console.error('[API Proxy] POST /organizations error:', e);
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    // MIGRATION: Using AdminOrganizationsService instead of direct fetch
+    const organization = await AdminOrganizationsService.createOrganization(body);
+    
+    if (!organization) {
+      return NextResponse.json({ error: 'Failed to create organization' }, { status: 400 });
+    }
+    
+    return NextResponse.json(organization);
+    
+  } catch (error) {
+    console.error('Error creating organization:', error);
+    return NextResponse.json(
+      { error: 'Failed to create organization' },
+      { status: 500 }
+    );
   }
 }

@@ -342,20 +342,30 @@ export default function ProductEnrichmentPreview({
               )}
 
               {match.enrichableFields.useSpecs && scannedData.specifications && (
-                <label className="flex items-center gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
+                <label className="flex items-start gap-3 cursor-pointer hover:bg-neutral-50 p-2 rounded">
                   <input
                     type="checkbox"
                     checked={enrichmentOptions.useSpecs}
                     onChange={(e) => 
                       setEnrichmentOptions({ ...enrichmentOptions, useSpecs: e.target.checked })
                     }
-                    className="w-4 h-4"
+                    className="w-4 h-4 mt-1"
                   />
                   <div className="flex-1">
                     <p className="font-medium">Add product specifications</p>
-                    <p className="text-sm text-neutral-600">
-                      {Object.keys(scannedData.specifications).length} specification(s)
-                    </p>
+                    <div className="text-sm text-neutral-600 mt-1 space-y-1">
+                      {Object.entries(scannedData.specifications).map(([key, value]) => (
+                        <div key={key} className="flex gap-2">
+                          <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>
+                          <span>
+                            {typeof value === 'object' && value !== null 
+                              ? Object.entries(value as Record<string, any>).map(([k, v]) => `${k}: ${v}`).join(', ')
+                              : String(value)
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </label>
               )}

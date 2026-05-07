@@ -2,6 +2,8 @@
 
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
+import { Button } from '@mantine/core';
+
 
 export default function CapacityOverviewPage() {
   return (

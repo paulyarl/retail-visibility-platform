@@ -13,6 +13,8 @@ interface ConfirmDialogProps {
   variant?: 'danger' | 'warning' | 'info';
 }
 
+
+
 export default function ConfirmDialog({
   isOpen,
   onClose,

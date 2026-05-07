@@ -10,6 +10,10 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+
+
+
 
 export default function GBPCategoryLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -21,22 +25,12 @@ export default function GBPCategoryLayout({ children }: { children: React.ReactN
     // Fetch tenant tier
     const fetchTier = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const res = await fetch(`${apiUrl}/tenants/${tenantId}`, {
-          headers,
-          credentials: 'include',
-        });
+        const res = await api.get(`/api/tenants/${tenantId}`);
         
         if (res.ok) {
           const data = await res.json();
-          setTier(data.subscriptionTier || 'trial');
+          // API may return snake_case or camelCase depending on endpoint
+          setTier(data.subscriptionTier || data.subscription_tier || 'trial');
         }
       } catch (err) {
         console.error('Failed to fetch tenant tier:', err);

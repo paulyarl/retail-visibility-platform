@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface ChangeLocationStatusModalProps {
   isOpen: boolean;
@@ -98,17 +98,16 @@ export default function ChangeLocationStatusModal({
   const fetchCurrentStatus = async () => {
     setStatusLoading(true);
     try {
-      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}`);
-      if (response.ok) {
-        const tenantData = await response.json();
-        const backendStatus = tenantData.locationStatus || 'active';
-        setCurrentStatus(backendStatus);
-        setSelectedStatus(backendStatus); // Reset selected status to current
-      } else {
-        console.error('Failed to fetch current tenant status');
-        setCurrentStatus(initialStatus); // Fallback to prop
-        setSelectedStatus(initialStatus);
-      }
+      const tenantData = await tenantInfoService.getTenantDataWithCacheBusting(tenantId);
+      // console.log('[ChangeLocationStatusModal] Tenant data from API:', tenantData);
+      // console.log('[ChangeLocationStatusModal] Available fields:', Object.keys(tenantData));
+      // console.log('[ChangeLocationStatusModal] locationStatus field:', tenantData.locationStatus);
+      // console.log('[ChangeLocationStatusModal] location_status field:', tenantData.location_status);
+      
+      const backendStatus = tenantData.locationStatus || tenantData.location_status || 'active';
+      // console.log('[ChangeLocationStatusModal] Setting current status to:', backendStatus);
+      setCurrentStatus(backendStatus);
+      setSelectedStatus(backendStatus); // Reset selected status to current
     } catch (err) {
       console.error('Error fetching current status:', err);
       setCurrentStatus(initialStatus); // Fallback to prop
@@ -140,15 +139,8 @@ export default function ChangeLocationStatusModal({
   const fetchImpactPreview = async () => {
     setPreviewLoading(true);
     try {
-      const response = await api.post(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}/status/preview`,
-        { status: selectedStatus }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setImpact(data);
-      }
+      const data = await tenantInfoService.getTenantStatusPreview(tenantId, selectedStatus);
+      setImpact(data);
     } catch (err) {
       console.error('Failed to fetch impact preview:', err);
     } finally {
@@ -171,25 +163,16 @@ export default function ChangeLocationStatusModal({
         return;
       }
 
-      const response = await api.patch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}/status`,
-        {
-          status: selectedStatus,
-          reason: reason.trim() || undefined,
-          reopeningDate: reopeningDate || undefined,
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update status');
-      }
-
-      // Success!
-      onStatusChanged?.();
+      await tenantInfoService.updateTenantStatus(tenantId, selectedStatus);
+      
+      // Close modal and trigger refresh
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update location status');
+      if (onStatusChanged) {
+        onStatusChanged();
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setLoading(false);
     }
@@ -214,19 +197,11 @@ export default function ChangeLocationStatusModal({
   const selectedOption = STATUS_OPTIONS.find(opt => opt.value === selectedStatus);
   const allowedTransitions = STATUS_OPTIONS.filter(opt => {
     // Can't transition to current status
-    if (opt.value === currentStatus) return false;
-    
-    // Define allowed transitions (must stay in sync with backend STATUS_TRANSITIONS)
-    const transitions: Record<string, string[]> = {
-      pending: ['active', 'archived'],
-      active: ['inactive', 'closed', 'archived'],
-      inactive: ['active', 'closed', 'archived'],
-      closed: ['archived'],
-      archived: ['active'],
-    };
-    
-    return transitions[currentStatus]?.includes(opt.value);
+    return opt.value !== currentStatus;
   });
+  
+  // console.log('[ChangeLocationStatusModal] Current status:', currentStatus);
+  // console.log('[ChangeLocationStatusModal] Allowed transitions:', allowedTransitions.map(opt => opt.value));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">

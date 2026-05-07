@@ -4,20 +4,25 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Users, UserPlus, Key, Trash2, Mail } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { Button } from '@mantine/core';
 import { Spinner } from '@/components/ui';
 
 interface TenantUser {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-  createdAt: string;
-  lastLogin?: string;
+  name: string;
+  platformRole: string;
+  tenantRole: string;
+  isActive: boolean;
+  lastLogin: string;
+  addedAt: string;
 }
+
+
+
 
 export default function TenantUsersPage() {
   const params = useParams();
@@ -44,15 +49,14 @@ export default function TenantUsersPage() {
 
   const loadUsers = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiUrl}/api/tenants/${tenantId}/users`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-      }
+      const users = await tenantInfoService.getUsers(tenantId);
+      console.log('[TenantUsersPage] Users loaded:', users);
+      console.log('[TenantUsersPage] Users type:', typeof users);
+      console.log('[TenantUsersPage] Is array?', Array.isArray(users));
+      setUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Failed to load users:', error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -65,19 +69,12 @@ export default function TenantUsersPage() {
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/users/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      const response = await tenantInfoService.inviteUser(tenantId, {
+        email: inviteEmail,
+        role: inviteRole,
       });
 
-      if (response.ok) {
+      if (response) {
         setSuccess(`✅ Invitation sent to ${inviteEmail}`);
         setInviteEmail('');
         setInviteRole('USER');
@@ -87,8 +84,7 @@ export default function TenantUsersPage() {
           setSuccess('');
         }, 2000);
       } else {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to invite user');
+        throw new Error('Failed to invite user');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to invite user');
@@ -103,17 +99,9 @@ export default function TenantUsersPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await tenantInfoService.deleteUser(tenantId, userId);
 
-      if (response.ok) {
+      if (response) {
         await loadUsers();
       } else {
         alert('Failed to remove user');
@@ -206,20 +194,18 @@ export default function TenantUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {users.map((user) => (
+                  {Array.isArray(users) && users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                             <span className="text-white font-semibold">
-                              {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                              {(user.name?.[0] || user.email[0]).toUpperCase()}
                             </span>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {user.firstName && user.lastName 
-                                ? `${user.firstName} ${user.lastName}`
-                                : user.firstName || user.lastName || 'Unnamed User'}
+                              {user.name || 'Unnamed User'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {user.email}
@@ -229,7 +215,7 @@ export default function TenantUsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                          {user.role}
+                          {user.tenantRole}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

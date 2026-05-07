@@ -2,28 +2,44 @@
  * Subscription tier definitions and limits
  * Centralized tier configuration for the platform
  *
- * NOTE: Trial is a STATUS, not a tier. This type only models actual tiers.
+ * Trial wrappers (trial_*) provide full tier benefits during 14-day trial period.
+ * expired_trial is a virtual tier for tenants who didn't convert after trial+grace period.
  */
 
-export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier =
+  | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'professional' | 'storefront' | 'enterprise' | 'organization' | 'chain_starter'
+  | 'trial_google_only' | 'trial_starter' | 'trial_discovery'| 'trial_storefront' | 'trial_chain_starter' | 'trial_commitment' | 'trial_professional' | 'trial_storefront'
+  | 'expired_trial';
 
 export interface TierLimits {
   name: string;
   price: string;
   pricePerMonth: number;
-  maxSKUs: number;
+  maxSkus: number;
   maxLocations: number;
   description: string;
   features: string[];
   color: string;
+  isTrial?: boolean;
+  isExpired?: boolean;
+  trialTarget?: string;
 }
+
+// Trial-eligible tiers (can be wrapped in trial_*)
+export const TRIAL_ELIGIBLE_TIERS = ['google_only', 'starter', 'discovery', 'commitment', 'storefront', 'chain_starter'] as const;
+export type TrialEligibleTier = typeof TRIAL_ELIGIBLE_TIERS[number];
+
+// Trial duration constants
+export const TRIAL_DURATION_DAYS = 14;
+export const GRACE_DURATION_DAYS = 14;
+export const TOTAL_TRIAL_DAYS = TRIAL_DURATION_DAYS + GRACE_DURATION_DAYS; // 30 days
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   google_only: {
     name: 'Google-Only',
     price: '$29/month',
     pricePerMonth: 29,
-    maxSKUs: 250,
+    maxSkus: 250,
     maxLocations: 1,
     description: 'Get discovered on Google',
     features: [
@@ -41,7 +57,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Starter',
     price: '$29/month',
     pricePerMonth: 29,
-    maxSKUs: 500,
+    maxSkus: 500,
     maxLocations: 3,
     description: 'Core visibility and storefront for small retailers',
     features: [
@@ -56,16 +72,48 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     ],
     color: 'bg-blue-100 text-blue-900',
   },
-  professional: {
-    name: 'Professional',
+  discovery: {
+    name: 'Discovery',
+    price: '$29/month',
+    pricePerMonth: 29,
+    maxSkus: 100,
+    maxLocations: 2,
+    description: 'Discover new products and expand your catalog',
+    features: [
+      'Up to 2 locations',
+      'Up to 100 SKUs per location',
+      'Product discovery tools',
+      'Advanced analytics',
+      'Priority support',
+    ],
+    color: 'bg-purple-100 text-purple-900',
+  },
+  commitment: {
+    name: 'Commitment',
     price: '$99/month',
     pricePerMonth: 99,
-    maxSKUs: 5000,
-    maxLocations: 10,
+    maxSkus: 500,
+    maxLocations: 8,
+    description: 'Committed to growth with advanced features',
+    features: [
+      'Up to 1 locations',
+      'Up to 500 SKUs per location',
+      'Advanced product discovery',
+      'Enhanced analytics',
+      'Priority support',
+    ],
+    color: 'bg-orange-100 text-orange-900',
+  },
+  storefront: {
+    name: 'Storefront',
+    price: '$59/month',
+    pricePerMonth: 59,
+    maxSkus: 250,
+    maxLocations: 1,
     description: 'Connected & growing retailers (POS + intelligence)',
     features: [
-      'Up to 10 locations',
-      'Up to 5,000 SKUs per location',
+      'Up to 1 location',
+      'Up to 250 SKUs per location',
       'Quick Start Wizard (50–100 products in seconds)',
       'SKU scanning + inventory intelligence',
       'Full Google Business Profile & Shopping suite',
@@ -76,23 +124,53 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     ],
     color: 'bg-purple-100 text-purple-900',
   },
+  professional: {
+    name: 'Professional',
+    price: '$199/month',
+    pricePerMonth: 199,
+    maxSkus: 750,
+    maxLocations: 15,
+    description: 'Professional retailers with advanced needs',
+    features: [
+      'Up to 2 locations',
+      'Up to 750 SKUs per location',
+      'Advanced product discovery',
+      'Enhanced analytics',
+      'Priority support',
+    ],
+    color: 'bg-orange-100 text-orange-900',
+  },
+  chain_starter: {
+    name: 'Chain Starter',
+    price: '$329/month',
+    pricePerMonth: 329,
+    maxSkus: 1000,
+    maxLocations: 1,
+    description: 'Get discovered on Google',
+    features: [
+      '1000 SKUs',
+      'Google Shopping feeds',
+      'Google Merchant Center sync',
+      '512px QR codes',
+      'Basic product pages',
+      'Performance analytics',
+      'No storefront',
+    ],
+    color: 'bg-green-100 text-green-900',
+  },
   enterprise: {
     name: 'Enterprise',
     price: '$499/month',
     pricePerMonth: 499,
-    maxSKUs: Infinity,
-    maxLocations: 25,
+    maxSkus: 1000,
+    maxLocations: 2,
     description: 'Full connector + AI automation (up to ~25 locations)',
     features: [
-      'Up to 25 locations',
-      'Effectively unlimited SKUs for most SMBs',
+      'Up to 2 locations',
+      'Up to 1000 SKUs per location',
       'Everything in Professional',
       'API access & custom integrations',
       'Advanced chain management with hero-location testing',
-      'White-label storefront & custom branding',
-      'AI-assisted product enrichment & copy',
-      'Dedicated account manager',
-      'SLA guarantees',
     ],
     color: 'bg-amber-100 text-amber-900',
   },
@@ -100,8 +178,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Organization',
     price: 'Custom',
     pricePerMonth: 0,
-    maxSKUs: Infinity,
-    maxLocations: Infinity,
+    maxSkus: 1000,
+    maxLocations: 2,
     description: 'For chains & franchises with 25+ locations',
     features: [
       'Everything in Enterprise',
@@ -113,6 +191,167 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
       'Custom contracts & pricing',
     ],
     color: 'bg-emerald-100 text-emerald-900',
+  },
+
+  // Trial wrapper tiers - provide full tier benefits during trial
+  trial_google_only: {
+    name: 'Trial: Google-Only',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 250,
+    maxLocations: 1,
+    description: '14-day trial of Google-Only tier',
+    features: [
+      '250 SKUs',
+      'Google Shopping feeds',
+      'Google Merchant Center sync',
+      '512px QR codes',
+      'Basic product pages',
+      'Performance analytics',
+      'No storefront',
+    ],
+    color: 'bg-green-100 text-green-900 border-2 border-green-500',
+    isTrial: true,
+    trialTarget: 'google_only',
+  },
+  trial_starter: {
+    name: 'Trial: Starter',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 500,
+    maxLocations: 3,
+    description: '14-day trial of Starter tier',
+    features: [
+      'Up to 3 locations',
+      'Up to 500 SKUs per location',
+      'Storefront with product catalog & search',
+      'Directory listing',
+      'Google Shopping feeds & Merchant Center sync',
+      'Basic barcode scanner + manual entry',
+      'Basic product enrichment',
+      'QR codes & basic analytics',
+    ],
+    color: 'bg-blue-100 text-blue-900 border-2 border-blue-500',
+    isTrial: true,
+    trialTarget: 'starter',
+  },
+  trial_discovery: {
+    name: 'Trial: Discovery',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 500,
+    maxLocations: 3,
+    description: '14-day trial of Discovery tier',
+    features: [
+      'Up to 3 locations',
+      'Up to 500 SKUs per location',
+      'Storefront with product catalog & search',
+      'Directory listing',
+      'Google Shopping feeds & Merchant Center sync',
+      'Basic barcode scanner + manual entry',
+      'Basic product enrichment',
+      'QR codes & basic analytics',
+    ],
+    color: 'bg-blue-100 text-blue-900 border-2 border-blue-500',
+    isTrial: true,
+    trialTarget: 'discovery',
+  },
+  trial_storefront: {
+    name: 'Trial: Storefront',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 500,
+    maxLocations: 3,
+    description: '14-day trial of Storefront tier',
+    features: [
+      'Up to 3 locations',
+      'Up to 500 SKUs per location',
+      'Storefront with product catalog & search',
+      'Directory listing',
+      'Google Shopping feeds & Merchant Center sync',
+      'Basic barcode scanner + manual entry',
+      'Basic product enrichment',
+      'QR codes & basic analytics',
+    ],
+    color: 'bg-blue-100 text-blue-900 border-2 border-blue-500',
+    isTrial: true,
+    trialTarget: 'storefront',
+  },
+  trial_commitment: {
+    name: 'Trial: Commitment',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 500,
+    maxLocations: 3,
+    description: '14-day trial of Commitment tier',
+    features: [
+      'Up to 3 locations',
+      'Up to 500 SKUs per location',
+      'Storefront with product catalog & search',
+      'Directory listing',
+      'Google Shopping feeds & Merchant Center sync',
+      'Basic barcode scanner + manual entry',
+      'Basic product enrichment',
+      'QR codes & basic analytics',
+    ],
+    color: 'bg-blue-100 text-blue-900 border-2 border-blue-500',
+    isTrial: true,
+    trialTarget: 'commitment',
+  },
+  
+  trial_professional: {
+    name: 'Trial: Professional',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 750,
+    maxLocations: 15,
+    description: '14-day trial of Professional tier',
+    features: [
+      'Up to 15 locations',
+      'Up to 750 SKUs per location',
+      'Quick Start Wizard (50-100 products in seconds)',
+      'SKU scanning + inventory intelligence',
+      'Full Google Business Profile & Shopping suite',
+      'Clover + Square POS integration',
+      'Advanced analytics & bulk operations',
+      'CSV import/export & higher enrichment quotas',
+      'Priority support',
+    ],
+    color: 'bg-purple-100 text-purple-900 border-2 border-purple-500',
+    isTrial: true,
+    trialTarget: 'professional',
+  },
+  trial_chain_starter: {
+    name: 'Trial: Chain Starter',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 1000,
+    maxLocations: 5,
+    description: '14-day trial of Chain Starter (organization)',
+    features: [
+      'Up to 5 locations',
+      'Up to 1000 SKUs',
+      'Chain branding & management',
+      'Master catalog distribution',
+      'Propagation to all locations',
+      'Chain analytics dashboard',
+    ],
+    color: 'bg-amber-100 text-amber-900 border-2 border-amber-500',
+    isTrial: true,
+    trialTarget: 'chain_starter',
+  },
+
+  // Expired trial - invisible on public pages
+  expired_trial: {
+    name: 'Trial Expired',
+    price: '$0',
+    pricePerMonth: 0,
+    maxSkus: 0,
+    maxLocations: 0,
+    description: 'Trial period ended - subscription required',
+    features: [],
+    color: 'bg-gray-100 text-gray-500',
+    isExpired: true,
   },
 };
 
@@ -129,15 +368,15 @@ export function getTierInfo(tier: SubscriptionTier | string | null | undefined):
  */
 export function canAddSKUs(tier: SubscriptionTier | string | null | undefined, currentCount: number, toAdd: number = 1): boolean {
   const tierInfo = getTierInfo(tier);
-  if (tierInfo.maxSKUs === Infinity) return true;
-  return (currentCount + toAdd) <= tierInfo.maxSKUs;
+  if (tierInfo.maxSkus === Infinity) return true;
+  return (currentCount + toAdd) <= tierInfo.maxSkus;
 }
 
 /**
  * Get SKU limit for a tier
  */
 export function getSKULimit(tier: SubscriptionTier | string | null | undefined): number {
-  return getTierInfo(tier).maxSKUs;
+  return getTierInfo(tier).maxSkus;
 }
 
 /**
@@ -145,16 +384,17 @@ export function getSKULimit(tier: SubscriptionTier | string | null | undefined):
  */
 export function needsUpgrade(tier: SubscriptionTier | string | null | undefined, currentCount: number): boolean {
   const tierInfo = getTierInfo(tier);
-  if (tierInfo.maxSKUs === Infinity) return false;
-  return currentCount >= tierInfo.maxSKUs;
+  if (tierInfo.maxSkus === Infinity) return false;
+  return currentCount >= tierInfo.maxSkus;
 }
 
 /**
  * Get recommended tier based on SKU count
  */
 export function getRecommendedTier(skuCount: number): SubscriptionTier {
-  if (skuCount <= 500) return 'starter';
-  if (skuCount <= 5000) return 'professional';
-  if (skuCount <= 10000) return 'enterprise';
+  if (skuCount <= 250) return 'storefront';
+  if (skuCount <= 500) return 'commitment';
+  if (skuCount <= 750) return 'professional';
+  if (skuCount <= 1000) return 'enterprise';
   return 'organization';
 }

@@ -1,30 +1,497 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, checkTenantAccess } from '../middleware/auth';
 import { categoryService } from '../services/CategoryService';
+import { generateProductCatId } from '../lib/id-generator';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const router = Router();
 
-router.get('/api/platform/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
+router.get('/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const categories = await categoryService.getTenantCategories('platform');
+    const { prisma } = await import('../prisma');
+    const categories = await prisma.platform_categories.findMany({
+      where: { is_active: true },
+      orderBy: [
+        { sort_order: 'asc' },
+        { name: 'asc' },
+      ],
+    });
     return res.json({ success: true, data: categories });
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });
 
-router.post('/api/platform/categories', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+router.post('/categories', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const name = String(req.body?.name || '').trim();
+    const { prisma } = await import('../prisma');
+    let name = String(req.body?.name || '').trim();
     const slug = String(req.body?.slug || '').trim();
+    const googleCategoryId = String(req.body?.googleCategoryId || '').trim();
+    let description = String(req.body?.description || '').trim();
+    const iconEmoji = String(req.body?.icon_emoji || req.body?.iconEmoji || '').trim();
+    
     if (!name || !slug) return res.status(400).json({ success: false, error: 'invalid_payload' });
-    const created = await categoryService.createTenantCategory('platform', { name, slug });
+    
+    // Helper function to format slug-like text to Title Case
+    const formatToTitleCase = (text: string) => {
+      return text
+        .replace(/_/g, ' ')      // Replace underscores with spaces
+        .replace(/-/g, ' ')      // Replace hyphens with spaces
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    };
+    
+    // If name looks like a slug (has underscores or is all lowercase with hyphens), format it properly
+    if (name.includes('_') || (name === name.toLowerCase() && name.includes('-'))) {
+      name = formatToTitleCase(name);
+    }
+    
+    // If description looks like a slug (e.g., "cabinet_store business"), format it
+    if (description) {
+      // Check if description contains underscores or slug-like patterns
+      if (description.includes('_') || /^[a-z_-]+\s+business$/i.test(description)) {
+        // Extract the category part before " business"
+        const categoryPart = description.replace(/\s+business$/i, '');
+        const formattedCategory = formatToTitleCase(categoryPart);
+        description = `${formattedCategory} - Business category for ${formattedCategory.toLowerCase()}`;
+      }
+    }
+    
+    // Create in platform_categories table
+    const created = await prisma.platform_categories.create({
+      data: {
+        name,
+        slug,
+        google_category_id: googleCategoryId || slug,
+        description: description || `Business category for ${name.toLowerCase()}`,
+        icon_emoji: iconEmoji || '📦',  // Use provided emoji or default to box
+        sort_order: 0,
+        level: 0,
+        is_active: true,
+      },
+    });
     return res.status(201).json({ success: true, data: created });
   } catch (e: any) {
     // Check for unique constraint violation on slug
-    if (e?.message?.includes('Unique constraint failed') && e?.message?.includes('slug')) {
+    if (e?.code === 'P2002' || e?.message?.includes('Unique constraint')) {
       return res.status(409).json({ success: false, error: 'duplicate_slug', message: `A category with slug "${req.body?.slug}" already exists` });
     }
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { prisma } = await import('../prisma');
+    
+    // Build update data from request body
+    // Note: directory_category only has: id, tenantId, parentId, name, slug, googleCategoryId, isActive, sortOrder, createdAt, updatedAt
+    const updateData: Record<string, any> = {};
+    
+    if (req.body?.name) {
+      updateData.name = String(req.body.name).trim();
+    }
+    if (req.body?.slug) {
+      updateData.slug = String(req.body.slug).trim();
+    }
+    if (req.body?.googleCategoryId !== undefined) {
+      updateData.googleCategoryId = req.body.googleCategoryId ? String(req.body.googleCategoryId).trim() : null;
+    }
+    if (req.body?.sortOrder !== undefined) {
+      updateData.sortOrder = parseInt(req.body.sortOrder, 10) || 0;
+    }
+    if (req.body?.isActive !== undefined) {
+      updateData.isActive = Boolean(req.body.isActive);
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, error: 'no_fields_to_update' });
+    }
+    
+    // Update directly in database
+    const updated = await prisma.directory_category.update({
+      where: { id },
+      data: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
+    });
+    
+    return res.json({ success: true, data: updated });
+  } catch (e: any) {
+    console.error('[PATCH /categories/:id] Error:', e);
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await categoryService.softDeleteDirectoryCategory('platform', id);
+    return res.status(204).send();
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+// Quick start endpoint for platform categories (aligned with tenant quick-start)
+// Access: Platform users OR tenant members (tenant access)
+router.post('/categories/quick-start', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { businessType = 'general', categoryCount = 15 } = req.body;
+    const { prisma } = await import('../prisma');
+    const { generateQsCatId } = await import('../lib/id-generator');
+    
+    // Use the same taxonomy branches as tenant quick-start
+    const taxonomyBranches: Record<string, string[][]> = {
+      grocery: [
+        ['Food, Beverages & Tobacco', 'Food Items'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      fashion: [
+        ['Apparel & Accessories', 'Clothing'],
+        ['Apparel & Accessories', 'Shoes'],
+        ['Apparel & Accessories', 'Clothing Accessories'],
+      ],
+      electronics: [
+        ['Electronics', 'Computers'],
+        ['Electronics', 'Audio'],
+        ['Electronics', 'Cameras & Optics'],
+        ['Electronics', 'Communications'],
+      ],
+      home_garden: [
+        ['Home & Garden', 'Home Decor'],
+        ['Home & Garden', 'Kitchen & Dining'],
+        ['Home & Garden', 'Furniture'],
+        ['Home & Garden', 'Lawn & Garden'],
+      ],
+      health_beauty: [
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Bath & Body'],
+      ],
+      sports_outdoors: [
+        ['Sporting Goods', 'Exercise & Fitness'],
+        ['Sporting Goods', 'Outdoor Recreation'],
+        ['Sporting Goods', 'Athletics'],
+      ],
+      toys_games: [
+        ['Toys & Games', 'Toys'],
+        ['Toys & Games', 'Games'],
+        ['Toys & Games', 'Puzzles'],
+      ],
+      automotive: [
+        ['Vehicles & Parts', 'Vehicle Parts & Accessories'],
+        ['Vehicles & Parts', 'Motor Vehicle Care & Cleaning'],
+      ],
+      books_media: [
+        ['Media', 'Books'],
+        ['Media', 'Music & Sound Recordings'],
+        ['Media', 'DVDs & Videos'],
+      ],
+      pet_supplies: [
+        ['Animals & Pet Supplies', 'Pet Supplies'],
+        ['Animals & Pet Supplies', 'Pet Food'],
+      ],
+      office_supplies: [
+        ['Office Supplies', 'General Office Supplies'],
+        ['Office Supplies', 'Paper Products'],
+        ['Office Supplies', 'Presentation Supplies'],
+      ],
+      jewelry: [
+        ['Apparel & Accessories', 'Jewelry'],
+        ['Apparel & Accessories', 'Watches'],
+      ],
+      baby_kids: [
+        ['Baby & Toddler', 'Baby Care'],
+        ['Baby & Toddler', 'Baby Toys & Activity Equipment'],
+        ['Baby & Toddler', 'Baby Transport'],
+      ],
+      arts_crafts: [
+        ['Arts & Entertainment', 'Hobbies & Creative Arts'],
+        ['Arts & Entertainment', 'Party & Celebration'],
+      ],
+      hardware_tools: [
+        ['Hardware', 'Building Materials'],
+        ['Hardware', 'Power & Hand Tools'],
+        ['Hardware', 'Plumbing'],
+      ],
+      furniture: [
+        ['Furniture', 'Living Room Furniture'],
+        ['Furniture', 'Bedroom Furniture'],
+        ['Furniture', 'Office Furniture'],
+      ],
+      restaurant: [
+        ['Food, Beverages & Tobacco', 'Food Items', 'Prepared Foods'],
+        ['Food, Beverages & Tobacco', 'Beverages'],
+      ],
+      pharmacy: [
+        ['Health & Beauty', 'Health Care'],
+        ['Health & Beauty', 'Personal Care'],
+        ['Health & Beauty', 'Vitamins & Supplements'],
+      ],
+      general: [
+        ['Home & Garden'],
+        ['Health & Beauty'],
+        ['Sporting Goods'],
+        ['Toys & Games'],
+        ['Office Supplies'],
+        ['Arts & Entertainment'],
+      ],
+    };
+    
+    // Fetch existing categories to avoid duplicates
+    const existingCategories = await prisma.directory_category.findMany({
+      where: { tenantId: 'platform' },
+      select: { name: true, slug: true },
+    });
+    
+    const existingNames = new Set(existingCategories.map(c => c.name.toLowerCase()));
+    
+    // Import Google taxonomy functions
+    const { selectRandomFromBranch, getCategoryById } = await import('../lib/google/taxonomy');
+    
+    // Use hierarchical branch-based generation
+    const branches = taxonomyBranches[businessType] || taxonomyBranches.general;
+    let hierarchicalCategories: Array<{ node: any; name: string }> = [];
+    
+    console.log(`[Platform Quick Start] Using hierarchical branch generation for ${businessType}`);
+    
+    // Distribute category count across branches
+    const perBranch = Math.ceil(categoryCount / branches.length);
+    
+    for (const branch of branches) {
+      const branchCategories = selectRandomFromBranch(branch, perBranch, {
+        minDepth: 1,
+        maxDepth: 3,
+        diversify: true,
+      });
+      
+      // Use the last part of the path as the friendly name
+      hierarchicalCategories.push(...branchCategories.map(node => ({
+        node,
+        name: node.path[node.path.length - 1],
+      })));
+    }
+    
+    // Trim to requested count
+    hierarchicalCategories = hierarchicalCategories.slice(0, categoryCount);
+    
+    // Filter out duplicates
+    const categoriesToCreate = hierarchicalCategories.filter(cat => {
+      const nameExists = existingNames.has(cat.name.toLowerCase());
+      if (nameExists) {
+        console.log(`[Platform Quick Start] Skipping duplicate category: "${cat.name}"`);
+      }
+      return !nameExists;
+    });
+    
+    if (categoriesToCreate.length === 0) {
+      const categories = await categoryService.getTenantCategories('platform');
+      return res.json({
+        success: true,
+        data: categories,
+        categoriesCreated: 0,
+        duplicatesSkipped: hierarchicalCategories.length,
+        message: 'All categories already exist. No new categories were created.',
+      });
+    }
+    
+    console.log(`[Platform Quick Start] Creating ${categoriesToCreate.length} new categories (${hierarchicalCategories.length - categoriesToCreate.length} duplicates skipped)`);
+    
+    // Create categories with Google taxonomy alignment
+    const createdCategories = [];
+    for (const cat of categoriesToCreate) {
+      try {
+        const googleCategoryId = cat.node.id;
+        const categoryName = cat.name;
+        
+        console.log(`[Platform Quick Start] Creating category: "${categoryName}" (${cat.node.path.join(' > ')})`);
+        
+        const created = await prisma.directory_category.create({
+          data: {
+            id: generateProductCatId('platform'),
+            tenantId: 'platform',
+            name: categoryName,
+            slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            googleCategoryId,
+            isActive: true,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          } as any,
+        });
+        createdCategories.push(created);
+      } catch (error: any) {
+        console.error(`[Platform Quick Start] Failed to create category ${cat.name}:`, error);
+      }
+    }
+    
+    console.log(`[Platform Quick Start] Created ${createdCategories.length} categories for platform`);
+    
+    // Fetch all platform categories to return
+    const categories = await categoryService.getTenantCategories('platform');
+    
+    const duplicatesSkipped = hierarchicalCategories.length - categoriesToCreate.length;
+    const responseMessage = duplicatesSkipped > 0
+      ? `Created ${createdCategories.length} new categories. Skipped ${duplicatesSkipped} duplicate${duplicatesSkipped === 1 ? '' : 's'}.`
+      : undefined;
+    
+    return res.json({
+      success: true,
+      data: categories,
+      categoriesCreated: createdCategories.length,
+      duplicatesSkipped,
+      ...(responseMessage && { message: responseMessage }),
+    });
+  } catch (e: any) {
+    console.error('[Platform Quick Start] Error:', e);
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+// Bulk import endpoint for platform categories from external source or seed file
+router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    console.log('[Bulk Import] Request body:', req.body);
+    const { source = 'seed', categories: externalCategories } = req.body;
+    console.log('[Bulk Import] Parsed source:', source, 'externalCategories present:', !!externalCategories);
+    
+    const { prisma } = await import('../prisma');
+    const { generateProductCatId } = await import('../lib/id-generator');
+    
+    let categoriesToImport: any[] = [];
+    
+    // Load from different sources
+    if (source === 'seed' || source === 'file') {
+      console.log('[Bulk Import] Loading from seed file using fs');
+      // Load from seed file using fs like the gbp-seed endpoint
+      const seedPath = path.join(__dirname, '../data/platform-categories-seed.json');
+      const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+      categoriesToImport = Array.isArray(seedData) ? seedData : (seedData.categories || []);
+      console.log('[Bulk Import] Loaded', categoriesToImport.length, 'categories from seed file');
+    } else if (source === 'custom' && externalCategories) {
+      // Use provided categories from request body
+      categoriesToImport = externalCategories;
+      console.log('[Bulk Import] Using', categoriesToImport.length, 'custom categories from request');
+    } else {
+      console.log('[Bulk Import] Invalid source:', source, 'returning invalid_source error');
+      return res.status(400).json({ success: false, error: 'invalid_source' });
+    }
+    
+    console.log(`[Bulk Import] Processing ${categoriesToImport.length} categories from ${source} source`);
+    
+    const results = {
+      total: categoriesToImport.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+      details: [] as any[],
+    };
+    
+    // Import categories with full seed data
+    for (const category of categoriesToImport) {
+      try {
+        // Check if category already exists (by google_category_id or slug)
+        const existing = await prisma.directory_category.findFirst({
+          where: {
+            tenantId: 'platform',
+            OR: [
+              { googleCategoryId: category.google_category_id || category.googleCategoryId },
+              { slug: category.slug },
+            ],
+          },
+        });
+        
+        const categoryData = {
+          name: category.name,
+          slug: category.slug,
+          googleCategoryId: category.google_category_id || category.googleCategoryId,
+          sortOrder: category.sort_order || category.sortOrder || 0,
+          isActive: true,
+          updatedAt: new Date(),
+        };
+        
+        if (existing) {
+          // Update existing category with new data
+          await prisma.directory_category.update({
+            where: { id: existing.id },
+            data: categoryData,
+          });
+          results.updated++;
+          results.details.push({
+            name: category.name,
+            status: 'updated',
+            id: existing.id,
+          });
+        } else {
+          // Create new category
+          const created = await prisma.directory_category.create({
+            data: {
+              id: generateProductCatId('platform'),
+              tenantId: 'platform',
+              ...categoryData,
+              createdAt: new Date(),
+            } as any,
+          });
+          results.created++;
+          results.details.push({
+            name: category.name,
+            status: 'created',
+            id: created.id,
+          });
+        }
+      } catch (error: any) {
+        console.error(`[Bulk Import] Failed to process category ${category.name}:`, error);
+        results.errors++;
+        results.details.push({
+          name: category.name,
+          status: 'error',
+          error: error.message,
+        });
+      }
+    }
+    
+    // Fetch all platform categories to return
+    const allCategories = await categoryService.getTenantCategories('platform');
+    
+    console.log(`[Bulk Import] Completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.errors} errors`);
+    
+    return res.json({
+      success: true,
+      data: allCategories,
+      import_results: results,
+      message: `Import completed: ${results.created} created, ${results.updated} updated, ${results.errors} errors`,
+    });
+  } catch (e: any) {
+    console.error('[Bulk Import] Error:', e);
+    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+  }
+});
+
+// GET /api/platform/categories/gbp-seed - Get GBP seed data for search
+// Note: Requires authentication but not admin - any logged-in user can search categories
+router.get('/categories/gbp-seed', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    console.log('[GBP Seed] Request received from user:', (req.user as any)?.id);
+    
+    // Load the seed file
+    const seedPath = path.join(__dirname, '../data/platform-categories-seed.json');
+    const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+    
+    const categories = Array.isArray(seedData) ? seedData : (seedData.categories || []);
+    console.log('[GBP Seed] Returning', categories.length, 'categories');
+    
+    return res.json({
+      success: true,
+      categories,
+    });
+  } catch (e: any) {
+    console.error('[GBP Seed] Error:', e);
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
   }
 });

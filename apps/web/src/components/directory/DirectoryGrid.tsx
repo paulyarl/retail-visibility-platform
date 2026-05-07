@@ -1,7 +1,8 @@
 "use client";
 
-import StoreCard from './StoreCard';
-import { Skeleton } from '@/components/ui';
+import { StoreList, StoreData } from '@/components/stores';
+import { LinkType } from '../stores/StoreCard';
+
 
 interface DirectoryListing {
   id: string;
@@ -11,18 +12,25 @@ interface DirectoryListing {
   address?: string;
   city?: string;
   state?: string;
-  phone?: string;
-  logoUrl?: string;
+  zipCode?: string;
+  latitude?: number;
+  longitude?: number;
   primaryCategory?: string;
-  ratingAvg: number;
-  ratingCount: number;
-  productCount: number;
-  isFeatured: boolean;
-  subscriptionTier: string;
-  useCustomWebsite: boolean;
-  website?: string;
-  distance?: number;
-  isOpen?: boolean;
+  gbpPrimaryCategoryName?: string;
+  category?: {
+    name: string;
+    slug: string;
+    icon?: string;
+  };
+  logoUrl?: string;
+  bannerUrl?: string;
+  ratingAvg?: number;
+  ratingCount?: number;
+  productCount?: number | string; // API may return string
+  isFeatured?: boolean;
+  subscriptionTier?: string;
+  directoryPublished?: boolean;
+  businessHours?: any;
 }
 
 interface Pagination {
@@ -35,73 +43,67 @@ interface Pagination {
 interface DirectoryGridProps {
   listings: DirectoryListing[];
   loading?: boolean;
+  isLoading?: boolean;
+  viewMode?: 'grid' | 'list';
   pagination?: Pagination;
   baseUrl?: string;
   categorySlug?: string;
 }
 
+
+// Transform directory listing to store data format
+function transformListing(listing: DirectoryListing): StoreData {
+  // console.log(`transformListing: ${listing.businessName}`, listing);
+  return {
+    id: listing.id,
+    tenantId: listing.tenantId,
+    name: listing.businessName,
+    slug: listing.slug,
+    address: listing.address,
+    city: listing.city,
+    state: listing.state,
+    zipCode: listing.zipCode,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
+    logoUrl: listing.logoUrl,
+    bannerUrl: listing.bannerUrl,
+    primaryCategory: listing.category?.name || listing.primaryCategory || listing.gbpPrimaryCategoryName,
+    ratingAvg: listing.ratingAvg,
+    ratingCount: listing.ratingCount,
+    productCount: Number(listing.productCount) || 0,
+    isFeatured: listing.isFeatured,
+    subscriptionTier: listing.subscriptionTier,
+    businessHours: listing.businessHours,
+  };
+}
+
 export default function DirectoryGrid({ 
   listings, 
-  loading, 
+  loading,
+  isLoading = false, 
+  viewMode = 'grid', 
   pagination,
-  baseUrl = '/directory',
-  categorySlug 
+  baseUrl = '', 
+  categorySlug = '' 
 }: DirectoryGridProps) {
-  // Loading state
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="space-y-3">
-            <Skeleton className="w-full aspect-video rounded-lg" />
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        ))}
-      </div>
-    );
-  }
+  // Transform listings to store data format
+  const stores = listings.map(transformListing);
+  // console.log(`DirectoryGrid: ${stores.length} stores`, stores);
+  
+  // Use either loading prop
+  const showLoading = loading || isLoading;
 
-  // Empty state
-  if (listings.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <svg 
-          className="mx-auto h-16 w-16 text-neutral-400 dark:text-neutral-600 mb-4" 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={1.5} 
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" 
-          />
-        </svg>
-        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-          No stores found
-        </h3>
-        <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
-          Try adjusting your search or filters to find what you're looking for.
-        </p>
-      </div>
-    );
-  }
-
-  // Grid view
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {listings.map((listing, index) => (
-          <StoreCard
-            key={listing.id}
-            listing={listing}
-            index={index}
-          />
-        ))}
-      </div>
+      <StoreList
+        stores={stores}
+        viewMode={viewMode}
+        linkType={LinkType.Directory}
+        showLogo={true}
+        showCategories={true}
+        maxCategories={3}
+        loading={showLoading}
+      />
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
@@ -117,22 +119,34 @@ export default function DirectoryGrid({
           )}
 
           {/* Page Numbers */}
-          {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-            const pageNum = i + 1;
-            return (
-              <a
-                key={pageNum}
-                href={`${baseUrl}${categorySlug ? `/${categorySlug}` : ''}?page=${pageNum}`}
-                className={`px-4 py-2 text-sm font-medium rounded-lg ${
-                  pageNum === pagination.page
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {pageNum}
-              </a>
-            );
-          })}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              let pageNum: number;
+              if (pagination.totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (pagination.page <= 3) {
+                pageNum = i + 1;
+              } else if (pagination.page >= pagination.totalPages - 2) {
+                pageNum = pagination.totalPages - 4 + i;
+              } else {
+                pageNum = pagination.page - 2 + i;
+              }
+              
+              return (
+                <a
+                  key={pageNum}
+                  href={`${baseUrl}${categorySlug ? `/${categorySlug}` : ''}?page=${pageNum}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                    pageNum === pagination.page
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNum}
+                </a>
+              );
+            })}
+          </div>
 
           {/* Next Button */}
           {pagination.page < pagination.totalPages && (
@@ -148,5 +162,6 @@ export default function DirectoryGrid({
     </>
   );
 }
+
 
 export { DirectoryGrid };

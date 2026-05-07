@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge } from '@/components/ui';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 interface GoogleAccount {
   connected: boolean;
@@ -26,6 +27,8 @@ interface GoogleConnectCardProps {
   onDisconnect?: () => void;
 }
 
+
+
 export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }: GoogleConnectCardProps) {
   const [account, setAccount] = useState<GoogleAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,14 +41,12 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/google/status?tenantId=${tenantId}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch Google account status');
-      }
-
-      const data = await response.json();
-      setAccount(data);
+      const data = await googleIntegrationService.getStatus(tenantId);
+      setAccount({
+        connected: data.isConnected,
+        email: data.email,
+        displayName: data.businessName,
+      });
     } catch (err) {
       console.error('[GoogleConnect] Status fetch error:', err);
       setError('Failed to load Google account status');
@@ -64,27 +65,20 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
       setConnecting(true);
       setError(null);
 
-      // Get authorization URL from backend
-      const response = await fetch(`/api/google/auth?tenantId=${tenantId}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.error === 'incomplete_business_profile') {
-          setError('Please complete your business profile before connecting to Google');
-          return;
-        }
-        throw new Error('Failed to initiate Google authorization');
-      }
-
-      const { authUrl } = await response.json();
+      // Get authorization URL from service
+      const { authUrl } = await googleIntegrationService.getAuthUrl(tenantId);
       
       // Redirect to Google OAuth
       window.location.href = authUrl;
       
       onConnect?.();
-    } catch (err) {
+    } catch (err: any) {
       console.error('[GoogleConnect] Connection error:', err);
-      setError('Failed to connect to Google');
+      if (err.message?.includes('incomplete_business_profile')) {
+        setError('Please complete your business profile before connecting to Google');
+      } else {
+        setError('Failed to connect to Google');
+      }
       setConnecting(false);
     }
   };
@@ -99,13 +93,7 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
       setDisconnecting(true);
       setError(null);
 
-      const response = await fetch(`/api/google/disconnect?tenantId=${tenantId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to disconnect Google account');
-      }
+      await googleIntegrationService.disconnect(tenantId);
 
       setAccount({ connected: false });
       onDisconnect?.();

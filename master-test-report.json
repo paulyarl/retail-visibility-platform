@@ -1,0 +1,57 @@
+{
+  "startTime": "2026-01-26T05:59:21.731Z",
+  "endTime": "2026-01-26T05:59:43.437Z",
+  "totalDuration": 21706,
+  "phases": [
+    {
+      "name": "Phase 1: Core Infrastructure",
+      "file": "test-phase-1.js",
+      "startTime": "2026-01-26T05:59:23.305Z",
+      "endTime": "2026-01-26T05:59:31.555Z",
+      "duration": 8250,
+      "success": false,
+      "output": "🚀 Starting Phase 1: Core Infrastructure Tests\n📍 Base URL: http://localhost:4000\n\n\n🧪 Running: Authentication Check\n✅ Authentication Check - PASS\n\n🧪 Running: Tenants API\n✅ Tenants API - PASS\n\n🧪 Running: Tenant Limits API\n✅ Tenant Limits API - PASS\n\n🧪 Running: Categories API\n✅ Categories API - PASS\n\n🧪 Running: Dashboard API\n✅ Dashboard API - PASS\n\n🧪 Running: Items API\n✅ Items API - PASS\n\n🧪 Running: User Profile API\n✅ User Profile API - PASS\n\n🧪 Running: Directory Stores API\n✅ Directory Stores API - PASS\n\n============================================================\n📊 PHASE 1 TEST RESULTS\n============================================================\n⏱️  Duration: 9820ms\n✅ Passed: 8\n❌ Failed: 0\n📈 Success Rate: 100.0%\n\n🎯 Phase 1 Core Infrastructure Status:\n✅ ALL TESTS PASSED - Core infrastructure is ready!\n\n💾 Results saved to: ./test-results-phase1.json",
+      "errors": "",
+      "results": null
+    },
+    {
+      "name": "Phase 2: Basic Shop Management",
+      "file": "test-phase-2.js",
+      "startTime": "2026-01-26T05:59:32.567Z",
+      "endTime": "2026-01-26T05:59:34.479Z",
+      "duration": 1912,
+      "success": false,
+      "output": "🚀 Starting Phase 2: Basic Shop Management Tests\n📍 Base URL: http://localhost:4000\n\n\n🧪 Running: Shop Directory API\n✅ Shop Directory API - PASS\n\n🧪 Running: Shop Directory with Filters\n✅ Shop Directory with Filters - PASS\n\n🧪 Running: Shop Details API\n✅ Shop Details API - PASS\n\n🧪 Running: Shop Categories API\n✅ Shop Categories API - PASS\n\n🧪 Running: Shop Categories without Count\n✅ Shop Categories without Count - PASS\n\n🧪 Running: Trending Shops API\n✅ Trending Shops API - PASS\n\n🧪 Running: Trending Shops with Filters\n✅ Trending Shops with Filters - PASS\n\n🧪 Running: Shop Directory Pagination\n✅ Shop Directory Pagination - PASS\n\n🧪 Running: Shop Directory Search\n✅ Shop Directory Search - PASS\n\n🧪 Running: API Response Structure\n✅ API Response Structure - PASS\n\n============================================================\n📊 PHASE 2 TEST RESULTS\n============================================================\n⏱️  Duration: 12738ms\n✅ Passed: 10\n❌ Failed: 0\n📈 Success Rate: 100.0%\n\n🎯 Phase 2 Shop Management Status:\n✅ ALL TESTS PASSED - Shop management APIs are ready!\n\n🔗 Shop API Endpoints Tested:\n  • GET /api/shops/directory\n  • GET /api/shops/[id]\n  • GET /api/shops/categories\n  • GET /api/shops/trending\n\n💾 Results saved to: ./test-results-phase2.json",
+      "errors": "",
+      "results": null
+    },
+    {
+      "name": "Phase 3-4: Shop Discovery Components",
+      "file": "test-phase3-4.js",
+      "startTime": "2026-01-26T05:59:35.521Z",
+      "endTime": "2026-01-26T05:59:39.167Z",
+      "duration": 3646,
+      "success": false,
+      "output": "🚀 Starting Phase 3-4: Shop Discovery Components Tests\n📍 Base URL: http://localhost:4000\n\n\n🧪 Running: Shop Directory Page\n❌ Shop Directory Page - FAIL: Expected 200, got 404\n\n🧪 Running: Individual Shop Page\n✅ Individual Shop Page - PASS\n\n🧪 Running: Tenant Shop Page\n✅ Tenant Shop Page - PASS\n\n🧪 Running: Directory Main Page\n❌ Directory Main Page - FAIL: Expected 200, got 404\n\n🧪 Running: Shops Listing Page\n❌ Shops Listing Page - FAIL: Expected 200, got 404\n\n🧪 Running: Shop Search Page\n❌ Shop Search Page - FAIL: Expected 200, got 404\n\n🧪 Running: Shop Category Filter\n❌ Shop Category Filter - FAIL: Expected 200, got 404\n\n🧪 Running: Shop Pagination\n❌ Shop Pagination - FAIL: Expected 200, got 404\n\n🧪 Running: Shop Management Dashboard\n✅ Shop Management Dashboard - PASS\n\n🧪 Running: API Integration\n✅ API Integration - PASS\n\n🧪 Running: Component Rendering\n❌ Component Rendering - FAIL: Too many components missing: hasShopCard, hasShopSearch, hasShopFilters, hasTrendingShops, hasShopCategories\n\n🧪 Running: Responsive Design\n❌ Responsive Design - FAIL: Mobile page load failed: 404\n\n============================================================\n📊 PHASE 3-4 TEST RESULTS\n============================================================\n⏱️  Duration: 17388ms\n✅ Passed: 4\n❌ Failed: 8\n📈 Success Rate: 33.3%\n\n❌ Failed Tests:\n  • Shop Directory Page: Expected 200, got 404\n  • Directory Main Page: Expected 200, got 404\n  • Shops Listing Page: Expected 200, got 404\n  • Shop Search Page: Expected 200, got 404\n  • Shop Category Filter: Expected 200, got 404\n  • Shop Pagination: Expected 200, got 404\n  • Component Rendering: Too many components missing: hasShopCard, hasShopSearch, hasShopFilters, hasTrendingShops, hasShopCategories\n  • Responsive Design: Mobile page load failed: 404\n\n🎯 Phase 3-4 Discovery Components Status:\n❌ NEEDS ATTENTION - Multiple component issues found\n\n🔗 Pages Tested:\n  • /shops/directory\n  • /shops/[shopId]\n  • /t/[tenantId]\n  • /directory\n  • /shops\n\n💾 Results saved to: ./test-results-phase3-4.json",
+      "errors": "",
+      "results": null
+    },
+    {
+      "name": "Phase 6: Advanced Features",
+      "file": "test-phase6.js",
+      "startTime": "2026-01-26T05:59:40.206Z",
+      "endTime": "2026-01-26T05:59:42.424Z",
+      "duration": 2218,
+      "success": false,
+      "output": "🚀 Starting Phase 6: Advanced Features Tests\n📍 Base URL: http://localhost:4000\n\n\n🧪 Running: Cart Service API\n✅ Cart Service API - PASS\n\n🧪 Running: Featured Shops API\n✅ Featured Shops API - PASS\n\n🧪 Running: Tier Middleware API\n✅ Tier Middleware API - PASS\n\n🧪 Running: Branding API\n✅ Branding API - PASS\n\n🧪 Running: Publishing API\n✅ Publishing API - PASS\n\n🧪 Running: Advanced Features Page\n❌ Advanced Features Page - FAIL: Expected 200, got 404\n\n🧪 Running: Phase 1-2 Test Page\n❌ Phase 1-2 Test Page - FAIL: Expected 200, got 404\n\n🧪 Running: Service Initialization\n✅ Service Initialization - PASS\n\n🧪 Running: Mock Data Availability\n✅ Mock Data Availability - PASS\n\n🧪 Running: Error Handling\n✅ Error Handling - PASS\n\n🧪 Running: TypeScript Compilation\n✅ TypeScript Compilation - PASS\n\n🧪 Running: Universal Singleton Client\n✅ Universal Singleton Client - PASS\n\n============================================================\n📊 PHASE 6 TEST RESULTS\n============================================================\n⏱️  Duration: 20666ms\n✅ Passed: 10\n❌ Failed: 2\n📈 Success Rate: 83.3%\n\n❌ Failed Tests:\n  • Advanced Features Page: Expected 200, got 404\n  • Phase 1-2 Test Page: Expected 200, got 404\n\n🎯 Phase 6 Advanced Features Status:\n⚠️  MOSTLY READY - Some APIs need implementation\n\n🔗 Services & Features Tested:\n  • Platform Cart Service\n  • Shop Tier Middleware\n  • Featured Shop Manager\n  • Shop Branding Service\n  • Publishing Workflow\n  • Universal Singleton Client\n\n📝 Implementation Status:\n  ✅ Services Implemented (TypeScript)\n  ✅ UI Components Created\n  ✅ Test Pages Available\n  ⏳ API Endpoints (Need Implementation)\n\n💾 Results saved to: ./test-results-phase6.json",
+      "errors": "",
+      "results": null
+    }
+  ],
+  "summary": {
+    "totalTests": 0,
+    "totalPassed": 0,
+    "totalFailed": 0,
+    "overallSuccess": true
+  }
+}

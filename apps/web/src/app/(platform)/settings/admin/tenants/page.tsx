@@ -1,509 +1,495 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Spinner, Alert } from '@/components/ui';
-import { motion } from 'framer-motion';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from '@/components/ui';
+import { Button, TextInput, Pagination, Group, Stack, Container } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
-import { isTrialStatus } from '@/lib/trial';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
-interface Tenant {
+type Tenant = {
   id: string;
   name: string;
-  createdAt?: string;
-  userId?: string;
-  subscriptionStatus?: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
+  locationStatus?: string;
   trialEndsAt?: string;
-  status: 'active' | 'inactive';
-  itemCount?: number;
+  subscriptionEndsAt?: string;
+  createdAt?: string;
+  metadata?: {
+    businessName?: string;
+    city?: string;
+    state?: string;
+  };
   organization?: {
     id: string;
     name: string;
+    subscriptionStatus?: string;
+    subscriptionTier?: string;
   } | null;
-}
+};
+
+const SUBSCRIPTION_STATUSES = [
+  { value: 'trial', label: '🧪 Trial', color: 'bg-neutral-100 text-neutral-800' },
+  { value: 'active', label: '💳 Active', color: 'bg-green-100 text-green-800' },
+  { value: 'past_due', label: '⚠️ Past Due', color: 'bg-red-100 text-red-800' },
+  { value: 'cancelled', label: '❌ Cancelled', color: 'bg-gray-100 text-gray-800' },
+];
+
+const LOCATION_STATUSES = [
+  { value: 'active', label: '✅ Active', color: 'bg-green-100 text-green-800' },
+  { value: 'pending', label: '🚧 Pending', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'inactive', label: '⏸️ Inactive', color: 'bg-orange-100 text-orange-800' },
+  { value: 'closed', label: '🔒 Closed', color: 'bg-red-100 text-red-800' },
+  { value: 'archived', label: '📦 Archived', color: 'bg-gray-100 text-gray-800' },
+];
+
+const TIERS = [
+  { value: 'discovery', label: '🔍 Discovery', color: 'bg-cyan-100 text-cyan-800' },
+  { value: 'commitment', label: '🤝 Commitment', color: 'bg-teal-100 text-teal-800' },
+  { value: 'storefront', label: '🏪 Storefront', color: 'bg-lime-100 text-lime-800' },
+  { value: 'starter', label: '🌱️ Starter', color: 'bg-blue-100 text-blue-800' },
+  { value: 'professional', label: '👔 Professional', color: 'bg-purple-100 text-purple-800' },
+  { value: 'enterprise', label: '🏢 Enterprise', color: 'bg-indigo-100 text-indigo-800' },
+  { value: 'custom', label: '⚙️ Custom', color: 'bg-amber-100 text-amber-800' },
+];
+
+const ITEMS_PER_PAGE = 20;
 
 export default function AdminTenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
-  const itemsPerPage = 10;
+  
+  // Admin filtering states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'trial' | 'active' | 'past_due' | 'cancelled'>('all');
+  const [locationFilter, setLocationFilter] = useState<'all' | 'active' | 'pending' | 'inactive' | 'closed' | 'archived'>('all');
+  const [organizationFilter, setOrganizationFilter] = useState<'all' | 'chain' | 'standalone'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'discovery' | 'commitment' | 'storefront' | 'starter' | 'professional' | 'enterprise' | 'custom'>('all');
 
   useEffect(() => {
-    const loadTenants = async () => {
-      try {
-        const res = await api.get('/api/tenants');
-        if (!res.ok) throw new Error('Failed to load tenants');
-        const data = await res.json();
-        
-        if (!Array.isArray(data)) {
-          setTenants([]);
-          return;
-        }
-        
-        // Fetch item counts for each tenant in parallel
-        const tenantsWithCounts = await Promise.all(
-          data.map(async (t: any) => {
-            try {
-              const itemsRes = await api.get(`/api/tenants/${t.id}/items`);
-              const items = itemsRes.ok ? await itemsRes.json() : [];
-              
-              // Determine status based on subscriptionStatus (treat trial as active for this view)
-              const isActive = t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus);
-              
-              return {
-                ...t,
-                status: isActive ? 'active' : 'inactive',
-                itemCount: Array.isArray(items) ? items.length : 0,
-              };
-            } catch {
-              return {
-                ...t,
-                status: t.subscriptionStatus === 'active' || isTrialStatus(t.subscriptionStatus) ? 'active' : 'inactive',
-                itemCount: 0,
-              };
-            }
-          })
-        );
-        
-        setTenants(tenantsWithCounts);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load tenants');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadTenants();
   }, []);
 
-  const getStatusBadge = (status: string) => {
-    return status === 'active' 
-      ? <Badge variant="success">Active</Badge>
-      : <Badge variant="default">Inactive</Badge>;
+  const loadTenants = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await platformHomeService.getTenants();
+      setTenants(data || []);
+    } catch (err) {
+      setError("Failed to load tenants");
+      console.error('Admin tenants page error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Filter tenants based on search query, status, and chain type
-  const filteredTenants = tenants.filter(tenant => {
-    const matchesSearch = tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || tenant.status === statusFilter;
-    const matchesChain = chainFilter === 'all' || 
-      (chainFilter === 'chain' && tenant.organization) ||
-      (chainFilter === 'standalone' && !tenant.organization);
-    return matchesSearch && matchesStatus && matchesChain;
-  });
+  const getSubscriptionStatusInfo = (status?: string) => {
+    return SUBSCRIPTION_STATUSES.find(s => s.value === status) || SUBSCRIPTION_STATUSES[1];
+  };
+
+  const getLocationStatusInfo = (status?: string) => {
+    return LOCATION_STATUSES.find(s => s.value === (status || 'active')) || LOCATION_STATUSES[0];
+  };
+
+  // Subscription hierarchy logic - resolve conflicts between tenant and organization subscriptions
+  const getEffectiveSubscriptionStatus = (tenant: Tenant) => {
+    const tenantStatus = tenant.subscriptionStatus;
+    const orgStatus = tenant.organization?.subscriptionStatus;
+    
+    // Priority 1: If tenant has active or cancelled subscription, use that (user's explicit choice)
+    if (tenantStatus === 'active' || tenantStatus === 'cancelled') {
+      return tenantStatus;
+    }
+    
+    // Priority 2: If tenant is past due or trial, check if organization has better status
+    if (tenantStatus === 'past_due' || tenantStatus === 'trial') {
+      if (orgStatus === 'active') {
+        return 'active'; // Inherit organization's active status
+      }
+    }
+    
+    // Priority 3: If both are past due, use tenant's status (more specific)
+    if (tenantStatus === 'past_due' && orgStatus === 'past_due') {
+      return tenantStatus;
+    }
+    
+    // Priority 4: Default to tenant's status
+    return tenantStatus || 'active';
+  };
+
+  const getSubscriptionTier = (tenant: Tenant) => {
+    const tenantTier = tenant.subscriptionTier;
+    const orgTier = tenant.organization?.subscriptionTier;
+    
+    // If tenant has a tier, use it (tenant can have higher tier than organization)
+    if (tenantTier) {
+      return tenantTier;
+    }
+    
+    // Otherwise inherit organization's tier
+    return orgTier || 'discovery';
+  };
+
+  // Filter tenants based on admin criteria
+  const filteredTenants = useMemo(() => {
+    let filtered = tenants;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(tenant => 
+        tenant.name.toLowerCase().includes(query) || 
+        tenant.id.toLowerCase().includes(query) ||
+        tenant.metadata?.city?.toLowerCase().includes(query) ||
+        tenant.organization?.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Organization filter
+    if (organizationFilter === 'chain') {
+      filtered = filtered.filter(tenant => tenant.organization);
+    } else if (organizationFilter === 'standalone') {
+      filtered = filtered.filter(tenant => !tenant.organization);
+    }
+
+    // Subscription status filter - use effective status
+    if (subscriptionFilter !== 'all') {
+      filtered = filtered.filter(tenant => getEffectiveSubscriptionStatus(tenant) === subscriptionFilter);
+    }
+
+    // Location status filter
+    if (locationFilter !== 'all') {
+      filtered = filtered.filter(tenant => (tenant.locationStatus || 'active') === locationFilter);
+    }
+
+    // Tier filter - use effective tier
+    if (tierFilter !== 'all') {
+      filtered = filtered.filter(tenant => getSubscriptionTier(tenant) === tierFilter);
+    }
+
+    return filtered;
+  }, [tenants, searchQuery, organizationFilter, subscriptionFilter, locationFilter, tierFilter]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredTenants.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedTenants = filteredTenants.slice(startIndex, endIndex);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, chainFilter]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  const paginatedTenants = filteredTenants.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE, 
+    currentPage * ITEMS_PER_PAGE
+  );
+  const totalPages = Math.ceil(filteredTenants.length / ITEMS_PER_PAGE);
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+    <div className="min-h-screen bg-neutral-50">
       <PageHeader
-        title="All Tenants"
-        description="System-wide tenant management"
-        icon={Icons.Tenants}
-        backLink={{ href: '/settings/admin', label: 'Back to Admin' }}
+        title="Platform Tenant Management"
+        description="Comprehensive view of all platform tenants with advanced filtering"
+        icon={Icons.Settings}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+      <div className="container mx-auto px-4 py-8">
         {error && (
-          <Alert variant="error" title="Error">
+          <Alert variant="error" className="mb-6">
             {error}
           </Alert>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-neutral-900">{tenants.length}</p>
-                <p className="text-sm text-neutral-600 mt-1">Total Tenants</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">
-                  {tenants.filter(t => t.status === 'active').length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Active</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-neutral-600">
-                  {tenants.filter(t => t.status === 'inactive').length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Inactive</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-orange-600">
-                  {tenants.filter(t => t.organization).length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Chain Locations</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-4">
+        {/* Admin Filters */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Admin Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Stack gap="md">
               {/* Search */}
-              <div className="flex-1 min-w-[200px]">
-                <input
-                  type="text"
-                  placeholder="Search tenants..."
+              <div>
+                <TextInput
+                  placeholder="Search tenants by name, ID, city, or organization..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-neutral-900"
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 />
               </div>
 
-              {/* Status Filter */}
-              <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                >
-                  All Status
-                </Button>
-                <Button
-                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                >
-                  Active
-                </Button>
-                <Button
-                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('inactive')}
-                >
-                  Inactive
-                </Button>
-              </div>
+              {/* Filter Groups */}
+              <Group wrap="wrap" gap="sm">
+                {/* Organization Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">Organization Type</div>
+                  <Group>
+                    <Button
+                      variant={organizationFilter === 'all' ? 'filled' : 'light'}
+                      size="sm"
+                      onClick={() => {
+                        setOrganizationFilter('all');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={organizationFilter === 'chain' ? 'filled' : 'light'}
+                      size="sm"
+                      onClick={() => {
+                        setOrganizationFilter('chain');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      🏢 Chain
+                    </Button>
+                    <Button
+                      variant={organizationFilter === 'standalone' ? 'filled' : 'light'}
+                      size="sm"
+                      onClick={() => {
+                        setOrganizationFilter('standalone');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      🏪 Standalone
+                    </Button>
+                  </Group>
+                </Stack>
 
-              {/* Chain Filter */}
-              <div className="flex gap-2">
-                <Button
-                  variant={chainFilter === 'all' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setChainFilter('all')}
-                >
-                  All Types
-                </Button>
-                <Button
-                  variant={chainFilter === 'chain' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setChainFilter('chain')}
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  Chain
-                </Button>
-                <Button
-                  variant={chainFilter === 'standalone' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setChainFilter('standalone')}
-                >
-                  Standalone
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                {/* Subscription Status Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">💳 Subscription Status</div>
+                  <Group>
+                    {SUBSCRIPTION_STATUSES.map(status => (
+                      <Button
+                        key={status.value}
+                        variant={subscriptionFilter === status.value ? 'filled' : 'light'}
+                        size="sm"
+                        onClick={() => {
+                          setSubscriptionFilter(status.value as any);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {status.label}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
 
-        {/* Results Count */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-neutral-700">
-            Showing {filteredTenants.length} of {tenants.length} tenants
-          </p>
-        </div>
+                {/* Tier Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">🏆️ Subscription Tier</div>
+                  <Group>
+                    {TIERS.map(tier => (
+                      <Button
+                        key={tier.value}
+                        variant={tierFilter === tier.value ? 'filled' : 'light'}
+                        size="sm"
+                        onClick={() => {
+                          setTierFilter(tier.value as any);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {tier.label}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
 
-        <div className="grid grid-cols-1 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-blue-600">
-                  {tenants.reduce((sum, t) => sum + (t.itemCount || 0), 0)}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Total Items</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                {/* Location Status Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">📍 Location Status</div>
+                  <Group>
+                    {LOCATION_STATUSES.map(status => (
+                      <Button
+                        key={status.value}
+                        variant={locationFilter === status.value ? 'filled' : 'light'}
+                        size="sm"
+                        onClick={() => {
+                          setLocationFilter(status.value as any);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {status.label}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
+              </Group>
 
-        {/* Search Bar */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <svg 
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search by tenant name or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-neutral-900"
-                />
+              {/* Results Summary */}
+              <div className="text-sm text-neutral-600 border-t pt-4">
+                Showing {paginatedTenants.length} of {filteredTenants.length} tenants 
+                {filteredTenants.length !== tenants.length && ` (from ${tenants.length} total)`}
               </div>
-              {searchQuery && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setSearchQuery('')}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-            {searchQuery && (
-              <p className="text-sm text-neutral-600 mt-2">
-                Found {filteredTenants.length} tenant{filteredTenants.length !== 1 ? 's' : ''}
-              </p>
-            )}
+            </Stack>
           </CardContent>
         </Card>
 
         {/* Tenants List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Tenants</CardTitle>
-            <CardDescription>
-              Showing {startIndex + 1}-{Math.min(endIndex, filteredTenants.length)} of {filteredTenants.length} tenant{filteredTenants.length !== 1 ? 's' : ''}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Platform Tenants 
+                <span className="ml-2 text-sm font-normal text-neutral-600">
+                  ({filteredTenants.length} filtered)
+                </span>
+              </CardTitle>
+              <Button onClick={loadTenants} variant="outline" size="sm">
+                🔄 Refresh
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {filteredTenants.length === 0 ? (
+            {loading ? (
               <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={searchQuery ? "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" : "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"} />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-neutral-900">
-                  {searchQuery ? 'No matching tenants' : 'No tenants'}
-                </h3>
-                <p className="mt-1 text-sm text-neutral-500">
-                  {searchQuery ? `No tenants found matching "${searchQuery}"` : 'No tenants have been created yet.'}
-                </p>
-                {searchQuery && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setSearchQuery('')}
-                    className="mt-4"
-                  >
-                    Clear Search
-                  </Button>
-                )}
+                <Spinner size="lg" />
+                <p className="text-neutral-500 mt-4">Loading tenants...</p>
+              </div>
+            ) : filteredTenants.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">No tenants found matching the current filters</p>
+                <Button onClick={() => {
+                  setSearchQuery("");
+                  setSubscriptionFilter('all');
+                  setLocationFilter('all');
+                  setOrganizationFilter('all');
+                  setTierFilter('all');
+                }} variant="outline" size="sm" className="mt-4">
+                  Clear Filters
+                </Button>
               </div>
             ) : (
-              <div className="divide-y divide-neutral-200">
-                {paginatedTenants.map((tenant, index) => (
-                  <motion.div
-                    key={tenant.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="py-4 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-neutral-900">{tenant.name}</p>
-                          {getStatusBadge(tenant.status)}
+              <>
+                <div className="space-y-4">
+                  {paginatedTenants.map(tenant => {
+                    const effectiveStatus = getEffectiveSubscriptionStatus(tenant);
+                    const effectiveStatusInfo = getSubscriptionStatusInfo(effectiveStatus);
+                    const locationStatusInfo = getLocationStatusInfo(tenant.locationStatus);
+                    const tenantTier = getSubscriptionTier(tenant);
+                    const hasInheritedStatus = tenant.subscriptionStatus !== effectiveStatus;
+
+                    return (
+                      <div
+                        key={tenant.id}
+                        className="p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer relative group"
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('button')) return;
+                          window.location.href = `/tenants?id=${tenant.id}`;
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold text-lg">{tenant.name}</h3>
+                              
+                              {/* Effective Subscription Status */}
+                              <Badge className={effectiveStatusInfo.color}>
+                                {effectiveStatusInfo.label}
+                              </Badge>
+                              
+                              {/* Inheritance Indicator */}
+                              {hasInheritedStatus && (
+                                <Badge variant="outline" className="text-xs px-2 py-1">
+                                  via {tenant.organization?.name}
+                                </Badge>
+                              )}
+                              
+                              {/* Location Status */}
+                              <Badge className={locationStatusInfo.color}>
+                                {locationStatusInfo.label}
+                              </Badge>
+                              
+                              {/* Organization Badge */}
+                              {tenant.organization && (
+                                <Badge variant="outline">
+                                  🏢 {tenant.organization.name}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="text-sm text-neutral-600 space-y-1">
+                              <div className="flex items-center gap-4">
+                                <span>ID: {tenant.id}</span>
+                                {tenantTier && (
+                                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                    {tenantTier}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {tenant.metadata?.city && (
+                                <div>📍 {tenant.metadata.city}, {tenant.metadata.state}</div>
+                              )}
+                              
+                              <div className="flex items-center gap-4">
+                                <span>📅 Created: {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                                {tenant.trialEndsAt && (
+                                  <span>🧪 Trial ends: {new Date(tenant.trialEndsAt).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                              
+                              {/* Subscription Details - Show conflicts */}
+                              {hasInheritedStatus && (
+                                <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                  ⚠️ Status inherited from organization
+                                  {tenant.subscriptionStatus && (
+                                    <span className="ml-1">
+                                      (was: {tenant.subscriptionStatus})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/t/${tenant.id}/dashboard`}>
+                              <Button variant="outline" size="sm">
+                                👁️ View Dashboard
+                              </Button>
+                            </Link>
+                            <Link href={`/t/${tenant.id}/settings/payment-gateways`}>
+                              <Button variant="outline" size="sm">
+                                ⚙️ Manage Payment Gateway
+                              </Button>
+                            </Link>
+                            <Link href={`/settings/subscription?tenantId=${tenant.id}`}>
+                              <Button variant="outline" size="sm">
+                                ⚙️ Manage Subscription
+                              </Button>
+                            </Link>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/t/${tenant.id}/settings/location-status`}>
+                              <Button variant="outline" size="sm">
+                                👁️ View Status
+                              </Button>
+                            </Link>
+                            <Link href={`/t/${tenant.id}/settings/onboarding`}>
+                              <Button variant="outline" size="sm">
+                                ⚙️ Manage Profile
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
-                        <p className="text-sm text-neutral-600">ID: {tenant.id}</p>
-                        <p className="text-xs text-neutral-500 mt-1">
-                          {tenant.itemCount || 0} items
-                          {tenant.createdAt && ` • Created ${new Date(tenant.createdAt).toLocaleDateString()}`}
-                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(tenant.status)}
-                      {tenant.organization && (
-                        <Badge variant="default" className="bg-orange-100 text-orange-800 flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          Chain: {tenant.organization.name}
-                        </Badge>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => {
-                          // Store tenant ID and navigate to tenant-scoped settings
-                          localStorage.setItem('tenantId', tenant.id);
-                          window.location.href = `/t/${tenant.id}/settings`;
-                        }}
-                      >
-                        View Details
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => {
-                          // Store tenant ID and navigate to items with query param
-                          localStorage.setItem('tenantId', tenant.id);
-                          window.location.href = `/items?tenantId=${tenant.id}`;
-                        }}
-                      >
-                        View Items
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center mt-6">
+                    <Pagination
+                      total={totalPages}
+                      value={currentPage}
+                      onChange={setCurrentPage}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </>
             )}
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="mt-6 flex items-center justify-between border-t border-neutral-200 pt-4">
-                <div className="text-sm text-neutral-600">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Previous
-                  </Button>
-                  
-                  {/* Page Numbers */}
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-1 rounded text-sm ${
-                            currentPage === pageNum
-                              ? 'bg-primary-500 text-white'
-                              : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Info Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>About Tenant Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-neutral-600">
-              <p>
-                This page shows all tenants across the entire system. As an admin, you can view and manage all tenant locations.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-neutral-900">Active Tenants</p>
-                    <p className="text-xs text-neutral-500">Tenants currently in use</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-neutral-900">Inventory Items</p>
-                    <p className="text-xs text-neutral-500">Total items across all tenants</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

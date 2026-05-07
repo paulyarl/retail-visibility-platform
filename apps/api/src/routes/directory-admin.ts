@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { z } from 'zod';
+import { generateDirectoryFeaturedId, generateProductCatId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
     const {
       status, // published, draft, featured
       tier,
+      quality,
       category,
       search,
       page = '1',
@@ -39,65 +41,80 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
     const where: any = {};
 
     if (status === 'published') {
-      where.isPublished = true;
+      where.is_published = true;
     } else if (status === 'draft') {
-      where.isPublished = false;
+      where.is_published = false;
     } else if (status === 'featured') {
-      where.isFeatured = true;
+      where.is_featured = true;
+    }
+
+    if (tier) {
+      where.tenants = {
+        subscription_tier: tier,
+      };
+    }
+
+    if (search) {
+      where.OR = [
+        { tenants: { name: { contains: search, mode: 'insensitive' } } },
+        { primary_category: { contains: search, mode: 'insensitive' } },
+        { secondary_categories: { has: search } },
+      ];
     }
 
     if (category) {
-      where.OR = [
-        { primaryCategory: category },
-        { secondaryCategories: { has: category } },
-      ];
+      if (!where.OR) where.OR = [];
+      where.OR.push(
+        { primary_category: category },
+        { secondary_categories: { has: category } },
+      );
     }
 
     // Get listings
     const [listings, total] = await Promise.all([
-      prisma.directorySettings.findMany({
+      prisma.directory_settings_list.findMany({
         where,
         include: {
-          tenant: {
+          tenants: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
             },
           },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updated_at: 'desc' },
         skip,
         take: limitNum,
       }),
-      prisma.directorySettings.count({ where }),
+      prisma.directory_settings_list.count({ where }),
     ]);
 
     // Add quality scores (basic calculation)
     const enrichedListings = await Promise.all(
       listings.map(async (listing) => {
-        const profile = await prisma.tenantBusinessProfile.findUnique({
-          where: { tenantId: listing.tenantId },
+        const profile = await prisma.tenant_business_profiles_list.findUnique({
+          where: { tenant_id: listing.tenant_id },
         });
 
-        const itemCount = await prisma.InventoryItem.count({
-          where: { tenantId: listing.tenantId, itemStatus: 'active' },
+        const itemCount = await prisma.inventory_items.count({
+          where: { tenant_id: listing.tenant_id, item_status: 'active' },
         });
 
         // Calculate quality score
         let qualityScore = 0;
         if (profile) {
-          if (profile.businessName) qualityScore += 15;
-          if (profile.businessLine1) qualityScore += 10;
+          if (profile.business_name) qualityScore += 15;
+          if (profile.address_line1) qualityScore += 10;
           if (profile.city && profile.state) qualityScore += 10;
-          if (profile.phoneNumber) qualityScore += 10;
+          if (profile.phone_number) qualityScore += 10;
           if (profile.email) qualityScore += 5;
           if (profile.website) qualityScore += 10;
-          if (profile.logoUrl) qualityScore += 10;
+          if (profile.logo_url) qualityScore += 10;
           if (profile.hours) qualityScore += 10;
         }
-        if (listing.seoDescription && listing.seoDescription.length > 100) qualityScore += 10;
-        if (listing.primaryCategory) qualityScore += 5;
+        if (listing.seo_description && listing.seo_description.length > 100) qualityScore += 10;
+        if (listing.primary_category) qualityScore += 5;
         if (itemCount > 0) qualityScore += 10;
         if (itemCount > 10) qualityScore += 5;
 
@@ -105,18 +122,35 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
           ...listing,
           qualityScore,
           itemCount,
-          business_name: profile?.businessName || listing.tenant?.name || 'Unknown Business',
+          businessName: profile?.business_name || listing.tenants?.name || 'Unknown Business',
+          tenant: listing.tenants ? {
+            id: listing.tenants.id,
+            name: listing.tenants.name,
+            subscriptionTier: listing.tenants.subscription_tier,
+          } : null,
         };
       })
     );
 
+    // Apply quality filter if specified
+    let filteredListings = enrichedListings;
+    if (quality) {
+      if (quality === 'low') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore <= 50);
+      } else if (quality === 'medium') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore > 50 && listing.qualityScore <= 100);
+      } else if (quality === 'high') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore > 100);
+      }
+    }
+
     return res.json({
-      listings: enrichedListings,
+      listings: filteredListings,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
+        total: quality ? filteredListings.length : total,
+        totalPages: Math.ceil((quality ? filteredListings.length : total) / limitNum),
       },
     });
   } catch (error: any) {
@@ -137,28 +171,28 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
       featuredListings,
       draftListings,
     ] = await Promise.all([
-      prisma.directorySettings.count(),
-      prisma.directorySettings.count({ where: { isPublished: true } }),
-      prisma.directorySettings.count({ where: { isFeatured: true } }),
-      prisma.directorySettings.count({ where: { isPublished: false } }),
+      prisma.directory_settings_list.count(),
+      prisma.directory_settings_list.count({ where: { is_published: true } }),
+      prisma.directory_settings_list.count({ where: { is_featured: true } }),
+      prisma.directory_settings_list.count({ where: { is_published: false } }),
     ]);
 
     // Get listings by tier
-    const listingsByTier = await prisma.directorySettings.groupBy({
-      by: ['tenantId'],
+    const listingsByTier = await prisma.directory_settings_list.groupBy({
+      by: ['tenant_id'],
       _count: true,
     });
 
     // Get tenant tiers
-    const tenantIds = listingsByTier.map(l => l.tenantId);
-    const tenants = await prisma.tenant.findMany({
+    const tenantIds = listingsByTier.map(l => l.tenant_id);
+    const tenants = await prisma.tenants.findMany({
       where: { id: { in: tenantIds } },
-      select: { id: true, subscriptionTier: true },
+      select: { id: true, subscription_tier: true },
     });
 
     const tierCounts: Record<string, number> = {};
     tenants.forEach(t => {
-      const tier = t.subscriptionTier || 'unknown';
+      const tier = t.subscription_tier || 'unknown';
       tierCounts[tier] = (tierCounts[tier] || 0) + 1;
     });
 
@@ -181,22 +215,22 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
  */
 router.get('/featured', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const featured = await prisma.directoryFeaturedListings.findMany({
+    const featured = await prisma.directory_featured_listings_list.findMany({
       where: {
-        featuredUntil: { gt: new Date() },
+        featured_until: { gt: new Date() },
       },
       include: {
-        tenant: {
+        tenants: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true,
+            subscription_tier: true,
           },
         },
       },
       orderBy: [
-        { placementPriority: 'desc' },
-        { featuredFrom: 'desc' },
+        { placement_priority: 'desc' },
+        { featured_from: 'desc' },
       ],
     });
 
@@ -226,23 +260,24 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
     }
 
     // Create featured listing record
-    const featured = await prisma.directoryFeaturedListings.create({
+    const featured = await prisma.directory_featured_listings_list.create({
       data: {
-        tenantId,
-        featuredFrom: new Date(),
-        featuredUntil,
-        placementPriority: parsed.data.placement_priority || 5,
-        createdBy: (req as any).user?.userId,
+        id: generateDirectoryFeaturedId(tenantId),
+        tenant_id: tenantId,
+        featured_from: new Date(),
+        featured_until: featuredUntil,
+        placement_priority: parsed.data.placement_priority || 5,
+        created_by: (req as any).user?.userId,
       },
     });
 
     // Update directory settings
-    await prisma.directorySettings.update({
-      where: { tenantId },
+    await prisma.directory_settings_list.update({
+      where: { tenant_id: tenantId },
       data: {
-        isFeatured: true,
-        featuredUntil,
-        updatedAt: new Date(),
+        is_featured: true,
+        featured_until: featuredUntil,
+        updated_at: new Date(),
       },
     });
 
@@ -262,23 +297,23 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
     const { tenantId } = req.params;
 
     // Update directory settings
-    await prisma.directorySettings.update({
-      where: { tenantId },
+    await prisma.directory_settings_list.update({
+      where: { tenant_id: tenantId },
       data: {
-        isFeatured: false,
-        featuredUntil: null,
-        updatedAt: new Date(),
+        is_featured: false,
+        featured_until: null,
+        updated_at: new Date(),
       },
     });
 
     // Expire any active featured listings
-    await prisma.directoryFeaturedListings.updateMany({
+    await prisma.directory_featured_listings_list.updateMany({
       where: {
-        tenantId,
-        featuredUntil: { gt: new Date() },
+        tenant_id: tenantId,
+        featured_until: { gt: new Date() },
       },
       data: {
-        featuredUntil: new Date(), // Set to now to expire
+        featured_until: new Date(), // Set to now to expire
       },
     });
 

@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { getAdminEmail, type EmailCategory } from '@/lib/admin-emails';
+
 
 interface ContactCategory {
   id: EmailCategory;

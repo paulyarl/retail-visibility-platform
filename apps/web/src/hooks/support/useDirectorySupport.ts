@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { directorySupportService } from '@/services/DirectorySupportSingletonService';
 
 export interface DirectoryStatus {
   tenant: {
@@ -56,18 +57,11 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/support/directory/tenant/${tenantId}/status`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch status');
-      }
-
-      return await response.json();
-    } catch (err) {
-      console.error('Error fetching directory status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load status');
+      const status = await directorySupportService.getDirectoryStatus(tenantId);
+      return status;
+    } catch (error) {
+      console.error('Failed to get directory status:', error);
+      setError('Failed to get directory status');
       return null;
     } finally {
       setLoading(false);
@@ -79,15 +73,8 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/support/directory/tenant/${tenantId}/quality-check`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to check quality');
-      }
-
-      return await response.json();
+      const qualityCheck = await directorySupportService.getDirectoryQualityCheck(tenantId);
+      return qualityCheck;
     } catch (err) {
       console.error('Error checking quality:', err);
       setError(err instanceof Error ? err.message : 'Failed to check quality');
@@ -102,16 +89,8 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/support/directory/tenant/${tenantId}/notes`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch notes');
-      }
-
-      const data = await response.json();
-      return data.notes || [];
+      const notes = await directorySupportService.getDirectoryNotes(tenantId);
+      return notes || [];
     } catch (err) {
       console.error('Error fetching notes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load notes');
@@ -126,20 +105,8 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/support/directory/tenant/${tenantId}/add-note`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ note }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add note');
-      }
-
-      return true;
+      const result = await directorySupportService.addDirectoryNote(tenantId, note);
+      return !!result;
     } catch (err) {
       console.error('Error adding note:', err);
       setError(err instanceof Error ? err.message : 'Failed to add note');
@@ -154,16 +121,8 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/support/directory/search?q=${encodeURIComponent(query)}`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to search');
-      }
-
-      const data = await response.json();
-      return data.tenants || [];
+      const data = await directorySupportService.searchDirectory(query);
+      return data?.tenants || [];
     } catch (err) {
       console.error('Error searching tenants:', err);
       setError(err instanceof Error ? err.message : 'Failed to search');

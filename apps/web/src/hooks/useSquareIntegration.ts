@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SquareStatus } from '@/components/square';
+import { squareIntegrationService } from '@/services/SquareIntegrationSingletonService';
 
 interface SquareIntegrationData {
   enabled: boolean;
@@ -55,14 +56,18 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       setLoading(true);
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/square/status`);
+      const responseData = await squareIntegrationService.getSquareStatus(tenantId);
       
-      if (!res.ok) {
+      if (!responseData) {
         throw new Error('Failed to fetch integration status');
       }
       
-      const responseData = await res.json();
-      setData(responseData);
+      if (responseData.success && responseData.data) {
+        setData(responseData.data);
+      } else {
+        setData(null);
+        setError(responseData?.userMessage || 'Failed to load Square status');
+      }
     } catch (err: any) {
       console.error('Failed to fetch Square status:', err);
       setError(err.message);
@@ -77,14 +82,11 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       setError(null);
       
       // Fetch authorization URL
-      const res = await fetch(`/api/integrations/${tenantId}/square/oauth/authorize`);
+      const responseData = await squareIntegrationService.getSquareOAuthAuthorize(tenantId);
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to initiate OAuth flow');
+      if (!responseData) {
+        throw new Error('Failed to initiate OAuth flow');
       }
-      
-      const responseData = await res.json();
       
       // Redirect to Square authorization page
       if (typeof window !== 'undefined' && responseData.authorizationUrl) {
@@ -110,15 +112,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/square/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to disconnect');
-      }
+      await squareIntegrationService.disconnectSquare(tenantId);
       
       // Show success message
       if (typeof window !== 'undefined') {
@@ -139,15 +133,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
     try {
       setError(null);
       
-      const res = await fetch(`/api/integrations/${tenantId}/square/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to sync');
-      }
+      await squareIntegrationService.syncSquare(tenantId);
       
       // Show success message
       if (typeof window !== 'undefined') {

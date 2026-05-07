@@ -1,1083 +1,945 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button, Input, Modal, ModalFooter, Pagination, Alert } from '@/components/ui';
-import PageHeader, { Icons } from '@/components/PageHeader';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import ManageUserTenantsModal from '@/components/admin/ManageUserTenantsModal';
-import { motion } from 'framer-motion';
-import { api } from '@/lib/api';
-import { useAccessControl } from '@/lib/auth/useAccessControl';
-import { canManageUsers } from '@/lib/auth/access-control';
+import React, { useState, useEffect } from 'react';
+import { Users, UserPlus, Key, Trash2, Shield, User as UserIcon, Search, Filter, Edit, Building2, Mail, Power, UserCheck, ChevronDown, ChevronRight, Eye, EyeOff, Save, X } from 'lucide-react';
+import { Card } from '@mantine/core';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@mantine/core';
+import CreateUserModal from '@/components/admin/CreateUserModal';
+import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
+import EditUserModal from '@/components/admin/EditUserModal';
+import ManageTenantsModal from '@/components/admin/ManageTenantsModal';
+import UserStatusModal from '@/components/admin/UserStatusModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
+import { adminUsersService } from '@/services/AdminUsersService';
+import { adminUserService } from '@/services/AdminUserService';
+
 
 interface User {
   id: string;
   email: string;
-  name: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER'; // All supported roles
-  status: 'active' | 'inactive' | 'pending';
-  lastActive: string;
-  tenants: number;
-  tenantRoles?: Array<{
-    tenantId: string;
-    tenantName: string;
-    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'; // Tenant-level roles
+  name?: string;
+  role: string;
+  created_at: string;
+  last_login_at?: string;
+  is_active: boolean;
+  email_verified: boolean;
+  tenants?: Array<{
+    id: string;
+    name: string;
+    role: string;
   }>;
 }
 
-export default function UsersManagementPage() {
+export default function PlatformUserMaintenancePage() {
+  const { user } = useAuth();
+  const canManage = user ? canManageUsers(user) : false;
+  const canView = user ? canViewUsers(user) : false;
+  const canCreateUser = user ? (user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT') : false;
+  const canResetPassword = user ? (user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT') : false;
+  const canDelete = user ? (user.role === 'PLATFORM_ADMIN') : false;
+  const canEditRole = user ? (user.role === 'PLATFORM_ADMIN') : false;
+  const canManageTenants = user ? (user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT') : false;
+  
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteMode, setInviteMode] = useState<'create' | 'assign' | 'invite'>('create');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [invitePassword, setInvitePassword] = useState('');
-  const [inviteFirstName, setInviteFirstName] = useState('');
-  const [inviteLastName, setInviteLastName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER'>('USER');
-  
-  // Edit user state
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState<'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER'>('USER');
-  const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'pending'>('active');
-  
-  // Permissions state
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
-  const [permissionsUser, setPermissionsUser] = useState<User | null>(null);
-  const [permissions, setPermissions] = useState({
-    canCreateTenants: true,
-    canEditTenants: true,
-    canDeleteTenants: false,
-    canManageUsers: false,
-    canViewAnalytics: true,
-    canManageInventory: true,
-    canAccessAdmin: false,
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
   });
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
+  });
+  const [manageTenantsModal, setManageTenantsModal] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
+  });
+  const [statusModal, setStatusModal] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
+  });
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [editingTenantRole, setEditingTenantRole] = useState<{ userId: string; tenantId: string; currentRole: string } | null>(null);
   
-  // Tenant management state
-  const [showTenantsModal, setShowTenantsModal] = useState(false);
-  const [tenantsUser, setTenantsUser] = useState<User | null>(null);
-  
-  // Access control
-  const { user } = useAccessControl(null, {});
-  const canManage = user ? canManageUsers(user) : false;
-  const canInvite = user ? (canManageUsers(user) || user.role === 'PLATFORM_SUPPORT') : false;
-  
-  // Pagination and search state
+  // Pagination and filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'ADMIN' | 'OWNER' | 'USER'>('all');
+  const pageSize = 10;
 
-  // Memoized load users function to prevent unnecessary re-calls
-  const loadUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await api.get('/api/admin/users');
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load users');
-      }
-
-      setUsers(Array.isArray(data?.users) ? data.users : (Array.isArray(data) ? data : []));
-    } catch (err) {
-      console.error('[Users] Load error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load users on mount only
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
-  
-  // Memoized filtered users to prevent unnecessary re-computations
-  const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const searchLower = searchQuery.toLowerCase();
-      const userName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-      const matchesSearch = userName.toLowerCase().includes(searchLower) ||
-             user.email.toLowerCase().includes(searchLower) ||
-             user.role.toLowerCase().includes(searchLower);
-      const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-      return matchesSearch && matchesStatus && matchesRole;
-    });
-  }, [users, searchQuery, statusFilter, roleFilter]);
-  
-  // Memoized paginated users to prevent unnecessary re-computations
-  const paginatedUsers = useMemo(() => {
-    return filteredUsers.slice(
-      (currentPage - 1) * pageSize,
-      currentPage * pageSize
-    );
-  }, [filteredUsers, currentPage, pageSize]);
+  }, []);
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'PLATFORM_ADMIN':
-        return <Badge variant="error">Platform Admin</Badge>;
-      case 'PLATFORM_SUPPORT':
-        return <Badge variant="warning">Platform Support</Badge>;
-      case 'PLATFORM_VIEWER':
-        return <Badge variant="info">Platform Viewer</Badge>;
-      case 'ADMIN':
-        return <Badge variant="error">Admin</Badge>;
-      case 'OWNER':
-        return <Badge variant="warning">Tenant Owner</Badge>;
-      case 'TENANT_ADMIN':
-        return <Badge variant="info">Tenant Admin</Badge>;
-      case 'USER':
-        return <Badge variant="default">User</Badge>;
-      default:
-        return <Badge variant="default">{role}</Badge>;
-    }
-  };
-
-  const getAssignmentStatus = (user: User) => {
-    // Only show assignment status for tenant owners
-    if (!user || user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT' || user.role === 'PLATFORM_VIEWER') {
-      return null;
-    }
-
-    const assignmentCount = user.tenantRoles?.length || 0;
-    
-    if (assignmentCount === 0) {
-      return (
-        <Badge variant="warning" className="text-xs">
-          Unassigned
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge variant="success" className="text-xs">
-          {assignmentCount} tenant{assignmentCount !== 1 ? 's' : ''}
-        </Badge>
-      );
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="success">Active</Badge>;
-      case 'inactive':
-        return <Badge variant="default">Inactive</Badge>;
-      case 'pending':
-        return <Badge variant="warning">Pending</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
-
-  const handleInvite = async () => {
-    if (!inviteEmail || !inviteRole) {
-      setError('Please provide email and role');
-      return;
-    }
-
-    if (inviteMode === 'create' && !invitePassword) {
-      setError('Please provide a password for the new user');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+  const loadUsers = async () => {
     try {
-      // For tenant owners, we need to get their owned tenants first
-      let targetTenantId = '';
+      setLoading(true);
       
-      if (user?.role === 'OWNER') {
-        // Get the first owned tenant (for simplicity)
-        // In a real implementation, you might want to let them choose
-        const tenantsResponse = await api.get('/api/admin/tenants');
-        const tenantsData = await tenantsResponse.json();
-        
-        if (tenantsData.success && tenantsData.tenants.length > 0) {
-          targetTenantId = tenantsData.tenants[0].id;
-        } else {
-          throw new Error('No tenants available for assignment');
-        }
-      }
-
-      let response, data;
-
-      if (inviteMode === 'invite') {
-        // Send email invitation
-        response = await api.post('/api/admin/users/send-invitation', {
-          email: inviteEmail,
-          tenantId: targetTenantId,
-          role: inviteRole,
-        });
-        data = await response.json();
-
-        if (response.ok && data.success) {
-          setSuccess(`Invitation sent to ${inviteEmail} for role ${inviteRole}`);
-        } else {
-          throw new Error(data.error || 'Failed to send invitation');
-        }
-      } else if (inviteMode === 'create') {
-        // Create new user and assign to tenant
-        response = await api.post('/api/admin/users/create', {
-          email: inviteEmail,
-          password: invitePassword,
-          firstName: inviteFirstName,
-          lastName: inviteLastName,
-          tenantId: targetTenantId,
-          role: inviteRole,
-        });
-        data = await response.json();
-
-        if (response.ok && data.success) {
-          setSuccess(`Successfully created user ${inviteEmail} and assigned to tenant with role ${inviteRole}`);
-        } else {
-          throw new Error(data.error || 'Failed to create user');
-        }
-      } else {
-        // Assign existing user to tenant
-        response = await api.post('/api/admin/users/invite-by-email', {
-          email: inviteEmail,
-          tenantId: targetTenantId,
-          role: inviteRole,
-        });
-        data = await response.json();
-
-        if (response.ok && data.success) {
-          setSuccess(`Successfully assigned ${inviteEmail} to tenant with role ${inviteRole}`);
-        } else if (data.action === 'registration_required') {
-          setError(data.message);
-          return;
-        } else {
-          throw new Error(data.error || 'Failed to assign user');
-        }
-      }
-
-      // Reset form and close modal
-      setShowInviteModal(false);
-      setInviteEmail('');
-      setInvitePassword('');
-      setInviteFirstName('');
-      setInviteLastName('');
-      setInviteRole('USER');
-      await loadUsers(); // Refresh the user list
-    } catch (err) {
-      console.error('[Users] Invite error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process user');
+      const usersWithTenants = await adminUsersService.getUsersWithTenants();
+      
+      // console.log('DEBUG: Users from service:', usersWithTenants);
+      // console.log('DEBUG: First user tenants:', usersWithTenants?.[0]?.tenants);
+      
+      // Debug specific user email verification status
+      const targetUser = usersWithTenants?.find((u: any) => u.id === 'adminuser-ZQTQ003Q');
+      // if (targetUser) {
+      //   console.log('DEBUG: Target user status:', {
+      //     id: targetUser.id,
+      //     email: targetUser.email,
+      //     is_active: targetUser.is_active,
+      //     email_verified: targetUser.email_verified,
+      //     combinedStatus: targetUser.is_active && targetUser.email_verified ? 'active' : 
+      //                    targetUser.is_active && !targetUser.email_verified ? 'active_unverified' :
+      //                    !targetUser.is_active && targetUser.email_verified ? 'inactive' : 'pending'
+      //   });
+      // }
+      
+      setUsers(usersWithTenants || []);
+    } catch (error) {
+      console.error('Failed to load users:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditClick = (user: User) => {
-    setEditingUser(user);
-    const userName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-    setEditName(userName);
-    setEditEmail(user.email);
-    setEditRole(user.role);
-    setEditStatus(user.status);
-    setShowEditModal(true);
-  };
-
-  const handleManageTenantsClick = (user: User) => {
-    setTenantsUser(user);
-    setShowTenantsModal(true);
-  };
-
-  const handleEditSave = async () => {
-    if (!editingUser) return;
-    
-    try {
-      setError(null);
-      const [firstName, ...lastNameParts] = editName.split(' ');
-      const lastName = lastNameParts.join(' ');
-      
-      const res = await api.put(`/api/users/${editingUser.id}`, {
-        firstName,
-        lastName,
-        email: editEmail,
-        role: editRole,
-        isActive: editStatus === 'active',
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update user');
-      }
-      
-      setSuccess('User updated successfully');
-      setShowEditModal(false);
-      setEditingUser(null);
-      // Optimistic update instead of full reload
-      setUsers(prevUsers => 
-        prevUsers.map(u => u.id === editingUser.id ? 
-          { ...u, name: editName, email: editEmail, role: editRole as User['role'], status: editStatus } : u
-        )
-      );
-      
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      console.error('[Users] Update error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update user');
-    }
-  };
-
-  const handlePermissionsClick = (user: User) => {
-    setPermissionsUser(user);
-    // Reset permissions to default for each user
-    // TODO: Load user's actual permissions from API instead of using defaults
-    setPermissions({
-      canCreateTenants: true,
-      canEditTenants: true,
-      canDeleteTenants: false,
-      canManageUsers: false,
-      canViewAnalytics: true,
-      canManageInventory: true,
-      canAccessAdmin: false,
-    });
-    setShowPermissionsModal(true);
-  };
-
-  const handlePermissionsSave = () => {
-    if (!permissionsUser) return;
-    
-    console.log('Updating permissions for user:', permissionsUser.id, permissions);
-    // TODO: Implement API call
-    setShowPermissionsModal(false);
-    setPermissionsUser(null);
-  };
-
-  const handlePermissionsClose = () => {
-    setShowPermissionsModal(false);
-    setPermissionsUser(null);
-    // Reset permissions to default to prevent state leakage
-    setPermissions({
-      canCreateTenants: true,
-      canEditTenants: true,
-      canDeleteTenants: false,
-      canManageUsers: false,
-      canViewAnalytics: true,
-      canManageInventory: true,
-      canAccessAdmin: false,
-    });
-  };
-
-  const handleDelete = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    if (!confirm(`Delete user ${userEmail}? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      setError(null);
-      const res = await api.delete(`/api/users/${userId}`);
-      
-      if (res.status === 204 || res.ok) {
-        setSuccess('User deleted successfully');
-        // Optimistic update instead of full reload
-        setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
-        setTimeout(() => setSuccess(null), 3000);
+      const success = await adminUsersService.deleteUser(userId);
+
+      if (success) {
+        await loadUsers();
       } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete user');
+        alert('Failed to delete user');
       }
-    } catch (err) {
-      console.error('[Users] Delete error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+    } catch (error) {
+      console.error('Delete user error:', error);
+      alert('Failed to delete user');
     }
   };
 
-  if (loading) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-          <PageHeader
-            title="User Management"
-            description="Loading..."
-            icon={Icons.Users}
-          />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
+  const handleToggleUserStatus = async (userId: string, userEmail: string, currentStatus: boolean, currentEmailVerified: boolean) => {
+    let newStatus: boolean;
+    let newEmailVerified: boolean;
+    let action: string;
+
+    // Determine the next status
+    if (currentStatus && currentEmailVerified) {
+      // Active & Verified -> Inactive
+      newStatus = false;
+      newEmailVerified = true;
+      action = 'deactivate';
+    } else if (!currentStatus && currentEmailVerified) {
+      // Inactive & Verified -> Pending
+      newStatus = false;
+      newEmailVerified = false;
+      action = 'set to pending';
+    } else {
+      // Pending -> Active & Verified
+      newStatus = true;
+      newEmailVerified = true;
+      action = 'activate';
+    }
+
+    const confirmMessage = `${action.charAt(0).toUpperCase() + action.slice(1)} user ${userEmail}?`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const success = await adminUsersService.updateUser(userId, {
+        isActive: newStatus,
+        emailVerified: newEmailVerified,
+      });
+
+      if (success) {
+        await loadUsers();
+      } else {
+        alert('Failed to update user status');
+      }
+    } catch (error) {
+      console.error('Failed to update user status:', error);
+      alert('Failed to update user status');
+    }
+  };
+
+  // Filter and paginate users
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = !searchQuery || 
+                         u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (u.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+                         u.role.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    
+    const isActive = Boolean(u.is_active);
+    const isVerified = Boolean(u.email_verified);
+    
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = isActive && isVerified;
+    } else if (statusFilter === 'active_unverified') {
+      matchesStatus = isActive && !isVerified;
+    } else if (statusFilter === 'inactive') {
+      matchesStatus = !isActive && isVerified;
+    } else if (statusFilter === 'pending') {
+      matchesStatus = !isActive && !isVerified;
+    }
+    
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+  
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'PLATFORM_ADMIN':
+      case 'ADMIN':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+      case 'PLATFORM_SUPPORT':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'PLATFORM_VIEWER':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'OWNER':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
+      case 'USER':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'PLATFORM_ADMIN':
+        return 'Platform Admin';
+      case 'PLATFORM_SUPPORT':
+        return 'Platform Support';
+      case 'PLATFORM_VIEWER':
+        return 'Platform Viewer';
+      case 'OWNER':
+        return 'Tenant Owner';
+      case 'USER':
+        return 'Tenant User';
+      case 'ADMIN':
+        return 'Admin (Deprecated)';
+      default:
+        return role;
+    }
+  };
+
+  const toggleRowExpansion = (userId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(userId)) {
+      newExpanded.delete(userId);
+    } else {
+      newExpanded.add(userId);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  const handleEditTenantRole = (userId: string, tenantId: string, currentRole: string) => {
+    setEditingTenantRole({ userId, tenantId, currentRole });
+  };
+
+  const handleSaveTenantRole = async (userId: string, tenantId: string, newRole: string) => {
+    try {
+      // First remove the existing assignment
+      await adminUserService.removeUserFromTenant(userId, tenantId);
+
+      // Then add with new role - response contains updated tenant data
+      const result = await adminUserService.addUserToTenant(userId, tenantId, newRole);
+
+      // Instant update: update local state with response data
+      if (result) {
+        setUsers(prevUsers => 
+          prevUsers.map(u => 
+            u.id === userId 
+              ? {
+                  ...u,
+                  tenants: (u.tenants || []).map(t => 
+                    t.id === result.tenant_id 
+                      ? { ...t, role: result.role }
+                      : t
+                  ),
+                }
+              : u
+          )
+        );
+      }
+      setEditingTenantRole(null);
+    } catch (error) {
+      console.error('Failed to update tenant role:', error);
+      alert(`Failed to update tenant role: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTenantRole(null);
+  };
+
+  const getTenantRoleOptions = () => [
+    { value: 'OWNER', label: 'Owner', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' },
+    { value: 'ADMIN', label: 'Admin', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' },
+    { value: 'SUPPORT', label: 'Support', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' },
+    { value: 'MEMBER', label: 'Member', color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' },
+    { value: 'VIEWER', label: 'Viewer', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+  ];
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <PageHeader
-        title="User Management"
-        description="Manage users, permissions, and access"
-        icon={Icons.Users}
-        backLink={{
-          href: '/settings/admin',
-          label: 'Back to Admin'
-        }}
-        actions={
-          <Button onClick={() => setShowInviteModal(true)} disabled={!canInvite} title={!canInvite ? 'View only' : undefined}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Invite User
-          </Button>
-        }
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Info Alert */}
-        {user?.role === 'OWNER' ? (
-          <Alert variant="success" title="Tenant Owner - Secure User Assignment">
-            <div className="text-sm space-y-2">
-              <p>
-                As a <strong>Tenant Owner</strong>, you can manage users assigned to your tenants:
-              </p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>View Users:</strong> See only users already assigned to your tenants (privacy protected)</li>
-                <li><strong>Create User:</strong> Use "Create User" to create new employees and automatically assign them</li>
-                <li><strong>Assign by Email:</strong> Use "Assign Existing User" to add users who already registered</li>
-                <li><strong>Manage Roles:</strong> Click "Manage Tenants" to modify user roles within your tenants</li>
-              </ul>
-              <p className="text-xs bg-blue-50 border border-blue-200 rounded p-2 mt-2">
-                <strong>🚀 Streamlined:</strong> Create new users directly with automatic tenant assignment, or assign existing users by email. Privacy protected - you only see users assigned to your tenants.
-              </p>
-            </div>
-          </Alert>
-        ) : (
-          <Alert variant="info" title="About Platform-Level Roles">
-            <div className="text-sm space-y-2">
-              <p>
-                These are <strong>platform-level roles</strong> that determine a user's global access:
-              </p>
-            <div className="space-y-3">
-              <div>
-                <p className="font-semibold text-neutral-900 mb-1">Platform Users:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>Platform Admin:</strong> Full system access, unlimited tenants</li>
-                  <li><strong>Platform Support:</strong> View all tenants + support actions (3 tenant limit)</li>
-                  <li><strong>Platform Viewer:</strong> Read-only access to all tenants (cannot create)</li>
-                </ul>
-              </div>
-              <div>
-                <p className="font-semibold text-neutral-900 mb-1">Tenant Users:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>Tenant Owner:</strong> Can create/own tenants, manage settings & billing (limits based on subscription tier)</li>
-                  <li><strong>Tenant Admin:</strong> Support role for assigned tenants (below Tenant Owner, cannot manage settings/ownership)</li>
-                  <li><strong>Tenant User:</strong> Basic access (limits based on subscription tier)</li>
-                </ul>
-              </div>
-            </div>
-            <p className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2">
-              <strong>Tenant Limits:</strong> For Tenant Users and Owners, the number of tenants they can create depends on their <strong>subscription tier</strong>: Trial (1), Google-Only (1), Starter (3), Professional (10), Enterprise (25), Organization (unlimited).
-            </p>
-            <p className="mt-2">
-              <strong>Note:</strong> Users also have <strong>tenant-specific roles</strong> (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to. Those are managed within each tenant's settings, not here.
-            </p>
-          </div>
-        </Alert>
-        )}
-
-        {error && (
-          <Alert variant="error" title="Error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success" title="Success" onClose={() => setSuccess(null)}>
-            {success}
-          </Alert>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-neutral-900">{users.length}</p>
-                <p className="text-sm text-neutral-600 mt-1">Total Users</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">
-                  {users.filter(u => u.status === 'active').length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Active</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-600">
-                  {users.filter(u => u.status === 'pending').length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Pending</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-red-600">
-                  {users.filter(u => u.role === 'ADMIN').length}
-                </p>
-                <p className="text-sm text-neutral-600 mt-1">Admins</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-4">
-              {/* Search */}
-              <div className="flex-1 min-w-[200px]">
-                <Input
-                  type="text"
-                  placeholder="Search users..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                >
-                  All Status
-                </Button>
-                <Button
-                  variant={statusFilter === 'active' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                >
-                  Active
-                </Button>
-                <Button
-                  variant={statusFilter === 'inactive' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('inactive')}
-                >
-                  Inactive
-                </Button>
-                <Button
-                  variant={statusFilter === 'pending' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter('pending')}
-                >
-                  Pending
-                </Button>
-              </div>
-
-              {/* Role Filter */}
-              <div className="flex gap-2">
-                <Button
-                  variant={roleFilter === 'all' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setRoleFilter('all')}
-                >
-                  All Roles
-                </Button>
-                <Button
-                  variant={roleFilter === 'ADMIN' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setRoleFilter('ADMIN')}
-                >
-                  Platform Admin
-                </Button>
-                <Button
-                  variant={roleFilter === 'OWNER' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setRoleFilter('OWNER')}
-                >
-                  Tenant Owner
-                </Button>
-                <Button
-                  variant={roleFilter === 'USER' ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setRoleFilter('USER')}
-                >
-                  User
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Results Count */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-neutral-700">
-            Showing {filteredUsers.length} of {users.length} users
-          </p>
-        </div>
-
-        {/* Users List */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>All Users</CardTitle>
-                <CardDescription>Manage user accounts and permissions</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredUsers.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-neutral-500">
-                  {searchQuery ? 'No users match your search' : 'No users found'}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="divide-y divide-neutral-200">
-                  {paginatedUsers.map((user, index) => (
-                <motion.div
-                  key={user.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="py-4 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-primary-600 font-semibold text-lg">
-                        {(() => {
-                          const userName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-                          return userName.charAt(0).toUpperCase();
-                        })()}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-neutral-900">
-                          {user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
-                        </p>
-                        {getRoleBadge(user.role)}
-                        {getStatusBadge(user.status)}
-                        {getAssignmentStatus(user)}
-                      </div>
-                      <p className="text-sm text-neutral-600">{user.email}</p>
-                      <p className="text-xs text-neutral-500 mt-1">
-                        Last active: {user.lastActive} • {user.tenants} tenant{user.tenants !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleEditClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Edit user details and role'}>
-                      Edit Role
-                    </Button>
-                    <Button size="sm" variant="primary" onClick={() => handleManageTenantsClick(user)} disabled={!canManage} title={!canManage ? 'View only' : 'Manage tenant assignments'}>
-                      Manage Tenants
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id)} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-                      <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </Button>
-                  </div>
-                </motion.div>
-                  ))}
-                </div>
-                
-                {/* Pagination */}
-                {filteredUsers.length > 0 && (
-                  <div className="mt-6">
-                    <Pagination
-                      currentPage={currentPage}
-                      totalItems={filteredUsers.length}
-                      pageSize={pageSize}
-                      onPageChange={setCurrentPage}
-                      onPageSizeChange={(newSize) => {
-                        setPageSize(newSize);
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+    <div className="p-6">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Platform User Maintenance
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Manage platform users, roles, and tenant assignments
+        </p>
       </div>
 
-      {/* Invite User Modal */}
-      <Modal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        title={inviteMode === 'create' ? 'Create User' : inviteMode === 'invite' ? 'Send Invitation' : 'Assign User by Email'}
-        description={inviteMode === 'create' ? 'Create a new user and automatically assign to your tenant' : inviteMode === 'invite' ? 'Send an email invitation to join your tenant' : 'Assign an existing user to your tenant by their email address'}
-      >
-        <div className="space-y-4">
-          {/* Mode Selection */}
+      {/* User Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{users.length}</p>
+          </div>
+        </Card>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
+            <p className="text-2xl font-bold text-green-600">{users.filter(u => u.is_active).length}</p>
+          </div>
+        </Card>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Pending Users</p>
+            <p className="text-2xl font-bold text-yellow-600">{users.filter(u => !u.email_verified).length}</p>
+          </div>
+        </Card>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Admin Users</p>
+            <p className="text-2xl font-bold text-purple-600">{users.filter(u => ['PLATFORM_ADMIN', 'ADMIN'].includes(u.role)).length}</p>
+          </div>
+        </Card>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Inactive Users</p>
+            <p className="text-2xl font-bold text-red-600">{users.filter(u => !u.is_active).length}</p>
+          </div>
+        </Card>
+      </div>
+      
+      {/* Header Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Platform Users
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {filteredUsers.length} of {users.length} users
+          </p>
+        </div>
+        {canCreateUser ? (
+          <Button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invite User
+          </Button>
+        ) : (
+          <div className="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+            <Shield className="w-4 h-4 inline mr-2" />
+            {canView ? 'Read-Only Access' : 'No Access'}
+          </div>
+        )}
+      </div>
+      
+      {/* Search and Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by email, name, or role..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+        
+        {/* Filter Chips */}
+        <div className="space-y-3">
+          {/* Status Filters */}
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Action
-            </label>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'all', label: 'All Status', count: users.length },
+                { value: 'active', label: 'Active', count: users.filter(u => u.is_active && u.email_verified).length },
+                { value: 'active_unverified', label: 'Active (Unverified)', count: users.filter(u => u.is_active && !u.email_verified).length },
+                { value: 'inactive', label: 'Inactive', count: users.filter(u => !u.is_active && u.email_verified).length },
+                { value: 'pending', label: 'Pending', count: users.filter(u => !u.is_active && !u.email_verified).length }
+              ].map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    setStatusFilter(filter.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-all ${
+                    statusFilter === filter.value 
+                      ? 'bg-blue-100 text-blue-800 border-blue-300 ring-2 ring-blue-500' 
+                      : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {filter.label} ({filter.count})
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Role Filters */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'all', label: 'All Roles', count: users.length },
+                { value: 'PLATFORM_ADMIN', label: 'Platform Admin', count: users.filter(u => u.role === 'PLATFORM_ADMIN').length },
+                { value: 'PLATFORM_SUPPORT', label: 'Platform Support', count: users.filter(u => u.role === 'PLATFORM_SUPPORT').length },
+                { value: 'PLATFORM_VIEWER', label: 'Platform Viewer', count: users.filter(u => u.role === 'PLATFORM_VIEWER').length },
+                { value: 'OWNER', label: 'Tenant Owner', count: users.filter(u => u.role === 'OWNER').length },
+                { value: 'USER', label: 'Tenant User', count: users.filter(u => u.role === 'USER').length }
+              ].map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    setRoleFilter(filter.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-all ${
+                    roleFilter === filter.value 
+                      ? 'bg-blue-100 text-blue-800 border-blue-300 ring-2 ring-blue-500' 
+                      : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {filter.label} ({filter.count})
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">
+              {searchQuery || roleFilter !== 'all' || statusFilter !== 'all' ? 'No users match your filters' : 'No users yet'}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+              {searchQuery || roleFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your search or filters' : 'Create your first user to get started'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Tenants
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Last Login
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {paginatedUsers.map((user) => (
+                  <React.Fragment key={user.id}>
+                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <UserIcon className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {user.name || 'Unnamed User'}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            user.is_active && user.email_verified
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                              : !user.is_active && user.email_verified
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                              : user.is_active && !user.email_verified
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                          }`}>
+                            {user.is_active && user.email_verified ? 'Active' : 
+                             !user.is_active && user.email_verified ? 'Inactive' :
+                             user.is_active && !user.email_verified ? 'Active (Unverified)' : 'Pending'}
+                          </span>
+                          {!user.email_verified && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Email not verified
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
+                          {(user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN') && <Shield className="w-3 h-3" />}
+                          {getRoleLabel(user.role)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          <button
+                            onClick={() => toggleRowExpansion(user.id)}
+                            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Building2 className="w-4 h-4 text-gray-400" />
+                              <span>{user.tenants?.length || 0} tenant{(user.tenants?.length || 0) !== 1 ? 's' : ''}</span>
+                            </div>
+                            <span className="ml-2 text-blue-600 dark:text-blue-400 text-xs font-bold">
+                              {expandedRows.has(user.id) ? '-' : '+'}
+                            </span>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {user.last_login_at 
+                          ? new Date(user.last_login_at).toLocaleDateString()
+                          : 'Never'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Edit Role */}
+                          {canEditRole ? (
+                            <button
+                              onClick={() => setEditModalOpen({ open: true, user })}
+                              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                              title="Edit Role"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                              title="Platform Admin only"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          {/* Manage Tenants */}
+                          {canManageTenants ? (
+                            <button
+                              onClick={() => setManageTenantsModal({ open: true, user })}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              title="Manage Tenants"
+                            >
+                              <Building2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                              title="Platform Admin/Support only"
+                            >
+                              <Building2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          {/* Reset Password */}
+                          {canResetPassword ? (
+                            <button
+                              onClick={() => setResetPasswordModal({ open: true, user })}
+                              className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
+                              title="Reset Password"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                              title="Platform Admin/Support only"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          {/* Manage Status */}
+                          {canEditRole ? (
+                            <button
+                              onClick={() => setStatusModal({ open: true, user })}
+                              className={`${
+                                user.is_active && user.email_verified
+                                  ? 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300'
+                                  : !user.is_active && user.email_verified
+                                  ? 'text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300'
+                                  : 'text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
+                              }`}
+                              title="Manage User Status"
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                              title="Platform Admin only"
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          {/* Delete User */}
+                          {canDelete ? (
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.email)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                              title="Platform Admin only"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    {/* Expandable Tenant Details Row */}
+                    {expandedRows.has(user.id) && user.tenants && user.tenants.length > 0 && (
+                      <tr key={`tenant-details-${user.id}`} className="bg-gray-50 dark:bg-gray-900/50">
+                        <td colSpan={7} className="px-6 py-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                              <Building2 className="w-4 h-4" />
+                              <span>Tenant Assignments ({user.tenants.length})</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {user.tenants.map((tenant) => (
+                                <div
+                                  key={tenant.id}
+                                  className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded">
+                                      <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-gray-900 dark:text-white text-sm">
+                                        {tenant.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        ID: {tenant.id}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {/* Role Display/Edit */}
+                                    {editingTenantRole?.userId === user.id && editingTenantRole?.tenantId === tenant.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <select
+                                          value={editingTenantRole.currentRole}
+                                          onChange={(e) => setEditingTenantRole({ ...editingTenantRole, currentRole: e.target.value })}
+                                          className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        >
+                                          {getTenantRoleOptions().map(option => (
+                                            <option key={option.value} value={option.value}>
+                                              {option.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          onClick={() => handleSaveTenantRole(user.id, tenant.id, editingTenantRole.currentRole)}
+                                          className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                                          title="Save"
+                                        >
+                                          <Save className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                          title="Cancel"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                                          tenant.role === 'OWNER' 
+                                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
+                                            : tenant.role === 'ADMIN'
+                                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                                            : tenant.role === 'SUPPORT'
+                                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                                            : tenant.role === 'MEMBER'
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                        }`}>
+                                          {tenant.role}
+                                        </span>
+                                        {canManageTenants && (
+                                          <button
+                                            onClick={() => handleEditTenantRole(user.id, tenant.id, tenant.role)}
+                                            className="p-1 text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                                            title="Edit role"
+                                          >
+                                            <Edit className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {filteredUsers.length > pageSize && (
+          <div className="mt-6 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredUsers.length)} of {filteredUsers.length} users
+            </div>
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={inviteMode === 'create' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setInviteMode('create')}
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create New User
-              </Button>
-              <Button
-                type="button"
-                variant={inviteMode === 'invite' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setInviteMode('invite')}
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                      page === currentPage
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send Invitation
-              </Button>
-              <Button
-                type="button"
-                variant={inviteMode === 'assign' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setInviteMode('assign')}
-              >
-                Assign Existing User
-              </Button>
+                Next
+              </button>
             </div>
           </div>
+        )}
+      </div>
 
-          <Input
-            type="email"
-            label="Email Address"
-            placeholder="user@example.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-          />
-
-          {inviteMode === 'create' && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  type="text"
-                  label="First Name"
-                  placeholder="John"
-                  value={inviteFirstName}
-                  onChange={(e) => setInviteFirstName(e.target.value)}
-                />
-                <Input
-                  type="text"
-                  label="Last Name"
-                  placeholder="Doe"
-                  value={inviteLastName}
-                  onChange={(e) => setInviteLastName(e.target.value)}
-                />
-              </div>
-              <Input
-                type="password"
-                label="Password"
-                placeholder="Choose a secure password"
-                value={invitePassword}
-                onChange={(e) => setInvitePassword(e.target.value)}
-              />
-            </>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Role
-            </label>
-            <select 
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER')}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <optgroup label="Platform Users">
-                <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
-                <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + support actions (3 tenant limit)</option>
-                <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create)</option>
-              </optgroup>
-              <optgroup label="Tenant Users">
-                <option value="OWNER">Tenant Owner - Can create/own tenants, manage settings & billing (limits based on subscription tier)</option>
-                <option value="TENANT_ADMIN">Tenant Admin - Support role for assigned tenants (below Tenant Owner, cannot manage settings/ownership)</option>
-                <option value="USER">Tenant User - Basic access (limits based on subscription tier)</option>
-              </optgroup>
-            </select>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="ghost" onClick={() => setShowInviteModal(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleInvite} disabled={!canInvite} title={!canInvite ? 'View only' : undefined}>
-            {inviteMode === 'create' ? 'Create User' : inviteMode === 'invite' ? 'Send Invitation' : 'Assign User'}
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Edit User Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit User"
-        description={editingUser ? `Update details for ${editingUser.name || `${editingUser.firstName || ''} ${editingUser.lastName || ''}`.trim() || editingUser.email}` : ''}
-      >
-        <div className="space-y-4">
-          <Input
-            label="Name"
-            placeholder="Full name"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            disabled={!canManage}
-          />
-          <Input
-            type="email"
-            label="Email Address"
-            placeholder="user@example.com"
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-            disabled={!canManage}
-          />
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-neutral-900 mb-2">
-              Platform Role
-            </label>
-            <select 
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'TENANT_ADMIN' | 'USER')}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2"
-              disabled={!canManage}
-            >
-              <optgroup label="Platform Users">
-                <option value="PLATFORM_ADMIN">Platform Admin - Full system access (unlimited tenants)</option>
-                <option value="PLATFORM_SUPPORT">Platform Support - View all tenants + support actions (3 tenant limit)</option>
-                <option value="PLATFORM_VIEWER">Platform Viewer - Read-only access to all tenants (cannot create)</option>
-              </optgroup>
-              <optgroup label="Tenant Users">
-                <option value="OWNER">Tenant Owner - Can create/own tenants, manage settings & billing (limits based on subscription tier)</option>
-                <option value="TENANT_ADMIN">Tenant Admin - Support role for assigned tenants (below Tenant Owner, cannot manage settings/ownership)</option>
-                <option value="USER">Tenant User - Basic access (limits based on subscription tier)</option>
-              </optgroup>
-              <optgroup label="Deprecated">
-                <option value="ADMIN">Admin (Deprecated) - Use Platform Admin instead</option>
-              </optgroup>
-            </select>
-            <p className="text-xs text-neutral-600">
-              Platform roles control global access. Users also have tenant-specific roles (Tenant Owner, Tenant Support, Tenant Member, Tenant Viewer) for each location they belong to.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Status
-            </label>
-            <select 
-              value={editStatus}
-              onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive' | 'pending')}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              disabled={!canManage}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending</option>
-            </select>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="ghost" onClick={() => setShowEditModal(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleEditSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-            Save Changes
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Permissions Modal */}
-      <Modal
-        isOpen={showPermissionsModal}
-        onClose={handlePermissionsClose}
-        title="User Permissions"
-        description={permissionsUser ? `Manage permissions for ${permissionsUser.name || `${permissionsUser.firstName || ''} ${permissionsUser.lastName || ''}`.trim() || permissionsUser.email}` : ''}
-        size="lg"
-      >
-        <div className="space-y-4">
-          <div className="bg-neutral-50 p-4 rounded-lg">
-            <p className="text-sm text-neutral-600">
-              Configure what this user can access and manage in the platform.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {/* Tenant Permissions */}
-            <div className="border-b border-neutral-200 pb-3">
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Tenant Management</h3>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.canCreateTenants}
-                    onChange={(e) => setPermissions({...permissions, canCreateTenants: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Create Tenants</p>
-                    <p className="text-xs text-neutral-500">Allow user to create new tenant locations</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.canEditTenants}
-                    onChange={(e) => setPermissions({...permissions, canEditTenants: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Edit Tenants</p>
-                    <p className="text-xs text-neutral-500">Allow user to modify tenant details</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.canDeleteTenants}
-                    onChange={(e) => setPermissions({...permissions, canDeleteTenants: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Delete Tenants</p>
-                    <p className="text-xs text-neutral-500">Allow user to permanently delete tenants</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Inventory Permissions */}
-            <div className="border-b border-neutral-200 pb-3">
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Inventory</h3>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={permissions.canManageInventory}
-                  onChange={(e) => setPermissions({...permissions, canManageInventory: e.target.checked})}
-                  className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                />
-                <div>
-                  <p className="text-sm font-medium text-neutral-900">Manage Inventory</p>
-                  <p className="text-xs text-neutral-500">Allow user to add, edit, and delete inventory items</p>
-                </div>
-              </label>
-            </div>
-
-            {/* Analytics Permissions */}
-            <div className="border-b border-neutral-200 pb-3">
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Analytics</h3>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={permissions.canViewAnalytics}
-                  onChange={(e) => setPermissions({...permissions, canViewAnalytics: e.target.checked})}
-                  className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                />
-                <div>
-                  <p className="text-sm font-medium text-neutral-900">View Analytics</p>
-                  <p className="text-xs text-neutral-500">Allow user to view reports and analytics</p>
-                </div>
-              </label>
-            </div>
-
-            {/* Admin Permissions */}
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Administration</h3>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.canManageUsers}
-                    onChange={(e) => setPermissions({...permissions, canManageUsers: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Manage Users</p>
-                    <p className="text-xs text-neutral-500">Allow user to invite and manage other users</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.canAccessAdmin}
-                    onChange={(e) => setPermissions({...permissions, canAccessAdmin: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Access Admin Dashboard</p>
-                    <p className="text-xs text-neutral-500">Allow user to access admin settings and features</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="ghost" onClick={handlePermissionsClose}>
-            Cancel
-          </Button>
-          <Button onClick={handlePermissionsSave} disabled={!canManage} title={!canManage ? 'View only' : undefined}>
-            Save Permissions
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Manage User Tenants Modal */}
-      <ManageUserTenantsModal
-        isOpen={showTenantsModal}
-        onClose={() => setShowTenantsModal(false)}
-        user={tenantsUser}
-        onSuccess={() => {
-          // Only reload if tenant assignments actually changed
-          // The modal will handle its own state updates
-          setShowTenantsModal(false);
+      {/* Modals */}
+      <CreateUserModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={(createdUser) => {
+          // Instant update: add new user to local state
+          if (createdUser) {
+            setUsers(prevUsers => [...prevUsers, createdUser]);
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
         }}
       />
 
-      {/* Error/Success Alerts */}
-      {error && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <Alert variant="error" title="Error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        </div>
-      )}
-      {success && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <Alert variant="success" title="Success" onClose={() => setSuccess(null)}>
-            {success}
-          </Alert>
-        </div>
-      )}
+      <EditUserModal
+        isOpen={editModalOpen.open}
+        onClose={() => setEditModalOpen({ open: false, user: null })}
+        user={editModalOpen.user}
+        onSuccess={(updatedUser) => {
+          if (updatedUser) {
+            // Instant update: update local state with response data
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === updatedUser.id 
+                  ? {
+                      ...u,
+                      name: updatedUser.name,
+                      role: updatedUser.role,
+                      is_active: updatedUser.is_active ?? updatedUser.isActive,
+                      email_verified: updatedUser.email_verified ?? updatedUser.emailVerified,
+                    }
+                  : u
+              )
+            );
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
+        }}
+      />
+
+      <ManageTenantsModal
+        isOpen={manageTenantsModal.open}
+        onClose={() => setManageTenantsModal({ open: false, user: null })}
+        user={manageTenantsModal.user}
+        onSuccess={(addedTenant, removedTenantId, updatedTenant) => {
+          // Instant update: update local state with response data
+          if (addedTenant) {
+            setUsers(prevUsers => {
+              return prevUsers.map(u => {
+                if (u.id === manageTenantsModal.user?.id) {
+                  return {
+                    ...u,
+                    tenants: [...(u.tenants || []), {
+                      id: addedTenant.tenant_id,
+                      name: addedTenant.tenantName,
+                      role: addedTenant.role,
+                    }],
+                  };
+                }
+                return u;
+              });
+            });
+          } else if (removedTenantId) {
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === manageTenantsModal.user?.id 
+                  ? {
+                      ...u,
+                      tenants: (u.tenants || []).filter(t => t.id !== removedTenantId),
+                    }
+                  : u
+              )
+            );
+          } else if (updatedTenant) {
+            // Handle tenant role update
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === manageTenantsModal.user?.id 
+                  ? {
+                      ...u,
+                      tenants: (u.tenants || []).map(t => 
+                        t.id === updatedTenant.tenant_id 
+                          ? { ...t, role: updatedTenant.role }
+                          : t
+                      ),
+                    }
+                  : u
+              )
+            );
+          }
+        }}
+      />
+
+      <ResetPasswordModal
+        isOpen={resetPasswordModal.open}
+        onClose={() => setResetPasswordModal({ open: false, user: null })}
+        userEmail={resetPasswordModal.user?.email || ''}
+        userId={resetPasswordModal.user?.id || ''}
+      />
+
+      {/* User Status Modal */}
+      <UserStatusModal
+        isOpen={statusModal.open}
+        onClose={() => setStatusModal({ open: false, user: null })}
+        user={statusModal.user}
+        onSuccess={(updatedUser) => {
+          // Instant update: update local state with response data
+          if (updatedUser) {
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === updatedUser.id 
+                  ? {
+                      ...u,
+                      is_active: updatedUser.is_active,
+                      email_verified: updatedUser.email_verified,
+                    }
+                  : u
+              )
+            );
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
+        }}
+      />
     </div>
-    </ProtectedRoute>
   );
 }

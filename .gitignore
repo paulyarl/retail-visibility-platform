@@ -52,3 +52,11 @@ Thumbs.db
 !RESET_DATABASE.sql
 !SYNC_*.sql
 !VERIFY_*.sql
+.env*.local
+
+# Migration exports and sensitive data
+scripts/migration_exports/
+scripts/storage_migration/
+scripts/0*.sh
+scripts/README.md
+DATABASE_MIGRATION_PLAN.md

@@ -1,18 +1,60 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
-import type { SubscriptionTier } from '@/lib/qr-tiers';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface QRCodeModalProps {
   isOpen: boolean;
-  onClose: () => void;
   productUrl: string;
   productName: string;
-  tier?: SubscriptionTier | string | null;
+  onClose: () => void;
+  tenantId: string;
 }
 
-export function QRCodeModal({ isOpen, onClose, productUrl, productName, tier }: QRCodeModalProps) {
+export function QRCodeModal(props: QRCodeModalProps) {
+  const { isOpen, onClose, productUrl, productName, tenantId } = props;
+  
+  const actualTenantId = tenantId || 'tid-ej2um44f';
+  
+  // Fetch tier and logo using singleton (10-min cache)
+  const [tierId, setTierId] = useState<string | null>(null);
+  const [tierLoading, setTierLoading] = useState(true);
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchTierAndLogo = async () => {
+      try {
+        setTierLoading(true);
+        
+        // Fetch tier and profile via new service (cached)
+        const [tier, profile] = await Promise.all([
+          publicTenantInfoService.getTenantTier(actualTenantId),
+          publicTenantInfoService.getTenantProfile(actualTenantId)
+        ]);
+        
+        if (tier) {
+          const effectiveTierId = tier.effective?.id || tier.id;
+          setTierId(effectiveTierId);
+          
+          // Set logo if professional or above
+          if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'chain_enterprise' || effectiveTierId === 'professional' || effectiveTierId === 'chain_professional') {
+            setTenantLogo(profile?.logo_url || null);
+          }
+        }
+      } catch (error) {
+        console.error('[QRCodeModal] Error fetching tier:', error);
+      } finally {
+        setTierLoading(false);
+      }
+    };
+    
+    if (isOpen && actualTenantId) {
+      fetchTierAndLogo();
+    }
+  }, [actualTenantId, isOpen]);
+  
   return (
     <Modal
       isOpen={isOpen}
@@ -30,7 +72,8 @@ export function QRCodeModal({ isOpen, onClose, productUrl, productName, tier }: 
           url={productUrl} 
           productName={productName}
           size={256}
-          tier={tier}
+          tenantId={actualTenantId}
+          logoUrl={tenantLogo || undefined}
         />
         
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

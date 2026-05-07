@@ -5,33 +5,34 @@
  * Extracted from CLI scripts for use in API endpoints.
  */
 
-import { PrismaClient } from '@prisma/client';
-import { generateQuickStartProducts } from './quick-start';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
+import { generateQuickStartProducts, QuickStartScenario } from './quick-start';
+import { generateQuickStart, generateUserTenantId } from './id-generator';
 
 // Chain size configurations
+// Aligned with Quick Start max of 25 products per location
 const CHAIN_SIZES = {
   small: {
     locations: 1,
-    skuRange: [200, 400],
+    skuRange: [20, 25],
   },
   medium: {
     locations: 3,
-    skuRange: [600, 1200],
+    skuRange: [20, 25],
   },
   large: {
     locations: 5,
-    skuRange: [1500, 2500],
+    skuRange: [20, 25],
   },
 };
 
 export interface CreateTestChainOptions {
   name: string;
   size: 'small' | 'medium' | 'large';
-  scenario: 'grocery' | 'fashion' | 'electronics' | 'general';
+  scenario: string; // Any of the 19 business types from BusinessTypeSelector
   seedProducts?: boolean;
   createAsDrafts?: boolean;
+  generateImages?: boolean;
 }
 
 export interface TestChainResult {
@@ -48,22 +49,22 @@ export interface TestChainResult {
  * Create a test organization with multiple tenant locations
  */
 export async function createTestChain(options: CreateTestChainOptions): Promise<TestChainResult> {
-  const { name, size, scenario, seedProducts = true, createAsDrafts = true } = options;
+  const { name, size, scenario, seedProducts = true, createAsDrafts = true, generateImages = false } = options;
   
   const config = CHAIN_SIZES[size];
   const orgId = `org_test_${Date.now()}`;
   
   // Create organization
-  const org = await prisma.organization.create({
+  const org = await prisma.organizations_list.create({
     data: {
       id: orgId,
       name,
       // Store owner in both legacy snake_case and new camelCase columns
-      ownerId: 'admin_test', // Test organizations owned by admin
-      maxLocations: config.locations * 2, // Allow room for growth
-      maxTotalSKUs: config.skuRange[1] * 2,
+      owner_id: 'admin_test', // Test organizations owned by admin
+      max_locations: config.locations * 2, // Allow room for growth
+      max_total_skus: config.skuRange[1] * 2,
       // Required timestamps
-      updatedAt: new Date(),
+      updated_at: new Date(),
     },
   });
 
@@ -80,13 +81,13 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     const skuCount = Math.floor(minSkus + (maxSkus - minSkus) * (1 - i * 0.3));
     
     // Create tenant
-    const currentTenant = await prisma.tenant.create({
+    const currentTenant = await prisma.tenants.create({
       data: {
         id: tenantId,
         name: `${name} - ${locationName}`,
-        subscriptionTier: 'professional',
-        subscriptionStatus: 'active',
-        organizationId: org.id,
+        subscription_tier: 'professional',
+        subscription_status: 'active',
+        organization_id: org.id,
       },
     });
 
@@ -95,11 +96,12 @@ export async function createTestChain(options: CreateTestChainOptions): Promise<
     if (seedProducts) {
       const result = await generateQuickStartProducts({
         tenant_id: currentTenant.id,
-        scenario,
+        scenario: scenario as QuickStartScenario,
         productCount: skuCount,
         assignCategories: true,
         createAsDrafts,
-      });
+        generateImages,
+      }, prisma);
       actualSkuCount = result.productsCreated;
     }
 
@@ -127,32 +129,32 @@ export async function deleteTestChain(organizationId: string): Promise<{
   productsDeleted: number;
 }> {
   // Get all tenants in the organization
-  const tenants = await prisma.tenant.findMany({
-    where: { organizationId },
+  const tenants = await prisma.tenants.findMany({
+    where: { organization_id: organizationId },
     select: { id: true },
   });
 
   // Count products before deletion
-  const productCount = await prisma.InventoryItem.count({
+  const productCount = await prisma.inventory_items.count({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all products
-  await prisma.InventoryItem.deleteMany({
+  await prisma.inventory_items.deleteMany({
     where: {
-      tenantId: { in: tenants.map(t => t.id) },
+      tenant_id: { in: tenants.map(t => t.id) },
     },
   });
 
   // Delete all tenants
-  await prisma.tenant.deleteMany({
-    where: { organizationId },
+  await prisma.tenants.deleteMany({
+    where: { organization_id: organizationId },
   });
 
   // Delete organization
-  await prisma.organization.delete({
+  await prisma.organizations_list.delete({
     where: { id: organizationId },
   });
 
@@ -167,62 +169,69 @@ export async function deleteTestChain(organizationId: string): Promise<{
  */
 export async function createTestTenant(options: {
   name: string;
+  city?: string;
+  state?: string;
   subscriptionTier?: string;
   subscriptionStatus?: string;
   organizationId?: string;
   ownerId?: string;
-  scenario?: 'grocery' | 'fashion' | 'electronics' | 'general';
-  productCount?: number;
+  seedProducts?: boolean;
+  scenario?: string; // Any of the 19 business types
   createAsDrafts?: boolean;
+  generateImages?: boolean;
 }) {
   const {
     name,
+    city,
+    state,
     subscriptionTier = 'professional',
     subscriptionStatus = 'trial',
     organizationId,
     ownerId,
-    scenario = 'general',
-    productCount = 0,
+    seedProducts = true,
+    scenario = 'grocery',
     createAsDrafts = true,
+    generateImages = false,
   } = options;
 
   const tenantId = `tenant_test_${Date.now()}`;
 
   // Create tenant
-  const tenant = await prisma.tenant.create({
+  const tenant = await prisma.tenants.create({
     data: {
       id: tenantId,
       name,
-      subscriptionTier,
-      subscriptionStatus,
-      organizationId: organizationId || null,
+      subscription_tier: subscriptionTier,
+      subscription_status: subscriptionStatus,
+      organization_id: organizationId || null,
     },
   });
 
   // Link to owner if provided
   if (ownerId) {
-    await prisma.userTenant.create({
+    await prisma.user_tenants.create({
       data: {
-        id: `ut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        userId: ownerId,
-        tenantId: tenant.id,
+        id: generateUserTenantId(ownerId, tenant.id),
+        user_id: ownerId,
+        tenant_id: tenant.id,
         role: 'OWNER',
-        updatedAt: new Date(),
+        updated_at: new Date(),
       },
     });
     console.log(`[Admin Tools] Linked tenant ${tenant.id} to owner ${ownerId}`);
   }
 
-  // Seed products if requested
+  // Seed products if requested (default ~25 products)
   let result = null;
-  if (productCount > 0) {
+  if (seedProducts) {
     result = await generateQuickStartProducts({
       tenant_id: tenant.id,
-      scenario,
-      productCount,
+      scenario: scenario as QuickStartScenario,
+      productCount: 25, // Aligned with Quick Start max
       assignCategories: true,
       createAsDrafts,
-    });
+      generateImages,
+    }, prisma);
   }
 
   return {
@@ -251,8 +260,8 @@ export async function bulkSeedProducts(options: {
     try {
       // Clear existing products if requested
       if (clearExisting) {
-        await prisma.InventoryItem.deleteMany({
-          where: { tenantId: tenantId },
+        await prisma.inventory_items.deleteMany({
+          where: { tenant_id: tenantId },
         });
       }
 
@@ -263,7 +272,7 @@ export async function bulkSeedProducts(options: {
         productCount,
         assignCategories: true,
         createAsDrafts,
-      });
+      }, prisma);
 
       results.push({
         tenantId,
@@ -296,8 +305,8 @@ export async function bulkClearProducts(tenantIds: string[]) {
 
   for (const tenantId of tenantIds) {
     try {
-      const result = await prisma.InventoryItem.deleteMany({
-        where: { tenantId: tenantId },
+      const result = await prisma.inventory_items.deleteMany({
+        where: { tenant_id: tenantId },
       });
 
       results.push({

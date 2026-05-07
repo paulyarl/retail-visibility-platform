@@ -13,6 +13,8 @@ interface BusinessProfileCardProps {
   tenantName?: string;
 }
 
+
+
 export default function BusinessProfileCard({ profile, loading, onUpdate, tenantName }: BusinessProfileCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 

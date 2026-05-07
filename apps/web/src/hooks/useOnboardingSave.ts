@@ -5,14 +5,15 @@ import { onboardingStorageService } from '@/services/onboardingStorageService';
 
 interface UseOnboardingSaveOptions {
   tenantId: string;
-  onSuccess?: () => void;
+  onSuccess?: (savedProfile: Partial<BusinessProfile>) => void;
 }
 
 interface UseOnboardingSaveReturn {
-  save: (data: Partial<BusinessProfile>) => Promise<void>;
+  save: (data: Partial<BusinessProfile>) => Promise<Partial<BusinessProfile>>;
   saving: boolean;
   error: string | null;
   success: boolean;
+  savedProfile: Partial<BusinessProfile> | null;
 }
 
 /**
@@ -26,14 +27,17 @@ export function useOnboardingSave({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<Partial<BusinessProfile> | null>(null);
 
-  const save = async (data: Partial<BusinessProfile>) => {
+  const save = async (data: Partial<BusinessProfile>): Promise<Partial<BusinessProfile>> => {
     setSaving(true);
     setError(null);
     setSuccess(false);
 
     try {
-      await onboardingDataService.saveProfile(tenantId, data);
+      const savedData = await onboardingDataService.saveProfile(tenantId, data);
+      
+      setSavedProfile(savedData);
       
       // Clear saved progress after successful save
       onboardingStorageService.clear(tenantId);
@@ -41,12 +45,16 @@ export function useOnboardingSave({
       setSuccess(true);
       
       if (onSuccess) {
-        onSuccess();
+        onSuccess(savedData);
       }
+      
+      return savedData;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save business profile';
       setError(errorMessage);
-      throw err;
+      // Don't re-throw - handle gracefully to avoid Next.js error overlay
+      // Return empty object to allow UI to continue functioning
+      return {};
     } finally {
       setSaving(false);
     }
@@ -57,5 +65,6 @@ export function useOnboardingSave({
     saving,
     error,
     success,
+    savedProfile,
   };
 }

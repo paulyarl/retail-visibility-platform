@@ -6,15 +6,62 @@ import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { isTrialStatus } from '@/lib/trial';
 import { getMaintenanceState, type MaintenanceState } from '@/lib/subscription-status';
 
-export function SubscriptionStatusGuide() {
-  const { usage, loading } = useSubscriptionUsage();
+interface SubscriptionStatusGuideProps {
+  tenantId?: string;
+  // Optional: pass known values from parent to avoid separate fetch
+  tier?: string;
+  status?: string;
+  trialEndsAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  skuUsage?: number;
+  skuLimit?: number;
+  locationUsage?: number;
+  locationLimit?: number;
+}
+
+export function SubscriptionStatusGuide({
+  tenantId: tenantIdProp,
+  tier: tierProp,
+  status: statusProp,
+  trialEndsAt: trialEndsAtProp,
+  subscriptionEndsAt: subscriptionEndsAtProp,
+  skuUsage: skuUsageProp,
+  skuLimit: skuLimitProp,
+  locationUsage: locationUsageProp,
+  locationLimit: locationLimitProp,
+}: SubscriptionStatusGuideProps = {}) {
+  // Don't render anything if no tenant is explicitly provided
+  // This prevents showing maintenance mode for stale localStorage tenantId
+  if (!tenantIdProp) {
+    return null;
+  }
+
+  // Pass tier props to hook so it uses parent's known values
+  const { usage, loading } = useSubscriptionUsage(tenantIdProp, {
+    tier: tierProp,
+    status: statusProp,
+    trialEndsAt: trialEndsAtProp,
+  });
 
   if (loading || !usage) {
     return null;
   }
 
-  const tier = usage.tier;
-  const status = usage.status || 'active';
+  // Use props if provided, otherwise use fetched data
+  const tier = tierProp || usage.tier || 'starter';
+  const status = statusProp || usage.status || 'active';
+  const trialEndsAt = trialEndsAtProp ?? usage.trialEndsAt ?? null;
+  const subscriptionEndsAt = subscriptionEndsAtProp ?? usage.subscriptionEndsAt ?? null;
+  const skuUsage = skuUsageProp ?? usage.skuUsage ?? 0;
+  const skuLimit = skuLimitProp ?? usage.skuLimit ?? Infinity;
+  const locationUsage = locationUsageProp ?? usage.locationUsage ?? 0;
+  const locationLimit = locationLimitProp ?? usage.locationLimit ?? Infinity;
+
+  // Skip if we don't have enough data
+  if (!tier) {
+    return null;
+  }
+
   const now = new Date();
 
   // ----- Maintenance vs freeze (google_only lifecycle) -----
@@ -22,14 +69,14 @@ export function SubscriptionStatusGuide() {
   const maintenanceState: MaintenanceState = getMaintenanceState({
     tier,
     status,
-    trialEndsAt: usage.trialEndsAt,
+    trialEndsAt,
   });
 
   // ----- Trial nearing expiration -----
   let showTrialWarning = false;
   let trialDaysRemaining: number | null = null;
-  if (isTrialStatus(status) && usage.trialEndsAt) {
-    const trialEnd = new Date(usage.trialEndsAt);
+  if (isTrialStatus(status) && trialEndsAt) {
+    const trialEnd = new Date(trialEndsAt);
     if (!Number.isNaN(trialEnd.getTime())) {
       const diffMs = trialEnd.getTime() - now.getTime();
       trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -40,14 +87,12 @@ export function SubscriptionStatusGuide() {
   }
 
   // ----- SKU limits -----
-  const skuLimit = usage.skuLimit;
-  const skuPercent = usage.skuPercent;
+  const skuPercent = skuLimit !== Infinity ? Math.round((skuUsage / skuLimit) * 100) : 0;
   const showSkuApproaching = skuLimit !== Infinity && skuPercent >= 80 && skuPercent < 100;
   const showSkuExceeded = skuLimit !== Infinity && skuPercent >= 100;
 
   // ----- Location limits -----
-  const locationLimit = usage.locationLimit;
-  const locationPercent = usage.locationPercent;
+  const locationPercent = locationLimit !== Infinity ? Math.round((locationUsage / locationLimit) * 100) : 0;
   const showLocationApproaching = locationLimit !== Infinity && locationPercent >= 80 && locationPercent < 100;
   const showLocationExceeded = locationLimit !== Infinity && locationPercent >= 100;
 
@@ -95,7 +140,7 @@ export function SubscriptionStatusGuide() {
               {showSkuExceeded ? 'SKU limit reached' : 'Approaching SKU limit'}
             </CardTitle>
             <CardDescription>
-              You are using {usage.skuUsage.toLocaleString()} of {skuLimit === Infinity ? '∞' : skuLimit.toLocaleString()} SKUs on your current plan.
+              You are using {skuUsage.toLocaleString()} of {skuLimit === Infinity ? '∞' : skuLimit.toLocaleString()} SKUs on your current plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
@@ -119,7 +164,7 @@ export function SubscriptionStatusGuide() {
               {showLocationExceeded ? 'Location limit reached' : 'Approaching location limit'}
             </CardTitle>
             <CardDescription>
-              You are using {usage.locationUsage} of {locationLimit === Infinity ? '∞' : locationLimit.toString()} locations on your current plan.
+              You are using {locationUsage} of {locationLimit === Infinity ? '∞' : locationLimit.toString()} locations on your current plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-gray-700 dark:text-gray-300 space-y-2">

@@ -1,32 +1,13 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, AnimatedCard } from '@/components/ui';
-import PageHeader from '@/components/PageHeader';
-import { ProtectedCard } from '@/lib/auth/ProtectedCard';
-import { AccessPresets } from '@/lib/auth/useAccessControl';
-import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
+import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
 
-type SettingCard = {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  href: string;
-  color: string;
-  badge?: string;
-  accessOptions?: any;
-};
-
-type SettingsGroup = {
-  title: string;
-  description: string;
-  cards: SettingCard[];
-};
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
 
 export default function PlatformSettings() {
-  const router = useRouter();
-
-  const settingsGroups: SettingsGroup[] = [
+  // Legacy settings groups - will be transformed to unified format
+  const legacySettingsGroups = [
     {
       title: 'Account & Preferences',
       description: 'Personalize your experience',
@@ -41,6 +22,39 @@ export default function PlatformSettings() {
           ),
           href: '/settings/account',
           color: 'bg-blue-500',
+        },
+        {
+          title: 'Security',
+          description: 'Manage sessions, security alerts, and account security',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ),
+          href: '/settings/security',
+          color: 'bg-red-500',
+        },
+        {
+          title: 'Two-Factor Authentication',
+          description: 'Add an extra layer of security with 2FA',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          href: '/settings/mfa',
+          color: 'bg-green-500',
+        },
+        {
+          title: 'Privacy & Data',
+          description: 'Manage privacy preferences and GDPR compliance',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+            </svg>
+          ),
+          href: '/settings/privacy',
+          color: 'bg-indigo-500',
         },
         {
           title: 'Appearance',
@@ -127,7 +141,7 @@ export default function PlatformSettings() {
           ),
           href: '/admin/users',
           color: 'bg-blue-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
         {
           title: 'Platform User Maintenance',
@@ -139,7 +153,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin/users',
           color: 'bg-orange-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
       ],
     },
@@ -158,7 +172,20 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin',
           color: 'bg-purple-500',
-          accessOptions: AccessPresets.PLATFORM_STAFF,
+          accessOptions: { roles: ['admin', 'platform_staff'] },
+        },
+        {
+          title: 'Platform Settings',
+          description: 'Platform configuration, branding, and system controls',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          href: '/settings/admin/platform',
+          color: 'bg-blue-600',
+          accessOptions: { roles: ['admin', 'platform_staff'] },
         },
       ],
     },
@@ -182,61 +209,11 @@ export default function PlatformSettings() {
     },
   ];
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <PageHeader
-        title="Platform Settings"
-        description="Manage platform-wide settings and administration"
-      />
+  const config: UnifiedSettingsConfig = transformToUnifiedConfig(legacySettingsGroups, {
+    title: 'Platform Settings',
+    description: 'Manage platform-wide settings and administration',
+    showLimits: true,
+  });
 
-      <div className="space-y-12">
-        {/* Tenant Limits Badge - Prominent Display */}
-        <div className="mb-8">
-          <TenantLimitBadge variant="full" showUpgrade={true} />
-        </div>
-
-        {settingsGroups.map((group) => (
-          <div key={group.title}>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {group.title}
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {group.description}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {group.cards.map((card) => (
-                <ProtectedCard
-                  key={card.title}
-                  accessOptions={card.accessOptions}
-                >
-                  <AnimatedCard
-                    onClick={() => router.push(card.href)}
-                    className="cursor-pointer h-full"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className={`${card.color} p-3 rounded-lg text-white`}>
-                          {card.icon}
-                        </div>
-                        {card.badge && (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                            {card.badge}
-                          </span>
-                        )}
-                      </div>
-                      <CardTitle className="mt-4">{card.title}</CardTitle>
-                      <CardDescription>{card.description}</CardDescription>
-                    </CardHeader>
-                  </AnimatedCard>
-                </ProtectedCard>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <UnifiedSettings config={config} />;
 }

@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { canSwitchToTenant } from "@/lib/auth/access-control";
 import { navigateToTenant } from "@/lib/tenant-navigation";
+import { clientTenantContextManager } from "@/lib/clientTenantContext";
+import { securitySingletonService } from "@/services/SecuritySingletonService";
+import { adminSecurityMonitoringService } from "@/services/AdminSecurityMonitoringSingletonService";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
+import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 
 type Tenant = { 
   id: string; 
@@ -35,10 +38,12 @@ const getStatusBadge = (status?: string) => {
   );
 };
 
+
+
 export default function TenantSwitcher() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user,isAuthenticated,currentTenantId,switchTenant } = useAuth();
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   useEffect(() => {
@@ -46,22 +51,48 @@ export default function TenantSwitcher() {
       // Skip if unauthenticated
       if (typeof window === 'undefined') return;
       
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
+      // Skip if on onboarding pages to avoid redirect loops
+      if (window.location.pathname === '/onboarding' || window.location.pathname.includes('/onboarding')) {
+        return;
+      }
+      
+      if (!isAuthenticated) return;
       try {
-        const res = await api.get("/api/tenants", { skipAuthRedirect: true });
-        if (!res.ok) return;
-        const data: Tenant[] = await res.json();
-        // Limit to authorized memberships to avoid confusion
-        const memberIds = (user?.tenants || []).map(t => t.id);
-        const filtered = memberIds.length > 0 ? data.filter(t => memberIds.includes(t.id)) : data;
-        setTenants(filtered);
-        // Determine current from localStorage or first tenant
-        const stored = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
-        const selected = filtered.find((t) => t.id === stored)?.id || filtered[0]?.id || null;
-        if (selected) {
-          setCurrent(selected);
-          if (stored !== selected) localStorage.setItem("tenantId", selected);
+        let list: Tenant[] = [];
+        
+        // PLATFORM_ADMIN gets all active tenants
+        if (user?.role === 'PLATFORM_ADMIN') {
+          const allTenants = await adminSecurityMonitoringService.getAvailableTenants();
+          list = allTenants
+            .filter((t: any) => t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial_discovery')
+            .map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              locationStatus: t.subscriptionStatus === 'expired' ? 'inactive' : 'active'
+            }));
+        } else {
+          // Regular users get their assigned tenants
+          const sessionInfo = await securitySingletonService.getSessionInfo();
+          
+          if (sessionInfo.isAuthenticated && sessionInfo.user?.tenants) {
+            list = sessionInfo.user.tenants.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              locationStatus: t.locationStatus
+            }));
+          }
+        }
+        
+        setTenants(list);
+        
+        // Use centralized tenant context manager
+        const currentContext = clientTenantContextManager.getTenantContext();
+        const selected = currentContext.tenantId || list[0]?.id || null;
+        setCurrent(selected);
+        
+        // Sync with auth context if needed
+        if (selected && selected !== currentTenantId) {
+          switchTenant(selected);
         }
       } catch (e) {
         // ignore for header
@@ -74,14 +105,23 @@ export default function TenantSwitcher() {
     setCurrent(tenantId);
     if (typeof window === "undefined") return;
 
-    // Gate by membership: use centralized permission helper
-    if (!user || !canSwitchToTenant(user, tenantId)) {
+    // PLATFORM_ADMIN can switch to any tenant
+    // Other users need permission check
+    if (!user || (user.role !== 'PLATFORM_ADMIN' && !canSwitchToTenant(user, tenantId))) {
       window.location.href = '/tenants';
       return;
     }
 
-    // Use centralized navigation utility
+    // Update centralized tenant context
+    clientTenantContextManager.setTenantContext(tenantId, 'localStorage');
+    
+    // Update auth context
+    switchTenant(tenantId);
+
+    // Use centralized navigation utility with preserveCurrentPage: false
+    // This ensures dropdown switching always goes to dashboard, not last remembered path
     await navigateToTenant(tenantId, {
+      preserveCurrentPage: false, // Always go to dashboard when switching via dropdown
       navigate: (url) => {
         window.location.href = url;
       }
@@ -131,16 +171,19 @@ export default function TenantSwitcher() {
                 // Skip if unauthenticated
                 if (typeof window === 'undefined') return;
                 
-                const token = localStorage.getItem('access_token');
-                if (!token) return;
+                if (!isAuthenticated) return;
                 try {
-                  const res = await api.get("/api/tenants", { skipAuthRedirect: true });
-                  if (!res.ok) return;
-                  const data: Tenant[] = await res.json();
-                  // Limit to authorized memberships to avoid confusion
-                  const memberIds = (user?.tenants || []).map(t => t.id);
-                  const filtered = memberIds.length > 0 ? data.filter(t => memberIds.includes(t.id)) : data;
-                  setTenants(filtered);
+                  // Use SecuritySingletonService to get updated tenant list
+                  const sessionInfo = await securitySingletonService.getSessionInfo();
+                  
+                  if (sessionInfo.isAuthenticated && sessionInfo.user?.tenants) {
+                    const list = sessionInfo.user.tenants.map((t: any) => ({
+                      id: t.id,
+                      name: t.name,
+                      locationStatus: t.locationStatus
+                    }));
+                    setTenants(list);
+                  }
                 } catch (e) {
                   // ignore for header
                 }

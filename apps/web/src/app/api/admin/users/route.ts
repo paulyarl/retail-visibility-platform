@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(req: NextRequest) {
   try {
-    // Get auth token from cookies
-    const token = req.cookies.get('access_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/admin/users`, {
+    const { accessToken } = authResult;
+    
+    // Make authenticated request to backend
+    const res = await authenticatedFetch('/admin/users', accessToken, {
       method: 'GET',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-      },
     });
     
     if (!res.ok) {

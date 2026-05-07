@@ -2,10 +2,14 @@
  * React Hook for Access Control
  * 
  * Provides easy-to-use hooks for checking user permissions in React components
+ * 
+ * OPTIMIZED: Uses AuthContext user data instead of fetching /auth/me independently
  */
+'use client';
 
-import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import {
   UserData,
   TenantData,
@@ -14,6 +18,8 @@ import {
   AccessControlOptions,
   checkAccess,
   isPlatformAdmin,
+  isPlatformSupport,
+  isPlatformViewer,
   isTenantOwnerOrAdmin,
   getTenantRole,
   isOrganizationAdmin,
@@ -23,8 +29,7 @@ import {
 
 // Re-export for convenience
 export { AccessPresets } from './access-control';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+ 
 
 export interface UseAccessControlResult {
   user: UserData | null;
@@ -35,6 +40,8 @@ export interface UseAccessControlResult {
   hasAccess: boolean;
   accessReason?: string;
   isPlatformAdmin: boolean;
+  isPlatformSupport: boolean;
+  isPlatformViewer: boolean;
   isTenantAdmin: boolean;
   isOrgAdmin: boolean;
   isOrgMember: boolean;
@@ -53,55 +60,89 @@ export function useAccessControl(
   options: AccessControlOptions = {},
   fetchOrganization: boolean = false
 ): UseAccessControlResult {
-  const [user, setUser] = useState<UserData | null>(null);
+  // Use AuthContext instead of fetching /auth/me independently
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  
   const [tenantData, setTenantData] = useState<TenantData | null>(null);
   const [organizationData, setOrganizationData] = useState<OrganizationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tenantLoading, setTenantLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  // Convert AuthContext user to UserData format
+  const user = useMemo((): UserData | null => {
+    if (!authUser) return null;
+    return authUser as unknown as UserData;
+  }, [authUser]);
+
+  const fetchTenantData = useCallback(async () => {
+    if (!tenantId || !user) return;
+    
     try {
-      setLoading(true);
+      setTenantLoading(true);
       setError(null);
 
-      // Fetch user data
-      const userRes = await api.get(`${API_BASE_URL}/auth/me`);
-      if (!userRes.ok) throw new Error('Failed to fetch user data');
-      const response = await userRes.json();
-      // API returns { user: {...} }, extract the user object
-      const userData = response.user || response;
-      setUser(userData);
-
       // Fetch tenant data if tenantId provided
-      if (tenantId) {
-        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
-        if (tenantRes.ok) {
-          const tenant = await tenantRes.json();
-          setTenantData(tenant);
+      const tenant = await tenantInfoService.getTenantInfo(tenantId);
+      if (tenant) {
+        setTenantData(tenant);
 
-          // Fetch organization data if needed
-          if (fetchOrganization && tenant.organizationId) {
-            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenant.organizationId}`);
-            if (orgRes.ok) {
-              const org = await orgRes.json();
-              setOrganizationData(org);
+        // Fetch organization data if needed
+        if (fetchOrganization) {
+          const organizationId = tenant.metadata?.organizationId;
+          if (organizationId) {
+            const orgResult = await tenantInfoService.getOrganization(organizationId);
+            setOrganizationData(orgResult.success ? orgResult.data : null);
+          } else {
+            // Try to find organization by searching organizations that contain this tenant
+            try {
+              const organizations = await tenantInfoService.getOrganizations();
+              
+              // Ensure organizations is an array before calling find
+              if (!Array.isArray(organizations)) {
+                console.warn('[useAccessControl] Organizations is not an array:', organizations);
+                throw new Error('Invalid organizations data format');
+              }
+              
+              // Find the organization that contains this tenant
+              const matchingOrg = organizations.find((org: any) =>
+                org.tenants?.some((t: any) => t.id === tenantId)
+              );
+
+              if (matchingOrg) {
+                // Now fetch the full organization data
+                const orgResult = await tenantInfoService.getOrganization(matchingOrg.id);
+                setOrganizationData(orgResult.success ? orgResult.data : null);
+              } else {
+                setOrganizationData(null);
+              }
+            } catch (orgError) {
+              console.warn('Failed to fetch organizations:', orgError);
+              setOrganizationData(null);
             }
           }
         }
+      } else {
+        setTenantData(null);
+        setOrganizationData(null);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-      setUser(null);
+    } catch (error) {
+      console.error('Failed to fetch tenant data:', error);
+      setError('Failed to load tenant data');
       setTenantData(null);
       setOrganizationData(null);
     } finally {
-      setLoading(false);
+      setTenantLoading(false);
     }
-  };
+  }, [tenantId, user, fetchOrganization]);
 
   useEffect(() => {
-    fetchData();
-  }, [tenantId, fetchOrganization]);
+    if (user && tenantId) {
+      fetchTenantData();
+    }
+  }, [user, tenantId, fetchTenantData]);
+
+  // Combined loading state
+  const loading = authLoading || tenantLoading;
 
   if (!user) {
     return {
@@ -112,11 +153,13 @@ export function useAccessControl(
       error,
       hasAccess: false,
       isPlatformAdmin: false,
+      isPlatformSupport: false,
+      isPlatformViewer: false,
       isTenantAdmin: false,
       isOrgAdmin: false,
       isOrgMember: false,
       tenantRole: null,
-      refetch: fetchData,
+      refetch: fetchTenantData,
     };
   }
 
@@ -128,6 +171,8 @@ export function useAccessControl(
 
   const accessCheck = checkAccess(user, context, options);
   const platformAdmin = isPlatformAdmin(user);
+  const platformSupport = isPlatformSupport(user);
+  const platformViewer = isPlatformViewer(user);
   const tenantAdmin = tenantId ? isTenantOwnerOrAdmin(user, tenantId) : false;
   const orgAdmin = organizationData ? isOrganizationAdmin(user, organizationData) : false;
   const orgMember = organizationData ? isOrganizationMember(user, organizationData) : false;
@@ -142,11 +187,13 @@ export function useAccessControl(
     hasAccess: accessCheck.hasAccess,
     accessReason: accessCheck.reason,
     isPlatformAdmin: platformAdmin,
+    isPlatformSupport: platformSupport,
+    isPlatformViewer: platformViewer,
     isTenantAdmin: tenantAdmin,
     isOrgAdmin: orgAdmin,
     isOrgMember: orgMember,
     tenantRole: role,
-    refetch: fetchData,
+    refetch: fetchTenantData,
   };
 }
 

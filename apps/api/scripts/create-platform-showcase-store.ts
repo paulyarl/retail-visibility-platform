@@ -13,6 +13,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { generateQuickStartProducts } from '../src/lib/quick-start';
+import { generateTenantId } from '../src/lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -25,7 +26,7 @@ const SHOWCASE_CONFIG = {
   },
   businessProfile: {
     businessName: 'Visible Shelf Demo Store',
-    addressLine1: '123 Demo Street',
+    businessLine1: '123 Demo Street',
     city: 'San Francisco',
     state: 'CA',
     postalCode: '94102',
@@ -50,6 +51,7 @@ const SHOWCASE_CONFIG = {
       description: 'Explore our showcase store featuring products across multiple categories. See how Visible Shelf can transform your retail business.',
       keywords: ['demo store', 'retail showcase', 'inventory management', 'visible shelf'],
     },
+    updatedAt: new Date(),
   },
   // Product mix across different scenarios
   productScenarios: [
@@ -83,13 +85,14 @@ async function createShowcaseStore() {
     console.log('📦 Creating tenant...');
     const tenant = await prisma.tenant.create({
       data: {
+        id: generateTenantId(),
         name: SHOWCASE_CONFIG.tenant.name,
         subscriptionTier: SHOWCASE_CONFIG.tenant.subscriptionTier,
         subscriptionStatus: SHOWCASE_CONFIG.tenant.subscriptionStatus,
         region: 'us-east-1',
         language: 'en-US',
         currency: 'USD',
-        data_policy_accepted: true,
+        dataPolicyAccepted: true,
         metadata: {
           isShowcase: true,
           isPlatformDemo: true,
@@ -104,6 +107,7 @@ async function createShowcaseStore() {
     console.log('🏢 Creating business profile with platform branding...');
     await prisma.tenantBusinessProfile.create({
       data: {
+        
         tenantId: tenant.id,
         ...SHOWCASE_CONFIG.businessProfile,
       },
@@ -118,7 +122,7 @@ async function createShowcaseStore() {
       console.log(`   Adding ${count} ${scenario} products...`);
       try {
         const result = await generateQuickStartProducts({
-          tenantId: tenant.id,
+          tenant_id: tenant.id,
           scenario: scenario as any, // Type assertion for scenario names
           productCount: count,
           assignCategories: true,
@@ -139,6 +143,7 @@ async function createShowcaseStore() {
       const directorySettings = await prisma.directorySettings.upsert({
         where: { tenantId: tenant.id },
         create: {
+          id: tenant.id,
           tenantId: tenant.id,
           isPublished: true,
           isFeatured: true,
@@ -148,6 +153,7 @@ async function createShowcaseStore() {
           seoKeywords: SHOWCASE_CONFIG.businessProfile.seoTags.keywords,
           primaryCategory: 'retail',
           secondaryCategories: ['grocery', 'fashion', 'electronics', 'home'],
+          updatedAt: new Date(),
         },
         update: {
           isPublished: true,
@@ -174,7 +180,7 @@ async function createShowcaseStore() {
 
     for (const feature of showcaseFeatures) {
       try {
-        await prisma.tenantFeatureOverride.upsert({
+        await prisma.tenantFeatureOverrides.upsert({
           where: {
             tenantId_feature: {
               tenantId: tenant.id,
@@ -182,11 +188,13 @@ async function createShowcaseStore() {
             },
           },
           create: {
+            id: `${tenant.id}_${feature}`,
             tenantId: tenant.id,
             feature,
             granted: true,
             reason: 'Platform showcase store',
             grantedBy: 'platform-admin',
+            updatedAt: new Date(),
           },
           update: {
             granted: true,

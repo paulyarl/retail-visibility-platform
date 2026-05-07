@@ -1,12 +1,6 @@
-import SettingsFooter from '@/components/SettingsFooter';
+import { ReactNode } from 'react';
+import { SettingsLayoutRouter } from '@/components/navigation/SettingsLayoutRouter';
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-1">
-        {children}
-      </div>
-      <SettingsFooter />
-    </div>
-  );
+export default function SettingsLayout({ children }: { children: ReactNode }) {
+  return <SettingsLayoutRouter>{children}</SettingsLayoutRouter>;
 }

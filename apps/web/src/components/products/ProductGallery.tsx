@@ -14,6 +14,8 @@ interface ProductGalleryProps {
   productTitle: string;
 }
 
+
+
 export default function ProductGallery({ gallery, productTitle }: ProductGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 

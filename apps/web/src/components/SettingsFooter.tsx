@@ -14,7 +14,7 @@ export default function SettingsFooter() {
           <div className="flex items-center gap-4 text-sm text-neutral-600">
             <span>© {currentYear} {settings?.platformName || 'Visible Shell'}</span>
             <span className="hidden sm:inline">•</span>
-            <span className="text-xs bg-neutral-100 px-2 py-1 rounded">v3.5.0</span>
+            <span className="text-xs bg-neutral-100 px-2 py-1 rounded">v4.0.0</span>
           </div>
           
           <div className="flex items-center gap-6 text-sm">
@@ -24,7 +24,7 @@ export default function SettingsFooter() {
             <a href="#" className="text-neutral-600 hover:text-neutral-900 transition-colors">
               Docs
             </a>
-            <Link href="/" className="text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/dashboard" className="text-neutral-600 hover:text-neutral-900 transition-colors">
               Dashboard
             </Link>
           </div>

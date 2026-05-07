@@ -5,9 +5,10 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
-import { UserTenantRole } from '@prisma/client';
+import { user_tenant_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
 import { getTenantLimitConfig, canCreateTenant } from '../config/tenant-limits';
+import { generateUserTenantId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -22,38 +23,93 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    // Get all users in this tenant
-    const userTenants = await prisma.userTenant.findMany({
-      where: { tenantId },
+    // Get all users in this tenant from user_tenants table
+    const userTenants = await prisma.user_tenants.findMany({
+      where: { tenant_id:tenantId },
       include: {
-        user: {
+        users: {
           select: {
             id: true,
             email: true,
-            firstName: true,
-            lastName: true,
+            first_name: true,
+            last_name: true,
             role: true,
-            isActive: true,
-            lastLogin: true,
+            is_active: true,
+            last_login: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
+
+    // Also check if there's a platform admin who owns this tenant (via created_by field)
+    // This handles cases where platform admins own tenants but don't have explicit user_tenants entries
+    let additionalUsers = [];
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        created_by: true,
+        created_at: true,
+      },
+    });
+
+    // If there's a created_by user, fetch their details and check if they're a platform admin
+    if (tenant?.created_by) {
+      const creator = await prisma.users.findUnique({
+        where: { id: tenant.created_by },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          is_active: true,
+          last_login: true,
+        },
+      });
+
+      if (creator) {
+        const isPlatformAdmin = creator.role === 'PLATFORM_ADMIN' || creator.role === 'ADMIN';
+        const alreadyInList = userTenants.some(ut => ut.users.id === creator.id);
+
+        if (isPlatformAdmin && !alreadyInList) {
+          additionalUsers.push({
+            id: creator.id,
+            email: creator.email,
+            name: `${creator.first_name || ''} ${creator.last_name || ''}`.trim() || creator.email,
+            platformRole: creator.role,
+            tenantRole: user_tenant_role.OWNER, // Use enum value instead of string
+            isActive: creator.is_active,
+            lastLogin: creator.last_login ? creator.last_login.toISOString() : 'Never',
+            addedAt: tenant.created_at?.toISOString() || new Date().toISOString(),
+          });
+        }
+      }
+    }
 
     // Transform data for frontend
     const users = userTenants.map(ut => ({
-      id: ut.user.id,
-      email: ut.user.email,
-      name: `${ut.user.firstName || ''} ${ut.user.lastName || ''}`.trim() || ut.user.email,
-      platformRole: ut.user.role,
+      id: ut.users.id,
+      email: ut.users.email,
+      name: `${ut.users.first_name || ''} ${ut.users.last_name || ''}`.trim() || ut.users.email,
+      platformRole: ut.users.role,
       tenantRole: ut.role,
-      isActive: ut.user.isActive,
-      lastLogin: ut.user.lastLogin ? ut.user.lastLogin.toISOString() : 'Never',
-      addedAt: ut.createdAt.toISOString(),
+      isActive: ut.users.is_active,
+      lastLogin: ut.users.last_login ? ut.users.last_login.toISOString() : 'Never',
+      addedAt: ut.created_at.toISOString(),
     }));
 
-    res.json(users);
+    // Add any additional users (like platform admin owners)
+    users.push(...additionalUsers);
+
+    res.json({
+      success: true,
+      users,
+      data: users, // Generic data field for compatibility
+      items: users, // Items field for compatibility
+      results: users, // Results field for compatibility
+      total: users.length
+    });
   } catch (error) {
     console.error('[GET /tenants/:tenantId/user] Error:', error);
     res.status(500).json({ error: 'failed_to_fetch_tenant_user' });
@@ -82,7 +138,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Find user by email
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: parsed.data.email },
     });
 
@@ -94,11 +150,11 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Check if user is already in tenant
-    const existing = await prisma.userTenant.findUnique({
+    const existing = await prisma.user_tenants.findUnique({
       where: {
-        userId_tenantId: {
-          userId: user.id,
-          tenantId,
+        user_id_tenant_id: {
+          user_id: user.id,
+          tenant_id:tenantId,
         },
       },
     });
@@ -111,29 +167,30 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     }
 
     // Add user to tenant
-    const userTenant = await prisma.userTenant.create({
+    const userTenant = await prisma.user_tenants.create({
       data: {
-        id: `ut_${tenantId}_${user.id}`,
-        user: {
+        //id: `ut_${tenantId}_${user.id}`,
+        id: generateUserTenantId(user.id,tenantId),
+        users: {
           connect: {
             id: user.id
           }
         },
-        tenant: {
+        tenants: {
           connect: {
             id: tenantId
           }
         },
-        role: parsed.data.role as UserTenantRole,
-        updatedAt: new Date(),
+        role: parsed.data.role as user_tenant_role,
+        updated_at: new Date(),
       },
       include: {
-        user: {
+        users: {
           select: {
             id: true,
             email: true,
-            firstName: true,
-            lastName: true,
+            first_name: true,
+            last_name: true,
             role: true,
           },
         },
@@ -143,10 +200,10 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
     res.status(201).json({
       id: user.id,
       email: user.email,
-      name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
       platformRole: user.role,
       tenantRole: userTenant.role,
-      addedAt: userTenant.createdAt.toISOString(),
+      addedAt: userTenant.created_at.toISOString(),
     });
   } catch (error: any) {
     console.error('[POST /tenants/:tenantId/users] Error:', error);
@@ -185,7 +242,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     // CRITICAL: Check if changing TO OWNER role (ownership transfer)
     if (parsed.data.role === 'OWNER') {
       // Get the target user to check if they're a platform user
-      const targetUser = await prisma.user.findUnique({
+      const targetUser = await prisma.users.findUnique({
         where: { id: userId },
         select: { role: true },
       });
@@ -204,16 +261,16 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
         // Regular user or platform viewer - check their tenant limits
         
         // Count target user's current owned tenants
-        const ownedTenants = await prisma.userTenant.findMany({
+        const ownedTenants = await prisma.user_tenants.findMany({
           where: {
-            userId: userId,
-            role: UserTenantRole.OWNER,
+            user_id: userId,
+            role: user_tenant_role.OWNER,
           },
           include: {
-            tenant: {
+            tenants: {
               select: {
-                subscriptionTier: true,
-                subscriptionStatus: true,
+                subscription_tier: true,
+                subscription_status: true,
               },
             },
           },
@@ -226,17 +283,20 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
           organization: 5,
           enterprise: 4,
           professional: 3,
+          commitment: 3,
+          storefront: 2,
           starter: 2,
-          google_only: 1,
+          discovery: 1,
+          google_only: 0,
         };
 
-        let effectiveTier = 'starter';
+        let effectiveTier = 'discovery';
         let effectiveStatus = 'trial';
         let highestPriority = 0;
 
         for (const ut of ownedTenants) {
-          const tier = ut.tenant.subscriptionTier || 'starter';
-          const status = ut.tenant.subscriptionStatus || 'trial';
+          const tier = ut.tenants.subscription_tier || 'discovery';
+          const status = ut.tenants.subscription_status || 'trial';
           const priority = tierPriority[tier] || 0;
           
           if (priority > highestPriority) {
@@ -266,15 +326,15 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
     }
 
     // Update user's role
-    const userTenant = await prisma.userTenant.update({
+    const userTenant = await prisma.user_tenants.update({
       where: {
-        userId_tenantId: {
-          userId,
-          tenantId,
+        user_id_tenant_id: {
+          user_id:userId,
+          tenant_id:tenantId,
         },
       },
       data: {
-        role: parsed.data.role as UserTenantRole,
+        role: parsed.data.role as user_tenant_role,
       },
     });
 
@@ -310,11 +370,11 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
     }
 
     // Remove user from tenant
-    await prisma.userTenant.delete({
+    await prisma.user_tenants.delete({
       where: {
-        userId_tenantId: {
-          userId,
-          tenantId,
+        user_id_tenant_id: {
+          user_id:userId,
+          tenant_id:tenantId,
         },
       },
     });

@@ -4,15 +4,23 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   googleCategoryId: string | null;
+  icon?: string | null;
   storeCount: number;
+  primaryStoreCount?: number;
+  secondaryStoreCount?: number;
   productCount: number;
 }
+
+
+
 
 export default function AllCategoriesClient() {
   const router = useRouter();
@@ -27,16 +35,23 @@ export default function AllCategoriesClient() {
       setError(null);
 
       try {
-        const apiBaseUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiBaseUrl}/api/directory/categories`);
+        // Fetch from materialized view for primary/secondary breakdown
+        const result = await recommendationsService.getDirectoryMVCategories();
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch categories');
+        if (result) {
+          const transformedCategories = (result.categories || []).map((cat: any) => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            googleCategoryId: cat.googleCategoryId,
+            icon: cat.icon,
+            storeCount: cat.storeCount,
+            primaryStoreCount: cat.primaryStoreCount,
+          secondaryStoreCount: cat.secondaryStoreCount,
+            productCount: cat.totalProducts,
+          }));
+          setCategories(transformedCategories);
         }
-
-        const result = await response.json();
-        setCategories(result.data?.categories || []);
       } catch (err) {
         console.error('Error fetching categories:', err);
         setError('Failed to load categories. Please try again.');
@@ -48,9 +63,11 @@ export default function AllCategoriesClient() {
     fetchCategories();
   }, []);
 
-  const filteredCategories = categories.filter((cat) =>
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCategories = categories
+    .filter((cat) => cat.storeCount > 0) // Only show categories that have stores
+    .filter((cat) =>
+      cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   if (loading) {
     return (
@@ -139,8 +156,8 @@ export default function AllCategoriesClient() {
         ) : (
           <>
             <div className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-              Showing {filteredCategories.length} of {categories.length}{' '}
-              {categories.length === 1 ? 'category' : 'categories'}
+              Showing {filteredCategories.length} of {categories.filter(cat => cat.storeCount > 0).length}{' '}
+              {categories.filter(cat => cat.storeCount > 0).length === 1 ? 'category' : 'categories'} with stores
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -152,27 +169,47 @@ export default function AllCategoriesClient() {
                   }
                   className="flex items-start gap-3 p-4 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-all bg-white dark:bg-neutral-800"
                 >
-                  <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-2xl">
+                    {category.icon || <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <h3 className="font-medium text-neutral-900 dark:text-white text-sm truncate">
                       {category.name}
                     </h3>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-                      {category.storeCount}{' '}
-                      {category.storeCount === 1 ? 'store' : 'stores'}
-                      {' · '}
-                      {category.productCount}{' '}
-                      {category.productCount === 1 ? 'product' : 'products'}
-                    </p>
+                    <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+                      {/* Show primary/secondary breakdown if available */}
+                      {category.primaryStoreCount !== undefined && category.secondaryStoreCount !== undefined ? (
+                        <>
+                          <span className="font-medium text-blue-600 dark:text-blue-400">
+                            {category.primaryStoreCount} specialized
+                          </span>
+                          {category.secondaryStoreCount > 0 && (
+                            <span className="text-neutral-500">
+                              {' + '}{category.secondaryStoreCount} also carry
+                            </span>
+                          )}
+                          <div className="mt-0.5">
+                            {category.productCount}{' '}
+                            {category.productCount === 1 ? 'product' : 'products'}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {category.storeCount}{' '}
+                          {category.storeCount === 1 ? 'store' : 'stores'}
+                          {' · '}
+                          {category.productCount}{' '}
+                          {category.productCount === 1 ? 'product' : 'products'}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
             </div>
           </>
         )}
-      </div>
+      </div> 
     </div>
   );
 }

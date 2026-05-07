@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Use NEXT_PUBLIC_API_BASE_URL for consistency with client-side API calls
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ organizationId: string }> }
 ) {
-  // Get authorization header from client request
-  const authHeader = req.headers.get('authorization');
+  // Require authentication via Auth0 session
+  const authResult = await requireAuth(req);
   
-  if (!authHeader) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  if (authResult instanceof NextResponse) {
+    return authResult; // Return error response
   }
+  
+  const { accessToken } = authResult;
 
   const { organizationId } = await params;
   const body = await req.json();
 
   try {
-    const response = await fetch(`${API_URL}/organizations/${organizationId}/items/propagate`, {
+    const response = await authenticatedFetch(`/organizations/${organizationId}/items/propagate`, accessToken, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
       body: JSON.stringify(body),
     });
 

@@ -14,38 +14,62 @@ router.get("/status", async (req, res) => {
       return res.status(400).json({ error: "tenant_required" });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-        stripeCustomerId: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
+        stripe_customer_id: true,
         _count: {
           select: {
-            inventoryItems: true,
-            userTenants: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
       },
     });
 
     if (!tenant) {
+      
+        console.log(`${req.method} ${req.path} - route: getSubscriptionStatus`);
       return res.status(404).json({ error: "tenant_not_found" });
     }
 
     const now = new Date();
 
-    // Calculate days remaining (trial or subscription)
+    // Calculate effective expiration with manual priority
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
+    // Calculate days remaining using effective expiration
     let daysRemaining = null;
     
-    if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {
-      daysRemaining = Math.ceil((tenant.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    } else if (tenant.subscriptionEndsAt) {
-      daysRemaining = Math.ceil((tenant.subscriptionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (effectiveExpiration?.expiresAt) {
+      daysRemaining = Math.ceil((effectiveExpiration.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Get tier limits
@@ -55,7 +79,7 @@ router.get("/status", async (req, res) => {
       enterprise: { _count: Infinity, user_tenants: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "starter";
+    const tier = tenant.subscription_tier || "starter";
     const tierLimits = limits[tier] || limits.starter;
 
     res.json({
@@ -64,23 +88,31 @@ router.get("/status", async (req, res) => {
         name: tenant.name,
       },
       subscription: {
-        status: tenant.subscriptionStatus,
-        tier: tenant.subscriptionTier,
-        trialEndsAt: tenant.trialEndsAt,
-        subscriptionEndsAt: tenant.subscriptionEndsAt,
+        status: tenant.subscription_status,
+        tier: tenant.subscription_tier,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
         daysRemaining,
-        hasStripeAccount: !!tenant.stripeCustomerId,
+        hasStripeAccount: !!tenant.stripe_customer_id,
+        // Manual subscription control fields
+        manualSubscriptionControl: tenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+        manualSubscriptionReason: tenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       usage: {
         _count: {
-          current: tenant._count.inventoryItems,
+          current: tenant._count.inventory_items,
           limit: tierLimits._count,
-          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventoryItems / tierLimits._count) * 100),
+          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventory_items / tierLimits._count) * 100),
         },
         user_tenants: {
-          current: tenant._count.userTenants,
+          current: tenant._count.user_tenants,
           limit: tierLimits.user_tenants,
-          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.userTenants / tierLimits.user_tenants) * 100),
+          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.user_tenants / tierLimits.user_tenants) * 100),
         },
       },
     });
@@ -123,16 +155,16 @@ router.patch("/update", async (req, res) => {
       data.subscriptionEndsAt = new Date(updates.subscriptionEndsAt);
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: tenantId },
       data,
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 

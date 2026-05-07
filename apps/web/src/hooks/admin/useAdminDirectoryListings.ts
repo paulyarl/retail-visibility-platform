@@ -1,20 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 export interface AdminDirectoryListing {
   id: string;
-  tenantId: string;
-  isPublished: boolean;
-  isFeatured: boolean;
-  primaryCategory?: string;
-  secondaryCategories?: string[];
+  tenant_id: string;
+  is_published: boolean;
+  is_featured: boolean;
+  primary_category?: string;
+  secondary_categories?: string[];
   slug?: string;
-  updatedAt: string;
+  updated_at: string;
   qualityScore: number;
   itemCount: number;
   businessName: string;
-  tenant: {
+  tenants?: {
+    id: string;
+    name: string;
+    subscription_tier: string;
+  };
+  tenant?: {
     id: string;
     name: string;
     subscriptionTier: string;
@@ -23,7 +29,8 @@ export interface AdminDirectoryListing {
 
 export interface DirectoryFilters {
   status?: 'published' | 'draft' | 'featured';
-  tier?: string;
+  tier?: 'google_only' | 'starter'| 'discovery' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
+  quality?: 'low' | 'medium' | 'high';
   category?: string;
   search?: string;
   page?: number;
@@ -43,14 +50,14 @@ export interface AdminDirectoryListingsHook {
   featureListing: (tenantId: string, until: Date, priority?: number) => Promise<void>;
   unfeatureListing: (tenantId: string) => Promise<void>;
   refresh: () => Promise<void>;
-  setFilters: (filters: DirectoryFilters) => void;
 }
 
 export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): AdminDirectoryListingsHook {
-  const [listings, setListings] = useState<AdminDirectoryListing[]>([]);
+  const [allListings, setAllListings] = useState<AdminDirectoryListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<DirectoryFilters>(initialFilters || {});
+  // Use the passed-in filters directly, not internal state
+  const filters = initialFilters || {};
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -58,80 +65,109 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     totalPages: 0,
   });
 
+  // Fetch all listings once on mount
   const fetchListings = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      // Fetch all listings without filters to get the full dataset
+      const data = await platformHomeService.getAdminDirectoryListings({});
+      
+      if (data) {
+        // Transform listings to match expected format
+        const transformedListings = data.listings.map((listing: any) => ({
+          ...listing,
+          tenantId: listing.tenant_id,
+          isPublished: listing.is_published,
+          isFeatured: listing.is_featured,
+          primaryCategory: listing.primary_category,
+          secondaryCategories: listing.secondary_categories,
+          updatedAt: listing.updated_at,
+          qualityScore: listing.qualityScore,
+          itemCount: listing.itemCount,
+          businessName: listing.businessName,
+          tenant: listing.tenants ? {
+            id: listing.tenants.id,
+            name: listing.tenants.name,
+            subscriptionTier: listing.tenants.subscription_tier
+          } : listing.tenant
+        }));
 
-      const params = new URLSearchParams();
-      if (filters.status) params.append('status', filters.status);
-      if (filters.tier) params.append('tier', filters.tier);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.search) params.append('search', filters.search);
-      if (filters.page) params.append('page', filters.page.toString());
-      if (filters.limit) params.append('limit', filters.limit.toString());
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        setAllListings(transformedListings);
+        setPagination(data.pagination);
+      } else {
+        setAllListings([]);
+        setPagination(pagination);
       }
-
-      const response = await fetch(`${apiBaseUrl}/api/admin/directory/listings?${params}`, {
-        credentials: 'include',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch listings');
-      }
-
-      const data = await response.json();
-      setListings(data.listings || []);
-      setPagination(data.pagination || pagination);
     } catch (err) {
       console.error('Error fetching admin directory listings:', err);
       setError(err instanceof Error ? err.message : 'Failed to load listings');
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
+
+  // Client-side filtering using useMemo - instant filtering
+  const listings = useMemo(() => {
+    let filtered = allListings;
+
+    // Status filter
+    if (filters.status === 'published') {
+      filtered = filtered.filter(l => l.is_published);
+    } else if (filters.status === 'draft') {
+      filtered = filtered.filter(l => !l.is_published);
+    } else if (filters.status === 'featured') {
+      filtered = filtered.filter(l => l.is_featured);
+    }
+
+    // Tier filter
+    if (filters.tier) {
+      filtered = filtered.filter(l => 
+        l.tenant?.subscriptionTier === filters.tier || 
+        l.tenants?.subscription_tier === filters.tier
+      );
+    }
+
+    // Quality filter
+    if (filters.quality) {
+      if (filters.quality === 'low') {
+        filtered = filtered.filter(l => l.qualityScore <= 50);
+      } else if (filters.quality === 'medium') {
+        filtered = filtered.filter(l => l.qualityScore > 50 && l.qualityScore <= 100);
+      } else if (filters.quality === 'high') {
+        filtered = filtered.filter(l => l.qualityScore > 100);
+      }
+    }
+
+    // Search filter
+    if (filters.search?.trim()) {
+      const query = filters.search.trim().toLowerCase();
+      filtered = filtered.filter(l => 
+        l.businessName?.toLowerCase().includes(query) ||
+        l.tenant?.name?.toLowerCase().includes(query) ||
+        l.primary_category?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [allListings, filters]);
+
+  // Update pagination based on filtered results
+  const filteredPagination = useMemo(() => ({
+    ...pagination,
+    total: listings.length,
+    totalPages: Math.ceil(listings.length / (pagination.limit || 50)),
+  }), [listings, pagination]);
+
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
   const featureListing = useCallback(async (tenantId: string, until: Date, priority: number = 5) => {
     try {
       setError(null);
-
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${apiBaseUrl}/api/admin/directory/feature/${tenantId}`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          featured_until: until.toISOString(),
-          placement_priority: priority,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to feature listing');
-      }
-
+      await platformHomeService.featureDirectoryListing(tenantId, until, priority);
       await fetchListings();
     } catch (err) {
       console.error('Error featuring listing:', err);
@@ -143,26 +179,7 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
   const unfeatureListing = useCallback(async (tenantId: string) => {
     try {
       setError(null);
-
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-      const headers: HeadersInit = {};
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${apiBaseUrl}/api/admin/directory/unfeature/${tenantId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to unfeature listing');
-      }
-
+      await platformHomeService.unfeatureDirectoryListing(tenantId);
       await fetchListings();
     } catch (err) {
       console.error('Error unfeaturing listing:', err);
@@ -171,18 +188,13 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
     }
   }, [fetchListings]);
 
-  useEffect(() => {
-    fetchListings();
-  }, [fetchListings]);
-
   return {
     listings,
     loading,
     error,
-    pagination,
+    pagination: filteredPagination,
     featureListing,
     unfeatureListing,
     refresh: fetchListings,
-    setFilters,
   };
 }

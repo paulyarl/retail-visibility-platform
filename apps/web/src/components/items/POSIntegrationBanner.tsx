@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { X } from 'lucide-react';
+import { getIntegrationsSingleton } from '@/lib/singletons/IntegrationsSingleton';
 
 interface POSIntegrationBannerProps {
   tenantId: string;
@@ -31,34 +32,14 @@ export default function POSIntegrationBanner({
   // Check if POS is connected
   useEffect(() => {
     const checkPOSConnection = async () => {
+      setLoading(true);
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        
-        // Get access token from localStorage (same way AuthContext does)
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}/integrations/clover`, {
-          headers,
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setHasPOS(data.connected || false);
-        } else if (response.status === 404) {
-          // API not implemented yet, assume no POS connection
-          console.warn('[POSIntegrationBanner] Clover integration API not available');
-          setHasPOS(false);
-        }
+        // Use singleton for cached integration status (5-min TTL)
+        const singleton = getIntegrationsSingleton(tenantId);
+        const cloverIntegration = await singleton.fetchCloverIntegration();
+        setHasPOS(cloverIntegration?.connected || false);
       } catch (error) {
-        console.error('[POSIntegrationBanner] Failed to check POS connection:', error);
+        console.error('Failed to check POS connection:', error);
       } finally {
         setLoading(false);
       }

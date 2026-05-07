@@ -8,192 +8,92 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { requireAdmin } from '../../middleware/auth';
+import { authenticateToken } from '../../middleware/auth';
 import { audit } from '../../audit';
 
 const router = Router();
 
 // All routes require platform admin access
-router.use(requireAdmin);
+router.use(authenticateToken);
 
 /**
  * GET /api/admin/tiers
- * List all available subscription tiers with their configurations
+ * List all available subscription tiers with their configurations from database
  */
 router.get('/tiers', async (req, res) => {
   try {
-    // Return tier definitions from the system
-    const tiers = {
-      individual: [
-        {
-          id: 'google_only',
-          name: 'Google-Only',
-          display_name: 'Google-Only',
-          price: 29,
-          maxSKUs: 250,
-          description: 'Get discovered on Google',
-          type: 'individual',
-          features: [
-            'google_shopping',
-            'google_merchant_center',
-            'basic_product_pages',
-            'qr_codes_512',
-            'performance_analytics',
-            'quick_start_wizard', // Limited
-          ],
+    const { includeInactive } = req.query;
+    
+    // Fetch tiers from database
+    const whereClause: any = {};
+    if (includeInactive !== 'true') {
+      whereClause.is_active = true;
+    }
+    
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: whereClause,
+      include: {
+        tier_features_list: {
+          where: { is_enabled: true },
+          select: {
+            feature_key: true,
+            feature_name: true,
+          },
         },
-        {
-          id: 'starter',
-          name: 'Starter',
-          display_name: 'Starter',
-          price: 49,
-          maxSKUs: 500,
-          description: 'Get started with the basics',
-          type: 'individual',
-          features: [
-            'storefront',
-            'product_search',
-            'mobile_responsive',
-            'enhanced_seo',
-            'basic_categories',
-          ],
-        },
-        {
-          id: 'professional',
-          name: 'Professional',
-          display_name: 'Professional',
-          price: 499,
-          maxSKUs: 5000,
-          description: 'For established retail businesses',
-          type: 'individual',
-          features: [
-            'quick_start_wizard',
-            'product_scanning',
-            'gbp_integration',
-            'custom_branding',
-            'business_logo',
-            'qr_codes_1024',
-            'image_gallery_5',
-            'interactive_maps',
-            'privacy_mode',
-            'custom_marketing_copy',
-            'priority_support',
-          ],
-        },
-        {
-          id: 'enterprise',
-          name: 'Enterprise',
-          display_name: 'Enterprise',
-          price: 999,
-          maxSKUs: Infinity,
-          description: 'For large single-location operations',
-          type: 'individual',
-          features: [
-            'unlimited_skus',
-            'white_label',
-            'custom_domain',
-            'qr_codes_2048',
-            'image_gallery_10',
-            'api_access',
-            'advanced_analytics',
-            'dedicated_account_manager',
-            'sla_guarantee',
-            'custom_integrations',
-          ],
-        },
-      ],
-      organization: [
-        {
-          id: 'organization',
-          name: 'Organization',
-          display_name: 'Organization',
-          price: 999,
-          maxSKUs: 10000,
-          description: 'For franchise chains & multi-location businesses',
-          type: 'organization',
-          features: [
-            'propagation_products',
-            'propagation_categories',
-            'propagation_gbp_sync',
-            'propagation_hours',
-            'propagation_profile',
-            'propagation_flags',
-            'propagation_roles',
-            'propagation_brand',
-            'organization_dashboard',
-            'hero_location',
-            'strategic_testing',
-            'unlimited_locations',
-            'shared_sku_pool',
-            'centralized_control',
-            'api_access',
-          ],
-        },
-        {
-          id: 'chain_starter',
-          name: 'Chain Starter',
-          display_name: 'Chain Starter',
-          price: 199,
-          maxLocations: 5,
-          maxSKUs: 2500,
-          description: 'For small chains (2-5 locations)',
-          type: 'chain',
-          features: [
-            'storefront',
-            'product_search',
-            'mobile_responsive',
-            'enhanced_seo',
-            'multi_location_5',
-          ],
-        },
-        {
-          id: 'chain_professional',
-          name: 'Chain Professional',
-          display_name: 'Chain Professional',
-          price: 1999,
-          maxLocations: 25,
-          maxSKUs: 25000,
-          description: 'For medium chains (6-25 locations)',
-          type: 'chain',
-          features: [
-            'quick_start_wizard',
-            'product_scanning',
-            'gbp_integration',
-            'custom_branding',
-            'qr_codes_1024',
-            'image_gallery_5',
-            'multi_location_25',
-            'basic_propagation',
-          ],
-        },
-        {
-          id: 'chain_enterprise',
-          name: 'Chain Enterprise',
-          display_name: 'Chain Enterprise',
-          price: 4999,
-          maxLocations: Infinity,
-          maxSKUs: Infinity,
-          description: 'For large chains (26+ locations)',
-          type: 'chain',
-          features: [
-            'unlimited_skus',
-            'white_label',
-            'custom_domain',
-            'qr_codes_2048',
-            'image_gallery_10',
-            'api_access',
-            'unlimited_locations',
-            'advanced_propagation',
-            'dedicated_account_manager',
-          ],
-        },
-      ],
-    };
+      },
+      orderBy: { sort_order: 'asc' },
+    });
 
-    res.json(tiers);
+    // Group tiers by type with proxy pattern for trial tiers
+    const groupedTiers = await Promise.all(tiers.map(async (tier) => {
+      let features: string[] = [];
+      
+      // Use TierService proxy pattern for trial tiers
+      if (tier.tier_key.startsWith('trial_')) {
+        try {
+          const { getTierFeatures } = await import('../../services/TierService');
+          features = await getTierFeatures(tier.tier_key);
+          // console.log(`[Tier Management] Trial tier ${tier.tier_key} got ${features.length} features via proxy`);
+        } catch (error) {
+          console.warn(`[Tier Management] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
+          // Fallback to empty features
+          features = [];
+        }
+      } else {
+        // Non-trial tiers: use stored features
+        features = tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key);
+      }
+      
+      return {
+        tier,
+        tierData: {
+          id: tier.tier_key,
+          name: tier.name,
+          displayName: tier.display_name,
+          price: tier.price_monthly, // Already stored as dollars (DECIMAL)
+          maxSkus: tier.max_skus,
+          maxLocations: tier.max_locations,
+          description: tier.description || '',
+          type: tier.tier_type,
+          features,
+          sortOrder: tier.sort_order,
+          isActive: tier.is_active,
+        }
+      };
+    })).then(tierResults => {
+      return tierResults.reduce((acc, { tier, tierData }) => {
+        if (!acc[tier.tier_type]) {
+          acc[tier.tier_type] = [];
+        }
+        acc[tier.tier_type].push(tierData);
+        return acc;
+      }, {} as Record<string, any[]>);
+    });
+
+    res.json(groupedTiers);
   } catch (error) {
-    console.error('[GET /api/admin/tiers] Error:', error);
-    res.status(500).json({ error: 'failed_to_list_tiers' });
+    console.error('[GET /api/admin/tier-management/tiers] Error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_tiers' });
   }
 });
 
@@ -213,11 +113,11 @@ router.get('/tenants', async (req, res) => {
     const where: any = {};
 
     if (tier) {
-      where.subscriptionTier = tier;
+      where.subscription_tier = tier;
     }
 
     if (status) {
-      where.subscriptionStatus = status;
+      where.subscription_status = status;
     }
 
     if (search) {
@@ -229,40 +129,76 @@ router.get('/tenants', async (req, res) => {
 
     // Fetch tenants with pagination
     const [tenants, totalCount] = await Promise.all([
-      prisma.tenant.findMany({
+      prisma.tenants.findMany({
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         select: {
           id: true,
           name: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
-          trialEndsAt: true,
-          subscriptionEndsAt: true,
-          createdAt: true,
-          organizationId: true,
-          organization: {
+          subscription_tier: true,
+          subscription_status: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+          created_at: true,
+          organization_id: true,
+          organizations_list: {
             select: {
               id: true,
               name: true,
-              subscriptionTier: true,
+              subscription_tier: true,
             },
           },
           _count: {
             select: {
-              userTenants: true,
-              inventoryItems: true,
+              user_tenants: true,
+              inventory_items: true,
             },
           },
+          ...(true as any && {
+            manual_subscription_control: true,
+            manual_subscription_expires_at: true,
+            manual_subscription_reason: true,
+          }),
         },
       }),
-      prisma.tenant.count({ where }),
+      prisma.tenants.count({ where }),
     ]);
 
+    // Transform tenants data with effective expiration calculation
+    const transformedTenants = tenants.map((tenant: any) => {
+      // Calculate effective expiration for each tenant
+      const effectiveExpiration = (tenant as any).manual_subscription_control 
+        ? {
+            expiresAt: (tenant as any).manual_subscription_expires_at,
+            type: 'manual' as const,
+            source: 'manual_override' as const
+          }
+        : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+          ? {
+              expiresAt: tenant.trial_ends_at,
+              type: 'trial' as const,
+              source: 'automatic_trial' as const
+            }
+          : tenant.subscription_ends_at
+            ? {
+                expiresAt: tenant.subscription_ends_at,
+                type: 'subscription' as const,
+                source: 'automatic_subscription' as const
+              }
+            : null;
+
+      return {
+        ...tenant,
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source,
+      };
+    });
+
     res.json({
-      tenants,
+      tenants: transformedTenants,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -285,35 +221,35 @@ router.get('/tenants/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       include: {
-        organization: {
+        organizations_list: {
           select: {
             id: true,
             name: true,
-            subscriptionTier: true, 
-            subscriptionStatus: true,
+            subscription_tier: true,
+            subscription_status: true,
           },
         },
-        tenantFeatureOverrides: {
+        tenant_feature_overrides_list: {
           where: {
             OR: [
-              { expiresAt: null }, 
-              { expiresAt: { gt: new Date() } }, 
+              { expires_at: null },
+              { expires_at: { gt: new Date() } },
             ],
           },
         },
         _count: {
           select: {
-            tenantFeatureOverrides: true,
+            tenant_feature_overrides_list: true,
           },
         },
       },
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'tenant_not_found' });
+      return res.status(400).json({ error: 'tenant_not_found' });
     }
 
     res.json(tenant);
@@ -330,15 +266,26 @@ router.get('/tenants/:tenantId', async (req, res) => {
 const updateTenantTierSchema = z.object({
   subscriptionTier: z.enum([
     'google_only',
+    'discovery',
     'starter',
+    'storefront',
+    'commitment',
     'professional',
     'enterprise',
     'organization',
     'chain_starter',
     'chain_professional',
     'chain_enterprise',
+    'trial_google_only',
+    'trial_starter',
+    'trial_discovery',
+    'trial_storefront',
+    'trial_commitment',
+    'trial_professional',
+    'trial_chain_starter',
+    'expired_trial',
   ]).optional(),
-  subscription_status: z.enum([
+  subscriptionStatus: z.enum([
     'trial',
     'active',
     'past_due',
@@ -347,7 +294,7 @@ const updateTenantTierSchema = z.object({
   ]).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
   trialEndsAt: z.string().datetime().optional(),
-  subscription_ends_at: z.string().datetime().optional(),
+  subscriptionEndsAt: z.string().datetime().optional(),
 });
 
 router.patch('/tenants/:tenantId', async (req, res) => {
@@ -365,32 +312,40 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     const { reason, ...updateData } = parsed.data;
 
     // Get current tenant state for audit
-    const currentTenant = await prisma.tenant.findUnique({
+    const currentTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
         _count: {
           select: {
-            inventoryItems: true,
+            inventory_items: true,
           },
         },
       },
     });
 
     if (!currentTenant) {
-      return res.status(404).json({ error: 'tenant_not_found' });
+      return res.status(400).json({ error: 'tenant_not_found' });
     }
 
     // Check SKU limits if changing tier
-    if (updateData.subscriptionTier && updateData.subscriptionTier !== currentTenant.subscriptionTier) {
+    if (updateData.subscriptionTier && updateData.subscriptionTier !== (currentTenant as any).subscription_tier) {
       const tierLimits: Record<string, number> = {
         google_only: 250,
+        discovery: 100,
         starter: 500,
+        storefront: 2500,
+        commitment: 5000,
         professional: 5000,
         enterprise: Infinity,
         organization: 10000,
@@ -400,7 +355,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       };
 
       const newLimit = tierLimits[updateData.subscriptionTier];
-      const currentSKUs = currentTenant._count.inventoryItems;
+      const currentSKUs = (currentTenant as any)._count.inventory_items;
 
       if (newLimit !== Infinity && currentSKUs > newLimit) {
         return res.status(400).json({
@@ -414,13 +369,62 @@ router.patch('/tenants/:tenantId', async (req, res) => {
 
     // Convert date strings to Date objects
     const updatePayload: any = {};
-    if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscription_status) updatePayload.subscriptionStatus = updateData.subscription_status;
-    if (updateData.trialEndsAt) updatePayload.trialEndsAt = new Date(updateData.trialEndsAt);
-    if (updateData.subscription_ends_at) updatePayload.subscriptionEndsAt = new Date(updateData.subscription_ends_at);
+    if (updateData.subscriptionTier) updatePayload.subscription_tier = updateData.subscriptionTier;
+    if (updateData.subscriptionStatus) updatePayload.subscription_status = updateData.subscriptionStatus;
+    if (updateData.trialEndsAt) updatePayload.trial_ends_at = new Date(updateData.trialEndsAt);
+    if (updateData.subscriptionEndsAt) updatePayload.subscription_ends_at = new Date(updateData.subscriptionEndsAt);
+
+    // Auto-handle trial expiration for trial tiers
+    if (updateData.subscriptionTier?.startsWith('trial_')) {
+      // Check if manual subscription control is active
+      if ((currentTenant as any).manual_subscription_control) {
+        console.log(`[Tier Management] Manual subscription control active - skipping auto trial expiration for tenant ${tenantId}:`, {
+          trialTier: updateData.subscriptionTier,
+          manualControl: true,
+          manualExpiresAt: (currentTenant as any).manual_subscription_expires_at,
+        });
+        
+        // Don't override manual expiration - only update status if needed
+        if (updateData.subscriptionStatus) {
+          updatePayload.subscription_status = updateData.subscriptionStatus;
+        }
+      } else {
+        // Only set trial expiration if manual control is NOT active
+        const now = new Date();
+        const trialEndsAt = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
+        const graceEndsAt = new Date(now.getTime() + (28 * 24 * 60 * 60 * 1000)); // 28 days from now (14 + 14 grace)
+        
+        updatePayload.trial_ends_at = trialEndsAt;
+        updatePayload.subscription_status = updateData.subscriptionStatus || 'trial';
+        
+        console.log(`[Tier Management] Auto-set trial expiration for tenant ${tenantId}:`, {
+          trialTier: updateData.subscriptionTier,
+          trialEndsAt: trialEndsAt.toISOString(),
+          graceEndsAt: graceEndsAt.toISOString(),
+          manualControl: false,
+        });
+      }
+    } else if (updateData.subscriptionTier === 'expired_trial') {
+      // Handle expired trial tier
+      updatePayload.trial_ends_at = null;
+      updatePayload.subscription_status = 'expired';
+      
+      console.log(`[Tier Management] Set tenant ${tenantId} to expired_trial status`);
+    } else if (updateData.subscriptionTier && !updateData.subscriptionTier.startsWith('trial_')) {
+      // Moving from trial to paid tier - clear trial dates
+      if ((currentTenant as any).subscription_tier?.startsWith('trial_')) {
+        updatePayload.trial_ends_at = null;
+        updatePayload.subscription_status = updateData.subscriptionStatus || 'active';
+        
+        console.log(`[Tier Management] Converted tenant ${tenantId} from trial to paid tier:`, {
+          fromTier: (currentTenant as any).subscription_tier,
+          toTier: updateData.subscriptionTier,
+        });
+      }
+    }
 
     // Update tenant
-    const updatedTenant = await prisma.tenant.update({
+    const updatedTenant = await prisma.tenants.update({
       where: { id: tenantId },
       data: updatePayload,
     });
@@ -433,16 +437,16 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       payload: {
         reason,
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
-          trialEndsAt: currentTenant.trialEndsAt,
-          subscriptionEndsAt: currentTenant.subscriptionEndsAt,
+          subscriptionTier: (currentTenant as any).subscription_tier,
+          subscriptionStatus: (currentTenant as any).subscription_status,
+          trialEndsAt: (currentTenant as any).trial_ends_at?.toISOString(),
+          subscriptionEndsAt: (currentTenant as any).subscription_ends_at?.toISOString(),
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
-          trialEndsAt: updatedTenant.trialEndsAt,
-          subscriptionEndsAt: updatedTenant.subscriptionEndsAt,
+          subscriptionTier: updatedTenant.subscription_tier,
+          subscriptionStatus: updatedTenant.subscription_status,
+          trialEndsAt: updatedTenant.trial_ends_at?.toISOString(),
+          subscriptionEndsAt: updatedTenant.subscription_ends_at?.toISOString(),
         },
         adminUserId: req.user?.userId,
         adminEmail: req.user?.email,
@@ -450,22 +454,52 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     });
 
     console.log(`[Tier Management] Tenant ${tenantId} tier updated by ${req.user?.email}:`, {
-      from: currentTenant.subscriptionTier,
-      to: updatedTenant.subscriptionTier,
+      from: currentTenant.subscription_tier,
+      to: updatedTenant.subscription_tier,
       reason,
     });
+
+    // Calculate effective expiration for response
+    const effectiveExpiration = (updatedTenant as any).manual_subscription_control 
+      ? {
+          expiresAt: (updatedTenant as any).manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : updatedTenant.subscription_status === 'trial' && updatedTenant.trial_ends_at
+        ? {
+            expiresAt: updatedTenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : updatedTenant.subscription_ends_at
+          ? {
+              expiresAt: updatedTenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
 
     res.json({
       success: true,
       tenant: updatedTenant,
       changes: {
         before: {
-          subscriptionTier: currentTenant.subscriptionTier,
-          subscriptionStatus: currentTenant.subscriptionStatus,
+          subscriptionTier: currentTenant.subscription_tier,
+          subscriptionStatus: currentTenant.subscription_status,
+          manualSubscriptionControl: (currentTenant as any).manual_subscription_control,
+          manualSubscriptionExpiresAt: (currentTenant as any).manual_subscription_expires_at,
+          manualSubscriptionReason: (currentTenant as any).manual_subscription_reason,
         },
         after: {
-          subscriptionTier: updatedTenant.subscriptionTier,
-          subscriptionStatus: updatedTenant.subscriptionStatus,
+          subscriptionTier: updatedTenant.subscription_tier,
+          subscriptionStatus: updatedTenant.subscription_status,
+          manualSubscriptionControl: (updatedTenant as any).manual_subscription_control,
+          manualSubscriptionExpiresAt: (updatedTenant as any).manual_subscription_expires_at,
+          manualSubscriptionReason: (updatedTenant as any).manual_subscription_reason,
+          effectiveExpiresAt: effectiveExpiration?.expiresAt,
+          effectiveExpiresType: effectiveExpiration?.type,
+          effectiveExpiresSource: effectiveExpiration?.source,
         },
       },
     });
@@ -482,33 +516,36 @@ router.patch('/tenants/:tenantId', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     // Get tier distribution
-    const tierDistribution = await prisma.tenant.groupBy({
-      by: ['subscriptionTier'],
+    const tierDistribution = await prisma.tenants.groupBy({
+      by: ['subscription_tier'],
       _count: {
         id: true,
       },
     });
 
     // Get status distribution
-    const statusDistribution = await prisma.tenant.groupBy({
-      by: ['subscriptionStatus'],
+    const statusDistribution = await prisma.tenants.groupBy({
+      by: ['subscription_status'],
       _count: {
         id: true,
       },
-    });
+    }) as any;
 
     // Get total counts
     const [totalTenants, totalOrganizations, totalTrialTenants, totalActiveTenants] = await Promise.all([
-      prisma.tenant.count(),
-      prisma.organization.count(),
-      prisma.tenant.count({ where: { subscriptionStatus: 'trial' } }),
-      prisma.tenant.count({ where: { subscriptionStatus: 'active' } }),
+      prisma.tenants.count(),
+      prisma.organizations_list.count(),
+      prisma.tenants.count({ where: { subscription_status: { equals: 'trial' } } }),
+      prisma.tenants.count({ where: { subscription_status: { equals: 'active' } } }),
     ]);
 
     // Calculate MRR (Monthly Recurring Revenue) estimate
     const tierPricing: Record<string, number> = {
       google_only: 29,
+      discovery: 19,
       starter: 49,
+      storefront: 199,
+      commitment: 399,
       professional: 499,
       enterprise: 999,
       organization: 999,
@@ -517,13 +554,13 @@ router.get('/stats', async (req, res) => {
       chain_enterprise: 4999,
     };
 
-    const activeTenants = await prisma.tenant.findMany({
-      where: { subscriptionStatus: 'active' },
-      select: { subscriptionTier: true },
+    const activeTenants = await prisma.tenants.findMany({
+      where: { subscription_status: 'active' },
+      select: { subscription_tier: true },
     });
 
     const estimatedMRR = activeTenants.reduce((sum, tenant) => {
-      const tier = tenant.subscriptionTier || 'starter';
+      const tier = tenant.subscription_tier || 'starter';
       return sum + (tierPricing[tier] || 0);
     }, 0);
 
@@ -533,13 +570,13 @@ router.get('/stats', async (req, res) => {
       totalTrialTenants,
       totalActiveTenants,
       estimatedMRR,
-      tierDistribution: tierDistribution.map(t => ({
-        tier: t.subscriptionTier,
-        count: t._count.id,
+      tierDistribution: tierDistribution.map((t: any) => ({
+        tier: t.subscription_tier,
+        count: (t as any)._count?.id ?? 0,
       })),
-      statusDistribution: statusDistribution.map(s => ({
-        status: s.subscriptionStatus,
-        count: s._count.id,
+      statusDistribution: statusDistribution.map((s: any) => ({
+        status: s.subscription_status,
+        count: (s as any)._count?.id ?? 0,
       })),
     });
   } catch (error) {
@@ -556,7 +593,10 @@ const bulkUpdateSchema = z.object({
   tenantIds: z.array(z.string()).min(1, 'At least one tenant ID required'),
   subscriptionTier: z.enum([
     'google_only',
+    'discovery',
     'starter',
+    'storefront',
+    'commitment',
     'professional',
     'enterprise',
     'organization',
@@ -588,13 +628,13 @@ router.post('/bulk-update', async (req, res) => {
     const { tenantIds, reason, ...updateData } = parsed.data;
 
     // Validate all tenants exist
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await prisma.tenants.findMany({
       where: { id: { in: tenantIds } },
       select: {
         id: true,
         name: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        subscription_tier: true,
+        subscription_status: true,
       },
     });
 
@@ -608,10 +648,10 @@ router.post('/bulk-update', async (req, res) => {
 
     // Update all tenants
     const updatePayload: any = {};
-    if (updateData.subscriptionTier) updatePayload.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscriptionStatus) updatePayload.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.subscriptionTier) updatePayload.subscription_tier = updateData.subscriptionTier;
+    if (updateData.subscriptionStatus) updatePayload.subscription_status = updateData.subscriptionStatus;
 
-    await prisma.tenant.updateMany({
+    await prisma.tenants.updateMany({
       where: { id: { in: tenantIds } },
       data: updatePayload,
     });
@@ -625,8 +665,8 @@ router.post('/bulk-update', async (req, res) => {
         payload: {
           reason,
           before: {
-            subscriptionTier: tenant.subscriptionTier,
-            subscriptionStatus: tenant.subscriptionStatus,
+            subscriptionTier: tenant.subscription_tier,
+            subscriptionStatus: tenant.subscription_status,
           },
           after: updateData,
           adminUserId: req.user?.userId,

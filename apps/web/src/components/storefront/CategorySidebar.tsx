@@ -8,6 +8,8 @@ interface Category {
   name: string;
   slug: string;
   count: number;
+  category_type?: string;
+  is_primary?: boolean;
 }
 
 interface CategorySidebarProps {
@@ -58,7 +60,14 @@ export default function CategorySidebar({ tenantId, categories, totalProducts }:
                 : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
             }`}
           >
-            <span>{category.name}</span>
+            <div className="flex items-center gap-2">
+              <span>{category.name}</span>
+              {category.is_primary && (
+                <span className="px-2 py-1 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full">
+                  Primary
+                </span>
+              )}
+            </div>
             <span className={`text-sm ${
               currentCategory === category.slug
                 ? 'text-primary-600 dark:text-primary-400'

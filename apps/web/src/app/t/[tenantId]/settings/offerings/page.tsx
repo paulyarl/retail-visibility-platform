@@ -1,4 +1,5 @@
 import OfferingsSettingsPage from '@/app/(platform)/settings/offerings/page';
+import { Button } from '@mantine/core';
 import SetTenantId from '@/components/client/SetTenantId';
 
 export default async function TenantScopedOfferingsSettings({ params }: { params: Promise<{ tenantId: string }> }) {

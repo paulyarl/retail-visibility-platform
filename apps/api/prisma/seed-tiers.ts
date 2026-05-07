@@ -2,6 +2,7 @@
  * Seed script for tier system
  * Run with: npx tsx prisma/seed-tiers.ts
  */
+/// <reference types="node" />
 
 import { PrismaClient } from '@prisma/client';
 
@@ -11,7 +12,7 @@ async function main() {
   console.log('🌱 Seeding tier system...');
 
   // Check if tiers already exist
-  const existingTiers = await prisma.subscriptionTier.count();
+  const existingTiers = await prisma.subscription_tiers_list.count();
   if (existingTiers > 0) {
     console.log(`✓ Tiers already seeded (${existingTiers} tiers found)`);
     return;
@@ -21,14 +22,14 @@ async function main() {
   const tiers = [
     {
       id: 'tier_google_only',
-      tierKey: 'google_only',
+      tier_key: 'google_only',
       name: 'Google-Only',
-      displayName: 'Google-Only',
+      display_name: 'Google-Only',
       description: 'Get discovered on Google',
-      priceMonthly: 2900,
-      maxSKUs: 250,
-      tierType: 'individual',
-      sortOrder: 1,
+      price_monthly: 2900,
+      max_skus: 250,
+      tier_type: 'individual',
+      sort_order: 1,
       features: [
         { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: false },
         { featureKey: 'google_merchant_center', featureName: 'Google Merchant Center', isInherited: false },
@@ -40,14 +41,14 @@ async function main() {
     },
     {
       id: 'tier_starter',
-      tierKey: 'starter',
+      tier_key: 'starter',
       name: 'Starter',
-      displayName: 'Starter',
+      display_name: 'Starter',
       description: 'Get started with the basics',
-      priceMonthly: 4900,
-      maxSKUs: 500,
-      tierType: 'individual',
-      sortOrder: 2,
+      price_monthly: 4900,
+      max_skus: 500,
+      tier_type: 'individual',
+      sort_order: 2,
       features: [
         { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
         { featureKey: 'google_merchant_center', featureName: 'Google Merchant Center', isInherited: true },
@@ -63,14 +64,14 @@ async function main() {
     },
     {
       id: 'tier_professional',
-      tierKey: 'professional',
+      tier_key: 'professional',
       name: 'Professional',
-      displayName: 'Professional',
+      display_name: 'Professional',
       description: 'For established retail businesses',
-      priceMonthly: 49900,
-      maxSKUs: 5000,
-      tierType: 'individual',
-      sortOrder: 3,
+      price_monthly: 49900,
+      max_skus: 5000,
+      tier_type: 'individual',
+      sort_order: 3,
       features: [
         { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
         { featureKey: 'google_merchant_center', featureName: 'Google Merchant Center', isInherited: true },
@@ -97,14 +98,14 @@ async function main() {
     },
     {
       id: 'tier_enterprise',
-      tierKey: 'enterprise',
+      tier_key: 'enterprise',
       name: 'Enterprise',
-      displayName: 'Enterprise',
+      display_name: 'Enterprise',
       description: 'For large single-location operations',
-      priceMonthly: 99900,
-      maxSKUs: null,
-      tierType: 'individual',
-      sortOrder: 4,
+      price_monthly: 99900,
+      max_skus: null,
+      tier_type: 'individual',
+      sort_order: 4,
       features: [
         { featureKey: 'google_shopping', featureName: 'Google Shopping', isInherited: true },
         { featureKey: 'storefront', featureName: 'Public Storefront', isInherited: true },
@@ -126,15 +127,26 @@ async function main() {
 
   for (const tierData of tiers) {
     const { features, ...tier } = tierData;
-    await prisma.subscriptionTier.create({
-      data: {
-        ...tier,
-        features: {
-          create: features,
-        },
-      },
+
+    // Create the tier first
+    const createdTier = await prisma.subscription_tiers_list.create({
+      data: tier,
     });
-    console.log(`✓ Created tier: ${tier.displayName}`);
+
+    // Then create features for this tier
+    if (features && features.length > 0) {
+      await prisma.tier_features_list.createMany({
+        data: features.map((feature, index) => ({
+          id: `${createdTier.id}_${feature.featureKey}_${index}`, // Generate unique ID
+          tier_id: createdTier.id,
+          feature_key: feature.featureKey,
+          feature_name: feature.featureName,
+          is_inherited: feature.isInherited,
+        })),
+      });
+    }
+
+    console.log(`✓ Created tier: ${tier.display_name}`);
   }
 
   console.log('✅ Tier system seeded successfully!');

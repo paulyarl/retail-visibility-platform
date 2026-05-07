@@ -77,7 +77,7 @@ export function useTierAccess(tenantTier: string | null | undefined): TierAccess
   const { user } = useAuth();
   
   // Check if user is platform admin or support
-  const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' || user?.role === 'ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   
   return useMemo(() => {
     const tierDisplay = getTierDisplayName(tier);

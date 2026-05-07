@@ -51,6 +51,8 @@ interface ContextBadgesProps {
  * // Analytics page
  * <ContextBadges tenant={tenant} contextLabel="Analytics" showBorder />
  */
+
+
 export function ContextBadges({ 
   tenant, 
   showPlatformRole = false, 
@@ -104,6 +106,7 @@ export function ContextBadges({
  * @example
  * <ContextBadgesSection tenant={tenant} />
  */
+
 export function ContextBadgesSection(props: ContextBadgesProps) {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">

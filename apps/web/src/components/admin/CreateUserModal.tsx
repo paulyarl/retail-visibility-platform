@@ -1,25 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, UserPlus, Loader2, AlertTriangle } from 'lucide-react';
+import { adminUsersService, AdminUser } from '@/services/AdminUsersService';
+
+interface Tenant {
+  id: string;
+  name: string;
+}
 
 interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (createdUser?: AdminUser | null) => void;
 }
 
 export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenantsLoading, setTenantsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
-    role: 'USER' as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER',
+    platformRole: 'USER' as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
+    tenantRole: 'MEMBER' as 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER',
+    tenantId: '',
   });
+
+  // Load tenants when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadTenants();
+    }
+  }, [isOpen]);
+
+  const loadTenants = async () => {
+    setTenantsLoading(true);
+    try {
+      const tenantList = await adminUsersService.getAllTenants();
+      setTenants(tenantList);
+      // Auto-select first tenant if available
+      if (tenantList.length > 0 && !formData.tenantId) {
+        setFormData(prev => ({ ...prev, tenantId: tenantList[0].id }));
+      }
+    } catch (err) {
+      console.error('Failed to load tenants:', err);
+    } finally {
+      setTenantsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,30 +61,26 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      const result = await adminUsersService.createUser({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.name.split(' ')[0] || '',
+        lastName: formData.name.split(' ').slice(1).join(' ') || '',
+        role: formData.tenantRole,
+        tenantId: formData.tenantId,
+        platformRole: formData.platformRole,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to create user');
+      if (!result) {
+        throw new Error('Failed to create user');
       }
 
-      const result = await response.json();
       setSuccess(`✅ User created successfully! Email: ${formData.email}`);
       
       setTimeout(() => {
-        onSuccess?.();
+        onSuccess?.(result);
         onClose();
-        setFormData({ email: '', password: '', name: '', role: 'USER' });
+        setFormData({ email: '', password: '', name: '', platformRole: 'USER', tenantRole: 'MEMBER', tenantId: tenants[0]?.id || '' });
         setSuccess('');
       }, 2000);
     } catch (err: any) {
@@ -116,7 +145,7 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="user@example.com"
               disabled={loading}
             />
@@ -157,35 +186,87 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
             />
           </div>
 
-          {/* Role */}
+          {/* Tenant */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Role *
+              Tenant *
+            </label>
+            {tenantsLoading ? (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading tenants...
+              </div>
+            ) : (
+              <select
+                value={formData.tenantId}
+                onChange={(e) => setFormData({ ...formData, tenantId: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading}
+                required
+              >
+                <option value="">Select a tenant</option>
+                {tenants.map(tenant => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Platform Role */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Platform Role *
             </label>
             <select
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER' })}
+              value={formData.platformRole}
+              onChange={(e) => setFormData({ ...formData, platformRole: e.target.value as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER' })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             >
-              <optgroup label="Platform Users">
+              <optgroup label="Platform Roles">
                 <option value="PLATFORM_ADMIN">Platform Admin</option>
                 <option value="PLATFORM_SUPPORT">Platform Support</option>
                 <option value="PLATFORM_VIEWER">Platform Viewer</option>
               </optgroup>
-              <optgroup label="Tenant Users">
+              <optgroup label="Tenant Roles">
                 <option value="OWNER">Tenant Owner</option>
-                <option value="TENANT_ADMIN">Tenant Admin</option>
                 <option value="USER">Tenant User</option>
               </optgroup>
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {formData.role === 'PLATFORM_ADMIN' && 'Full platform access, unlimited tenants'}
-              {formData.role === 'PLATFORM_SUPPORT' && 'View all tenants + support actions (3 tenant limit)'}
-              {formData.role === 'PLATFORM_VIEWER' && 'Read-only access to all tenants (cannot create)'}
-              {formData.role === 'OWNER' && 'Can create/own tenants (limits based on subscription tier)'}
-              {formData.role === 'TENANT_ADMIN' && 'Support role for assigned tenants (below Tenant Owner, cannot manage settings/ownership)'}
-              {formData.role === 'USER' && 'Basic access (limits based on subscription tier)'}
+              {formData.platformRole === 'PLATFORM_ADMIN' && 'Full platform access, unlimited tenants'}
+              {formData.platformRole === 'PLATFORM_SUPPORT' && 'View all tenants + support actions'}
+              {formData.platformRole === 'PLATFORM_VIEWER' && 'Read-only access to all tenants'}
+              {formData.platformRole === 'OWNER' && 'Can create/own tenants'}
+              {formData.platformRole === 'USER' && 'Basic tenant user'}
+            </p>
+          </div>
+
+          {/* Tenant Role */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tenant Role *
+            </label>
+            <select
+              value={formData.tenantRole}
+              onChange={(e) => setFormData({ ...formData, tenantRole: e.target.value as 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER' })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading}
+            >
+              <option value="OWNER">Owner</option>
+              <option value="ADMIN">Admin</option>
+              <option value="SUPPORT">Support</option>
+              <option value="MEMBER">Member</option>
+              <option value="VIEWER">Viewer</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {formData.tenantRole === 'OWNER' && 'Full control - can manage all settings and users'}
+              {formData.tenantRole === 'ADMIN' && 'Can manage most settings and users, cannot change ownership'}
+              {formData.tenantRole === 'SUPPORT' && 'Can manage products, orders, and customer interactions'}
+              {formData.tenantRole === 'MEMBER' && 'Standard access - can manage products and view orders'}
+              {formData.tenantRole === 'VIEWER' && 'Read-only access - can only view data'}
             </p>
           </div>
 

@@ -5,8 +5,28 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { adminCategoriesService } from '@/services/AdminCategoriesService';
 
-type BusinessType = 'grocery' | 'fashion' | 'electronics' | 'general';
+type BusinessType = 
+  | 'grocery' 
+  | 'fashion' 
+  | 'electronics'
+  | 'home_garden'
+  | 'health_beauty'
+  | 'sports_outdoors'
+  | 'toys_games'
+  | 'automotive'
+  | 'books_media'
+  | 'pet_supplies'
+  | 'office_supplies'
+  | 'jewelry'
+  | 'baby_kids'
+  | 'arts_crafts'
+  | 'hardware_tools'
+  | 'furniture'
+  | 'restaurant'
+  | 'pharmacy'
+  | 'general';
 
 const businessTypes = [
   {
@@ -15,7 +35,7 @@ const businessTypes = [
     icon: '🛒',
     description: 'Fresh produce, dairy, meat, bakery, beverages',
     categoryCount: 15,
-    examples: ['Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Beverages'],
+    examples: ['Fresh Fruits', 'Dairy Products', 'Meat & Seafood', 'Bakery Items', 'Beverages'],
   },
   {
     id: 'fashion' as BusinessType,
@@ -30,8 +50,128 @@ const businessTypes = [
     name: 'Electronics Store',
     icon: '📱',
     description: 'Phones, computers, audio, gaming, accessories',
+    categoryCount: 12,
+    examples: ['Mobile Phones', 'Computers', 'Audio Equipment', 'Gaming', 'Smart Home'],
+  },
+  {
+    id: 'home_garden' as BusinessType,
+    name: 'Home & Garden',
+    icon: '🏡',
+    description: 'Home decor, kitchen, furniture, lawn & garden',
+    categoryCount: 15,
+    examples: ['Home Decor', 'Kitchen & Dining', 'Furniture', 'Lawn & Garden', 'Bedding'],
+  },
+  {
+    id: 'health_beauty' as BusinessType,
+    name: 'Health & Beauty',
+    icon: '💄',
+    description: 'Personal care, cosmetics, skincare, wellness',
+    categoryCount: 12,
+    examples: ['Personal Care', 'Cosmetics', 'Skincare', 'Hair Care', 'Bath & Body'],
+  },
+  {
+    id: 'sports_outdoors' as BusinessType,
+    name: 'Sports & Outdoors',
+    icon: '⚽',
+    description: 'Exercise, fitness, outdoor recreation, athletics',
+    categoryCount: 12,
+    examples: ['Exercise Equipment', 'Outdoor Recreation', 'Team Sports', 'Camping', 'Cycling'],
+  },
+  {
+    id: 'toys_games' as BusinessType,
+    name: 'Toys & Games',
+    icon: '🧸',
+    description: 'Toys, games, puzzles, educational items',
     categoryCount: 10,
-    examples: ['Mobile Phones', 'Computers', 'Audio', 'Gaming', 'Smart Home'],
+    examples: ['Action Figures', 'Board Games', 'Puzzles', 'Educational Toys', 'Outdoor Toys'],
+  },
+  {
+    id: 'automotive' as BusinessType,
+    name: 'Automotive',
+    icon: '🚗',
+    description: 'Vehicle parts, accessories, car care',
+    categoryCount: 10,
+    examples: ['Vehicle Parts', 'Car Accessories', 'Car Care', 'Tools', 'Electronics'],
+  },
+  {
+    id: 'books_media' as BusinessType,
+    name: 'Books & Media',
+    icon: '📚',
+    description: 'Books, music, movies, magazines',
+    categoryCount: 10,
+    examples: ['Books', 'Music', 'Movies & TV', 'Magazines', 'E-Books'],
+  },
+  {
+    id: 'pet_supplies' as BusinessType,
+    name: 'Pet Supplies',
+    icon: '🐾',
+    description: 'Pet food, toys, accessories, care products',
+    categoryCount: 10,
+    examples: ['Dog Supplies', 'Cat Supplies', 'Pet Food', 'Pet Toys', 'Pet Care'],
+  },
+  {
+    id: 'office_supplies' as BusinessType,
+    name: 'Office Supplies',
+    icon: '📎',
+    description: 'Stationery, paper, office equipment',
+    categoryCount: 10,
+    examples: ['Writing Supplies', 'Paper Products', 'Office Equipment', 'Filing', 'Presentation'],
+  },
+  {
+    id: 'jewelry' as BusinessType,
+    name: 'Jewelry Store',
+    icon: '💍',
+    description: 'Fine jewelry, watches, accessories',
+    categoryCount: 8,
+    examples: ['Rings', 'Necklaces', 'Earrings', 'Bracelets', 'Watches'],
+  },
+  {
+    id: 'baby_kids' as BusinessType,
+    name: 'Baby & Kids',
+    icon: '👶',
+    description: 'Baby care, toys, clothing, equipment',
+    categoryCount: 12,
+    examples: ['Baby Care', 'Baby Toys', 'Baby Transport', 'Diapering', 'Feeding'],
+  },
+  {
+    id: 'arts_crafts' as BusinessType,
+    name: 'Arts & Crafts',
+    icon: '🎨',
+    description: 'Art supplies, craft materials, hobbies',
+    categoryCount: 10,
+    examples: ['Art Supplies', 'Craft Materials', 'Sewing', 'Scrapbooking', 'Party Supplies'],
+  },
+  {
+    id: 'hardware_tools' as BusinessType,
+    name: 'Hardware & Tools',
+    icon: '🔨',
+    description: 'Building materials, power tools, plumbing',
+    categoryCount: 12,
+    examples: ['Power Tools', 'Hand Tools', 'Building Materials', 'Plumbing', 'Electrical'],
+  },
+  {
+    id: 'furniture' as BusinessType,
+    name: 'Furniture Store',
+    icon: '🛋️',
+    description: 'Living room, bedroom, office furniture',
+    categoryCount: 10,
+    examples: ['Living Room', 'Bedroom', 'Office Furniture', 'Outdoor Furniture', 'Storage'],
+  },
+  {
+    id: 'restaurant' as BusinessType,
+    name: 'Restaurant/Cafe',
+    icon: '🍽️',
+    description: 'Prepared foods, beverages, catering',
+    categoryCount: 10,
+    examples: ['Appetizers', 'Main Courses', 'Desserts', 'Beverages', 'Catering'],
+  },
+  {
+    id: 'pharmacy' as BusinessType,
+    name: 'Pharmacy',
+    icon: '💊',
+    description: 'Health care, personal care, vitamins',
+    categoryCount: 12,
+    examples: ['Medications', 'Vitamins', 'Personal Care', 'First Aid', 'Health Devices'],
   },
   {
     id: 'general' as BusinessType,
@@ -42,6 +182,9 @@ const businessTypes = [
     examples: ['Home & Garden', 'Health & Beauty', 'Sports', 'Toys', 'Books'],
   },
 ];
+
+
+
 
 export default function CategoryQuickStartPage() {
   const params = useParams();
@@ -59,6 +202,8 @@ export default function CategoryQuickStartPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [generatedCount, setGeneratedCount] = useState(0);
+  const [duplicatesSkipped, setDuplicatesSkipped] = useState(0);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   // Update category count when business type changes
   const handleTypeChange = (typeId: BusinessType) => {
@@ -76,40 +221,10 @@ export default function CategoryQuickStartPage() {
     setError(null);
 
     try {
-      // Get access token from localStorage
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${tenantId}/categories/quick-start`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          businessType: selectedType,
-          categoryCount,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        // Check if it's an auth/permission error
-        if (response.status === 401 || response.status === 403) {
-          setError(data.message || 'You do not have permission to use Category Quick Start');
-          setIsGenerating(false);
-          return;
-        }
-        throw new Error(data.message || 'Failed to generate categories');
-      }
-
-      const data = await response.json();
-      setGeneratedCount(data.categoriesCreated);
+      const categories = await adminCategoriesService.getQuickStartCategories(selectedType, categoryCount);
+      setGeneratedCount(categories.length);
+      setDuplicatesSkipped(0); // Would need to be tracked by service
+      setResultMessage(`Successfully generated ${categories.length} categories`);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
@@ -259,14 +374,30 @@ export default function CategoryQuickStartPage() {
           className="max-w-2xl w-full"
         >
           <Card className="p-8 text-center">
-            <div className="text-6xl mb-4">🎉</div>
+            <div className="text-6xl mb-4">{generatedCount === 0 ? '✓' : '🎉'}</div>
             <h1 className="text-3xl font-bold text-neutral-900 mb-4">
-              Categories Created Successfully!
+              {generatedCount === 0 ? 'No New Categories Needed!' : 'Categories Created Successfully!'}
             </h1>
-            <p className="text-lg text-neutral-600 mb-6">
-              Generated <span className="font-bold text-primary-600">{generatedCount} categories</span> for your store
+            <p className="text-lg text-neutral-600 mb-2">
+              {generatedCount === 0 ? (
+                <span>All selected categories already exist in your store.</span>
+              ) : (
+                <>
+                  Generated <span className="font-bold text-primary-600">{generatedCount} new {generatedCount === 1 ? 'category' : 'categories'}</span> for your store
+                </>
+              )}
             </p>
-            <div className="flex gap-3 justify-center">
+            {duplicatesSkipped > 0 && generatedCount > 0 && (
+              <p className="text-sm text-amber-600 mb-4">
+                ⚠️ Skipped {duplicatesSkipped} duplicate {duplicatesSkipped === 1 ? 'category' : 'categories'} that already existed
+              </p>
+            )}
+            {resultMessage && (
+              <p className="text-sm text-neutral-500 mb-4 italic">
+                {resultMessage}
+              </p>
+            )}
+            <div className="flex gap-3 justify-center mt-6">
               <Button onClick={() => router.push(`/t/${tenantId}/categories`)}>
                 View Categories
               </Button>

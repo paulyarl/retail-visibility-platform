@@ -15,8 +15,12 @@ export default function TierBadge({ tier, showDetails = false }: TierBadgeProps)
     switch (level) {
       case 'starter':
         return 'bg-neutral-100 text-neutral-700 border-neutral-300';
-      case 'growth':
+      case 'discovery':
         return 'bg-blue-100 text-blue-700 border-blue-300';
+      case 'commitment':
+        return 'bg-indigo-100 text-indigo-700 border-indigo-300';
+      case 'storefront':
+        return 'bg-orange-100 text-orange-700 border-orange-300';
       case 'pro':
       case 'professional':
         return 'bg-purple-100 text-purple-700 border-purple-300';
@@ -35,8 +39,12 @@ export default function TierBadge({ tier, showDetails = false }: TierBadgeProps)
     switch (level) {
       case 'starter':
         return '🌱';
-      case 'growth':
-        return '📈';
+      case 'discovery':
+        return '🔍';
+      case 'commitment':
+        return '🤝';
+      case 'storefront':
+        return '🏪';
       case 'pro':
       case 'professional':
         return '⭐';
@@ -59,8 +67,12 @@ export default function TierBadge({ tier, showDetails = false }: TierBadgeProps)
     switch (level) {
       case 'starter':
         return 'Starter';
-      case 'growth':
-        return 'Growth';
+      case 'discovery':
+        return 'Discovery';
+      case 'commitment':
+        return 'Commitment';
+      case 'storefront':
+        return 'Storefront';
       case 'pro':
       case 'professional':
         return 'Professional';
@@ -113,3 +125,4 @@ export default function TierBadge({ tier, showDetails = false }: TierBadgeProps)
     </div>
   );
 }
+

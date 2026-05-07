@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { Sparkles, Zap, RefreshCw, Globe, Store, Package, ArrowRight, CheckCircle } from 'lucide-react';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
+
+
+
 
 export default function AboutDirectoryClient() {
   return (
@@ -282,6 +286,10 @@ export default function AboutDirectoryClient() {
           </div>
         </div>
       </div>
+
+      
+                        {/* Platform Branding Footer */}
+                        <PoweredByFooter />
     </div>
   );
 }

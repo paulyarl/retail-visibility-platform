@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { dashboardDataService } from '@/services/DashboardDataSingletonService';
 
 export interface DashboardStats {
   totalItems: number;
@@ -83,16 +83,8 @@ export function useDashboardData(isAuthenticated: boolean, authLoading: boolean)
         return;
       }
 
-      const url = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
-
-      const response = await api.get(url);
-
-      if (!response.ok) {
-        throw new Error(`Dashboard API returned ${response.status}`);
-      }
-
-      const dashboardData = await response.json();
-      setData(dashboardData);
+      const response = await dashboardDataService.getDashboardData(tenantId);
+      setData(response);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
       setError(errorMessage);

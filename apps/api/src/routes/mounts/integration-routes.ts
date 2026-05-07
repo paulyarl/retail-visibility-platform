@@ -8,6 +8,7 @@ import scanRoutes from '../scan';
 import scanMetricsRoutes from '../scan-metrics';
 import emailTestRoutes from '../email-test';
 import testGbpRoutes from '../test-gbp';
+import oauthRoutes from '../oauth';
 
 /**
  * Mount integration routes
@@ -15,6 +16,10 @@ import testGbpRoutes from '../test-gbp';
  */
 export function mountIntegrationRoutes(app: Express) {
   console.log('🔌 Mounting integration routes...');
+
+  // OAuth for Payment Gateways (PayPal, Square)
+  app.use('/api/oauth', oauthRoutes);
+  console.log('✅ OAuth routes mounted at /api/oauth');
 
   // POS Integrations
   app.use('/api/integrations', cloverRoutes);
@@ -35,7 +40,7 @@ export function mountIntegrationRoutes(app: Express) {
   app.use('/api/google-business', googleBusinessOAuthRoutes);
 
   // Scanning and barcode processing
-  app.use('/api', scanRoutes);
+  app.use('/api/scan', scanRoutes);
   console.log('✅ Scan routes mounted at /api/scan');
   app.use(scanMetricsRoutes);
 

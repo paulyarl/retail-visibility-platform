@@ -1,6 +1,10 @@
-import { Badge, Button, Card, CardContent } from '@/components/ui';
+import { Badge, Card, CardContent, Tooltip } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { Item } from '@/services/itemsDataService';
+import { Copy } from 'lucide-react';
 import SyncStatusIndicator from './SyncStatusIndicator';
+import QuickStockEditor from '@/components/shared/QuickStockEditor';
+import VariantIndicator from './VariantIndicator';
 
 interface ItemsListProps {
   items: Item[];
@@ -9,10 +13,19 @@ interface ItemsListProps {
   onQRCode: (item: Item) => void;
   onPhotos: (item: Item) => void;
   onCategory: (item: Item) => void;
+  onClone?: (item: Item) => void;
   onPropagate?: (item: Item) => void;
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
+  onStockUpdate?: (itemId: string, newStock: number) => Promise<void>;
+  onRestore?: (item: Item) => void;
+  onPurge?: (item: Item) => void;
   tenantId?: string;
+  bulkMode?: boolean;
+  selectedItems?: Set<string>;
+  onToggleSelection?: (itemId: string) => void;
+  hasOrganizationAccess?: boolean;
+  organizationData?: any;
 }
 
 /**
@@ -26,11 +39,27 @@ export default function ItemsList({
   onQRCode,
   onPhotos,
   onCategory,
+  onClone,
   onPropagate,
   onVisibilityToggle,
   onStatusToggle,
+  onStockUpdate,
+  onRestore,
+  onPurge,
   tenantId,
+  bulkMode = false,
+  selectedItems = new Set(),
+  onToggleSelection,
+  hasOrganizationAccess,
+  organizationData,
 }: ItemsListProps) {
+  // Stock status helper function
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { status: 'out', color: 'text-red-600 bg-red-50', label: 'Out of Stock' };
+    if (stock < 5) return { status: 'low', color: 'text-orange-600 bg-orange-50', label: 'Low Stock' };
+    return { status: 'good', color: 'text-green-600 bg-green-50', label: 'In Stock' };
+  };
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12">
@@ -52,30 +81,62 @@ export default function ItemsList({
       {items.map((item) => (
         <Card 
           key={item.id} 
-          className="border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900"
+          className={`group hover:shadow-lg transition-all duration-200 ${bulkMode ? 'ring-2 ring-primary-500' : ''} ${selectedItems.has(item.id) ? 'ring-2 ring-primary-500 bg-primary-50/50' : ''} border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-100 dark:to-neutral-200`}
         >
           <CardContent className="p-3 sm:p-4 md:p-5">
             {/* Row 1: Main Info */}
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-2 sm:mb-3">
-              {/* Image - Primary photo - Clickable */}
-              <div 
-                className="flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
-                title="View item details"
-              >
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shadow-md border-2 border-neutral-200 dark:border-neutral-600"
+              {/* Checkbox for bulk selection */}
+              {bulkMode && (
+                <div className="flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.has(item.id)}
+                    onChange={() => onToggleSelection?.(item.id)}
+                    className="w-5 h-5 rounded border-2 border-neutral-300 dark:border-neutral-600 cursor-pointer"
                   />
-                ) : (
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border-2 border-neutral-200 dark:border-neutral-600">
-                    <svg className="w-8 h-8 sm:w-10 sm:h-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                </div>
+              )}
+              
+              {/* Image - Primary photo - Clickable */}
+              <div className="relative flex-shrink-0">
+                <div 
+                  className="cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    if (bulkMode && onToggleSelection) {
+                      onToggleSelection(item.id);
+                    } else {
+                      tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                    }
+                  }}
+                  title={bulkMode ? "Click to select" : "View item details"}
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shadow-md border-2 border-neutral-200 dark:border-neutral-600"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border-2 border-neutral-200 dark:border-neutral-600">
+                      <svg className="w-8 h-8 sm:w-10 sm:h-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Photo Count Badge */}
+                {item.photoCount && item.photoCount > 1 && (
+                  <div className="absolute -top-1 -right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    +{item.photoCount - 1}
                   </div>
                 )}
+                
+                {/* Stock Status Badge */}
+                <div className={`absolute -bottom-1 -right-1 ${getStockStatus(item.stock).color} text-xs px-1.5 py-0.5 rounded-full font-medium`}>
+                  {getStockStatus(item.stock).label}
+                </div>
               </div>
 
               {/* Details */}
@@ -83,24 +144,44 @@ export default function ItemsList({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 
-                      className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white mb-0.5 sm:mb-1 truncate cursor-pointer hover:text-primary-600 transition-colors"
+                      className="text-base sm:text-lg font-bold text-neutral-900 mb-0.5 sm:mb-1 truncate cursor-pointer hover:text-primary-600 transition-colors"
                       onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
                       title="View item details"
                     >
                       {item.name}
                     </h3>
                     <p className="text-xs sm:text-sm text-neutral-500 font-mono">{item.sku}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm text-neutral-400 font-mono">
+                        /products/{item.id}
+                      </span>
+                      <Tooltip content="Copy product URL">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700"
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/products/${item.id}`)}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                    </div>
                     {item.description && (
-                      <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">
+                      <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-800 mt-1 line-clamp-2">
                         {item.description}
                       </p>
                     )}
-                    {item.categoryPath && item.categoryPath.length > 0 && (
-                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800 mt-1">
+                    {item.tenantCategory && (
+                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-700 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800 mt-1">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
-                        {item.categoryPath.join(' › ')}
+                        <span>{typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || ''}</span>
+                        {item.tenantCategory.googleCategoryId && (
+                          <span className="text-blue-600 dark:text-blue-900 font-mono" title="Google Category ID">
+                            ({item.tenantCategory.googleCategoryId})
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -108,8 +189,8 @@ export default function ItemsList({
                   {/* Badges & Sync Status */}
                   <div className="flex flex-col gap-2 items-end">
                     <div className="flex flex-wrap gap-2 justify-end">
-                      <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : item.status === 'draft' ? 'info' : 'default'}>
-                        {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : item.status === 'draft' ? 'Draft' : 'Archived'}
+                      <Badge variant={(item.itemStatus || item.status) === 'active' ? 'success' : (item.itemStatus || item.status) === 'syncing' ? 'info' : (item.itemStatus || item.status) === 'draft' ? 'info' : 'default'}>
+                        {(item.itemStatus || item.status) === 'active' ? 'Active' : (item.itemStatus || item.status) === 'syncing' ? 'Syncing' : (item.itemStatus || item.status) === 'draft' ? 'Draft' : 'Archived'}
                       </Badge>
                       <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
                         {item.visibility}
@@ -119,7 +200,7 @@ export default function ItemsList({
                     <SyncStatusIndicator 
                       itemStatus={item.status}
                       visibility={item.visibility}
-                      categoryPath={item.categoryPath}
+                      tenantCategoryId={item.tenantCategoryId}
                       showDetails={true}
                     />
                   </div>
@@ -129,22 +210,42 @@ export default function ItemsList({
                 <div className="flex items-center gap-6 mt-2">
                   <div>
                     <p className="text-xs text-neutral-500">Price</p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-white">
+                    <p className="text-xl font-bold text-neutral-900">
                       {item.price && item.price > 0 ? `$${item.price.toFixed(2)}` : ''}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-neutral-500">Stock</p>
-                    <p className={`text-lg font-semibold ${item.stock < 10 ? 'text-warning' : 'text-success'}`}>
-                      {item.stock}
-                    </p>
+                    {onStockUpdate ? (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs text-neutral-500">Stock</p>
+                        <QuickStockEditor
+                          itemId={item.id}
+                          itemName={item.name}
+                          currentStock={item.stock}
+                          onUpdate={onStockUpdate}
+                          className="text-lg font-semibold"
+                          compact={false}
+                          showStatus={true}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-neutral-500">Stock</p>
+                        <p className={`text-lg font-semibold ${item.stock < 10 ? 'text-warning' : 'text-success'}`}>
+                          {item.stock}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {/* Variant Information */}
+                <VariantIndicator item={item} compact={true} showDetails={true} />
               </div>
             </div>
 
             {/* Row 2: Actions - Core sync actions first, then additional, then blocking */}
-            <div className="flex flex-wrap gap-2 pt-4 mt-1 border-t-2 border-gradient-to-r from-neutral-200 via-neutral-300 to-neutral-200 dark:from-neutral-700 dark:via-neutral-600 dark:to-neutral-700">
+            <div className="flex flex-wrap gap-2 pt-4 mt-1 border-t-2 dark:border-neutral-800 border-gradient-to-r from-neutral-200 via-neutral-300 to-neutral-200 dark:from-neutral-700 dark:via-neutral-600 dark:to-neutral-700">
               {/* CORE SYNC ACTIONS - Edit, Photos, Category */}
               <Button 
                 size="sm" 
@@ -157,6 +258,20 @@ export default function ItemsList({
                 </svg>
                 Edit
               </Button>
+              {onClone && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => onClone(item)}
+                  title="Clone this product to create a variant (keeps all data, generates new SKU)"
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white border-0"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Clone
+                </Button>
+              )}
               <Button 
                 size="sm" 
                 variant="ghost" 
@@ -213,16 +328,28 @@ export default function ItemsList({
                 size="sm" 
                 variant="ghost"
                 onClick={() => onPropagate?.(item)}
-                disabled={!onPropagate}
-                title={onPropagate ? "Push this product to all your other locations (Starter+ with 2+ locations)" : "Propagate to other locations - Available on Starter tier with 2+ locations"}
-                className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${!onPropagate ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1}
+                title={
+                  hasOrganizationAccess && organizationData && organizationData.tenants.length > 1
+                    ? "Push this product to all your other locations (Starter+ with 2+ locations)"
+                    : !hasOrganizationAccess
+                    ? "Propagation requires organization membership"
+                    : organizationData?.tenants.length <= 1
+                    ? "Propagation requires multiple locations in your organization"
+                    : "Loading organization data..."
+                }
+                className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${
+                  (!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1) ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
                 Propagate
-                {!onPropagate && (
-                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-semibold">ORG</span>
+                {(!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1) && (
+                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-semibold">
+                    {!hasOrganizationAccess ? 'ORG' : organizationData?.tenants.length <= 1 ? '1 LOC' : 'LOAD'}
+                  </span>
                 )}
               </Button>
 
@@ -232,17 +359,17 @@ export default function ItemsList({
                   size="sm" 
                   variant="ghost" 
                   onClick={() => onStatusToggle(item)}
-                  title={item.status === 'active' ? 'Archive this product (will stop syncing to Google, but keeps the data)' : 'Restore from archive (required for Google sync)'}
-                  className={`ml-auto ${item.status === 'active' ? 'text-green-600 hover:text-green-700' : 'text-amber-600 hover:text-amber-700'}`}
+                  title={(item.itemStatus || item.status) === 'active' ? 'Archive this product (will stop syncing to Google, but keeps the data)' : 'Restore from archive (required for Google sync)'}
+                  className={`ml-auto ${(item.itemStatus || item.status) === 'active' ? 'text-green-600 hover:text-green-700' : 'text-amber-600 hover:text-amber-700'}`}
                 >
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    {item.status === 'active' ? (
+                    {(item.itemStatus || item.status) === 'active' ? (
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     ) : (
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     )}
                   </svg>
-                  {item.status === 'active' ? 'Active' : 'Archived'}
+                  {(item.itemStatus || item.status) === 'active' ? 'Active' : 'Archived'}
                 </Button>
               )}
               {onVisibilityToggle && (
@@ -286,6 +413,39 @@ export default function ItemsList({
                 </svg>
                 Trash
               </Button>
+              {/* Show Restore/Purge for trashed items */}
+              {(item.itemStatus || item.status) === 'trashed' && onRestore && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onRestore(item)}
+                  className="text-success hover:text-success"
+                  title="Restore item from trash"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Restore
+                </Button>
+              )}
+              {(item.itemStatus || item.status) === 'trashed' && onPurge && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm(`Permanently delete "${item.name}"? This cannot be undone.`)) {
+                      onPurge(item);
+                    }
+                  }}
+                  className="text-error hover:text-error"
+                  title="Permanently delete this item"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Purge
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,18 +1,36 @@
 import { NextResponse } from 'next/server';
-import { proxyGet, proxyPost, proxyPut } from '@/lib/api-proxy';
+import { rbacService } from '@/services/RBACService';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const path = `/permissions${url.search}`;
+  const params: {
+    resource?: string;
+    action?: string;
+    isActive?: boolean;
+  } = {};
+  
+  if (url.searchParams.has('resource')) {
+    params.resource = url.searchParams.get('resource')!;
+  }
+  if (url.searchParams.has('action')) {
+    params.action = url.searchParams.get('action')!;
+  }
+  if (url.searchParams.has('isActive')) {
+    params.isActive = url.searchParams.get('isActive') === 'true';
+  }
   
   try {
-    const res = await proxyGet(req, path);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    // Get permissions using service with automatic caching
+    const permissions = await rbacService.getPermissions(params);
+    
+    return NextResponse.json(permissions);
   } catch (error) {
-    console.error('[API Proxy /permissions] Error:', error);
+    console.error('[Permissions API GET] Error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed', message: 'Failed to fetch permissions' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch permissions' 
+      },
       { status: 500 }
     );
   }
@@ -20,17 +38,29 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const url = new URL(req.url);
-  const path = `/permissions${url.pathname.replace('/api/permissions', '')}${url.search}`;
+  const path = url.pathname.replace('/api/permissions', '');
   
   try {
     const body = await req.json();
-    const res = await proxyPost(req, path, body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Create permission using service with automatic cache invalidation
+    const newPermission = await rbacService.createPermission(body);
+    
+    if (!newPermission) {
+      return NextResponse.json({ 
+        error: 'creation_failed',
+        message: 'Failed to create permission' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(newPermission, { status: 201 });
   } catch (error) {
-    console.error('[API Proxy /permissions POST] Error:', error);
+    console.error('[Permissions API POST] Error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed', message: 'Failed to update permissions' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to create permission' 
+      },
       { status: 500 }
     );
   }
@@ -38,17 +68,30 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   const url = new URL(req.url);
-  const path = `/permissions${url.pathname.replace('/api/permissions', '')}${url.search}`;
+  const pathParts = url.pathname.split('/');
+  const permissionId = pathParts[pathParts.length - 1];
   
   try {
     const body = await req.json();
-    const res = await proxyPut(req, path, body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Update permission using service with automatic cache invalidation
+    const updatedPermission = await rbacService.updatePermission(permissionId, body);
+    
+    if (!updatedPermission) {
+      return NextResponse.json({ 
+        error: 'update_failed',
+        message: 'Failed to update permission' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(updatedPermission);
   } catch (error) {
-    console.error('[API Proxy /permissions PUT] Error:', error);
+    console.error('[Permissions API PUT] Error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed', message: 'Failed to update permission' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to update permission' 
+      },
       { status: 500 }
     );
   }

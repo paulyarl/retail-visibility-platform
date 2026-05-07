@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Tag } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface CategoryPageProps {
   params: {
@@ -69,20 +70,10 @@ const CATEGORY_INFO: Record<string, { name: string; description: string; emoji: 
 };
 
 async function getCategoryListings(category: string, page: number = 1) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   const limit = 12;
   
   try {
-    const res = await fetch(
-      `${apiUrl}/api/directory/search?category=${encodeURIComponent(category)}&page=${page}&limit=${limit}`,
-      { next: { revalidate: 300 } }
-    );
-
-    if (!res.ok) {
-      return null;
-    }
-
-    return await res.json();
+    return await recommendationsService.searchByCategory(category, page, limit);
   } catch (error) {
     console.error('Error fetching category listings:', error);
     return null;

@@ -68,7 +68,7 @@ export function deriveInternalStatus(tenant: {
   // 4. Check for explicit expired status (from auto-downgrade)
   if (status === 'expired') {
     // If tier is google_only, check maintenance window
-    if (tier === 'google_only') {
+    if (tier === 'google_only' || tier === 'discovery') {
       const maintenanceState = getMaintenanceState({
         tier,
         status,
@@ -95,7 +95,7 @@ export function deriveInternalStatus(tenant: {
     }
 
     // Check if this is google_only tier (internal maintenance tier)
-    if (tier === 'google_only') {
+    if (tier === 'google_only' || tier === 'discovery') {
       // This shouldn't happen (google_only should have status='expired')
       // but handle it gracefully
       const maintenanceState = getMaintenanceState({
@@ -136,7 +136,7 @@ export function getMaintenanceState(ctx: {
 
   let inMaintenanceWindow = false;
 
-  if (tier === 'google_only' && !isInactive) {
+  if ((tier === 'google_only' || tier === 'discovery') && !isInactive) {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true; // No boundary = always maintenance
     } else {
@@ -148,7 +148,7 @@ export function getMaintenanceState(ctx: {
   }
 
   // For google_only with expired status, check maintenance window
-  if (tier === 'google_only' && status === 'expired') {
+  if ((tier === 'google_only' || tier === 'discovery') && status === 'expired') {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true;
     } else {
@@ -159,8 +159,8 @@ export function getMaintenanceState(ctx: {
     }
   }
 
-  const isFullyFrozen = (isInactive && tier === 'google_only' && !inMaintenanceWindow) || 
-                        (tier === 'google_only' && !inMaintenanceWindow);
+  const isFullyFrozen = (isInactive && (tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow) || 
+                        ((tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow);
 
   if (inMaintenanceWindow) return 'maintenance';
   if (isFullyFrozen) return 'freeze';

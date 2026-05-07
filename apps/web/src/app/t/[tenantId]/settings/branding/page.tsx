@@ -2,13 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Label, Alert, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Image from 'next/image';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
+
+// Force dynamic rendering to prevent prerendering issues
+export const dynamic = 'force-dynamic';
 
 export default function TenantBrandingPage() {
   const params = useParams();
@@ -40,36 +44,55 @@ export default function TenantBrandingPage() {
 
   const loadBranding = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
       // Fetch tenant info for name, logo, and banner
-      const tenantResponse = await api.get(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`);
+      const tenantData = await platformHomeService.getTenant(tenantId);
       let tenantName = '';
       let logoUrl = '';
       let bannerUrl = '';
       
-      if (tenantResponse.ok) {
-        const tenantData = await tenantResponse.json();
+      if (tenantData) {
         tenantName = tenantData.name || '';
-        // Logo and banner are stored in tenant.metadata
-        logoUrl = tenantData.metadata?.logo_url || '';
-        bannerUrl = tenantData.metadata?.banner_url || '';
+        // Logo and banner - handle both snake_case (API response) and camelCase (TypeScript interface)
+        logoUrl = (tenantData as any).logo_url || tenantData.logoUrl || '';
+        bannerUrl = (tenantData as any).banner_url || tenantData.bannerUrl || '';
+        // console.log(`[Branding] Logo URL from tenant: ${logoUrl}`);
+        // console.log(`[Branding] Banner URL from tenant: ${bannerUrl}`);
       }
-      
-      // Fetch profile for business description
+
+      // Fetch profile for business description and check for logo/banner there too
       let businessName = tenantName;
       let businessDescription = '';
       
       try {
-        const response = await api.get(`${apiBaseUrl}/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
-        if (response.ok) {
-          const data = await response.json();
+        const profileData = await platformHomeService.getTenantProfile(tenantId);
+        // console.log(`[Branding] Profile data:`, profileData);
+        if (profileData) {
           // Use tenant name if no business_name is set, otherwise use business_name
-          businessName = data.business_name || tenantName || '';
-          businessDescription = data.business_description || '';
+          businessName = profileData?.business_name || tenantName || '';
+          businessDescription = profileData?.website || '';
+          
+          // Check for logo and banner in profile data (this is where logo_url should be)
+          if (!logoUrl) logoUrl = profileData?.logo_url || '';
+          if (!bannerUrl) bannerUrl = profileData?.banner_url || '';
+          // console.log(`[Branding] Logo URL after profile check: ${logoUrl}`);
+          // console.log(`[Branding] Banner URL after profile check: ${bannerUrl}`);
         }
       } catch (profileErr) {
         console.warn('Profile fetch failed, using tenant name:', profileErr);
+      }
+      
+      // If no logo found, try to get it from mv_global_discovery
+      if (!logoUrl) {
+        try {
+          const logoData = await platformHomeService.getTenantLogo(tenantId);
+          // console.log(`[Branding] Logo data:`, logoData);
+          if (logoData?.success && logoData.data && logoData.data.length > 0) {
+            logoUrl = logoData.data[0].tenant_logo_url || '';
+            // console.log('[Branding] Found logo from mv_global_discovery:', logoUrl);
+          }
+        } catch (logoErr) {
+          console.warn('Failed to fetch logo from mv_global_discovery:', logoErr);
+        }
       }
       
       // Set all state
@@ -96,32 +119,19 @@ export default function TenantBrandingPage() {
       const result = await uploadImage(file, ImageUploadPresets.logo);
 
       // Upload to backend
-      const body = JSON.stringify({
-        tenant_id: tenantId,
-        dataUrl: result.dataUrl,
-        contentType: result.contentType,
-      });
-
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Logo upload error:', errorData);
-        throw new Error(errorData.message || errorData.error || 'Upload failed');
-      }
-
-      const payload = await res.json();
-      const uploadedUrl = payload.url;
+      const payload = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+      const uploadedUrl = payload.data?.url;
+      // console.log(`[Branding] Logo upload payload:`, payload);
       
       if (uploadedUrl) {
+        // console.log('[Branding] Logo upload successful, URL:', uploadedUrl);
         setLogoUrl(uploadedUrl);
         setLogoPreview(uploadedUrl);
         setSuccess('Logo uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
+      } else {
+        console.error('[Branding] Logo upload response missing URL:', payload);
+        setError('Logo upload succeeded but no URL was returned');
       }
     } catch (err: any) {
       console.error('Logo upload error:', err);
@@ -147,32 +157,19 @@ export default function TenantBrandingPage() {
       const result = await uploadImage(file, ImageUploadPresets.banner);
 
       // Upload to backend
-      const body = JSON.stringify({
-        tenant_id: tenantId,
-        dataUrl: result.dataUrl,
-        contentType: result.contentType,
-      });
-
-      const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/banner`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Banner upload error:', errorData);
-        throw new Error(errorData.message || errorData.error || 'Upload failed');
-      }
-
-      const payload = await res.json();
-      const uploadedUrl = payload.url;
+      const payload = await platformHomeService.uploadTenantBanner(tenantId, result.dataUrl, result.contentType);
+      const uploadedUrl = payload.data?.url;
+      // console.log(`[Branding] Banner upload payload:`, payload);
       
       if (uploadedUrl) {
+        // console.log('[Branding] Banner upload successful, URL:', uploadedUrl);
         setBannerUrl(uploadedUrl);
         setBannerPreview(uploadedUrl);
         setSuccess('Banner uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
+      } else {
+        console.error('[Branding] Banner upload response missing URL:', payload);
+        setError('Banner upload succeeded but no URL was returned');
       }
     } catch (err: any) {
       console.error('Banner upload error:', err);
@@ -190,55 +187,38 @@ export default function TenantBrandingPage() {
   };
 
   const handleSave = async () => {
+    // console.log('[Branding] Save clicked with values:', {
+    //   businessName,
+    //   tagline,
+    //   logoUrl,
+    //   bannerUrl
+    // });
+    
     try {
       setSaving(true);
       setError(null);
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
       // Update tenant name
-      const tenantResponse = await fetch(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: businessName,
-        }),
-      });
-
-      if (!tenantResponse.ok) {
-        const errorData = await tenantResponse.json().catch(() => ({}));
-        console.error('Tenant name update failed:', tenantResponse.status, errorData);
-        throw new Error('Failed to update tenant name');
-      }
+      await platformHomeService.updateTenantName(tenantId, businessName);
       
       // Update profile (business description, logo, banner)
-      const response = await fetch(`${apiBaseUrl}/tenant/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          business_name: businessName,
-          business_description: tagline,
-          logo_url: logoUrl,
-          banner_url: bannerUrl,
-        }),
+      // console.log('[Branding] Sending profile update:', {
+      //   tenant_id: tenantId,
+      //   business_name: businessName,
+      //   business_description: tagline,
+      //   logo_url: logoUrl,
+      //   banner_url: bannerUrl,
+      // });
+      
+      const response = await platformHomeService.updateTenantProfileBranding(tenantId, {
+        business_name: businessName,
+        business_description: tagline,
+        logo_url: logoUrl,
+        banner_url: bannerUrl,
       });
 
-      if (response.ok) {
-        setSuccess('Branding updated successfully!');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Save failed:', response.status, errorData);
-        throw new Error(errorData.message || errorData.error || 'Failed to update branding');
-      }
+      setSuccess('Branding updated successfully!');
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       console.error('Save error:', err);
       setError(err.message || 'Failed to save branding');
@@ -308,6 +288,8 @@ export default function TenantBrandingPage() {
                     alt="Store logo"
                     fill
                     className="object-contain"
+                    loading="eager"
+                    sizes="(max-width: 768px) 192px, 192px"
                   />
                 </div>
               </div>
@@ -364,6 +346,8 @@ export default function TenantBrandingPage() {
                     alt="Store banner"
                     fill
                     className="object-contain"
+                    loading="eager"
+                    sizes="(max-width: 768px) 100vw, 768px"
                   />
                 </div>
               </div>
@@ -444,7 +428,7 @@ export default function TenantBrandingPage() {
         {/* Save Button */}
         <div className="flex justify-end gap-3">
           <Button
-            variant="secondary"
+             variant="secondary" style={{ color: 'white' }}
             onClick={loadBranding}
             disabled={loading || saving}
           >
@@ -452,6 +436,8 @@ export default function TenantBrandingPage() {
           </Button>
           <Button
             onClick={handleSave}
+            variant="filled"
+            style={{ color: 'white' }}
             disabled={loading || saving || uploadingLogo || uploadingBanner}
           >
             {saving ? 'Saving...' : 'Save Changes'}
