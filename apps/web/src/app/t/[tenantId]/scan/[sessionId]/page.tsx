@@ -57,22 +57,22 @@ export default function TenantActiveScanPage() {
 
   const loadSession = async () => {
     try {
-      console.log('[TenantScanSession] Loading session:', sessionId);
+      // console.log('[TenantScanSession] Loading session:', sessionId);
       const sessionData = await itemsSingletonService.getScanSession(sessionId);
-      console.log('[TenantScanSession] Session data response:', sessionData);
+      // console.log('[TenantScanSession] Session data response:', sessionData);
       
       if (sessionData && sessionData.success && sessionData.data) {
         const session = sessionData.data.session || sessionData.data; // Handle nested structure
-        console.log('[TenantScanSession] Parsed session:', session);
-        console.log('[TenantScanSession] Session status:', session.status);
-        console.log('[TenantScanSession] Session device type:', session.deviceType);
+        // console.log('[TenantScanSession] Parsed session:', session);
+        // console.log('[TenantScanSession] Session status:', session.status);
+        // console.log('[TenantScanSession] Session device type:', session.deviceType);
         
         setSession(session);
         setResults(session.results || session.scan_results_list || []);
         
         // Auto-select first result for preview
         const results = session.results || session.scan_results_list || [];
-        console.log('[TenantScanSession] Session results:', results);
+        // console.log('[TenantScanSession] Session results:', results);
         if (results.length > 0 && !selectedResult) {
           setSelectedResult(results[0]);
         }
@@ -95,36 +95,36 @@ export default function TenantActiveScanPage() {
     
     try {
       setScanning(true);
-      console.log('[TenantScanSession] Scanning barcode:', barcode);
+      // console.log('[TenantScanSession] Scanning barcode:', barcode);
       
       const data = await itemsSingletonService.lookupBarcode(sessionId, barcode);
-      console.log('[TenantScanSession] Scan response:', data);
+      // console.log('[TenantScanSession] Scan response:', data);
 
       if (data && data.success) {
         // Add new result to the list
         const newResult = data.result;
-        console.log('[TenantScanSession] New result:', newResult);
+        // console.log('[TenantScanSession] New result:', newResult);
         
         setResults(prev => {
-          console.log('[TenantScanSession] Previous results:', prev);
+          // console.log('[TenantScanSession] Previous results:', prev);
           const updated = [...prev, newResult];
-          console.log('[TenantScanSession] Updated results:', updated);
+          // console.log('[TenantScanSession] Updated results:', updated);
           return updated;
         });
         
         setSession(prev => {
-          console.log('[TenantScanSession] Previous session:', prev);
+          // console.log('[TenantScanSession] Previous session:', prev);
           const updated = prev ? {
             ...prev,
             scannedCount: prev.scannedCount + 1,
             duplicateCount: prev.duplicateCount + (data.duplicate ? 1 : 0)
           } : null;
-          console.log('[TenantScanSession] Updated session:', updated);
+          // console.log('[TenantScanSession] Updated session:', updated);
           return updated;
         });
         
         // Auto-select the new result for preview
-        console.log('[TenantScanSession] Setting selected result:', newResult);
+        // console.log('[TenantScanSession] Setting selected result:', newResult);
         setSelectedResult(newResult);
       } else {
         console.error('[TenantScanSession] Scan failed:', data);
@@ -218,7 +218,7 @@ export default function TenantActiveScanPage() {
       setCommitting(true);
       
       // First, save all enrichment data for all results
-      console.log('Saving enrichment data for all results...');
+      // console.log('Saving enrichment data for all results...');
       for (const result of session.results) {
         if (result.enrichment && Object.keys(result.enrichment).length > 0) {
           try {
@@ -286,9 +286,9 @@ export default function TenantActiveScanPage() {
     );
   }
 
-  console.log('[TenantScanSession] Rendering with session:', session);
-  console.log('[TenantScanSession] Session status for scanner:', session.status);
-  console.log('[TenantScanSession] Device type for scanner:', session.deviceType);
+  // console.log('[TenantScanSession] Rendering with session:', session);
+  // console.log('[TenantScanSession] Session status for scanner:', session.status);
+  // console.log('[TenantScanSession] Device type for scanner:', session.deviceType);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">

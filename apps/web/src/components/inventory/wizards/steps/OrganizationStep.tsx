@@ -28,6 +28,7 @@ import {
   MapPin
 } from 'lucide-react';
 import TenantCategorySelector from '@/components/items/TenantCategorySelector';
+import CategoryAssignmentModal from '@/components/items/CategoryAssignmentModal';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 
 import { Input } from '@/components/ui/Input';
@@ -53,15 +54,27 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryI
         return;
       }
 
-      // For tenant categories (scid- prefix), fetch from tenant service
-      if (categoryId.startsWith('scid-')) {
+      // For tenant categories (scid- or itemcat- prefix), fetch from tenant service
+      if (categoryId.startsWith('scid-') || categoryId.startsWith('itemcat-')) {
         try {
           const { tenantCategoriesService } = await import('@/services/TenantCategoriesService');
           const categories = await tenantCategoriesService.getTenantCategories(tenantId || '');
           const category = categories.find(cat => cat.id === categoryId);
-          
+
           if (category) {
             setCategoryName(category.name);
+            // If category has googleCategoryId, fetch the full taxonomy path
+            if (category.googleCategoryId) {
+              try {
+                const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+                const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(category.googleCategoryId);
+                if (data && data.path && Array.isArray(data.path)) {
+                  setFullCategoryPath(data.path.join(' > '));
+                }
+              } catch {
+                // Ignore taxonomy fetch errors for tenant categories
+              }
+            }
             return;
           }
         } catch (error) {
@@ -72,7 +85,7 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryI
         try {
           const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
           const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
-          
+
           if (data && data.path && Array.isArray(data.path)) {
             const pathString = data.path.join(' > ');
             const finalCategoryName = data.path[data.path.length - 1];
@@ -152,7 +165,7 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
   const [newTag, setNewTag] = useState('');
   const [newSeoKeyword, setNewSeoKeyword] = useState('');
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 
   // Debug: Log when categoryId changes
@@ -165,34 +178,13 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
     });
   }, [data.categoryId, data.googleCategoryId, data.categoryPath]);
 
-  const handleCategoryChange = (categoryId: string, googleCategoryPath?: string, googleTaxonomyId?: string) => {
-    console.log('[OrganizationStep] Category change received:', {
-      categoryId,
-      googleCategoryPath,
-      googleTaxonomyId,
-      currentData: data
-    });
-
-    const newData = {
+  const handleCategoryAssign = async (itemId: string, categoryId: string) => {
+    console.log('[OrganizationStep] Category assigned:', { itemId, categoryId });
+    onChange({
       ...data,
       categoryId
-    };
-
-    // Also update Google category info if provided
-    if (googleTaxonomyId) {
-      newData.googleCategoryId = googleTaxonomyId;
-      console.log('[OrganizationStep] Updating Google category ID:', googleTaxonomyId);
-    }
-
-    // Store category path if provided
-    if (googleCategoryPath) {
-      newData.categoryPath = googleCategoryPath;
-      console.log('[OrganizationStep] Updating category path:', googleCategoryPath);
-    }
-
-    console.log('[OrganizationStep] Calling onChange with new data:', newData);
-    onChange(newData);
-    setShowCategorySelector(false);
+    });
+    setShowCategoryModal(false);
   };
 
   // Removed handleGoogleCategoryChange and handleShopCategoryChange
@@ -357,22 +349,12 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowCategorySelector(!showCategorySelector)}
+              onClick={() => setShowCategoryModal(true)}
               className="w-full"
             >
               <FolderTree className="h-4 w-4 mr-2" />
-              {showCategorySelector ? 'Hide Category Selection' : data.categoryId ? 'Change Category' : 'Select Category'}
+              {data.categoryId ? 'Change Category' : 'Select Category'}
             </Button>
-
-            {showCategorySelector && (
-              <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                <TenantCategorySelector
-                  selectedCategoryId={data.categoryId}
-                  onSelect={handleCategoryChange}
-                  onCancel={() => setShowCategorySelector(false)}
-                />
-              </div>
-            )}
           </div>
 
           {data.categoryId && (
@@ -386,15 +368,7 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
                     </div>
                     <div className="text-sm text-green-700">
                       <div className="border border-green-300 dark:border-green-700 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
-                        {(() => {
-                          console.log('[OrganizationStep] About to render CategoryNameDisplay:', {
-                            categoryId: data.categoryId,
-                            googleCategoryId: data.googleCategoryId,
-                            categoryPath: data.categoryPath,
-                            hasCategoryId: !!data.categoryId
-                          });
-                          return <CategoryNameDisplay categoryId={data.categoryId} tenantId={tenantId} categoryPath={data.categoryPath} />;
-                        })()}
+                        <CategoryNameDisplay categoryId={data.categoryId} tenantId={tenantId} categoryPath={data.categoryPath} />
                       </div>
                     </div>
                   </div>
@@ -653,7 +627,7 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
                 {isFormValid() ? 'Organization configured' : 'Organization needs attention'}
               </h4>
               <p className="text-sm text-gray-600">
-                {isFormValid() 
+                {isFormValid()
                   ? 'Product organization is properly configured with categories and settings.'
                   : 'Please select a product category before continuing.'
                 }
@@ -662,6 +636,22 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
           </div>
         </CardContent>
       </Card>
+
+      {/* Category Assignment Modal */}
+      {showCategoryModal && (
+        <CategoryAssignmentModal
+          item={{
+            id: 'wizard-item',
+            name: 'New Product',
+            sku: '',
+            tenantId: tenantId || '',
+            tenantCategoryId: data.categoryId || ''
+          } as any}
+          onSave={handleCategoryAssign}
+          onClose={() => setShowCategoryModal(false)}
+          tenantId={tenantId}
+        />
+      )}
     </div>
   );
 }

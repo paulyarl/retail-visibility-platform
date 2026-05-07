@@ -28,10 +28,13 @@ import {
   AlertTriangle,
   CheckCircle,
   X,
-  ImagePlus
+  ImagePlus,
+  Loader2
 } from 'lucide-react';
 import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 import VariantPhotoUploadModal from '../VariantPhotoUploadModal';
+import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -67,7 +70,8 @@ interface MediaStepProps {
 
 interface UploadedImage {
   id: string;
-  url: string;
+  url: string; // Supabase URL (permanent)
+  path: string; // Storage path for later linking
   name: string;
   size: number;
   type: string;
@@ -110,31 +114,51 @@ export default function MediaStep({ data, errors, productType, variants, onChang
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Note: PhotoSingleton is available for post-creation photo management
-  // During wizard creation, photos are stored temporarily and uploaded after item creation
-  // Full photo management (upload, delete, reorder) available on item detail page
+  // Note: Photos are uploaded to Supabase immediately during wizard
+  // This avoids localStorage quota issues with base64 data
+  // After item creation, photos are linked to the item via the backend API
 
-  // Handle file upload
+  // Handle file upload with immediate Supabase upload
   const handleFileUpload = useCallback(async (files: FileList, isPrimary: boolean = false) => {
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-      // Simulate file upload with progress
-      for (let i = 0; i < files.length; i++) {
+      const totalFiles = files.length;
+      
+      for (let i = 0; i < totalFiles; i++) {
         const file = files[i];
-        const progress = ((i + 1) / files.length) * 100;
+        const progress = ((i + 1) / totalFiles) * 100;
         setUploadProgress(progress);
 
-        // Simulate upload delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Compress image first
+        const result = await uploadImage(file, ImageUploadPresets.product);
+        
+        if (result.error) {
+          console.error('[MediaStep] Image compression error:', result.error);
+          continue;
+        }
+
+        // Upload to Supabase immediately via service
+        let uploadResult;
+        try {
+          uploadResult = await itemsService.uploadTempPhoto({
+            tenantId,
+            dataUrl: result.dataUrl,
+          });
+          console.log('[MediaStep] Photo uploaded to Supabase:', uploadResult.url);
+        } catch (uploadError) {
+          console.error('[MediaStep] Supabase upload failed:', uploadError);
+          continue; // Skip this image if upload fails
+        }
 
         const uploadedImage: UploadedImage = {
-          id: `img_${Date.now()}_${i}`,
-          url: URL.createObjectURL(file),
+          id: uploadResult.id,
+          url: uploadResult.url, // Permanent Supabase URL
+          path: uploadResult.path, // Storage path for later linking
           name: file.name,
-          size: file.size,
-          type: file.type,
+          size: uploadResult.bytes || result.compressedSize,
+          type: uploadResult.contentType || result.contentType,
           uploadedAt: new Date()
         };
 
@@ -156,7 +180,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [data, onChange]);
+  }, [data, onChange, tenantId]);
 
   // Handle drag and drop
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -188,7 +212,24 @@ export default function MediaStep({ data, errors, productType, variants, onChang
     galleryInputRef.current?.click();
   };
 
-  const handleRemoveImage = (imageId: string, isPrimary: boolean = false) => {
+  const handleRemoveImage = async (imageId: string, isPrimary: boolean = false) => {
+    // Find the image to get its path for deletion
+    const imageToRemove = isPrimary 
+      ? data.primaryImage 
+      : data.galleryImages.find(img => img.id === imageId);
+    
+    // Delete from Supabase using the exact path returned from upload
+    if (imageToRemove?.path) {
+      try {
+        await itemsService.deleteTempPhoto(imageToRemove.path);
+        console.log('[MediaStep] Deleted temp photo from Supabase:', imageToRemove.path);
+      } catch (error) {
+        console.error('[MediaStep] Failed to delete temp photo:', error);
+        // Continue with local removal even if delete fails
+      }
+    }
+    
+    // Remove from local state
     if (isPrimary) {
       onChange({
         ...data,
@@ -345,7 +386,8 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           <Label className="text-base font-medium">
             Primary Image {!productType.hasVariants && <span className="text-red-500">*</span>}
           </Label>
-          <Button onClick={handlePrimaryImageUpload} disabled={isUploading}>
+          <Button onClick={handlePrimaryImageUpload} disabled={isUploading}
+          variant='gradient' style={{ color: 'white' }}>
             <Upload className="h-4 w-4 mr-2" />
             {isUploading ? 'Uploading...' : 'Upload'}
           </Button>
@@ -382,13 +424,13 @@ export default function MediaStep({ data, errors, productType, variants, onChang
                     Uploaded {new Date(data.primaryImage.uploadedAt).toLocaleTimeString()}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
+                <Button 
+                  variant='gradient' style={{ color: 'white' }}
                   size="sm"
                   onClick={() => handleRemoveImage(data.primaryImage.id, true)}
                   className="p-2"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" style={{ color: 'white' }} />
                 </Button>
               </div>
             </CardContent>
@@ -430,7 +472,8 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           <Label className="text-base font-medium">Gallery Images</Label>
           <div className="flex items-center space-x-2">
             <Badge variant="default">{data.galleryImages.length} images</Badge>
-            <Button onClick={handleGalleryUpload} disabled={isUploading}>
+            <Button onClick={handleGalleryUpload} disabled={isUploading}
+            variant='gradient' style={{ color: 'white' }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Images
             </Button>

@@ -136,8 +136,10 @@ interface WizardData {
   // Step 6: Organization & Categories
   organization: {
     categoryId: string;
+    categoryName?: string;
     googleCategoryId?: string;
     shopCategoryId?: string;
+    categoryPath?: string;
     tags: string[];
     seoTitle?: string;
     seoDescription?: string;
@@ -382,34 +384,122 @@ export default function ItemCreationWizard({
     
     setIsLoading(true);
     try {
-      // Use ProductSingleton for automatic caching
-      const { useProductSingleton } = await import('@/providers/data/ProductSingleton');
-      const productSingleton = useProductSingleton();
+      // Fetch product directly from API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/items/${productId}`);
       
-      // Fetch product via singleton (cached)
-      const productData = await productSingleton.actions.fetchProductById(productId, tenantId);
-      
-      if (productData) {
-        // Map existing product data to wizard data structure
-        setWizardData({
-          ...INITIAL_DATA, // Start with all default values
-          basicInfo: {
-            name: productData.name || '',
-            brand: productData.brand || '',
-            manufacturer: (productData as any).manufacturer || '',
-            condition: (productData as any).condition || 'new',
-            mpn: (productData as any).mpn || '',
-            status: (productData as any).status || 'draft'
-          },
-          // TODO: Map other fields from productData
-          productType: INITIAL_DATA.productType,
-          pricing: INITIAL_DATA.pricing,
-          content: INITIAL_DATA.content,
-          media: INITIAL_DATA.media,
-          organization: INITIAL_DATA.organization,
-          review: INITIAL_DATA.review
-        });
+      if (!response.ok) {
+        throw new Error(`Failed to load product: ${response.status}`);
       }
+      
+      const productData = await response.json();
+      console.log('[ItemCreationWizard] Loaded product for editing:', productData);
+      
+      // Extract metadata fields
+      const metadata = productData.metadata || {};
+      
+      // Map existing product data to wizard data structure
+      setWizardData({
+        ...INITIAL_DATA,
+        basicInfo: {
+          name: productData.name || '',
+          brand: productData.brand || '',
+          manufacturer: productData.manufacturer || '',
+          condition: productData.condition?.replace('brand_new', 'new') || 'new',
+          mpn: productData.mpn || '',
+          status: productData.item_status === 'active' ? 'active' : 'draft'
+        },
+        productType: {
+          type: productData.product_type || 'physical',
+          sku: productData.sku || '',
+          hasVariants: productData.has_variants || false,
+          stockQuantity: productData.stock || 0,
+          variants: productData.product_variants || [],
+          variantConfig: metadata.variantConfig || INITIAL_DATA.productType.variantConfig,
+          digitalProduct: {
+            deliveryMethod: productData.digital_delivery_method || 'direct_download',
+            assets: productData.digital_assets || [],
+            licenseType: productData.license_type || 'personal',
+            accessDurationDays: productData.access_duration_days || null,
+            downloadLimit: productData.download_limit || null,
+            externalUrl: '',
+            assetName: '',
+            accessInstructions: ''
+          }
+        },
+        pricing: {
+          listPrice: productData.price_cents || 0,
+          salePrice: metadata.sale_price_cents || productData.sale_price_cents || undefined,
+          variantPricing: INITIAL_DATA.pricing.variantPricing,
+          gatewaySelection: {
+            gateway_type: metadata.payment_gateway_type || productData.payment_gateway_type || null,
+            gateway_id: metadata.payment_gateway_id || productData.payment_gateway_id || null
+          }
+        },
+        content: {
+          description: productData.description || '',
+          enhancedDescription: productData.marketing_description || '',
+          features: metadata.features || [],
+          specifications: metadata.specifications || {},
+          tags: metadata.tags || []
+        },
+        media: {
+          primaryImage: productData.image_url ? {
+            id: `existing-primary-${Date.now()}`,
+            url: productData.image_url,
+            path: '', // No path for existing images
+            name: 'Primary Image',
+            size: 0,
+            type: 'image/jpeg',
+            uploadedAt: new Date()
+          } : null,
+          galleryImages: (productData.image_gallery || []).map((url: string, idx: number) => ({
+            id: `existing-gallery-${idx}-${Date.now()}`,
+            url,
+            path: '', // No path for existing images
+            name: `Gallery Image ${idx + 1}`,
+            size: 0,
+            type: 'image/jpeg',
+            uploadedAt: new Date()
+          })),
+          variantMedia: metadata.variantMedia || INITIAL_DATA.media.variantMedia,
+          videoUrl: metadata.videoUrl || '',
+          videoThumbnail: metadata.videoThumbnail || ''
+        },
+        organization: {
+          categoryId: productData.directory_category_id || productData.tenantCategoryId || '',
+          categoryName: productData.tenantCategory?.name || '',
+          googleCategoryId: productData.tenantCategory?.googleCategoryId || '',
+          categoryPath: productData.category_path?.[0] || '',
+          tags: metadata.tags || [],
+          seoTitle: metadata.seo_title || '',
+          seoDescription: metadata.seo_description || '',
+          seoKeywords: metadata.seo_keywords || [],
+          inventorySettings: {
+            trackInventory: metadata.track_inventory ?? metadata.inventorySettings?.trackInventory ?? true,
+            allowBackorder: metadata.allow_backorder ?? metadata.inventorySettings?.allowBackorder ?? false,
+            lowStockThreshold: metadata.low_stock_threshold || metadata.inventorySettings?.lowStockThreshold || 5,
+            reorderPoint: metadata.inventorySettings?.reorderPoint || 10,
+            maxStockLevel: metadata.inventorySettings?.maxStockLevel || 1000
+          },
+          organizationSettings: metadata.organizationSettings || {
+            featured: productData.is_featured || false,
+            priority: productData.featured_priority || 0,
+            visibility: productData.visibility || 'public',
+            searchable: true
+          },
+          channels: INITIAL_DATA.organization.channels
+        },
+        review: {
+          publishingOptions: metadata.publishingOptions || INITIAL_DATA.review.publishingOptions,
+          featuringOptions: {
+            isFeatured: productData.is_featured || false,
+            featuredDuration: 30,
+            featuredPriority: productData.featured_priority || 0,
+            featuredTypes: productData.featured_type ? [productData.featured_type] : metadata.featuringOptions?.featuredTypes || [],
+            autoFeature: false
+          }
+        }
+      });
     } catch (error) {
       console.error('Error loading product:', error);
     } finally {
@@ -703,6 +793,7 @@ export default function ItemCreationWizard({
               media: wizardData.media,
               // Organization step data from nested organization object
               categoryId: wizardData.organization.categoryId,
+              categoryName: wizardData.organization.categoryName,
               googleCategoryId: wizardData.organization.googleCategoryId,
               shopCategoryId: wizardData.organization.shopCategoryId,
               tags: wizardData.organization.tags,

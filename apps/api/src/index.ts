@@ -28,7 +28,7 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
-import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateTenantVariantId,generateVariantSkuFromParent } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateTenantVariantId, generateVariantSkuFromParent, generateSKU, generateTenantKey } from './lib/id-generator';
 import { propagateVariants } from './utils/variant-propagation';
 
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
@@ -100,7 +100,7 @@ import {
 import billingRoutes from './routes/billing';
 // import subscriptionRoutes from './routes/subscriptions';
 // import categoryRoutes from './routes/categories';
-import photosRouter from './photos';
+import photosRouter, { migrateTempPhotos } from './photos';
 import directoryPhotosRouter from './routes/directory-photos';
 import rateLimitWarningsRoutes from './routes/rate-limit-warnings';
 
@@ -4781,7 +4781,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
     priceCents: price_cents !== null && price_cents !== undefined ? Number(price_cents) : null,
-    salePriceCents: sale_price_cents !== null && sale_price_cents !== undefined ? Number(sale_price_cents) : null,
+    salePriceCents: metadataObj.sale_price_cents ?? (sale_price_cents !== null && sale_price_cents !== undefined ? Number(sale_price_cents) : null),
     imageUrl: image_url || null,
     imageGallery: imageGallery, // Add actual photo gallery data
     tenantCategory,
@@ -4808,8 +4808,18 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     license_type: it.license_type || metadataObj.license_type,
     access_duration_days: it.access_duration_days || metadataObj.access_duration_days,
     download_limit: it.download_limit || metadataObj.download_limit,
-    payment_gateway_type: it.payment_gateway_type || metadataObj.payment_gateway_type,
-    payment_gateway_id: it.payment_gateway_id || metadataObj.payment_gateway_id,
+    payment_gateway_type: metadataObj.payment_gateway_type || it.payment_gateway_type,
+    payment_gateway_id: metadataObj.payment_gateway_id || it.payment_gateway_id,
+    // Metadata fields for display
+    features: metadataObj.features || [],
+    specifications: metadataObj.specifications || {},
+    tags: metadataObj.tags || [],
+    seo_title: metadataObj.seo_title || null,
+    seo_description: metadataObj.seo_description || null,
+    track_inventory: metadataObj.track_inventory ?? true,
+    allow_backorder: metadataObj.allow_backorder ?? false,
+    low_stock_threshold: metadataObj.low_stock_threshold || 5,
+    videoUrl: metadataObj.videoUrl || null,
     // Multi-type featured products support
     featuredTypes: featuredTypesArray, // Array of featured types
     featuredProducts: featuredTypes, // Full featured product details with expirations
@@ -4883,17 +4893,19 @@ const conditionSchema = z.enum(['new', 'brand_new', 'refurbished', 'used']).tran
 const baseItemSchema = z.object({
   tenant_id: z.string().min(1).optional(),
   tenantId: z.string().min(1).optional(), // Accept camelCase from frontend
-  sku: z.string().min(1),
+  sku: z.string().min(1).optional(), // Optional - API will auto-generate if not provided
   name: z.string().min(1),
   price_cents: z.number().int().nonnegative(),
   stock: z.number().int().nonnegative(),
-  image_url: z.string().url().nullable().optional(),
+  image_url: z.string().nullable().optional(),
+  image_gallery: z.array(z.string()).optional(), // Array of image URLs
   metadata: z.any().optional(),
   description: z.string().optional(),
+  marketing_description: z.string().nullable().optional(),
   // v3.4 SWIS fields (required by schema)
   title: z.string().min(1).optional(),
   brand: z.string().min(1).optional(),
-  manufacturer: z.string().optional(),
+  manufacturer: z.string().nullable().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
   availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
@@ -4934,6 +4946,20 @@ const baseItemSchema = z.object({
   // Payment gateway fields
   payment_gateway_type: z.string().nullable().optional(),
   payment_gateway_id: z.string().nullable().optional(),
+  // Sale price
+  sale_price_cents: z.number().int().nonnegative().nullable().optional(),
+  // Tags and SEO
+  tags: z.array(z.string()).optional(),
+  seo_title: z.string().nullable().optional(),
+  seo_description: z.string().nullable().optional(),
+  // Inventory settings
+  track_inventory: z.boolean().optional(),
+  allow_backorder: z.boolean().optional(),
+  low_stock_threshold: z.number().int().optional(),
+  // Featuring
+  is_featured: z.boolean().optional(),
+  featured_priority: z.number().int().optional(),
+  featured_type: z.string().nullable().optional(),
 });
 
 const createItemSchema = baseItemSchema.extend({
@@ -4965,8 +4991,32 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
   console.log('[POST /items] Parsed data:', parsed.data);
   try {
     // Extract variants and other special fields before creating item
-    const { variants, has_variants, product_type, digital_delivery_method, digital_assets, license_type, access_duration_days, download_limit, payment_gateway_type, payment_gateway_id, ...itemData } = parsed.data;
-    
+    const {
+      variants,
+      has_variants,
+      product_type,
+      digital_delivery_method,
+      digital_assets,
+      license_type,
+      access_duration_days,
+      download_limit,
+      payment_gateway_type,
+      payment_gateway_id,
+      image_gallery,
+      sale_price_cents,
+      tags,
+      seo_title,
+      seo_description,
+      is_featured,
+      featured_priority,
+      featured_type,
+      marketing_description,
+      track_inventory,
+      allow_backorder,
+      low_stock_threshold,
+      ...itemData
+    } = parsed.data;
+
     // If category is assigned, look up the slug for category_path
     let categoryPath: string[] = itemData.category_path || [];
     if (itemData.directory_category_id && categoryPath.length === 0) {
@@ -4987,6 +5037,11 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       ...itemData,
       title: itemData.title || itemData.name,
       brand: itemData.brand || 'Unknown',
+      // Auto-generate SKU if not provided
+      sku: itemData.sku || generateSKU({
+        tenantKey: generateTenantKey(itemData.tenant_id || ''),
+        productType: (product_type || 'physical') as 'physical' | 'digital' | 'hybrid',
+      }),
       // Price logic: prioritize price (dollars) over price_cents (cents)
       // Ensure price is never undefined since it's required in the schema
       price: itemData.price ?? (itemData.price_cents ? itemData.price_cents / 100 : 0),
@@ -4998,6 +5053,20 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       // Category assignment - keep both directory_category_id and category_path for storefront compatibility
       directory_category_id: itemData.directory_category_id || null,
       category_path: categoryPath,
+      // Media
+      image_url: itemData.image_url || null,
+      image_gallery: image_gallery || [],
+      // Content
+      marketing_description: marketing_description || null,
+      // Sale price is a DIRECT COLUMN (not metadata)
+      sale_price_cents: sale_price_cents || null,
+      // Payment gateway fields are DIRECT COLUMNS
+      payment_gateway_type: payment_gateway_type || null,
+      payment_gateway_id: payment_gateway_id || null,
+      // Featuring
+      is_featured: is_featured || false,
+      featured_priority: featured_priority || 0,
+      featured_type: featured_type || 'store_selection',
       // Include new fields as direct columns
       has_variants: has_variants || false,
       product_type: product_type || 'physical',
@@ -5006,11 +5075,20 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       license_type: license_type as any,
       access_duration_days: access_duration_days,
       download_limit: download_limit,
-      payment_gateway_type: payment_gateway_type || null,
-      payment_gateway_id: payment_gateway_id || null,
       // Keep metadata for any other custom fields
       metadata: {
         ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? itemData.metadata : {}),
+        tags: tags || [],
+        // SEO settings (not direct columns, store in metadata)
+        seo_title: seo_title || null,
+        seo_description: seo_description || null,
+        // Inventory settings (not direct columns, store in metadata)
+        track_inventory: track_inventory ?? true,
+        allow_backorder: allow_backorder ?? false,
+        low_stock_threshold: low_stock_threshold || 5,
+        // Media settings (store in metadata)
+        videoUrl: (itemData.metadata as any)?.videoUrl || null,
+        videoThumbnail: (itemData.metadata as any)?.videoThumbnail || null,
         // Remove fields that are now in dedicated columns to avoid duplication
         ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? {
           has_variants: undefined,
@@ -5021,8 +5099,6 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
           license_type: undefined,
           access_duration_days: undefined,
           download_limit: undefined,
-          payment_gateway_type: undefined,
-          payment_gateway_id: undefined,
         } : {}),
       } as any,
     };
@@ -5083,6 +5159,70 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       return created;
     });
     
+    // Migrate temp photos to permanent URLs
+    const tenantId = itemData.tenant_id || '';
+    const allPhotoUrls = [
+      result.image_url,
+      ...(result.image_gallery || [])
+    ].filter((url): url is string => Boolean(url));
+    
+    let finalPhotoUrls = allPhotoUrls;
+    
+    if (allPhotoUrls.some(url => url.includes('/temp/'))) {
+      console.log('[POST /items] Migrating temp photos to permanent URLs...');
+      
+      const permanentUrls = await migrateTempPhotos(allPhotoUrls, tenantId, result.id);
+      
+      // Update the item with permanent URLs
+      const [permanentPrimaryUrl, ...permanentGalleryUrls] = permanentUrls;
+      
+      await prisma.inventory_items.update({
+        where: { id: result.id },
+        data: {
+          image_url: permanentPrimaryUrl || result.image_url,
+          image_gallery: permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery,
+        }
+      });
+      
+      // Update result for response
+      result.image_url = permanentPrimaryUrl || result.image_url;
+      result.image_gallery = permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery;
+      finalPhotoUrls = permanentUrls;
+    }
+    
+    // Create photo_assets records for all photos
+    if (finalPhotoUrls.length > 0) {
+      console.log(`[POST /items] Creating ${finalPhotoUrls.length} photo_assets records for item ${result.id}`);
+      
+      for (let i = 0; i < finalPhotoUrls.length; i++) {
+        const photoUrl = finalPhotoUrls[i];
+        const isPrimary = i === 0;
+        
+        try {
+          await prisma.photo_assets.create({
+            data: {
+              id: generatePhotoId(tenantId, result.id),
+              tenantId: tenantId,
+              inventoryItemId: result.id,
+              url: photoUrl,
+              position: i,
+              alt: isPrimary ? `${result.name} - Primary Image` : `${result.name} - Gallery Image ${i}`,
+              caption: null,
+              variant_id: null,
+              width: null,
+              height: null,
+              bytes: null,
+              contentType: 'image/jpeg',
+              exifRemoved: true,
+            }
+          });
+        } catch (photoError) {
+          console.error(`[POST /items] Failed to create photo_assets record for ${photoUrl}:`, photoError);
+          // Continue with other photos even if one fails
+        }
+      }
+    }
+    
     // await audit({ tenant_id: created.tenant_id, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     
     // Convert Decimal price to number and hide price_cents for frontend compatibility
@@ -5110,8 +5250,28 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   }
   console.log('[PUT /items/:id] Validation passed, parsed data:', JSON.stringify(parsed.data));
   try {
-    // Remove tenant_id from update data (can't be changed)
-    const { tenant_id: _, tenantId: __, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = parsed.data;
+    // Extract fields that go into metadata (not direct columns)
+    const {
+      tenant_id: _,
+      tenantId: __,
+      itemStatus,
+      item_status,
+      tenantCategoryId,
+      directory_category_id,
+      status,
+      // Fields to store in metadata (not direct columns)
+      tags,
+      seo_title,
+      seo_description,
+      track_inventory,
+      allow_backorder,
+      low_stock_threshold,
+      // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are DIRECT COLUMNS
+      // Do NOT destructure them - let them pass through to rest for direct storage
+      // Metadata object itself
+      metadata: incomingMetadata,
+      ...rest
+    } = parsed.data;
     
     // Build update data with proper field mappings
     const updateData: any = { ...rest };
@@ -5193,6 +5353,37 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       updateData.price_cents = Math.round(updateData.price * 100);
     } else if (updateData.price_cents !== undefined) {
       updateData.price = updateData.price_cents / 100;
+    }
+    
+    // Build metadata object with fields that are not direct columns
+    const metadataFields: any = {};
+    if (tags !== undefined) metadataFields.tags = tags;
+    if (seo_title !== undefined) metadataFields.seo_title = seo_title;
+    if (seo_description !== undefined) metadataFields.seo_description = seo_description;
+    if (track_inventory !== undefined) metadataFields.track_inventory = track_inventory;
+    if (allow_backorder !== undefined) metadataFields.allow_backorder = allow_backorder;
+    if (low_stock_threshold !== undefined) metadataFields.low_stock_threshold = low_stock_threshold;
+    // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are stored as direct columns
+    // They are NOT stored in metadata
+    
+    // Merge with existing metadata and incoming metadata
+    if (Object.keys(metadataFields).length > 0 || incomingMetadata) {
+      // Get existing item to merge metadata
+      const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const existingItem = await prisma.inventory_items.findUnique({
+        where: { id: itemId },
+        select: { metadata: true }
+      });
+      
+      const existingMetadata = (existingItem?.metadata as any) || {};
+      const mergedMetadata = {
+        ...existingMetadata,
+        ...(incomingMetadata || {}),
+        ...metadataFields,
+      };
+      
+      updateData.metadata = mergedMetadata;
+      console.log('[PUT /items/:id] Merged metadata:', JSON.stringify(mergedMetadata));
     }
     
     // Add updated_at timestamp
@@ -5279,9 +5470,23 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     // Convert Decimal price to number and hide price_cents for frontend compatibility
     const { price_cents, ...itemWithoutPriceCents } = updated;
+    const metadataObj = (updated.metadata as any) || {};
     const transformed = {
       ...itemWithoutPriceCents,
       price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
+      // sale_price_cents, payment_gateway_type, payment_gateway_id are direct columns
+      sale_price_cents: updated.sale_price_cents || null,
+      salePriceCents: updated.sale_price_cents || null,
+      payment_gateway_type: updated.payment_gateway_type || null,
+      payment_gateway_id: updated.payment_gateway_id || null,
+      // Extract other metadata fields for frontend display
+      tags: metadataObj.tags || [],
+      seo_title: metadataObj.seo_title || null,
+      seo_description: metadataObj.seo_description || null,
+      track_inventory: metadataObj.track_inventory ?? true,
+      allow_backorder: metadataObj.allow_backorder ?? false,
+      low_stock_threshold: metadataObj.low_stock_threshold || 5,
+      videoUrl: metadataObj.videoUrl || null,
     };
     
     console.log('[PUT /items/:id] Sending to frontend directory_category_id:', transformed.directory_category_id);

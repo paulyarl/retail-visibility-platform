@@ -283,12 +283,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   // console.log(`tenant: `, tenant);
 
   // Convert images to gallery format for ProductGallery component
+  // console.log(`Product 1 JSON: ${JSON.stringify(product)}`);
   const gallery = product.images?.map(img => ({
     url: img.url,
     alt: product.title,
     caption: null,
     position: img.position,
   })) || [];
+  // console.log(`Convert images: ${gallery}`);
 
   
 
@@ -318,6 +320,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       }))
       .slice(0, 10) // Will be further limited by tier features in TierBasedLandingPage
   };
+  // console.log(`productWithGallery: ${JSON.stringify(productWithGallery)}`)
 
   // Check if product is publicly accessible
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';

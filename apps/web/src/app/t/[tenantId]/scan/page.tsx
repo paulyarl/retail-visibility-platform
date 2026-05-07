@@ -311,6 +311,8 @@ export default function TenantScanPage() {
                 <Button
                   onClick={startNewSession}
                   disabled={creating || !Flags.SKU_SCANNING}
+                  variant='gradient'
+                  style={{color:'white',hover:{color:'indigo'},fontWeight:'bold'}}
                   loading={creating}
                   className="px-6"
                 >

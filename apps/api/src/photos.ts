@@ -18,6 +18,234 @@ const supabase =
     : null;
 
 /**
+ * Utility: Migrate temp photo URLs to permanent URLs
+ * Moves files from {tenantId}/temp/ to {tenantId}/items/{itemId}/
+ * Renames files to remove tmp- prefix and use cleaner names
+ * Returns the new permanent URLs
+ */
+export async function migrateTempPhotos(
+  tempUrls: string[],
+  tenantId: string,
+  itemId: string
+): Promise<string[]> {
+  if (!supabase || !tempUrls.length) return tempUrls;
+
+  const permanentUrls: string[] = [];
+  const timestamp = Date.now();
+
+  for (let i = 0; i < tempUrls.length; i++) {
+    const tempUrl = tempUrls[i];
+    // Check if this is a temp URL
+    if (!tempUrl.includes('/temp/')) {
+      // Not a temp URL, keep as-is
+      permanentUrls.push(tempUrl);
+      continue;
+    }
+
+    try {
+      // Extract the path from the URL
+      // URL format: https://{bucket}.supabase.co/storage/v1/object/public/photos/{tenantId}/temp/{filename}
+      const urlParts = tempUrl.split('/photos/');
+      if (urlParts.length < 2) {
+        permanentUrls.push(tempUrl);
+        continue;
+      }
+
+      const tempPath = urlParts[1]; // e.g., tid-xxx/temp/tmp-xxx.png
+      const originalFilename = tempPath.split('/').pop() || '';
+      
+      // Generate clean filename: remove tmp- prefix, add position prefix
+      // e.g., tmp-ABC123.png -> 01-ABC123.png or primary-ABC123.png
+      const cleanName = originalFilename.replace(/^tmp-/, '');
+      const positionPrefix = i === 0 ? 'primary' : String(i).padStart(2, '0');
+      const extension = cleanName.includes('.') ? cleanName.split('.').pop() : 'png';
+      const newFilename = `${positionPrefix}-${timestamp}-${Math.random().toString(36).substring(2, 8)}.${extension}`;
+      
+      // Construct permanent path: {tenantId}/items/{itemId}/{newFilename}
+      const permanentPath = `${tenantId}/items/${itemId}/${newFilename}`;
+
+      // Download from temp location
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from(StorageBuckets.PHOTOS.name)
+        .download(tempPath);
+
+      if (downloadError || !fileData) {
+        console.error('[migrateTempPhotos] Failed to download temp file:', downloadError);
+        permanentUrls.push(tempUrl); // Keep temp URL as fallback
+        continue;
+      }
+
+      // Upload to permanent location
+      const { error: uploadError } = await supabase.storage
+        .from(StorageBuckets.PHOTOS.name)
+        .upload(permanentPath, fileData, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('[migrateTempPhotos] Failed to upload to permanent location:', uploadError);
+        permanentUrls.push(tempUrl); // Keep temp URL as fallback
+        continue;
+      }
+
+      // Get the new public URL
+      const { data: publicUrlData } = supabase.storage
+        .from(StorageBuckets.PHOTOS.name)
+        .getPublicUrl(permanentPath);
+
+      permanentUrls.push(publicUrlData.publicUrl);
+
+      // Delete the temp file
+      await supabase.storage
+        .from(StorageBuckets.PHOTOS.name)
+        .remove([tempPath]);
+
+      console.log('[migrateTempPhotos] Migrated:', tempPath, '->', permanentPath);
+    } catch (error) {
+      console.error('[migrateTempPhotos] Error migrating photo:', error);
+      permanentUrls.push(tempUrl); // Keep temp URL as fallback
+    }
+  }
+
+  return permanentUrls;
+}
+
+/**
+ * POST /items/photos/temp
+ * Upload a photo to Supabase without linking to an item yet.
+ * Used during item creation wizard to avoid localStorage quota issues.
+ * Returns { id, url, path } for later linking to item.
+ */
+r.post("/photos/temp", upload.single("file"), async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ error: "server is not configured for uploads (missing SUPABASE envs)" });
+    }
+
+    const tenantId = req.body?.tenantId || req.body?.tenant_id;
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenantId is required" });
+    }
+
+    let url: string;
+    let path: string;
+    let contentType: string;
+    let bytes: number;
+
+    // Case A: multipart upload
+    if (req.file) {
+      const f = req.file;
+      const tempId = generateQuickStart("tmp");
+      path = `${tenantId}/temp/${tempId}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+      
+      const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(path, f.buffer, {
+        cacheControl: "3600",
+        contentType: f.mimetype || "application/octet-stream",
+        upsert: false,
+      });
+      
+      if (error) return res.status(500).json({ error: error.message });
+      
+      const pub = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path);
+      url = pub.data.publicUrl;
+      contentType = f.mimetype || "application/octet-stream";
+      bytes = f.size;
+      path = data.path;
+    }
+    // Case B: JSON with dataUrl (base64)
+    else if (req.is("application/json") && req.body?.dataUrl) {
+      const dataUrl = req.body.dataUrl as string;
+      const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ error: "invalid dataUrl format" });
+      }
+      
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      const ext = mimeType.split('/')[1] || 'jpg';
+      const tempId = generateQuickStart("tmp");
+      path = `${tenantId}/temp/${tempId}.${ext}`;
+      
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from(StorageBuckets.PHOTOS.name)
+        .upload(path, buffer, {
+          cacheControl: "3600",
+          contentType: mimeType,
+          upsert: false,
+        });
+      
+      if (uploadError) {
+        return res.status(500).json({ error: uploadError.message });
+      }
+      
+      const pub = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(uploadData.path);
+      url = pub.data.publicUrl;
+      contentType = mimeType;
+      bytes = buffer.length;
+      path = uploadData.path;
+    } else {
+      return res.status(400).json({ error: "provide multipart 'file' or JSON 'dataUrl'" });
+    }
+
+    // Generate a temp ID for reference
+    const tempId = generateQuickStart("tmp");
+
+    return res.status(201).json({
+      id: tempId,
+      url,
+      path,
+      contentType,
+      bytes,
+    });
+  } catch (e: any) {
+    console.error("temp photo upload error", e);
+    return res.status(500).json({ error: e?.message || "upload failed" });
+  }
+});
+
+/**
+ * DELETE /items/photos/temp
+ * Delete a temporary photo from Supabase storage.
+ * Used when user removes a photo during wizard before item creation.
+ * Body: { path: string } - the exact path returned from upload
+ */
+r.delete("/photos/temp", async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ error: "server is not configured for uploads (missing SUPABASE envs)" });
+    }
+
+    const { path } = req.body || {};
+    if (!path) {
+      return res.status(400).json({ error: "path is required" });
+    }
+
+    // Security check: only allow deleting files in temp folders
+    if (!path.includes('/temp/')) {
+      return res.status(400).json({ error: "can only delete temp photos" });
+    }
+
+    // Delete the file directly using the path
+    const { error: deleteError } = await supabase.storage
+      .from(StorageBuckets.PHOTOS.name)
+      .remove([path]);
+
+    if (deleteError) {
+      console.error("temp photo delete error", deleteError);
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    return res.status(200).json({ success: true, path });
+  } catch (e: any) {
+    console.error("temp photo delete error", e);
+    return res.status(500).json({ error: e?.message || "delete failed" });
+  }
+});
+
+/**
  * POST /items/:id/photos
  * Accepts EITHER:
  *  - multipart/form-data with field "file"

@@ -78,10 +78,12 @@ export default function CategoryAssignmentModal({
           } as any);
 
           // console.log('[CategoryAssignmentModal] createCategory response:', newCategory);
-          if (newCategory && newCategory.id) {
-            // console.log('[CategoryAssignmentModal] Created tenant category:', newCategory.id);
-            setSelectedCategoryId(newCategory.id);
-            setSelectedCategoryName(newCategory.name);
+          // Response structure: { success: true, data: { id, name, ... } }
+          const categoryData = (newCategory as any)?.data || newCategory;
+          if (categoryData && categoryData.id) {
+            // console.log('[CategoryAssignmentModal] Created tenant category:', categoryData.id);
+            setSelectedCategoryId(categoryData.id);
+            setSelectedCategoryName(categoryData.name);
           } else {
             console.error('[CategoryAssignmentModal] createCategory returned invalid response:', newCategory);
           }

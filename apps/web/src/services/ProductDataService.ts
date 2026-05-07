@@ -182,6 +182,7 @@ class ProductDataService extends PublicApiSingleton {
 
       const productData = response.data.data; // Fixed: product data is nested
       // console.log(`[ProductDataService] productData: ${JSON.stringify(productData)}`);
+      // console.log(`[ProductDataService] productData: ${JSON.stringify(productData)}`);
       return productData;
     } catch (error) {
       console.error('[ProductDataService] Error in fetchProduct:', error);

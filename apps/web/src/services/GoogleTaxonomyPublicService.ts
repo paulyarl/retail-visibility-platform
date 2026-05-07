@@ -46,7 +46,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<GoogleTaxonomyPath>(
-      `/api/public/google-taxonomy/${googleCategoryId}`,
+      `/public/google-taxonomy/${googleCategoryId}`,
       {},
       `google-taxonomy-${googleCategoryId}`,
       this.TAXONOMY_TTL
@@ -66,7 +66,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    */
   async getPopularGoogleCategories(limit: number = 50): Promise<GoogleTaxonomyPath[] | null> {
     const response = await this.makeDefaultRequest<GoogleTaxonomyPath[]>(
-      `/api/public/google-taxonomy/popular`,
+      `/public/google-taxonomy/popular`,
       {},
       `google-taxonomy-popular`,
       this.TAXONOMY_TTL
@@ -91,7 +91,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<GoogleTaxonomyPath[]>(
-      `/api/public/google-taxonomy/search`,
+      `/public/google-taxonomy/search`,
       { method: 'POST', body: JSON.stringify({ query }) },
       `google-taxonomy-search-${query}`,
       this.TAXONOMY_TTL

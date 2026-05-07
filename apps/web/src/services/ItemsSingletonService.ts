@@ -289,6 +289,55 @@ class ItemsSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Upload a temporary photo to Supabase (not linked to an item yet)
+   * Used during item creation wizard to avoid localStorage quota issues
+   * Returns { id, url, path, contentType, bytes }
+   */
+  async uploadTempPhoto(photoData: {
+    tenantId: string;
+    dataUrl: string;
+  }): Promise<{ id: string; url: string; path: string; contentType: string; bytes: number }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/items/photos/temp`,
+      {
+        method: 'POST',
+        body: JSON.stringify(photoData)
+      },
+      `temp-photo-upload-${Date.now()}`
+    );
+
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to upload temp photo:', result.error);
+      throw result.error;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Delete a temporary photo from Supabase storage
+   * Used when user removes a photo during wizard before item creation
+   * @param path - The exact path returned from uploadTempPhoto
+   */
+  async deleteTempPhoto(path: string): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/items/photos/temp`,
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ path })
+      },
+      `temp-photo-delete-${Date.now()}`
+    );
+
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to delete temp photo:', result.error);
+      return false;
+    }
+
+    return result.data?.success ?? true;
+  }
+
+  /**
    * Upload photos for an item
    * Note: This will invalidate relevant cache entries
    */

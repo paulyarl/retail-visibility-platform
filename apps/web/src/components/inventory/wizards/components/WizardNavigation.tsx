@@ -174,6 +174,8 @@ export default function WizardNavigation({
                 <Button
                   onClick={isLastStep ? onSubmit : onNext}
                   disabled={!canGoNext || isSubmitting}
+                  loading={isSubmitting}
+                  variant='gradient' style={{ color: 'white' }}
                   className="flex items-center gap-2"
                 >
                   {isSubmitting ? (
@@ -196,7 +198,7 @@ export default function WizardNavigation({
               <div className="flex flex-row gap-2">
                 {/* Save Button */}
                 <Button
-                  variant="outline"
+                 variant='gradient' style={{ color: 'white' }}
                   onClick={handleSave}
                   disabled={isSubmitting}
                   className="flex items-center gap-2 flex-1"
@@ -212,7 +214,7 @@ export default function WizardNavigation({
                 {/* Add to Queue Button */}
                 {onAddToQueue && (
                   <Button
-                    variant="outline"
+                    variant='gradient' style={{ color: 'white' }}
                     onClick={onAddToQueue}
                     disabled={isSubmitting || !hasSku}
                     className="flex items-center gap-2"
@@ -228,7 +230,7 @@ export default function WizardNavigation({
             {/* Keyboard Shortcuts Help */}
             <div className="flex items-center justify-between">
               <Button
-                variant="ghost"
+                variant='outline' style={{ color: 'navy' }}
                 size="sm"
                 onClick={() => setShowShortcuts(!showShortcuts)}
                 className="text-xs text-gray-500"

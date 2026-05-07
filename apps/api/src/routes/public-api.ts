@@ -119,7 +119,7 @@ router.get('/products/featured', async (req, res) => {
   try {
     const query = FeaturedProductsQuerySchema.parse(req.query);
 
-    console.log(`[Public API] Featured products request with query:`, query);
+    // console.log(`[Public API] Featured products request with query:`, query);
 
     // Use FeaturedService with intelligent caching
     const { FeaturedService } = await import('../services/FeaturedService');
@@ -171,7 +171,7 @@ router.get('/products/search/global', async (req, res) => {
       });
     }
 
-    console.log(`[Public API] Global product search: "${query.search}"`);
+    // console.log(`[Public API] Global product search: "${query.search}"`);
 
     // Use ProductService for global search
     const { ProductService } = await import('../services/ProductService');
@@ -216,7 +216,7 @@ router.get('/products', async (req, res) => {
   try {
     const query = ProductQuerySchema.parse(req.query);
 
-    console.log(`[Public API] General products request with query:`, query);
+    // console.log(`[Public API] General products request with query:`, query);
 
     // Use FeaturedService to get general product listing
     const { FeaturedService } = await import('../services/FeaturedService');
@@ -252,7 +252,7 @@ router.get('/stores', async (req, res) => {
   try {
     const query = StoreQuerySchema.parse(req.query);
 
-    console.log(`[Public API] Stores request with query:`, query);
+    // console.log(`[Public API] Stores request with query:`, query);
 
     // Use StoreService
     const { StoreService } = await import('../services/StoreService');
@@ -303,7 +303,7 @@ router.get('/stores/search', async (req, res) => {
       });
     }
 
-    console.log(`[Public API] Store search: "${query.search}"`);
+    // console.log(`[Public API] Store search: "${query.search}"`);
 
     // Use StoreService for search
     const { StoreService } = await import('../services/StoreService');

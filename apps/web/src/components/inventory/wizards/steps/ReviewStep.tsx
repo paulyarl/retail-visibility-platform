@@ -48,8 +48,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 
 // Helper component to display category name by ID using CategorySingleton for caching
-function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
-  const [categoryName, setCategoryName] = useState<string>('Loading...');
+function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCategoryId }: { categoryId: string; categoryName?: string; googleCategoryId?: string }) {
+  const [categoryName, setCategoryName] = useState<string>(providedName || 'Loading...');
   const [fullCategoryPath, setFullCategoryPath] = useState<string>('');
   const { state, actions } = useCategorySingleton();
 
@@ -60,7 +60,25 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
         return;
       }
 
-      console.log('[CategoryNameDisplay] Looking for category:', categoryId);
+      // If name was provided directly, use it
+      if (providedName) {
+        setCategoryName(providedName);
+        // Still try to get taxonomy path if we have googleCategoryId
+        if (googleCategoryId) {
+          try {
+            const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+            const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
+            if (data && data.path && Array.isArray(data.path)) {
+              setFullCategoryPath(data.path.join(' > '));
+            }
+          } catch {
+            // Ignore taxonomy fetch errors
+          }
+        }
+        return;
+      }
+
+      console.log('[CategoryNameDisplay] Looking for category:', categoryId, 'googleCategoryId:', googleCategoryId);
 
       // First try to find in tenant categories (using CategorySingleton)
       if (state.categories.length > 0) {
@@ -68,6 +86,19 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
         if (category) {
           console.log('[CategoryNameDisplay] Found in tenant categories:', category.name);
           setCategoryName(category.name);
+          // Use the category's googleCategoryId or the provided one for taxonomy path
+          const gcid =  googleCategoryId;
+          if (gcid) {
+            try {
+              const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+              const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(gcid);
+              if (data && data.path && Array.isArray(data.path)) {
+                setFullCategoryPath(data.path.join(' > '));
+              }
+            } catch {
+              // Ignore taxonomy fetch errors
+            }
+          }
           return;
         }
       } else {
@@ -77,11 +108,24 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
             includeChildren: true,
             includeProductCount: false
           });
-          
+
           const category = actions.getCategoryById(categoryId);
           if (category) {
             console.log('[CategoryNameDisplay] Found in tenant categories after load:', category.name);
             setCategoryName(category.name);
+            // Use the category's googleCategoryId or the provided one for taxonomy path
+            const gcid =  googleCategoryId;
+            if (gcid) {
+              try {
+                const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+                const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(gcid);
+                if (data && data.path && Array.isArray(data.path)) {
+                  setFullCategoryPath(data.path.join(' > '));
+                }
+              } catch {
+                // Ignore taxonomy fetch errors
+              }
+            }
             return;
           }
         } catch (error) {
@@ -89,22 +133,24 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
         }
       }
 
-      // If not found in tenant categories, try Google taxonomy
-      console.log('[CategoryNameDisplay] Not found in tenant categories, trying Google taxonomy...');
-      try {
-        const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-        const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
-        
-        if (data && data.path && Array.isArray(data.path)) {
-          const pathString = data.path.join(' > ');
-          const finalCategoryName = data.path[data.path.length - 1]; // Get last element
-          console.log('[CategoryNameDisplay] Found in Google taxonomy:', pathString);
-          setCategoryName(finalCategoryName);
-          setFullCategoryPath(pathString); // Store full path separately
-          return;
+      // If not found in tenant categories but we have googleCategoryId, use it for taxonomy lookup
+      if (googleCategoryId) {
+        console.log('[CategoryNameDisplay] Using googleCategoryId for taxonomy lookup:', googleCategoryId);
+        try {
+          const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+          const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
+
+          if (data && data.path && Array.isArray(data.path)) {
+            const pathString = data.path.join(' > ');
+            const finalCategoryName = data.path[data.path.length - 1];
+            console.log('[CategoryNameDisplay] Found in Google taxonomy:', pathString);
+            setCategoryName(finalCategoryName);
+            setFullCategoryPath(pathString);
+            return;
+          }
+        } catch (error) {
+          console.error('[CategoryNameDisplay] Error fetching Google taxonomy:', error);
         }
-      } catch (error) {
-        console.error('[CategoryNameDisplay] Error fetching Google taxonomy:', error);
       }
 
       // If still not found, show unknown category
@@ -113,7 +159,7 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
     }
 
     loadCategoryName();
-  }, [categoryId, state.categories.length]);
+  }, [categoryId, providedName, googleCategoryId, state.categories.length]);
 
   return (
     <div className="space-y-1">
@@ -136,6 +182,7 @@ interface ReviewStepProps {
     content: any;
     media: any;
     categoryId?: string;
+    categoryName?: string;
     googleCategoryId?: string;
     shopCategoryId?: string;
     tags: string[];
@@ -326,9 +373,9 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
     if (!data.basicInfo.name || data.basicInfo.name.trim().length < 3) {
       errors.push('Product name is required (min 3 characters)');
     }
-    if (!data.productType.sku || data.productType.sku.trim().length < 2) {
-      errors.push('SKU is required (min 2 characters)');
-    }
+    // if (!data.productType.sku || data.productType.sku.trim().length < 2) {
+    //   errors.push('SKU is required (min 2 characters)');
+    // }
 
     // Product Type Validation
     if (data.productType.hasVariants && data.productType.variants.length === 0) {
@@ -697,7 +744,7 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
                   });
                   return data.categoryId ? (
                     <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/20">
-                      <CategoryNameDisplay categoryId={data.categoryId} />
+                      <CategoryNameDisplay categoryId={data.categoryId} categoryName={data.categoryName} googleCategoryId={data.googleCategoryId} />
                     </div>
                   ) : (
                     <span className="text-sm font-medium text-gray-400">Not set</span>

@@ -266,13 +266,31 @@ export class SingleProductService {
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,
-      quantity: product.quantity || 0,
-      images: photos.map((photo: any) => ({
+      // For simple products, quantity mirrors stock if not explicitly set
+      quantity: product.quantity ?? product.stock ?? 0,
+      images: photos.length > 0 ? photos.map((photo: any) => ({
         id: photo.id,
         url: photo.url,
         position: photo.position,
         isPrimary: photo.position === 0
-      })),
+      })) : (product.image_gallery && Array.isArray(product.image_gallery) && product.image_gallery.length > 0
+        ? [
+            // Prepend image_url as first image if it exists
+            ...(product.image_url ? [{ id: 'primary', url: product.image_url, position: 0, isPrimary: true }] : []),
+            // Then add gallery images
+            ...product.image_gallery.map((url: string, index: number) => ({
+              id: `gallery-${index}`,
+              url,
+              position: index + (product.image_url ? 1 : 0),
+              isPrimary: index === 0 && !product.image_url
+            }))
+          ]
+        : (product.image_url ? [{
+            id: 'primary',
+            url: product.image_url,
+            position: 0,
+            isPrimary: true
+          }] : [])),
       tenant: tenant ? {
         id: tenant.id,
         name: tenant.name,
@@ -420,13 +438,30 @@ export class SingleProductService {
         sku: product.sku || '',
         availability: this.determineAvailability(product.stock, product.quantity),
         stock: product.stock || 0,
-        quantity: product.quantity || 0,
-        images: productPhotos.map((photo: any) => ({
+        quantity: product.quantity ?? product.stock ?? 0,
+        images: productPhotos.length > 0 ? productPhotos.map((photo: any) => ({
           id: photo.id,
           url: photo.url,
           position: photo.position,
           isPrimary: photo.position === 0
-        })),
+        })) : ((product as any).image_gallery && Array.isArray((product as any).image_gallery) && (product as any).image_gallery.length > 0
+          ? [
+              // Prepend image_url as first image if it exists
+              ...((product as any).image_url ? [{ id: 'primary', url: (product as any).image_url, position: 0, isPrimary: true }] : []),
+              // Then add gallery images
+              ...(product as any).image_gallery.map((url: string, index: number) => ({
+                id: `gallery-${index}`,
+                url,
+                position: index + ((product as any).image_url ? 1 : 0),
+                isPrimary: index === 0 && !(product as any).image_url
+              }))
+            ]
+          : ((product as any).image_url ? [{
+              id: 'primary',
+              url: (product as any).image_url,
+              position: 0,
+              isPrimary: true
+            }] : [])),
         tenant: tenant ? {
           id: tenant.id,
           name: tenant.name,
@@ -664,13 +699,30 @@ export class SingleProductService {
         sku: fullProduct.sku || '',
         availability: this.determineAvailability(fullProduct.stock, fullProduct.quantity),
         stock: fullProduct.stock || 0,
-        quantity: fullProduct.quantity || 0,
-        images: photos.map((photo: any) => ({
+        quantity: fullProduct.quantity ?? fullProduct.stock ?? 0,
+        images: photos.length > 0 ? photos.map((photo: any) => ({
           id: photo.id,
           url: photo.url,
           position: photo.position,
           isPrimary: photo.position === 0
-        })),
+        })) : ((fullProduct as any).image_gallery && Array.isArray((fullProduct as any).image_gallery) && (fullProduct as any).image_gallery.length > 0
+          ? [
+              // Prepend image_url as first image if it exists
+              ...((fullProduct as any).image_url ? [{ id: 'primary', url: (fullProduct as any).image_url, position: 0, isPrimary: true }] : []),
+              // Then add gallery images
+              ...(fullProduct as any).image_gallery.map((url: string, index: number) => ({
+                id: `gallery-${index}`,
+                url,
+                position: index + ((fullProduct as any).image_url ? 1 : 0),
+                isPrimary: index === 0 && !(fullProduct as any).image_url
+              }))
+            ]
+          : ((fullProduct as any).image_url ? [{
+              id: 'primary',
+              url: (fullProduct as any).image_url,
+              position: 0,
+              isPrimary: true
+            }] : [])),
         tenant: {
           id: row.tenant_id,
           name: row.tenant_name,
@@ -792,8 +844,25 @@ export class SingleProductService {
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,
-      quantity: product.quantity || 0,
-      images: [], // Should be populated by the calling method
+      quantity: product.quantity ?? product.stock ?? 0,
+      images: (product.image_gallery && Array.isArray(product.image_gallery) && product.image_gallery.length > 0
+        ? [
+            // Prepend image_url as first image if it exists
+            ...(product.image_url ? [{ id: 'primary', url: product.image_url, position: 0, isPrimary: true }] : []),
+            // Then add gallery images
+            ...product.image_gallery.map((url: string, index: number) => ({
+              id: `gallery-${index}`,
+              url,
+              position: index + (product.image_url ? 1 : 0),
+              isPrimary: index === 0 && !product.image_url
+            }))
+          ]
+        : (product.image_url ? [{
+            id: 'primary',
+            url: product.image_url,
+            position: 0,
+            isPrimary: true
+          }] : [])),
       tenant: {
         id: product.tenant_id,
         name: 'Unknown Store',

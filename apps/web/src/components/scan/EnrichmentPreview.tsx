@@ -336,12 +336,27 @@ export default function EnrichmentPreview({
                   </label>
                   <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3 space-y-1">
                     {Object.entries(enrichment.metadata).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between text-sm">
+                      <div key={key} className="text-sm">
                         <span className="text-neutral-600 dark:text-neutral-400 capitalize">
                           {key.replace(/_/g, ' ')}:
                         </span>
-                        <span className="text-neutral-900 dark:text-white font-medium">
-                          {String(value)}
+                        <span className="text-neutral-900 dark:text-white font-medium ml-2">
+                          {value === null ? (
+                            <span className="text-neutral-400 italic">Not available</span>
+                          ) : typeof value === 'object' ? (
+                            Object.keys(value as Record<string, any>).length === 0 ? (
+                              <span className="text-neutral-400 italic">None</span>
+                            ) : (
+                              <span className="pl-2">
+                                {Object.entries(value as Record<string, any>)
+                                  .filter(([, v]) => v !== null && v !== undefined)
+                                  .map(([k, v]) => `${k}: ${v}`)
+                                  .join(', ')}
+                              </span>
+                            )
+                          ) : (
+                            String(value)
+                          )}
                         </span>
                       </div>
                     ))}
