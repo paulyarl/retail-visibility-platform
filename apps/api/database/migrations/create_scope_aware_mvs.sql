@@ -65,6 +65,44 @@ SELECT
   (ii.metadata->>'thumbnail_url')::text as thumbnail_url,
   (ii.metadata->>'featured_image_url')::text as featured_image_url,
   
+  -- PRODUCT SLUG DATA (from product_slug_registry)
+  psr.product_slug,
+  psr.universal_sku,
+  psr.brand_normalized,
+  psr.category_normalized,
+  psr.slug_type,
+  psr.slug_prefix,
+  psr.original_sku,
+  
+  -- PLATFORM AGGREGATE METRICS (from product_slug_registry)
+  -- How many tenants have this product
+  COALESCE(
+    (SELECT COUNT(DISTINCT psr2.tenant_id) 
+     FROM product_slug_registry psr2 
+     WHERE psr2.product_slug = psr.product_slug 
+       AND psr2.is_active = true),
+    1
+  ) as platform_tenant_count,
+  -- Total purchases across all tenants for this product
+  COALESCE(
+    (SELECT SUM(oi.quantity) 
+     FROM order_items oi 
+     JOIN orders o ON o.id = oi.order_id 
+     JOIN inventory_items ii2 ON ii2.id = oi.inventory_item_id 
+     WHERE ii2.product_slug = psr.product_slug
+       AND o.order_status IN ('paid', 'processing', 'shipped', 'delivered')
+       AND o.payment_status IN ('paid', 'partially_refunded')),
+    0
+  ) as platform_purchase_count,
+  -- Total stock across all tenants for this product
+  COALESCE(
+    (SELECT SUM(ii2.stock) 
+     FROM inventory_items ii2 
+     WHERE ii2.product_slug = psr.product_slug
+       AND ii2.item_status = 'active'),
+    0
+  ) as platform_total_stock,
+  
   -- RICH PRICING DATA (from inventory_items)
   ii.price_cents as list_price_cents,
   ii.sale_price_cents,
@@ -431,6 +469,7 @@ LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = t.id
 LEFT JOIN tenant_business_profiles_list tbp ON tbp.tenant_id = t.id
 LEFT JOIN inventory_items ii ON ii.tenant_id = t.id
 LEFT JOIN directory_category dc ON dc.id = ii.directory_category_id AND dc."tenantId" = t.id
+LEFT JOIN product_slug_registry psr ON psr.product_slug = ii.product_slug AND psr.is_active = true
 LEFT JOIN featured_products fp ON fp.inventory_item_id = ii.id 
   AND fp.tenant_id = t.id 
   AND fp.is_active = true

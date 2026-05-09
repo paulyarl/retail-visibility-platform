@@ -1,0 +1,2 @@
+id,tenant_id,timezone,periods,source_hash,last_synced_at,sync_attempts,last_error,created_at,updated_at
+cmhzopmlc0001l10kfbepoalc,cmhtu9abj0000l504ex9c8h2v,America/New_York,"[{""day"": ""MONDAY"", ""open"": ""09:00"", ""close"": ""17:00""}, {""day"": ""TUESDAY"", ""open"": ""09:00"", ""close"": ""17:00""}, {""day"": ""WEDNESDAY"", ""open"": ""09:00"", ""close"": ""17:00""}, {""day"": ""THURSDAY"", ""open"": ""09:00"", ""close"": ""17:00""}, {""day"": ""FRIDAY"", ""open"": ""09:00"", ""close"": ""23:00""}]",,,0,,2025-11-15 02:45:32.448,2025-11-15 02:46:59.153
