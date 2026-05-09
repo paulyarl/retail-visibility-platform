@@ -1060,6 +1060,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 // ... (rest of the code remains the same)
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
   const currentPriceCents = selectedVariant?.price_cents || product.priceCents;
+  const currentListPriceCents = selectedVariant?.price_cents || product.listPriceCents;
   const getStock = (v: any) => v?.inventory_quantity ?? v?.stock ?? v?.variant_stock ?? v?.variant_inventory_quantity ?? 0;
   const currentStock = getStock(selectedVariant) || product.stock;
   const currentSku = selectedVariant?.sku || product.sku;
@@ -1346,7 +1347,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
               </div>
             ) : (
               <PriceDisplay
-                priceCents={currentPriceCents}
+                priceCents={currentListPriceCents}
                 salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
                 variant="large"
                 showSavingsBadge={true}

@@ -30,6 +30,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const isAuthenticated = false;
+  const authLoading = false;
 
   const fetchSettings = async () => {
     try {
@@ -81,6 +84,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       setLoading(false);
     }
   };
+  if (authLoading) {
+    return null;
+  }
 
   useEffect(() => {
     fetchSettings();
