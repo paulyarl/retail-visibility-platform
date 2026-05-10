@@ -84,7 +84,7 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
       if (state.categories.length > 0) {
         const category = actions.getCategoryById(categoryId);
         if (category) {
-          console.log('[CategoryNameDisplay] Found in tenant categories:', category.name);
+          // console.log('[CategoryNameDisplay] Found in tenant categories:', category.name);
           setCategoryName(category.name);
           // Use the category's googleCategoryId or the provided one for taxonomy path
           const gcid =  googleCategoryId;
@@ -111,7 +111,7 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
 
           const category = actions.getCategoryById(categoryId);
           if (category) {
-            console.log('[CategoryNameDisplay] Found in tenant categories after load:', category.name);
+            // console.log('[CategoryNameDisplay] Found in tenant categories after load:', category.name);
             setCategoryName(category.name);
             // Use the category's googleCategoryId or the provided one for taxonomy path
             const gcid =  googleCategoryId;
@@ -135,7 +135,7 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
 
       // If not found in tenant categories but we have googleCategoryId, use it for taxonomy lookup
       if (googleCategoryId) {
-        console.log('[CategoryNameDisplay] Using googleCategoryId for taxonomy lookup:', googleCategoryId);
+        // console.log('[CategoryNameDisplay] Using googleCategoryId for taxonomy lookup:', googleCategoryId);
         try {
           const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
           const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
@@ -143,7 +143,7 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
           if (data && data.path && Array.isArray(data.path)) {
             const pathString = data.path.join(' > ');
             const finalCategoryName = data.path[data.path.length - 1];
-            console.log('[CategoryNameDisplay] Found in Google taxonomy:', pathString);
+            // console.log('[CategoryNameDisplay] Found in Google taxonomy:', pathString);
             setCategoryName(finalCategoryName);
             setFullCategoryPath(pathString);
             return;

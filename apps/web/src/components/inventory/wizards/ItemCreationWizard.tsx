@@ -462,7 +462,7 @@ export default function ItemCreationWizard({
             uploadedAt: new Date()
           })),
           variantMedia: metadata.variantMedia || INITIAL_DATA.media.variantMedia,
-          videoUrl: metadata.videoUrl || '',
+          videoUrl: productData.videoUrl || metadata.videoUrl || '',
           videoThumbnail: metadata.videoThumbnail || ''
         },
         organization: {

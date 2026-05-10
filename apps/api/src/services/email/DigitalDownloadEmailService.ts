@@ -252,6 +252,189 @@ Thanks for your business!
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
+
+  /**
+   * Send expiration reminder email
+   */
+  async sendExpirationReminder(data: {
+    customerEmail: string;
+    customerName: string;
+    expiringAccess: Array<{
+      productName: string;
+      accessToken: string;
+      expiresAt: Date;
+      downloadsRemaining: number | null;
+    }>;
+  }): Promise<void> {
+    console.log('[DigitalDownloadEmail] Sending expiration reminder to:', data.customerEmail);
+
+    const emailHtml = this.generateExpirationReminderHtml(data);
+    const emailText = this.generateExpirationReminderText(data);
+
+    // TODO: Integrate with your email service
+    console.log('[DigitalDownloadEmail] Expiration reminder generated');
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('\n' + '='.repeat(80));
+      console.log('EXPIRATION REMINDER EMAIL');
+      console.log('='.repeat(80));
+      console.log('To:', data.customerEmail);
+      console.log('Subject: ⚠️ Your Digital Downloads Are Expiring Soon');
+      console.log('\n' + emailText);
+      console.log('='.repeat(80) + '\n');
+    }
+  }
+
+  /**
+   * Generate HTML expiration reminder email
+   */
+  private generateExpirationReminderHtml(data: {
+    customerEmail: string;
+    customerName: string;
+    expiringAccess: Array<{
+      productName: string;
+      accessToken: string;
+      expiresAt: Date;
+      downloadsRemaining: number | null;
+    }>;
+  }): string {
+    const accessItems = data.expiringAccess.map(access => {
+      const daysUntilExpiration = Math.ceil(
+        (access.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
+
+      return `
+        <tr>
+          <td style="padding: 20px; border: 1px solid #fbbf24; border-radius: 8px; margin-bottom: 16px; background: #fffbeb;">
+            <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 18px;">
+              ⚠️ ${access.productName}
+            </h3>
+            <p style="margin: 0 0 12px 0; color: #b45309; font-size: 14px;">
+              Expires in <strong>${daysUntilExpiration} day${daysUntilExpiration !== 1 ? 's' : ''}</strong>
+            </p>
+            <a href="${process.env.FRONTEND_URL}/download/${access.accessToken}" 
+               style="display: inline-block; padding: 12px 24px; background: #f59e0b; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+              📥 Download Now Before It Expires
+            </a>
+            ${access.downloadsRemaining !== null ? `
+              <p style="margin: 12px 0 0 0; color: #92400e; font-size: 14px;">
+                Downloads remaining: ${access.downloadsRemaining}
+              </p>
+            ` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Digital Downloads Are Expiring</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(to right, #fef3c7, #fde68a);">
+              <h1 style="margin: 0; color: #92400e; font-size: 28px;">
+                ⚠️ Your Downloads Are Expiring Soon
+              </h1>
+              <p style="margin: 12px 0 0 0; color: #b45309; font-size: 16px;">
+                Hi ${data.customerName}, don't lose access to your purchases!
+              </p>
+            </td>
+          </tr>
+
+          <!-- Expiring Items -->
+          <tr>
+            <td style="padding: 20px 40px;">
+              <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 20px;">Expiring Digital Products:</h2>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                ${accessItems}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Warning -->
+          <tr>
+            <td style="padding: 20px 40px; background: #fef3c7; border-radius: 8px; margin: 20px 40px;">
+              <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">⚡ Act Now</h3>
+              <p style="margin: 0; color: #b45309; font-size: 14px; line-height: 1.6;">
+                Once access expires, you won't be able to download these files. Download them now to ensure you have permanent access to your purchases.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 40px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0;">Questions? Reply to this email or contact support.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Generate plain text expiration reminder email
+   */
+  private generateExpirationReminderText(data: {
+    customerEmail: string;
+    customerName: string;
+    expiringAccess: Array<{
+      productName: string;
+      accessToken: string;
+      expiresAt: Date;
+      downloadsRemaining: number | null;
+    }>;
+  }): string {
+    const accessItems = data.expiringAccess.map(access => {
+      const daysUntilExpiration = Math.ceil(
+        (access.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
+
+      return `
+⚠️ ${access.productName}
+   Expires in: ${daysUntilExpiration} day${daysUntilExpiration !== 1 ? 's' : ''}
+   Download: ${process.env.FRONTEND_URL}/download/${access.accessToken}
+   ${access.downloadsRemaining !== null ? `Downloads remaining: ${access.downloadsRemaining}` : ''}
+      `.trim();
+    }).join('\n\n');
+
+    return `
+⚠️ YOUR DOWNLOADS ARE EXPIRING SOON
+
+Hi ${data.customerName},
+
+Some of your digital purchases will expire soon. Download them now to ensure permanent access!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${accessItems}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ ACT NOW
+
+Once access expires, you won't be able to download these files.
+Download them now to ensure you have permanent access.
+
+Questions? Reply to this email or contact support.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    `.trim();
+  }
 }
 
 // Export singleton instance

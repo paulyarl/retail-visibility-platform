@@ -60,14 +60,18 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
     }
   }
 
-  async addToCart(shopId: string, productId: string, quantity: number): Promise<void> {
+  async addToCart(shopId: string, productId: string, quantity: number, productDetails?: Partial<CartItem>): Promise<void> {
     try {
       // Sync with server first
       await this.makeDefaultRequest<void>(
         `/api/carts/${shopId}/items`,
         {
           method: 'POST',
-          body: JSON.stringify({ productId, quantity })
+          body: JSON.stringify({ 
+            productId, 
+            quantity,
+            productDetails // Include digital product details
+          })
         },
         `cart-add-${shopId}-${productId}`
       );
@@ -89,14 +93,35 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
     if (existingItem) {
       existingItem.quantity += quantity;
       existingItem.lastAdded = new Date().toISOString();
+      // Update digital product details if provided
+      if (productDetails) {
+        existingItem.productType = productDetails.productType;
+        existingItem.digitalDeliveryMethod = productDetails.digitalDeliveryMethod;
+        existingItem.hasDownloadPage = productDetails.hasDownloadPage;
+        existingItem.downloadPageId = productDetails.downloadPageId;
+        existingItem.requiresLicenseKey = productDetails.requiresLicenseKey;
+        existingItem.accessDurationDays = productDetails.accessDurationDays;
+        existingItem.downloadLimit = productDetails.downloadLimit;
+      }
     } else {
-      // In a real implementation, we'd fetch product details
+      // Create new item with digital product details
       const newItem: CartItem = {
         productId,
         quantity,
-        price: 0, // Would fetch from API
+        price: productDetails?.price || 0,
         addedAt: new Date().toISOString(),
-        lastAdded: new Date().toISOString()
+        lastAdded: new Date().toISOString(),
+        productName: productDetails?.productName,
+        productImage: productDetails?.productImage,
+        productSku: productDetails?.productSku,
+        // Digital product fields
+        productType: productDetails?.productType,
+        digitalDeliveryMethod: productDetails?.digitalDeliveryMethod,
+        hasDownloadPage: productDetails?.hasDownloadPage,
+        downloadPageId: productDetails?.downloadPageId,
+        requiresLicenseKey: productDetails?.requiresLicenseKey,
+        accessDurationDays: productDetails?.accessDurationDays,
+        downloadLimit: productDetails?.downloadLimit
       };
       shopCart.items.push(newItem);
     }
@@ -220,12 +245,110 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
     totalShops: number;
     totalItems: number;
     totalPrice: number;
+    hasDigitalProducts: boolean;
+    hasPhysicalProducts: boolean;
+    requiresShipping: boolean;
   }> {
     const platformCart = await this.getPlatformCart();
+    const allItems = Object.values(platformCart.shops).flatMap(shop => shop.items);
+    
+    const hasDigitalProducts = allItems.some(item => 
+      item.productType === 'digital' || item.productType === 'hybrid'
+    );
+    const hasPhysicalProducts = allItems.some(item => 
+      item.productType === 'physical' || item.productType === 'hybrid'
+    );
+    
     return {
       totalShops: Object.keys(platformCart.shops).length,
       totalItems: platformCart.totalItems,
-      totalPrice: platformCart.totalPrice
+      totalPrice: platformCart.totalPrice,
+      hasDigitalProducts,
+      hasPhysicalProducts,
+      requiresShipping: hasPhysicalProducts
+    };
+  }
+
+  // Digital product specific methods
+  async getDigitalCartItems(shopId?: string): Promise<CartItem[]> {
+    const cart = shopId 
+      ? await this.getShopCart(shopId)
+      : await this.getPlatformCart();
+    
+    const items = shopId 
+      ? (cart as ShopCart).items 
+      : Object.values((cart as PlatformCart).shops).flatMap(shop => shop.items);
+    
+    return items.filter(item => 
+      item.productType === 'digital' || item.productType === 'hybrid'
+    );
+  }
+
+  async getPhysicalCartItems(shopId?: string): Promise<CartItem[]> {
+    const cart = shopId 
+      ? await this.getShopCart(shopId)
+      : await this.getPlatformCart();
+    
+    const items = shopId 
+      ? (cart as ShopCart).items 
+      : Object.values((cart as PlatformCart).shops).flatMap(shop => shop.items);
+    
+    return items.filter(item => 
+      item.productType === 'physical' || item.productType === 'hybrid'
+    );
+  }
+
+  async hasDigitalProducts(shopId?: string): Promise<boolean> {
+    const digitalItems = await this.getDigitalCartItems(shopId);
+    return digitalItems.length > 0;
+  }
+
+  async hasLicenseKeyProducts(shopId?: string): Promise<boolean> {
+    const digitalItems = await this.getDigitalCartItems(shopId);
+    return digitalItems.some(item => item.requiresLicenseKey === true);
+  }
+
+  async getCartDigitalSummary(shopId?: string): Promise<{
+    totalDigitalItems: number;
+    totalDownloadPages: number;
+    requiresLicenseActivation: boolean;
+    accessDurations: Array<{ productId: string; productName?: string; durationDays?: number }>;
+    downloadLimits: Array<{ productId: string; productName?: string; limit?: number }>;
+  }> {
+    const digitalItems = await this.getDigitalCartItems(shopId);
+    
+    const uniqueDownloadPages = new Set(
+      digitalItems
+        .filter(item => item.downloadPageId)
+        .map(item => item.downloadPageId)
+    );
+    
+    const requiresLicenseActivation = digitalItems.some(
+      item => item.requiresLicenseKey === true
+    );
+    
+    const accessDurations = digitalItems
+      .filter(item => item.accessDurationDays !== undefined)
+      .map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        durationDays: item.accessDurationDays
+      }));
+    
+    const downloadLimits = digitalItems
+      .filter(item => item.downloadLimit !== undefined)
+      .map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        limit: item.downloadLimit
+      }));
+    
+    return {
+      totalDigitalItems: digitalItems.length,
+      totalDownloadPages: uniqueDownloadPages.size,
+      requiresLicenseActivation,
+      accessDurations,
+      downloadLimits
     };
   }
 }

@@ -1,5 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '../../../prisma';
+import { digitalFulfillmentService } from '../../digital-assets/DigitalFulfillmentService';
+import { realtimeService } from '../../RealtimeService';
 
 /**
  * Stripe Webhook Event Handler
@@ -124,6 +126,9 @@ export class StripeWebhookHandler {
           created_at: new Date(),
         },
       });
+
+      // Fulfill digital products if applicable
+      await this.fulfillDigitalProducts(payment.order_id, payment.tenant_id);
 
       console.log(`[Stripe Webhook] Payment ${payment.id} marked as paid`);
     }
@@ -431,6 +436,56 @@ export class StripeWebhookHandler {
     } catch (error) {
       console.error('[Stripe Webhook] Error fetching balance transaction:', error);
       return null;
+    }
+  }
+
+  /**
+   * Fulfill digital products for an order after successful payment
+   */
+  private static async fulfillDigitalProducts(orderId: string, tenantId: string): Promise<void> {
+    try {
+      const hasDigital = await digitalFulfillmentService.hasDigitalProducts(orderId);
+      
+      if (!hasDigital) {
+        return;
+      }
+
+      console.log(`[Stripe Webhook] Fulfilling digital products for order ${orderId}`);
+
+      const baseUrl = process.env.WEB_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const result = await digitalFulfillmentService.fulfillOrder(orderId, baseUrl);
+
+      if (result.success) {
+        console.log(`[Stripe Webhook] Digital fulfillment complete: ${result.accessGrants.length} grants created`);
+
+        // Get order for customer notification
+        const order = await prisma.orders.findUnique({
+          where: { id: orderId },
+          include: {
+            order_items: {
+              include: { inventory_items: true },
+            },
+          },
+        });
+
+        if (order?.customer_id) {
+          // Send real-time notification
+          await realtimeService.handlePaymentSuccess({
+            id: order.id,
+            customer_id: order.customer_id,
+            customer_email: order.customer_email,
+            items: order.order_items.map(item => ({
+              id: item.id,
+              product_type: (item.inventory_items as any)?.product_type || 'physical',
+            })),
+          });
+        }
+      } else {
+        console.error(`[Stripe Webhook] Digital fulfillment had errors:`, result.errors);
+      }
+    } catch (error) {
+      console.error('[Stripe Webhook] Error fulfilling digital products:', error);
+      // Don't throw - payment was successful, fulfillment can be retried
     }
   }
 }

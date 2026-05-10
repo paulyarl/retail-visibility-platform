@@ -273,15 +273,15 @@ export class DigitalFulfillmentService {
         return {
           productName: grant.productName,
           downloadUrl: grant.downloadUrl,
-          accessDurationDays: accessGrant?.expires_at 
-            ? Math.ceil((accessGrant.expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          accessDurationDays: accessGrant?.access_expires_at 
+            ? Math.ceil((accessGrant.access_expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : null,
-          downloadLimit: accessGrant?.download_limit || null,
-          downloadsRemaining: accessGrant?.download_limit 
-            ? accessGrant.download_limit - (accessGrant.download_count || 0)
+          downloadLimit: accessGrant?.max_downloads || null,
+          downloadsRemaining: accessGrant?.max_downloads 
+            ? accessGrant.max_downloads - (accessGrant.download_count || 0)
             : null,
           fileSize: asset?.file_size_bytes,
-          expiresAt: accessGrant?.expires_at,
+          expiresAt: accessGrant?.access_expires_at,
         };
       })
     );

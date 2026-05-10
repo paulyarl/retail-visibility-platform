@@ -29,6 +29,7 @@ export interface Item {
   };
   imageUrl?: string; // Primary photo URL from backend
   images?: string[]; // Legacy field, may be deprecated
+  imageGallery?: never[]; // Gallery images - kept for type compatibility
   photoCount?: number; // Number of photos for this item
   metadata?: any;
   createdAt?: string;

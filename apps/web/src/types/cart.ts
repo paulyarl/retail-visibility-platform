@@ -13,6 +13,14 @@ export interface CartItem {
   productImage?: string;
   productSku?: string;
   variant?: ProductVariant;
+  // Digital product fields
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: 'direct_download' | 'license_key' | 'external_link' | 'access_grant';
+  hasDownloadPage?: boolean;
+  downloadPageId?: string;
+  requiresLicenseKey?: boolean;
+  accessDurationDays?: number;
+  downloadLimit?: number;
 }
 
 export interface ProductVariant {

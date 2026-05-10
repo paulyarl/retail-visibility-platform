@@ -772,6 +772,100 @@ export const storeStatusRateLimit = rateLimit({
   }
 });
 
+// Rate limiter for digital downloads
+export const downloadRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 downloads per minute
+  message: {
+    error: 'download_rate_limit_exceeded',
+    message: 'Too many download requests, please try again later.',
+    retryAfter: 60 * 1000
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for authenticated platform admin users
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
+  handler: async (req: Request, res: Response) => {
+    // Store rate limit warning for trend analysis
+    await storeRateLimitWarning(req, true);
+
+    // Collect comprehensive incident context for download analytics
+    const incidentContext = await collectIncidentContext(req);
+
+    // Enhance context for download-specific patterns
+    incidentContext.downloadContext = {
+      accessToken: req.params.accessToken?.substring(0, 8) + '...',
+      assetId: req.params.assetId,
+      isDigitalProduct: req.path.includes('/download'),
+    };
+
+    // Log security alert for download rate limit violation
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'download_rate_limit_exceeded',
+        severity: 'warning',
+        title: 'Download Rate Limit Exceeded',
+        message: `Download limit exceeded for ${incidentContext.userContext.isAuthenticated ? 'user' : 'IP'} ${incidentContext.ipAddress} - potential abuse`,
+        metadata: incidentContext,
+      });
+    }
+
+    res.status(429).json({
+      error: 'download_rate_limit_exceeded',
+      message: 'Too many download requests, please try again later.',
+      retryAfter: Math.ceil((req.rateLimit?.resetTime?.getTime() || Date.now() + 60 * 1000) / 1000)
+    });
+  }
+});
+
+// Rate limiter for access token validation (stricter)
+export const accessTokenRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // limit each IP to 30 access validation requests per minute
+  message: {
+    error: 'access_token_rate_limit_exceeded',
+    message: 'Too many access validation requests, please try again later.',
+    retryAfter: 60 * 1000
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req: Request) => {
+    const user = (req as any).user;
+    return user?.role === 'PLATFORM_ADMIN' || user?.role === 'PLATFORM_SUPPORT';
+  },
+  handler: async (req: Request, res: Response) => {
+    await storeRateLimitWarning(req, true);
+
+    const incidentContext = await collectIncidentContext(req);
+
+    // Flag potential token enumeration attacks
+    incidentContext.riskIndicators.potentialTokenEnumeration = true;
+
+    const userId = (req as any).user?.userId || (req as any).user?.user_id;
+    if (userId) {
+      createSecurityAlert({
+        userId,
+        type: 'access_token_rate_limit_exceeded',
+        severity: 'warning',
+        title: 'Access Token Rate Limit Exceeded',
+        message: `Access validation limit exceeded for IP ${incidentContext.ipAddress} - potential token enumeration attack`,
+        metadata: incidentContext,
+      });
+    }
+
+    res.status(429).json({
+      error: 'access_token_rate_limit_exceeded',
+      message: 'Too many access validation requests, please try again later.',
+      retryAfter: Math.ceil((req.rateLimit?.resetTime?.getTime() || Date.now() + 60 * 1000) / 1000)
+    });
+  }
+});
+
 /**
  * Apply appropriate rate limiting based on route path and database configuration
  */

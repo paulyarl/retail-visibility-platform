@@ -57,8 +57,8 @@ export class DigitalAccessService {
         customer_email: params.customerEmail,
         access_token: accessToken,
         download_count: 0,
-        download_limit: params.downloadLimit,
-        expires_at: expiresAt,
+        max_downloads: params.downloadLimit,
+        access_expires_at: expiresAt,
         created_at: now,
         updated_at: now,
       },
@@ -208,7 +208,7 @@ export class DigitalAccessService {
     await prisma.digital_access_grants.update({
       where: { access_token: accessToken },
       data: {
-        expires_at: newExpiry,
+        access_expires_at: newExpiry,
         updated_at: new Date(),
       },
     });
@@ -255,7 +255,7 @@ export class DigitalAccessService {
 
       if (grant.revoked_at) {
         stats.revokedGrants++;
-      } else if (grant.expires_at && grant.expires_at < now) {
+      } else if (grant.access_expires_at && grant.access_expires_at < now) {
         stats.expiredGrants++;
       } else {
         stats.activeGrants++;
@@ -274,7 +274,7 @@ export class DigitalAccessService {
 
     const result = await prisma.digital_access_grants.deleteMany({
       where: {
-        expires_at: {
+        access_expires_at: {
           lt: cutoffDate,
         },
       },

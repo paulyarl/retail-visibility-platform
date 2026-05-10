@@ -667,6 +667,66 @@ export function generateGlobalProductId(): string {
 }
 
 /**
+ * Generate download page ID
+ * Format: dlp-tid-abc123 (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDownloadPageId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dlp-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate digital asset ID
+ * Format: asset-tid-abc123 (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDigitalAssetId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `asset-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate download access log ID
+ * Format: dlog-tid-abc123 (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDownloadLogId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dlog-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate access grant ID
+ * Format: grant-tid-abc123 (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateAccessGrantId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `grant-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate access token for download access
+ * Format: atok-abc123xyz456 (18 chars)
+ * URL-safe, secure, unique, non-guessable
+ */
+export function generateAccessToken(): string {
+  const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 12);
+  return `atok-${nanoid()}`;
+}
+
+/**
+ * Generate license key for digital products
+ * Format: XXXX-XXXX-XXXX-XXXX (19 chars, 4 groups of 4)
+ * Uses unambiguous characters (no 0, O, 1, I)
+ */
+export function generateLicenseKey(): string {
+  const nanoid = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 4);
+  return `${nanoid()}-${nanoid()}-${nanoid()}-${nanoid()}`;
+}
+
+/**
  * Generate product slug using new UPC/LPC system
  * Matches database trigger logic exactly
  * 

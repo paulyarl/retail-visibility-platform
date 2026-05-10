@@ -525,7 +525,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                         src={`https://www.youtube.com/embed/${videoId}`}
                         title="Product Video"
                         className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                         allowFullScreen
                       />
                     </div>

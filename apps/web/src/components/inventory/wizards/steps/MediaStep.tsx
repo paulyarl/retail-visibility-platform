@@ -36,7 +36,7 @@ import VariantPhotoUploadModal from '../VariantPhotoUploadModal';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { itemsService } from '@/services/ItemsSingletonService';
 
-import { Button } from '@mantine/core';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Switch } from '@/components/ui/Switch';
@@ -46,6 +46,7 @@ import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
 import { Progress } from '@/components/ui/Progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/Dialog';
 
 interface MediaStepProps {
   data: {
@@ -149,6 +150,13 @@ export default function MediaStep({ data, errors, productType, variants, onChang
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any | null>(null);
   const [showVariantPhotoModal, setShowVariantPhotoModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    imageId: string;
+    isPrimary: boolean;
+    imageName: string;
+    isVideo: boolean;
+  }>({ isOpen: false, imageId: '', isPrimary: false, imageName: '', isVideo: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -250,35 +258,81 @@ export default function MediaStep({ data, errors, productType, variants, onChang
     galleryInputRef.current?.click();
   };
 
-  const handleRemoveImage = async (imageId: string, isPrimary: boolean = false) => {
-    // Find the image to get its path for deletion
+  const handleRemoveImage = (imageId: string, isPrimary: boolean = false) => {
+    // Find the image to get its name for the confirmation dialog
     const imageToRemove = isPrimary 
       ? data.primaryImage 
       : data.galleryImages.find(img => img.id === imageId);
     
-    // Delete from Supabase using the exact path returned from upload
-    if (imageToRemove?.path) {
-      try {
-        await itemsService.deleteTempPhoto(imageToRemove.path);
-        console.log('[MediaStep] Deleted temp photo from Supabase:', imageToRemove.path);
-      } catch (error) {
-        console.error('[MediaStep] Failed to delete temp photo:', error);
-        // Continue with local removal even if delete fails
+    if (!imageToRemove) return;
+    
+    // Show confirmation dialog
+    setDeleteConfirmation({
+      isOpen: true,
+      imageId,
+      isPrimary,
+      imageName: isPrimary ? 'Primary Image' : imageToRemove.name || 'Gallery Image',
+      isVideo: false
+    });
+  };
+
+  const handleRemoveVideo = () => {
+    // Show confirmation dialog for video
+    setDeleteConfirmation({
+      isOpen: true,
+      imageId: '',
+      isPrimary: false,
+      imageName: 'Product Video',
+      isVideo: true
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { imageId, isPrimary, isVideo } = deleteConfirmation;
+    
+    if (isVideo) {
+      // Handle video deletion
+      onChange({
+        ...data,
+        videoUrl: ''
+      });
+    } else {
+      // Handle image deletion
+      const imageToRemove = isPrimary 
+        ? data.primaryImage 
+        : data.galleryImages.find(img => img.id === imageId);
+      
+      // Delete from Supabase using the exact path returned from upload
+      if (imageToRemove?.path) {
+        try {
+          await itemsService.deleteTempPhoto(imageToRemove.path);
+          console.log('[MediaStep] Deleted temp photo from Supabase:', imageToRemove.path);
+        } catch (error) {
+          console.error('[MediaStep] Failed to delete temp photo:', error);
+          // Continue with local removal even if delete fails
+        }
+      }
+      
+      // Remove from local state
+      if (isPrimary) {
+        onChange({
+          ...data,
+          primaryImage: null
+        });
+      } else {
+        onChange({
+          ...data,
+          galleryImages: data.galleryImages.filter(img => img.id !== imageId)
+        });
       }
     }
     
-    // Remove from local state
-    if (isPrimary) {
-      onChange({
-        ...data,
-        primaryImage: null
-      });
-    } else {
-      onChange({
-        ...data,
-        galleryImages: data.galleryImages.filter(img => img.id !== imageId)
-      });
-    }
+    // Close confirmation dialog
+    setDeleteConfirmation({ isOpen: false, imageId: '', isPrimary: false, imageName: '', isVideo: false });
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation({ isOpen: false, imageId: '', isPrimary: false, imageName: '', isVideo: false });
   };
 
   const handleVideoUrlChange = (url: string) => {
@@ -613,9 +667,19 @@ export default function MediaStep({ data, errors, productType, variants, onChang
             {/* Video Preview */}
             <Card className="border-gray-200">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center space-x-2">
-                  <Eye className="h-4 w-4" />
-                  <span>Video Preview</span>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="h-4 w-4" />
+                    <span>Video Preview</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveVideo()}
+                    className="p-1 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
@@ -625,7 +689,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
                       src={getVideoEmbedUrl(data.videoUrl)!}
                       className="w-full h-full"
                       allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                       title="Product Video Preview"
                     />
                   ) : (
@@ -909,6 +973,26 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmation.isOpen} onOpenChange={(open) => !open && cancelDelete()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteConfirmation.imageName}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDelete}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              {deleteConfirmation.isVideo ? 'Delete Video' : 'Delete Image'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
