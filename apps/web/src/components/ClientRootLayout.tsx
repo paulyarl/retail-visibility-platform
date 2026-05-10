@@ -47,8 +47,8 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
     <QueryClientWrapper>
       <ThemeProvider>
         <PlatformThemeProvider>
-          <PlatformSettingsProvider>
-            <CustomAuthProvider>
+          <CustomAuthProvider>
+            <PlatformSettingsProvider>
               <CartWidgetProvider>
                 <ProductLayoutProvider>
                   <GlobalAlertProvider>
@@ -62,9 +62,9 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
                   </GlobalAlertProvider>
                 </ProductLayoutProvider>
               </CartWidgetProvider>
+            </PlatformSettingsProvider>
             </CustomAuthProvider>
-          </PlatformSettingsProvider>
-        </PlatformThemeProvider>
+          </PlatformThemeProvider>
       </ThemeProvider>
     </QueryClientWrapper>
   );

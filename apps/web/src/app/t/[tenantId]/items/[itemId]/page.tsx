@@ -8,6 +8,7 @@ import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
 import { itemsService } from '@/services/ItemsSingletonService';
 import { Card, CardContent, Badge, Button, Modal, ModalFooter } from '@/components/ui';
+import { SalePrice } from '@/components/products/SalePrice';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
 import { QRCodeModal } from '@/components/items/QRCodeModal';
@@ -268,7 +269,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         price: (itemData as any).price_cents ? (itemData as any).price_cents / 100 : ((itemData as any).price || 0),
         stock: (itemData as any).stock || 0,
         itemStatus: (itemData as any).item_status || (itemData as any).status || 'draft',
-        condition: (itemData as any).condition || 'new',
+        condition: (itemData as any).condition === 'brand_new' ? 'new' : (itemData as any).condition || 'new',
         tenantCategory: (itemData as any).tenantCategory || null,
         tenantCategoryId: (itemData as any).tenant_category_id || (itemData as any).directory_category_id,
         imageUrl: (itemData as any).image_url || (itemData as any).imageUrl,
@@ -296,62 +297,52 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       setItem(normalizedItem);
 
       // Fetch photos via PhotoSingleton, fallback to image_gallery from API
+      // console.log(`Inventory Item: ${JSON.stringify(itemData)}`);
+
+      let imageUrl = (itemData as any).image_url||(itemData as any).imageUrl;
+      let itemGallery = (itemData as any).imageGallery;
+
       try {
         const photoSingleton = PhotoSingleton.getInstance(tenantId);
-        const itemPhotos = await photoSingleton.fetchItemPhotos(itemId);
+        const itemPhotos = await photoSingleton.fetchItemPhotos(itemId);        
 
-          let imageUrl = (itemData as any).image_url||(itemData as any).imageUrl;
-          let firstGalleryPhoto:any[] = [],allGalleryPhotos:any[] = [];
-          if (imageUrl){
-              firstGalleryPhoto = new Array();
-              firstGalleryPhoto.push({imageUrl});
-          }
-          // console.log(`firstGalleryPhoto 1: ${imageUrl}`);
-          // console.log(`firstGalleryPhoto 1.5: ${firstGalleryPhoto[0].imageUrl}`);
-        
-        // If no photos from photo_assets, use image_gallery from API response
-        if (itemPhotos.length === 0 && (itemData as any).image_gallery && (itemData as any).image_gallery.length > 0) {
-        
-          // console.log(`firstGalleryPhoto 2: ${firstGalleryPhoto[0].imageUrl}`);
-          allGalleryPhotos = firstGalleryPhoto ? [firstGalleryPhoto[0].imageUrl,...(itemData as any).image_gallery] : [...(itemData as any).image_gallery];
-         const galleryPhotos = allGalleryPhotos.map((url: string, index: number) => ({
-            id: `gallery-${index}`,
-            url,
-            position: index,
-            alt: `${itemData.name} - Image ${index + 1}`
-          }));
-          
-        //  console.log(`firstGalleryPhoto 3: ${firstGalleryPhoto[0]?.imageUrl}`);
-         setPhotos(galleryPhotos);
-        } else {
-            allGalleryPhotos = firstGalleryPhoto ? [firstGalleryPhoto[0].imageUrl,...itemPhotos] : [...itemPhotos];
-            // console.log(`allGalleryPhotos 4: ${JSON.stringify(allGalleryPhotos)}`);
-            setPhotos(allGalleryPhotos);
+        // console.log(`imageUrl    : ${JSON.stringify(imageUrl)}`);
+        // console.log(`itemGallery : ${JSON.stringify(itemGallery)}`);
+
+        switch(true) {
+          case itemPhotos.length > 0:
+            setPhotos(itemPhotos);
+            break;
+          case itemGallery && Array.isArray(itemGallery) && itemGallery.length > 0:           
+            setPhotos(itemGallery);
+            break;
+          case imageUrl && typeof imageUrl === 'string' && imageUrl.length > 0:
+           setPhotos([{
+                id: 'legacy-image',
+                url: imageUrl as string,
+                position: 0,
+                alt: null,
+                caption: 'Legacy image (stored on item, not in photo gallery)',
+              }]);
+            break;
+          default:
+            setPhotos([]);
+            break;
         }
       } catch (photoError) {
         console.warn('Failed to load photos via singleton:', photoError);
         // Fallback to image_gallery from API
-        if ((itemData as any).image_gallery && (itemData as any).image_gallery.length > 0) {
-          let imageUrl = (itemData as any).image_url;
-           let firstGalleryPhoto:any[] = [],allGalleryPhotos:any[] = [];
-          if (imageUrl){
-              firstGalleryPhoto = new Array();
-              firstGalleryPhoto.push({imageUrl});
-          }
-          // console.log(`firstGalleryPhoto 5: ${imageUrl}`);
-          // console.log(`firstGalleryPhoto 6: ${JSON.stringify((itemData as any).image_gallery)}`);
-          allGalleryPhotos = firstGalleryPhoto ? [firstGalleryPhoto[0].imageUrl,...(itemData as any).image_gallery] : [...(itemData as any).image_gallery];
-          const galleryPhotos = allGalleryPhotos.map((url: string, index: number) => ({
-            id: `gallery-${index}`,
-            url,
-            position: index,
-            alt: `${itemData.name} - Image ${index + 1}`
-          }));
-          // console.log(`firstGalleryPhoto 7: ${JSON.stringify(galleryPhotos)}`);
+        if (itemGallery && Array.isArray(itemGallery) && itemGallery.length > 0) {
 
-          setPhotos(galleryPhotos);
+          setPhotos(itemGallery);
         } else {
-          setPhotos([]);
+          setPhotos([{
+                id: 'legacy-image',
+                url: imageUrl as string,
+                position: 0,
+                alt: null,
+                caption: 'Legacy image (stored on item, not in photo gallery)',
+              }]);
         }
       }
     } catch (err) {
@@ -582,6 +573,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </Card>
             )}
 
+            {/* Features */}
+            {(item as any).features && Array.isArray((item as any).features) && (item as any).features.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Features
+                  </h2>
+                  <ul className="space-y-2">
+                    {(item as any).features.map((feature: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2 text-neutral-700 dark:text-neutral-300">
+                        <span className="text-green-500 mt-1">✓</span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Product Details */}
             <Card>
               <CardContent className="p-6">
@@ -715,14 +725,31 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     <div>
                       <dt className="text-sm font-medium text-neutral-500">Condition</dt>
                       <dd className="text-base text-neutral-900 dark:text-white">
-                        {item.condition === 'new' ? 'New' : item.condition === 'used' ? 'Used' : 'Refurbished'}
+                        {item.condition === 'new' ? 'New' : item.condition === 'used' ? 'Used' : item.condition === 'refurbished' ? 'Refurbished' : item.condition}
                       </dd>
                     </div>
                   )}
                   <div>
                     <dt className="text-sm font-medium text-neutral-500">Price</dt>
                     <dd className="text-2xl font-bold text-neutral-900 dark:text-white">
-                      ${(item.price ?? 0).toFixed(2)}
+                      <SalePrice 
+                        product={{
+                          price: {
+                            cents: Math.round((item.price ?? 0) * 100),
+                            currency: 'USD',
+                            formatted: `$${(item.price ?? 0).toFixed(2)}`
+                          },
+                          salePrice: (item as any).salePriceCents ? {
+                            cents: (item as any).salePriceCents,
+                            currency: 'USD', 
+                            formatted: `$${((item as any).salePriceCents / 100).toFixed(2)}`
+                          } : undefined
+                        }}
+                        variant="detail"
+                        showOriginalPrice={true}
+                        showDiscountPercentage={true}
+                        showDiscountAmount={true}
+                      />
                     </dd>
                   </div>
                   <div>

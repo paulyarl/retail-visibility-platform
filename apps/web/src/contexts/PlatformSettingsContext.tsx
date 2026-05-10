@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { publicBrandingService } from '@/services/PublicBrandingService';
 import { adminSettingsService } from '@/services/AdminSettingsService';
+import { useAuth } from './AuthContext';
 
 interface PlatformSettings {
   platformName: string;
@@ -30,9 +31,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const isAuthenticated = false;
-  const authLoading = false;
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  // const isAuthenticated = false;
+  // const authLoading = false;
 
   const fetchSettings = async () => {
     try {
@@ -50,9 +51,11 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
         // Try to fetch payment settings from admin service
         let paymentSettings = null;
         try {
-          const paymentData = await adminSettingsService.getPaymentSettings();
-          if (paymentData) {
-            paymentSettings = paymentData.minimumPaymentAmount;
+          if (isAuthenticated){
+            const paymentData = await adminSettingsService.getPaymentSettings();
+            if (paymentData) {
+              paymentSettings = paymentData.minimumPaymentAmount;
+            }
           }
         } catch (paymentError) {
           console.warn('[PlatformSettingsProvider] Failed to fetch payment settings, using defaults:', paymentError);
@@ -84,13 +87,14 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       setLoading(false);
     }
   };
-  if (authLoading) {
-    return null;
-  }
 
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  if (authLoading) {
+    return null;
+  }
 
   return (
     <PlatformSettingsContext.Provider value={{ settings, loading, error, refetch: fetchSettings }}>

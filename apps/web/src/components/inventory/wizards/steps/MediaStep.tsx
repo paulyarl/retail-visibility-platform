@@ -102,6 +102,44 @@ const CLONING_STRATEGIES = [
   }
 ];
 
+// Helper function to convert video URLs to embeddable formats
+function getVideoEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  
+  try {
+    const urlObj = new URL(url);
+    
+    // YouTube URLs
+    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      let videoId: string | undefined;
+      
+      if (urlObj.hostname.includes('youtu.be')) {
+        // youtu.be/VIDEO_ID
+        videoId = urlObj.pathname.slice(1);
+      } else {
+        // youtube.com/watch?v=VIDEO_ID or youtube.com/embed/VIDEO_ID
+        videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
+      }
+      
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+    
+    // Vimeo URLs
+    if (urlObj.hostname.includes('vimeo.com')) {
+      const vimeoId = urlObj.pathname.split('/').pop();
+      if (vimeoId) {
+        return `https://player.vimeo.com/video/${vimeoId}`;
+      }
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MediaStep({ data, errors, productType, variants, onChange }: MediaStepProps) {
   const params = useParams();
   const tenantId = params.tenantId as string;
@@ -556,20 +594,56 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           onChange={(e) => handleVideoUrlChange(e.target.value)}
         />
         {data.videoUrl && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <Video className="h-5 w-5 text-blue-600" />
-                <div className="flex-1">
-                  <div className="font-medium">Video Added</div>
-                  <div className="text-sm text-gray-600 truncate">{data.videoUrl}</div>
+          <>
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <Video className="h-5 w-5 text-blue-600" />
+                  <div className="flex-1">
+                    <div className="font-medium">Video Added</div>
+                    <div className="text-sm text-gray-600 truncate">{data.videoUrl}</div>
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-800">
+                    Ready
+                  </Badge>
                 </div>
-                <Badge className="bg-blue-100 text-blue-800">
-                  Ready
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Video Preview */}
+            <Card className="border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center space-x-2">
+                  <Eye className="h-4 w-4" />
+                  <span>Video Preview</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  {getVideoEmbedUrl(data.videoUrl) ? (
+                    <iframe
+                      src={getVideoEmbedUrl(data.videoUrl)!}
+                      className="w-full h-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      title="Product Video Preview"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm opacity-75">Video preview not available</p>
+                        <p className="text-xs opacity-50 mt-1">Please enter a valid YouTube or Vimeo URL</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  💡 Supported: YouTube, Vimeo videos
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
 

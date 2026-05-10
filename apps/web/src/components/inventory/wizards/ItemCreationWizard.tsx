@@ -427,8 +427,8 @@ export default function ItemCreationWizard({
           }
         },
         pricing: {
-          listPrice: productData.price_cents || 0,
-          salePrice: metadata.sale_price_cents || productData.sale_price_cents || undefined,
+          listPrice: productData.priceCents || productData.price_cents || 0,
+          salePrice: metadata.sale_price_cents || productData.salePriceCents || undefined,
           variantPricing: INITIAL_DATA.pricing.variantPricing,
           gatewaySelection: {
             gateway_type: metadata.payment_gateway_type || productData.payment_gateway_type || null,
@@ -438,25 +438,25 @@ export default function ItemCreationWizard({
         content: {
           description: productData.description || '',
           enhancedDescription: productData.marketing_description || '',
-          features: metadata.features || [],
-          specifications: metadata.specifications || {},
+          features: productData.features || metadata.features || [],
+          specifications: productData.specifications || metadata.specifications || {},
           tags: metadata.tags || []
         },
         media: {
-          primaryImage: productData.image_url ? {
+          primaryImage: productData.imageUrl || productData.image_url ? {
             id: `existing-primary-${Date.now()}`,
-            url: productData.image_url,
+            url: productData.imageUrl || productData.image_url,
             path: '', // No path for existing images
             name: 'Primary Image',
             size: 0,
             type: 'image/jpeg',
             uploadedAt: new Date()
           } : null,
-          galleryImages: (productData.image_gallery || []).map((url: string, idx: number) => ({
+          galleryImages: (productData.imageGallery || productData.image_gallery || []).map((item: any, idx: number) => ({
             id: `existing-gallery-${idx}-${Date.now()}`,
-            url,
+            url: typeof item === 'string' ? item : item.url,
             path: '', // No path for existing images
-            name: `Gallery Image ${idx + 1}`,
+            name: typeof item === 'string' ? `Gallery Image ${idx + 1}` : (item.alt || `Gallery Image ${idx + 1}`),
             size: 0,
             type: 'image/jpeg',
             uploadedAt: new Date()

@@ -78,7 +78,7 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
         return;
       }
 
-      console.log('[CategoryNameDisplay] Looking for category:', categoryId, 'googleCategoryId:', googleCategoryId);
+      // console.log('[CategoryNameDisplay] Looking for category:', categoryId, 'googleCategoryId:', googleCategoryId);
 
       // First try to find in tenant categories (using CategorySingleton)
       if (state.categories.length > 0) {
@@ -307,12 +307,12 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Debug: Log the data structure when component renders
-  console.log('[ReviewStep] Component rendering with data:', {
-    categoryId: data.categoryId,
-    googleCategoryId: data.googleCategoryId,
-    tags: data.tags,
-    hasCategoryId: !!data.categoryId
-  });
+  // console.log('[ReviewStep] Component rendering with data:', {
+  //   categoryId: data.categoryId,
+  //   googleCategoryId: data.googleCategoryId,
+  //   tags: data.tags,
+  //   hasCategoryId: !!data.categoryId
+  // });
   const [isComplete, setIsComplete] = useState(false);
   
   // Tier-based limits - using singleton for caching
@@ -722,6 +722,12 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
                 <span className="text-sm text-gray-600">Gallery:</span>
                 <span className="text-sm font-medium">{data.media.galleryImages.length} images</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Video:</span>
+                <Badge variant={data.media.videoUrl ? 'default' : 'secondary'}>
+                  {data.media.videoUrl ? 'Added' : 'None'}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
 
@@ -737,11 +743,11 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
               <div className="flex justify-between items-start">
                 <span className="text-sm text-gray-600 pt-2">Category:</span>
                 {(() => {
-                  console.log('[ReviewStep] About to render category display:', {
-                    hasCategoryId: !!data.categoryId,
-                    categoryId: data.categoryId,
-                    googleCategoryId: data.googleCategoryId
-                  });
+                  // console.log('[ReviewStep] About to render category display:', {
+                  //   hasCategoryId: !!data.categoryId,
+                  //   categoryId: data.categoryId,
+                  //   googleCategoryId: data.googleCategoryId
+                  // });
                   return data.categoryId ? (
                     <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/20">
                       <CategoryNameDisplay categoryId={data.categoryId} categoryName={data.categoryName} googleCategoryId={data.googleCategoryId} />
