@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onboardingStateService } from '@/services/OnboardingStateService';
+import { tenantManagementService } from '@/services/TenantManagementService';
 
 /**
  * Auth0-Connected Signup Wizard
@@ -75,22 +76,21 @@ export default function SignupWizardPage() {
           // console.log('[SignupWizard] User has tenants, fetching data for review:', tenantId);
           
           try {
-            // Fetch existing tenant data
-            const response = await fetch(`/api/tenants/${tenantId}`);
-            if (response.ok) {
-              const tenantData = await response.json();
+            // Fetch existing tenant data using service
+            const tenantData = await tenantManagementService.getTenant(tenantId);
+            if (tenantData) {
               setExistingUserData(tenantData);
               
               // Pre-populate form with existing data
               setFormData({
                 firstName: user.firstName || '',
                 lastName: user.lastName || '',
-                businessName: tenantData.businessName || '',
+                businessName: tenantData.business_name || '',
                 email: user.email || '',
-                phone: tenantData.phoneNumber || user.phone || '',
-                businessType: tenantData.businessType || '',
-                numberOfLocations: tenantData.numberOfLocations || '1',
-                preferredTier: tenantData.tier || '',
+                phone: tenantData.phone_number || user.phone || '',
+                businessType: tenantData.business_type || '',
+                numberOfLocations: String(tenantData.metadata?.numberOfLocations || '1'),
+                preferredTier: tenantData.metadata?.tier || '',
               });
               
               setShowReviewForm(true);
@@ -219,21 +219,18 @@ export default function SignupWizardPage() {
         // console.log('[SignupWizard] Updating existing user data:', formData);
         
         try {
-          const response = await fetch(`/api/tenants/${existingUserData.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              businessName: formData.businessName,
-              businessType: formData.businessType,
-              phoneNumber: formData.phone,
+          // Use service to update tenant
+          const updatedTenant = await tenantManagementService.updateTenant(existingUserData.id, {
+            business_name: formData.businessName,
+            business_type: formData.businessType,
+            phone_number: formData.phone,
+            metadata: {
               tier: formData.preferredTier,
               numberOfLocations: formData.numberOfLocations,
-            }),
+            },
           });
 
-          if (response.ok) {
+          if (updatedTenant) {
             // Save updated data to onboarding state service
             onboardingStateService.savePhase1({
               firstName: formData.firstName,

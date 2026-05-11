@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
 import { 
   Download, 
   File, 
@@ -92,18 +93,8 @@ export default function PublicDownloadPage() {
       setLoading(true);
       setError(null);
 
-      // Load download page data
-      const pageResponse = await fetch(`/api/downloads/${tenantId}/${slug}`);
-      if (!pageResponse.ok) {
-        if (pageResponse.status === 404) {
-          setError('Download page not found');
-        } else {
-          setError('Failed to load download page');
-        }
-        return;
-      }
-
-      const pageResult = await pageResponse.json();
+      // Load download page data using service
+      const pageResult = await publicDownloadService.getDownloadPage(tenantId, slug);
       if (!pageResult.success) {
         setError(pageResult.error || 'Failed to load download page');
         return;
@@ -113,10 +104,7 @@ export default function PublicDownloadPage() {
 
       // Validate access if token is provided
       if (accessToken) {
-        const accessResponse = await fetch(
-          `/api/downloads/${tenantId}/${slug}/validate?token=${accessToken}`
-        );
-        const accessResult = await accessResponse.json();
+        const accessResult = await publicDownloadService.validateAccess(tenantId, slug, accessToken);
         setAccessValidation(accessResult);
       } else {
         // No token provided - check if authentication is required
@@ -142,17 +130,8 @@ export default function PublicDownloadPage() {
     try {
       setDownloadingAssetId(asset.id);
 
-      // Record the download
-      const response = await fetch(`/api/downloads/${tenantId}/${slug}/download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: accessToken,
-          assetId: asset.id,
-        }),
-      });
-
-      const result = await response.json();
+      // Record the download using service
+      const result = await publicDownloadService.recordDownload(tenantId, slug, accessToken, asset.id);
 
       if (!result.success) {
         setError(result.error || 'Download failed');

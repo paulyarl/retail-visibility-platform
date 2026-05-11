@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
@@ -384,14 +385,13 @@ export default function ItemCreationWizard({
     
     setIsLoading(true);
     try {
-      // Fetch product directly from API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/items/${productId}`);
+      // Fetch product via service
+      const productData = await itemsService.getItem(productId);
       
-      if (!response.ok) {
-        throw new Error(`Failed to load product: ${response.status}`);
+      if (!productData) {
+        throw new Error('Failed to load product');
       }
       
-      const productData = await response.json();
       console.log('[ItemCreationWizard] Loaded product for editing:', productData);
       
       // Extract metadata fields
@@ -404,7 +404,7 @@ export default function ItemCreationWizard({
           name: productData.name || '',
           brand: productData.brand || '',
           manufacturer: productData.manufacturer || '',
-          condition: productData.condition?.replace('brand_new', 'new') || 'new',
+          condition: (productData.condition?.replace('brand_new', 'new') || 'new') as 'new' | 'used' | 'refurbished',
           mpn: productData.mpn || '',
           status: productData.item_status === 'active' ? 'active' : 'draft'
         },
@@ -416,9 +416,9 @@ export default function ItemCreationWizard({
           variants: productData.product_variants || [],
           variantConfig: metadata.variantConfig || INITIAL_DATA.productType.variantConfig,
           digitalProduct: {
-            deliveryMethod: productData.digital_delivery_method || 'direct_download',
+            deliveryMethod: (productData.digital_delivery_method || 'direct_download') as 'direct_download' | 'external_link' | 'license_key' | 'access_grant',
             assets: productData.digital_assets || [],
-            licenseType: productData.license_type || 'personal',
+            licenseType: (productData.license_type || 'personal') as 'personal' | 'commercial' | 'educational' | 'enterprise',
             accessDurationDays: productData.access_duration_days || null,
             downloadLimit: productData.download_limit || null,
             externalUrl: '',

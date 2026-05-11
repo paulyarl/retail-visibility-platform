@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
 import { tenantDirectoryManagementService } from "@/services/TenantDirectoryManagementService";
+import { externalApiService } from "@/services/ExternalApiService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import { DirectoryListing } from "@/hooks/directory/useDirectoryListing";
 
@@ -110,13 +111,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       setUploading(true);
       setError(null);
 
-      // Fetch the image from the URL
-      const response = await fetch(pastedUrl);
-      if (!response.ok) {
+      // Fetch the image from the URL using service
+      const blob = await externalApiService.fetchImageAsBlob(pastedUrl);
+      if (!blob) {
         throw new Error('Failed to fetch image from URL');
       }
-
-      const blob = await response.blob();
       
       // Convert blob to File
       const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });

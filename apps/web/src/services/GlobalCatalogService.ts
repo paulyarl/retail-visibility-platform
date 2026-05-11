@@ -331,6 +331,39 @@ class GlobalCatalogService extends FlexibleApiSingleton {
       return null;
     }
   }
+
+  /**
+   * Adopt a product from global catalog into tenant inventory
+   * Creates a tenant inventory item from a global catalog product
+   */
+  async adoptProduct(params: {
+    tenantId: string;
+    globalProductId: string;
+    productSlug: string;
+    universalSku?: string;
+    priceCents: number;
+    stock: number;
+    sku?: string;
+    description?: string;
+  }): Promise<{ success: boolean; itemId?: string; error?: string }> {
+    try {
+      const result = await this.makePublicRequest<{ success: boolean; itemId?: string; error?: string }>(
+        '/api/catalog/adopt',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        },
+        `catalog-adopt:${params.globalProductId}:${params.tenantId}`,
+        0 // No cache for mutations
+      );
+
+      return result.data || { success: false, error: 'Failed to adopt product' };
+    } catch (error) {
+      console.error('[GlobalCatalogService] Error adopting product:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to adopt product' };
+    }
+  }
 }
 
 // Export singleton instance

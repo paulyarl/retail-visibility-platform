@@ -13,6 +13,7 @@ import { useState, useCallback } from 'react';
 import { Download, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
 
 interface DownloadableAsset {
   id: string;
@@ -61,52 +62,23 @@ export default function DownloadProgress({
     setIsComplete(false);
 
     try {
-      // Fetch the file with access token
-      const response = await fetch(`${asset.downloadUrl}?token=${accessToken}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
+      // Use service for download with progress tracking
+      const { blob, totalSize } = await publicDownloadService.downloadFromUrl(
+        asset.downloadUrl,
+        accessToken,
+        {
+          expectedSize: asset.fileSize,
+          onProgress: (prog, loaded, total) => {
+            setProgress(prog);
+            if (total > 0) {
+              setDownloadSize(total);
+            }
+          },
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error(response.status === 403 
-          ? 'Access denied. Your download link may have expired.'
-          : response.status === 404
-          ? 'File not found.'
-          : 'Download failed. Please try again.'
-        );
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Unable to read response stream');
-      }
-
-      const contentLength = response.headers.get('Content-Length');
-      const totalSize = contentLength ? parseInt(contentLength, 10) : asset.fileSize || 0;
       setDownloadSize(totalSize);
 
-      const chunks: Uint8Array[] = [];
-      let receivedLength = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-
-        chunks.push(value);
-        receivedLength += value.length;
-
-        if (totalSize > 0) {
-          const progressPercent = Math.round((receivedLength / totalSize) * 100);
-          setProgress(progressPercent);
-        }
-      }
-
-      // Create blob from chunks
-      const blob = new Blob(chunks as BlobPart[], { type: asset.mimeType || 'application/octet-stream' });
-      
       // Create download URL
       const url = window.URL.createObjectURL(blob);
       
@@ -259,13 +231,12 @@ export function DownloadProgressCompact({
     setError(null);
 
     try {
-      const response = await fetch(`${asset.downloadUrl}?token=${accessToken}`);
+      const { blob } = await publicDownloadService.downloadFromUrl(
+        asset.downloadUrl,
+        accessToken,
+        { expectedSize: asset.fileSize }
+      );
       
-      if (!response.ok) {
-        throw new Error('Download failed');
-      }
-
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       
       const link = document.createElement('a');
@@ -339,10 +310,12 @@ export function DownloadAllProgress({
       setCurrentIndex(i);
       
       try {
-        const response = await fetch(`${assets[i].downloadUrl}?token=${accessToken}`);
-        if (!response.ok) throw new Error(`Failed to download ${assets[i].name}`);
+        const { blob } = await publicDownloadService.downloadFromUrl(
+          assets[i].downloadUrl,
+          accessToken,
+          { expectedSize: assets[i].fileSize }
+        );
         
-        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         
         const link = document.createElement('a');

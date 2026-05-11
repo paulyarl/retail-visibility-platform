@@ -299,17 +299,17 @@ async function getUserLocation(): Promise<{
       
       const { latitude, longitude } = position.coords;
       
-      // Reverse geocoding to get city/state
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-      const data = await response.json();
+      // Reverse geocoding to get city/state using service
+      const data = await externalApiService.reverseGeocode(latitude, longitude, { usePublicContext: true });
       
-      const address = data.address || {};
-      const city = address.city || address.town || address.village || 'Unknown';
-      const state = address.state || 'Unknown';
+      if (data && data.address) {
+        const address = data.address;
+        const city = address.city || address.town || address.village || 'Unknown';
+        const state = address.state || 'Unknown';
+        return { latitude, longitude, city, state };
+      }
       
-      return { latitude, longitude, city, state };
+      return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
     }
   } catch (error) {
     console.warn('Geolocation failed, falling back to IP-based location');

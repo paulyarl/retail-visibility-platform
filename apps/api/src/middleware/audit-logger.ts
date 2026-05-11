@@ -49,7 +49,7 @@ async function logAudit(req: Request, res: Response, requestId: string) {
       if (req.method === 'POST') action = 'create';
       if (req.method === 'DELETE') action = 'delete';
       if (req.method === 'PUT' || req.method === 'PATCH') action = 'update';
-    } else if (path.includes('/tenant')) {
+    } else if (path.includes('/tenants')) {
       entityType = 'tenant';
     } else if (path.includes('/policy')) {
       entityType = 'policy';

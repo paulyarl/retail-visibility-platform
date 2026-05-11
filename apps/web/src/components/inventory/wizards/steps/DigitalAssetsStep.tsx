@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
-// File upload will be handled via API route
+import { itemsService } from '@/services/ItemsSingletonService';
 
 export interface DigitalAsset {
   id: string;
@@ -147,24 +147,18 @@ export default function DigitalAssetsStep({
         const base64Data = base64.split(',')[1];
         
         try {
-          // Upload via API route
-          const response = await fetch('/api/digital-assets/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tenantId,
-              itemId: itemId || `temp_${Date.now()}`,
-              fileName: file.name,
-              mimeType: file.type,
-              fileData: base64Data,
-            }),
+          // Upload via service
+          const result = await itemsService.uploadDigitalAsset({
+            tenantId,
+            itemId: itemId || `temp_${Date.now()}`,
+            fileName: file.name,
+            mimeType: file.type,
+            fileData: base64Data,
           });
           
-          if (!response.ok) {
-            throw new Error('Upload failed');
+          if (!result.success) {
+            throw new Error(result.error || 'Upload failed');
           }
-          
-          const result = await response.json();
           
           // Update asset with upload result
           const updatedAssets = data.assets.map(a => 

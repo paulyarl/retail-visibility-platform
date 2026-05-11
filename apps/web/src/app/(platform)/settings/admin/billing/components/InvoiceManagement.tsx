@@ -187,17 +187,21 @@ export function InvoiceManagement({
         // Determine if manual or subscription invoice based on ID pattern
         const isManualInvoice = invoiceId.startsWith('inv-');
         
-        let blob: Blob;
         if (isManualInvoice) {
-          // Manual invoice - use ManualBillingService
+          // Manual invoice - use ManualBillingService (already returns blob URL via ResponseType.BLOB)
           const result = await manualBillingService.generateInvoicePDF(invoiceId);
           if (!result.success || !result.pdfUrl) {
             setAlertMessage({ type: 'error', message: result.error || 'Failed to generate invoice PDF' });
             return;
           }
-          // Fetch the blob from the URL
-          const response = await fetch(result.pdfUrl);
-          blob = await response.blob();
+          // Open the blob URL directly - no need to fetch again
+          const a = document.createElement('a');
+          a.href = result.pdfUrl;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setAlertMessage({ type: 'success', message: 'Invoice PDF opened in new tab' });
         } else {
           // Subscription invoice - use SubscriptionBillingService
           // Need tenant ID - for admin view, we may need to fetch it
@@ -206,19 +210,19 @@ export function InvoiceManagement({
             setAlertMessage({ type: 'error', message: 'Tenant ID required for subscription invoice' });
             return;
           }
-          blob = await subscriptionBillingService.downloadInvoicePdf(invoiceId, tenantId);
-        }
+          const blob = await subscriptionBillingService.downloadInvoicePdf(invoiceId, tenantId);
 
-        // Create blob URL and open in new tab
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        setAlertMessage({ type: 'success', message: 'Invoice PDF opened in new tab' });
+          // Create blob URL and open in new tab
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+          setAlertMessage({ type: 'success', message: 'Invoice PDF opened in new tab' });
+        }
       } catch (error) {
         setAlertMessage({ type: 'error', message: 'Failed to generate invoice PDF' });
       } finally {

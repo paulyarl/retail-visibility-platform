@@ -93,11 +93,12 @@ async function getUserLocation(): Promise<{
       
       const { latitude, longitude } = position.coords;
       
-      // Reverse geocoding to get city/state
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-      const data = await response.json();
+      // Reverse geocoding via service
+      const data = await externalApiService.reverseGeocode(latitude, longitude);
+      
+      if (!data) {
+        return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
+      }
       
       const address = data.address || {};
       const city = address.city || address.town || address.village || 'Unknown';

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Button, Alert } from '@/components/ui';
 import { Search, Image as ImageIcon, Download, ExternalLink, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 interface ImageResult {
   id: string;
@@ -55,24 +56,7 @@ export default function ImageFinderModal({
     setImages([]);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/images/search?query=${encodeURIComponent(searchQuery)}`,
-        { headers, credentials: 'include' }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to search for images');
-      }
-
-      const data = await response.json();
+      const data = await itemsService.searchImages(searchQuery);
       setImages(data.images || []);
 
       if (data.images.length === 0) {
@@ -92,31 +76,15 @@ export default function ImageFinderModal({
     setError(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const result = await itemsService.attachImage(productId, tenantId, {
+        imageUrl: selectedImage.downloadUrl,
+        source: selectedImage.source,
+        photographer: selectedImage.photographer,
+        photographerUrl: selectedImage.photographerUrl,
+      });
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${tenantId}/items/${productId}/attach-image`,
-        {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({
-            imageUrl: selectedImage.downloadUrl,
-            source: selectedImage.source,
-            photographer: selectedImage.photographer,
-            photographerUrl: selectedImage.photographerUrl,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to attach image');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to attach image');
       }
 
       onImageAttached();

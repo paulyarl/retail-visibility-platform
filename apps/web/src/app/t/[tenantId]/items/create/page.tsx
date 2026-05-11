@@ -7,6 +7,7 @@ import ItemCreationWizard from "@/components/inventory/wizards/ItemCreationWizar
 import CartButton from "@/components/inventory/CartButton";
 import ItemPickerModal from "@/components/inventory/ItemPickerModal";
 import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
+import { itemsService } from '@/services/ItemsSingletonService';
 import { Button } from '@mantine/core';
 import { Edit, Plus } from 'lucide-react';
 
@@ -163,27 +164,17 @@ export default function CreateItemPage({
 
       console.log('[CreateItemPage] API payload:', apiPayload);
 
-      // Use PUT for updates, POST for creation
-      const url = isEditing 
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/items/${productId}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/items`;
-      
-      const method = isEditing ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiPayload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+      // Use service methods for create/update
+      let result;
+      if (isEditing && productId) {
+        result = await itemsService.updateItem(productId, apiPayload as any, tenantId);
+      } else {
+        result = await itemsService.createItem(apiPayload as any, tenantId);
       }
 
-      const result = await response.json();
+      if (!result) {
+        throw new Error(`Failed to ${isEditing ? 'update' : 'create'} product`);
+      }
       console.log(`[CreateItemPage] Product ${isEditing ? 'updated' : 'created'} successfully:`, result);
 
       // Only link photos for new items (existing items already have photos linked)
@@ -191,8 +182,6 @@ export default function CreateItemPage({
         // Link photos to item in photo_assets table
         const itemId = result.id;
         if (itemId) {
-          const { itemsService } = await import('@/services/ItemsSingletonService');
-          
           // Link primary image (already uploaded to Supabase)
           if (media.primaryImage?.url) {
             try {

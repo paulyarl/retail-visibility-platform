@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Button, Modal, TextInput, NumberInput, Textarea, Select } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
-import { GlobalProduct } from '@/services/GlobalCatalogService';
+import { GlobalProduct, globalCatalogService } from '@/services/GlobalCatalogService';
 import { productSlugService } from '@/services/ProductSlugService';
 
 interface ProductAdoptionModalProps {
@@ -74,25 +74,20 @@ export default function ProductAdoptionModal({
     setError(null);
     
     try {
-      // Call API to adopt product
-      const response = await fetch('/api/catalog/adopt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId,
-          globalProductId: product.id,
-          productSlug: product.product_slug,
-          universalSku: product.universal_sku,
-          priceCents: Math.round(price * 100),
-          stock,
-          sku,
-          description
-        })
+      // Use service to adopt product
+      const result = await globalCatalogService.adoptProduct({
+        tenantId,
+        globalProductId: product.id,
+        productSlug: product.product_slug,
+        universalSku: product.universal_sku,
+        priceCents: Math.round(price * 100),
+        stock,
+        sku,
+        description
       });
       
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to adopt product');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to adopt product');
       }
       
       setSuccess(true);

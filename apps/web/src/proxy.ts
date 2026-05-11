@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth0 } from './lib/auth0';
+import AuthSyncService from './services/AuthSyncService';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
@@ -57,21 +58,9 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
       return false;
     }
 
-    // Check database for user role via API
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
-    const response = await fetch(`${apiBaseUrl}/api/auth/lookup?identifier=${encodeURIComponent(session.user.email)}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.log('[Proxy] Failed to lookup user in database');
-      return false;
-    }
-
-    const result = await response.json();
-    const user = result.user;
+    // Check database for user role via service
+    const authSyncService = AuthSyncService.getInstance();
+    const user = await authSyncService.getUserByIdentifier(session.user.email);
 
     if (!user || !user.is_active) {
       return false;
