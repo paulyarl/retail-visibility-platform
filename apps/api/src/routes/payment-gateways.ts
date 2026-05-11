@@ -131,10 +131,25 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
     }
 
     // Add tenant tier to each gateway for frontend deposit calculation
-    const gatewaysWithTier = allGateways.map(gateway => ({
-      ...gateway,
-      tenant_tier: tenant?.subscription_tier || null,
-    }));
+    const gatewaysWithTier = allGateways.map(gateway => {
+      const gatewayWithTier = {
+        ...gateway,
+        tenant_tier: tenant?.subscription_tier || null,
+      };
+
+      // For Square, ensure the config includes the public credentials needed for frontend SDK
+      if (gateway.gateway_type === 'square' && gateway.config) {
+        const config = gateway.config as any;
+        gatewayWithTier.config = {
+          ...config,
+          // Ensure these fields are present for frontend Square SDK
+          application_id: config.application_id,
+          location_id: config.location_id,
+        };
+      }
+
+      return gatewayWithTier;
+    });
 
     res.json({
       success: true,

@@ -229,6 +229,9 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
     );
   };
 
+  // Check if variants have their own pricing (from step 2)
+  const hasVariantsWithPricing = variants && variants.length > 0 && variants.some(v => v.price_cents || v.priceCents);
+
   return (
     <div className="space-y-6">
       {/* Help Section */}
@@ -239,15 +242,18 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
             <div>
               <h4 className="font-medium text-blue-900">Pricing Strategy</h4>
               <p className="text-sm text-blue-700 mt-1">
-                Set competitive pricing with sale options, variant pricing strategies, and payment gateway selection.
-                Use the sliders to quickly adjust prices and see real-time calculations.
+                {hasVariantsWithPricing 
+                  ? 'Variant pricing is managed on each variant card in Step 2. Configure payment gateway below.'
+                  : 'Set competitive pricing with sale options, variant pricing strategies, and payment gateway selection.'}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* List Price */}
+      {/* Parent Product Pricing - Only show if no variants with pricing */}
+      {!hasVariantsWithPricing && (
+        <>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -378,23 +384,27 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
       </div>
 
       <Separator />
+        </>
+      )}
 
-      {/* Variant Pricing */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-base font-medium">Variant Pricing</Label>
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={data.variantPricing.enabled}
-              onCheckedChange={(checked) => handleVariantPricingChange('enabled', checked)}
-            />
-            <Label className="text-sm">
-              {data.variantPricing.enabled ? 'Enabled' : 'Disabled'}
-            </Label>
+      {/* Variant Pricing - Only show if no variants with pricing from step 2 */}
+      {!hasVariantsWithPricing && (
+        <>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-medium">Variant Pricing</Label>
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={data.variantPricing.enabled}
+                onCheckedChange={(checked) => handleVariantPricingChange('enabled', checked)}
+              />
+              <Label className="text-sm">
+                {data.variantPricing.enabled ? 'Enabled' : 'Disabled'}
+              </Label>
+            </div>
           </div>
-        </div>
 
-        {data.variantPricing.enabled && (
+          {data.variantPricing.enabled && (
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium">Pricing Strategy</Label>
@@ -628,7 +638,9 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
             )}
           </div>
         )}
-      </div>
+        </div>
+        </>
+      )}
 
       <Separator />
 

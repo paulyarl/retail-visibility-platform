@@ -382,12 +382,24 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
       errors.push('At least one variant is required when variants are enabled');
     }
 
-    // Pricing Validation
-    if (!data.pricing.listPrice || data.pricing.listPrice <= 0) {
-      errors.push('List price must be greater than 0');
-    }
-    if (data.pricing.salePrice && data.pricing.salePrice >= data.pricing.listPrice) {
-      errors.push('Sale price must be less than list price');
+    // Pricing Validation - skip parent price check if variants have their own pricing
+    const variants = data.productType?.variants || [];
+    const hasVariantsWithPricing = variants.length > 0 && variants.some((v: any) => v.price_cents || v.priceCents);
+    
+    if (!hasVariantsWithPricing) {
+      // Parent pricing validation (only when variants don't have pricing)
+      if (!data.pricing.listPrice || data.pricing.listPrice <= 0) {
+        errors.push('List price must be greater than 0');
+      }
+      if (data.pricing.salePrice && data.pricing.salePrice >= data.pricing.listPrice) {
+        errors.push('Sale price must be less than list price');
+      }
+    } else {
+      // Variant pricing validation
+      const variantsWithoutPrice = variants.filter((v: any) => !(v.price_cents || v.priceCents));
+      if (variantsWithoutPrice.length > 0) {
+        errors.push(`${variantsWithoutPrice.length} variant(s) are missing list price`);
+      }
     }
 
     // Content Validation
@@ -688,18 +700,73 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">List Price:</span>
-                <span className="text-sm font-medium">${(data.pricing.listPrice / 100).toFixed(2)}</span>
-              </div>
-              {data.pricing.salePrice && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Sale Price:</span>
-                  <span className="text-sm font-medium text-orange-600">
-                    ${(data.pricing.salePrice / 100).toFixed(2)}
-                  </span>
-                </div>
-              )}
+              {(() => {
+                // Check if variants have their own pricing
+                const variants = data.productType?.variants || [];
+                const hasVariantsWithPricing = variants.length > 0 && variants.some((v: any) => v.price_cents || v.priceCents);
+                
+                if (hasVariantsWithPricing) {
+                  // Show variant pricing range
+                  const listPrices = variants
+                    .map((v: any) => v.price_cents || v.priceCents || 0)
+                    .filter((p: number) => p > 0);
+                  const salePrices = variants
+                    .map((v: any) => v.sale_price_cents || v.salePriceCents)
+                    .filter((p: any): p is number => typeof p === 'number' && p > 0);
+                  
+                  const minList = listPrices.length > 0 ? Math.min(...listPrices) : 0;
+                  const maxList = listPrices.length > 0 ? Math.max(...listPrices) : 0;
+                  const minSale = salePrices.length > 0 ? Math.min(...salePrices) : 0;
+                  const maxSale = salePrices.length > 0 ? Math.max(...salePrices) : 0;
+                  
+                  return (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Variant Prices:</span>
+                        <span className="text-sm font-medium">
+                          {minList === maxList 
+                            ? `$${(minList / 100).toFixed(2)}`
+                            : `$${(minList / 100).toFixed(2)} - $${(maxList / 100).toFixed(2)}`
+                          }
+                        </span>
+                      </div>
+                      {salePrices.length > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Sale Prices:</span>
+                          <span className="text-sm font-medium text-orange-600">
+                            {minSale === maxSale 
+                              ? `$${(minSale / 100).toFixed(2)}`
+                              : `$${(minSale / 100).toFixed(2)} - $${(maxSale / 100).toFixed(2)}`
+                            }
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Variants:</span>
+                        <span className="text-sm font-medium">{variants.length} variants</span>
+                      </div>
+                    </>
+                  );
+                }
+                
+                // Show parent pricing (no variants with pricing)
+                return (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">List Price:</span>
+                      <span className="text-sm font-medium">${(data.pricing.listPrice / 100).toFixed(2)}</span>
+                    </div>
+                    {data.pricing.salePrice && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Sale Price:</span>
+                        <span className="text-sm font-medium text-orange-600">
+                          ${(data.pricing.salePrice / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
 

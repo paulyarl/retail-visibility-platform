@@ -470,13 +470,13 @@ class TenantOrderService extends TenantApiSingleton {
    * Confirm order pickup
    * Updates order fulfillment status to picked up
    */
-  async confirmPickup(orderId: string, email?: string, phone?: string): Promise<boolean> {
+  async confirmPickup(orderId: string, email?: string, phone?: string): Promise<{ success: boolean; fulfilledAt?: string }> {
     try {
       if (!orderId) {
         throw new Error('Order ID is required');
       }
 
-      await this.makeDefaultRequest<void>(
+      const response = await this.makeDefaultRequest<{ success: boolean; order: { fulfilledAt: string } }>(
         `/api/orders/${orderId}/pickup`,
         {
           method: 'PATCH',
@@ -485,10 +485,13 @@ class TenantOrderService extends TenantApiSingleton {
         `pickup-confirm-${orderId}`
       );
 
-      return true;
+      return {
+        success: response.success,
+        fulfilledAt: response.data?.order?.fulfilledAt
+      };
     } catch (error) {
       console.error('[TenantOrderService] Failed to confirm pickup:', error);
-      return false;
+      return { success: false };
     }
   }
 

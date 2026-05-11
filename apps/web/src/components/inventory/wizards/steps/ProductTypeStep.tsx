@@ -12,8 +12,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle, Upload, Image, Loader2, X } from 'lucide-react';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
 
 import { Label } from '@/components/ui/Label';
@@ -28,6 +28,8 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/shadcn-select';
 import DigitalProductConfig, { DigitalProductData } from '@/components/items/DigitalProductConfig';
+import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 interface ProductTypeStepProps {
   data: {
@@ -79,6 +81,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [newAttributeType, setNewAttributeType] = useState('');
   const [showAddAttribute, setShowAddAttribute] = useState(false);
   const [skuError, setSkuError] = useState<string>('');
+  const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
+  const variantImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid') => {
     // Auto-adjust stock quantity based on product type
@@ -284,6 +288,56 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
     }
   };
 
+  // Handle variant image upload
+  const handleVariantImageUpload = async (variantId: string, file: File) => {
+    if (!tenantId) return;
+    
+    setUploadingVariantId(variantId);
+    try {
+      // Step 1: Compress image
+      const result = await uploadImage(file, ImageUploadPresets.product);
+      
+      if (result.error) {
+        console.error('[ProductTypeStep] Image compression error:', result.error);
+        return;
+      }
+      
+      // Step 2: Upload to Supabase
+      const uploadResult = await itemsService.uploadTempPhoto({
+        tenantId,
+        dataUrl: result.dataUrl,
+      });
+      
+      if (uploadResult?.url) {
+        const updatedVariants = data.variants.map(v =>
+          v.id === variantId ? { ...v, image_url: uploadResult.url, image_path: uploadResult.path } : v
+        );
+        onChange({ ...data, variants: updatedVariants });
+      }
+    } catch (error) {
+      console.error('[ProductTypeStep] Variant image upload error:', error);
+    } finally {
+      setUploadingVariantId(null);
+    }
+  };
+
+  // Remove variant image
+  const handleRemoveVariantImage = async (variantId: string) => {
+    const variant = data.variants.find(v => v.id === variantId);
+    if (variant?.image_path) {
+      try {
+        await itemsService.deleteTempPhoto(variant.image_path);
+      } catch (error) {
+        console.error('[ProductTypeStep] Failed to delete variant image:', error);
+      }
+    }
+    
+    const updatedVariants = data.variants.map(v =>
+      v.id === variantId ? { ...v, image_url: null, image_path: null } : v
+    );
+    onChange({ ...data, variants: updatedVariants });
+  };
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'physical':
@@ -468,49 +522,55 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
 
       <Separator />
 
-      {/* Stock Quantity */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Package className="h-4 w-4 text-green-600" />
-          <Label className="text-base font-medium">Stock Quantity</Label>
-        </div>
+      {/* Stock Quantity - Only show if no variants with stock */}
+      {(() => {
+        const hasVariantsWithStock = data.hasVariants && data.variants.length > 0 && data.variants.some(v => v.stock !== undefined && v.stock !== null);
         
-        <div className="space-y-2">
-          <Label className="text-sm text-gray-600">
-            {data.type === 'digital' 
-              ? 'Set available units (for digital products, this represents download/licenses available)'
-              : 'Set initial stock quantity (units available for sale)'
-            }
-          </Label>
-          <div className="flex items-center space-x-4">
-            <Input
-              type="number"
-              value={data.stockQuantity || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleStockQuantityChange(parseInt(e.target.value) || 0)}
-              min={0}
-              max={999999}
-              step={1}
-              className="w-32"
-              placeholder="0"
-            />
-            <div className="text-sm text-gray-500">
-              {data.stockQuantity > 0 
-                ? `${data.stockQuantity} units available`
-                : 'Out of stock'
-              }
+        return !hasVariantsWithStock && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Package className="h-4 w-4 text-green-600" />
+              <Label className="text-base font-medium">Stock Quantity</Label>
             </div>
-          </div>
-        </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-600">
+                {data.type === 'digital' 
+                  ? 'Set available units (for digital products, this represents download/licenses available)'
+                  : 'Set initial stock quantity (units available for sale)'
+                }
+              </Label>
+              <div className="flex items-center space-x-4">
+                <Input
+                  type="number"
+                  value={data.stockQuantity || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleStockQuantityChange(parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={999999}
+                  step={1}
+                  className="w-32"
+                  placeholder="0"
+                />
+                <div className="text-sm text-gray-500">
+                  {data.stockQuantity > 0 
+                    ? `${data.stockQuantity} units available`
+                    : 'Out of stock'
+                  }
+                </div>
+              </div>
+            </div>
 
-        {data.type === 'physical' && data.stockQuantity === 0 && (
-          <Alert className="mt-2">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Product will be marked as out of stock. Consider adding inventory to enable sales.
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
+            {data.type === 'physical' && data.stockQuantity === 0 && (
+              <Alert className="mt-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Product will be marked as out of stock. Consider adding inventory to enable sales.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Digital Product Configuration - Only for Digital/Hybrid */}
       {(data.type === 'digital' || data.type === 'hybrid') && (
@@ -713,6 +773,10 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Label className="text-sm text-gray-600">Enter price in cents (199 = $1.99)</Label>
+                <span className="block text-xs text-blue-600 font-medium">
+                  💡 Tip: Enter prices in cents for speed (80 = $0.80, 1499 = $14.99, 19599 = $195.99)
+                </span>
                 {showVariantConfig && (
                   <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
                     <Input
@@ -737,24 +801,48 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                     <p className="text-sm">Click "Add Variant" to create your first variant</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {data.variants.map((variant, index) => (
-                      <div key={variant.id} className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
+                      <div key={variant.id} className="p-4 bg-gray-50 rounded-lg border">
+                        {/* Header Row: Name, Active Toggle, Actions */}
+                        <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center space-x-3">
                             <span className="text-sm font-medium text-gray-500">
                               #{index + 1}
                             </span>
-                            <span className="font-medium">{variant.name}</span>
-                            {variant.isActive && (
-                              <Badge variant="default" className="text-xs">Active</Badge>
-                            )}
+                            <Input
+                              value={variant.variant_name || variant.name || ''}
+                              onChange={(e) => {
+                                const updatedVariants = data.variants.map(v =>
+                                  v.id === variant.id ? { ...v, variant_name: e.target.value, name: e.target.value } : v
+                                );
+                                onChange({ ...data, variants: updatedVariants });
+                              }}
+                              placeholder="Variant name"
+                              className="w-48"
+                            />
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`active-${variant.id}`}
+                                checked={variant.is_active !== false && variant.isActive !== false}
+                                onCheckedChange={(checked: boolean) => {
+                                  const updatedVariants = data.variants.map(v =>
+                                    v.id === variant.id ? { ...v, is_active: checked, isActive: checked } : v
+                                  );
+                                  onChange({ ...data, variants: updatedVariants });
+                                }}
+                              />
+                              <Label htmlFor={`active-${variant.id}`} className="text-sm">
+                                Active
+                              </Label>
+                            </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => duplicateVariant(variant.id)}
+                              title="Duplicate variant"
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
@@ -762,52 +850,205 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                               variant="ghost"
                               size="sm"
                               onClick={() => removeVariant(variant.id)}
+                              title="Delete variant"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                        
-                        {/* Variant SKU */}
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Label className="text-sm text-gray-600 min-w-[60px]">SKU:</Label>
-                          <Input
-                            value={variant.sku || ''}
-                            onChange={(e) => updateVariantSku(variant.id, e.target.value)}
-                            placeholder="Enter SKU or auto-generate..."
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => autoGenerateVariantSku(variant.id)}
-                            title="Auto-generate SKU"
-                          >
-                            <Wand2 className="h-4 w-4" />
-                          </Button>
-                        </div>
 
-                        {/* Variant Stock Quantity */}
-                        <div className="flex items-center space-x-4">
-                          <Label className="text-sm text-gray-600">Stock:</Label>
-                          <Input
-                            type="number"
-                            value={variant.stock || ''}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateVariantStock(variant.id, parseInt(e.target.value) || 0)}
-                            min={0}
-                            max={999999}
-                            step={1}
-                            className="w-24"
-                            placeholder="0"
-                          />
-                          <div className="text-sm text-gray-500">
-                            {variant.stock > 0 
-                              ? `${variant.stock} units`
-                              : 'Out of stock'
-                            }
+                        {/* Grid Layout for Variant Fields */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {/* SKU */}
+                          <div>
+                            <Label className="text-xs text-gray-500 mb-1 block">SKU</Label>
+                            <div className="flex items-center space-x-1">
+                              <Input
+                                value={variant.sku || ''}
+                                onChange={(e) => updateVariantSku(variant.id, e.target.value)}
+                                placeholder="SKU"
+                                className="flex-1 text-sm"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => autoGenerateVariantSku(variant.id)}
+                                title="Auto-generate SKU"
+                              >
+                                <Wand2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* List Price (cents) */}
+                          <div>
+                            <Label className="text-xs text-gray-500 mb-1 block">List Price (cents)</Label>
+                            <Input
+                              type="number"
+                              value={variant.price_cents || variant.priceCents || ''}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const priceCents = parseInt(e.target.value) || 0;
+                                const updatedVariants = data.variants.map(v =>
+                                  v.id === variant.id ? { ...v, price_cents: priceCents, priceCents } : v
+                                );
+                                onChange({ ...data, variants: updatedVariants });
+                              }}
+                              min={0}
+                              step={1}
+                              placeholder="1499 = $14.99"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          {/* Sale Price (cents) */}
+                          <div>
+                            <Label className="text-xs text-gray-500 mb-1 block">Sale Price (cents)</Label>
+                            <Input
+                              type="number"
+                              value={variant.sale_price_cents || variant.salePriceCents || ''}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const salePriceCents = e.target.value ? parseInt(e.target.value) : null;
+                                const updatedVariants = data.variants.map(v =>
+                                  v.id === variant.id ? { ...v, sale_price_cents: salePriceCents, salePriceCents } : v
+                                );
+                                onChange({ ...data, variants: updatedVariants });
+                              }}
+                              min={0}
+                              step={1}
+                              placeholder="Optional"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          {/* Stock */}
+                          <div>
+                            <Label className="text-xs text-gray-500 mb-1 block">Stock</Label>
+                            <Input
+                              type="number"
+                              value={variant.stock ?? 0}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateVariantStock(variant.id, parseInt(e.target.value) || 0)}
+                              min={0}
+                              max={999999}
+                              step={1}
+                              placeholder="0"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          {/* Sort Order */}
+                          <div>
+                            <Label className="text-xs text-gray-500 mb-1 block">Sort Order</Label>
+                            <Input
+                              type="number"
+                              value={variant.sort_order ?? index}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const sortOrder = parseInt(e.target.value) || 0;
+                                const updatedVariants = data.variants.map(v =>
+                                  v.id === variant.id ? { ...v, sort_order: sortOrder } : v
+                                );
+                                onChange({ ...data, variants: updatedVariants });
+                              }}
+                              min={0}
+                              placeholder="0"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          {/* Variant Image */}
+                          <div className="col-span-2">
+                            <Label className="text-xs text-gray-500 mb-1 block">Variant Image</Label>
+                            <div className="flex items-center space-x-3">
+                              {variant.image_url ? (
+                                <div className="flex items-center space-x-3">
+                                  <img
+                                    src={variant.image_url}
+                                    alt={variant.variant_name || variant.name}
+                                    className="w-12 h-12 object-cover rounded border"
+                                  />
+                                  <span className="text-xs text-gray-500 truncate max-w-[150px]">
+                                    {variant.image_url.split('/').pop()}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveVariantImage(variant.id)}
+                                    title="Remove image"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <input
+                                    ref={variantImageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleVariantImageUpload(variant.id, file);
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={uploadingVariantId === variant.id}
+                                    onClick={() => {
+                                      variantImageInputRef.current?.click();
+                                    }}
+                                  >
+                                    {uploadingVariantId === variant.id ? (
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <Upload className="h-3 w-3 mr-1" />
+                                    )}
+                                    Upload
+                                  </Button>
+                                  <span className="text-xs text-gray-400">No image</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        {/* Attributes Section */}
+                        {(() => {
+                          // Get all attribute keys from both config and variant's existing attributes
+                          const configAttrs = data.variantConfig.attributeTypes || [];
+                          const variantAttrKeys = Object.keys(variant.attributes || {});
+                          const allAttrKeys = [...new Set([...configAttrs, ...variantAttrKeys])];
+                          
+                          return allAttrKeys.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <Label className="text-xs text-gray-500 mb-2 block">Attributes</Label>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {allAttrKeys.map((attrKey) => (
+                                  <div key={attrKey}>
+                                    <Label className="text-xs text-gray-400 capitalize mb-1 block">
+                                      {attrKey.replace(/_/g, ' ')}
+                                    </Label>
+                                    <Input
+                                      value={variant.attributes?.[attrKey] || ''}
+                                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        const updatedVariants = data.variants.map(v =>
+                                          v.id === variant.id
+                                            ? { ...v, attributes: { ...v.attributes, [attrKey]: e.target.value } }
+                                            : v
+                                        );
+                                        onChange({ ...data, variants: updatedVariants });
+                                      }}
+                                      placeholder={attrKey}
+                                      className="text-sm"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

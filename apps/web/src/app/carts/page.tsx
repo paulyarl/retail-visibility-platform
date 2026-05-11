@@ -229,6 +229,8 @@ export default function MultiCartPage() {
                           <Button
                             key={gateway.id}
                             onClick={() => handleCheckout(cart.tenant_id, gateway.gateway_type)}
+                            variant="gradient"
+                            style={{ color: 'white' }}
                             className={gateway.is_default ? 'bg-black hover:bg-gray-800' : 'bg-blue-600 hover:bg-blue-700'}
                           >
                             {gateway.gateway_type === 'square' ? (
@@ -319,10 +321,21 @@ export default function MultiCartPage() {
                                 <Minus className="h-3 w-3" />
                               </Button>
                               <span className="w-6 text-center text-sm">{item.quantity}</span>
+                              {item.stock !== undefined && item.stock > 0 && (
+                                <span className="text-xs text-gray-400">/{item.stock}</span>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateQuantity(cart.tenant_id, item.product_id, item.quantity + 1, item.variant_id)}
+                                onClick={() => {
+                                  const maxStock = item.stock ?? Infinity;
+                                  if (item.quantity >= maxStock) {
+                                    alert(`Cannot add more. Only ${maxStock} available in stock.`);
+                                    return;
+                                  }
+                                  updateQuantity(cart.tenant_id, item.product_id, item.quantity + 1, item.variant_id);
+                                }}
+                                disabled={item.stock !== undefined && item.quantity >= item.stock}
                                 className="h-7 w-7 p-0"
                               >
                                 <Plus className="h-3 w-3" />

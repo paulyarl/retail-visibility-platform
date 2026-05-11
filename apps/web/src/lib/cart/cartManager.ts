@@ -19,6 +19,8 @@ export interface CartItem {
   variant_id?: string; // Variant identifier if product has variants
   variant_name?: string; // Display name like "Large - Blue"
   variant_attributes?: Record<string, string>; // Attributes like {size: "Large", color: "Blue"}
+  // Stock info for validation
+  stock?: number; // Available stock for this item/variant
 }
 
 export interface Cart {

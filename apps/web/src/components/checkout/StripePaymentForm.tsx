@@ -30,6 +30,7 @@ interface StripePaymentFormProps {
   onSuccess: (orderId: string) => void;
   onBack: () => void;
   tenantId: string;
+  orderId?: string; // Optional - passed when payment intent is created on mount
 }
 
 function StripeCheckoutForm({ 
@@ -40,12 +41,14 @@ function StripeCheckoutForm({
   cartItems, 
   onSuccess, 
   onBack,
-  tenantId 
+  tenantId,
+  orderId 
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentElementLoading, setPaymentElementLoading] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,29 +61,11 @@ function StripeCheckoutForm({
     setError(null);
 
     try {
-      // Create order and payment intent using service
-      const checkoutResult = await checkoutService.initiateCheckout(
-        tenantId,
-        amount,
-        customerInfo,
-        cartItems,
-        {
-          shippingAddress,
-          fulfillmentMethod,
-        }
-      );
-
-      if (!checkoutResult) {
-        throw new Error('Failed to initiate checkout');
-      }
-
-      const { orderId } = checkoutResult;
-
-      // Confirm payment with Stripe
+      // Payment intent already created on mount - just confirm the payment
       const { error: submitError } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/checkout/success?orderId=${orderId}`,
+          return_url: `${window.location.origin}/checkout/success`,
         },
       });
 
@@ -90,8 +75,8 @@ function StripeCheckoutForm({
         return;
       }
 
-      // Payment succeeded
-      onSuccess(orderId);
+      // Payment succeeded - the redirect will happen automatically
+      // onSuccess will be called on the success page
     } catch (err: any) {
       console.error('[Stripe] Payment error:', err);
       setError(err.message || 'Payment failed. Please try again.');
@@ -108,7 +93,23 @@ function StripeCheckoutForm({
         </div>
       )}
 
-      <PaymentElement />
+      {/* Payment Element with loading state */}
+      <div className="relative">
+        {paymentElementLoading && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg min-h-[200px]">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+              <p className="text-sm text-gray-600">Loading payment methods...</p>
+            </div>
+          </div>
+        )}
+        <PaymentElement 
+          onReady={() => {
+            console.log('[Stripe] PaymentElement ready');
+            setPaymentElementLoading(false);
+          }}
+        />
+      </div>
 
       <div className="flex gap-3 pt-4">
         <Button type="button" variant="outline" onClick={onBack} disabled={loading}>
@@ -131,6 +132,7 @@ function StripeCheckoutForm({
 
 export default function StripePaymentFormWrapper(props: StripePaymentFormProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { settings: platformSettings } = usePlatformSettings();
@@ -149,10 +151,44 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
   }
 
   useEffect(() => {
-    // We'll create the payment intent after the user submits the form
-    // For now, just set loading to false
-    setLoading(false);
-  }, [props.amount]);
+    // Create order and payment intent on mount
+    const initializeCheckout = async () => {
+      try {
+        setLoading(true);
+        console.log('[Stripe] Creating order and payment intent...');
+        
+        const checkoutResult = await checkoutService.initiateCheckout(
+          props.tenantId,
+          props.amount,
+          props.customerInfo,
+          props.cartItems,
+          {
+            shippingAddress: props.shippingAddress,
+            fulfillmentMethod: props.fulfillmentMethod,
+          }
+        );
+
+        if (!checkoutResult) {
+          throw new Error('Failed to create order');
+        }
+
+        console.log('[Stripe] Checkout initialized:', {
+          orderId: checkoutResult.orderId,
+          hasClientSecret: !!checkoutResult.clientSecret
+        });
+
+        setOrderId(checkoutResult.orderId);
+        setClientSecret(checkoutResult.clientSecret);
+      } catch (err: any) {
+        console.error('[Stripe] Failed to initialize checkout:', err);
+        setError(err.message || 'Failed to initialize payment. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeCheckout();
+  }, [props.amount, props.tenantId]);
 
   if (loading) {
     return (
@@ -242,34 +278,36 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
   }
 
   
-  // Create payment intent options - use payment mode for simplicity
+  // We need a clientSecret to initialize the PaymentElement
+  if (!clientSecret) {
+    return (
+      <StripeWrapper>
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+            <p className="text-sm text-gray-600">Preparing payment form...</p>
+          </div>
+        </div>
+      </StripeWrapper>
+    );
+  }
+
+  // Create payment intent options with clientSecret from server
   const options = {
-    mode: 'payment' as const,
-    currency: 'usd',
-    amount: props.amount,
-    // In production, you'd want to create a payment intent on the server
-    // and pass the clientSecret here instead
+    clientSecret,
+    appearance: {
+      theme: 'stripe' as const,
+    },
   };
 
-  // For Stripe, we need to create the payment intent first
-  // This is a simplified version - in production, you'd want to handle this differently
   return (
     <StripeWrapper>
-      <div className="space-y-4">
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <p className="text-purple-800 text-sm">
-            Stripe checkout requires the merchant to have a connected Stripe account.
-            Please ensure Stripe Connect is configured before accepting Stripe payments.
-          </p>
-        </div>
-
-        <Elements 
-          stripe={loadStripe(publishableKey!)} 
-          options={options}
-        >
-          <StripeCheckoutForm {...props} />
-        </Elements>
-      </div>
+      <Elements 
+        stripe={loadStripe(publishableKey!)} 
+        options={options}
+      >
+        <StripeCheckoutForm {...props} orderId={orderId!} />
+      </Elements>
     </StripeWrapper>
   );
 }

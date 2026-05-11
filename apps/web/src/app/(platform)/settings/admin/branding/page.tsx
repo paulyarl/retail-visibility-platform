@@ -81,7 +81,7 @@ export default function PlatformBrandingPage() {
         // Map PlatformSettings to PlatformBranding interface
         const brandingData: PlatformBranding = {
           platformName: data.platformName || '',
-          platformDescription: data.branding?.description || '',
+          platformDescription: data.branding?.description || data.platformDescription || '',
           logoUrl: data.logoUrl || null,
           faviconUrl: data.faviconUrl || null,
           bannerUrl: data.bannerUrl || null,
@@ -183,7 +183,7 @@ export default function PlatformBrandingPage() {
         // Map PlatformSettings to PlatformBranding interface
         const brandingData: PlatformBranding = {
           platformName: updatedBranding.platformName || '',
-          platformDescription: updatedBranding.branding?.description || '',
+          platformDescription: updatedBranding.branding?.description || updatedBranding.platformDescription || '',
           logoUrl: updatedBranding.logoUrl || null,
           faviconUrl: updatedBranding.faviconUrl || null,
           bannerUrl: updatedBranding.bannerUrl || null,

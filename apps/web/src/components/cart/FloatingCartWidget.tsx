@@ -102,7 +102,8 @@ export function FloatingCartWidget() {
               {/* Action Bar */}
               <div className="flex items-center gap-1">
                 <Button
-                  variant="ghost"
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   size="sm"
                   onClick={() => setWidgetState('minimized')}
                   className="h-8 w-8 p-0 hover:bg-blue-100"
@@ -111,7 +112,8 @@ export function FloatingCartWidget() {
                   <Minimize2 className="h-4 w-4" />
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   size="sm"
                   onClick={() => setWidgetState('hidden')}
                   className="h-8 w-8 p-0 hover:bg-blue-100"
@@ -176,6 +178,8 @@ export function FloatingCartWidget() {
                   router.push('/carts');
                 }}
                 className="w-full"
+                variant='gradient'
+                style={{ color: 'white' }}
               >
                 View All Carts
                 <ArrowRight className="ml-2 h-4 w-4" />

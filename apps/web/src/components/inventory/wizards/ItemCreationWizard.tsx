@@ -413,8 +413,21 @@ export default function ItemCreationWizard({
           sku: productData.sku || '',
           hasVariants: productData.has_variants || false,
           stockQuantity: productData.stock || 0,
-          variants: productData.product_variants || [],
-          variantConfig: metadata.variantConfig || INITIAL_DATA.productType.variantConfig,
+          variants: productData.variants || productData.product_variants || [],
+          variantConfig: {
+            ...INITIAL_DATA.productType.variantConfig,
+            ...metadata.variantConfig,
+            // Extract attribute types from variant attributes if not in metadata
+            attributeTypes: metadata.variantConfig?.attributeTypes?.length
+              ? metadata.variantConfig.attributeTypes
+              : productData.variants?.reduce((types: string[], variant: any) => {
+                  const attrKeys = Object.keys(variant.attributes || {});
+                  attrKeys.forEach(key => {
+                    if (!types.includes(key)) types.push(key);
+                  });
+                  return types;
+                }, []) || []
+          },
           digitalProduct: {
             deliveryMethod: (productData.digital_delivery_method || 'direct_download') as 'direct_download' | 'external_link' | 'license_key' | 'access_grant',
             assets: productData.digital_assets || [],

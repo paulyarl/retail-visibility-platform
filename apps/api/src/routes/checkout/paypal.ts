@@ -216,6 +216,19 @@ router.post('/capture-order', async (req, res) => {
       include: { orders: true },
     });
 
+    // Decrement stock after successful payment
+    if (payment && payment.orders) {
+      try {
+        const { getStockService } = await import('../../services/StockService');
+        const stockService = getStockService(prisma);
+        await stockService.decrementStockForOrder(payment.orders.id);
+        console.log(`[PayPal] Stock decremented for order ${payment.orders.id} after payment capture`);
+      } catch (stockError) {
+        console.error(`[PayPal] Failed to decrement stock for order ${payment.orders?.id}:`, stockError);
+        // Don't fail the payment processing if stock decrement fails
+      }
+    }
+
     // Record platform revenue transaction
     if (payment && payment.platform_fee_cents && payment.platform_fee_cents > 0) {
       try {
