@@ -208,7 +208,8 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
           Back
         </Button>
         <Button
-          variant="outline"
+          variant="gradient"
+          style={{ color: 'white' }}
           onClick={() => router.push('/carts')}
         >
           <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

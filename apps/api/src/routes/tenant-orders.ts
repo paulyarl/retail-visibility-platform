@@ -543,6 +543,19 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       data: updateData
     });
 
+    // Restore stock for cancelled orders
+    if (fulfillmentStatus === 'cancelled') {
+      try {
+        const { getStockService } = await import('../services/StockService');
+        const stockService = getStockService(prisma);
+        await stockService.restoreStockForOrder(orderId);
+        console.log(`[Tenant Orders] Stock restored for cancelled order: ${orderId}`);
+      } catch (stockError) {
+        console.error(`[Tenant Orders] Failed to restore stock for cancelled order ${orderId}:`, stockError);
+        // Don't fail the cancellation if stock restoration fails
+      }
+    }
+
     // Handle tracking number update (stored in shipments table)
     let shipmentTrackingNumber = null;
     if (trackingNumber !== undefined) {

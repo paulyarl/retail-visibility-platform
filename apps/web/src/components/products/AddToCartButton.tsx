@@ -126,6 +126,8 @@ export function AddToCartButton({
       // Gateway suggestion (used at checkout)
       suggested_gateway_type: suggestedGatewayType,
       suggested_gateway_id: product.payment_gateway_id || undefined,
+      // Stock info for validation
+      stock: itemStock,
     }, product.tenantLogo || tenantLogo);
 
     setAdded(true);
@@ -148,11 +150,20 @@ export function AddToCartButton({
   }
 
   const isOutOfStock = product.stock !== undefined && product.stock <= 0;
+  const needsVariantSelection = product.has_variants && !variant;
 
   if (isOutOfStock) {
     return (
       <Button disabled className={className}>
         Out of Stock
+      </Button>
+    );
+  }
+
+  if (needsVariantSelection) {
+    return (
+      <Button disabled className={className}>
+        Select Options First
       </Button>
     );
   }

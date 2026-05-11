@@ -35,6 +35,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       source = 'web',
       fulfillment_method,
       pickup_tenant_id, // Multi-location: selected pickup location
+      payment_method,
     } = req.body;
 
     // Validation
@@ -57,16 +58,29 @@ router.post('/orders', async (req: Request, res: Response) => {
     // Extract tenant_id from the first item (all items should be from same tenant)
     let tenant_id: string | null = null;
     
-    // Try to get tenant_id from items
+    // Try to get tenant_id from items (check both inventory_items and product_variants)
     for (const item of items) {
       if (item.id) {
-        const inventoryItem = await prisma.inventory_items.findUnique({
-          where: { id: item.id },
-          select: { tenant_id: true },
-        });
-        if (inventoryItem?.tenant_id) {
-          tenant_id = inventoryItem.tenant_id;
-          break;
+        // First check if it's a variant (starts with 'vid-')
+        if (item.id.startsWith('vid-')) {
+          const variant = await prisma.product_variants.findUnique({
+            where: { id: item.id },
+            select: { tenant_id: true },
+          });
+          if (variant?.tenant_id) {
+            tenant_id = variant.tenant_id;
+            break;
+          }
+        } else {
+          // Check inventory_items
+          const inventoryItem = await prisma.inventory_items.findUnique({
+            where: { id: item.id },
+            select: { tenant_id: true },
+          });
+          if (inventoryItem?.tenant_id) {
+            tenant_id = inventoryItem.tenant_id;
+            break;
+          }
         }
       }
     }
@@ -111,22 +125,18 @@ router.post('/orders', async (req: Request, res: Response) => {
     if (!tenant_id) {
       tenant_id = 'demo-tenant';
       
-      // Check if demo tenant exists, create if not
-      const demoTenant = await prisma.tenants.findUnique({
+      // Create demo tenant if it doesn't exist (using upsert to avoid race conditions)
+      await prisma.tenants.upsert({
         where: { id: tenant_id },
+        update: {}, // No updates if it exists
+        create: {
+          id: tenant_id,
+          name: 'Demo Store',
+          slug: 'demo-store',
+          subscription_tier: 'commitment', // Changed to commitment for testing
+          subscription_status: 'active',
+        },
       });
-      
-      if (!demoTenant) {
-        await prisma.tenants.create({
-          data: {
-            id: tenant_id,
-            name: 'Demo Store',
-            slug: 'demo-store',
-            subscription_tier: 'commitment', // Changed to commitment for testing
-            subscription_status: 'active',
-          },
-        });
-      }
     }
 
     // Get tenant subscription tier to determine checkout mode
@@ -166,6 +176,9 @@ router.post('/orders', async (req: Request, res: Response) => {
       list_price_cents?: number;
       description?: string;
       image_url?: string;
+      variant_id?: string;
+      inventory_item_id: string;
+      total_price_cents: number;
     }> = [];
 
     for (const item of items) {
@@ -178,45 +191,166 @@ router.post('/orders', async (req: Request, res: Response) => {
         });
       }
 
-      // Fetch item details from inventory
-      const inventoryItem = await prisma.inventory_items.findUnique({
-        where: { id: item.id },
-      });
+      let inventoryItem;
+      let variant;
+      let itemData;
 
-      if (!inventoryItem) {
-        return res.status(400).json({
-          success: false,
-          error: 'item_not_found',
-          message: `Item with id ${item.id} not found in inventory`,
+      // Check if it's a variant (starts with 'vid-')
+      if (item.id.startsWith('vid-')) {
+        variant = await prisma.product_variants.findUnique({
+          where: { id: item.id },
+          include: {
+            inventory_items: true,
+          },
         });
+
+        if (!variant) {
+          return res.status(400).json({
+            success: false,
+            error: 'item_not_found',
+            message: `Variant with id ${item.id} not found`,
+          });
+        }
+
+        if (variant.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            error: 'insufficient_stock',
+            message: `Insufficient stock for ${variant.variant_name}. Available: ${variant.stock}, Requested: ${item.quantity}`,
+            available_stock: variant.stock,
+            requested_quantity: item.quantity,
+          });
+        }
+
+        // Use variant data with parent item info
+        const isOnSale = variant.sale_price_cents !== null && variant.sale_price_cents !== undefined;
+        const unitPriceCents = isOnSale ? variant.sale_price_cents! : variant.price_cents;
+        const listPriceCents = variant.price_cents;
+
+        itemData = {
+          id: variant.id,
+          sku: variant.sku,
+          name: `${variant.inventory_items.name} - ${variant.variant_name}`,
+          quantity: item.quantity,
+          unit_price_cents: unitPriceCents,
+          list_price_cents: listPriceCents,
+          description: variant.inventory_items.description,
+          image_url: variant.image_url || variant.inventory_items.image_url,
+          variant_id: variant.id,
+          inventory_item_id: variant.parent_item_id, // For order_items FK constraint
+          total_price_cents: unitPriceCents * item.quantity,
+        };
+      } else {
+        // Regular inventory item
+        inventoryItem = await prisma.inventory_items.findUnique({
+          where: { id: item.id },
+        });
+
+        if (!inventoryItem) {
+          return res.status(400).json({
+            success: false,
+            error: 'item_not_found',
+            message: `Item with id ${item.id} not found in inventory`,
+          });
+        }
+
+        if (inventoryItem.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            error: 'insufficient_stock',
+            message: `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`,
+            available_stock: inventoryItem.stock,
+            requested_quantity: item.quantity,
+          });
+        }
+
+        // Use database values for the order
+        // If item is on sale (sale_price_cents is not null), use sale price; otherwise use regular price
+        const isOnSale = inventoryItem.sale_price_cents !== null && inventoryItem.sale_price_cents !== undefined;
+        const unitPriceCents = isOnSale ? inventoryItem.sale_price_cents! : inventoryItem.price_cents;
+        const listPriceCents = inventoryItem.price_cents; // Always store original price
+
+        itemData = {
+          id: inventoryItem.id,
+          sku: inventoryItem.sku,
+          name: inventoryItem.name,
+          quantity: item.quantity,
+          unit_price_cents: unitPriceCents,
+          list_price_cents: listPriceCents,
+          description: inventoryItem.description,
+          image_url: inventoryItem.image_url,
+          inventory_item_id: inventoryItem.id, // For order_items FK constraint
+          total_price_cents: unitPriceCents * item.quantity,
+        };
       }
 
-      if (inventoryItem.stock < item.quantity) {
+      validatedItems.push(itemData);
+    }
+
+    // Check stock availability before creating order
+    console.log('[Checkout] Checking stock availability for validated items');
+    try {
+      const { getStockService } = await import('../services/StockService');
+      const stockService = getStockService(prisma);
+      
+      // Create a temporary order to check stock (we'll delete it after checking)
+      const tempOrderId = `temp-stock-check-${Date.now()}`;
+      await prisma.orders.create({
+        data: {
+          id: tempOrderId,
+          tenant_id,
+          order_number: `TEMP-${Date.now()}`,
+          order_status: 'draft',
+          payment_status: 'pending',
+          fulfillment_status: 'unfulfilled',
+          subtotal_cents: 0,
+          total_cents: 0,
+          customer_email: customer.email,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // Create temporary order items for stock checking
+      await prisma.order_items.createMany({
+        data: validatedItems.map(item => ({
+          id: `temp-item-${Date.now()}-${Math.random()}`,
+          order_id: tempOrderId,
+          inventory_item_id: item.inventory_item_id,
+          variant_id: item.variant_id || null,
+          sku: item.sku,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price_cents: item.unit_price_cents,
+          subtotal_cents: item.unit_price_cents * item.quantity, // Calculate subtotal
+          total_cents: item.total_price_cents,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })),
+      });
+
+      // Check stock availability
+      const stockCheck = await stockService.checkStockAvailability(tempOrderId);
+      
+      // Clean up temporary order and items
+      await prisma.order_items.deleteMany({ where: { order_id: tempOrderId } });
+      await prisma.orders.delete({ where: { id: tempOrderId } });
+
+      if (!stockCheck.sufficient) {
+        console.log('[Checkout] Stock check failed:', stockCheck.issues);
         return res.status(400).json({
           success: false,
           error: 'insufficient_stock',
-          message: `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`,
-          available_stock: inventoryItem.stock,
-          requested_quantity: item.quantity,
+          message: 'Some items are no longer available in the requested quantity',
+          stockIssues: stockCheck.issues,
         });
       }
 
-      // Use database values for the order
-      // If item is on sale (sale_price_cents is not null), use sale price; otherwise use regular price
-      const isOnSale = inventoryItem.sale_price_cents !== null && inventoryItem.sale_price_cents !== undefined;
-      const unitPriceCents = isOnSale ? inventoryItem.sale_price_cents! : inventoryItem.price_cents;
-      const listPriceCents = inventoryItem.price_cents; // Always store original price
-
-      validatedItems.push({
-        id: item.id,
-        sku: inventoryItem.sku || item.id,
-        name: inventoryItem.name,
-        quantity: item.quantity,
-        unit_price_cents: unitPriceCents,
-        list_price_cents: listPriceCents,
-        description: inventoryItem.description || undefined,
-        image_url: inventoryItem.image_url || undefined,
-      });
+      console.log('[Checkout] Stock availability confirmed');
+    } catch (stockCheckError) {
+      console.error('[Checkout] Error checking stock availability:', stockCheckError);
+      // Don't fail checkout if stock check fails, but log the error
+      console.warn('[Checkout] Proceeding with order despite stock check failure');
     }
 
     // Generate order number
@@ -314,7 +448,8 @@ router.post('/orders', async (req: Request, res: Response) => {
             tax_cents: item.tax_cents || 0,
             discount_cents: item.discount_cents || 0,
             total_cents: item.total_cents,
-            inventory_item_id: validatedItems[index]?.id, // Link to inventory item
+            variant_id: validatedItems[index]?.variant_id || null,
+            inventory_item_id: validatedItems[index]?.inventory_item_id || validatedItems[index]?.id, // Link to inventory item (or parent for variants)
             updated_at: new Date(),
           })),
         },
@@ -338,8 +473,8 @@ router.post('/orders', async (req: Request, res: Response) => {
         id: generatePaymentId(order.tenant_id),
         tenant_id: order.tenant_id,
         order_id: order.id,
-        gateway_type: 'paypal',
-        payment_method: 'paypal',
+        gateway_type: payment_method || 'paypal',
+        payment_method: payment_method || 'paypal',
         // For deposit orders, collect deposit amount; for full payment, collect total
         amount_cents: paymentAmount,
         platform_fee_cents: fees.platformFeeCents,

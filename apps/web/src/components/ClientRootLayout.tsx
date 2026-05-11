@@ -54,9 +54,11 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
                   <GlobalAlertProvider>
                     <UniversalProvider>
                       <Notifications position="top-right" />
-                      <ErrorBoundary>
-                        {children}
-                      </ErrorBoundary>
+                      <div key="error-boundary-wrapper">
+                        <ErrorBoundary>
+                          {children}
+                        </ErrorBoundary>
+                      </div>
                       <FloatingCartWidget />
                     </UniversalProvider>
                   </GlobalAlertProvider>

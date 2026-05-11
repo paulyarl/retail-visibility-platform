@@ -131,15 +131,29 @@ function CheckoutPageContent() {
         const squareGateway = gateways.find((g: any) => g.gateway_type === 'square' && g.is_active);
         console.log('[Checkout] Square gateway found:', squareGateway);
         console.log('[Checkout] Square gateway config:', squareGateway?.config);
+        console.log('[Checkout] Square gateway config keys:', squareGateway?.config ? Object.keys(squareGateway.config) : 'no config');
+        
         if (squareGateway?.config) {
-          console.log('[Checkout] Setting Square config:', {
-            applicationId: squareGateway.config.application_id,
-            locationId: squareGateway.config.location_id
+          const config = squareGateway.config;
+          console.log('[Checkout] Config fields:', {
+            application_id: config.application_id,
+            location_id: config.location_id,
+            applicationId: config.applicationId, // Check alternative field name
+            locationId: config.locationId, // Check alternative field name
           });
-          setSquareConfig({
-            applicationId: squareGateway.config.application_id,
-            locationId: squareGateway.config.location_id
-          });
+          
+          if (config.application_id && config.location_id) {
+            console.log('[Checkout] Setting Square config:', {
+              applicationId: config.application_id,
+              locationId: config.location_id
+            });
+            setSquareConfig({
+              applicationId: config.application_id,
+              locationId: config.location_id
+            });
+          } else {
+            console.log('[Checkout] Square config missing required fields:', config);
+          }
         } else {
           console.log('[Checkout] No Square config found, squareGateway:', squareGateway);
         }

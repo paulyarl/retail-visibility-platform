@@ -259,7 +259,7 @@ class CustomerOrderService extends PublicApiSingleton {
     amount: number;
   }): Promise<boolean> {
     try {
-      await this.makeDefaultRequest<void>(
+      const response = await this.makeDefaultRequest<void>(
         `/api/orders/${orderId}/payment`,
         {
           method: 'PUT',
@@ -267,6 +267,11 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `payment-status-${orderId}`
       );
+
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to update payment status:', response.error);
+      return false;
+      }
 
       return true;
     } catch (error) {
@@ -290,6 +295,10 @@ class CustomerOrderService extends PublicApiSingleton {
         {},
         `order-downloads-${orderId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to get order downloads:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -313,6 +322,10 @@ class CustomerOrderService extends PublicApiSingleton {
         {},
         `payment-details-${paymentId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to get payment details:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -342,6 +355,10 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `paypal-order-${orderData.orderId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to create PayPal order:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -368,6 +385,10 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `paypal-capture-${orderData.orderId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to capture PayPal order:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -414,6 +435,10 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `checkout-order-${orderData.paymentMethod}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to create checkout order:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -444,6 +469,10 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `square-payment-${paymentData.orderId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to process Square payment:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {
@@ -474,6 +503,10 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         `square-charge-${paymentData.orderId}`
       );
+      if (!response.success){
+          console.error('[CustomerOrderService] Failed to create Square charge:', response.error);
+      return null;
+      }
 
       return response;
     } catch (error) {

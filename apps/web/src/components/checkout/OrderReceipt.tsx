@@ -23,6 +23,7 @@ interface OrderReceiptProps {
     subtotal: number;
     status: string;
     fulfillmentStatus?: string;
+    fulfilledAt?: string | null;
     orderId?: string;
     paymentId?: string;
     gatewayTransactionId?: string;
@@ -49,9 +50,11 @@ interface OrderReceiptProps {
     remainingBalanceCents?: number;
     pickupDeadline?: string | null;
     depositForfeitedAt?: string | null;
-    // Cancellation
+    // Cancellation fields
     cancellationReason?: string;
     cancelledAt?: string | null;
+    // Payment gateway
+    gatewayType?: string;
   };
   onPrint?: () => void;
   className?: string;
@@ -133,7 +136,7 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
         }
 
         // Fetch fulfillment settings for pickup ready time
-        const fulfillmentSettings = await tenantOrderService.getFulfillmentSettings(cart.tenantId);
+        const fulfillmentSettings = await publicTenantInfoService.getFulfillmentSettings(cart.tenantId);
         if (fulfillmentSettings) {
           // console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentSettings);
           setFulfillmentSettings(fulfillmentSettings);
@@ -209,6 +212,7 @@ ${tenantProfile.country_code}` : 'Store Location';
     
     const storePhone = tenantProfile?.phone_number || '(555) 123-4567';
     const storeEmail = tenantProfile?.email || `support@${cart.tenantName.toLowerCase().replace(/\s+/g, '-')}.com`;
+    // console.log(`Cart gateway 1: ${cart.gatewayType}`);
 
     return `
 ╔══════════════════════════════════════════════════════════════╗
@@ -311,9 +315,25 @@ TOTAL: ${formatCurrency(total)}
 
 PAYMENT INFORMATION
 ───────────────────────────────────────────────────────────
-Payment Method: PayPal
+Payment Method: ${cart.gatewayType ? cart.gatewayType.charAt(0).toUpperCase() + cart.gatewayType.slice(1) : 'PayPal'}
 Payment Status: ${cart.status.toUpperCase()}
 Transaction ID: ${cart.gatewayTransactionId || cart.paymentId || cart.orderId || 'N/A'}
+
+═══════════════════════════════════════════════════════════════
+
+FULFILLMENT INFORMATION
+───────────────────────────────────────────────────────────
+Fulfillment Method: ${getFulfillmentLabel()}
+Fulfillment Status: ${cart.fulfillmentStatus === 'fulfilled' ? 'PICKED UP' : cart.fulfillmentStatus?.toUpperCase() || 'PROCESSING'}${cart.fulfilledAt ? `
+Picked Up On: ${new Date(cart.fulfilledAt).toLocaleDateString('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})}` : ''}${cart.fulfillmentMethod === 'pickup' && tenantProfile?.address_line1 ? `
+Pickup Location: ${tenantProfile.address_line1}${tenantProfile.address_line2 ? `, ${tenantProfile.address_line2}` : ''}, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}` : ''}
 
 ═══════════════════════════════════════════════════════════════
 
@@ -729,6 +749,7 @@ Generated on ${new Date().toLocaleString()}
                         // console.log('[OrderReceipt] Business hours state:', businessHours);
                         // console.log('[OrderReceipt] Monday hours:', dayHours);
                       // }
+                      //  console.log(`Cart gateway 2: ${cart.gatewayType}`);
                       
                       return (
                         <div key={day} className={`flex justify-between ${isToday ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
@@ -775,6 +796,7 @@ Generated on ${new Date().toLocaleString()}
             <div className="space-y-3">
               {cart.items.map((item) => {
                 const itemTotal = item.unitPrice * item.quantity;
+                //  console.log(`Cart gateway 3: ${cart.gatewayType}`);
                 return (
                   <div key={item.id} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
                     <div className="flex-1">
@@ -869,7 +891,7 @@ Generated on ${new Date().toLocaleString()}
             <h4 className="font-semibold text-blue-900 mb-2">Payment Information</h4>
             <div className="space-y-1 text-sm">
               <p className="text-blue-700">
-                <span className="font-medium">Method:</span> PayPal
+                <span className="font-medium">Method:</span> {cart.gatewayType ? cart.gatewayType.charAt(0).toUpperCase() + cart.gatewayType.slice(1) : 'PayPal'}
               </p>
               <p className="text-blue-700">
                 <span className="font-medium">Status:</span> {cart.status.charAt(0).toUpperCase() + cart.status.slice(1)}
@@ -877,6 +899,49 @@ Generated on ${new Date().toLocaleString()}
               <p className="text-blue-700">
                 <span className="font-medium">Transaction ID:</span> {cart.gatewayTransactionId || cart.paymentId || cart.orderId || 'Processing...'}
               </p>
+            </div>
+          </div>
+
+          {/* Fulfillment Information */}
+          <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+            <h4 className="font-semibold text-purple-900 mb-2">Fulfillment Information</h4>
+            <div className="space-y-1 text-sm">
+              <p className="text-purple-700">
+                <span className="font-medium">Method:</span> {getFulfillmentLabel()}
+              </p>
+              <p className="text-purple-700">
+                <span className="font-medium">Status:</span>{' '}
+                {cart.fulfillmentStatus === 'fulfilled' ? (
+                  <span className="text-green-700 font-semibold">Picked Up</span>
+                ) : cart.fulfillmentStatus === 'pending' ? (
+                  <span className="text-amber-700 font-semibold">Pending</span>
+                ) : cart.fulfillmentStatus ? (
+                  cart.fulfillmentStatus.charAt(0).toUpperCase() + cart.fulfillmentStatus.slice(1)
+                ) : (
+                  'Processing'
+                )}
+              </p>
+              {cart.fulfilledAt && (
+                <p className="text-purple-700">
+                  <span className="font-medium">Picked Up On:</span>{' '}
+                  {new Date(cart.fulfilledAt).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              )}
+              {cart.fulfillmentMethod === 'pickup' && tenantProfile?.address_line1 && (
+                <p className="text-purple-700 mt-2 pt-2 border-t border-purple-200">
+                  <span className="font-medium">Pickup Location:</span>{' '}
+                  {tenantProfile.address_line1}
+                  {tenantProfile.address_line2 && `, ${tenantProfile.address_line2}`}
+                  {`, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}`}
+                </p>
+              )}
             </div>
           </div>
 

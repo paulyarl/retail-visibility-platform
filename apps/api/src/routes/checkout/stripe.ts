@@ -120,6 +120,17 @@ router.post('/confirm-payment', async (req, res) => {
       },
     });
 
+    // Decrement stock after successful payment
+    try {
+      const { getStockService } = await import('../../services/StockService');
+      const stockService = getStockService(prisma);
+      await stockService.decrementStockForOrder(payment.orders.id);
+      console.log(`[Stripe] Stock decremented for order ${payment.orders.id} after payment completion`);
+    } catch (stockError) {
+      console.error(`[Stripe] Failed to decrement stock for order ${payment.orders.id}:`, stockError);
+      // Don't fail the payment processing if stock decrement fails
+    }
+
     // Record platform revenue transaction
     if (payment.platform_fee_cents && payment.platform_fee_cents > 0) {
       try {

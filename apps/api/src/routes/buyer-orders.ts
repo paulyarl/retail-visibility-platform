@@ -62,6 +62,28 @@ router.get('/buyer', async (req, res) => {
       },
     });
 
+    // Fetch variants for all orders by tenant and parent_item_id
+    const parentItemIds = [...new Set(orders.flatMap(order => 
+      order.order_items.map(item => item.inventory_item_id)
+    ))];
+    
+    const variants = parentItemIds.length > 0 ? await prisma.product_variants.findMany({
+      where: { 
+        parent_item_id: { in: parentItemIds.filter(id => id !== null) as string[] },
+        tenant_id: orders[0]?.tenant_id 
+      },
+      select: {
+        id: true,
+        sku: true,
+        variant_name: true,
+        image_url: true,
+      },
+    }) : [];
+    
+    // Create maps for both variant_id and sku lookup
+    const variantMapById = new Map(variants.map(v => [v.id, v]));
+    const variantMapBySku = new Map(variants.map(v => [v.sku, v]));
+
     // Transform to buyer-friendly format
     const ordersList = orders.map((order) => {
         const tenant = order.tenants;
@@ -73,11 +95,13 @@ router.get('/buyer', async (req, res) => {
           orderNumber: order.order_number,
           paymentId: payment?.id || null,
           gatewayTransactionId: payment?.gateway_transaction_id || null,
+          gatewayType: payment?.gateway_type || null,
           tenantId: tenant.id,
           tenantName: tenant.name,
           tenantLogo: (tenant.metadata as any)?.logo_url || null,
           status: order.order_status,
           fulfillmentStatus: order.fulfillment_status,
+          fulfilledAt: order.fulfilled_at,
           orderDate: order.created_at,
           paidAt: order.paid_at || order.created_at,
           total: order.total_cents,
@@ -101,14 +125,26 @@ router.get('/buyer', async (req, res) => {
             postalCode: order.shipping_postal_code || '',
             country: order.shipping_country || 'US',
           } : null,
-          items: order.order_items.map((item) => ({
-            id: item.id,
-            name: item.inventory_items?.name || item.name || '',
-            sku: item.inventory_items?.sku || item.sku || '',
-            quantity: item.quantity,
-            unitPrice: item.unit_price_cents,
-            imageUrl: item.inventory_items?.image_url || item.image_url || null,
-          })),
+          items: order.order_items.map((item) => {
+            // Try to find variant by variant_id first, then by sku
+            let variant = null;
+            if (item.variant_id) {
+              variant = variantMapById.get(item.variant_id);
+            } else if (item.sku) {
+              variant = variantMapBySku.get(item.sku);
+            }
+            
+            return {
+              id: item.id,
+              name: variant ? 
+                `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` : 
+                (item.inventory_items?.name || item.name || ''),
+              sku: variant?.sku || item.inventory_items?.sku || item.sku || '',
+              quantity: item.quantity,
+              unitPrice: item.unit_price_cents,
+              imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+            };
+          }),
           itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
           refunds: order.refunds?.map(refund => ({
             id: refund.id,
@@ -204,6 +240,26 @@ router.get('/:orderId', async (req, res) => {
       }
     }
 
+    // Fetch variants for order by tenant and parent_item_id
+    const parentItemIds = [...new Set(order.order_items.map(item => item.inventory_item_id))];
+    
+    const variants = parentItemIds.length > 0 ? await prisma.product_variants.findMany({
+      where: { 
+        parent_item_id: { in: parentItemIds.filter(id => id !== null) as string[] },
+        tenant_id: order.tenant_id 
+      },
+      select: {
+        id: true,
+        sku: true,
+        variant_name: true,
+        image_url: true,
+      },
+    }) : [];
+    
+    // Create maps for both variant_id and sku lookup
+    const variantMapById = new Map(variants.map(v => [v.id, v]));
+    const variantMapBySku = new Map(variants.map(v => [v.sku, v]));
+
     const payment = order.payments[0];
     const tenant = order.tenants;
 
@@ -217,6 +273,7 @@ router.get('/:orderId', async (req, res) => {
       tenantLogo: (tenant.metadata as any)?.logo_url || null,
       status: order.order_status,
       fulfillmentStatus: order.fulfillment_status,
+      fulfilledAt: order.fulfilled_at,
       orderDate: order.created_at,
       paidAt: order.paid_at || order.created_at,
       total: order.total_cents,
@@ -244,14 +301,26 @@ router.get('/:orderId', async (req, res) => {
         postalCode: order.shipping_postal_code || '',
         country: order.shipping_country || 'US',
       } : null,
-      items: order.order_items.map((item) => ({
-        id: item.id,
-        name: item.inventory_items?.name || item.name || '',
-        sku: item.inventory_items?.sku || item.sku || '',
-        quantity: item.quantity,
-        unitPrice: item.unit_price_cents,
-        imageUrl: item.inventory_items?.image_url || item.image_url || null,
-      })),
+      items: order.order_items.map((item) => {
+        // Try to find variant by variant_id first, then by sku
+        let variant = null;
+        if (item.variant_id) {
+          variant = variantMapById.get(item.variant_id);
+        } else if (item.sku) {
+          variant = variantMapBySku.get(item.sku);
+        }
+        
+        return {
+          id: item.id,
+          name: variant ? 
+            `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` : 
+            (item.inventory_items?.name || item.name || ''),
+          sku: variant?.sku || item.inventory_items?.sku || item.sku || '',
+          quantity: item.quantity,
+          unitPrice: item.unit_price_cents,
+          imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+        };
+      }),
       itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
       refunds: order.refunds?.map(refund => ({
         id: refund.id,
@@ -500,6 +569,17 @@ router.patch('/:orderId/cancel', async (req, res) => {
     });
 
     console.log('[Buyer Orders] Order cancelled:', orderId, cancellationReason ? `Reason: ${cancellationReason}` : 'No reason provided');
+
+    // Restore stock for cancelled orders (both paid and draft)
+    try {
+      const { getStockService } = await import('../services/StockService');
+      const stockService = getStockService(prisma);
+      await stockService.restoreStockForOrder(orderId);
+      console.log(`[Buyer Orders] Stock restored for cancelled order: ${orderId}`);
+    } catch (stockError) {
+      console.error(`[Buyer Orders] Failed to restore stock for cancelled order ${orderId}:`, stockError);
+      // Don't fail the cancellation if stock restoration fails
+    }
 
     // Send order cancelled notification (async, don't wait)
     const { getOrderNotificationService } = await import('../services/OrderNotificationService');

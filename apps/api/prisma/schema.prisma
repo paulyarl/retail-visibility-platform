@@ -3539,6 +3539,8 @@ enum payment_method {
   check
   bank_transfer
   other
+  square
+  stripe
 }
 
 enum payment_status {

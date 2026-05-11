@@ -10,6 +10,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface PlatformSettings {
   platformName: string;
+  platformDescription: string;
   logoUrl: string | null;
   faviconUrl: string | null;
   bannerUrl: string | null;
@@ -47,6 +48,10 @@ export interface PlatformSettings {
   socialInstagram?: string;
   socialLinkedIn?: string;
   socialYoutube?: string;
+  socialTiktok?: string;
+  socialSnapchat?: string;
+  socialThreads?: string;
+  socialPinterest?: string;
   features?: Record<string, any>;
 }
 
@@ -93,7 +98,8 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
       
       // Return default settings if no data
       return {
-        platformName: 'Visible Shelf',
+        platformName: 'Visible Shelf LLC',
+        platformDescription: '',
         logoUrl: null,
         faviconUrl: null,
         bannerUrl: null,
@@ -106,26 +112,30 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
           accent: '#ffdd07',
           neutral: '#64748b'
         },
-        themeFontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        themeFontFamily: 'Poppins,Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         themeBorderRadius: 'md',
         themeButtonSize: 'sm',
         themeSpacing: 16,
-        contactEmail: 'billing@visible-shelf.com',
+        contactEmail: 'billing@visibleshelf.com',
         contactPhone: '',
         contactAddress: '',
-        contactWebsite: 'https://visible-shelf.com',
+        contactWebsite: 'https://visibleshelf.com',
         socialFacebook: '',
         socialTwitter: '',
         socialInstagram: '',
         socialLinkedIn: '',
         socialYoutube: '',
+        socialTiktok: '',
+        socialPinterest: '',
+        socialSnapchat: '',
       };
     } catch (error) {
       console.error('[PlatformSettingsSingleton] Failed to get platform settings:', error);
       
       // Return default settings on error
       return {
-        platformName: 'Visible Shelf',
+        platformName: 'Visible Shelf LLC',
+        platformDescription: '',
         logoUrl: null,
         faviconUrl: null,
         bannerUrl: null,
@@ -138,19 +148,22 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
           accent: '#ffdd07',
           neutral: '#64748b'
         },
-        themeFontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        themeFontFamily: 'Poppins,Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         themeBorderRadius: 'md',
         themeButtonSize: 'sm',
         themeSpacing: 16,
-        contactEmail: 'billing@visible-shelf.com',
+        contactEmail: 'billing@visibleshelf.com',
         contactPhone: '',
         contactAddress: '',
-        contactWebsite: 'https://visible-shelf.com',
+        contactWebsite: 'https://visibleshelf.com',
         socialFacebook: '',
         socialTwitter: '',
         socialInstagram: '',
         socialLinkedIn: '',
         socialYoutube: '',
+        socialTiktok: '',
+        socialPinterest: '',
+        socialSnapchat: '',
       };
     }
   }

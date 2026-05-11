@@ -20,6 +20,7 @@ interface BuyerOrder {
   fulfillmentStatus?: string;
   orderDate: string;
   paidAt: string;
+  fulfilledAt?: string;
   total: number;
   subtotal: number;
   platformFee: number;
@@ -156,20 +157,21 @@ export default function BuyerOrderHistory() {
     try {
       setConfirmingPickup(true);
       
-      const success = await tenantOrderService.confirmPickup(orderId, email, phone);
+      const result = await tenantOrderService.confirmPickup(orderId, email, phone);
       
-      if (success) {
-        // Update local state
+      if (result.success) {
+        // Update local state with fulfilledAt timestamp
         if (selectedOrder && selectedOrder.orderId === orderId) {
           setSelectedOrder({
             ...selectedOrder,
             fulfillmentStatus: 'fulfilled',
+            fulfilledAt: result.fulfilledAt,
           });
         }
 
         setOrders(orders.map(order => 
           order.orderId === orderId 
-            ? { ...order, fulfillmentStatus: 'fulfilled' }
+            ? { ...order, fulfillmentStatus: 'fulfilled', fulfilledAt: result.fulfilledAt }
             : order
         ));
 
@@ -368,8 +370,19 @@ export default function BuyerOrderHistory() {
               )}
               
               {selectedOrder.fulfillmentStatus === 'fulfilled' && (
-                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-semibold">
-                  ✓ Picked Up
+                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg">
+                  <div className="font-semibold">✓ Picked Up</div>
+                  {selectedOrder.fulfilledAt && (
+                    <div className="text-xs text-green-700 mt-1">
+                      {new Date(selectedOrder.fulfilledAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -818,6 +831,7 @@ export default function BuyerOrderHistory() {
               subtotal: selectedOrder.subtotal,
               status: selectedOrder.status,
               fulfillmentStatus: selectedOrder.fulfillmentStatus,
+              fulfilledAt: selectedOrder.fulfilledAt || undefined,
               orderId: selectedOrder.orderNumber,
               paymentId: (selectedOrder as any).paymentId || undefined,
               gatewayTransactionId: (selectedOrder as any).gatewayTransactionId || undefined,
@@ -835,6 +849,8 @@ export default function BuyerOrderHistory() {
               // Cancellation fields
               cancellationReason: (selectedOrder as any).cancellationReason || undefined,
               cancelledAt: (selectedOrder as any).cancelledAt || undefined,
+              // Payment gateway
+              gatewayType: (selectedOrder as any).gatewayType || undefined,
             }}
           />
         </div>

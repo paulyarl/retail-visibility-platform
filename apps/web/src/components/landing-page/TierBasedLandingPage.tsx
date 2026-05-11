@@ -1030,6 +1030,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [quantity, setQuantity] = useState(1);
   
   // Move all hooks to the top - Rules of Hooks
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
@@ -1064,7 +1065,10 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const getStock = (v: any) => v?.inventory_quantity ?? v?.stock ?? v?.variant_stock ?? v?.variant_inventory_quantity ?? 0;
   const currentStock = getStock(selectedVariant) || product.stock;
   const currentSku = selectedVariant?.sku || product.sku;
-  const currentAvailability = selectedVariant ? (getStock(selectedVariant) > 0 ? 'in_stock' : 'out_of_stock') : product.availability;
+  // Treat 'limited' as in_stock since it means stock > 0
+  const currentAvailability = selectedVariant 
+    ? (getStock(selectedVariant) > 0 ? 'in_stock' : 'out_of_stock') 
+    : (product.availability === 'in_stock' || product.availability === 'limited' ? 'in_stock' : product.availability);
   // console.log(`[TierBasedLandingPage] Current availability: ${currentAvailability}`);
   
   // Calculate variant price range and stock for display when no variant is selected
@@ -1402,14 +1406,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           </div>
               );
             } else {
-              // {product.stock > 0 ? `In stock (${product.stock})` : 'Out of stock'}
               return (
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                   currentAvailability === 'in_stock' 
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-red-100 text-red-800'
                 }`}>
-                  {currentAvailability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+                  {currentAvailability === 'in_stock' 
+                    ? `✓ In Stock (${currentStock} available)` 
+                    : '✗ Out of Stock'}
                 </span>
               );
             }
@@ -1423,6 +1428,43 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 <Package className="flex items-center justify-center h-5 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add to Cart</span>
               </div>
+              
+              {/* Quantity Selector */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-sm text-gray-600">Quantity:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max={currentStock || 999}
+                    value={quantity}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      const max = currentStock || 999;
+                      setQuantity(Math.min(Math.max(1, val), max));
+                    }}
+                    className="w-16 h-8 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => setQuantity(Math.min(quantity + 1, currentStock || 999))}
+                    disabled={quantity >= (currentStock || 999)}
+                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+                {currentStock > 0 && (
+                  <span className="text-xs text-gray-400">max {currentStock}</span>
+                )}
+              </div>
+              
               <AddToCartButton
                 product={{
                   id: selectedVariant?.id || product.id,
@@ -1433,9 +1475,10 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                   imageUrl: selectedVariant?.image_url || product.imageUrl,
                   stock: currentAvailability === 'in_stock' ? (currentStock || 999) : 0,
                   tenantId: product.tenantId,
-                  
+                  has_variants: hasVariants,
                 }}
                 variant={selectedVariant}
+                quantity={quantity}
                 tenantName={tenant.metadata?.businessName || tenant.name}
                 tenantLogo={businessLogo}
                 hasActivePaymentGateway={effectiveCanPurchase}
