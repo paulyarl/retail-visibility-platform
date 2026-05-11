@@ -2,10 +2,10 @@
  * Checkout Service
  * 
  * Handles checkout operations including order creation and payment intent generation
- * Uses TenantApiSingleton for authenticated checkout operations
+ * Uses PublicApiSingleton for public/guest checkout operations (no authentication required)
  */
 
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface CustomerInfo {
   email: string;
@@ -51,7 +51,7 @@ export interface CreatePaymentIntentResponse {
   paymentIntentId: string;
 }
 
-class CheckoutService extends TenantApiSingleton {
+class CheckoutService extends PublicApiSingleton {
   private static instance: CheckoutService;
 
   /**
@@ -89,15 +89,42 @@ class CheckoutService extends TenantApiSingleton {
 
   /**
    * Create an order and payment record
-   * Uses the /api/checkout/create-order endpoint
+   * Uses the /api/checkout/orders endpoint
    */
   async createOrder(request: CreateOrderRequest): Promise<CreateOrderResponse | null> {
     try {
-      const result = await this.makeDefaultRequest<CreateOrderResponse>(
-        '/api/checkout/create-order',
+      // Transform request to match API expected format
+      const apiRequest = {
+        customer: {
+          email: request.customerInfo.email,
+          name: `${request.customerInfo.firstName} ${request.customerInfo.lastName}`.trim(),
+          firstName: request.customerInfo.firstName,
+          lastName: request.customerInfo.lastName,
+          phone: request.customerInfo.phone,
+        },
+        items: request.cartItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+        })),
+        shipping_address: request.shippingAddress,
+        fulfillment_method: request.fulfillmentMethod,
+        payment_method: request.paymentMethod,
+      };
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        order: {
+          id: string;
+          order_number: string;
+        };
+        payment: {
+          id: string;
+        };
+      }>(
+        '/api/checkout/orders',
         {
           method: 'POST',
-          body: JSON.stringify(request)
+          body: JSON.stringify(apiRequest)
         },
         `checkout-order-${request.tenantId}-${Date.now()}`
       );
@@ -107,7 +134,18 @@ class CheckoutService extends TenantApiSingleton {
         return null;
       }
 
-      return result.data || null;
+      // Transform API response to match service interface
+      const data = result.data;
+      if (!data?.order || !data?.payment) {
+        console.error('[CheckoutService] Invalid response structure:', data);
+        return null;
+      }
+
+      return {
+        orderId: data.order.id,
+        paymentId: data.payment.id,
+        orderNumber: data.order.order_number,
+      };
     } catch (error) {
       console.error('[CheckoutService] Create order error:', error);
       return null;
@@ -120,7 +158,12 @@ class CheckoutService extends TenantApiSingleton {
    */
   async createPaymentIntent(request: CreatePaymentIntentRequest): Promise<CreatePaymentIntentResponse | null> {
     try {
-      const result = await this.makeDefaultRequest<CreatePaymentIntentResponse>(
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        clientSecret: string;
+        paymentIntentId: string;
+        platformFee?: number;
+      }>(
         '/api/checkout/stripe/create-payment-intent',
         {
           method: 'POST',
@@ -134,7 +177,16 @@ class CheckoutService extends TenantApiSingleton {
         return null;
       }
 
-      return result.data || null;
+      const data = result.data;
+      if (!data?.clientSecret || !data?.paymentIntentId) {
+        console.error('[CheckoutService] Invalid payment intent response:', data);
+        return null;
+      }
+
+      return {
+        clientSecret: data.clientSecret,
+        paymentIntentId: data.paymentIntentId,
+      };
     } catch (error) {
       console.error('[CheckoutService] Create payment intent error:', error);
       return null;
@@ -186,6 +238,90 @@ class CheckoutService extends TenantApiSingleton {
       paymentId: orderResponse.paymentId,
       clientSecret: intentResponse.clientSecret,
     };
+  }
+
+  /**
+   * Confirm a successful Stripe payment
+   * Uses the /api/checkout/stripe/confirm-payment endpoint
+   */
+  async confirmStripePayment(paymentIntentId: string, clientSecret?: string): Promise<{ orderId: string } | null> {
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        orderId: string;
+      }>(
+        '/api/checkout/stripe/confirm-payment',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            paymentIntentId,
+            clientSecret,
+          })
+        },
+        `stripe-confirm-${paymentIntentId}`
+      );
+
+      if (!result.success) {
+        console.error('[CheckoutService] Failed to confirm payment:', result.error);
+        return null;
+      }
+
+      return {
+        orderId: result.data?.orderId || '',
+      };
+    } catch (error) {
+      console.error('[CheckoutService] Confirm payment error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get order details by order ID
+   * Uses the /api/checkout/orders/:orderId endpoint
+   */
+  async getOrder(orderId: string): Promise<{
+    id: string;
+    order_number: string;
+    tenant_id: string;
+    customer_email?: string;
+    customer_phone?: string;
+    customer_name?: string;
+    total_cents: number;
+    order_items?: any[];
+    created_at: string;
+  } | null> {
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        order: {
+          id: string;
+          order_number: string;
+          tenant_id: string;
+          customer_email?: string;
+          customer_phone?: string;
+          customer_name?: string;
+          total_cents: number;
+          order_items?: any[];
+          created_at: string;
+        };
+      }>(
+        `/api/checkout/orders/${orderId}`,
+        {
+          method: 'GET',
+        },
+        `order-${orderId}`
+      );
+
+      if (!result.success || !result.data?.order) {
+        console.error('[CheckoutService] Failed to get order:', result.error);
+        return null;
+      }
+
+      return result.data.order;
+    } catch (error) {
+      console.error('[CheckoutService] Get order error:', error);
+      return null;
+    }
   }
 }
 

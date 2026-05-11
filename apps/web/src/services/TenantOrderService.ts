@@ -487,7 +487,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return {
         success: response.success,
-        fulfilledAt: response.order?.fulfilledAt
+        fulfilledAt: response.data?.order?.fulfilledAt
       };
     } catch (error) {
       console.error('[TenantOrderService] Failed to confirm pickup:', error);

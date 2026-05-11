@@ -357,6 +357,9 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
                   disabled={status === 'processing' || status === 'success' || !selectedGateway}
                   className="w-full"
                   size="lg"
+                  
+                            variant="gradient"
+                            style={{ color: 'white' }}
                 >
                   {status === 'processing' && (
                     <>

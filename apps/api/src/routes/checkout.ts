@@ -224,8 +224,8 @@ router.post('/orders', async (req: Request, res: Response) => {
 
         // Use variant data with parent item info
         const isOnSale = variant.sale_price_cents !== null && variant.sale_price_cents !== undefined;
-        const unitPriceCents = isOnSale ? variant.sale_price_cents! : variant.price_cents;
-        const listPriceCents = variant.price_cents;
+        const unitPriceCents = isOnSale ? variant.sale_price_cents! : (variant.price_cents ?? 0);
+        const listPriceCents = variant.price_cents ?? 0;
 
         itemData = {
           id: variant.id,
@@ -234,8 +234,8 @@ router.post('/orders', async (req: Request, res: Response) => {
           quantity: item.quantity,
           unit_price_cents: unitPriceCents,
           list_price_cents: listPriceCents,
-          description: variant.inventory_items.description,
-          image_url: variant.image_url || variant.inventory_items.image_url,
+          description: variant.inventory_items.description ?? undefined,
+          image_url: variant.image_url ?? variant.inventory_items.image_url ?? undefined,
           variant_id: variant.id,
           inventory_item_id: variant.parent_item_id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
@@ -267,8 +267,8 @@ router.post('/orders', async (req: Request, res: Response) => {
         // Use database values for the order
         // If item is on sale (sale_price_cents is not null), use sale price; otherwise use regular price
         const isOnSale = inventoryItem.sale_price_cents !== null && inventoryItem.sale_price_cents !== undefined;
-        const unitPriceCents = isOnSale ? inventoryItem.sale_price_cents! : inventoryItem.price_cents;
-        const listPriceCents = inventoryItem.price_cents; // Always store original price
+        const unitPriceCents = isOnSale ? inventoryItem.sale_price_cents! : (inventoryItem.price_cents ?? 0);
+        const listPriceCents = inventoryItem.price_cents ?? 0; // Always store original price
 
         itemData = {
           id: inventoryItem.id,
@@ -277,8 +277,8 @@ router.post('/orders', async (req: Request, res: Response) => {
           quantity: item.quantity,
           unit_price_cents: unitPriceCents,
           list_price_cents: listPriceCents,
-          description: inventoryItem.description,
-          image_url: inventoryItem.image_url,
+          description: inventoryItem.description ?? undefined,
+          image_url: inventoryItem.image_url ?? undefined,
           inventory_item_id: inventoryItem.id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
         };

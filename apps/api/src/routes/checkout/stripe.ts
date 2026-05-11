@@ -88,20 +88,29 @@ router.post('/create-payment-intent', async (req, res) => {
  */
 router.post('/confirm-payment', async (req, res) => {
   try {
-    const { paymentIntentId, paymentId } = req.body;
+    const { paymentIntentId, paymentId, clientSecret } = req.body;
 
-    if (!paymentIntentId || !paymentId) {
+    if (!paymentIntentId) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'paymentIntentId and paymentId are required'
+        message: 'paymentIntentId is required'
       });
     }
 
-    // Get payment record
-    const payment = await prisma.payments.findUnique({
-      where: { id: paymentId },
-      include: { orders: true },
-    });
+    // Find payment by paymentId or by gateway_transaction_id (paymentIntentId)
+    let payment;
+    if (paymentId) {
+      payment = await prisma.payments.findUnique({
+        where: { id: paymentId },
+        include: { orders: true },
+      });
+    } else {
+      // Find by Stripe payment intent ID
+      payment = await prisma.payments.findFirst({
+        where: { gateway_transaction_id: paymentIntentId },
+        include: { orders: true },
+      });
+    }
 
     if (!payment?.orders) {
       return res.status(404).json({
@@ -112,7 +121,7 @@ router.post('/confirm-payment', async (req, res) => {
 
     // Update payment status
     await prisma.payments.update({
-      where: { id: paymentId },
+      where: { id: payment.id },
       data: {
         payment_status: 'paid',
         captured_at: new Date(),

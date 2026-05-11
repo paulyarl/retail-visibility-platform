@@ -229,6 +229,8 @@ export default function MultiCartPage() {
                           <Button
                             key={gateway.id}
                             onClick={() => handleCheckout(cart.tenant_id, gateway.gateway_type)}
+                            variant="gradient"
+                            style={{ color: 'white' }}
                             className={gateway.is_default ? 'bg-black hover:bg-gray-800' : 'bg-blue-600 hover:bg-blue-700'}
                           >
                             {gateway.gateway_type === 'square' ? (
