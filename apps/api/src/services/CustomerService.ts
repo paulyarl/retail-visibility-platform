@@ -198,7 +198,7 @@ export class CustomerService {
     if (!relationship) {
       relationship = await prisma.customer_tenant_relationships.create({
         data: {
-          id: generateCustomerTenantRelationshipId(tenantId),
+          id: generateCustomerTenantRelationshipId(tenantId, customerId),
           customer_id: customerId,
           tenant_id: tenantId,
         },

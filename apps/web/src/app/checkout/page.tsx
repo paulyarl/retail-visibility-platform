@@ -17,6 +17,7 @@ import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { CustomerAuthProvider } from '@/contexts/CustomerAuthContext';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -46,6 +47,8 @@ function CheckoutPageContent() {
   const { carts } = useMultiCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('review');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod | null>(null);
   const [fulfillmentFee, setFulfillmentFee] = useState<number>(0);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
@@ -332,8 +335,10 @@ function CheckoutPageContent() {
     );
   }
 
-  const handleCustomerInfoSubmit = (info: CustomerInfo) => {
+  const handleCustomerInfoSubmit = (info: CustomerInfo, custId?: string, addrId?: string) => {
     setCustomerInfo(info);
+    setCustomerId(custId || null);
+    setSelectedAddressId(addrId || null);
     setCurrentStep('fulfillment');
   };
 
@@ -785,15 +790,17 @@ function CheckoutPageContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading checkout...</p>
+    <CustomerAuthProvider>
+      <Suspense fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading checkout...</p>
+          </div>
         </div>
-      </div>
-    }>
-      <CheckoutPageContent />
-    </Suspense>
+      }>
+        <CheckoutPageContent />
+      </Suspense>
+    </CustomerAuthProvider>
   );
 }

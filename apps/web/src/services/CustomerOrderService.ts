@@ -23,6 +23,7 @@ export interface CustomerOrder {
   items: CustomerOrderItem[];
   createdAt: string;
   paidAt: string;
+  fulfilledAt?: string;
   trackingNumber?: string;
   shippingAddress: {
     addressLine1: string;
