@@ -7,6 +7,7 @@ import './newrelic';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import { user_role } from '@prisma/client';
 
 // Fix for Supabase SSL certificate issues in production
@@ -318,6 +319,7 @@ import stripeConnectWebhooks from './routes/stripe-connect-webhooks';
 app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }), stripeConnectWebhooks);
 console.log('Stripe Connect webhooks mounted at /api/webhooks/stripe-connect');
 
+app.use(cookieParser()); // Parse cookies for customer session auth
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -7600,6 +7602,21 @@ console.log('✅ Fulfillment coordination routes mounted at /api/fulfillment');
 import customerRoutes from './routes/customers';
 app.use('/api/customers', customerRoutes);
 console.log('✅ Customer management routes mounted at /api/customers');
+
+/* ------------------------------ customer authentication ------------------------------ */
+import customerAuthRoutes from './routes/customer-auth';
+app.use('/api/customer-auth', customerAuthRoutes);
+console.log('✅ Customer authentication routes mounted at /api/customer-auth');
+
+/* ------------------------------ customer addresses ------------------------------ */
+import customerAddressesRoutes from './routes/customer-addresses';
+app.use('/api/customer-addresses', customerAddressesRoutes);
+console.log('✅ Customer addresses routes mounted at /api/customer-addresses');
+
+/* ------------------------------ customer notifications ------------------------------ */
+import customerNotificationsRoutes from './routes/customer-notifications';
+app.use('/api/customer-notifications', customerNotificationsRoutes);
+console.log('✅ Customer notifications routes mounted at /api/customer-notifications');
 
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';

@@ -36,7 +36,12 @@ router.post('/orders', async (req: Request, res: Response) => {
       fulfillment_method,
       pickup_tenant_id, // Multi-location: selected pickup location
       payment_method,
+      customer_id, // Optional: for logged-in customers
     } = req.body;
+
+    // Check for logged-in customer from session cookie
+    const sessionCustomerId = req.cookies?.customer_session_id;
+    const effectiveCustomerId = customer_id || sessionCustomerId || null;
 
     // Validation
     if (!customer?.email) {
@@ -388,9 +393,10 @@ router.post('/orders', async (req: Request, res: Response) => {
       });
     }
 
-    // Generate order ID
-    // Generate order ID first to avoid circular reference
-    const orderId = generateOrderId(tenant_id);
+    // Generate order ID with customer correlation if available
+    // Format: order-{tenantKey}-{customerKey}-{nanoid} for logged-in customers
+    // Format: order-{tenantKey}-GUEST-{nanoid} for guest checkout
+    const orderId = generateOrderId(tenant_id, effectiveCustomerId);
     
     // Create order
     const order = await prisma.orders.create({
@@ -398,6 +404,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         id: orderId,
         order_number,
         tenant_id,
+        customer_id: effectiveCustomerId, // Link to customer account if logged in
         customer_email: customer.email,
         customer_name: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || null,
         customer_phone: customer.phone || null,

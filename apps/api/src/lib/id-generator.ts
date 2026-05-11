@@ -136,11 +136,22 @@ export function generateSessionId(tenantId: string): string {
 
 /**
  * Generates short order IDs
- * Format: ord-abc123 (12 chars)
+ * Format (with customer): order-{tenantKey}-{customerKey}-{nanoid}
+ * Format (guest): order-{tenantKey}-GUEST-{nanoid}
+ * 
+ * Examples:
+ * - Logged-in: order-A3K9-CUA3K9M-x7y2z9 (tenant + customer traceable)
+ * - Guest: order-A3K9-GUEST-x7y2z9 (tenant traceable only)
  */
-export function generateOrderId(tenantId: string): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `order-${generateTenantKey(tenantId)}-${nanoid()}`;
+export function generateOrderId(tenantId: string, customerId?: string | null): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  const tenantKey = generateTenantKey(tenantId);
+  
+  if (customerId) {
+    return `order-${tenantKey}-${generateCustomerKey(customerId)}-${nanoid()}`;
+  }
+  
+  return `order-${tenantKey}-GUEST-${nanoid()}`;
 }
 
 /**
@@ -487,6 +498,60 @@ export function generateTenantKey(tenantId: string): string {
 }
 
 /**
+ * Generate a customer key from customer ID
+ * Converts customer ID to a 5-character alphanumeric key
+ * Format: CUST-XXXXX (e.g., CUST-A3K9M)
+ */
+export function generateCustomerKey(customerId: string): string {
+  if (!customerId) return 'CUNKN';
+  
+  // Use a simple hash to create consistent 5-char key from customer ID
+  let hash = 0;
+  for (let i = 0; i < customerId.length; i++) {
+    hash = ((hash << 5) - hash) + customerId.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert hash to 5-character alphanumeric key
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tempHash = Math.abs(hash);
+  let key = '';
+  for (let i = 0; i < 5; i++) {
+    key += chars[tempHash % chars.length];
+    tempHash = Math.floor(tempHash / chars.length);
+  }
+  
+  return `CU${key}`;
+}
+
+/**
+ * Generate an order key from order ID
+ * Converts order ID to a 6-character alphanumeric key
+ * Format: ORD-XXXXXX (e.g., ORD-A3K9M2)
+ */
+export function generateOrderKey(orderId: string): string {
+  if (!orderId) return 'ORDUNK';
+  
+  // Use a simple hash to create consistent 6-char key from order ID
+  let hash = 0;
+  for (let i = 0; i < orderId.length; i++) {
+    hash = ((hash << 5) - hash) + orderId.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert hash to 6-character alphanumeric key
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tempHash = Math.abs(hash);
+  let key = '';
+  for (let i = 0; i < 6; i++) {
+    key += chars[tempHash % chars.length];
+    tempHash = Math.floor(tempHash / chars.length);
+  }
+  
+  return key;
+}
+
+/**
  * Generate an owner key from owner ID
  * Converts owner ID to a 5-character alphanumeric key
  */
@@ -619,13 +684,28 @@ export function generateCustomerId(): string {
 }
 
 /**
- * Generates short customer tenant relationship IDs
- * Format: ctr-tid-abc123 (17 chars vs 36 for UUID)
- * URL-safe, readable, unique, tenant-traceable
+ * Generates short customer address IDs
+ * Format: caddr-CUXXXXX-abc123 (20 chars vs 36 for UUID)
+ * URL-safe, readable, unique, customer-traceable
  */
-export function generateCustomerTenantRelationshipId(tenantId: string): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `ctr-${generateTenantKey(tenantId)}-${nanoid()}`;
+export function generateCustomerAddressId(customerId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `caddr-${generateCustomerKey(customerId)}-${nanoid()}`;
+}
+
+/**
+ * Generates short customer tenant relationship IDs
+ * Format: ctr-{tenantKey}-{customerKey}-{nanoid}
+ * URL-safe, readable, unique, tenant + customer traceable
+ * 
+ * Example: ctr-A3K9-CUA3K9M-x7y2z9
+ * - A3K9 = tenant key
+ * - CUA3K9M = customer key
+ * - x7y2z9 = unique suffix
+ */
+export function generateCustomerTenantRelationshipId(tenantId: string, customerId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `ctr-${generateTenantKey(tenantId)}-${generateCustomerKey(customerId)}-${nanoid()}`;
 }
 
 /**

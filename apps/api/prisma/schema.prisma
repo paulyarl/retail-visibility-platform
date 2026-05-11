@@ -250,6 +250,32 @@ model consent_records {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_addresses {
+  id                    String    @id @db.VarChar(255)
+  customer_id           String    @db.VarChar(255)
+  label                 String?   @db.VarChar(100)
+  is_default            Boolean?  @default(false)
+  is_billing            Boolean?  @default(false)
+  address_line1         String    @db.VarChar(255)
+  address_line2         String?   @db.VarChar(255)
+  city                  String    @db.VarChar(100)
+  state                 String    @db.VarChar(50)
+  postal_code           String    @db.VarChar(20)
+  country               String    @default("US") @db.VarChar(2)
+  phone                 String?   @db.VarChar(20)
+  recipient_name        String?   @db.VarChar(255)
+  delivery_instructions String?
+  is_active             Boolean?  @default(true)
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  customers             customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_addresses_customer")
+
+  @@index([customer_id], map: "idx_customer_addresses_customer_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model customer_tenant_relationships {
   id                    String    @id
@@ -278,38 +304,78 @@ model customer_tenant_relationships {
   @@index([tenant_id], map: "idx_customer_tenant_tenant")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model customers {
-  id                            String                          @id
-  customer_number               String                          @unique(map: "customers_customer_number_unique")
-  email                         String                          @unique(map: "customers_email_unique")
+  id                            String                             @id
+  customer_number               String                             @unique(map: "customers_customer_number_unique")
+  email                         String                             @unique(map: "customers_email_unique")
   first_name                    String?
   last_name                     String?
   phone                         String?
-  date_of_birth                 DateTime?                       @db.Date
+  date_of_birth                 DateTime?                          @db.Date
   gender                        String?
-  preferred_language            String?                         @default("en")
-  timezone                      String?                         @default("UTC")
-  marketing_consent             Boolean?                        @default(false)
-  sms_consent                   Boolean?                        @default(false)
-  email_consent                 Boolean?                        @default(true)
-  platform_orders               Int?                            @default(0)
-  platform_value_cents          Int?                            @default(0)
-  first_platform_order_at       DateTime?                       @db.Timestamp(6)
-  last_platform_order_at        DateTime?                       @db.Timestamp(6)
-  tags                          Json?                           @default("[]")
-  preferences                   Json?                           @default("{}")
-  metadata                      Json?                           @default("{}")
-  created_at                    DateTime                        @default(now()) @db.Timestamp(6)
-  updated_at                    DateTime                        @default(now()) @db.Timestamp(6)
+  preferred_language            String?                            @default("en")
+  timezone                      String?                            @default("UTC")
+  marketing_consent             Boolean?                           @default(false)
+  sms_consent                   Boolean?                           @default(false)
+  email_consent                 Boolean?                           @default(true)
+  platform_orders               Int?                               @default(0)
+  platform_value_cents          Int?                               @default(0)
+  first_platform_order_at       DateTime?                          @db.Timestamp(6)
+  last_platform_order_at        DateTime?                          @db.Timestamp(6)
+  tags                          Json?                              @default("[]")
+  preferences                   Json?                              @default("{}")
+  metadata                      Json?                              @default("{}")
+  created_at                    DateTime                           @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime                           @default(now()) @db.Timestamp(6)
+  auth0_id                      String?                            @unique @db.VarChar(255)
+  password_hash                 String?                            @db.VarChar(255)
+  email_verified                Boolean?                           @default(false)
+  last_login_at                 DateTime?                          @db.Timestamp(6)
+  failed_login_attempts         Int?                               @default(0)
+  locked_until                  DateTime?                          @db.Timestamp(6)
+  reset_password_token          String?                            @db.VarChar(255)
+  reset_password_expires        DateTime?                          @db.Timestamp(6)
+  email_verification_token      String?                            @db.VarChar(255)
+  email_verification_expires    DateTime?                          @db.Timestamp(6)
+  customer_key                  String?                            @unique @db.VarChar(7)
+  customer_addresses            customer_addresses[]
+  notification_preferences      customer_notification_preferences?
   customer_tenant_relationships customer_tenant_relationships[]
   digital_access_grants         digital_access_grants[]
+  orders                        orders[]
 
+  @@index([auth0_id], map: "idx_customers_auth0_id")
   @@index([created_at], map: "idx_customers_created_at")
+  @@index([customer_key], map: "idx_customers_customer_key")
   @@index([email], map: "idx_customers_email")
   @@index([last_platform_order_at], map: "idx_customers_last_platform_order")
   @@index([first_name, last_name], map: "idx_customers_name")
   @@index([phone], map: "idx_customers_phone")
+}
+
+model customer_notification_preferences {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()"))
+  customer_id          String    @unique
+  order_updates        Boolean   @default(true)
+  shipping_updates     Boolean   @default(true)
+  heart_updates        Boolean   @default(true)
+  review_reminders     Boolean   @default(true)
+  review_responses     Boolean   @default(true)
+  list_updates         Boolean   @default(true)
+  list_reminders       Boolean   @default(true)
+  promotional_emails   Boolean   @default(false)
+  recommended_products Boolean   @default(true)
+  price_drop_alerts    Boolean   @default(true)
+  back_in_stock        Boolean   @default(true)
+  sms_enabled          Boolean   @default(false)
+  sms_phone            String?
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+  customer             customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([customer_id], map: "idx_customer_notification_preferences_customer_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -1690,11 +1756,13 @@ model orders {
   remaining_balance_cents   Int?                        @default(0)
   deposit_forfeited_at      DateTime?                   @db.Timestamp(6)
   pickup_deadline           DateTime?                   @db.Timestamp(6)
+  order_key                 String?                     @unique @db.VarChar(6)
   digital_access_grants     digital_access_grants[]
   fulfillment_notifications fulfillment_notifications[]
   fulfillment_schedules     fulfillment_schedules?
   order_items               order_items[]
   order_status_history      order_status_history[]
+  customers                 customers?                  @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_orders_customer")
   tenants                   tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
   payments                  payments[]
   refunds                   refunds[]
@@ -1704,6 +1772,7 @@ model orders {
   @@index([customer_email], map: "idx_orders_customer_email")
   @@index([customer_id], map: "idx_orders_customer_id")
   @@index([fulfillment_status], map: "idx_orders_fulfillment_status")
+  @@index([order_key], map: "idx_orders_order_key")
   @@index([order_number], map: "idx_orders_order_number")
   @@index([payment_status], map: "idx_orders_payment_status")
   @@index([pickup_deadline], map: "idx_orders_pickup_deadline")
