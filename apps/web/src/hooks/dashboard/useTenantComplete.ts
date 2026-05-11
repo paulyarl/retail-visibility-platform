@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { organizationService } from '@/services/OrganizationService';
+import { tenantPublicService } from '@/services/TenantPublicService';
 import {
   resolveTier,
   ResolvedTier,
@@ -188,9 +189,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     queryFn: async () => {
       if (!tenantId) return null;
       try {
-        const response = await fetch(`/api/public/tenant/${tenantId}/profile`);
-        const data = await response.json();
-        return data.success ? data.data : null;
+        return tenantPublicService.getPublicTenantProfile(tenantId);
       } catch {
         return null;
       }
@@ -286,9 +285,9 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     subscriptionEndsAt: rawProfile.subscription_ends_at || rawProfile.subscriptionEndsAt || null,
     // Location fields - use publicProfileData as primary source (from tenant_business_profiles_list)
     city: publicProfileData?.city || businessProfile?.city || rawProfile.city || null,
-    state: publicProfileData?.state || businessProfile?.state || rawProfile.state || null,
-    countryCode: publicProfileData?.countryCode || businessProfile?.country_code || rawProfile.country_code || rawProfile.countryCode || null,
-    bannerUrl: publicProfileData?.bannerUrl || businessProfile?.banner_url || rawProfile.banner_url || rawProfile.bannerUrl || null,
+    state: publicProfileData?.address?.state || businessProfile?.state || rawProfile.state || null,
+    countryCode: publicProfileData?.country_code || businessProfile?.country_code || rawProfile.country_code || rawProfile.countryCode || null,
+    bannerUrl: publicProfileData?.banner || businessProfile?.banner || rawProfile.banner || null,
   } : null;
 
   // Build resolved tier from secondary query

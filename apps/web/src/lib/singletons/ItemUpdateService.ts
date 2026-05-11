@@ -23,7 +23,7 @@ export interface ItemUpdateData {
   name?: string;
   brand?: string;
   manufacturer?: string;
-  condition?: 'new' | 'used' | 'refurbished';
+  condition?: 'new' | 'used' | 'refurbished' | 'brand_new';
   mpn?: string;
   price_cents?: number;
   salePriceCents?: number;

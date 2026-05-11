@@ -442,6 +442,26 @@ class ExternalApiService extends ExternalApiSingleton {
   }
 
   /**
+   * Fetch an image from URL and return as Blob
+   * Used for downloading external images (e.g., pasted URLs in galleries)
+   */
+  async fetchImageAsBlob(url: string): Promise<Blob | null> {
+    try {
+      const response = await this.makeExternalRequest<Blob>(url, {
+        signal: AbortSignal.timeout(30000) // 30 seconds for images
+      }, {
+        cacheKey: `image-${url.substring(0, 100)}`,
+        ttl: 60 * 60 * 1000 // 1 hour cache
+      });
+
+      return response.data || null;
+    } catch (error) {
+      console.error('[ExternalApiService] Failed to fetch image:', error);
+      return null;
+    }
+  }
+
+  /**
    * Clear external API cache
    * Note: Cache clearing would need to be implemented in the base class
    * For now, we'll just log the intent

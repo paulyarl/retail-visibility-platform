@@ -8,6 +8,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
 
 export interface Item {
   id: string;
@@ -17,18 +18,22 @@ export interface Item {
   brand?: string;
   manufacturer?: string;
   mpn?: string; // Manufacturer Part Number
-  condition?: 'new' | 'used' | 'refurbished';
+  condition?: 'new' | 'used' | 'refurbished' | 'brand_new';
   price: number | null;
   price_cents?: number; // Price in cents for internal calculations
+  priceCents?: number; // CamelCase alias
   sale_price?: number | null; // Sale price in dollars for display
   sale_price_cents?: number; // Sale price in cents for internal calculations
+  salePriceCents?: number; // CamelCase alias
   stock: number;
   status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
   itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Backend field name
   item_status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Snake case version for backend
   visibility: 'public' | 'private';
   categoryPath?: string[];
+  category_path?: string[]; // Snake case alias
   tenantCategoryId?: string | null;
+  directory_category_id?: string | null; // Snake case alias
   tenantId?: string; // Tenant ID for the item
   tenantCategory?: {
     id: string;
@@ -37,19 +42,32 @@ export interface Item {
     googleCategoryId?: string | null;
   };
   imageUrl?: string;
+  image_url?: string; // Snake case alias
   images?: string[];
+  imageGallery?: any[]; // Gallery images
+  image_gallery?: any[]; // Snake case alias
   photoCount?: number; // Number of photos for this item
   metadata?: any;
   createdAt?: string;
   updatedAt?: string;
+  // Marketing content fields
+  marketing_description?: string;
+  features?: string[];
+  specifications?: Record<string, string>;
+  videoUrl?: string;
+  // Featured fields
+  is_featured?: boolean;
+  featured_priority?: number;
+  featured_type?: string;
   // New fields for variants and digital products
   has_variants?: boolean;
   variants?: ProductVariant[]; // Variants array from complete endpoint
+  product_variants?: ProductVariant[]; // Snake case alias
   default_variant_id?: string;
   product_type?: 'physical' | 'digital' | 'hybrid';
-  digital_delivery_method?: string;
+  digital_delivery_method?: 'direct_download' | 'external_link' | 'license_key' | 'access_grant';
   digital_assets?: any[];
-  license_type?: string;
+  license_type?: 'personal' | 'commercial' | 'educational' | 'enterprise';
   access_duration_days?: number;
   download_limit?: number;
   payment_gateway_type?: string;
@@ -312,6 +330,112 @@ class ItemsSingletonService extends TenantApiSingleton {
     }
 
     return result.data;
+  }
+
+  /**
+   * Upload a digital asset file for digital products
+   * Uses the /api/digital-assets/upload endpoint
+   * Returns { asset: { id, file_path, file_size_bytes, mime_type } }
+   */
+  async uploadDigitalAsset(params: {
+    tenantId: string;
+    itemId: string;
+    fileName: string;
+    mimeType: string;
+    fileData: string; // Base64 encoded file data
+  }): Promise<{
+    success: boolean;
+    asset?: {
+      id: string;
+      file_path: string;
+      file_size_bytes?: number;
+      mime_type?: string;
+    };
+    error?: string;
+  }> {
+    const result = await this.makeDefaultRequest<{
+      success: boolean;
+      asset?: {
+        id: string;
+        file_path: string;
+        file_size_bytes?: number;
+        mime_type?: string;
+      };
+      error?: string;
+    }>(
+      '/api/digital-assets/upload',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      },
+      `digital-asset-upload-${params.itemId}-${Date.now()}`,
+      0 // No cache for uploads
+    );
+
+    return result.data || { success: false, error: 'Upload failed' };
+  }
+
+  /**
+   * Search for stock images from Unsplash/Pexels
+   * Uses the /api/v1/images/search endpoint
+   */
+  async searchImages(query: string): Promise<{
+    images: Array<{
+      id: string;
+      url: string;
+      thumbnail: string;
+      description: string;
+      photographer: string;
+      photographerUrl: string;
+      source: 'unsplash' | 'pexels';
+      downloadUrl: string;
+    }>;
+  }> {
+    const result = await this.makeDefaultRequest<{
+      images: Array<{
+        id: string;
+        url: string;
+        thumbnail: string;
+        description: string;
+        photographer: string;
+        photographerUrl: string;
+        source: 'unsplash' | 'pexels';
+        downloadUrl: string;
+      }>;
+    }>(
+      `/api/v1/images/search?query=${encodeURIComponent(query)}`,
+      {
+        method: 'GET',
+      },
+      `image-search-${query}`,
+      5 * 60 * 1000 // 5 minute cache
+    );
+
+    return result.data || { images: [] };
+  }
+
+  /**
+   * Attach an external image to an item
+   * Uses the /api/v1/tenants/:tenantId/items/:itemId/attach-image endpoint
+   */
+  async attachImage(itemId: string, tenantId: string, imageData: {
+    imageUrl: string;
+    source: string;
+    photographer: string;
+    photographerUrl: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<{ success: boolean; error?: string }>(
+      `/api/v1/tenants/${tenantId}/items/${itemId}/attach-image`,
+      {
+        method: 'POST',
+        body: JSON.stringify(imageData),
+      },
+      `attach-image-${itemId}`,
+      0 // No cache for mutations
+    );
+
+    return result.data || { success: false, error: 'Failed to attach image' };
   }
 
   /**

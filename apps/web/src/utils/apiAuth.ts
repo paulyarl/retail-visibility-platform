@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth0 } from '@/lib/auth0';
+import AuthSyncService from '@/services/AuthSyncService';
 
 /**
  * Get Auth0 session and access token for API authentication
@@ -73,24 +74,10 @@ export async function requirePlatformAdmin(req: NextRequest): Promise<{
   // Check if user has platform admin role
   const session = authResult.session;
   
-  // Query backend to verify platform admin status
+  // Query backend to verify platform admin status via service
   try {
-    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-    const response = await fetch(`${apiBaseUrl}/api/auth/lookup?identifier=${encodeURIComponent(session.user.email)}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: 'forbidden', message: 'Access denied' },
-        { status: 403 }
-      );
-    }
-    
-    const result = await response.json();
-    const user = result.user;
+    const authSyncService = AuthSyncService.getInstance();
+    const user = await authSyncService.getUserByIdentifier(session.user.email);
     
     if (!user || !user.is_active || user.role !== 'PLATFORM_ADMIN') {
       return NextResponse.json(

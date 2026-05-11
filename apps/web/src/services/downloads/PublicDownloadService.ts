@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
 
 // Types
 export interface PublicDownloadPage {
@@ -26,11 +27,19 @@ export interface PublicDownloadPage {
   supportEmail?: string;
   supportUrl?: string;
   
+  // Access Control
+  requireAuthentication: boolean;
+  accessExpires: boolean;
+  accessDurationDays?: number;
+  downloadLimit?: number;
+  allowMultipleDownloads: boolean;
+  
   // Item Info
   item: {
     id: string;
     name: string;
     productType: string;
+    digitalDeliveryMethod: string;
   };
   
   // Assets (filtered based on access)
@@ -184,9 +193,77 @@ class PublicDownloadService extends PublicApiSingleton {
     return response.data;
   }
 
+  /**
+   * Validate access for tenant-scoped download page
+   */
+  async validateAccess(tenantId: string, slug: string, token: string): Promise<{
+    granted: boolean;
+    reason?: string;
+    accessGrant?: {
+      downloadCount: number;
+      maxDownloads: number | null;
+      expiresAt: string | null;
+    };
+  }> {
+    const response = await this.makeDefaultRequest<{
+      granted: boolean;
+      reason?: string;
+      accessGrant?: {
+        downloadCount: number;
+        maxDownloads: number | null;
+        expiresAt: string | null;
+      };
+    }>(
+      `/api/downloads/${tenantId}/${slug}/validate?token=${token}`,
+      {},
+      `access-validate-${tenantId}-${slug}-${token}`
+    );
+
+    return response.data || { granted: false, reason: 'VALIDATION_FAILED' };
+  }
+
+  /**
+   * Record and initiate download for tenant-scoped download page
+   */
+  async recordDownload(tenantId: string, slug: string, token: string, assetId: string): Promise<{
+    success: boolean;
+    downloadUrl?: string;
+    licenseKey?: string;
+    error?: string;
+  }> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      downloadUrl?: string;
+      licenseKey?: string;
+      error?: string;
+    }>(
+      `/api/downloads/${tenantId}/${slug}/download`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, assetId }),
+      }
+    );
+
+    return response.data || { success: false, error: 'Download failed' };
+  }
+
   // =====================
   // Download Page Access
   // =====================
+
+  /**
+   * Get download page by tenant and slug (tenant-scoped public access)
+   */
+  async getDownloadPage(tenantId: string, slug: string): Promise<{ success: boolean; data: PublicDownloadPage; error?: string }> {
+    const response = await this.makeDefaultRequest<{ success: boolean; data: PublicDownloadPage; error?: string }>(
+      `/api/downloads/${tenantId}/${slug}`,
+      {},
+      `download-page-${tenantId}-${slug}`
+    );
+
+    return response.data || { success: false, data: null as any, error: 'Failed to fetch download page' };
+  }
 
   /**
    * Get download page by slug (public access)
@@ -316,6 +393,132 @@ class PublicDownloadService extends PublicApiSingleton {
     // Combine chunks into blob
     const blob = new Blob(chunks as BlobPart[]);
     return blob;
+  }
+
+  /**
+   * Download file with streaming response for progress tracking
+   * Uses ResponseType.STREAM for platform architecture alignment
+   */
+  async downloadFileWithProgress(
+    downloadUrl: string,
+    onProgress?: (progress: number, loadedBytes: number, totalBytes: number) => void
+  ): Promise<Blob> {
+    // Use service request with STREAM response type
+    const response = await this.makeDefaultRequest<ReadableStream<Uint8Array>>(
+      downloadUrl,
+      {
+        method: 'GET',
+      },
+      `download-stream-${Date.now()}`,
+      0, // No cache for downloads
+      {
+        responseType: ResponseType.STREAM,
+      }
+    );
+
+    if (!response.success || !response.data) {
+      throw new Error('Failed to initiate download stream');
+    }
+
+    const stream = response.data;
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let receivedBytes = 0;
+    let totalBytes = 0;
+
+    // Try to get content-length from metadata if available
+    const contentLength = response.status ? undefined : 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+      
+      chunks.push(value);
+      receivedBytes += value.length;
+      
+      if (onProgress) {
+        // Calculate progress (we may not know total, so pass both values)
+        const progress = totalBytes > 0 ? (receivedBytes / totalBytes) * 100 : 0;
+        onProgress(progress, receivedBytes, totalBytes);
+      }
+    }
+
+    // Combine chunks into blob
+    const blob = new Blob(chunks as BlobPart[]);
+    return blob;
+  }
+
+  /**
+   * Download from URL with access token and progress tracking
+   * Used by DownloadProgress component for binary file downloads
+   */
+  async downloadFromUrl(
+    url: string,
+    accessToken: string,
+    options?: {
+      onProgress?: (progress: number, loadedBytes: number, totalBytes: number) => void;
+      expectedSize?: number;
+    }
+  ): Promise<{ blob: Blob; totalSize: number }> {
+    // Build URL with token
+    const urlWithToken = url.includes('?') 
+      ? `${url}&token=${accessToken}` 
+      : `${url}?token=${accessToken}`;
+
+    // Use service request with STREAM response type
+    const response = await this.makeDefaultRequest<ReadableStream<Uint8Array>>(
+      urlWithToken,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      },
+      `download-${Date.now()}`,
+      0, // No cache for downloads
+      {
+        responseType: ResponseType.STREAM,
+      }
+    );
+
+    if (!response.success) {
+      const status = response.status;
+      if (status === 403) {
+        throw new Error('Access denied. Your download link may have expired.');
+      } else if (status === 404) {
+        throw new Error('File not found.');
+      }
+      throw new Error('Download failed. Please try again.');
+    }
+
+    if (!response.data) {
+      throw new Error('Unable to read response stream');
+    }
+
+    const stream = response.data;
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let receivedBytes = 0;
+    const totalBytes = options?.expectedSize || 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+
+      chunks.push(value);
+      receivedBytes += value.length;
+
+      if (options?.onProgress) {
+        const progress = totalBytes > 0 ? (receivedBytes / totalBytes) * 100 : 0;
+        options.onProgress(progress, receivedBytes, totalBytes);
+      }
+    }
+
+    // Combine chunks into blob
+    const blob = new Blob(chunks as BlobPart[]);
+    return { blob, totalSize: receivedBytes };
   }
 
   /**

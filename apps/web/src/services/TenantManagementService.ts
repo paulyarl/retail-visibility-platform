@@ -26,6 +26,7 @@ export interface TenantLimits {
 export interface TenantProfile {
   id: string;
   business_name: string;
+  business_type?: string;
   address_line1: string;
   city: string;
   postal_code: string;
@@ -238,6 +239,55 @@ class TenantManagementService extends TenantApiSingleton {
     } catch (error) {
       console.error('[TenantManagementService] Failed to get all tenants:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get tenant by ID (for signup wizard and other operations)
+   * Uses the /api/tenants/[id] endpoint
+   */
+  async getTenant(tenantId: string): Promise<TenantProfile | null> {
+    try {
+      const response = await this.makeDefaultRequest<TenantProfile>(
+        `/api/tenants/${tenantId}`,
+        {},
+        `tenant-${tenantId}`,
+        this.PROFILE_TTL
+      );
+
+      return response.data || null;
+    } catch (error) {
+      console.error('[TenantManagementService] Failed to get tenant:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update tenant by ID (for signup wizard and other operations)
+   * Uses PATCH /api/tenants/[id] endpoint
+   */
+  async updateTenant(tenantId: string, data: Partial<TenantProfile>): Promise<TenantProfile | null> {
+    try {
+      const response = await this.makeDefaultRequest<TenantProfile>(
+        `/api/tenants/${tenantId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        },
+        `tenant-${tenantId}`,
+        0 // No cache for mutations
+      );
+
+      // Invalidate cached tenant data
+      await this.invalidateCache(`tenant-${tenantId}`);
+      
+      return response.data || null;
+    } catch (error) {
+      console.error('[TenantManagementService] Failed to update tenant:', error);
+      return null;
     }
   }
 
