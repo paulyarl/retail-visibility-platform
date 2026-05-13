@@ -9,6 +9,7 @@ export enum RequestType {
   PUBLIC = 'public',
   AUTHENTICATED = 'authenticated',
   TENANT = 'tenant',
+  CUSTOMER = 'customer',
   ADMIN = 'admin',
   SYSTEM = 'system',
   EXTERNAL = 'external'
@@ -66,6 +67,18 @@ export interface TenantRequestOptions extends UniversalResponseOptions {
   requestTarget?: RequestTarget;
   responseType?: ResponseType;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
+  context?: AppContext;
+  isolation?: CacheIsolation;
+  userId?: string;
+  cacheKey?: string;
+}
+
+export interface CustomerRequestOptions extends UniversalResponseOptions {
+  customerId?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
+  responseType?: ResponseType;
+  // Context data for enhanced cacheKey generation
   context?: AppContext;
   isolation?: CacheIsolation;
   userId?: string;

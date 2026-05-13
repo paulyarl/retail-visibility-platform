@@ -32,6 +32,7 @@ interface PayPalPaymentFormProps {
     sku: string;
     quantity: number;
     unitPrice: number;
+    tenantId: string;
   }>;
   onSuccess: (orderNumber: string, gatewayTransactionId?: string) => void;
   onBack: () => void;
@@ -77,7 +78,7 @@ function PayPalPaymentFormContent({
         cartItems,
       });
 
-      console.log('PayPal create order response:', response);
+      // console.log('PayPal create order response:', response);
 
       if (!response) {
         throw new Error('Failed to create PayPal order');
@@ -207,7 +208,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
   const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
   
   if (!paymentValidation.isValid) {
-    console.log('[PayPal] Amount validation failed:', paymentValidation);
+    // console.log('[PayPal] Amount validation failed:', paymentValidation);
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800 font-medium">Payment Amount Too Low</p>

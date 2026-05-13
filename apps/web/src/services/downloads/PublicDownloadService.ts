@@ -2,11 +2,11 @@
  * Public Download Service - Singleton
  * 
  * Customer-facing service for accessing download pages and downloading files
- * Uses PublicApiSingleton for public operations
+ * Uses CustomerApiSingleton for public operations
  * Handles access token validation, download tracking, and license key activation
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
 
 // Types
@@ -124,7 +124,13 @@ export interface DownloadLogEntry {
   errorMessage?: string;
 }
 
-class PublicDownloadService extends PublicApiSingleton {
+class PublicDownloadService extends CustomerApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(customerId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   private static instance: PublicDownloadService;
 
   private constructor() {

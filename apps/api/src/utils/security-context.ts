@@ -211,6 +211,7 @@ export function collectEnhancedSecurityContext(req: Request) {
     // Application context
     application: {
       tenantId: req.headers['x-tenant-id'],
+      customerId: req.headers['x-customer-id'],
       userId: (req as any).user?.user_id,
       userRole: (req as any).user?.role,
       userEmail: (req as any).user?.email,

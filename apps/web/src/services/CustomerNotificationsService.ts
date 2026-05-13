@@ -3,8 +3,9 @@
  * Handles customer notification preferences
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import customerAuthService from './CustomerAuthService';
 
 export interface NotificationPreferences {
   // Order notifications
@@ -29,9 +30,19 @@ export interface NotificationPreferences {
   smsPhone?: string;
 }
 
-class CustomerNotificationsService extends PublicApiSingleton {
+class CustomerNotificationsService extends CustomerApiSingleton {
   constructor() {
     super('customer-notifications');
+  }
+
+  getServiceCachePatterns(): string[] {
+    return ['customer-notifications-get', 'customer-notifications-update'];
+  }
+
+  async invalidateServiceCaches(customerId?: string): Promise<void> {
+    for (const pattern of this.getServiceCachePatterns()) {
+      await this.invalidateCache(pattern);
+    }
   }
 
   /**
@@ -43,7 +54,7 @@ class CustomerNotificationsService extends PublicApiSingleton {
     error?: string;
   }> {
     try {
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         preferences: NotificationPreferences;
       }>(
@@ -86,7 +97,7 @@ class CustomerNotificationsService extends PublicApiSingleton {
     error?: string;
   }> {
     try {
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         preferences: NotificationPreferences;
         message?: string;

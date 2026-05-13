@@ -42,6 +42,7 @@ interface ContextStorageConfig {
   [AppContext.PRODUCT]: StorageStrategy;
   [AppContext.STORE]: StorageStrategy;
   [AppContext.USER]: StorageStrategy;
+  [AppContext.CUSTOMER]: StorageStrategy;
   [AppContext.SHOP]: StorageStrategy;
   [AppContext.DIRECTORY]: StorageStrategy;
   [AppContext.SYSTEM]: StorageStrategy;
@@ -176,7 +177,10 @@ export class ContextAwareCacheManager {
       
       // USER: Privacy-focused, memory-only, encrypted
       [AppContext.USER]: this.createUserStrategy(caps),      
-      
+
+      // CUSTOMER: Customer-specific data, encrypted, persistent
+      [AppContext.CUSTOMER]: this.createCustomerStrategy(caps),      
+
       // GLOBAL: Shared data, compressed, persistent
       [AppContext.GLOBAL]: this.createGlobalStrategy(caps),
          
@@ -336,7 +340,26 @@ export class ContextAwareCacheManager {
   }
 
   /**
-   * 👤 Global context strategy: Shared data
+   * � Customer context strategy: Customer-specific data, encrypted, persistent
+   */
+  private createCustomerStrategy(caps: BrowserCapabilities): StorageStrategy {
+    return {
+      primary: caps.indexedDB && !caps.isPrivateMode ? StorageType.INDEXED_DB : StorageType.LOCAL_STORAGE,
+      fallback: caps.localStorage ? StorageType.LOCAL_STORAGE : StorageType.INDEXED_DB,
+      encryption: true,        // Encrypt customer data
+      compression: false,      // Customer data usually small
+      persistent: true,        // Persist customer data across sessions
+      priority: 'high',       // High priority for customer experience
+      maxSize: 100,            // Moderate size for customer data
+      ttl: 10 * 60 * 1000,    // 10 minutes
+      httpOnly: false,
+      secure: true,
+      crossTab: true
+    };
+  }
+
+  /**
+   * �👤 Global context strategy: Shared data
    */
   private createGlobalStrategy(caps: BrowserCapabilities): StorageStrategy {
     return {

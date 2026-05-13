@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, XCircle } from 'lucide-react';
 import { clearCart } from '@/lib/cart/cartManager';
 import { checkoutService } from '@/services/CheckoutService';
+import { customerAuthService } from '@/services/CustomerAuthService';
 
 function SuccessPageContent() {
   const searchParams = useSearchParams();
@@ -23,7 +24,7 @@ function SuccessPageContent() {
       }
 
       try {
-        console.log('[Checkout Success] Confirming payment:', { paymentIntentId, redirectStatus });
+        // console.log('[Checkout Success] Confirming payment:', { paymentIntentId, redirectStatus });
 
         // Confirm the payment using service
         const confirmResult = await checkoutService.confirmStripePayment(paymentIntentId, clientSecret || undefined);
@@ -32,7 +33,7 @@ function SuccessPageContent() {
           throw new Error('Failed to confirm payment');
         }
 
-        console.log('[Checkout Success] Payment confirmed, orderId:', confirmResult.orderId);
+        // console.log('[Checkout Success] Payment confirmed, orderId:', confirmResult.orderId);
 
         // Fetch order details using service
         const order = await checkoutService.getOrder(confirmResult.orderId);
@@ -52,7 +53,7 @@ function SuccessPageContent() {
           const tenantId = order?.tenant_id;
           if (tenantId) {
             clearCart(tenantId);
-            console.log('[Checkout Success] Cart cleared for tenant:', tenantId);
+            // console.log('[Checkout Success] Cart cleared for tenant:', tenantId);
           }
           
           // Trigger cart update event
@@ -61,8 +62,9 @@ function SuccessPageContent() {
           console.error('[Checkout Success] Failed to clear cart:', err);
         }
 
-        // Redirect to buyer order history (like Square flow)
-        router.replace('/my-orders');
+        // Redirect to order history (account page if logged in, my-orders for guests)
+        const isLoggedIn = customerAuthService.isAuthenticated();
+        router.replace(isLoggedIn ? '/account/orders' : '/my-orders');
       } catch (err: any) {
         console.error('[Checkout Success] Error:', err);
         setError(err.message || 'Failed to process payment confirmation');

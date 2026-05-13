@@ -50,6 +50,8 @@ function StripeCheckoutForm({
   const [error, setError] = useState<string | null>(null);
   const [paymentElementLoading, setPaymentElementLoading] = useState(true);
 
+  // console.log('[Stripe] StripeCheckoutForm props:', { amount, customerInfo, shippingAddress, fulfillmentMethod, cartItems, onSuccess, onBack, tenantId, orderId });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -137,11 +139,13 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
   const [error, setError] = useState<string | null>(null);
   const { settings: platformSettings } = usePlatformSettings();
 
+  // console.log(`[Stripe] props:`, props);
+
   // Validate minimum payment amount using platform-wide settings
   const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
   
   if (!paymentValidation.isValid) {
-    console.log('[Stripe] Amount validation failed:', paymentValidation);
+    // console.log('[Stripe] Amount validation failed:', paymentValidation);
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800 font-medium">Payment Amount Too Low</p>
@@ -172,10 +176,10 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
           throw new Error('Failed to create order');
         }
 
-        console.log('[Stripe] Checkout initialized:', {
-          orderId: checkoutResult.orderId,
-          hasClientSecret: !!checkoutResult.clientSecret
-        });
+        // console.log('[Stripe] Checkout initialized:', {
+        //   orderId: checkoutResult.orderId,
+        //   hasClientSecret: !!checkoutResult.clientSecret
+        // });
 
         setOrderId(checkoutResult.orderId);
         setClientSecret(checkoutResult.clientSecret);

@@ -8,6 +8,9 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { CustomerTokenService } from '../services/CustomerTokenService';
+
+const customerTokenService = CustomerTokenService.getInstance();
 import { generateOrderNumber, generateOrderItemId, generatePaymentId,generateOrderId } from '../lib/id-generator';
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 import { customAlphabet } from 'nanoid';
@@ -38,10 +41,20 @@ router.post('/orders', async (req: Request, res: Response) => {
       payment_method,
       customer_id, // Optional: for logged-in customers
     } = req.body;
+    // console.log('Creating order', req.body);
 
-    // Check for logged-in customer from session cookie
+    // Check for logged-in customer from JWT token, cookie, or request body
+    const authHeader = req.headers.authorization;
+    let tokenCustomerId: string | null = null;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        tokenCustomerId = payload.customerId;
+      }
+    }
     const sessionCustomerId = req.cookies?.customer_session_id;
-    const effectiveCustomerId = customer_id || sessionCustomerId || null;
+    const effectiveCustomerId = customer_id || tokenCustomerId || sessionCustomerId || null;
 
     // Validation
     if (!customer?.email) {
@@ -63,29 +76,46 @@ router.post('/orders', async (req: Request, res: Response) => {
     // Extract tenant_id from the first item (all items should be from same tenant)
     let tenant_id: string | null = null;
     
-    // Try to get tenant_id from items (check both inventory_items and product_variants)
+    // Try to get tenant_id from items using reliable SKU-based lookup
+    // console.log('Extracting tenant_id from items', items);
     for (const item of items) {
-      if (item.id) {
-        // First check if it's a variant (starts with 'vid-')
+      // console.log('Looking up tenant for item', item);
+      if (item.id && item.sku) {
+        // Extract parent item ID from variant ID (handle both vid- and variant- prefixes)
+        let parentItemId;
         if (item.id.startsWith('vid-')) {
-          const variant = await prisma.product_variants.findUnique({
-            where: { id: item.id },
-            select: { tenant_id: true },
-          });
-          if (variant?.tenant_id) {
-            tenant_id = variant.tenant_id;
-            break;
-          }
+          parentItemId = item.id.substring(4).split('-')[0]; // Remove 'vid-' prefix, get first part
+        } else if (item.id.startsWith('variant-')) {
+          parentItemId = item.id.substring(8).split('-')[0]; // Remove 'variant-' prefix, get first part
         } else {
-          // Check inventory_items
-          const inventoryItem = await prisma.inventory_items.findUnique({
-            where: { id: item.id },
-            select: { tenant_id: true },
-          });
-          if (inventoryItem?.tenant_id) {
-            tenant_id = inventoryItem.tenant_id;
-            break;
-          }
+          parentItemId = item.id; // Assume it's the parent item ID directly
+        }
+
+        // UPDATE: because of an id bug, we're looking up variants by id, sku, tenant-id
+        
+        const variant = await prisma.product_variants.findFirst({
+          where: {
+            id: item.id,
+            sku: item.sku,
+            tenant_id: tenant_id ? { equals: tenant_id } : undefined,
+            is_active: true,
+          },
+          select: { tenant_id: true },
+        });
+        
+        if (variant?.tenant_id) {
+          tenant_id = variant.tenant_id;
+          break;
+        }
+
+        // Fallback: check inventory_items for non-variant items
+        const inventoryItem = await prisma.inventory_items.findUnique({
+          where: { id: item.id },
+          select: { tenant_id: true },
+        });
+        if (inventoryItem?.tenant_id) {
+          tenant_id = inventoryItem.tenant_id;
+          break;
         }
       }
     }
@@ -95,12 +125,16 @@ router.post('/orders', async (req: Request, res: Response) => {
     if (pickup_tenant_id) {
       // Validate pickup location has all items in stock
       const { checkoutLocationService } = await import('../services/CheckoutLocationService');
+      // console.log('Validating location for cart', pickup_tenant_id, items);
       const validation = await checkoutLocationService.validateLocationForCart(
         pickup_tenant_id,
         items.map((item: any) => ({
           inventoryItemId: item.id,
           productSlug: item.productSlug,
           sku: item.sku,
+          variantId: item.variantId,
+          productId: item.productId,
+          productName: item.productName,
           quantity: item.quantity,
         }))
       );
@@ -187,12 +221,13 @@ router.post('/orders', async (req: Request, res: Response) => {
     }> = [];
 
     for (const item of items) {
-      // Only id and quantity are required from frontend
-      if (!item.id || !item.quantity) {
+      // Require id, quantity, and tenant info for reliable lookup
+      // console.log(`[Post Order] Purchased item: ${JSON.stringify(item)}`);
+      if (!item.id || !item.quantity || !item.sku) {
         return res.status(400).json({
           success: false,
           error: 'invalid_item',
-          message: 'Each item must have id and quantity',
+          message: 'Each item must have id, quantity, and sku',
         });
       }
 
@@ -200,23 +235,32 @@ router.post('/orders', async (req: Request, res: Response) => {
       let variant;
       let itemData;
 
-      // Check if it's a variant (starts with 'vid-')
+      // Extract parent item ID from variant ID (handle both vid- and variant- prefixes)
+      let parentItemId;
       if (item.id.startsWith('vid-')) {
-        variant = await prisma.product_variants.findUnique({
-          where: { id: item.id },
-          include: {
-            inventory_items: true,
-          },
-        });
+        parentItemId = item.id.substring(4).split('-')[0]; // Remove 'vid-' prefix, get first part
+      } else if (item.id.startsWith('variant-')) {
+        parentItemId = item.id.substring(8).split('-')[0]; // Remove 'variant-' prefix, get first part
+      } else {
+        parentItemId = item.id; // Assume it's the parent item ID directly
+      }
 
-        if (!variant) {
-          return res.status(400).json({
-            success: false,
-            error: 'item_not_found',
-            message: `Variant with id ${item.id} not found`,
-          });
-        }
+      // UPDATE: Because of a id bug, were looking up variant by id, sku, tenant-id
 
+      variant = await prisma.product_variants.findFirst({
+        where: {
+          tenant_id: tenant_id,
+          id: item.id,
+          sku: item.sku,
+          is_active: true,
+        },
+        include: {
+          inventory_items: true,
+        },
+      });
+
+      if (variant) {
+        // Variant found - use variant data
         if (variant.stock < item.quantity) {
           return res.status(400).json({
             success: false,
@@ -224,6 +268,11 @@ router.post('/orders', async (req: Request, res: Response) => {
             message: `Insufficient stock for ${variant.variant_name}. Available: ${variant.stock}, Requested: ${item.quantity}`,
             available_stock: variant.stock,
             requested_quantity: item.quantity,
+            variant_info: {
+              id: variant.id,
+              sku: variant.sku,
+              variant_name: variant.variant_name,
+            },
           });
         }
 
@@ -245,13 +294,15 @@ router.post('/orders', async (req: Request, res: Response) => {
           inventory_item_id: variant.parent_item_id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
         };
+        validatedItems.push(itemData);
       } else {
-        // Regular inventory item
+        // No variant found - treat as regular inventory item
         inventoryItem = await prisma.inventory_items.findUnique({
           where: { id: item.id },
         });
 
         if (!inventoryItem) {
+          // console.log(`Item with id ${item.id} not found in inventory`); 
           return res.status(400).json({
             success: false,
             error: 'item_not_found',
@@ -287,13 +338,14 @@ router.post('/orders', async (req: Request, res: Response) => {
           inventory_item_id: inventoryItem.id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
         };
+        validatedItems.push(itemData);
       }
-
-      validatedItems.push(itemData);
+      
+    
     }
 
     // Check stock availability before creating order
-    console.log('[Checkout] Checking stock availability for validated items');
+    // console.log('[Checkout] Checking stock availability for validated items');
     try {
       const { getStockService } = await import('../services/StockService');
       const stockService = getStockService(prisma);
@@ -342,7 +394,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       await prisma.orders.delete({ where: { id: tempOrderId } });
 
       if (!stockCheck.sufficient) {
-        console.log('[Checkout] Stock check failed:', stockCheck.issues);
+        // console.log('[Checkout] Stock check failed:', stockCheck.issues);
         return res.status(400).json({
           success: false,
           error: 'insufficient_stock',
@@ -351,7 +403,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         });
       }
 
-      console.log('[Checkout] Stock availability confirmed');
+      // console.log('[Checkout] Stock availability confirmed');
     } catch (stockCheckError) {
       console.error('[Checkout] Error checking stock availability:', stockCheckError);
       // Don't fail checkout if stock check fails, but log the error
@@ -384,13 +436,13 @@ router.post('/orders', async (req: Request, res: Response) => {
       depositCalculation = calculateDeposit(totals.total_cents, depositPercentage);
       paymentAmount = depositCalculation.depositCents;
       
-      console.log('[Checkout] Tier 3 deposit calculation:', {
-        total: totals.total_cents,
-        depositPercentage: depositCalculation.depositPercentage,
-        depositCents: depositCalculation.depositCents,
-        remainingBalance: depositCalculation.remainingBalanceCents,
-        pickupDeadline: depositCalculation.pickupDeadline,
-      });
+      // console.log('[Checkout] Tier 3 deposit calculation:', {
+      //   total: totals.total_cents,
+      //   depositPercentage: depositCalculation.depositPercentage,
+      //   depositCents: depositCalculation.depositCents,
+      //   remainingBalance: depositCalculation.remainingBalanceCents,
+      //   pickupDeadline: depositCalculation.pickupDeadline,
+      // });
     }
 
     // Generate order ID with customer correlation if available

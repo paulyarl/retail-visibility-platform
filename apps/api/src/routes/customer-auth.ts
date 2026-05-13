@@ -9,14 +9,17 @@
  * - Email verification
  * - Logout
  * 
- * Session management uses httpOnly cookies (customer_session_id)
+ * Session management uses JWT tokens (stored in localStorage by frontend)
+ * This solves the cross-port localhost cookie issue (localhost:3000 -> localhost:4000)
  */
 
 import { Router, Request, Response } from 'express';
 import { CustomerAuthService } from '../services/CustomerAuthService';
+import { CustomerTokenService } from '../services/CustomerTokenService';
 
 const router = Router();
 const customerAuthService = CustomerAuthService.getInstance();
+const customerTokenService = CustomerTokenService.getInstance();
 
 /**
  * POST /api/customer-auth/register
@@ -59,18 +62,17 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Set session cookie
-    res.cookie('customer_session_id', result.customer!.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    // Generate JWT tokens
+    const tokens = await customerTokenService.generateTokens(
+      result.customer!.id,
+      result.customer!.email
+    );
 
     res.status(201).json({
       success: true,
       customer: result.customer,
       isNewCustomer: result.isNewCustomer,
+      tokens, // Return tokens to frontend
     });
   } catch (error: any) {
     console.error('[CustomerAuth API] Register error:', error);
@@ -117,17 +119,16 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Set session cookie
-    res.cookie('customer_session_id', result.customer!.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    // Generate JWT tokens
+    const tokens = await customerTokenService.generateTokens(
+      result.customer!.id,
+      result.customer!.email
+    );
 
     res.json({
       success: true,
       customer: result.customer,
+      tokens, // Return tokens to frontend
     });
   } catch (error: any) {
     console.error('[CustomerAuth API] Login error:', error);
@@ -186,18 +187,17 @@ router.post('/oauth/:provider', async (req: Request, res: Response) => {
       });
     }
 
-    // Set session cookie
-    res.cookie('customer_session_id', result.customer!.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    // Generate JWT tokens
+    const tokens = await customerTokenService.generateTokens(
+      result.customer!.id,
+      result.customer!.email
+    );
 
     res.json({
       success: true,
       customer: result.customer,
       isNewCustomer: result.isNewCustomer,
+      tokens, // Return tokens to frontend
     });
   } catch (error: any) {
     console.error('[CustomerAuth API] OAuth error:', error);
@@ -319,17 +319,16 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       });
     }
 
-    // Set session cookie
-    res.cookie('customer_session_id', result.customer!.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    // Generate JWT tokens
+    const tokens = await customerTokenService.generateTokens(
+      result.customer!.id,
+      result.customer!.email
+    );
 
     res.json({
       success: true,
       customer: result.customer,
+      tokens, // Return tokens to frontend
       message: 'Password reset successfully',
     });
   } catch (error: any) {
@@ -349,13 +348,30 @@ router.post('/reset-password', async (req: Request, res: Response) => {
  */
 router.post('/logout', async (req: Request, res: Response) => {
   try {
-    const customerId = req.cookies?.customer_session_id;
+    // Get customer ID from token or cookie
+    const token = CustomerTokenService.extractBearerToken(req);
+    let customerId: string | null = null;
+
+    if (token) {
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        customerId = payload.customerId;
+      }
+    }
+
+    // Fallback to cookie
+    if (!customerId) {
+      customerId = req.cookies?.customer_session_id || null;
+    }
 
     if (customerId) {
+      // Invalidate refresh token in database
+      await customerTokenService.logout(customerId);
+      // Also call the legacy logout method
       await customerAuthService.logout(customerId);
     }
 
-    // Clear session cookie
+    // Clear session cookie (for backward compatibility)
     res.clearCookie('customer_session_id', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -377,53 +393,27 @@ router.post('/logout', async (req: Request, res: Response) => {
 
 /**
  * GET /api/customer-auth/me
- * 
- * Get current customer profile from session cookie
- */
-router.get('/me', async (req: Request, res: Response) => {
-  try {
-    const customerId = req.cookies?.customer_session_id;
-
-    if (!customerId) {
-      return res.status(401).json({
-        success: false,
-        error: 'unauthorized',
-        message: 'Not authenticated',
-      });
-    }
-
-    const customer = await customerAuthService.getCustomer(customerId);
-
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        error: 'not_found',
-        message: 'Customer not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      customer,
-    });
-  } catch (error: any) {
-    console.error('[CustomerAuth API] Get profile error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'server_error',
-      message: 'Failed to get customer profile',
-    });
-  }
-});
-
-/**
  * PUT /api/customer-auth/profile
  * 
  * Update customer profile (name, phone)
  */
 router.put('/profile', async (req: Request, res: Response) => {
   try {
-    const customerId = req.cookies?.customer_session_id;
+    // Get customer ID from token or cookie
+    const token = CustomerTokenService.extractBearerToken(req);
+    let customerId: string | null = null;
+
+    if (token) {
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        customerId = payload.customerId;
+      }
+    }
+
+    // Fallback to cookie
+    if (!customerId) {
+      customerId = req.cookies?.customer_session_id || null;
+    }
 
     if (!customerId) {
       return res.status(401).json({
@@ -471,7 +461,21 @@ router.put('/profile', async (req: Request, res: Response) => {
  */
 router.put('/password', async (req: Request, res: Response) => {
   try {
-    const customerId = req.cookies?.customer_session_id;
+    // Get customer ID from token or cookie
+    const token = CustomerTokenService.extractBearerToken(req);
+    let customerId: string | null = null;
+
+    if (token) {
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        customerId = payload.customerId;
+      }
+    }
+
+    // Fallback to cookie
+    if (!customerId) {
+      customerId = req.cookies?.customer_session_id || null;
+    }
 
     if (!customerId) {
       return res.status(401).json({
@@ -519,6 +523,69 @@ router.put('/password', async (req: Request, res: Response) => {
       success: false,
       error: 'server_error',
       message: 'Failed to change password',
+    });
+  }
+});
+
+/**
+ * GET /api/customer-auth/me
+ *
+ * Get current authenticated customer
+ */
+router.get('/me', async (req: Request, res: Response) => {
+  try {
+    // Get customer ID from token or cookie
+    const token = CustomerTokenService.extractBearerToken(req);
+    let customerId: string | null = null;
+
+    if (token) {
+      const payload = customerTokenService.verifyAccessToken(token);
+      if (payload) {
+        customerId = payload.customerId;
+      }
+    }
+
+    // Fallback to cookie
+    if (!customerId) {
+      customerId = req.cookies?.customer_session_id || null;
+    }
+
+    if (!customerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'unauthorized',
+        message: 'Not authenticated',
+      });
+    }
+
+    const customer = await customerAuthService.getCustomer(customerId);
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        error: 'customer_not_found',
+        message: 'Customer not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      customer: {
+        id: customer.id,
+        customerNumber: customer.customerNumber,
+        email: customer.email,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        phone: customer.phone,
+        emailVerified: customer.emailVerified,
+      },
+    });
+  } catch (error: any) {
+    console.error('[CustomerAuth API] Get me error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: 'Failed to get customer',
     });
   }
 });

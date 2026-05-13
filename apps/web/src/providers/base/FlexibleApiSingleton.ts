@@ -11,7 +11,7 @@
  * Default request type can be overridden per service
  */
 
-import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, ResponseType, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
+import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, ResponseType, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, CustomerRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
@@ -28,6 +28,7 @@ export type {
   SingletonCacheOptions,
   PublicRequestOptions,
   TenantRequestOptions,
+  CustomerRequestOptions,
   AuthenticatedRequestOptions,
   AdminRequestOptions,
   ExternalRequestOptions,
@@ -434,6 +435,35 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           ...modifiedOptions.headers,
         },
       },
+      ttl: requestOptions?.ttl || this.cacheTTL,
+      target: requestOptions?.requestTarget || this.defaultRequestTarget
+    };
+  }
+
+  /**
+   * Setup options for customer requests
+   */
+  private async setupCustomerRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    requestOptions?: CustomerRequestOptions
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onCustomerRequest<T>(url, options, requestOptions);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey: requestOptions?.cacheKey,
       ttl: requestOptions?.ttl || this.cacheTTL,
       target: requestOptions?.requestTarget || this.defaultRequestTarget
     };
@@ -1033,6 +1063,10 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         const tenantOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as TenantRequestOptions;
         setupResult = await this.setupTenantRequestOptions<T>(url, options || {}, tenantOptions);
         break;
+      case RequestType.CUSTOMER:
+        const customerOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as CustomerRequestOptions;
+        setupResult = await this.setupCustomerRequestOptions<T>(url, options || {}, customerOptions);
+        break;
       case RequestType.ADMIN:
         const adminOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as AdminRequestOptions;
         setupResult = await this.setupAdminRequestOptions<T>(url, options || {}, adminOptions);
@@ -1200,6 +1234,50 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     }
     if (email) {
       headers['x-auth0-email'] = email;
+    }
+    
+    return {
+      ...options,
+      headers,
+    };
+  }
+
+  /**
+   * Override hook for subclasses to customize customer request behavior
+   * Adds JWT Bearer token from customer_auth_token localStorage and
+   * x-customer-id header from customer_identity_cache
+   */
+  protected async onCustomerRequest<T>(
+    url: string,
+    options: RequestInit,
+    requestOptions?: CustomerRequestOptions
+  ): Promise<RequestInit> {
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+    
+    // Add customer JWT token if available
+    if (typeof window !== 'undefined') {
+      const customerToken = localStorage.getItem('customer_auth_token');
+      if (customerToken) {
+        headers['Authorization'] = `Bearer ${customerToken}`;
+      }
+      // Add customer identity header for API identification
+      const customerIdentity = localStorage.getItem('customer_identity_cache');
+      if (customerIdentity) {
+        try {
+          const parsed = JSON.parse(customerIdentity);
+          if (parsed?.id) {
+            headers['x-customer-id'] = parsed.id;
+          }
+        } catch {}
+      }
+    }
+
+    // Add customer ID from request options if provided
+    const customerId = requestOptions?.customerId;
+    if (customerId) {
+      headers['x-customer-id'] = customerId;
     }
     
     return {

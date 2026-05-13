@@ -338,6 +338,7 @@ async function collectIncidentContext(req: Request) {
       isAuthRequest: req.path.includes('/auth') || req.path.includes('/login'),
       isPublicRequest: req.path.startsWith('/public/'),
       hasTenantContext: !!req.headers['x-tenant-id'],
+      hasCustomerContext: !!req.headers['x-customer-id'],
     },
 
     // Risk indicators

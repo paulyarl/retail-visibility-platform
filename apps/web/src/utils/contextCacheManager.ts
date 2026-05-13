@@ -17,6 +17,7 @@ export enum CacheIsolation {
   GLOBAL = 'global',
   TENANT = 'tenant',
   USER = 'user', 
+  CUSTOMER = 'customer',
   ADMIN = 'admin',
   PRODUCT = 'product',
   STORE = 'store',
@@ -43,6 +44,7 @@ export enum AppContext {
   SHOP = 'shop',
   DIRECTORY = 'directory',
   USER = 'user',
+  CUSTOMER = 'customer',
   GLOBAL = 'global',
   PUBLIC = 'public',
   SYSTEM = 'system'
@@ -200,6 +202,16 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
     encryption: true,
     compression: false, // Privacy prioritized over performance
     persistent: false // Memory only for privacy
+  },
+
+  // Customer context: Customer-specific data, medium TTL, encrypted
+  [AppContext.CUSTOMER]: {
+    ttl: 10 * 60 * 1000, // 10 minutes
+    maxSize: 100,
+    isolation: CacheIsolation.CUSTOMER,
+    encryption: true,
+    compression: false,
+    persistent: true
   },
 
   // Global context: Shared data, medium TTL, maximum compression

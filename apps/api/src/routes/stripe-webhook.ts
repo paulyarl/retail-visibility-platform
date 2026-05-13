@@ -85,6 +85,14 @@ router.post('/', async (req: Request, res: Response) => {
         await handlePaymentMethodDetached(event.data.object as Stripe.PaymentMethod);
         break;
 
+      case 'payment_method.automatically_updated':
+        await handlePaymentMethodAutoUpdated(event.data.object as Stripe.PaymentMethod);
+        break;
+
+      case 'setup_intent.succeeded':
+        await handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent);
+        break;
+
       default:
         console.log(`[StripeWebhook] Unhandled event type: ${event.type}`);
     }
@@ -243,12 +251,88 @@ async function handlePaymentMethodAttached(paymentMethod: Stripe.PaymentMethod) 
 async function handlePaymentMethodDetached(paymentMethod: Stripe.PaymentMethod) {
   console.log(`[StripeWebhook] Payment method ${paymentMethod.id} detached`);
 
-  // Mark as inactive in our database
+  // Mark as inactive in tenant billing gateways
   await prisma.$executeRaw`
     UPDATE merchant_billing_gateways
     SET is_active = false
     WHERE payment_method_token = ${paymentMethod.id}
   `;
+
+  // Also mark as inactive in customer payment methods
+  await prisma.$executeRaw`
+    UPDATE customer_payment_methods
+    SET is_active = false, updated_at = now()
+    WHERE payment_method_token = ${paymentMethod.id}
+  `;
+}
+
+/**
+ * Handle payment method automatically updated by Stripe
+ * (e.g., card expiry date updated by the network)
+ */
+async function handlePaymentMethodAutoUpdated(paymentMethod: Stripe.PaymentMethod) {
+  console.log(`[StripeWebhook] Payment method ${paymentMethod.id} automatically updated`);
+
+  if (!paymentMethod.card) return;
+
+  // Update card details in customer_payment_methods
+  await prisma.$executeRaw`
+    UPDATE customer_payment_methods
+    SET 
+      card_last4 = ${paymentMethod.card.last4},
+      card_brand = ${paymentMethod.card.brand},
+      expiry_month = ${paymentMethod.card.exp_month},
+      expiry_year = ${paymentMethod.card.exp_year},
+      card_funding = ${paymentMethod.card.funding},
+      card_country = ${paymentMethod.card.country},
+      updated_at = now()
+    WHERE payment_method_token = ${paymentMethod.id} AND is_active = true
+  `;
+}
+
+/**
+ * Handle setup_intent.succeeded
+ * Customer has successfully saved a card via SetupIntent flow
+ */
+async function handleSetupIntentSucceeded(setupIntent: Stripe.SetupIntent) {
+  const { platform_customer_id, tenant_id } = setupIntent.metadata || {};
+
+  console.log(`[StripeWebhook] SetupIntent ${setupIntent.id} succeeded for customer ${platform_customer_id}, tenant ${tenant_id}`);
+
+  // The frontend is responsible for calling POST /api/customer-payment-methods
+  // after confirmSetup() succeeds. This webhook is for logging and verification.
+  // If the frontend fails to save, we can do it here as a safety net.
+
+  if (!platform_customer_id || !tenant_id || !setupIntent.payment_method) return;
+
+  // Check if this payment method was already saved by the frontend
+  const existing = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM customer_payment_methods
+    WHERE customer_id = ${platform_customer_id}
+    AND tenant_id = ${tenant_id}
+    AND payment_method_token = ${setupIntent.payment_method as string}
+    AND is_active = true
+  `;
+
+  if (existing.length > 0) {
+    console.log(`[StripeWebhook] Payment method ${setupIntent.payment_method} already saved for customer ${platform_customer_id}`);
+    return;
+  }
+
+  // Safety net: save the payment method if frontend didn't
+  console.log(`[StripeWebhook] Auto-saving payment method ${setupIntent.payment_method} for customer ${platform_customer_id}`);
+
+  try {
+    const { CustomerPaymentMethodsService } = await import('../services/CustomerPaymentMethodsService');
+    const service = CustomerPaymentMethodsService.getInstance();
+    await service.addPaymentMethod(platform_customer_id, {
+      tenantId: tenant_id,
+      gatewayType: 'stripe',
+      paymentMethodToken: setupIntent.payment_method as string,
+    });
+  } catch (error: any) {
+    console.error(`[StripeWebhook] Failed to auto-save payment method:`, error.message);
+  }
 }
 
 /**

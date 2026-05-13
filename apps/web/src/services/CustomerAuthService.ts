@@ -7,7 +7,7 @@
  * - Cookie-based session management
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 export interface Customer {
@@ -20,19 +20,36 @@ export interface Customer {
   emailVerified: boolean;
 }
 
+export interface CustomerAuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 export interface CustomerAuthResponse {
   success: boolean;
   customer?: Customer;
   isNewCustomer?: boolean;
+  tokens?: CustomerAuthTokens;
   error?: string;
 }
 
-class CustomerAuthService extends PublicApiSingleton {
+class CustomerAuthService extends CustomerApiSingleton {
   private static instance: CustomerAuthService;
   private customer: Customer | null = null;
 
   private constructor() {
     super('customer-auth-service', { ttl: 0 }); // No caching for auth
+  }
+
+  getServiceCachePatterns(): string[] {
+    return ['customer-auth-me', 'customer-auth-register', 'customer-auth-login'];
+  }
+
+  async invalidateServiceCaches(customerId?: string): Promise<void> {
+    for (const pattern of this.getServiceCachePatterns()) {
+      await this.invalidateCache(pattern);
+    }
   }
 
   static getInstance(): CustomerAuthService {
@@ -43,12 +60,57 @@ class CustomerAuthService extends PublicApiSingleton {
   }
 
   /**
-   * Initialize - check for existing session via cookie
+   * Get stored token from localStorage
+   */
+  private getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('customer_auth_token');
+  }
+
+  /**
+   * Store token in localStorage
+   */
+  private setToken(token: string): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('customer_auth_token', token);
+  }
+
+  /**
+   * Remove token from localStorage
+   */
+  private clearToken(): void {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('customer_auth_token');
+  }
+
+  /**
+   * Build headers with Authorization token
+   */
+  getAuthHeaders(): HeadersInit {
+    const token = this.getToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
+  /**
+   * Initialize - check for existing session via token or cookie
    */
   async initialize(): Promise<Customer | null> {
     if (typeof window === 'undefined') return null;
 
-    // Check for existing session via API (cookies sent automatically)
+    // Skip API call if no token exists - avoids unnecessary 401s on public pages
+    const token = this.getToken();
+    if (!token) {
+      this.customer = null;
+      return null;
+    }
+
+    // Check for existing session via API
     try {
       const result = await this.makeDefaultRequest<{
         success: boolean;
@@ -57,13 +119,14 @@ class CustomerAuthService extends PublicApiSingleton {
         '/api/customer-auth/me',
         {
           method: 'GET',
-          credentials: 'include', // Send cookies
+          credentials: 'include', // Send cookies for backward compatibility
         },
         'customer-auth-me'
       );
 
       if (result.success && result.data?.customer) {
         this.customer = result.data.customer;
+        this.setCurrentCustomer(this.customer.id, this.customer);
         return this.customer;
       }
     } catch (error) {
@@ -96,6 +159,11 @@ class CustomerAuthService extends PublicApiSingleton {
 
       if (result.success && result.data?.success) {
         this.customer = result.data.customer || null;
+        // Store JWT token in localStorage
+        if (result.data.tokens?.accessToken) {
+          this.setToken(result.data.tokens.accessToken);
+        }
+        if (this.customer) this.setCurrentCustomer(this.customer.id, this.customer);
         return result.data;
       }
 
@@ -117,11 +185,12 @@ class CustomerAuthService extends PublicApiSingleton {
    */
   async login(email: string, password: string): Promise<CustomerAuthResponse> {
     try {
-      const result = await this.makeDefaultRequest<CustomerAuthResponse>(
+      const result = await this.makeDefaultRequest<CustomerAuthResponse & { tokens?: { accessToken: string; refreshToken: string } }>(
         '/api/customer-auth/login',
         {
           method: 'POST',
-          credentials: 'include', // Send/receive cookies
+          credentials: 'include', // Send/receive cookies for backward compatibility
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         },
         'customer-auth-login'
@@ -129,6 +198,11 @@ class CustomerAuthService extends PublicApiSingleton {
 
       if (result.success && result.data?.success) {
         this.customer = result.data.customer || null;
+        // Store JWT token in localStorage
+        if (result.data.tokens?.accessToken) {
+          this.setToken(result.data.tokens.accessToken);
+        }
+        if (this.customer) this.setCurrentCustomer(this.customer.id, this.customer);
         return result.data;
       }
 
@@ -168,6 +242,11 @@ class CustomerAuthService extends PublicApiSingleton {
 
       if (result.success && result.data?.success) {
         this.customer = result.data.customer || null;
+        // Store JWT token in localStorage
+        if (result.data.tokens?.accessToken) {
+          this.setToken(result.data.tokens.accessToken);
+        }
+        if (this.customer) this.setCurrentCustomer(this.customer.id, this.customer);
         return result.data;
       }
 
@@ -193,7 +272,7 @@ class CustomerAuthService extends PublicApiSingleton {
         '/api/customer-auth/logout',
         {
           method: 'POST',
-          credentials: 'include', // Send/receive cookies
+          credentials: 'include',
         },
         'customer-auth-logout'
       );
@@ -201,8 +280,10 @@ class CustomerAuthService extends PublicApiSingleton {
       console.warn('[CustomerAuth] Logout API error:', error);
     }
 
-    // Clear local state
+    // Clear local state, token, and customer context
     this.customer = null;
+    this.clearToken();
+    this.clearCurrentCustomer();
   }
 
   /**
@@ -226,6 +307,7 @@ class CustomerAuthService extends PublicApiSingleton {
 
       if (result.success && result.data?.success) {
         this.customer = result.data.customer || null;
+        if (this.customer) this.setCurrentCustomer(this.customer.id, this.customer);
         return result.data;
       }
 
@@ -300,7 +382,8 @@ class CustomerAuthService extends PublicApiSingleton {
         '/api/customer-auth/reset-password',
         {
           method: 'POST',
-          credentials: 'include', // Send/receive cookies
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, newPassword }),
         },
         'customer-auth-reset-password'
@@ -308,6 +391,7 @@ class CustomerAuthService extends PublicApiSingleton {
 
       if (result.success && result.data?.success) {
         this.customer = result.data.customer || null;
+        if (this.customer) this.setCurrentCustomer(this.customer.id, this.customer);
         return result.data;
       }
 

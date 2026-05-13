@@ -60,6 +60,9 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
     initAuth();
   }, []);
 
+  // Customer identity cache is now managed by CustomerApiSingleton.setCurrentCustomer()
+  // which is called by CustomerAuthService on login/register/oauth/logout
+
   const login = useCallback(async (email: string, password: string): Promise<CustomerAuthResponse> => {
     setIsLoading(true);
     setError(null);

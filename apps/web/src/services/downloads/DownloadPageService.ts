@@ -2,10 +2,10 @@
  * Download Page Service - Singleton
  * 
  * Tenant-facing service for managing download pages
- * Uses AuthenticatedApiSingleton for secure tenant operations
+ * Uses TenantApiSingleton for secure tenant operations
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Types
 export interface DownloadPage {
@@ -173,7 +173,13 @@ export interface DownloadPageStats {
   totalBytesDownloaded: number;
 }
 
-class DownloadPageService extends AuthenticatedApiSingleton {
+class DownloadPageService extends TenantApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   private static instance: DownloadPageService;
 
   private constructor() {

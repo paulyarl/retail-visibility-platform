@@ -9,7 +9,9 @@ import {
   Bell, 
   Settings, 
   LogOut,
-  User
+  User,
+  CreditCard,
+  Download
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -17,7 +19,9 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { href: '/account', label: 'Overview', icon: LayoutDashboard },
   { href: '/account/orders', label: 'Orders', icon: Package },
+  { href: '/account/downloads', label: 'Digital Downloads', icon: Download },
   { href: '/account/addresses', label: 'Addresses', icon: MapPin },
+  { href: '/account/payment-methods', label: 'Payment Methods', icon: CreditCard },
   { href: '/account/notifications', label: 'Notifications', icon: Bell },
   { href: '/account/settings', label: 'Settings', icon: Settings },
 ];

@@ -305,7 +305,7 @@ app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info','x-admin-request','x-tenant-request','x-request-group','x-request-groups','x-require-all','x-admin-roles','x-audit-id','x-request-context','x-organization-id','x-organization-validation','x-audit-operation','x-audit-reason','x-service','x-service-key','x-auth0-email','x-auth0-id','x-session-id'],
+  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info','x-admin-request','x-tenant-request','x-request-group','x-request-groups','x-require-all','x-admin-roles','x-audit-id','x-request-context','x-organization-id','x-organization-validation','x-audit-operation','x-audit-reason','x-service','x-service-key','x-auth0-email','x-auth0-id','x-session-id','x-customer-id'],
 }));
 
 // IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
@@ -4812,16 +4812,18 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     download_limit: it.download_limit || metadataObj.download_limit,
     payment_gateway_type: metadataObj.payment_gateway_type || it.payment_gateway_type,
     payment_gateway_id: metadataObj.payment_gateway_id || it.payment_gateway_id,
-    // Metadata fields for display
-    features: metadataObj.features || [],
-    specifications: metadataObj.specifications || {},
-    tags: metadataObj.tags || [],
-    seo_title: metadataObj.seo_title || null,
-    seo_description: metadataObj.seo_description || null,
-    track_inventory: metadataObj.track_inventory ?? true,
-    allow_backorder: metadataObj.allow_backorder ?? false,
-    low_stock_threshold: metadataObj.low_stock_threshold || 5,
-    videoUrl: metadataObj.videoUrl || null,
+    // Use direct columns first, fallback to metadata for backward compatibility
+    features: it.features || metadataObj.features || [],
+    specifications: it.specifications || metadataObj.specifications || {},
+    tags: it.tags || metadataObj.tags || [],
+    seo_title: it.seo_title || metadataObj.seo_title || null,
+    seo_description: it.seo_description || metadataObj.seo_description || null,
+    enhanced_description: it.enhanced_description || metadataObj.enhancedDescription || null,
+    track_inventory: it.track_inventory ?? metadataObj.track_inventory ?? true,
+    allow_backorder: it.allow_backorder ?? metadataObj.allow_backorder ?? false,
+    low_stock_threshold: it.low_stock_threshold || metadataObj.low_stock_threshold || 5,
+    video_url: it.video_url || metadataObj.videoUrl || null,
+    videoUrl: it.video_url || metadataObj.videoUrl || null, // Keep videoUrl for backward compatibility
     // Multi-type featured products support
     featuredTypes: featuredTypesArray, // Array of featured types
     featuredProducts: featuredTypes, // Full featured product details with expirations
@@ -4898,7 +4900,7 @@ const baseItemSchema = z.object({
   sku: z.string().min(1).optional(), // Optional - API will auto-generate if not provided
   name: z.string().min(1),
   price_cents: z.number().int().nonnegative(),
-  stock: z.number().int().nonnegative(),
+  stock: z.number().int(), // Allow negative values for items with variants
   image_url: z.string().nullable().optional(),
   image_gallery: z.array(z.string()).optional(), // Array of image URLs
   metadata: z.any().optional(),
@@ -4954,6 +4956,13 @@ const baseItemSchema = z.object({
   tags: z.array(z.string()).optional(),
   seo_title: z.string().nullable().optional(),
   seo_description: z.string().nullable().optional(),
+  enhanced_description: z.string().nullable().optional(),
+  // Media fields
+  video_url: z.string().nullable().optional(),
+  video_thumbnail: z.string().nullable().optional(),
+  // Product details
+  features: z.array(z.string()).optional(),
+  specifications: z.any().optional(),
   // Inventory settings
   track_inventory: z.boolean().optional(),
   allow_backorder: z.boolean().optional(),
@@ -4967,7 +4976,7 @@ const baseItemSchema = z.object({
 const createItemSchema = baseItemSchema.extend({
   // Apply defaults only for creation
   price_cents: z.number().int().nonnegative().default(0),
-  stock: z.number().int().nonnegative().default(0),
+  stock: z.number().int().default(0), // Allow negative values for items with variants
 }).transform((data) => {
   const { tenant_id, tenantId, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = data;
   return {
@@ -5261,10 +5270,15 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       tenantCategoryId,
       directory_category_id,
       status,
-      // Fields to store in metadata (not direct columns)
+      // Fields to store in direct columns (extracted from metadata)
       tags,
       seo_title,
       seo_description,
+      enhanced_description,
+      features,
+      specifications,
+      video_url,
+      video_thumbnail,
       track_inventory,
       allow_backorder,
       low_stock_threshold,
@@ -5350,6 +5364,19 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       }
     }
 
+    // Add migrated fields to direct columns
+    if (tags !== undefined) updateData.tags = tags;
+    if (seo_title !== undefined) updateData.seo_title = seo_title;
+    if (seo_description !== undefined) updateData.seo_description = seo_description;
+    if (enhanced_description !== undefined) updateData.enhanced_description = enhanced_description;
+    if (features !== undefined) updateData.features = features;
+    if (specifications !== undefined) updateData.specifications = specifications;
+    if (video_url !== undefined) updateData.video_url = video_url;
+    if (video_thumbnail !== undefined) updateData.video_thumbnail = video_thumbnail;
+    if (track_inventory !== undefined) updateData.track_inventory = track_inventory;
+    if (allow_backorder !== undefined) updateData.allow_backorder = allow_backorder;
+    if (low_stock_threshold !== undefined) updateData.low_stock_threshold = low_stock_threshold;
+    
     // Sync price and price_cents fields
     if (updateData.price !== undefined) {
       updateData.price_cents = Math.round(updateData.price * 100);
@@ -5359,12 +5386,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     // Build metadata object with fields that are not direct columns
     const metadataFields: any = {};
-    if (tags !== undefined) metadataFields.tags = tags;
-    if (seo_title !== undefined) metadataFields.seo_title = seo_title;
-    if (seo_description !== undefined) metadataFields.seo_description = seo_description;
-    if (track_inventory !== undefined) metadataFields.track_inventory = track_inventory;
-    if (allow_backorder !== undefined) metadataFields.allow_backorder = allow_backorder;
-    if (low_stock_threshold !== undefined) metadataFields.low_stock_threshold = low_stock_threshold;
+    // NOTE: migrated fields are now stored as direct columns, not in metadata
     // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are stored as direct columns
     // They are NOT stored in metadata
     
@@ -5481,14 +5503,16 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       salePriceCents: updated.sale_price_cents || null,
       payment_gateway_type: updated.payment_gateway_type || null,
       payment_gateway_id: updated.payment_gateway_id || null,
-      // Extract other metadata fields for frontend display
-      tags: metadataObj.tags || [],
-      seo_title: metadataObj.seo_title || null,
-      seo_description: metadataObj.seo_description || null,
-      track_inventory: metadataObj.track_inventory ?? true,
-      allow_backorder: metadataObj.allow_backorder ?? false,
-      low_stock_threshold: metadataObj.low_stock_threshold || 5,
-      videoUrl: metadataObj.videoUrl || null,
+      // Use direct columns first, fallback to metadata for backward compatibility
+      tags: updated.tags || metadataObj.tags || [],
+      seo_title: updated.seo_title || metadataObj.seo_title || null,
+      seo_description: updated.seo_description || metadataObj.seo_description || null,
+      enhanced_description: updated.enhanced_description || metadataObj.enhancedDescription || null,
+      track_inventory: updated.track_inventory ?? metadataObj.track_inventory ?? true,
+      allow_backorder: updated.allow_backorder ?? metadataObj.allow_backorder ?? false,
+      low_stock_threshold: updated.low_stock_threshold || metadataObj.low_stock_threshold || 5,
+      video_url: updated.video_url || metadataObj.videoUrl || null,
+      videoUrl: updated.video_url || metadataObj.videoUrl || null, // Keep videoUrl for backward compatibility
     };
     
     console.log('[PUT /items/:id] Sending to frontend directory_category_id:', transformed.directory_category_id);
@@ -7608,6 +7632,11 @@ import customerAuthRoutes from './routes/customer-auth';
 app.use('/api/customer-auth', customerAuthRoutes);
 console.log('✅ Customer authentication routes mounted at /api/customer-auth');
 
+/* ------------------------------ customer auth token fallback ------------------------------ */
+import customerAuthTokenRoutes from './routes/customer-auth-token';
+app.use('/api/customer-auth-token', customerAuthTokenRoutes);
+console.log('✅ Customer auth token routes mounted at /api/customer-auth-token');
+
 /* ------------------------------ customer addresses ------------------------------ */
 import customerAddressesRoutes from './routes/customer-addresses';
 app.use('/api/customer-addresses', customerAddressesRoutes);
@@ -7617,6 +7646,16 @@ console.log('✅ Customer addresses routes mounted at /api/customer-addresses');
 import customerNotificationsRoutes from './routes/customer-notifications';
 app.use('/api/customer-notifications', customerNotificationsRoutes);
 console.log('✅ Customer notifications routes mounted at /api/customer-notifications');
+
+/* ------------------------------ customer payment methods ------------------------------ */
+import customerPaymentMethodsRoutes from './routes/customer-payment-methods';
+app.use('/api/customer-payment-methods', customerPaymentMethodsRoutes);
+console.log('✅ Customer payment methods routes mounted at /api/customer-payment-methods');
+
+/* ------------------------------ debug cookies ------------------------------ */
+import debugCookiesRoutes from './routes/debug-cookies';
+app.use('/api/debug-cookies', debugCookiesRoutes);
+console.log('✅ Debug cookies route mounted at /api/debug-cookies');
 
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';

@@ -6,11 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
-import { Package, MapPin, ShoppingBag, Clock, TrendingUp } from 'lucide-react';
+import { customerAddressesService } from '@/services/CustomerAddressesService';
+import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download } from 'lucide-react';
 
 export default function AccountOverviewPage() {
   const { customer } = useCustomerAuth();
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
+  const [digitalDownloadsCount, setDigitalDownloadsCount] = useState(0);
+  const [addressCount, setAddressCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -23,8 +26,29 @@ export default function AccountOverviewPage() {
     if (!customer?.email) return;
     
     try {
+      // Load recent orders
       const result = await customerOrderService.getCustomerOrders(customer.email, 1, 5);
       setRecentOrders(result.orders);
+
+      // Count digital downloads from recent orders
+      let digitalCount = 0;
+      for (const order of result.orders) {
+        for (const item of order.items) {
+          if (item.productType === 'digital' || item.productType === 'hybrid') {
+            digitalCount++;
+          }
+        }
+      }
+      setDigitalDownloadsCount(digitalCount);
+
+      // Load address count
+      try {
+        const result = await customerAddressesService.listAddresses();
+        setAddressCount(result.addresses?.length || 0);
+      } catch (addressError) {
+        console.error('Failed to load addresses:', addressError);
+        setAddressCount(0);
+      }
     } catch (error) {
       console.error('Failed to load recent orders:', error);
     } finally {
@@ -85,7 +109,7 @@ export default function AccountOverviewPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Saved Addresses</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{addressCount}</p>
               </div>
             </div>
           </CardContent>
@@ -160,7 +184,7 @@ export default function AccountOverviewPage() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/account/addresses">
           <Card className="hover:border-blue-300 hover:shadow-md transition-all cursor-pointer">
             <CardContent className="p-6">
@@ -188,6 +212,27 @@ export default function AccountOverviewPage() {
                   <p className="font-medium text-gray-900">Account Settings</p>
                   <p className="text-sm text-gray-600">Update your profile and preferences</p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/account/downloads">
+          <Card className="hover:border-blue-300 hover:shadow-md transition-all cursor-pointer relative">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Download className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">Digital Downloads</p>
+                  <p className="text-sm text-gray-600">Access your digital products</p>
+                </div>
+                {digitalDownloadsCount > 0 && (
+                  <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    {digitalDownloadsCount}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

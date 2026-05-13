@@ -6,6 +6,7 @@ import MultiCartCheckout from '@/components/cart/MultiCartCheckout';
 
 function MultiCartCheckoutContent() {
   const { carts, clearCart } = useMultiCart();
+  // console.log(`[MultiCartCheckoutPage] Carts: ${JSON.stringify(carts)}`);
 
   const handleCartProcessed = (tenantId: string) => {
     clearCart(tenantId);

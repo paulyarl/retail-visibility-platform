@@ -668,13 +668,24 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
   }
   
   try {
-    const authUser = localStorage.getItem('auth_user_cache');
-    
-    if (authUser) {
-      const decrypted = decrypt(authUser);
-      const parsed = JSON.parse(decrypted);
-      if (parsed?.user?.id) {
-        userId = parsed.user.id;
+    // Check customer identity cache first (JWT customer auth)
+    const customerIdentity = localStorage.getItem('customer_identity_cache');
+    if (customerIdentity) {
+      const parsed = JSON.parse(customerIdentity);
+      if (parsed?.id) {
+        userId = parsed.id;
+      }
+    }
+
+    // Fall back to Auth0 merchant session
+    if (!userId) {
+      const authUser = localStorage.getItem('auth_user_cache');
+      if (authUser) {
+        const decrypted = decrypt(authUser);
+        const parsed = JSON.parse(decrypted);
+        if (parsed?.user?.id) {
+          userId = parsed.user.id;
+        }
       }
     }
     

@@ -120,36 +120,36 @@ function CheckoutPageContent() {
         // Use CustomerOrderService for public checkout - no auth required
         const { gateways, tenant_tier } = await customerOrderService.getPaymentGateways(tenantId);
         
-        console.log('[Checkout] Payment gateways data:', gateways, 'Tenant tier:', tenant_tier);
+        // console.log('[Checkout] Payment gateways data:', gateways, 'Tenant tier:', tenant_tier);
         
         // Extract active gateway types
         const activeTypes = gateways
           .filter((gateway: any) => gateway.is_active)
           .map((gateway: any) => gateway.gateway_type as PaymentMethod);
         
-        console.log('[Checkout] Active gateway types:', activeTypes);
+        // console.log('[Checkout] Active gateway types:', activeTypes);
         setAvailableGateways(activeTypes);
         
         // Extract Square config from active Square gateway
         const squareGateway = gateways.find((g: any) => g.gateway_type === 'square' && g.is_active);
-        console.log('[Checkout] Square gateway found:', squareGateway);
-        console.log('[Checkout] Square gateway config:', squareGateway?.config);
-        console.log('[Checkout] Square gateway config keys:', squareGateway?.config ? Object.keys(squareGateway.config) : 'no config');
+        // console.log('[Checkout] Square gateway found:', squareGateway);
+        // console.log('[Checkout] Square gateway config:', squareGateway?.config);
+        // console.log('[Checkout] Square gateway config keys:', squareGateway?.config ? Object.keys(squareGateway.config) : 'no config');
         
         if (squareGateway?.config) {
           const config = squareGateway.config;
-          console.log('[Checkout] Config fields:', {
-            application_id: config.application_id,
-            location_id: config.location_id,
-            applicationId: config.applicationId, // Check alternative field name
-            locationId: config.locationId, // Check alternative field name
-          });
+          // console.log('[Checkout] Config fields:', {
+          //   application_id: config.application_id,
+          //   location_id: config.location_id,
+          //   applicationId: config.applicationId, // Check alternative field name
+          //   locationId: config.locationId, // Check alternative field name
+          // });
           
           if (config.application_id && config.location_id) {
-            console.log('[Checkout] Setting Square config:', {
-              applicationId: config.application_id,
-              locationId: config.location_id
-            });
+            // console.log('[Checkout] Setting Square config:', {
+            //   applicationId: config.application_id,
+            //   locationId: config.location_id
+            // });
             setSquareConfig({
               applicationId: config.application_id,
               locationId: config.location_id
@@ -199,7 +199,7 @@ function CheckoutPageContent() {
             setDepositOption('none');
           }
           
-          console.log('[Checkout] Tenant tier:', tier, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
+          // console.log('[Checkout] Tenant tier:', tier, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
         }
       } catch (error) {
         console.error('[Checkout] Failed to fetch payment gateways:', error);
@@ -213,7 +213,7 @@ function CheckoutPageContent() {
   const fetchTenantContact = async (tid: string) => {
     try {
       const profile = await tenantPublicService.getPublicTenantProfile(tid);
-      console.log('[Checkout] Tenant profile:', profile);
+      // console.log('[Checkout] Tenant profile:', profile);
       if (profile) {
         // Handle both response formats - data nested or direct
         const data = (profile as any).data || profile;
@@ -238,29 +238,29 @@ function CheckoutPageContent() {
 
   // Initialize checkout - validate cart exists
   useEffect(() => {
-    console.log('[Checkout] Initialization check:', { 
-      tenantId,
-      gatewayType,
-      hasCart: !!cart,
-      itemCount: cart?.items?.length,
-      isInitialized 
-    });
+    // console.log('[Checkout] Initialization check:', { 
+    //   tenantId,
+    //   gatewayType,
+    //   hasCart: !!cart,
+    //   itemCount: cart?.items?.length,
+    //   isInitialized 
+    // });
 
     if (!tenantId || !gatewayType) {
-      console.log('[Checkout] Missing tenant ID or gateway type, redirecting to /carts');
+      // console.log('[Checkout] Missing tenant ID or gateway type, redirecting to /carts');
       router.push('/carts');
       return;
     }
 
     if (cart) {
-      console.log('[Checkout] Cart found:', { 
-        tenantId: cart.tenant_id,
-        itemCount: cart.items.length
-      });
+      // console.log('[Checkout] Cart found:', { 
+      //   tenantId: cart.tenant_id,
+      //   itemCount: cart.items.length
+      // });
       
       // Valid cart - mark as initialized
       if (!isInitialized) {
-        console.log('[Checkout] Valid cart, initializing checkout');
+        // console.log('[Checkout] Valid cart, initializing checkout');
         setIsInitialized(true);
       }
     } else if (!isInitialized) {
@@ -300,12 +300,12 @@ function CheckoutPageContent() {
         pickupDeadline,
       });
       
-      console.log('[Checkout] Deposit calculated:', {
-        total,
-        depositPercentage,
-        depositCents,
-        remainingBalanceCents,
-      });
+      // console.log('[Checkout] Deposit calculated:', {
+      //   total,
+      //   depositPercentage,
+      //   depositCents,
+      //   remainingBalanceCents,
+      // });
     } else {
       setDepositInfo(null);
     }
@@ -360,16 +360,16 @@ function CheckoutPageContent() {
   };
 
   const handlePaymentSuccess = async (orderNumber: string, gatewayTransactionId?: string) => {
-    console.log('[Checkout] Payment success:', {
-      orderNumber,
-      gatewayTransactionId,
-      customerInfo,
-      shippingAddress,
-      fulfillmentMethod,
-      fulfillmentFee,
-      tenantId,
-      gatewayType
-    });
+    // console.log('[Checkout] Payment success:', {
+    //   orderNumber,
+    //   gatewayTransactionId,
+    //   customerInfo,
+    //   shippingAddress,
+    //   fulfillmentMethod,
+    //   fulfillmentFee,
+    //   tenantId,
+    //   gatewayType
+    // });
     
     // Clear the cart after successful payment
     if (tenantId) {
@@ -387,8 +387,10 @@ function CheckoutPageContent() {
       localStorage.setItem('buyer_phone', customerInfo.phone);
     }
     
-    // Redirect to buyer order history
-    router.push('/my-orders');
+    // Redirect to order history (account page if logged in, my-orders for guests)
+    const { customerAuthService } = await import('@/services/CustomerAuthService');
+    const isLoggedIn = customerAuthService.isAuthenticated();
+    router.push(isLoggedIn ? '/account/orders' : '/my-orders');
   };
 
   const handleBack = () => {

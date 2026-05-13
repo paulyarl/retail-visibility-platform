@@ -19,6 +19,12 @@ export interface ShopCartService {
 }
 
 class PlatformCartService extends PublicApiSingleton implements ShopCartService {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(customerId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   private static instance: PlatformCartService;
   private carts: Map<string, ShopCart> = new Map();
   private readonly STORAGE_KEY = 'platform_shopping_cart';

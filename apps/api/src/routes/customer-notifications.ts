@@ -5,13 +5,25 @@
  * - Get notification preferences
  * - Update notification preferences
  * 
- * Session management uses httpOnly cookies (customer_session_id)
+ * Session management uses JWT tokens or httpOnly cookies (customer_session_id)
  */
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { CustomerTokenService } from '../services/CustomerTokenService';
 
 const router = Router();
+const customerTokenService = CustomerTokenService.getInstance();
+
+// Helper to extract customer ID from token or cookie
+const getCustomerId = (req: Request): string | null => {
+  const token = CustomerTokenService.extractBearerToken(req);
+  if (token) {
+    const payload = customerTokenService.verifyAccessToken(token);
+    if (payload) return payload.customerId;
+  }
+  return req.cookies?.customer_session_id || null;
+};
 
 interface NotificationPreferences {
   // Order notifications
@@ -43,7 +55,7 @@ interface NotificationPreferences {
  */
 router.get('/preferences', async (req: Request, res: Response) => {
   try {
-    const customerId = req.cookies?.customer_session_id;
+    const customerId = getCustomerId(req);
 
     if (!customerId) {
       return res.status(401).json({
@@ -122,7 +134,7 @@ router.get('/preferences', async (req: Request, res: Response) => {
  */
 router.put('/preferences', async (req: Request, res: Response) => {
   try {
-    const customerId = req.cookies?.customer_session_id;
+    const customerId = getCustomerId(req);
 
     if (!customerId) {
       return res.status(401).json({

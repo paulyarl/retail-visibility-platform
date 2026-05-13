@@ -58,6 +58,7 @@ interface ContextStorageConfig {
   [AppContext.PRODUCT]: StorageStrategy;
   [AppContext.STORE]: StorageStrategy;
   [AppContext.USER]: StorageStrategy;
+  [AppContext.CUSTOMER]: StorageStrategy;
   [AppContext.PUBLIC]: StorageStrategy;
   [AppContext.DIRECTORY]: StorageStrategy;
   [AppContext.GLOBAL]: StorageStrategy;
@@ -256,6 +257,9 @@ export class UniversalStorageManager {
       // USER: Privacy-focused, session-based
       [AppContext.USER]: this.createUserStrategy(),
       
+      // CUSTOMER: Customer-specific data, encrypted, persistent
+      [AppContext.CUSTOMER]: this.createCustomerStrategy(),
+      
       // SHOP: Large data, compressed, persistent
       [AppContext.SHOP]: this.createShopStrategy(),
       
@@ -440,6 +444,26 @@ export class UniversalStorageManager {
       priority: 'high',       // High priority for user experience
       persistent: false,       // Never persist user data
       crossTab: false,        // No cross-tab sharing for privacy
+      httpOnly: false,
+      secure: true
+    };
+  }
+
+  /**
+   * 🛒 Customer context strategy: Customer-specific data, encrypted, persistent
+   */
+  private createCustomerStrategy(): StorageStrategy {
+    return {
+      primary: this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB : 
+              StorageType.LOCAL_STORAGE,
+      fallbacks: this.getFallbacks([StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      encryption: true,        // Encrypt customer data
+      compression: false,      // Customer data usually small
+      maxSize: 100,            // Moderate size for customer data
+      ttl: 10 * 60 * 1000,     // 10 minutes
+      priority: 'high',       // High priority for customer experience
+      persistent: true,        // Persist customer data across sessions
+      crossTab: true,         // Share across tabs for consistency
       httpOnly: false,
       secure: true
     };
