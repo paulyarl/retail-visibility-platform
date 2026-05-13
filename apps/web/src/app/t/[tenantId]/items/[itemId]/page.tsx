@@ -300,7 +300,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       // console.log(`Inventory Item: ${JSON.stringify(itemData)}`);
 
       let imageUrl = (itemData as any).image_url||(itemData as any).imageUrl;
-      let itemGallery = (itemData as any).imageGallery;
+      let itemGallery = (itemData as any).imageGallery||(itemData as any).image_gallery;
 
       try {
         const photoSingleton = PhotoSingleton.getInstance(tenantId);
