@@ -738,6 +738,16 @@ export function generateCustomerTenantRelationshipId(tenantId: string, customerI
  */
 
 /**
+ * Generates short customer payment method IDs
+ * Format: cpm-{customerKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, customer-traceable
+ */
+export function generateCustomerPaymentMethodId(customerId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `cpm-${generateCustomerKey(customerId)}-${nanoid()}`;
+}
+
+/**
  * Generate global product catalog ID
  * Format: gpc-abc123 (10 chars)
  */

@@ -802,12 +802,17 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         return;
       }
 
-      // Build headers with session ID for tracking continuity
+      // Build headers with session ID and customer auth for tracking continuity
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
       if (sessionId) {
         headers['x-session-id'] = sessionId;
+      }
+      // Include customer JWT token if available for personalized tracking
+      const customerToken = typeof window !== 'undefined' ? localStorage.getItem('customer_auth_token') : null;
+      if (customerToken) {
+        headers['Authorization'] = `Bearer ${customerToken}`;
       }
 
       const response = await this.makeSystemRequest<void>(

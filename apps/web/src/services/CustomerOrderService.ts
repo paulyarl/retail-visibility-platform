@@ -1,10 +1,11 @@
 /**
  * Customer Order Service
- * Handles customer order processing for public pages
- * Uses PublicApiSingleton for automatic caching and API integration
+ * Handles customer order processing for customer pages
+ * Uses CustomerApiSingleton for automatic JWT auth and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
+import { customerAuthService } from './CustomerAuthService';
 
 export interface CustomerOrder {
   orderId: string;
@@ -65,6 +66,7 @@ export interface CustomerOrder {
     firstName: string;
     lastName: string;
   };
+  cancellationReason?: string;
 }
 
 export interface CustomerOrderItem {
@@ -74,6 +76,8 @@ export interface CustomerOrderItem {
   quantity: number;
   unitPrice: number;
   imageUrl: string | null;
+  productType?: 'physical' | 'digital' | 'hybrid';
+  itemId?: string;
 }
 
 export interface PaymentGateway {
@@ -111,12 +115,22 @@ export interface OrderRequest {
   paymentMethod: string;
 }
 
-class CustomerOrderService extends PublicApiSingleton {
+class CustomerOrderService extends CustomerApiSingleton {
   private static instance: CustomerOrderService;
 
   private constructor() {
     super('customer-order-service');
     this.cacheTTL = 5 * 60 * 1000; // 5 minutes for order data
+  }
+
+  getServiceCachePatterns(): string[] {
+    return ['payment-gateways', 'create-order', 'order-', 'customer-orders-', 'checkout-order'];
+  }
+
+  async invalidateServiceCaches(customerId?: string): Promise<void> {
+    for (const pattern of this.getServiceCachePatterns()) {
+      await this.invalidateCache(pattern);
+    }
   }
 
   static getInstance(): CustomerOrderService {
@@ -187,7 +201,7 @@ class CustomerOrderService extends PublicApiSingleton {
     
     const response = await this.makeDefaultRequest<{
       success: boolean;
-      order: CustomerOrder;
+      order: any;
     }>(url, {}, `order-${orderId}`);
 
     if (!response.success) {
@@ -195,7 +209,41 @@ class CustomerOrderService extends PublicApiSingleton {
       return null;
     }
 
-    return response.data?.order || null;
+    const o = response.data?.order;
+    if (!o) return null;
+
+    return {
+      ...o,
+      orderStatus: o.orderStatus || o.status,
+      orderNumber: o.orderNumber || o.order_number,
+      createdAt: o.createdAt || o.orderDate || o.created_at,
+      paidAt: o.paidAt || o.paid_at,
+      fulfillmentStatus: o.fulfillmentStatus || o.fulfillment_status,
+      fulfillmentMethod: o.fulfillmentMethod || o.fulfillment_method,
+      customerEmail: o.customerEmail || o.customerInfo?.email || o.customer_email,
+      customerName: o.customerName || (o.customerInfo ? `${o.customerInfo.firstName} ${o.customerInfo.lastName}`.trim() : o.customer_name),
+      customerPhone: o.customerPhone || o.customerInfo?.phone || o.customer_phone,
+      total: (o.total ?? o.total_cents) / 100,
+      subtotal: (o.subtotal ?? o.subtotal_cents) / 100,
+      shipping: (o.shipping ?? o.shipping_cents ?? o.fulfillmentFee ?? 0) / 100,
+      tax: (o.tax ?? o.tax_cents ?? 0) / 100,
+      itemCount: o.itemCount ?? o.item_count,
+      items: (o.items || o.order_items || []).map((item: any) => ({
+        ...item,
+        name: item.name || item.inventory_items?.name,
+        sku: item.sku || item.inventory_items?.sku,
+        imageUrl: item.imageUrl || item.image_url || item.inventory_items?.image_url,
+        unitPrice: (item.unitPrice ?? item.unit_price_cents ?? 0) / 100,
+      })),
+      shippingAddress: o.shippingAddress || (o.shipping_address_line1 ? {
+        addressLine1: o.shipping_address_line1,
+        addressLine2: o.shipping_address_line2,
+        city: o.shipping_city,
+        state: o.shipping_state,
+        postalCode: o.shipping_postal_code,
+        country: o.shipping_country,
+      } : null),
+    } as CustomerOrder;
   }
 
   /**
@@ -239,8 +287,42 @@ class CustomerOrderService extends PublicApiSingleton {
       };
     }
 
+    const rawOrders = response.data?.orders || [];
     return {
-      orders: response.data?.orders || [],
+      orders: rawOrders.map((o: any) => ({
+        ...o,
+        orderStatus: o.orderStatus || o.status,
+        orderNumber: o.orderNumber || o.order_number,
+        createdAt: o.createdAt || o.orderDate || o.created_at,
+        paidAt: o.paidAt || o.paid_at,
+        fulfillmentStatus: o.fulfillmentStatus || o.fulfillment_status,
+        fulfillmentMethod: o.fulfillmentMethod || o.fulfillment_method,
+        customerEmail: o.customerEmail || o.customerInfo?.email || o.customer_email,
+        customerName: o.customerName || (o.customerInfo ? `${o.customerInfo.firstName} ${o.customerInfo.lastName}`.trim() : o.customer_name),
+        customerPhone: o.customerPhone || o.customerInfo?.phone || o.customer_phone,
+        total: (o.total ?? o.total_cents) / 100,
+        subtotal: (o.subtotal ?? o.subtotal_cents) / 100,
+        shipping: (o.shipping ?? o.shipping_cents ?? o.fulfillmentFee ?? 0) / 100,
+        tax: (o.tax ?? o.tax_cents ?? 0) / 100,
+        itemCount: o.itemCount ?? o.item_count,
+        items: (o.items || []).map((item: any) => ({
+          ...item,
+          name: item.name || item.inventory_items?.name,
+          sku: item.sku || item.inventory_items?.sku,
+          imageUrl: item.imageUrl || item.image_url || item.inventory_items?.image_url,
+          unitPrice: (item.unitPrice ?? item.unit_price_cents ?? 0) / 100,
+          productType: item.inventory_items?.product_type,
+          itemId: item.inventory_items?.id || item.itemId,
+        })),
+        shippingAddress: o.shippingAddress || (o.shipping_address_line1 ? {
+          addressLine1: o.shipping_address_line1,
+          addressLine2: o.shipping_address_line2,
+          city: o.shipping_city,
+          state: o.shipping_state,
+          postalCode: o.shipping_postal_code,
+          country: o.shipping_country,
+        } : null),
+      })),
       pagination: response.data?.pagination || {
         page,
         limit,
@@ -411,6 +493,9 @@ class CustomerOrderService extends PublicApiSingleton {
   }): Promise<any> {
     try {
       // Map frontend format to API expected format
+      // console.log('[CustomerOrderService] createCheckoutOrder - orderData:', orderData);
+      // Include customer_id if logged in so order is linked to account
+      const customer = customerAuthService.getCustomer();
       const apiPayload = {
         customer: {
           email: orderData.customerInfo.email,
@@ -420,19 +505,23 @@ class CustomerOrderService extends PublicApiSingleton {
         },
         items: orderData.cartItems.map((item: any) => ({
           id: item.inventoryItemId || item.id,
+          sku: item.sku,
+          name: item.name,
+          tenant_id: item.tenantId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         })),
         fulfillment_method: orderData.fulfillmentMethod,
         shipping_address: orderData.shippingAddress,
         payment_method: orderData.paymentMethod,
+        customer_id: customer?.id || undefined,
       };
 
       const response = await this.makeDefaultRequest<any>(
         '/api/checkout/orders',
         {
           method: 'POST',
-          body: JSON.stringify(apiPayload)
+          body: JSON.stringify(apiPayload),
         },
         `checkout-order-${orderData.paymentMethod}`
       );

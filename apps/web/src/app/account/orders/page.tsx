@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
-import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag } from 'lucide-react';
+import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Receipt, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import OrderReceipt from '@/components/checkout/OrderReceipt';
 
 export default function OrdersPage() {
   const { customer } = useCustomerAuth();
@@ -18,6 +19,12 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
+  const [confirmingPickup, setConfirmingPickup] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
 
   useEffect(() => {
     if (customer?.email) {
@@ -68,7 +75,7 @@ export default function OrdersPage() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch ((status || 'unknown').toLowerCase()) {
       case 'pending':
         return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'processing':
@@ -98,6 +105,258 @@ export default function OrdersPage() {
       currency: 'USD',
     }).format(amount);
   };
+
+  const handleConfirmPickup = async (orderId: string) => {
+    if (!customer?.email) {
+      alert('Please provide your email address');
+      return;
+    }
+
+    try {
+      setConfirmingPickup(true);
+      
+      // Use tenantOrderService for pickup confirmation
+      const { tenantOrderService } = await import('@/services/TenantOrderService');
+      const result = await tenantOrderService.confirmPickup(
+        orderId, 
+        customer.email, 
+        customer.phone || ''
+      );
+      
+      if (result.success) {
+        // Update local state with fulfilledAt timestamp
+        if (selectedOrder && selectedOrder.orderId === orderId) {
+          setSelectedOrder({
+            ...selectedOrder,
+            fulfillmentStatus: 'fulfilled',
+            fulfilledAt: result.fulfilledAt,
+          });
+        }
+
+        setOrders(orders.map(order => 
+          order.orderId === orderId 
+            ? { ...order, fulfillmentStatus: 'fulfilled', fulfilledAt: result.fulfilledAt }
+            : order
+        ));
+
+        alert('Order marked as picked up!');
+      } else {
+        throw new Error('Failed to confirm pickup');
+      }
+    } catch (error) {
+      console.error('Error confirming pickup:', error);
+      alert('Failed to confirm pickup. Please try again.');
+    } finally {
+      setConfirmingPickup(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      setCancellingOrder(true);
+      
+      const finalReason = cancellationReason === 'custom' ? customReason.trim() : cancellationReason;
+      
+      // Use tenantOrderService for order cancellation
+      const { tenantOrderService } = await import('@/services/TenantOrderService');
+      const success = await tenantOrderService.cancelOrder(
+        orderId, 
+        finalReason || 'Customer request', 
+        customer?.email || '', 
+        customer?.phone || ''
+      );
+      
+      if (success) {
+        // Update local state
+        if (selectedOrder) {
+          setSelectedOrder({
+            ...selectedOrder,
+            orderStatus: 'cancelled',
+            cancellationReason: finalReason
+          });
+        }
+
+        setOrders(orders.map(order => 
+          order.orderId === orderId 
+            ? { ...order, orderStatus: 'cancelled', cancellationReason: finalReason }
+            : order
+        ));
+
+        setShowCancelConfirm(false);
+        setCancellationReason('');
+        setCustomReason('');
+        alert('Order cancelled successfully');
+      } else {
+        throw new Error('Failed to cancel order');
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      alert('Failed to cancel order. Please try again.');
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
+
+  // Show receipt view for selected order
+  if (selectedOrder) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Button
+          variant="ghost"
+          onClick={() => setSelectedOrder(null)}
+          className="mb-4"
+        >
+          <ChevronLeft className="w-4 h-4 mr-2" />
+          Back to Orders
+        </Button>
+        <div>
+          {/* Cancel Confirmation Modal */}
+          {showCancelConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Cancel Order</h3>
+                <p className="text-gray-600 mb-4">
+                  Are you sure you want to cancel this order? This action cannot be undone.
+                </p>
+                
+                <div className="space-y-3 mb-4">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Reason for cancellation
+                  </label>
+                  <select
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a reason</option>
+                    <option value="no_longer_needed">No longer needed</option>
+                    <option value="found_elsewhere">Found elsewhere</option>
+                    <option value="mistake">Ordered by mistake</option>
+                    <option value="financial">Financial reasons</option>
+                    <option value="custom">Other (please specify)</option>
+                  </select>
+                  
+                  {cancellationReason === 'custom' && (
+                    <textarea
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please explain why you're cancelling..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                    />
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCancelConfirm(false);
+                      setCancellationReason('');
+                      setCustomReason('');
+                    }}
+                    className="flex-1"
+                  >
+                    Keep Order
+                  </Button>
+                  <Button
+                    onClick={() => handleCancelOrder(selectedOrder.orderId)}
+                    disabled={cancellingOrder || !cancellationReason || (cancellationReason === 'custom' && !customReason.trim())}
+                    className="flex-1"
+                  >
+                    {cancellingOrder ? 'Cancelling...' : 'Cancel Order'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <OrderReceipt
+            cart={{
+              tenantId: selectedOrder.tenantId,
+              tenantName: selectedOrder.tenantName,
+              tenantLogo: selectedOrder.tenantLogo || undefined,
+              items: selectedOrder.items.map(item => ({
+                id: item.id,
+                name: item.name,
+                sku: item.sku,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice * 100,
+              })),
+              subtotal: selectedOrder.subtotal * 100,
+              status: selectedOrder.orderStatus,
+              fulfillmentStatus: selectedOrder.fulfillmentStatus,
+              fulfilledAt: selectedOrder.fulfilledAt || undefined,
+              orderId: selectedOrder.orderNumber,
+              paymentId: selectedOrder.paymentId || undefined,
+              gatewayTransactionId: selectedOrder.gatewayTransactionId || undefined,
+              paidAt: selectedOrder.paidAt ? new Date(selectedOrder.paidAt) : undefined,
+              fulfillmentMethod: selectedOrder.fulfillmentMethod || undefined,
+              fulfillmentFee: selectedOrder.shipping ? selectedOrder.shipping * 100 : 0,
+              customerInfo: selectedOrder.customerInfo || (selectedOrder.customerEmail ? {
+                email: selectedOrder.customerEmail,
+                firstName: selectedOrder.customerName?.split(' ')[0] || '',
+                lastName: selectedOrder.customerName?.split(' ').slice(1).join(' ') || '',
+                phone: selectedOrder.customerPhone || '',
+              } : undefined),
+              shippingAddress: selectedOrder.shippingAddress || undefined,
+              checkoutMode: (selectedOrder as any).checkoutMode || undefined,
+              depositCents: (selectedOrder as any).depositCents || undefined,
+              remainingBalanceCents: (selectedOrder as any).remainingBalanceCents || undefined,
+              pickupDeadline: (selectedOrder as any).pickupDeadline || undefined,
+              gatewayType: (selectedOrder as any).gatewayType || undefined,
+            }}
+            actions={
+              <div className="flex gap-2 mt-4">
+                {selectedOrder.fulfillmentMethod === 'pickup' && 
+                 selectedOrder.orderStatus === 'paid' && 
+                 !selectedOrder.fulfilledAt && (
+                  <Button
+                    onClick={() => handleConfirmPickup(selectedOrder.orderId)}
+                    disabled={confirmingPickup}
+                    className="flex items-center gap-2"
+                  >
+                    {confirmingPickup ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Confirming...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        Confirm Pickup
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                {['paid', 'processing'].includes(selectedOrder.orderStatus) && !selectedOrder.fulfilledAt && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCancelConfirm(true)}
+                    disabled={cancellingOrder}
+                    className="flex items-center gap-2"
+                  >
+                    {cancellingOrder ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                        Cancelling...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4" />
+                        Cancel Order
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -236,11 +495,60 @@ export default function OrdersPage() {
                         <span className="text-gray-600">Total: </span>
                         <span className="font-medium text-gray-900">{formatCurrency(order.total)}</span>
                       </div>
-                      {order.trackingNumber && (
-                        <div className="text-sm text-blue-600">
-                          📦 {order.trackingNumber}
+                      <div className="flex items-center gap-3">
+                        {order.trackingNumber && (
+                          <div className="text-sm text-blue-600">
+                            📦 {order.trackingNumber}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          {order.fulfillmentMethod === 'pickup' && 
+                           order.orderStatus === 'paid' && 
+                           !order.fulfilledAt && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedOrder(order);
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              Confirm Pickup
+                            </Button>
+                          )}
+                          
+                          {['paid', 'processing'].includes(order.orderStatus) && !order.fulfilledAt && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedOrder(order);
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Cancel
+                            </Button>
+                          )}
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                            }}
+                          >
+                            <Receipt className="w-4 h-4 mr-1" />
+                            View Receipt
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </Link>
                 ))}

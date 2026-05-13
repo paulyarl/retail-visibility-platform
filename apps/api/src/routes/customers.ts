@@ -7,6 +7,7 @@ const customerService = CustomerService.getInstance();
 // Middleware to extract tenant info from headers
 const getTenantInfo = (req: Request) => {
   const tenantId = req.headers['x-tenant-id'] as string;
+  const customerId = req.headers['x-customer-id'] as string;
   const organizationId = req.headers['x-organization-id'] as string;
   return { tenantId, organizationId };
 };

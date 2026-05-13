@@ -342,6 +342,7 @@ model customers {
   customer_key                  String?                            @unique @db.VarChar(7)
   customer_addresses            customer_addresses[]
   notification_preferences      customer_notification_preferences?
+  customer_payment_methods      customer_payment_methods[]
   customer_tenant_relationships customer_tenant_relationships[]
   digital_access_grants         digital_access_grants[]
   orders                        orders[]
@@ -1283,6 +1284,17 @@ model inventory_items {
   product_slug                                                                    String?                  @db.VarChar(255)
   seo_keywords                                                                    String[]                 @default([])
   download_page_id                                                                String?                  @db.VarChar(255)
+  seo_title                                                                       String?
+  seo_description                                                                 String?
+  enhanced_description                                                            String?
+  tags                                                                            String[]
+  video_url                                                                       String?
+  video_thumbnail                                                                 String?
+  features                                                                        String[]
+  specifications                                                                  Json?
+  allow_backorder                                                                 Boolean?                 @default(false)
+  track_inventory                                                                 Boolean?                 @default(true)
+  low_stock_threshold                                                             Int?                     @default(5)
   digital_access_grants                                                           digital_access_grants[]
   digital_download_pages_digital_download_pages_item_idToinventory_items          digital_download_pages[] @relation("digital_download_pages_item_idToinventory_items")
   digital_downloads                                                               digital_downloads[]
@@ -1305,6 +1317,10 @@ model inventory_items {
   @@index([source])
   @@index([tenant_id, enrichment_status])
   @@index([tenant_id, updated_at])
+  @@index([seo_keywords], map: "idx_inventory_items_seo_keywords", type: Gin)
+  @@index([tags], map: "idx_inventory_items_tags", type: Gin)
+  @@index([features], map: "idx_inventory_items_features", type: Gin)
+  @@index([payment_gateway_id, payment_gateway_type], map: "idx_inventory_items_payment_gateway")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -3457,12 +3473,37 @@ model webhook_events {
   @@index([processed], map: "idx_webhook_events_processed")
 }
 
-enum LocationStatus {
-  pending
-  active
-  inactive
-  closed
-  archived
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_payment_methods {
+  id                   String    @id @db.VarChar(255)
+  customer_id          String    @db.VarChar(255)
+  tenant_id            String    @db.VarChar(255)
+  gateway_type         String    @default("stripe") @db.VarChar(50)
+  payment_method_token String?   @db.VarChar(255)
+  type                 String    @default("card") @db.VarChar(50)
+  card_last4           String?   @db.VarChar(4)
+  card_brand           String?   @db.VarChar(50)
+  expiry_month         Int?
+  expiry_year          Int?
+  card_funding         String?   @db.VarChar(20)
+  card_country         String?   @db.VarChar(2)
+  paypal_email         String?   @db.VarChar(255)
+  paypal_account_id    String?   @db.VarChar(255)
+  wallet_type          String?   @db.VarChar(50)
+  is_default           Boolean   @default(false)
+  is_active            Boolean   @default(true)
+  last_used_at         DateTime? @db.Timestamptz(6)
+  usage_count          Int       @default(0)
+  metadata             Json?     @default("{}")
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+  customers            customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([customer_id, tenant_id, payment_method_token], map: "customer_payment_methods_unique_token")
+  @@index([customer_id], map: "idx_customer_payment_methods_customer_id")
+  @@index([gateway_type], map: "idx_customer_payment_methods_gateway")
+  @@index([tenant_id, customer_id], map: "idx_customer_payment_methods_tenant_id")
 }
 
 enum action {

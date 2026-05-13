@@ -58,9 +58,10 @@ interface OrderReceiptProps {
   };
   onPrint?: () => void;
   className?: string;
+  actions?: React.ReactNode;
 }
 
-export default function OrderReceipt({ cart, onPrint, className = "" }: OrderReceiptProps) {
+export default function OrderReceipt({ cart, onPrint, className = "", actions }: OrderReceiptProps) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -946,6 +947,12 @@ Generated on ${new Date().toLocaleString()}
           </div>
 
           {/* Footer */}
+          {actions && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              {actions}
+            </div>
+          )}
+          
           <div className="mt-6 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
             <p>Thank you for your order!</p>
             <p>Questions? Contact us at support@visibleshelf.store</p>

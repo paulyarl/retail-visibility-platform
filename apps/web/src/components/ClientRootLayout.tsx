@@ -9,6 +9,7 @@ import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
 import { CartWidgetProvider } from "@/contexts/CartWidgetContext";
 import { ProductLayoutProvider } from "@/contexts/ProductLayoutContext";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
+import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
 import { UniversalProvider } from "@/providers/UniversalProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
@@ -52,15 +53,17 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
               <CartWidgetProvider>
                 <ProductLayoutProvider>
                   <GlobalAlertProvider>
-                    <UniversalProvider>
-                      <Notifications position="top-right" />
-                      <div key="error-boundary-wrapper">
-                        <ErrorBoundary>
-                          {children}
-                        </ErrorBoundary>
-                      </div>
-                      <FloatingCartWidget />
-                    </UniversalProvider>
+                    <CustomerAuthProvider>
+                      <UniversalProvider>
+                        <Notifications position="top-right" />
+                        <div key="error-boundary-wrapper">
+                          <ErrorBoundary>
+                            {children}
+                          </ErrorBoundary>
+                        </div>
+                        <FloatingCartWidget />
+                      </UniversalProvider>
+                    </CustomerAuthProvider>
                   </GlobalAlertProvider>
                 </ProductLayoutProvider>
               </CartWidgetProvider>

@@ -245,21 +245,21 @@ class ProductDataService extends PublicApiSingleton {
         return null;
       }
       
-      // Extract enriched fields from metadata if present
+      // Extract enriched fields from direct columns first, fallback to metadata for backward compatibility
       const metadata = productData.metadata || {};
       const enrichedFields: any = {};
       
-      // Extract AI-generated enriched content from metadata
-      if (metadata.enhancedDescription) {
-        enrichedFields.marketingDescription = metadata.enhancedDescription;
+      // Extract AI-generated enriched content from direct columns or metadata
+      if (productData.enhanced_description || metadata.enhancedDescription) {
+        enrichedFields.marketingDescription = productData.enhanced_description || metadata.enhancedDescription;
       }
-      if (metadata.features && Array.isArray(metadata.features)) {
-        enrichedFields.environmentalInfo = metadata.features; // Reuse environmentalInfo for features display
+      if ((productData.features && Array.isArray(productData.features)) || (metadata.features && Array.isArray(metadata.features))) {
+        enrichedFields.environmentalInfo = productData.features || metadata.features; // Reuse environmentalInfo for features display
       }
-      if (metadata.specifications && typeof metadata.specifications === 'object') {
+      if ((productData.specifications && typeof productData.specifications === 'object') || (metadata.specifications && typeof metadata.specifications === 'object')) {
         enrichedFields.specifications = {
           ...(productData.specifications || {}),
-          ...metadata.specifications
+          ...(metadata.specifications || {})
         };
       }
       

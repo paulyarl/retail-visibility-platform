@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
+import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { 
   Package, 
   ArrowLeft, 
@@ -16,6 +17,7 @@ import {
   Clock,
   Loader2,
   Download,
+  Receipt,
   Mail,
   Phone
 } from 'lucide-react';
@@ -27,6 +29,7 @@ export default function OrderDetailPage() {
   
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -46,7 +49,7 @@ export default function OrderDetailPage() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch ((status || 'unknown').toLowerCase()) {
       case 'pending':
         return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'processing':
@@ -199,6 +202,7 @@ export default function OrderDetailPage() {
         {/* Order Summary */}
         <div className="space-y-6">
           {/* Shipping Address */}
+          {order.shippingAddress && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -220,6 +224,7 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Contact Info */}
           <Card>
@@ -277,9 +282,13 @@ export default function OrderDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1">
-              <Download className="w-4 h-4 mr-2" />
-              Download Receipt
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowReceipt(!showReceipt)}
+            >
+              <Receipt className="w-4 h-4 mr-2" />
+              {showReceipt ? 'Hide Receipt' : 'View Receipt'}
             </Button>
             <Button variant="outline" className="flex-1">
               Request Help
@@ -287,6 +296,48 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Receipt View */}
+      {showReceipt && order && (
+        <div className="max-w-4xl mx-auto mt-8">
+          <OrderReceipt
+            cart={{
+              tenantId: order.tenantId,
+              tenantName: order.tenantName,
+              tenantLogo: order.tenantLogo || undefined,
+              items: order.items.map(item => ({
+                id: item.id,
+                name: item.name,
+                sku: item.sku,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice * 100,
+              })),
+              subtotal: order.subtotal * 100,
+              status: order.orderStatus,
+              fulfillmentStatus: order.fulfillmentStatus,
+              fulfilledAt: order.fulfilledAt || undefined,
+              orderId: order.orderNumber,
+              paymentId: order.paymentId || undefined,
+              gatewayTransactionId: order.gatewayTransactionId || undefined,
+              paidAt: order.paidAt ? new Date(order.paidAt) : undefined,
+              fulfillmentMethod: order.fulfillmentMethod || undefined,
+              fulfillmentFee: order.shipping ? order.shipping * 100 : 0,
+              customerInfo: order.customerInfo || (order.customerEmail ? {
+                email: order.customerEmail,
+                firstName: order.customerName?.split(' ')[0] || '',
+                lastName: order.customerName?.split(' ').slice(1).join(' ') || '',
+                phone: order.customerPhone || '',
+              } : undefined),
+              shippingAddress: order.shippingAddress || undefined,
+              checkoutMode: (order as any).checkoutMode || undefined,
+              depositCents: (order as any).depositCents || undefined,
+              remainingBalanceCents: (order as any).remainingBalanceCents || undefined,
+              pickupDeadline: (order as any).pickupDeadline || undefined,
+              gatewayType: (order as any).gatewayType || undefined,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ export enum RequestType {
   PUBLIC = 'public',
   AUTHENTICATED = 'authenticated', 
   TENANT = 'tenant',
+  CUSTOMER = 'customer',
   ADMIN = 'admin',
   SYSTEM = 'system'
 }

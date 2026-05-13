@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar } from 'lucide-react';
+import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar ,User} from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { tenantOrderService } from '@/services/TenantOrderService';
@@ -319,11 +319,14 @@ export default function BuyerOrderHistory() {
                 <ShoppingBag className="h-5 w-5" />
                 <span>Browse Stores</span>
               </a>
-              <div className="flex items-center gap-4">
-                <a href="/my-orders" className="text-gray-900 font-semibold">
-                  My Orders
+              <a href="/account" className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
+                <User className="h-5 w-5" />
+                <span>Customer Dashboard</span>
+              </a>
+              <a href="/my-orders" className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
+                 <Truck className="h-5 w-5" />
+                  <span>My Orders</span>
                 </a>
-              </div>
             </div>
           </div>
         </div>
@@ -871,11 +874,10 @@ export default function BuyerOrderHistory() {
               <ShoppingBag className="h-5 w-5" />
               <span>Browse Stores</span>
             </a>
-            <div className="flex items-center gap-4">
-              <a href="/my-orders" className="text-gray-900 font-semibold">
-                My Orders
-              </a>
-            </div>
+            <a href="/my-orders" className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
+              <Truck className="h-5 w-5" />
+              <span>My Orders</span>
+            </a>
           </div>
         </div>
       </div>

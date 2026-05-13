@@ -104,6 +104,8 @@ class CheckoutService extends PublicApiSingleton {
         },
         items: request.cartItems.map(item => ({
           id: item.id,
+          tenantId: item.tenantId,
+          sku: item.sku,  
           quantity: item.quantity,
         })),
         shipping_address: request.shippingAddress,
@@ -207,6 +209,14 @@ class CheckoutService extends PublicApiSingleton {
     } = {}
   ): Promise<{ orderId: string; paymentId: string; clientSecret: string } | null> {
     // Step 1: Create order
+    // console.log('[CheckoutService] initiateCheckout - creating order with data:', {
+    //   tenantId,
+    //   customerInfo,
+    //   shippingAddress: options.shippingAddress,
+    //   fulfillmentMethod: options.fulfillmentMethod,
+    //   cartItems,
+    //   paymentMethod: 'stripe'
+    // });
     const orderResponse = await this.createOrder({
       tenantId,
       customerInfo,

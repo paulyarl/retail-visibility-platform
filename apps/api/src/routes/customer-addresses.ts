@@ -12,11 +12,23 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { generateCustomerAddressId } from '../lib/id-generator';
+import { CustomerTokenService } from '../services/CustomerTokenService';
 
 const router = Router();
+const customerTokenService = CustomerTokenService.getInstance();
 
-// Middleware to extract customer from session cookie
+// Middleware to extract customer from JWT token or session cookie
 const getCustomerId = (req: Request): string | null => {
+  // Try JWT token first
+  const token = CustomerTokenService.extractBearerToken(req);
+  if (token) {
+    const payload = customerTokenService.verifyAccessToken(token);
+    if (payload) {
+      return payload.customerId;
+    }
+  }
+
+  // Fallback to session cookie
   return req.cookies?.customer_session_id || null;
 };
 
@@ -25,6 +37,7 @@ const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
   const customerId = getCustomerId(req);
 
   if (!customerId) {
+    console.log('[Customer Addresses] Authentication failed');
     return res.status(401).json({
       success: false,
       error: 'unauthorized',

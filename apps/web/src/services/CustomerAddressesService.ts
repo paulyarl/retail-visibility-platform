@@ -4,7 +4,7 @@
  * Frontend service for customer shipping/billing address management
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import customerAuthService from './CustomerAuthService';
 
@@ -43,11 +43,21 @@ export interface CreateAddressInput {
 
 export interface UpdateAddressInput extends Partial<CreateAddressInput> {}
 
-class CustomerAddressesService extends PublicApiSingleton {
+class CustomerAddressesService extends CustomerApiSingleton {
   private static instance: CustomerAddressesService;
 
   private constructor() {
     super('customer-addresses-service', { ttl: 60000 }); // 1 minute cache
+  }
+
+  getServiceCachePatterns(): string[] {
+    return ['customer-addresses-list', 'customer-addresses-create', 'customer-addresses-update', 'customer-addresses-delete', 'customer-addresses-default'];
+  }
+
+  async invalidateServiceCaches(customerId?: string): Promise<void> {
+    for (const pattern of this.getServiceCachePatterns()) {
+      await this.invalidateCache(pattern);
+    }
   }
 
   static getInstance(): CustomerAddressesService {
@@ -69,7 +79,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         '/api/customer-addresses',
         {
           method: 'GET',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
         },
         'customer-addresses-list'
       );
@@ -97,7 +107,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         `/api/customer-addresses/${id}`,
         {
           method: 'GET',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
         },
         `customer-addresses-get-${id}`
       );
@@ -125,7 +135,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         '/api/customer-addresses',
         {
           method: 'POST',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
           body: JSON.stringify({
             label: input.label,
             isDefault: input.isDefault,
@@ -169,7 +179,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         `/api/customer-addresses/${id}`,
         {
           method: 'PUT',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
           body: JSON.stringify({
             label: input.label,
             isDefault: input.isDefault,
@@ -210,7 +220,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         `/api/customer-addresses/${id}`,
         {
           method: 'DELETE',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
         },
         `customer-addresses-delete-${id}`
       );
@@ -240,7 +250,7 @@ class CustomerAddressesService extends PublicApiSingleton {
         `/api/customer-addresses/${id}/default`,
         {
           method: 'PUT',
-          credentials: 'include', // Send cookies
+          credentials: 'include',
         },
         `customer-addresses-default-${id}`
       );

@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/Input';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import customerAddressesService, { CustomerAddress } from '@/services/CustomerAddressesService';
-import { LogIn, User, MapPin, Check } from 'lucide-react';
+import { LogIn, User, MapPin, Check, LogOut } from 'lucide-react';
 
 type CustomerInfoFormData = {
   email: string;
@@ -29,7 +29,7 @@ interface CustomerInfoFormProps {
 }
 
 export function CustomerInfoForm({ initialData, onSubmit }: CustomerInfoFormProps) {
-  const { customer, isAuthenticated, isLoading: authLoading, login, register } = useCustomerAuth();
+  const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = useCustomerAuth();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
@@ -180,9 +180,18 @@ export function CustomerInfoForm({ initialData, onSubmit }: CustomerInfoFormProp
       <div className="space-y-6">
         {/* Customer Info Summary */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-green-700 mb-2">
-            <User className="h-5 w-5" />
-            <span className="font-medium">Welcome back, {customer.firstName || customer.email}!</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-green-700">
+              <User className="h-5 w-5" />
+              <span className="font-medium">Welcome back, {customer.firstName || customer.email}!</span>
+            </div>
+            <button
+              onClick={async () => { await logout(); }}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
           <p className="text-sm text-green-600">
             {customer.email}

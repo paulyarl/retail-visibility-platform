@@ -154,6 +154,7 @@ export default function MultiCartPage() {
   }
 
   const totalAcrossAllCarts = carts.reduce((sum, cartSummary) => sum + cartSummary.total_cents, 0);
+  // console.log(`All carts: ${JSON.stringify(carts)}`);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

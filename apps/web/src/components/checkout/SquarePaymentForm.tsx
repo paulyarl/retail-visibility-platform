@@ -111,33 +111,33 @@ function SquarePaymentFormContent({
 
       // Check if container already has a Square card attached
       const containerId = `card-container-${orderId || 'default'}`;
-      console.log('[SquarePaymentForm] Looking for container:', containerId);
+      // console.log('[SquarePaymentForm] Looking for container:', containerId);
       
       // Log all available containers for debugging
       const allContainers = document.querySelectorAll('[id^="card-container-"]');
-      console.log('[SquarePaymentForm] Available containers:', Array.from(allContainers).map(el => el.id));
+      // console.log('[SquarePaymentForm] Available containers:', Array.from(allContainers).map(el => el.id));
       
       let container = document.getElementById(containerId);
       if (container) {
-        console.log('[SquarePaymentForm] Container found:', containerId);
+        // console.log('[SquarePaymentForm] Container found:', containerId);
       } else {
         // Fallback: use any available Square container if the specific one isn't found
-        console.log('[SquarePaymentForm] Specific container not found, looking for fallback...');
+        // console.log('[SquarePaymentForm] Specific container not found, looking for fallback...');
         const allContainers = document.querySelectorAll('[id^="card-container-"]');
         if (allContainers.length > 0) {
           container = allContainers[0] as HTMLElement;
-          console.log('[SquarePaymentForm] Using fallback container:', container.id);
-          console.log('[SquarePaymentForm] This suggests there might be multiple orders or stale order IDs');
+          // console.log('[SquarePaymentForm] Using fallback container:', container.id);
+          // console.log('[SquarePaymentForm] This suggests there might be multiple orders or stale order IDs');
         } else {
-          console.log('[SquarePaymentForm] No Square containers found at all');
+          // console.log('[SquarePaymentForm] No Square containers found at all');
         }
       }
       
       if (container) {
-        console.log('[SquarePaymentForm] Container ready for Square card attachment');
+        // console.log('[SquarePaymentForm] Container ready for Square card attachment');
       } else {
-        console.log('[SquarePaymentForm] Container not yet available, will retry...');
-        console.log('[SquarePaymentForm] Retry count:', retryCount, '/', maxRetries);
+        // console.log('[SquarePaymentForm] Container not yet available, will retry...');
+        // console.log('[SquarePaymentForm] Retry count:', retryCount, '/', maxRetries);
         if (retryCount < maxRetries) {
           retryCount++;
           
@@ -177,7 +177,7 @@ function SquarePaymentFormContent({
           
           const found = await waitForContainer();
           if (found) {
-            console.log('[SquarePaymentForm] Container found via MutationObserver, retrying...');
+            // console.log('[SquarePaymentForm] Container found via MutationObserver, retrying...');
             retryTimeout = setTimeout(initializeSquare, 100);
           } else {
             retryTimeout = setTimeout(initializeSquare, 800);
@@ -191,7 +191,7 @@ function SquarePaymentFormContent({
       try {
         // Check if Square.js is loaded
         if (!window.Square) {
-          console.log('[SquarePaymentForm] Square.js not yet loaded, waiting...');
+          // console.log('[SquarePaymentForm] Square.js not yet loaded, waiting...');
           throw new Error('Square.js failed to load. Please refresh the page.');
         }
 
@@ -201,7 +201,7 @@ function SquarePaymentFormContent({
         
         if (!appId || !locationId) {
           // Config not yet loaded - will retry when squareConfig updates
-          console.log('[SquarePaymentForm] Waiting for Square config...');
+          // console.log('[SquarePaymentForm] Waiting for Square config...');
           return;
         }
 
@@ -214,7 +214,7 @@ function SquarePaymentFormContent({
           throw new Error('Failed to initialize Square payments instance');
         }
 
-        console.log('[SquarePaymentForm] Payments instance created, creating card...');
+        // console.log('[SquarePaymentForm] Payments instance created, creating card...');
         setPayments(paymentsInstance);
 
         // Add timeout for card creation
@@ -229,7 +229,7 @@ function SquarePaymentFormContent({
           throw new Error('Failed to create Square card instance');
         }
         
-        console.log('[SquarePaymentForm] Card instance created, attaching to DOM...');
+        // console.log('[SquarePaymentForm] Card instance created, attaching to DOM...');
         
         // Use the container that was found earlier (might be fallback)
         if (!container) {
@@ -237,15 +237,15 @@ function SquarePaymentFormContent({
         }
         
         await cardInstance.attach(container);
-        console.log('[SquarePaymentForm] Card attached successfully to:', container.id);
+        // console.log('[SquarePaymentForm] Card attached successfully to:', container.id);
         setCard(cardInstance);
       } catch (err) {
-        console.error('[SquarePaymentForm] Initialization error:', err);
+        // console.error('[SquarePaymentForm] Initialization error:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         
         if ((errorMessage.includes('timed out') || errorMessage.includes('unable to be initialized') || errorMessage.includes('not found in DOM')) && retryCount < maxRetries) {
           retryCount++;
-          console.log(`[SquarePaymentForm] Retrying initialization (attempt ${retryCount}/${maxRetries})...`);
+          // console.log(`[SquarePaymentForm] Retrying initialization (attempt ${retryCount}/${maxRetries})...`);
           retryTimeout = setTimeout(initializeSquare, 2000);
         } else {
           setError(err instanceof Error ? err.message : 'Failed to initialize Square payment form');
@@ -263,12 +263,12 @@ function SquarePaymentFormContent({
 
       if (isFirstRun || isStrictModeRerun) {
         // Don't clear anything - Strict Mode will re-run the effect
-        console.log('[SquarePaymentForm] Strict Mode cleanup - preserving guard for re-initialization');
+        // console.log('[SquarePaymentForm] Strict Mode cleanup - preserving guard for re-initialization');
         return;
       }
 
       // Real cleanup: orderId changed to a different value
-      console.log('[SquarePaymentForm] Real cleanup - orderId changed from', previousOrderId, 'to', orderId);
+      // console.log('[SquarePaymentForm] Real cleanup - orderId changed from', previousOrderId, 'to', orderId);
       
       if (retryTimeout) {
         clearTimeout(retryTimeout);
@@ -276,7 +276,7 @@ function SquarePaymentFormContent({
       if (card) {
         try {
           card.destroy();
-          console.log('[SquarePaymentForm] Card instance destroyed');
+          // console.log('[SquarePaymentForm] Card instance destroyed');
         } catch (err) {
           // Silently ignore destroy errors - Square SDK handles cleanup
         }
@@ -450,6 +450,13 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
         orderCreatedRef.current = true;
         
         // Create order
+        // console.log('[SquarePaymentForm] Creating checkout order with data:', {
+        //   customerInfo,
+        //   cartItems,
+        //   fulfillmentMethod: 'pickup',
+        //   shippingAddress,
+        //   paymentMethod: 'square'
+        // });
         const orderResponse = await customerOrderService.createCheckoutOrder({
           customerInfo: {
             email: customerInfo.email,
@@ -549,7 +556,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
 
   // Early return for invalid payment amount (after all hooks)
   if (!paymentValidation.isValid) {
-    console.log('[Square] Amount validation failed:', paymentValidation);
+    // console.log('[Square] Amount validation failed:', paymentValidation);
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800 font-medium">Payment Amount Too Low</p>

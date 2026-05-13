@@ -45,6 +45,8 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
   const [selectedGateways, setSelectedGateways] = useState<Record<string, string>>({});
   const [tenantProfiles, setTenantProfiles] = useState<Record<string, TenantProfile>>({});
 
+  // console.log(`[MultiCartCheckout] carts: ${JSON.stringify(carts)}`);
+
   // Fetch available gateways and tenant profiles for each tenant
   useEffect(() => {
     const fetchData = async () => {
@@ -136,6 +138,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
     const { cart } = cartSummary;
     const statusKey = cart.tenant_id;
     const gatewayType = selectedGateways[cart.tenant_id];
+    // console.log(`Checkout cart: ${JSON.stringify(cart)}`)
 
     if (!gatewayType) {
       console.error('[MultiCartCheckout] No gateway selected');
@@ -239,6 +242,8 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
         const error = errors[statusKey];
         const availableGateways = tenantGateways[cart.tenant_id] || [];
         const selectedGateway = selectedGateways[cart.tenant_id];
+        // console.log(`[MultiCartCheckout] Selected cart: ${JSON.stringify(cart)}`);
+        // console.log(`[MultiCartCheckout] Selected cartSummary: ${JSON.stringify(cartSummary)}`);
         
         // Use fetched profile or fall back to cart data
         const tenantProfile = tenantProfiles[cart.tenant_id];
