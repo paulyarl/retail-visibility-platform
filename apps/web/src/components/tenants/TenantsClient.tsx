@@ -458,7 +458,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               onClick={() => setCreateModalOpen(true)} 
               disabled={loading}
               fullWidth
-              leftSection={<IconPlus size={16} />} style={{ color: 'white' }}
+              leftSection={<IconPlus size={16} />} size="lg" variant='gradient' style={{color: 'white'}}
             >
               Add New Location
             </Button>
@@ -482,14 +482,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     size="sm"
                     onClick={() => setViewMode('grid')}
                     aria-label="Grid view"
-                    leftSection={<IconLayoutGrid size={16} />} style={{ color: 'white' }}
+                    leftSection={<IconLayoutGrid size={16} />} gradient={{ from: 'indigo', to: 'cyan' }}
                   />
                   <Button
                     variant={viewMode === 'list' ? 'filled' : 'light'}
                     size="sm"
                     onClick={() => setViewMode('list')}
                     aria-label="List view"
-                    leftSection={<IconList size={16} />} style={{ color: 'white' }}
+                    leftSection={<IconList size={16} />} gradient={{ from: 'indigo', to: 'cyan' }}
                   />
                 </Button.Group>
               </Group>
@@ -909,8 +909,8 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
           {!editing && (
             <Group gap="xs" mt="md" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
               {/* Quick Status Change - Prominent placement */}
-               <Button size="sm" onClick={onViewItems ?? onSelect} title="Click to view the location inventory"
-                leftSection={<IconPackages size={16} />} style={{ color: 'white' }}
+               <Button size="md" onClick={onViewItems ?? onSelect} title="Click to view the location inventory"
+                leftSection={<IconPackages size={16} />} variant='gradient' style={{color: 'white'}}
               >
                 View Inventory
               </Button>

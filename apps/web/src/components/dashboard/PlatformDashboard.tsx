@@ -166,7 +166,7 @@ export default function PlatformDashboard() {
               {isAuthenticated ? (
                 <Tooltip label="Sign out of your account">
                   <Button 
-                    variant="secondary" 
+                    variant='gradient' style={{color: 'white'}}
                     size="sm"
                     className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
                     onClick={async () => { await logout(); }}
@@ -181,7 +181,7 @@ export default function PlatformDashboard() {
                 <Tooltip label="Sign in to your account">
                   <a href="/auth/login">
                     <Button 
-                      variant="primary" 
+                      variant='gradient' style={{color: 'white'}}
                       size="sm"
                       className="bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
                     >
@@ -241,7 +241,7 @@ export default function PlatformDashboard() {
               </Link>
               {isAuthenticated ? (
                 <Button 
-                  variant="secondary" 
+                  variant='gradient' style={{color: 'white'}}
                   className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                   size="md"
                   onClick={async () => { setMobileMenuOpen(false); await logout(); }}
@@ -254,7 +254,7 @@ export default function PlatformDashboard() {
               ) : (
                 <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
                   <Button 
-                    variant="primary" 
+                    variant='gradient' style={{color: 'white'}}
                     className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2" 
                     size="md"
                   >

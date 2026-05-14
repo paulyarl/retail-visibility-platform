@@ -178,6 +178,12 @@ export default function StoreInventoryHeader({
         >
           Add Product
         </Button>
+        <Button
+          onClick={() => window.open(`/t/${tenantId}/items/create`, '_self')}
+          className="bg-primary-600 hover:bg-primary-700 text-white"
+        >
+          Product Wizard
+        </Button>
         
         <Button
           onClick={onBulkUploadClick}

@@ -176,13 +176,13 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
             {user && (
               <>
                 <Link href={`/t/${tenantId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant='gradient' style={{color: 'white'}} size="sm">
                     <Settings className="h-4 w-4 mr-1" />
                     Settings
                   </Button>
                 </Link>
                 <Button
-                  variant="secondary"
+                 variant='gradient' style={{color: 'white'}}
                   size="sm"
                   onClick={handleLogout}
                 >
@@ -229,7 +229,7 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
                     </Button>
                   </Link>
                   <Button
-                    variant="secondary"
+                    variant='gradient' style={{color: 'white'}}
                     size="sm"
                     onClick={handleLogout}
                     className="w-full justify-start"

@@ -337,7 +337,7 @@ export default function DigitalDownloadsPage() {
               </Text>
               <Button 
                 component="a" 
-                href="/t/tid-zcp9a56y/items/create"
+                href={`/t/${getTenantId()}/items/create`}
                 variant='gradient' 
                 style={{color: 'white'}}
               >

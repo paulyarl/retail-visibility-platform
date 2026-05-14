@@ -16,7 +16,7 @@ interface QRCodeModalProps {
 export function QRCodeModal(props: QRCodeModalProps) {
   const { isOpen, onClose, productUrl, productName, tenantId } = props;
   
-  const actualTenantId = tenantId || 'tid-ej2um44f';
+  const actualTenantId = tenantId || '';
   
   // Fetch tier and logo using singleton (10-min cache)
   const [tierId, setTierId] = useState<string | null>(null);

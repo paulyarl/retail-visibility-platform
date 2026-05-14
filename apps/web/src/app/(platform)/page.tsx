@@ -305,7 +305,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </Link>
                 {isAuthenticated ? (
                   <Button 
-                    variant="secondary" 
+                    variant='gradient' style={{color: 'white'}}
                     size="sm"
                     onClick={async () => {
                       await logout();
@@ -315,7 +315,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Button>
                 ) : (
                   <a href="/auth/login">
-                    <Button variant="secondary" size="sm">Sign In</Button>
+                    <Button variant='gradient' style={{color: 'white'}} size="md">Sign In</Button>
                   </a>
                 )}
               </div>
@@ -344,7 +344,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </Link>
                 {isAuthenticated ? (
                   <Button 
-                    variant="secondary" 
+                    variant='gradient' style={{color: 'white'}}
                     className="w-full"
                     size="md"
                     onClick={async () => {
@@ -356,7 +356,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Button>
                 ) : (
                   <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                    <Button variant='gradient' style={{color: 'white'}} className="w-full" size="md">Sign In</Button>
                   </a>
                 )}
               </div>
@@ -970,7 +970,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Link>
                 )}
                 <Link href={scopedLinks.tenants} className="block">
-                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                  <Button variant='gradient' style={{color: 'white'}} className="w-full justify-start" size="md">
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
@@ -978,7 +978,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Button>
                 </Link>
                 <Link href={scopedLinks.items} className="block">
-                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                  <Button variant='gradient' style={{color: 'white'}} className="w-full justify-start" size="md">
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
@@ -986,7 +986,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </Button>
                 </Link>
                 <Link href={scopedLinks.createItem} className="block">
-                  <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                  <Button variant='gradient' style={{color: 'white'}} className="w-full justify-start" size="md">
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
@@ -1044,7 +1044,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               <AnimatedCard delay={0.4} hover={false}>
                 <div className="p-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                    <div className="h-3 w-3 rounded-full bg-orange-500"></div>
                     <div className="flex-1">
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why Choose Us?</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Everything you need to succeed online</p>
@@ -1129,7 +1129,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
         {/* Browse Directory - Prominent Platform Pillar */}
         <AnimatedCard delay={0.6} hover={true} className="mt-8 overflow-hidden">
-          <div className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 md:p-12">
+          <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-600 p-8 md:p-12">
             {/* Background Pattern */}
             <div className="absolute inset-0 opacity-10">
               <div className="absolute inset-0" style={{
@@ -1159,7 +1159,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     Platform Pillar
                   </div>
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-                    Discover Local Stores
+                    Discover Online Presence
                   </h2>
                   <p className="text-lg md:text-xl text-white/90 mb-6 max-w-2xl">
                     Browse our curated directory of {platformStats.activeRetailersFormatted}+ retailers with {platformStats.productsListedFormatted}+ products. 
@@ -1197,9 +1197,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   {/* CTA Button */}
                   <Link href="/directory">
                     <Button 
-                      variant="secondary" 
+                      variant='gradient' style={{color: 'white'}}
                       size="lg"
-                      className="bg-white text-purple-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 font-bold text-lg px-8 py-6"
+                      className="bg-white text-indigo-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 font-bold text-lg px-8 py-6"
                     >
                       <svg className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -1241,7 +1241,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </div>
                   {selectedTenantId && (
                     <Link href={`/tenant/${selectedTenantId}`} target="_blank">
-                      <Button variant="secondary" className="w-full" size="md">
+                      <Button variant='gradient' style={{color: 'white'}} className="w-full" size="md">
                         View Storefront →
                       </Button>
                     </Link>
@@ -1267,7 +1267,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   </div>
                   <Link href={scopedLinks.settingsTenant}>
-                    <Button variant="secondary" className="w-full" size="md" style={{ color: 'white' }}>
+                    <Button variant="gradient" className="w-full" size="md" style={{ color: 'white' }}>
                       Manage Integration →
                     </Button>
                   </Link>

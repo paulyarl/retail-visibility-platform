@@ -108,7 +108,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </Link>
                   <Button
-                    variant="secondary"
+                    variant='gradient' style={{color: 'white'}}
                     size="sm"
                     className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
                     onClick={async () => {
@@ -125,7 +125,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               ) : (
                 <Link href="/auth/login">
                   <Button 
-                    variant="primary" 
+                    variant='gradient' style={{color: 'white'}}
                     size="sm"
                     className="bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
                   >
@@ -185,7 +185,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <>
                       <Link href="/settings/account" className="block" onClick={() => setMobileMenuOpen(false)}>
                         <Button 
-                          variant="ghost" 
+                          variant='gradient' style={{color: 'white'}}
                           className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" 
                           size="md"
                         >
@@ -196,7 +196,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         </Button>
                       </Link>
                       <Button
-                        variant="secondary"
+                        variant='gradient' style={{color: 'white'}}
                         className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                         size="md"
                         onClick={async () => {
@@ -214,7 +214,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   ) : (
                     <Link href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
                       <Button 
-                        variant="primary" 
+                        variant='gradient' style={{color: 'white'}}
                         className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2" 
                         size="md"
                       >

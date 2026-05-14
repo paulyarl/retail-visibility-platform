@@ -204,7 +204,7 @@ export default function CreateItemPage({
       {/* Header with Edit Button */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">
-          {isEditing ? 'Edit Product' : 'Create New Product'}
+          {isEditing ? 'Edit with Product Wizard' : 'Add with Product Wizard'}
         </h1>
         <div className="flex items-center gap-2">
           <Button

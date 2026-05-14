@@ -204,7 +204,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
               ) : (
                 <Tooltip content="This store hasn't been published to the public directory yet. Click to discover other stores in the directory.">
                   <Button
-                    variant="secondary"
+                    variant='gradient' style={{color: 'white'}}
                     className="w-full border-neutral-300 text-neutral-400 text-sm font-medium hover:bg-neutral-50 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent navigating to storefront
