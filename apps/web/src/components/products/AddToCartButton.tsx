@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Button } from '@/components/ui/Button';
 import { ShoppingCart, Check, ArrowRight } from 'lucide-react';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 interface ProductVariant {
@@ -162,9 +163,22 @@ export function AddToCartButton({
 
   if (needsVariantSelection) {
     return (
-      <Button disabled className={className}>
-        Select Options First
-      </Button>
+      <div className={className}>
+        <div className={`flex gap-2 ${layout === 'stacked' ? 'flex-col' : 'flex-row'}`}>
+          <Tooltip content="Select options above to enable">
+            <Button disabled className={`bg-white text-gray-900 border-gray-300 ${layout === 'stacked' ? 'w-full' : ''}`}>
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Add to Cart
+            </Button>
+          </Tooltip>
+          <Tooltip content="Select options above to enable">
+            <Button disabled className={`bg-white text-gray-900 border-gray-300 ${layout === 'stacked' ? 'w-full' : ''}`}>
+              Buy Now
+            </Button>
+          </Tooltip>
+        </div>
+        <p className="text-xs text-gray-500 mt-1.5 text-center">Select options above to enable purchase</p>
+      </div>
     );
   }
 

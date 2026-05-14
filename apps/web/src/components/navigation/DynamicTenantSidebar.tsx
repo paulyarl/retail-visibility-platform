@@ -292,6 +292,7 @@ function buildTenantNav(
         { label: 'Appearance', href: `/t/${currentTenantId}/settings/appearance` },
         { label: 'Language & Region', href: `/t/${currentTenantId}/settings/language` },
         { label: 'Subscription', href: `/t/${currentTenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
+        { label: 'Digital Downloads', href: `/t/${currentTenantId}/settings/digital-downloads` },
         { label: 'Onboarding', href: `/t/${currentTenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
         { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization` },
         { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation` },

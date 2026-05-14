@@ -470,6 +470,12 @@ export default function PaymentGatewaysPage() {
               Fulfillment Settings
             </Button>
           </Link>
+          <Link href={`/t/${tenantId}/settings/commerce`}>
+            <Button variant="outline" size="sm">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Commerce Settings
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -562,7 +568,9 @@ export default function PaymentGatewaysPage() {
               </div>
             </div>
             {canUseAdvancedPayment && paypalGateways.length > 0 && (
-              <Button onClick={() => setShowPayPalForm(true)} size="sm">
+              <Button onClick={() => setShowPayPalForm(true)} size="sm"
+              variant='gradient' style={{color: 'white'}}>
+                <CreditCard className="w-5 h-5 text-white mt-0.5" />
                 Add Another PayPal Account
               </Button>
             )}
@@ -764,7 +772,9 @@ export default function PaymentGatewaysPage() {
               </div>
             </div>
             {canUseAdvancedPayment && squareGateways.length > 0 && (
-              <Button onClick={() => setShowSquareForm(true)} size="sm">
+              <Button onClick={() => setShowSquareForm(true)} size="sm"
+              variant='gradient' style={{color: 'white'}}>
+                <CreditCard className="w-5 h-5 text-white mt-0.5" />
                 Add Another Square Account
               </Button>
             )}

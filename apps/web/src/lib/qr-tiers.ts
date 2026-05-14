@@ -56,7 +56,31 @@ const QR_FEATURES_COMMITMENT: QRCodeFeatures = {
   enabled: true,
   maxResolution: 1024,
   customColors: true,
-  customLogo: false,
+  customLogo: true,  // Tenant logo available from Commitment (commerce begins)
+  bulkDownload: true,
+  analytics: true,
+  printTemplates: true,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+
+const QR_FEATURES_ECOMMERCE: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 1024,
+  customColors: true,
+  customLogo: true,  // Tenant logo available for commerce tiers
+  bulkDownload: true,
+  analytics: true,
+  printTemplates: true,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+
+const QR_FEATURES_OMNICHANNEL: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 1024,
+  customColors: true,
+  customLogo: true,  // Tenant logo available for commerce tiers
   bulkDownload: true,
   analytics: true,
   printTemplates: true,
@@ -68,7 +92,7 @@ const QR_FEATURES_PROFESSIONAL: QRCodeFeatures = {
   enabled: true,
   maxResolution: 1024,
   customColors: true,
-  customLogo: false,
+  customLogo: true,  // Tenant logo available for commerce tiers
   bulkDownload: true,
   analytics: true,
   printTemplates: true,
@@ -116,8 +140,10 @@ export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
   discovery: QR_FEATURES_DISCOVERY,
   storefront: QR_FEATURES_STOREFRONT,
   commitment: QR_FEATURES_COMMITMENT,
-  starter: QR_FEATURES_STOREFRONT,
+  ecommerce: QR_FEATURES_ECOMMERCE,
+  omnichannel: QR_FEATURES_OMNICHANNEL,
   professional: QR_FEATURES_PROFESSIONAL,
+  starter: QR_FEATURES_STOREFRONT,
   chain_starter: QR_FEATURES_CHAIN_STARTER,
   enterprise: QR_FEATURES_ENTERPRISE,
   organization: QR_FEATURES_ENTERPRISE,
@@ -127,6 +153,8 @@ export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
   trial_discovery: QR_FEATURES_DISCOVERY,
   trial_storefront: QR_FEATURES_STOREFRONT,
   trial_commitment: QR_FEATURES_COMMITMENT,
+  trial_ecommerce: QR_FEATURES_ECOMMERCE,
+  trial_omnichannel: QR_FEATURES_OMNICHANNEL,
   trial_starter: QR_FEATURES_STOREFRONT,
   trial_professional: QR_FEATURES_PROFESSIONAL,
   trial_chain_starter: QR_FEATURES_CHAIN_STARTER,

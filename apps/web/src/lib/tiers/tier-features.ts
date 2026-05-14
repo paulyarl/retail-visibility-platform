@@ -271,10 +271,12 @@ export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
   discovery: 29,
   storefront: 59,
-  commitment: 99,
+  commitment: 79,  // V2 pricing
+  ecommerce: 99,   // V2 new tier
+  omnichannel: 149, // V2 new tier
   professional: 199,
-  enterprise: 999,
-  organization: 999,
+  enterprise: 499,  // V2 pricing
+  organization: 399, // V2 pricing
   chain_starter: 199,
   chain_professional: 1999,
   chain_enterprise: 4999,

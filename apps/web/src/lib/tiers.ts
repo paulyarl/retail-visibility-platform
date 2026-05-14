@@ -7,8 +7,8 @@
  */
 
 export type SubscriptionTier =
-  | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'professional' | 'storefront' | 'enterprise' | 'organization' | 'chain_starter'
-  | 'trial_google_only' | 'trial_starter' | 'trial_discovery'| 'trial_storefront' | 'trial_chain_starter' | 'trial_commitment' | 'trial_professional' | 'trial_storefront'
+  | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'storefront' | 'enterprise' | 'organization' | 'chain_starter'
+  | 'trial_google_only' | 'trial_starter' | 'trial_discovery'| 'trial_storefront' | 'trial_chain_starter' | 'trial_commitment' | 'trial_professional' | 'trial_storefront' | 'trial_ecommerce' | 'trial_omnichannel'
   | 'expired_trial';
 
 export interface TierLimits {
@@ -90,19 +90,56 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   commitment: {
     name: 'Commitment',
-    price: '$99/month',
-    pricePerMonth: 99,
+    price: '$79/month',
+    pricePerMonth: 79,
     maxSkus: 500,
-    maxLocations: 8,
-    description: 'Committed to growth with advanced features',
+    maxLocations: 2,
+    description: 'Deposit-based commerce to drive foot traffic',
     features: [
-      'Up to 1 locations',
+      'Up to 2 locations',
       'Up to 500 SKUs per location',
-      'Advanced product discovery',
+      'Deposit-based checkout',
+      'Store pickup & BOPIS',
       'Enhanced analytics',
       'Priority support',
     ],
-    color: 'bg-orange-100 text-orange-900',
+    color: 'bg-green-100 text-green-900',
+  },
+  ecommerce: {
+    name: 'E-commerce',
+    price: '$99/month',
+    pricePerMonth: 99,
+    maxSkus: 1000,
+    maxLocations: 3,
+    description: 'Full online payment processing and delivery',
+    features: [
+      'Up to 3 locations',
+      'Up to 1000 SKUs per location',
+      'Full payment checkout',
+      'Delivery & shipping',
+      'Order management',
+      'Enhanced analytics',
+      'Priority support',
+    ],
+    color: 'bg-cyan-100 text-cyan-900',
+  },
+  omnichannel: {
+    name: 'Omnichannel',
+    price: '$149/month',
+    pricePerMonth: 149,
+    maxSkus: 2000,
+    maxLocations: 10,
+    description: 'Multi-channel retail with flexible payment options',
+    features: [
+      'Up to 10 locations',
+      'Up to 2000 SKUs per location',
+      'Flexible payment (deposit or full)',
+      'Delivery & shipping',
+      'Advanced analytics',
+      'API access',
+      'Priority support',
+    ],
+    color: 'bg-indigo-100 text-indigo-900',
   },
   storefront: {
     name: 'Storefront',
@@ -297,6 +334,46 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     color: 'bg-blue-100 text-blue-900 border-2 border-blue-500',
     isTrial: true,
     trialTarget: 'commitment',
+  },
+  trial_ecommerce: {
+    name: 'Trial: E-commerce',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 1000,
+    maxLocations: 3,
+    description: '14-day trial of E-commerce tier',
+    features: [
+      'Up to 3 locations',
+      'Up to 1000 SKUs per location',
+      'Full payment checkout',
+      'Delivery & shipping',
+      'Order management',
+      'Enhanced analytics',
+      'Priority support',
+    ],
+    color: 'bg-cyan-100 text-cyan-900 border-2 border-cyan-500',
+    isTrial: true,
+    trialTarget: 'ecommerce',
+  },
+  trial_omnichannel: {
+    name: 'Trial: Omnichannel',
+    price: 'Free / 14-day',
+    pricePerMonth: 0,
+    maxSkus: 2000,
+    maxLocations: 10,
+    description: '14-day trial of Omnichannel tier',
+    features: [
+      'Up to 10 locations',
+      'Up to 2000 SKUs per location',
+      'Flexible payment (deposit or full)',
+      'Delivery & shipping',
+      'Advanced analytics',
+      'API access',
+      'Priority support',
+    ],
+    color: 'bg-indigo-100 text-indigo-900 border-2 border-indigo-500',
+    isTrial: true,
+    trialTarget: 'omnichannel',
   },
   
   trial_professional: {

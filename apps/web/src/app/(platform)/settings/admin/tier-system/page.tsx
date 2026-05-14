@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input,
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Tier {
@@ -57,6 +57,8 @@ export default function TierSystemPage() {
   const [deactivatingTier, setDeactivatingTier] = useState<Tier | null>(null);
   const [deactivationReason, setDeactivationReason] = useState('');
   const [showInactiveTiers, setShowInactiveTiers] = useState(false);
+  const [showCommerceManager, setShowCommerceManager] = useState(false);
+  const [editingCommerceTier, setEditingCommerceTier] = useState<Tier | null>(null);
   const { toast, toasts, removeToast } = useToast();
   const [newTier, setNewTier] = useState<Partial<Tier>>({
     tierKey: '',
@@ -450,6 +452,125 @@ export default function TierSystemPage() {
     }
   };
 
+  // V2 Commerce Feature Management Functions
+  const handleOpenCommerceManager = (tier: Tier) => {
+    setEditingCommerceTier(tier);
+    setShowCommerceManager(true);
+  };
+
+  const handleCloseCommerceManager = () => {
+    setShowCommerceManager(false);
+    setEditingCommerceTier(null);
+  };
+
+  const handleToggleCommerceFeature = async (featureKey: string, isEnabled: boolean) => {
+    if (!editingCommerceTier) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+
+      // Update the tier's commerce features
+      const updatedFeatures = editingCommerceTier.features.map(f => 
+        f.featureKey === featureKey ? { ...f, isEnabled } : f
+      );
+
+      // If feature doesn't exist, add it
+      if (!updatedFeatures.some(f => f.featureKey === featureKey)) {
+        const newFeature: TierFeature = {
+          id: `commerce_${featureKey}_${Date.now()}`,
+          featureKey,
+          featureName: getCommerceFeatureName(featureKey),
+          isEnabled,
+          isInherited: false
+        };
+        updatedFeatures.push(newFeature);
+      }
+
+      const updatedTier = await platformHomeService.updateTier(editingCommerceTier.tierKey, {
+        ...editingCommerceTier,
+        features: updatedFeatures
+      });
+
+      if (updatedTier) {
+        // Update local state
+        setEditingCommerceTier({ ...editingCommerceTier, features: updatedFeatures });
+        setTiers(prevTiers => 
+          prevTiers.map(tier => 
+            tier.id === editingCommerceTier.id 
+              ? { ...tier, features: updatedFeatures }
+              : tier
+          )
+        );
+
+        toast(`✅ ${featureKey} ${isEnabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+      } else {
+        throw new Error('Failed to update commerce feature');
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle commerce feature:', err);
+      setError(err.message || 'Failed to update commerce feature');
+      toast(err.message || 'Failed to update commerce feature', { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getCommerceFeatureName = (featureKey: string): string => {
+    const names: Record<string, string> = {
+      'commerce_disabled': 'Commerce Disabled',
+      'commerce_enabled': 'Commerce Enabled',
+      'commerce_deposit_only': 'Deposit Only Commerce',
+      'commerce_full_payment': 'Full Payment Commerce',
+      'commerce_both_options': 'Flexible Commerce (Both Options)'
+    };
+    return names[featureKey] || featureKey;
+  };
+
+  const getCommerceFeatureDescription = (featureKey: string): string => {
+    const descriptions: Record<string, string> = {
+      'commerce_disabled': 'Payment processing is disabled for this tier',
+      'commerce_enabled': 'Basic payment processing is enabled',
+      'commerce_deposit_only': 'Customers pay deposit now, complete payment in-store',
+      'commerce_full_payment': 'Customers pay full amount online',
+      'commerce_both_options': 'Customers choose between deposit or full payment'
+    };
+    return descriptions[featureKey] || 'Commerce feature';
+  };
+
+  const getCommerceFeatureState = (tier: Tier, featureKey: string): boolean => {
+    const feature = tier.features.find(f => f.featureKey === featureKey);
+    return feature?.isEnabled || false;
+  };
+
+  const validateCommerceFeatures = (tier: Tier): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    const features = tier.features;
+
+    // Check for conflicting commerce features
+    const hasDisabled = getCommerceFeatureState(tier, 'commerce_disabled');
+    const hasDepositOnly = getCommerceFeatureState(tier, 'commerce_deposit_only');
+    const hasFullPayment = getCommerceFeatureState(tier, 'commerce_full_payment');
+    const hasBothOptions = getCommerceFeatureState(tier, 'commerce_both_options');
+
+    if (hasDisabled && (hasDepositOnly || hasFullPayment || hasBothOptions)) {
+      errors.push('Cannot enable commerce features when commerce is disabled');
+    }
+
+    if (hasBothOptions && !hasFullPayment) {
+      errors.push('Both options requires full payment to be enabled');
+    }
+
+    if (hasDepositOnly && (hasFullPayment || hasBothOptions)) {
+      errors.push('Deposit only cannot be combined with other payment options');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
   const handleCreateTier = async () => {
     try {
       setSaving(true);
@@ -780,14 +901,24 @@ export default function TierSystemPage() {
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-sm">Features:</span>
-                            <Button
-                              onClick={openFeatureManager}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              Manage Features
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => handleOpenCommerceManager(tier)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <CreditCard className="w-4 h-4 mr-1" />
+                                Commerce
+                              </Button>
+                              <Button
+                                onClick={openFeatureManager}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Manage Features
+                              </Button>
+                            </div>
                           </div>
                           
                           {/* Group direct features */}
@@ -1286,6 +1417,179 @@ export default function TierSystemPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Commerce Features Manager Modal */}
+      <Modal
+        isOpen={showCommerceManager}
+        onClose={handleCloseCommerceManager}
+        title={`Commerce Features - ${editingCommerceTier?.displayName}`}
+        size="lg"
+      >
+        {editingCommerceTier && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">V2 Commerce Configuration</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Configure payment options for this tier. These features determine checkout behavior.
+              </p>
+              
+              {/* Commerce Feature Validation */}
+              {(() => {
+                const validation = validateCommerceFeatures(editingCommerceTier);
+                if (!validation.valid) {
+                  return (
+                    <Alert variant="destructive" className="mb-4">
+                      <div className="font-medium">Configuration Issues:</div>
+                      <ul className="mt-2 text-sm list-disc list-inside">
+                        {validation.errors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </Alert>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Commerce Features Grid */}
+              <div className="space-y-4">
+                {/* Commerce Disabled */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">Commerce Disabled</div>
+                    <div className="text-sm text-gray-600">
+                      Payment processing is disabled for this tier
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleToggleCommerceFeature('commerce_disabled', !getCommerceFeatureState(editingCommerceTier, 'commerce_disabled'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_disabled') ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_disabled') ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
+
+                {/* Deposit Only Commerce */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">Deposit Only Commerce</div>
+                    <div className="text-sm text-gray-600">
+                      Customers pay deposit now, complete payment in-store
+                    </div>
+                    <div className="text-xs text-amber-600 mt-1">
+                      Used by: Commitment tier
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleToggleCommerceFeature('commerce_deposit_only', !getCommerceFeatureState(editingCommerceTier, 'commerce_deposit_only'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_deposit_only') ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_deposit_only') ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
+
+                {/* Full Payment Commerce */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">Full Payment Commerce</div>
+                    <div className="text-sm text-gray-600">
+                      Customers pay full amount online
+                    </div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      Used by: Professional, Organization tiers
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleToggleCommerceFeature('commerce_full_payment', !getCommerceFeatureState(editingCommerceTier, 'commerce_full_payment'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_full_payment') ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_full_payment') ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
+
+                {/* Flexible Commerce (Both Options) */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">Flexible Commerce (Both Options)</div>
+                    <div className="text-sm text-gray-600">
+                      Customers choose between deposit or full payment
+                    </div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      Used by: Enterprise, Chain Professional tiers
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleToggleCommerceFeature('commerce_both_options', !getCommerceFeatureState(editingCommerceTier, 'commerce_both_options'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_both_options') ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_both_options') ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
+
+                {/* Commerce Enabled (Fallback) */}
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-600">Commerce Enabled (Fallback)</div>
+                    <div className="text-sm text-gray-500">
+                      Basic payment processing enabled (used when no specific commerce features are set)
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleToggleCommerceFeature('commerce_enabled', !getCommerceFeatureState(editingCommerceTier, 'commerce_enabled'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_enabled') ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_enabled') ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Current Commerce Mode Display */}
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <div className="font-medium text-blue-800 mb-2">Current Checkout Mode:</div>
+                <div className="text-sm text-blue-700">
+                  {(() => {
+                    const hasDisabled = getCommerceFeatureState(editingCommerceTier, 'commerce_disabled');
+                    const hasDepositOnly = getCommerceFeatureState(editingCommerceTier, 'commerce_deposit_only');
+                    const hasFullPayment = getCommerceFeatureState(editingCommerceTier, 'commerce_full_payment');
+                    const hasBothOptions = getCommerceFeatureState(editingCommerceTier, 'commerce_both_options');
+
+                    if (hasDisabled) return '❌ Commerce Disabled';
+                    if (hasDepositOnly) return '💳 Deposit Only Required';
+                    if (hasBothOptions) return '🔄 Flexible (Deposit or Full Payment)';
+                    if (hasFullPayment) return '💰 Full Payment Only';
+                    if (getCommerceFeatureState(editingCommerceTier, 'commerce_enabled')) return '✅ Commerce Enabled';
+                    return '❓ No Commerce Configuration';
+                  })()}
+                </div>
+              </div>
+
+              {/* V2 Strategy Reference */}
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="font-medium text-amber-800 mb-2">V2 Strategy Reference:</div>
+                <div className="text-sm text-amber-700 space-y-1">
+                  <div><strong>Discovery/Storefront:</strong> Commerce Disabled</div>
+                  <div><strong>Commitment:</strong> Deposit Only ($79/mo)</div>
+                  <div><strong>E-commerce:</strong> Full Payment ($99/mo)</div>
+                  <div><strong>Omnichannel:</strong> Both Options ($149/mo)</div>
+                  <div><strong>Enterprise:</strong> Both Options ($499/mo)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={handleCloseCommerceManager}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );

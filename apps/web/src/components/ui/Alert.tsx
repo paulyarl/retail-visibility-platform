@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 
 export interface AlertProps {
-  variant?: 'info' | 'success' | 'warning' | 'error';
+  variant?: 'info' | 'success' | 'warning' | 'error' | 'destructive';
   title?: string;
   children: React.ReactNode;
   className?: string;
@@ -28,6 +28,7 @@ export function Alert({
     success: 'bg-green-50 border-green-200 text-green-800',
     warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     error: 'bg-red-50 border-red-200 text-red-800',
+    destructive: 'bg-red-50 border-red-200 text-red-800',
   };
 
   const iconColors = {
@@ -35,6 +36,7 @@ export function Alert({
     success: 'text-green-400',
     warning: 'text-yellow-400',
     error: 'text-red-400',
+    destructive: 'text-red-400',
   };
 
   const icons = {
@@ -54,6 +56,11 @@ export function Alert({
       </svg>
     ),
     error: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    destructive: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>

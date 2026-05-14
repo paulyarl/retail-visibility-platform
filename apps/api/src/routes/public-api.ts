@@ -2810,6 +2810,104 @@ router.get('/tenant/:tenantId/items', async (req, res) => {
 });
 
 /**
+ * GET /api/items/:itemId
+ * Get a single item by ID (tenant-scoped)
+ */
+router.get('/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    // Use the existing database connection pattern
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    
+    // Query the item directly from inventory_items
+    const query = `
+      SELECT 
+        id,
+        tenant_id,
+        sku,
+        name,
+        title,
+        description,
+        marketing_description,
+        price,
+        price_cents,
+        stock,
+        availability,
+        image_url,
+        image_gallery,
+        brand,
+        category_path,
+        condition,
+        currency,
+        item_status,
+        visibility,
+        manufacturer,
+        product_type,
+        digital_delivery_method,
+        has_variants,
+        created_at,
+        updated_at
+      FROM inventory_items
+      WHERE id = $1
+    `;
+    
+    const result = await pool.query(query, [itemId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Item not found'
+      });
+    }
+    
+    const item = result.rows[0];
+    
+    // Return the item with additional computed fields
+    const responseItem = {
+      id: item.id,
+      tenantId: item.tenant_id,
+      sku: item.sku,
+      name: item.name,
+      title: item.title,
+      description: item.description,
+      marketingDescription: item.marketing_description,
+      price: Number(item.price),
+      priceCents: item.price_cents,
+      stock: item.stock,
+      availability: item.availability,
+      imageUrl: item.image_url,
+      imageGallery: item.image_gallery || [],
+      brand: item.brand,
+      categoryPath: item.category_path,
+      condition: item.condition,
+      currency: item.currency,
+      itemStatus: item.item_status,
+      visibility: item.visibility,
+      manufacturer: item.manufacturer,
+      productType: item.product_type,
+      digitalDeliveryMethod: item.digital_delivery_method,
+      hasVariants: item.has_variants || false,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    };
+    
+    res.json({
+      success: true,
+      data: responseItem
+    });
+    
+  } catch (error) {
+    console.error('[PUBLIC API] Item fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch item'
+    });
+  }
+});
+
+/**
  * GET /api/public/tenant/:identifier/fulfillment-settings
  * Get tenant fulfillment settings by any identifier (tenant-id, slug, auto-id)
  */

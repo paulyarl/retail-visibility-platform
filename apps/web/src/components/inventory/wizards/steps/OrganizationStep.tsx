@@ -129,7 +129,6 @@ interface OrganizationStepProps {
     categoryPath?: string;
     googleCategoryId?: string;
     shopCategoryId?: string;
-    tags: string[];
     seoTitle?: string;
     seoDescription?: string;
     seoKeywords?: string[];
@@ -155,16 +154,8 @@ interface OrganizationStepProps {
 // Removed mock CATEGORIES, GOOGLE_CATEGORIES, and SHOP_CATEGORIES
 // TenantCategorySelector handles all category needs and aligns with platform standard (directory_category_id + category_path)
 
-const SUGGESTED_TAGS = [
-  'popular', 'new', 'sale', 'premium', 'eco-friendly', 'handmade', 'limited-edition',
-  'best-seller', 'trending', 'exclusive', 'vintage', 'modern', 'classic', 'custom',
-  'organic', 'sustainable', 'local', 'imported', 'gift-ready', 'bundle'
-];
-
 export default function OrganizationStep({ data, errors, onChange, tenantId }: OrganizationStepProps) {
-  const [newTag, setNewTag] = useState('');
   const [newSeoKeyword, setNewSeoKeyword] = useState('');
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 
@@ -189,32 +180,6 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
 
   // Removed handleGoogleCategoryChange and handleShopCategoryChange
   // TenantCategorySelector handles all category selection
-
-  const handleAddTag = () => {
-    if (newTag.trim() && !data.tags.includes(newTag.trim())) {
-      onChange({
-        ...data,
-        tags: [...data.tags, newTag.trim()]
-      });
-      setNewTag('');
-    }
-  };
-
-  const handleRemoveTag = (index: number) => {
-    onChange({
-      ...data,
-      tags: data.tags.filter((_, i) => i !== index)
-    });
-  };
-
-  const handleAddSuggestedTag = (tag: string) => {
-    if (!data.tags.includes(tag)) {
-      onChange({
-        ...data,
-        tags: [...data.tags, tag]
-      });
-    }
-  };
 
   const handleAddSeoKeyword = () => {
     if (newSeoKeyword.trim() && !data.seoKeywords?.includes(newSeoKeyword.trim())) {
@@ -258,12 +223,11 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
     if (data.categoryId) score += 20;
     if (data.googleCategoryId) score += 15;
     if (data.shopCategoryId) score += 10;
-    if (data.tags.length >= 3) score += 15;
-    if (data.seoTitle && data.seoTitle.length >= 10) score += 10;
-    if (data.seoDescription && data.seoDescription.length >= 50) score += 10;
-    if (data.seoKeywords && data.seoKeywords.length >= 3) score += 10;
-    if (data.inventorySettings.trackInventory) score += 5;
-    if (data.organizationSettings.searchable) score += 5;
+    if (data.seoTitle && data.seoTitle.length >= 10) score += 15;
+    if (data.seoDescription && data.seoDescription.length >= 50) score += 15;
+    if (data.seoKeywords && data.seoKeywords.length >= 3) score += 15;
+    if (data.inventorySettings.trackInventory) score += 10;
+    if (data.organizationSettings.searchable) score += 10;
     return Math.min(score, 100);
   };
 
@@ -385,66 +349,6 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
 
       <Separator />
 
-      {/* Tags */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-base font-medium">Product Tags</Label>
-          <Badge variant="default">{data.tags.length} tags</Badge>
-        </div>
-
-        {/* Suggested Tags */}
-        {tagSuggestions.length > 0 && (
-          <div>
-            <Label className="text-sm font-medium">Suggested Tags</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {tagSuggestions.map((tag) => (
-                <Button
-                  key={tag}
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleAddSuggestedTag(tag)}
-                  disabled={data.tags.includes(tag)}
-                  className="text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  {tag}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Current Tags */}
-        <div className="flex flex-wrap gap-2">
-          {data.tags.map((tag, index) => (
-            <Badge key={index} variant="info" className="flex items-center space-x-1">
-              <Tag className="h-3 w-3" />
-              <span>{tag}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRemoveTag(index)}
-                className="p-0 h-3 w-3"
-              >
-                <X className="h-2 w-2" />
-              </Button>
-            </Badge>
-          ))}
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Input
-            placeholder="Add a tag..."
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-            className="flex-1"
-          />
-          <Button onClick={handleAddTag} disabled={!newTag.trim()}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
       {/* SEO Optimization */}
       <div className="space-y-4">
@@ -462,6 +366,9 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
               onChange={(e) => onChange({ ...data, seoTitle: e.target.value })}
               maxLength={60}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Auto-populated from product name. You can customize if needed.
+            </p>
           </div>
           <div>
             <Label className="text-sm font-medium">SEO Keywords</Label>
@@ -492,6 +399,9 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
                 <Plus className="h-3 w-3" />
               </Button>
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Auto-populated from product tags. You can add more keywords as needed.
+            </p>
           </div>
         </div>
 
@@ -503,6 +413,9 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
             onChange={(e) => onChange({ ...data, seoDescription: e.target.value })}
             maxLength={160}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Auto-populated from product description. You can customize if needed.
+          </p>
         </div>
       </div>
 

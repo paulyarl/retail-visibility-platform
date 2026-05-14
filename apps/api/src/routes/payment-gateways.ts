@@ -80,7 +80,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
   try {
     const { tenantId } = req.params;
 
-    // Get gateways, tenant tier, and Stripe Connect status in parallel
+    // Get gateways, tenant tier, Stripe Connect status, and commerce features in parallel
     const [gateways, tenant, stripeConnect] = await Promise.all([
       prisma.tenant_payment_gateways.findMany({
         where: { 
@@ -115,6 +115,27 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
       }),
     ]);
 
+    // Fetch commerce features from tier_features_list based on tenant's tier
+    let commerceFeatures: string[] = [];
+    if (tenant?.subscription_tier) {
+      const tierKey = tenant.subscription_tier.startsWith('trial_') 
+        ? tenant.subscription_tier.replace('trial_', '') 
+        : tenant.subscription_tier;
+      
+      const tierRecord = await prisma.$queryRaw<Array<{id: string}>>`
+        SELECT id FROM subscription_tiers_list WHERE tier_key = ${tierKey} AND is_active = true LIMIT 1
+      `;
+      
+      if (tierRecord.length > 0) {
+        const tierId = tierRecord[0].id;
+        const features = await prisma.$queryRaw<Array<{feature_key: string}>>`
+          SELECT feature_key FROM tier_features_list 
+          WHERE tier_id = ${tierId} AND feature_key LIKE 'commerce_%' AND is_enabled = true
+        `;
+        commerceFeatures = features.map(f => f.feature_key);
+      }
+    }
+
     // Add Stripe Connect as a gateway if it's active
     const allGateways = [...gateways];
     if (stripeConnect && stripeConnect.onboarding_status === 'completed' && stripeConnect.stripe_payments_enabled) {
@@ -130,11 +151,12 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
       });
     }
 
-    // Add tenant tier to each gateway for frontend deposit calculation
+    // Add tenant tier and commerce features to each gateway for frontend checkout mode detection
     const gatewaysWithTier = allGateways.map(gateway => {
       const gatewayWithTier = {
         ...gateway,
         tenant_tier: tenant?.subscription_tier || null,
+        commerce_features: commerceFeatures,
       };
 
       // For Square, ensure the config includes the public credentials needed for frontend SDK
@@ -155,6 +177,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
       success: true,
       gateways: gatewaysWithTier,
       tenant_tier: tenant?.subscription_tier || null, // Also return tier at root level for empty gateways case
+      commerce_features: commerceFeatures, // Feature-based checkout mode detection
     });
   } catch (error: any) {
     console.error('[Payment Gateways] Public list error:', error);

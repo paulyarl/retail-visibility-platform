@@ -36,6 +36,8 @@ interface ProductWithVariantsProps {
   className?: string;
   showImage?: boolean;
   onImageChange?: (imageUrl: string | undefined) => void;
+  /** When true, skip rendering product name/price/stock/SKU (parent card already shows them) */
+  compact?: boolean;
 }
 
 export default function ProductWithVariants({
@@ -48,6 +50,7 @@ export default function ProductWithVariants({
   className = '',
   showImage = false,
   onImageChange,
+  compact = false,
 }: ProductWithVariantsProps) {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
@@ -194,7 +197,7 @@ export default function ProductWithVariants({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Optional Image Display */}
-      {showImage && currentImage && (
+      {!compact && showImage && currentImage && (
         <div className="relative">
           <img
             src={currentImage}
@@ -211,69 +214,82 @@ export default function ProductWithVariants({
         </div>
       )}
 
-      {/* Product Name and Featured Types */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {product.name}
-        </h1>
-        {effectiveFeaturedTypes.length > 0 && (
-          <div className="mb-3">
-            <FeaturedTypeBadges 
-              featuredTypes={effectiveFeaturedTypes}
-              maxVisible={3}
-              size="sm"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Price Display with Smart Sale Tagging */}
-      <div className="space-y-2">
-        <SalePrice 
-          product={{
-            price: {
-              cents: effectivePrice,
-              currency: 'USD',
-              formatted: `$${(effectivePrice / 100).toFixed(2)}`
-            },
-            salePrice: effectiveSalePrice ? {
-              cents: effectiveSalePrice,
-              currency: 'USD',
-              formatted: `$${(effectiveSalePrice / 100).toFixed(2)}`
-            } : undefined
-          }}
-          variant="detail"
-          showOriginalPrice={true}
-          showDiscountPercentage={true}
-          showDiscountAmount={true}
-        />
-        
-        {/* Stock Status */}
-        <div className="flex items-center gap-2">
-          {effectiveStock !== undefined && (
-            <Badge variant={effectiveStock > 0 ? 'success' : 'error'}>
-              {effectiveStock > 0 ? `${effectiveStock} in stock` : 'Out of stock'}
-            </Badge>
-          )}
-          
-          {/* SKU */}
-          <span className="text-sm text-gray-500">
-            SKU: {effectiveSku}
-          </span>
-          
-          {/* Variant Name */}
-          {selectedVariant?.variant_name && (
-            <Badge variant="default" className="text-xs">
-              {selectedVariant.variant_name}
-            </Badge>
+      {/* Product Name and Featured Types - skip in compact mode (parent card shows these) */}
+      {!compact && (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {product.name}
+          </h1>
+          {effectiveFeaturedTypes.length > 0 && (
+            <div className="mb-3">
+              <FeaturedTypeBadges 
+                featuredTypes={effectiveFeaturedTypes}
+                maxVisible={3}
+                size="sm"
+              />
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Price Display with Smart Sale Tagging - skip in compact mode */}
+      {!compact && (
+        <div className="space-y-2">
+          <SalePrice 
+            product={{
+              price: {
+                cents: effectivePrice,
+                currency: 'USD',
+                formatted: `$${(effectivePrice / 100).toFixed(2)}`
+              },
+              salePrice: effectiveSalePrice ? {
+                cents: effectiveSalePrice,
+                currency: 'USD',
+                formatted: `$${(effectiveSalePrice / 100).toFixed(2)}`
+              } : undefined
+            }}
+            variant="detail"
+            showOriginalPrice={true}
+            showDiscountPercentage={true}
+            showDiscountAmount={true}
+          />
+          
+          {/* Stock Status */}
+          <div className="flex items-center gap-2">
+            {effectiveStock !== undefined && (
+              <Badge variant={effectiveStock > 0 ? 'success' : 'error'}>
+                {effectiveStock > 0 ? `${effectiveStock} in stock` : 'Out of stock'}
+              </Badge>
+            )}
+            
+            {/* SKU */}
+            <span className="text-sm text-gray-500">
+              SKU: {effectiveSku}
+            </span>
+            
+            {/* Variant Name */}
+            {selectedVariant?.variant_name && (
+              <Badge variant="default" className="text-xs">
+                {selectedVariant.variant_name}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected variant info in compact mode */}
+      {compact && selectedVariant?.variant_name && (
+        <div className="flex items-center gap-2">
+          <Badge variant="default" className="text-xs">
+            {selectedVariant.variant_name}
+          </Badge>
+        </div>
+      )}
 
       {/* Variant Selector */}
       {product.has_variants && variants.length > 0 && (
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold mb-4">Select Options</h3>
+        <div className={compact ? '' : 'border-t pt-6'}>
+          {!compact && <h3 className="text-lg font-semibold mb-4">Select Options</h3>}
           {loading ? (
             <div className="text-center py-4">
               <div className="text-sm text-gray-500">Loading options...</div>
@@ -288,8 +304,8 @@ export default function ProductWithVariants({
         </div>
       )}
 
-      {/* Variant Comparison (when variants exist) */}
-      {product.has_variants && variants.length > 1 && (
+      {/* Variant Comparison - skip in compact mode */}
+      {!compact && product.has_variants && variants.length > 1 && (
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold mb-4">Available Variants</h3>
           <VariantComparisonGrid
@@ -307,29 +323,37 @@ export default function ProductWithVariants({
       )}
 
       {/* Add to Cart Button */}
-      <div className="border-t pt-6">
-        <AddToCartButton
-          product={{
-            ...product,
-            sku: effectiveSku,
-            priceCents: effectivePrice,
-            salePriceCents: effectiveSalePrice,
-            stock: effectiveStock,
-            tenantId,
-          }}
-          variant={selectedVariant}
-          tenantName={tenantName}
-          tenantLogo={tenantLogo}
-          defaultGatewayType={defaultGatewayType}
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          className="w-full"
-          layout="stacked"
-        />
-        
-        {effectiveStock <= 0 && (
-          <p className="text-sm text-red-600 text-center mt-2">
-            This item is currently out of stock
-          </p>
+      <div className={compact ? '' : 'border-t pt-6'}>
+        {loading && compact ? (
+          <div className="text-center py-2">
+            <div className="text-sm text-gray-500">Loading options...</div>
+          </div>
+        ) : (
+          <>
+            <AddToCartButton
+              product={{
+                ...product,
+                sku: effectiveSku,
+                priceCents: effectivePrice,
+                salePriceCents: effectiveSalePrice,
+                stock: effectiveStock,
+                tenantId,
+              }}
+              variant={selectedVariant}
+              tenantName={tenantName}
+              tenantLogo={tenantLogo}
+              defaultGatewayType={defaultGatewayType}
+              hasActivePaymentGateway={hasActivePaymentGateway}
+              className="w-full"
+              layout="stacked"
+            />
+            
+            {effectiveStock <= 0 && (
+              <p className="text-sm text-red-600 text-center mt-2">
+                This item is currently out of stock
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

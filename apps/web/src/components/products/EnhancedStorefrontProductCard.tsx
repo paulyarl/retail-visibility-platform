@@ -830,23 +830,32 @@ export default function EnhancedStorefrontProductCard({
 
               {/* Add to Cart Button */}
               {effectiveCanPurchase && (
-                <AddToCartButton
-                  product={{
-                    id: product.id,
-                    sku: product.sku,
-                    name: product.name,
-                    priceCents: product.priceCents,
-                    salePriceCents: product.salePriceCents,
-                    stock: product.stock,
-                    imageUrl: product.imageUrl,
-                    tenantId: product.tenantId,
-                  }}
-                  tenantName={tenantId}
-                  hasActivePaymentGateway={effectiveCanPurchase}
-                  defaultGatewayType={effectiveGatewayType}
-                  layout="stacked"
-                  className="w-full mt-2"
-                />
+                (product.variants && product.variants.length > 0) ? (
+                  <Link
+                    href={`/products/${product.id}`}
+                    className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors mt-2"
+                  >
+                    View Options
+                  </Link>
+                ) : (
+                  <AddToCartButton
+                    product={{
+                      id: product.id,
+                      sku: product.sku,
+                      name: product.name,
+                      priceCents: product.priceCents,
+                      salePriceCents: product.salePriceCents,
+                      stock: product.stock,
+                      imageUrl: product.imageUrl,
+                      tenantId: product.tenantId,
+                    }}
+                    tenantName={tenantId}
+                    hasActivePaymentGateway={effectiveCanPurchase}
+                    defaultGatewayType={effectiveGatewayType}
+                    layout="stacked"
+                    className="w-full mt-2"
+                  />
+                )
               )}
 
               {/* Features from metadata */}

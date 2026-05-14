@@ -163,6 +163,8 @@ import quickStartRoutes from './routes/quick-start';
 import tenantsRoutes from './routes/tenants';
 import paymentGatewaysRoutes from './routes/payment-gateways';
 import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
+import commerceSettingsRoutes from './routes/commerce-settings';
+import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
 import buyerOrdersRoutes from './routes/buyer-orders';
 import tenantOrdersRoutes from './routes/tenant-orders';
 import productLikesRoutes from './routes/product-likes';
@@ -7300,6 +7302,20 @@ app.use('/api/tenants', fulfillmentSettingsRoutes);
 app.use('/api', fulfillmentSettingsRoutes);
 console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings and /api/public/tenant/:tenantId/fulfillment-settings');
 
+/* ------------------------------ commerce settings ------------------------------ */
+app.use('/api/tenants', commerceSettingsRoutes);
+app.use('/api', commerceSettingsRoutes);
+console.log('✅ Commerce settings routes mounted at /api/tenants/:tenantId/commerce-settings and /api/public/tenant/:tenantId/commerce-settings');
+
+/* ------------------------------ organization commerce settings ------------------------------ */
+app.use('/api/organizations', organizationCommerceSettingsRoutes);
+app.use('/api', organizationCommerceSettingsRoutes);
+console.log('✅ Organization commerce settings routes mounted at /api/organizations/:organizationId/commerce-settings and /api/public/organization/:organizationId/commerce-settings');
+
+/* ------------------------------ billing ------------------------------ */
+app.use('/api', billingRoutes);
+console.log('✅ Billing routes mounted at /api/billing');
+
 /* ------------------------------ tenant orders ------------------------------ */
 app.use('/api', tenantOrdersRoutes);
 console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders');
@@ -7528,6 +7544,11 @@ console.log(' Tenant trial setup routes mounted at /api/tenants');
 import tenantNotificationsRoutes from './routes/tenant-notifications';
 app.use('/api/tenants', authenticateToken, tenantNotificationsRoutes);
 console.log('✅ Tenant notifications routes mounted at /api/tenants/:tenantId/notifications');
+
+/* ------------------------------ digital download pages ------------------------------ */
+import digitalDownloadPagesRoutes from './routes/tenant/digital-download-pages';
+app.use('/api/tenants', digitalDownloadPagesRoutes);
+console.log('✅ Digital download pages routes mounted at /api/tenants/:tenantId/digital-download-pages');
 
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);

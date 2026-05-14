@@ -10,6 +10,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
+import { apiQueriesService } from '@/services/ApiQueriesSingletonService';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useOrganizationData } from '@/hooks/useApiQueries';
 
@@ -58,6 +59,9 @@ export default function OrganizationPage() {
     }
   }, []);
   
+  // Get user role directly for platform admin detection
+  const [userRole, setUserRole] = useState<string | null>(null);
+  
   // Use centralized access control - organization members can view
   const {
     hasAccess,
@@ -69,6 +73,25 @@ export default function OrganizationPage() {
     AccessPresets.ORGANIZATION_MEMBER,
     true // Fetch organization data
   );
+
+  // Fetch user role directly for platform admin detection
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        // This would need to be implemented - for now, we'll use a simple approach
+        // In a real implementation, you'd have a user service that gets the current user's role
+        const response = await fetch('/api/auth/me');
+        const data = await response.json();
+        if (data.user?.role) {
+          setUserRole(data.user.role);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user role:', error);
+      }
+    };
+
+    fetchUserRole();
+  }, []);
 
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,6 +114,10 @@ export default function OrganizationPage() {
   const [showQuickStart, setShowQuickStart] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const locationsPerPage = 5;
+  const [availableOrganizations, setAvailableOrganizations] = useState<any[]>([]);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+  const [billingCounters, setBillingCounters] = useState<any>(null);
+  const [loadingBilling, setLoadingBilling] = useState(false);
 
   // Use organization data from access control hook or URL
   const { data: organizationData, isLoading: orgLoading, error: orgError } = useOrganizationData(organizationId);
@@ -107,6 +134,57 @@ export default function OrganizationPage() {
       setOrganizationId(urlOrgId);
     }
   }, [orgDataFromHook, urlOrgId]);
+
+  // Fetch available organizations when no organization context exists
+  useEffect(() => {
+    const fetchAvailableOrganizations = async () => {
+      if (!orgDataFromHook && !urlOrgId && (tenantRole || userRole)) {
+        setLoadingOrganizations(true);
+        try {
+          let organizations: any[] = [];
+          const effectiveRole = userRole || tenantRole;
+          
+          if (effectiveRole === 'PLATFORM_ADMIN') {
+            // Platform admins can see all organizations
+            organizations = await organizationsService.getOrganizations(1, 100); // Get first 100 organizations
+          } else if (['OWNER', 'TENANT_OWNER', 'TENANT_ADMIN'].includes(effectiveRole || '')) {
+            // Tenant admins/owners can see their organizations
+            // This would need to be implemented based on user's organization memberships
+            // For now, we'll show a message indicating they need to access via tenant route
+          }
+          
+          setAvailableOrganizations(organizations);
+        } catch (error) {
+          console.error('Failed to fetch organizations:', error);
+        } finally {
+          setLoadingOrganizations(false);
+        }
+      }
+    };
+
+    fetchAvailableOrganizations();
+  }, [orgDataFromHook, urlOrgId, tenantRole, userRole]);
+
+  // Fetch billing counters when organization is available
+  useEffect(() => {
+    const fetchBillingCounters = async () => {
+      if (organizationId) {
+        setLoadingBilling(true);
+        try {
+          const data = await apiQueriesService.getOrganizationBillingCounters(organizationId);
+          if (data.organizationId) {
+            setBillingCounters(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch billing counters:', error);
+        } finally {
+          setLoadingBilling(false);
+        }
+      }
+    };
+
+    fetchBillingCounters();
+  }, [organizationId]);
 
   const combinedLoading = accessLoading || orgLoading;
 
@@ -280,9 +358,9 @@ export default function OrganizationPage() {
   }
 
   // Allow access for platform admins and tenant owners
-  // TODO: Refine this to proper organization membership checking
+  // Platform admins should have access regardless of tenant context
   const allowedRoles = ['PLATFORM_ADMIN', 'OWNER', 'TENANT_OWNER'];
-  const userCanAccess = allowedRoles.includes(tenantRole || '') || hasAccess;
+  const userCanAccess = allowedRoles.includes(tenantRole || '') || hasAccess || userRole === 'PLATFORM_ADMIN';
 
   if (!userCanAccess) {
     return (
@@ -294,6 +372,130 @@ export default function OrganizationPage() {
         userRole={tenantRole}
         backLink={{ href: '/settings', label: 'Back to Settings' }}
       />
+    );
+  }
+
+  // Organization selection when no organization context exists
+  if (!orgDataFromHook && !urlOrgId && !organizationId) {
+    return (
+      <div className="container mx-auto p-6">
+        <PageHeader
+          title="Select Organization"
+          description="Choose an organization to manage"
+          icon={Icons.Settings}
+          backLink={{
+            href: '/settings',
+            label: 'Back to Settings'
+          }}
+        />
+        
+        {loadingOrganizations ? (
+          <Card withBorder padding="lg" radius="md">
+            <div className="py-12 text-center">
+              <Spinner size="lg" />
+              <p className="mt-4 text-neutral-600">Loading organizations...</p>
+            </div>
+          </Card>
+        ) : (
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-6">
+              {(userRole === 'PLATFORM_ADMIN' || tenantRole === 'PLATFORM_ADMIN') ? (
+                <>
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Available Organizations</h2>
+                    <p className="text-neutral-600 mb-6">
+                      As a Platform Admin, you can manage any organization in the system.
+                    </p>
+                  </div>
+                  
+                  {availableOrganizations.length > 0 ? (
+                    <div className="grid gap-4">
+                      {availableOrganizations.map((org) => (
+                        <div
+                          key={org.id}
+                          className="border border-neutral-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
+                          onClick={() => window.location.href = `/settings/organization?organizationId=${org.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-semibold text-neutral-900">{org.name}</h3>
+                              <p className="text-sm text-neutral-600">{org.description || 'No description'}</p>
+                              {org.tenants && (
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  {org.tenants.length} location{org.tenants.length !== 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={org.isActive ? 'success' : 'default'}>
+                                {org.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                              <Button  variant="gradient"
+              style={{color: 'white'}} size="sm">
+                                Manage
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-neutral-600">No organizations found in the system.</p>
+                    </div>
+                  )}
+                </>
+              ) : ['OWNER', 'TENANT_OWNER', 'TENANT_ADMIN'].includes(tenantRole || '') ? (
+                <div className="text-center py-8">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 max-w-md mx-auto">
+                    <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                      Access Your Organization via Tenant Dashboard
+                    </h3>
+                    <p className="text-amber-700 mb-4">
+                      To manage your organization settings, please access through your tenant dashboard.
+                    </p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-amber-600">
+                        Go to: <code className="bg-amber-100 px-2 py-1 rounded">/t/[tenantId]/settings/organization</code>
+                      </p>
+                      <p className="text-xs text-amber-500">
+                        Replace [tenantId] with your actual tenant ID
+                      </p>
+                    </div>
+                    <Button
+                      variant="gradient"
+                      style={{color: 'white'}}
+                      onClick={() => window.location.href = '/settings'}
+                      className="mt-4"
+                    >
+                      Return to Settings
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+                    <h3 className="text-lg font-semibold text-red-900 mb-2">
+                      Access Restricted
+                    </h3>
+                    <p className="text-red-700 mb-4">
+                      Organization management is only available to organization administrators.
+                    </p>
+                    <Button
+                      variant="gradient"
+                      style={{color: 'white'}}
+                      onClick={() => window.location.href = '/settings'}
+                      className="mt-4"
+                    >
+                      Return to Settings
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+      </div>
     );
   }
 
@@ -313,7 +515,8 @@ export default function OrganizationPage() {
           <div className="py-12 text-center">
             <p className="text-red-600">{error || 'No organization data available'}</p>
             <Button
-              variant="primary"
+              variant="gradient"
+              style={{color: 'white'}}
               onClick={() => window.location.href = '/settings'}
               className="mt-4"
             >
@@ -343,14 +546,121 @@ export default function OrganizationPage() {
   return (
     <div className="container mx-auto p-6">
       <PageHeader
-        title={orgData.organizationName}
-        description="Chain organization dashboard"
+        title={billingCounters?.organizationName || orgData.organizationName}
+        description="Manage your chain organization settings and monitor performance"
         icon={Icons.Settings}
         backLink={{
           href: '/settings',
           label: 'Back to Settings'
         }}
       />
+
+      {/* Welcome Section with Usage Metrics */}
+      {billingCounters && (
+        <div className="mt-6">
+          <Card withBorder padding="lg" radius="md">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-neutral-900">Welcome to Your Organization Dashboard</h2>
+                <p className="text-neutral-600 mt-1">
+                  Manage your chain operations, monitor usage, and configure settings across all locations
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-neutral-500">Organization ID</div>
+                <div className="font-mono text-xs text-neutral-400">{organizationId}</div>
+              </div>
+            </div>
+
+            {/* Usage Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Locations Usage */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-neutral-900">
+                  {billingCounters.current.totalLocations}
+                </div>
+                <div className="text-sm text-neutral-600 mb-2">Locations</div>
+                <div className="w-full bg-neutral-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full ${getGaugeColor((billingCounters.current.totalLocations / billingCounters.limits.maxLocations) * 100)}`}
+                    style={{ width: `${Math.min((billingCounters.current.totalLocations / billingCounters.limits.maxLocations) * 100, 100)}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {billingCounters.current.totalLocations} / {billingCounters.limits.maxLocations}
+                </div>
+              </div>
+
+              {/* Products Usage */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-neutral-900">
+                  {billingCounters.current.totalSKUs.toLocaleString()}
+                </div>
+                <div className="text-sm text-neutral-600 mb-2">Products</div>
+                <div className="w-full bg-neutral-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full ${getGaugeColor((billingCounters.current.totalSKUs / billingCounters.limits.maxTotalSKUs) * 100)}`}
+                    style={{ width: `${Math.min((billingCounters.current.totalSKUs / billingCounters.limits.maxTotalSKUs) * 100, 100)}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {billingCounters.current.totalSKUs.toLocaleString()} / {billingCounters.limits.maxTotalSKUs.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Subscription Tier */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-neutral-900">
+                  {billingCounters.subscription_tier?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
+                </div>
+                <div className="text-sm text-neutral-600 mb-2">Subscription Tier</div>
+                <Badge variant={billingCounters.subscription_status === 'active' ? 'success' : 'warning'}>
+                  {billingCounters.subscription_status?.toUpperCase() || 'UNKNOWN'}
+                </Badge>
+              </div>
+
+              {/* Overall Status */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-neutral-900">
+                  {billingCounters.status.overall === 'ok' ? '✅' : billingCounters.status.overall === 'warning' ? '⚠️' : '❌'}
+                </div>
+                <div className="text-sm text-neutral-600 mb-2">Overall Status</div>
+                <Badge variant={billingCounters.status.overall === 'ok' ? 'success' : billingCounters.status.overall === 'warning' ? 'warning' : 'error'}>
+                  {billingCounters.status.overall?.toUpperCase() || 'UNKNOWN'}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="mt-6 pt-6 border-t border-neutral-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-neutral-900">Quick Actions</h3>
+                  <p className="text-sm text-neutral-600">Common tasks for organization management</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="gradient"
+                    style={{color: 'white'}}
+                    size="sm"
+                    onClick={() => window.location.href = `/settings/organization/commerce?organizationId=${organizationId}`}
+                  >
+                    Commerce Settings
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    style={{color: 'white'}}
+                    size="sm"
+                    onClick={() => window.location.href = '/settings/subscription'}
+                  >
+                    Upgrade Plan
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div className="mt-6 space-y-6">
         {/* 1. HERO LOCATION BANNER - Prominent Leader Status */}
@@ -398,7 +708,8 @@ export default function OrganizationPage() {
             
             {/* Change Hero Button */}
             <Button 
-              variant="primary"
+              variant="gradient"
+              style={{color: 'white'}}
               size="lg"
               onClick={() => setShowHeroModal(true)}
               className="flex items-center gap-2"
@@ -489,14 +800,16 @@ export default function OrganizationPage() {
             </div>
             <div className="flex gap-2">
               <Button
-                variant="light"
+                 variant="gradient"
+              style={{color: 'white'}}
                 size="sm"
                 onClick={() => window.location.href = '/settings/subscription'}
               >
                 Manage Plan
               </Button>
               <Button
-                variant="light"
+                 variant="gradient"
+              style={{color: 'white'}}
                 size="sm"
                 onClick={() => window.location.href = '/settings/billing/invoices'}
               >
@@ -506,11 +819,38 @@ export default function OrganizationPage() {
           </div>
         </Card>
 
+        {/* 2.6. ORGANIZATION COMMERCE SETTINGS - Payment Options */}
+        <Card withBorder padding="lg" radius="md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-neutral-900">Commerce Settings</h3>
+                <p className="text-sm text-neutral-600">Configure payment options, deposits, and order settings for all locations</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="gradient" style={{ color: 'white' }}
+                size="sm"
+                onClick={() => window.location.href = `/settings/organization/commerce?organizationId=${organizationId}`}
+              >
+                Configure Commerce
+              </Button>
+            </div>
+          </div>
+        </Card>
+
         {/* 3. QUICK ACTIONS - Primary CTAs */}
         <Card withBorder padding="lg" radius="md">
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
               <Button 
-                variant="primary" 
+                 variant="gradient"
+              style={{color: 'white'}}
                 size="lg"
                 className="flex-1 flex items-center justify-center gap-2"
                 disabled={!heroLocation || syncing}
@@ -533,7 +873,8 @@ export default function OrganizationPage() {
                 )}
               </Button>
               <Button 
-                variant="secondary" 
+                 variant="gradient"
+              style={{color: 'white'}}
                 size="lg"
                 className="flex-1 flex items-center justify-center gap-2"
                 onClick={() => window.location.href = `/t/${heroLocation?.tenantId}/items`}
@@ -619,7 +960,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#categories`)}
@@ -647,7 +989,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="primary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       disabled={!heroLocation || syncing}
@@ -676,7 +1019,8 @@ export default function OrganizationPage() {
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        variant="primary"
+                        variant="gradient"
+                        style={{color: 'white'}}
                         size="sm"
                         className="flex-1"
                         disabled={!organizationId || syncingCategories}
@@ -685,7 +1029,8 @@ export default function OrganizationPage() {
                         {syncingCategories ? 'Syncing...' : 'Sync to GBP'}
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="gradient"
+                        style={{color: 'white'}}
                         size="sm"
                         onClick={() => window.location.href = '/settings/admin/categories'}
                       >
@@ -729,7 +1074,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#hours`)}
@@ -757,7 +1103,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#profile`)}
@@ -796,7 +1143,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#flags`)}
@@ -824,7 +1172,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#roles`)}
@@ -863,7 +1212,8 @@ export default function OrganizationPage() {
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="gradient"
+                      style={{color: 'white'}}
                       size="sm"
                       className="w-full"
                       onClick={() => heroLocation && (window.location.href = `/t/${heroLocation.tenantId}/settings/propagation#brand`)}
@@ -965,7 +1315,8 @@ export default function OrganizationPage() {
                           </p>
                         </div>
                         <Button
-                          variant="ghost"
+                          variant="gradient"
+              style={{color: 'white'}}
                           size="sm"
                           onClick={() => window.location.href = `/tenants?tenantId=${location.tenantId}`}
                         >
@@ -984,7 +1335,8 @@ export default function OrganizationPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
-                        variant="ghost"
+                        variant="gradient"
+                        style={{color: 'white'}}
                         size="sm"
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         disabled={currentPage === 1}
@@ -1010,7 +1362,8 @@ export default function OrganizationPage() {
                         ))}
                       </div>
                       <Button
-                        variant="ghost"
+                        variant="gradient"
+                        style={{color: 'white'}}
                         size="sm"
                         onClick={() => setCurrentPage(prev => Math.min(Math.ceil(orgData.locationBreakdown.length / locationsPerPage), prev + 1))}
                         disabled={currentPage === Math.ceil(orgData.locationBreakdown.length / locationsPerPage)}
@@ -1348,10 +1701,11 @@ export default function OrganizationPage() {
                   )}
                 </ul>
                 <Button
-                  variant="primary"
+                  variant="gradient"
+                  style={{color: 'white'}}
                   size="sm"
                   onClick={() => window.location.href = '/settings/subscription'}
-                  className="mt-4" style={{ color: '#ffffff' }}
+                  className="mt-4"
                 >
                   Upgrade Plan
                 </Button>
@@ -1441,7 +1795,8 @@ export default function OrganizationPage() {
             {/* Actions */}
             <div className="flex gap-3">
               <Button
-                variant="secondary"
+                variant="gradient"
+                style={{color: 'white'}}
                 className="flex-1"
                 onClick={() => {
                   setShowCategorySyncModal(false);
@@ -1452,7 +1807,8 @@ export default function OrganizationPage() {
                 Cancel
               </Button>
               <Button
-                variant="primary"
+                variant="gradient"
+                style={{color: 'white'}}
                 className="flex-1"
                 onClick={handleSyncCategoriesToGBP}
                 disabled={categorySyncScope === 'single' && !selectedSyncTenantId}

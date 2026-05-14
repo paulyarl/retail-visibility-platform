@@ -494,7 +494,8 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
             onKeyPress={(e) => e.key === 'Enter' && handleAddSpecification()}
           />
         </div>
-        <Button onClick={handleAddSpecification} disabled={!newSpecKey.trim() || !newSpecValue.trim()}>
+        <Button onClick={handleAddSpecification} disabled={!newSpecKey.trim() || !newSpecValue.trim()}
+        variant='gradient' style={{color: 'white'}}>
           <Plus className="h-4 w-4 mr-2" />
           Add Specification
         </Button>

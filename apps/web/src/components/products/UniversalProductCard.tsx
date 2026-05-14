@@ -455,13 +455,22 @@ export function UniversalProductCard({
           <div className="flex items-center gap-2">
             {hasActivePaymentGateway ? (
               <>
-                <AddToCartButton
-                  product={product}
-                  hasActivePaymentGateway={hasActivePaymentGateway}
-                  defaultGatewayType={defaultGatewayType}
-                  tenantName={product.tenantName}
-                  className="flex-1"
-                />
+                {product.has_variants ? (
+                  <Link
+                    href={`/products/${product.id}`}
+                    className="inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                  >
+                    View Options
+                  </Link>
+                ) : (
+                  <AddToCartButton
+                    product={product}
+                    hasActivePaymentGateway={hasActivePaymentGateway}
+                    defaultGatewayType={defaultGatewayType}
+                    tenantName={product.tenantName}
+                    className="flex-1"
+                  />
+                )}
                 {defaultGatewayType && (
                   <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                     {defaultGatewayType === 'paypal' && (

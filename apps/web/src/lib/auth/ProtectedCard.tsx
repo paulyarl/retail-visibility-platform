@@ -27,6 +27,12 @@ export interface ProtectedCardProps {
   
   /** Custom fallback content when access is denied */
   deniedContent?: ReactNode;
+  
+  /** Card title */
+  title?: string;
+  
+  /** Card description */
+  description?: string;
 }
 
 /**
@@ -49,6 +55,8 @@ export function ProtectedCard({
   fetchOrganization = false,
   hideWhenDenied = true,
   deniedContent,
+  title,
+  description,
 }: ProtectedCardProps) {
   const { hasAccess, loading } = useAccessControl(
     tenantId || null,

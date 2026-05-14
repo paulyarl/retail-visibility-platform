@@ -240,13 +240,15 @@ export function getTierPricing(tier: string): number {
   const pricing: Record<string, number> = {
     trial: 0,
     google_only: 29,
-    discovery: 99,
+    discovery: 29,
     starter: 49,
-    storefront: 199,
-    commitment: 499,
-    professional: 499,
-    enterprise: 999,
-    organization: 999,
+    storefront: 59,
+    commitment: 79,  // V2 pricing
+    ecommerce: 99,   // V2 new tier
+    omnichannel: 149, // V2 new tier
+    professional: 199,
+    enterprise: 499,  // V2 pricing
+    organization: 399, // V2 pricing
     chain_starter: 199,
     chain_professional: 1999,
     chain_enterprise: 4999,

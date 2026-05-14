@@ -88,6 +88,8 @@ export interface PaymentGateway {
   config?: Record<string, any>;
   // Tier 3 Commitment - tenant tier for deposit checkout mode detection
   tenant_tier?: string;
+  // V2 Feature-based commerce mode detection
+  commerce_features?: string[];
 }
 
 export interface OrderRequest {
@@ -143,11 +145,12 @@ class CustomerOrderService extends CustomerApiSingleton {
   /**
    * Get available payment gateways for a tenant
    */
-  async getPaymentGateways(tenantId: string): Promise<{ gateways: PaymentGateway[]; tenant_tier: string | null }> {
+  async getPaymentGateways(tenantId: string): Promise<{ gateways: PaymentGateway[]; tenant_tier: string | null; commerce_features: string[] }> {
     const response = await this.makeDefaultRequest<{
       success: boolean;
       gateways: PaymentGateway[];
       tenant_tier: string | null;
+      commerce_features: string[];
     }>(
       `/api/tenants/${tenantId}/payment-gateways/public`,
       {},
@@ -156,12 +159,13 @@ class CustomerOrderService extends CustomerApiSingleton {
 
     if (!response.success) {
       console.error('[CustomerOrderService] Failed to get payment gateways:', response.error);
-      return { gateways: [], tenant_tier: null };
+      return { gateways: [], tenant_tier: null, commerce_features: [] };
     }
 
     return {
       gateways: response.data?.gateways || [],
       tenant_tier: response.data?.tenant_tier || null,
+      commerce_features: response.data?.commerce_features || [],
     };
   }
 

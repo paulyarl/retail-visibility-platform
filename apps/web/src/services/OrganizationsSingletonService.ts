@@ -318,12 +318,67 @@ class OrganizationsSingletonService extends TenantApiSingleton {
   }
 
 
+  /**
+   * Get organization commerce settings
+   */
+  async getOrganizationCommerceSettings(organizationId: string): Promise<any | null> {
+    if (!organizationId) {
+      console.error('[OrganizationsSingleton] getOrganizationCommerceSettings: organizationId is required');
+      return null;
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/commerce-settings`,
+      {
+        method: 'GET',
+      },
+      `org-commerce-settings-${organizationId}`
+    );
+
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to get commerce settings:', result.error);
+      return null;
+    }
+
+    return result.data?.settings || null;
+  }
+
+  /**
+   * Update organization commerce settings
+   */
+  async updateOrganizationCommerceSettings(organizationId: string, settings: any): Promise<any | null> {
+    if (!organizationId) {
+      console.error('[OrganizationsSingleton] updateOrganizationCommerceSettings: organizationId is required');
+      return null;
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/commerce-settings`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings)
+      },
+      `org-commerce-settings-${organizationId}`
+    );
+
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to update commerce settings:', result.error);
+      return null;
+    }
+
+    // Invalidate cache after update
+    this.invalidateOrganizationCache(organizationId);
+
+    return result.data?.settings || null;
+  }
+
   private invalidateOrganizationCache(organizationId: string) {
     this.invalidateCache(`tenant-organization-${organizationId}`);
     this.invalidateCache(`organization-${organizationId}`);
     this.invalidateCache('organization-*');
     this.invalidateCache('organizations-*');
     this.invalidateCache('tenant-organization-*');
+    this.invalidateCache(`org-commerce-settings-${organizationId}`);
   }
 }
 

@@ -153,12 +153,6 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
               name: true,
             },
           },
-          users: {
-            select: {
-              first_name: true,
-              last_name: true,
-            },
-          },
         },
         orderBy: {
           created_at: 'desc',
@@ -193,12 +187,6 @@ router.get('/users', requirePlatformUser, async (req: Request, res: Response) =>
             select: {
               id: true,
               name: true,
-            },
-          },
-          users: {
-            select: {
-              first_name: true,
-              last_name: true,
             },
           },
         },
@@ -1135,15 +1123,13 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
             name: true,
           },
         },
-        users: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-          },
-        },
       },
+    });
+
+    // Look up the inviter user separately since invitations has no users relation
+    const inviterUser = await prisma.users.findUnique({
+      where: { id: requestingUser.userId },
+      select: { id: true, first_name: true, last_name: true, email: true },
     });
 
     // Send email invitation
@@ -1154,9 +1140,9 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
       
       const emailResult = await emailService.sendInvitationEmail({
         inviteeEmail: email,
-        inviterName: invitation.users.first_name && invitation.users.last_name 
-          ? `${invitation.users.first_name} ${invitation.users.last_name}`
-          : invitation.users.email,
+        inviterName: inviterUser?.first_name && inviterUser?.last_name 
+          ? `${inviterUser.first_name} ${inviterUser.last_name}`
+          : inviterUser?.email || requestingUser.userId,
         tenantName: invitation.tenants.name,
         role: role,
         acceptUrl: acceptUrl,
@@ -1197,10 +1183,10 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
         role: invitation.role,
         expiresAt: invitation.expires_at,
         tenant: invitation.tenants,
-        user: {
-          name: invitation.users.first_name && invitation.users.last_name 
-            ? `${invitation.users.first_name} ${invitation.users.last_name}`
-            : invitation.users.email,
+        inviter: {
+          name: inviterUser?.first_name && inviterUser?.last_name 
+            ? `${inviterUser.first_name} ${inviterUser.last_name}`
+            : inviterUser?.email || requestingUser.userId,
         },
         // Include acceptance URL for development/testing
         acceptUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`,
@@ -1263,35 +1249,38 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
             name: true,
           },
         },
-        users: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-          },
-        },
       },
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    const formattedInvitations = invitations.map(inv => ({
-      id: inv.id,
-      email: inv.email,
-      role: inv.role,
-      status: inv.accepted_at ? 'accepted' : (inv.expires_at < new Date() ? 'expired' : 'pending'),
-      tenant: inv.tenants,
-      user: {
-        name: inv.users.first_name && inv.users.last_name 
-          ? `${inv.users.first_name} ${inv.users.last_name}`
-          : inv.users.email,
-      },
-      created_at: inv.created_at,
-      expiresAt: inv.expires_at,
-      accepted_at: inv.accepted_at,
-    }));
+    // Look up inviter users separately since invitations has no users relation
+    const inviterIds = [...new Set(invitations.map(inv => inv.invited_by))];
+    const inviterUsers = await prisma.users.findMany({
+      where: { id: { in: inviterIds } },
+      select: { id: true, first_name: true, last_name: true, email: true },
+    });
+    const inviterMap = new Map(inviterUsers.map(u => [u.id, u]));
+
+    const formattedInvitations = invitations.map(inv => {
+      const inviter = inviterMap.get(inv.invited_by);
+      return {
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        status: inv.accepted_at ? 'accepted' : (inv.expires_at < new Date() ? 'expired' : 'pending'),
+        tenant: inv.tenants,
+        inviter: {
+          name: inviter?.first_name && inviter?.last_name 
+            ? `${inviter.first_name} ${inviter.last_name}`
+            : inviter?.email || inv.invited_by,
+        },
+        created_at: inv.created_at,
+        expiresAt: inv.expires_at,
+        accepted_at: inv.accepted_at,
+      };
+    });
 
     res.json({
       success: true,
@@ -1330,14 +1319,6 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
-          },
-        },
-        users: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
           },
         },
       },

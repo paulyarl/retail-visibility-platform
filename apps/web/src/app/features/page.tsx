@@ -467,8 +467,10 @@ const tiers = [
       'Branded storefront page',
       'Store logo on QR codes',
       'Add to cart / checkout',
-      'Conversion features'
+      'Conversion features',
+      'Payment processing'
     ],
+    commerceMode: '❌ Commerce Disabled',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'GET ONLINE',
@@ -499,8 +501,10 @@ const tiers = [
     excluded: [
       'Store logo on QR codes',
       'Add to cart / checkout flow',
-      'Conversion & reservation features'
+      'Conversion & reservation features',
+      'Payment processing'
     ],
+    commerceMode: '❌ Commerce Disabled',
     cta: 'Start Free Trial',
     popular: true,
     badge: 'MOST POPULAR',
@@ -508,19 +512,19 @@ const tiers = [
   },
   {
     name: 'Commitment',
-    price: '$99',
+    price: '$79',
     period: '/month',
     tagline: 'Capture Intent & Drive Foot Traffic',
-    description: 'Commitment commerce with holding deposits',
+    description: 'Deposit-based commerce to drive in-store pickup',
     trial: '14-day free trial',
     identity: 'I am selling online',
     realization: 'Shoppers reserve and show up — but some want to pay fully online',
-    upgradeTrigger: 'I want to close the full sale online',
+    upgradeTrigger: 'I want to offer flexible payment options',
     features: [
       'Everything in Discovery & Storefront',
       'Add to cart',
       'Checkout flow',
-      'Holding / commitment fee collected (10–15%)',
+      'Deposit collection (10-15%)',
       'Reserve / hold in store',
       'Click and collect / BOPIS',
       'Shopper notifications',
@@ -533,27 +537,58 @@ const tiers = [
       'Full online payment collection',
       'Delivery / fulfilment options'
     ],
+    commerceMode: '💳 Deposit Only Required',
     cta: 'Start Free Trial',
     popular: false,
-    badge: 'COMMITMENT COMMERCE',
+    badge: 'DEPOSIT COMMERCE',
     color: 'from-green-500 to-emerald-600'
   },
   {
-    name: 'Professional',
-    price: '$199',
+    name: 'E-commerce',
+    price: '$99',
     period: '/month',
-    tagline: 'Full E-Commerce Platform',
-    description: 'Complete online commerce with full payment processing',
+    tagline: 'Full Online Payment Processing',
+    description: 'Complete e-commerce with full payment collection and delivery',
     trial: '14-day free trial',
-    identity: 'I am a full online retailer',
-    realization: 'I have everything I need for online sales',
-    upgradeTrigger: 'I want advanced features and multi-location support',
+    identity: 'I need full online sales capabilities',
+    realization: 'I can process complete transactions online',
+    upgradeTrigger: 'I want to offer both deposit and full payment options',
     features: [
       'Everything in Discovery, Storefront & Commitment',
-      'Commitment checkout + holding fee',
+      'Add to cart',
       'Full online payment collection',
-      'Shopper payment path choice (deposit OR full payment)',
       'Delivery / fulfilment options',
+      'Shipping integration',
+      'Order management',
+      'Conversion analytics & reporting',
+      'Branded QR codes with store logo',
+      '14-day free trial'
+    ],
+    excluded: [
+      'Deposit payment options',
+      'Multi-location support'
+    ],
+    commerceMode: '💰 Full Payment Only',
+    cta: 'Start Free Trial',
+    popular: false,
+    badge: 'FULL ECOMMERCE',
+    color: 'from-cyan-500 to-blue-600'
+  },
+  {
+    name: 'Omnichannel',
+    price: '$149',
+    period: '/month',
+    tagline: 'Flexible Commerce - All Channels',
+    description: 'Multi-channel retail with pickup, delivery, and shipping',
+    trial: '14-day free trial',
+    identity: 'I sell across multiple channels',
+    realization: 'Customers can choose how they shop and pay',
+    upgradeTrigger: 'I need advanced features and higher limits',
+    features: [
+      'Everything in Discovery, Storefront, Commitment & E-commerce',
+      'Flexible payment options (deposit OR full payment)',
+      'Delivery / fulfilment options',
+      'Shipping integration',
       'Advanced analytics & reporting',
       'Branded QR codes with store logo',
       'API access & custom integrations',
@@ -561,13 +596,46 @@ const tiers = [
       '14-day free trial'
     ],
     excluded: [
-      'Multi-location support',
-      'Dedicated onboarding & support',
-      'Enterprise security & compliance'
+      'Multi-location support (beyond 10 locations)',
+      'Enterprise features'
     ],
+    commerceMode: '🔄 Flexible (Deposit or Full Payment)',
     cta: 'Start Free Trial',
     popular: false,
-    badge: 'FULL ECOMMERCE',
+    badge: 'OMNICHANNEL',
+    color: 'from-indigo-500 to-purple-600'
+  },
+  {
+    name: 'Professional',
+    price: '$199',
+    period: '/month',
+    tagline: 'Premium Commerce Platform',
+    description: 'Maximum flexibility with all payment options and multi-location support',
+    trial: '14-day free trial',
+    identity: 'I need the most powerful commerce solution',
+    realization: 'I have complete control over customer experience',
+    upgradeTrigger: 'Growth, scale, and advanced business needs',
+    features: [
+      'Everything in all lower tiers',
+      'Flexible payment options (deposit OR full payment)',
+      'Delivery / fulfilment options',
+      'Shipping integration',
+      'Advanced analytics & reporting',
+      'Branded QR codes with store logo',
+      'API access & custom integrations',
+      'Priority directory placement',
+      'Multi-location support (up to 5 locations)',
+      'Higher limits (2000 SKUs)',
+      '14-day free trial'
+    ],
+    excluded: [
+      'Multi-location support (beyond 5 locations)',
+      'Enterprise security & compliance'
+    ],
+    commerceMode: '🔄 Flexible (Deposit or Full Payment)',
+    cta: 'Start Free Trial',
+    popular: false,
+    badge: 'PREMIUM',
     color: 'from-amber-500 to-orange-600'
   },
   {
@@ -579,24 +647,26 @@ const tiers = [
     trial: '14-day free trial',
     identity: 'I am running a complete business operation',
     realization: 'I have enterprise-grade tools and support',
-    upgradeTrigger: 'Growth, scale, and advanced business needs',
+    upgradeTrigger: 'Maximum scale and customization',
     features: [
-      'Everything in Discovery, Storefront, Commitment & Professional',
-      'Multi-location support',
+      'Everything in all lower tiers',
+      'Flexible payment options (deposit OR full payment)',
+      'Multi-location support (20 locations)',
       'Advanced analytics dashboard',
       'Dedicated onboarding & support',
       'Enterprise security & compliance',
       'Custom contracts & pricing',
       'White-label options',
       'Priority directory & platform placement',
-      'Branded QR codes with store logo',
+      'Highest limits (10,000 SKUs)',
       '14-day free trial'
     ],
     excluded: [],
-    cta: 'Contact Sales',
+    commerceMode: '🔄 Flexible (Deposit or Full Payment)',
+    cta: 'Start Free Trial',
     popular: false,
     badge: 'ENTERPRISE',
-    color: 'from-red-500 to-purple-600'
+    color: 'from-red-500 to-pink-600'
   }
 ];
 
@@ -1591,7 +1661,7 @@ export default function FeaturesPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {tiers.map((tier, index) => (
               <motion.div
                 key={tier.name}
@@ -1612,6 +1682,15 @@ export default function FeaturesPage() {
                   <span className="text-5xl font-bold text-neutral-900">{tier.price}</span>
                   <span className="text-neutral-600">{tier.period}</span>
                 </div>
+                
+                {/* V2 Commerce Mode Display */}
+                {tier.commerceMode && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-sm font-medium text-blue-800 mb-1">Checkout Mode:</div>
+                    <div className="text-sm text-blue-700">{tier.commerceMode}</div>
+                  </div>
+                )}
+                
                 <a href="/auth/signup" className="block mb-6">
                   <Button className="w-full" variant={tier.popular ? 'primary' : 'secondary'}>
                     {tier.cta}

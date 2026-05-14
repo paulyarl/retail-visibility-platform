@@ -82,7 +82,7 @@ export default function VariantPopupModal({
 
   // Calculate current price/stock based on mode
   const currentPrice = hasVariants 
-    ? (selectedVariant ? selectedVariant.price_cents : product.variants?.[0]?.price_cents || 0)
+    ? (selectedVariant ? (selectedVariant.sale_price_cents || selectedVariant.price_cents) : (product.variants?.[0]?.sale_price_cents || product.variants?.[0]?.price_cents || 0))
     : (product.salePriceCents || product.priceCents || 0);
   const currentStock = hasVariants 
     ? (selectedVariant ? selectedVariant.stock : product.variants?.[0]?.stock || 0)
@@ -103,7 +103,7 @@ export default function VariantPopupModal({
     : (product.salePriceCents && product.salePriceCents < (product.priceCents || 0));
 
   const originalPrice = hasVariants
-    ? (selectedVariant?.price_cents || 0)
+    ? (selectedVariant?.price_cents || product.variants?.[0]?.price_cents || 0)
     : (product.priceCents || 0);
 
   return (
@@ -234,6 +234,8 @@ export default function VariantPopupModal({
             onClick={handleSelect}
             disabled={isButtonDisabled}
             loading={isAddingToCart}
+            variant='gradient'
+            style={{color:'white'}}
             color="blue"
           >
             {isAddingToCart ? (

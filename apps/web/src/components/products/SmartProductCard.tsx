@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { PriceDisplay } from './PriceDisplay';
-import ProductWithVariants from './ProductWithVariants';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
@@ -753,15 +752,12 @@ export default function SmartProductCard({
               return effectiveCanPurchase && (
                 <div className="mt-4">
                   {(product.has_variants === true) ? (
-                    <ProductWithVariants
-                      product={product}
-                      tenantId={tenantId}
-                      tenantName={tenantName || ''}
-                      tenantLogo={tenantLogo}
-                      defaultGatewayType={effectiveGatewayType}
-                      hasActivePaymentGateway={effectiveCanPurchase||propHasActivePaymentGateway}
-                      className="w-full"
-                    />
+                    <Link
+                      href={`/products/${product.id}`}
+                      className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                    >
+                      View Options
+                    </Link>
                   ) : (
                     <>
                       <AddToCartButton
@@ -981,13 +977,12 @@ export default function SmartProductCard({
             {effectiveCanPurchase && (
               <div className="mt-2">
                 {(product.has_variants === true) ? (
-                  <ProductWithVariants
-                    product={product}
-                    tenantId={tenantId}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    defaultGatewayType={effectiveGatewayType}
-                  />
+                  <Link
+                    href={`/products/${product.id}`}
+                    className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                  >
+                    View Options
+                  </Link>
                 ) : (
                   <AddToCartButton
                     product={product}
@@ -1171,13 +1166,12 @@ export default function SmartProductCard({
             </div>
             {effectiveCanPurchase && (
               (product.has_variants === true) ? (
-                <ProductWithVariants
-                  product={product}
-                  tenantId={tenantId}
-                  tenantName={tenantName || ''}
-                  tenantLogo={tenantLogo}
-                  defaultGatewayType={effectiveGatewayType}
-                />
+                <Link
+                  href={`/products/${product.id}`}
+                  className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                >
+                  View Options
+                </Link>
               ) : (
                 <AddToCartButton
                   product={product}
@@ -1329,14 +1323,12 @@ export default function SmartProductCard({
 
         {effectiveCanPurchase && (
             (product.has_variants === true) ? (
-              <ProductWithVariants
-                product={product}
-                tenantId={tenantId}
-                tenantName={tenantName || ''}
-                tenantLogo={tenantLogo}
-                defaultGatewayType={effectiveGatewayType}
-                className="w-full"
-              />
+              <Link
+                href={`/products/${product.id}`}
+                className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+              >
+                View Options
+              </Link>
             ) : (
               <AddToCartButton
                 product={product}

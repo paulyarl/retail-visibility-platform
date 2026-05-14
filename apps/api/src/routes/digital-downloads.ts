@@ -259,4 +259,180 @@ router.get('/orders/:orderId/downloads', async (req: Request, res: Response) => 
   }
 });
 
+/**
+ * GET /api/download/:tenantId/:slug
+ * Public download page endpoint for preview access
+ */
+router.get('/:tenantId/:slug', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, slug } = req.params;
+    const token = req.query.token as string;
+
+    console.log('[DigitalDownload] Page access:', { tenantId, slug, hasToken: !!token });
+
+    // Get download page by slug
+    const page = await prisma.digital_download_pages.findFirst({
+      where: {
+        slug: slug,
+        tenant_id: tenantId,
+        status: 'published' // Only show published pages publicly
+      },
+      include: {
+        // Include the associated item
+        inventory_items_digital_download_pages_item_idToinventory_items: {
+          select: {
+            id: true,
+            name: true,
+            product_type: true,
+            digital_delivery_method: true
+          }
+        }
+      }
+    });
+
+    if (!page) {
+      console.log('[DigitalDownload] Page not found:', { tenantId, slug });
+      return res.status(404).json({
+        success: false,
+        error: 'page_not_found',
+        message: 'Download page not found'
+      });
+    }
+
+    // Validate access token if provided
+    let accessGranted = !page.require_authentication; // Default to granted if no auth required
+    let variantId: string | null = null;
+    
+    if (token && page.require_authentication) {
+      // Look up the access grant
+      const accessGrant = await prisma.digital_access_grants.findUnique({
+        where: { access_token: token },
+        include: {
+          order_items: {
+            select: {
+              variant_id: true,
+              variant_name: true,
+              variant_attributes: true
+            }
+          }
+        }
+      });
+
+      if (!accessGrant) {
+        return res.status(403).json({
+          success: false,
+          error: 'access_denied',
+          message: 'Invalid access token'
+        });
+      }
+
+      // Check if access is still valid
+      if (accessGrant.revoked_at || 
+          (accessGrant.access_expires_at && accessGrant.access_expires_at < new Date())) {
+        return res.status(403).json({
+          success: false,
+          error: 'access_denied',
+          message: 'Access expired or revoked'
+        });
+      }
+
+      accessGranted = true;
+      variantId = accessGrant.order_items?.variant_id || null;
+    }
+
+    // Get digital assets for this page, filtered by variant if applicable
+    const assetsWhere: any = {
+      download_page_id: page.id,
+      tenant_id: tenantId
+    };
+
+    // Filter by variant if we have one
+    if (variantId) {
+      assetsWhere.variant_id = variantId;
+    } else {
+      // If no variant, get assets that don't have a variant_id
+      assetsWhere.variant_id = null;
+    }
+
+    const assets = await prisma.digital_downloads.findMany({
+      where: assetsWhere,
+      orderBy: { display_order: 'asc' },
+      include: {
+        product_variants: {
+          select: {
+            id: true,
+            variant_name: true,
+            attributes: true
+          }
+        }
+      }
+    });
+
+    // Format response
+    const responseData = {
+      id: page.id,
+      slug: page.slug,
+      title: page.title,
+      description: page.description,
+      logoUrl: page.logo_url,
+      bannerUrl: page.banner_url,
+      brandColor: page.brand_color,
+      instructions: page.instructions,
+      thankYouMessage: page.thank_you_message,
+      supportEmail: page.support_email,
+      supportUrl: page.support_url,
+      requireAuthentication: page.require_authentication,
+      accessExpires: page.access_expires,
+      accessDurationDays: page.access_duration_days,
+      downloadLimit: page.download_limit,
+      allowMultipleDownloads: page.allow_multiple_downloads,
+      item: page.inventory_items_digital_download_pages_item_idToinventory_items ? {
+        id: page.inventory_items_digital_download_pages_item_idToinventory_items.id,
+        name: page.inventory_items_digital_download_pages_item_idToinventory_items.name,
+        productType: page.inventory_items_digital_download_pages_item_idToinventory_items.product_type,
+        digitalDeliveryMethod: page.inventory_items_digital_download_pages_item_idToinventory_items.digital_delivery_method
+      } : null,
+      assets: assets.map(asset => ({
+        id: asset.id,
+        assetName: asset.asset_name,
+        assetType: asset.asset_type,
+        fileSize: asset.file_size,
+        fileMimeType: asset.file_mime_type,
+        externalUrl: asset.external_url,
+        downloadMethod: asset.download_method,
+        requiresLicenseKey: asset.requires_license_key,
+        isPrimary: asset.is_primary,
+        displayOrder: asset.display_order,
+        variantId: asset.variant_id,
+        variant: asset.product_variants ? {
+          id: asset.product_variants.id,
+          name: asset.product_variants.variant_name,
+          attributes: asset.product_variants.attributes
+        } : null
+      }))
+    };
+
+    if (!accessGranted) {
+      return res.status(403).json({
+        success: false,
+        error: 'access_denied',
+        message: 'Authentication required'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: responseData
+    });
+
+  } catch (error: any) {
+    console.error('[DigitalDownload] Page access error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: 'Failed to load download page'
+    });
+  }
+});
+
 export default router;

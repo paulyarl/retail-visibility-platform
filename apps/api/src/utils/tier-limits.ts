@@ -7,7 +7,7 @@
  * NOTE: Trial tiers are wrappers that proxy to their base tiers for limits.
  */
 
-export type SubscriptionTier = 'google_only'| 'discovery'|'storefront'|'commitment' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'google_only'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 /**
  * Map trial tiers to their base tiers for limit proxying
@@ -18,6 +18,8 @@ function getBaseTierForTrial(tier: string): SubscriptionTier {
     'trial_discovery': 'discovery',
     'trial_storefront': 'storefront',
     'trial_commitment': 'commitment',
+    'trial_ecommerce': 'ecommerce',
+    'trial_omnichannel': 'omnichannel',
     'trial_starter': 'starter',
     'trial_professional': 'professional',
     'trial_chain_starter': 'starter', // Use starter as base for chain trial
@@ -41,15 +43,23 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   discovery: {
     name: 'Discovery',
-    maxSkus: 1000,
+    maxSkus: 75,  // V2: Lower limit for discovery tier
   },
   storefront: {
     name: 'Storefront',
-    maxSkus: 5000,
+    maxSkus: 200,  // V2: Lower limit for storefront tier
   },
   commitment: {
     name: 'Commitment',
-    maxSkus: 10000,
+    maxSkus: 500,  // V2: Updated limit
+  },
+  ecommerce: {
+    name: 'E-commerce',
+    maxSkus: 1000, // V2: New tier
+  },
+  omnichannel: {
+    name: 'Omnichannel',
+    maxSkus: 2000, // V2: New tier
   },
   starter: {
     name: 'Starter',
@@ -57,15 +67,15 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   professional: {
     name: 'Professional',
-    maxSkus: 5000, // Updated from 2000 to 5000
+    maxSkus: 2000, // V2: Updated limit
   },
   enterprise: {
     name: 'Enterprise',
-    maxSkus: Infinity, // Unlimited SKUs
+    maxSkus: 10000, // V2: Updated limit (not unlimited)
   },
   organization: {
     name: 'Organization',
-    maxSkus: 10000, // Shared pool across all locations
+    maxSkus: 5000, // V2: Updated limit
   },
 };
 

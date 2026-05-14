@@ -15,11 +15,16 @@ import { generateOrderNumber, generateOrderItemId, generatePaymentId,generateOrd
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 import { customAlphabet } from 'nanoid';
 import {
-  getCheckoutModeForTier,
   calculateDeposit,
-  getDepositPercentageForTenant,
   CheckoutMode,
 } from '../utils/deposit-calculator';
+import {
+  getTenantCommerceCapabilities,
+  getCheckoutMode,
+  canProcessDeposits,
+  getDepositPercentageForOrder,
+  validateCheckoutRequest,
+} from '../utils/commerce-capabilities';
 
 const router = Router();
 
@@ -40,6 +45,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       pickup_tenant_id, // Multi-location: selected pickup location
       payment_method,
       customer_id, // Optional: for logged-in customers
+      checkout_mode = 'full_payment', // Default to full payment
     } = req.body;
     // console.log('Creating order', req.body);
 
@@ -186,23 +192,20 @@ router.post('/orders', async (req: Request, res: Response) => {
     
     const tenantTier = tenant?.subscription_tier || 'starter';
     
-    // Tier validation: Only commitment, professional, and enterprise tiers can use checkout
-    // Storefront (tier 2) and discovery (tier 1) can display products but cannot process orders
-    const effectiveTier = tenantTier.startsWith('trial_') ? tenantTier.replace('trial_', '') : tenantTier;
-    const hasCheckoutAccess = effectiveTier === 'commitment' || 
-                              effectiveTier === 'professional' || 
-                              effectiveTier === 'enterprise';
+    // Get comprehensive commerce capabilities
+    const commerceCapabilities = await getTenantCommerceCapabilities(tenant_id, prisma);
     
-    if (!hasCheckoutAccess) {
+    // Validate commerce is enabled
+    if (!commerceCapabilities.commerce_enabled) {
       return res.status(403).json({
         success: false,
         error: 'checkout_not_available',
         message: 'This store does not have checkout enabled. Please contact the store directly.',
-        tier: tenantTier,
+        tier: commerceCapabilities.tier,
       });
     }
     
-    const checkoutMode: CheckoutMode = getCheckoutModeForTier(tenantTier);
+    const checkoutCapabilities = getCheckoutMode(commerceCapabilities);
 
     // Validate items and check stock availability
     // Fetch item details from database - frontend only needs to send id and quantity
@@ -427,12 +430,13 @@ router.post('/orders', async (req: Request, res: Response) => {
     });
     const totals = calculateOrderTotals(line_items);
 
-    // Calculate deposit for Tier 3 commitment checkout
+    // Calculate deposit based on commerce capabilities
     let depositCalculation = null;
     let paymentAmount = totals.total_cents; // Default to full payment
     
-    if (checkoutMode === 'deposit') {
-      const depositPercentage = await getDepositPercentageForTenant(tenant_id, prisma);
+    if (checkoutCapabilities.mode === 'deposit_only' || 
+        (checkoutCapabilities.mode === 'flexible' && checkout_mode === 'deposit')) {
+      const depositPercentage = getDepositPercentageForOrder(commerceCapabilities, totals.total_cents);
       depositCalculation = calculateDeposit(totals.total_cents, depositPercentage);
       paymentAmount = depositCalculation.depositCents;
       
@@ -487,7 +491,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         shipping_cents: totals.shipping_cents,
         total_cents: totals.total_cents,
         // Tier 3 deposit fields
-        checkout_mode: checkoutMode,
+        checkout_mode: checkoutCapabilities.mode,
         deposit_percentage: depositCalculation?.depositPercentage || null,
         deposit_cents: depositCalculation?.depositCents || 0,
         remaining_balance_cents: depositCalculation?.remainingBalanceCents || 0,
@@ -546,7 +550,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         payment_status: 'pending',
         updated_at: new Date(),
         // Tier 3 deposit payment fields
-        is_deposit_payment: checkoutMode === 'deposit',
+        is_deposit_payment: checkoutCapabilities.mode === 'deposit_only' || checkoutCapabilities.mode === 'flexible',
         deposit_percentage: depositCalculation?.depositPercentage || null,
       },
     });
@@ -571,7 +575,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         created_at: order.created_at,
         order_items: (order as any).order_items,
         // Include deposit info for frontend
-        checkout_mode: checkoutMode,
+        checkout_mode: checkoutCapabilities.mode,
         deposit_cents: order.deposit_cents,
         remaining_balance_cents: order.remaining_balance_cents,
         pickup_deadline: order.pickup_deadline,

@@ -5,6 +5,7 @@ export interface SingleProductResult {
   name: string;
   title: string;
   description: string;
+  marketingDescription?: string; // Add marketing description field
   price: number | null;
   priceCents: number;
   listPriceCents: number;  // Add list price
@@ -118,8 +119,7 @@ export class SingleProductService {
    */
   async getProductById(productId: string): Promise<SingleProductResult | null> {
     const cacheKey = `product:${productId}`;
-
-    // Check cache first
+    
     const cached = this.getFromCache(cacheKey);
     if (cached) {
       console.log(`[SingleProductService] Cache hit for product: ${productId}`);
@@ -256,6 +256,7 @@ export class SingleProductService {
       name: product.name,
       title: product.name, // Add title field
       description: product.description || '',
+      marketingDescription: product.marketing_description || undefined, // Add marketing description
       price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
       priceCents: product.sale_price_cents || product.price_cents || 0, // Use sale price if available
       listPriceCents: product.price_cents || 0, // Add list price
@@ -428,6 +429,7 @@ export class SingleProductService {
         name: product.name,
         title: product.name, // Add title field
         description: product.description || '',
+        marketingDescription: product.marketing_description || undefined, // Add marketing description
         price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
         priceCents: product.sale_price_cents || product.price_cents || 0,
         listPriceCents: product.price_cents || 0,
@@ -689,6 +691,7 @@ export class SingleProductService {
         name: fullProduct.name,
         title: fullProduct.name,
         description: fullProduct.description || '',
+        marketingDescription: fullProduct.marketing_description || undefined, // Add marketing description
         price: fullProduct.sale_price_cents ? fullProduct.sale_price_cents / 100 : (fullProduct.price_cents ? fullProduct.price_cents / 100 : null),
         priceCents: fullProduct.sale_price_cents || fullProduct.price_cents || 0,
         listPriceCents: fullProduct.price_cents || 0,
@@ -828,12 +831,18 @@ export class SingleProductService {
     };
   }
 
+  private clearCache(): void {
+    this.cache.clear();
+    console.log('[SingleProductService] Cache cleared');
+  }
+
   private transformProduct(product: any): SingleProductResult {
     return {
       id: product.id,
       name: product.name,
       title: product.name, // Add title field
       description: product.description || '',
+      marketingDescription: product.marketing_description || undefined, // Add marketing description
       price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
       priceCents: product.sale_price_cents || product.price_cents || 0,
       listPriceCents: product.price_cents || 0,

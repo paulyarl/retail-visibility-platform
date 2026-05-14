@@ -398,6 +398,42 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     );
   }
 
+  // Calculate price summary for items with variants
+  const getPriceSummary = () => {
+    // Check if item has variants with their own pricing
+    if (item.has_variants && item.variants && item.variants.length > 0) {
+      const variantPrices = item.variants
+        .map((variant: any) => variant.price_cents || variant.priceCents || 0)
+        .filter((price: number) => price > 0);
+      
+      if (variantPrices.length > 0) {
+        const minPrice = Math.min(...variantPrices);
+        const maxPrice = Math.max(...variantPrices);
+        const hasPriceRange = minPrice !== maxPrice;
+        
+        return {
+          displayPrice: hasPriceRange 
+            ? `$${(minPrice / 100).toFixed(2)} - $${(maxPrice / 100).toFixed(2)}`
+            : `$${(minPrice / 100).toFixed(2)}`,
+          minPrice: minPrice / 100,
+          maxPrice: maxPrice / 100,
+          hasPriceRange,
+          isVariantBased: true
+        };
+      }
+    }
+    
+    // Fall back to parent product pricing
+    return {
+      displayPrice: `$${(item.price ?? 0).toFixed(2)}`,
+      minPrice: item.price ?? 0,
+      maxPrice: item.price ?? 0,
+      hasPriceRange: false,
+      isVariantBased: false
+    };
+  };
+
+  const priceSummary = getPriceSummary();
   const displayPhotos = photos.length > 0 ? photos : (item.imageUrl ? [{ id: 'primary', url: item.imageUrl, position: 0 }] : []);
 
   return (
@@ -730,26 +766,44 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </div>
                   )}
                   <div>
-                    <dt className="text-sm font-medium text-neutral-500">Price</dt>
+                    <dt className="text-sm font-medium text-neutral-500">
+                      Price
+                      {priceSummary.isVariantBased && (
+                        <span className="text-xs text-purple-600 ml-2 font-normal">
+                          (from {item.variants?.length || 0} variants)
+                        </span>
+                      )}
+                    </dt>
                     <dd className="text-2xl font-bold text-neutral-900 dark:text-white">
-                      <SalePrice 
-                        product={{
-                          price: {
-                            cents: Math.round((item.price ?? 0) * 100),
-                            currency: 'USD',
-                            formatted: `$${(item.price ?? 0).toFixed(2)}`
-                          },
-                          salePrice: (item as any).salePriceCents ? {
-                            cents: (item as any).salePriceCents,
-                            currency: 'USD', 
-                            formatted: `$${((item as any).salePriceCents / 100).toFixed(2)}`
-                          } : undefined
-                        }}
-                        variant="detail"
-                        showOriginalPrice={true}
-                        showDiscountPercentage={true}
-                        showDiscountAmount={true}
-                      />
+                      {priceSummary.isVariantBased ? (
+                        <div className="flex flex-col">
+                          <span className="text-xl">{priceSummary.displayPrice}</span>
+                          {priceSummary.hasPriceRange && (
+                            <span className="text-sm text-neutral-500 font-normal">
+                              {item.variants?.length || 0} variants available
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <SalePrice 
+                          product={{
+                            price: {
+                              cents: Math.round((item.price ?? 0) * 100),
+                              currency: 'USD',
+                              formatted: `$${(item.price ?? 0).toFixed(2)}`
+                            },
+                            salePrice: (item as any).salePriceCents ? {
+                              cents: (item as any).salePriceCents,
+                              currency: 'USD', 
+                              formatted: `$${((item as any).salePriceCents / 100).toFixed(2)}`
+                            } : undefined
+                          }}
+                          variant="detail"
+                          showOriginalPrice={true}
+                          showDiscountPercentage={true}
+                          showDiscountAmount={true}
+                        />
+                      )}
                     </dd>
                   </div>
                   <div>

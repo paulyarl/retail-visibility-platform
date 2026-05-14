@@ -1786,6 +1786,48 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get tenant commerce settings
+   */
+  async getTenantCommerceSettings(tenantId: string): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/commerce-settings`,
+      {},
+      `platform-tenant-commerce-settings-${tenantId}`,
+      this.cacheTTL
+    );
+
+    return result.data?.settings || null;
+  }
+
+  /**
+   * Update tenant commerce settings
+   */
+  async updateTenantCommerceSettings(tenantId: string, settings: any): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/commerce-settings`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      },
+      `platform-tenant-commerce-settings-${tenantId}`,
+      this.cacheTTL
+    );
+
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
+
+    return result.data?.settings || null;
+  }
+
+  /**
    * Get consolidated dashboard data for tenant
    */
   async getDashboardConsolidated(tenantId: string): Promise<any> {

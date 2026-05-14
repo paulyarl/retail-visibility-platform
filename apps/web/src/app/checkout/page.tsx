@@ -118,7 +118,7 @@ function CheckoutPageContent() {
       try {
         console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
         // Use CustomerOrderService for public checkout - no auth required
-        const { gateways, tenant_tier } = await customerOrderService.getPaymentGateways(tenantId);
+        const { gateways, tenant_tier, commerce_features } = await customerOrderService.getPaymentGateways(tenantId);
         
         // console.log('[Checkout] Payment gateways data:', gateways, 'Tenant tier:', tenant_tier);
         
@@ -172,35 +172,68 @@ function CheckoutPageContent() {
         
         if (tier) {
           setTenantTier(tier);
-          
-          // Determine checkout mode based on tier
-          const effectiveTier = tier.startsWith('trial_') ? tier.replace('trial_', '') : tier;
-          
-          // Storefront tier: checkout disabled
-          if (effectiveTier === 'storefront' || effectiveTier === 'starter' || effectiveTier === 'google_only' || effectiveTier === 'discovery') {
+        }
+
+        // Determine checkout mode based on commerce features (V2 feature-based approach)
+        // Falls back to tier-based logic if commerce_features is empty (backward compatible)
+        if (commerce_features && commerce_features.length > 0) {
+          // Step 1: Check if commerce is disabled
+          if (commerce_features.includes('commerce_disabled')) {
             setCheckoutMode('disabled');
             setDepositOption('none');
             // Fetch tenant contact info for display
             fetchTenantContact(tenantId);
           }
-          // Commitment tier: deposit is required
+          // Step 2: Check deposit-only commerce
+          else if (commerce_features.includes('commerce_deposit_only')) {
+            setCheckoutMode('deposit');
+            setDepositOption('required');
+          }
+          // Step 3: Check flexible commerce (both options)
+          else if (commerce_features.includes('commerce_both_options')) {
+            setCheckoutMode('full_payment'); // Default to full payment
+            setDepositOption('optional'); // Customer can choose deposit
+          }
+          // Step 4: Check full payment commerce
+          else if (commerce_features.includes('commerce_full_payment')) {
+            setCheckoutMode('full_payment');
+            setDepositOption('none');
+          }
+          // Step 5: commerce_enabled but no specific path — default to full payment
+          else if (commerce_features.includes('commerce_enabled')) {
+            setCheckoutMode('full_payment');
+            setDepositOption('none');
+          }
+          // No commerce features — disabled
+          else {
+            setCheckoutMode('disabled');
+            setDepositOption('none');
+            fetchTenantContact(tenantId);
+          }
+        } else if (tier) {
+          // Fallback: tier-based logic for backward compatibility
+          const effectiveTier = tier.startsWith('trial_') ? tier.replace('trial_', '') : tier;
+          
+          if (effectiveTier === 'storefront' || effectiveTier === 'starter' || effectiveTier === 'google_only' || effectiveTier === 'discovery') {
+            setCheckoutMode('disabled');
+            setDepositOption('none');
+            fetchTenantContact(tenantId);
+          }
           else if (effectiveTier === 'commitment') {
             setCheckoutMode('deposit');
             setDepositOption('required');
           } 
-          // Professional/Enterprise: customer can choose (default to full payment)
           else if (effectiveTier === 'professional' || effectiveTier === 'enterprise') {
-            setCheckoutMode('full_payment'); // Default to full payment
+            setCheckoutMode('full_payment');
             setDepositOption('optional');
           }
-          // Other tiers: full payment only
           else {
             setCheckoutMode('full_payment');
             setDepositOption('none');
           }
-          
-          // console.log('[Checkout] Tenant tier:', tier, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
         }
+        
+        // console.log('[Checkout] Tenant tier:', tier, 'Commerce features:', commerce_features, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
       } catch (error) {
         console.error('[Checkout] Failed to fetch payment gateways:', error);
       }

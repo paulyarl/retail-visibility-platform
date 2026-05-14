@@ -141,7 +141,6 @@ interface WizardData {
     googleCategoryId?: string;
     shopCategoryId?: string;
     categoryPath?: string;
-    tags: string[];
     seoTitle?: string;
     seoDescription?: string;
     seoKeywords?: string[];
@@ -252,7 +251,6 @@ const INITIAL_DATA: WizardData = {
     categoryId: '',
     googleCategoryId: '',
     shopCategoryId: '',
-    tags: [],
     seoTitle: '',
     seoDescription: '',
     seoKeywords: [],
@@ -483,7 +481,6 @@ export default function ItemCreationWizard({
           categoryName: productData.tenantCategory?.name || '',
           googleCategoryId: productData.tenantCategory?.googleCategoryId || '',
           categoryPath: productData.category_path?.[0] || '',
-          tags: metadata.tags || [],
           seoTitle: metadata.seo_title || '',
           seoDescription: metadata.seo_description || '',
           seoKeywords: metadata.seo_keywords || [],
@@ -585,13 +582,21 @@ export default function ItemCreationWizard({
         break;
       
       case 2: // Pricing Strategy
-        if (wizardData.pricing.listPrice <= 0) {
-          stepErrors.listPrice = 'List price must be greater than 0';
-          isValid = false;
-        }
-        if (wizardData.pricing.salePrice && wizardData.pricing.salePrice >= wizardData.pricing.listPrice) {
-          stepErrors.salePrice = 'Sale price must be less than list price';
-          isValid = false;
+        // Check if variants have their own pricing (from step 2)
+        const hasVariantsWithPricing = wizardData.productType.variants && 
+          wizardData.productType.variants.length > 0 && 
+          wizardData.productType.variants.some((v: any) => v.price_cents || v.priceCents);
+        
+        // Only validate parent product pricing if variants don't have their own pricing
+        if (!hasVariantsWithPricing) {
+          if (wizardData.pricing.listPrice <= 0) {
+            stepErrors.listPrice = 'List price must be greater than 0';
+            isValid = false;
+          }
+          if (wizardData.pricing.salePrice && wizardData.pricing.salePrice >= wizardData.pricing.listPrice) {
+            stepErrors.salePrice = 'Sale price must be less than list price';
+            isValid = false;
+          }
         }
         break;
       
@@ -618,10 +623,34 @@ export default function ItemCreationWizard({
   };
 
   const handleStepData = (stepData: any) => {
-    setWizardData(prev => ({
-      ...prev,
-      ...stepData
-    }));
+    // Auto-populate SEO fields when relevant data changes
+    const updatedData = { ...wizardData, ...stepData };
+    
+    // Sync SEO Title from Product Name (Step 1 -> Step 6)
+    if (stepData.basicInfo?.name && !updatedData.organization.seoTitle) {
+      updatedData.organization.seoTitle = stepData.basicInfo.name.length > 60 
+        ? stepData.basicInfo.name.substring(0, 57) + '...' 
+        : stepData.basicInfo.name;
+    }
+    
+    // Sync SEO Keywords from Product Tags (Step 4 -> Step 6)
+    if (stepData.content?.tags && (!updatedData.organization.seoKeywords || updatedData.organization.seoKeywords.length === 0)) {
+      updatedData.organization.seoKeywords = [...stepData.content.tags];
+    }
+    
+    // Sync SEO Description from Product Description (Step 4 -> Step 6)
+    if (stepData.content?.description && !updatedData.organization.seoDescription) {
+      updatedData.organization.seoDescription = stepData.content.description.length > 160 
+        ? stepData.content.description.substring(0, 157) + '...' 
+        : stepData.content.description;
+    }
+    
+    // Sync Product Tags from Content Step (Step 4 -> Step 6) for consistency
+    if (stepData.content?.tags) {
+      updatedData.organization.tags = [...stepData.content.tags];
+    }
+    
+    setWizardData(updatedData);
   };
 
   const handleNext = async () => {
@@ -809,7 +838,7 @@ export default function ItemCreationWizard({
               categoryName: wizardData.organization.categoryName,
               googleCategoryId: wizardData.organization.googleCategoryId,
               shopCategoryId: wizardData.organization.shopCategoryId,
-              tags: wizardData.organization.tags,
+              tags: wizardData.content.tags, // Tags from content step
               seoTitle: wizardData.organization.seoTitle,
               seoDescription: wizardData.organization.seoDescription,
               seoKeywords: wizardData.organization.seoKeywords,

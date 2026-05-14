@@ -263,7 +263,7 @@ class PublicDownloadService extends CustomerApiSingleton {
    */
   async getDownloadPage(tenantId: string, slug: string): Promise<{ success: boolean; data: PublicDownloadPage; error?: string }> {
     const response = await this.makeDefaultRequest<{ success: boolean; data: PublicDownloadPage; error?: string }>(
-      `/api/downloads/${tenantId}/${slug}`,
+      `/api/download/${tenantId}/${slug}`,
       {},
       `download-page-${tenantId}-${slug}`
     );
@@ -305,6 +305,72 @@ class PublicDownloadService extends CustomerApiSingleton {
     }
 
     return response.data;
+  }
+
+  /**
+   * Get download page with preview token support
+   */
+  async getDownloadPageWithPreview(
+    tenantId: string,
+    slug: string,
+    previewToken?: string
+  ): Promise<PublicDownloadPage> {
+    const cacheKey = `download-page-${tenantId}-${slug}-${previewToken || 'public'}`;
+    
+    const queryParams = new URLSearchParams();
+    if (previewToken) {
+      queryParams.append('preview', previewToken);
+    }
+
+    const response = await this.makeDefaultRequest<PublicDownloadPage>(
+      `/api/downloads/${tenantId}/${slug}${previewToken ? `?${queryParams.toString()}` : ''}`,
+      {},
+      cacheKey
+    );
+
+    if (!response.success || !response.data) {
+      throw new Error(this.getErrorMessage(response.error, 'Failed to fetch download page'));
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Validate preview token
+   */
+  async validatePreviewToken(previewToken: string): Promise<{
+    valid: boolean;
+    downloadPageId: string;
+    tenantId: string;
+    expiresAt: string;
+  }> {
+    const response = await this.makeDefaultRequest<{
+      valid: boolean;
+      downloadPageId: string;
+      tenantId: string;
+      expiresAt: string;
+    }>(
+      '/api/downloads/validate-preview-token',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ previewToken }),
+      },
+      `preview-token-${previewToken}`
+    );
+
+    if (!response.success || !response.data) {
+      throw new Error(this.getErrorMessage(response.error, 'Invalid preview token'));
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Get preview URL for a download page
+   */
+  public getPreviewUrl(tenantId: string, slug: string, previewToken: string): string {
+    return `/downloads/${tenantId}/${slug}?token=${previewToken}`;
   }
 
   // =====================

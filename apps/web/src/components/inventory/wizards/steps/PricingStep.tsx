@@ -35,6 +35,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/shadcn-select';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface PricingStepProps {
   data: {
@@ -82,11 +83,12 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
     try {
       setLoadingGateways(true);
       // Use singleton pattern for automatic caching (5-min TTL)
-      const { getPaymentGatewaySingleton } = await import('@/lib/singletons/PaymentGatewaySingleton');
-      const singleton = getPaymentGatewaySingleton(tenantId);
+      // const { getPaymentGatewaySingleton } = await import('@/lib/singletons/PaymentGatewaySingleton');
+      // const { tenantInfoService } = await import('@/services/TenantInfoService');
+      const singleton = tenantInfoService;
       
       // Fetch gateways via singleton (cached)
-      const gateways = await singleton.fetchGateways();
+      const gateways = await singleton.getPaymentGateways(tenantId);
       setTenantGateways(gateways);
     } catch (error) {
       console.error('Failed to fetch tenant gateways:', error);
@@ -220,6 +222,12 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
   };
 
   const isFormValid = () => {
+    // If variants have their own pricing from Step 2, don't validate parent product pricing
+    if (hasVariantsWithPricing) {
+      return true; // Pricing is managed at variant level
+    }
+    
+    // Otherwise validate parent product pricing
     return (
       data.listPrice > 0 &&
       data.listPrice <= 999999 &&
@@ -664,33 +672,48 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
         {loadingGateways ? (
           <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
         ) : tenantGateways.length > 0 ? (
-          <Select
-            value={data.gatewaySelection.gateway_type || ''}
-            onValueChange={handleGatewayChange}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select payment gateway" />
-            </SelectTrigger>
-            <SelectContent>
-              {tenantGateways
-                .filter(gateway => gateway.is_active)
-                .map((gateway) => (
-                  <SelectItem key={gateway.id} value={gateway.gateway_type}>
-                    <div className="flex flex-col">
-                      <div className="flex items-center space-x-2">
-                        <span>{gateway.config?.display_name || gateway.gateway_type}</span>
-                        {gateway.is_default && (
-                          <Badge variant="default" className="text-xs">Default</Badge>
-                        )}
+          <div className="space-y-2">
+            <Select
+              value={data.gatewaySelection.gateway_type || ''}
+              onValueChange={handleGatewayChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment gateway" />
+              </SelectTrigger>
+              <SelectContent>
+                {tenantGateways
+                  .filter(gateway => gateway.is_active)
+                  .map((gateway) => (
+                    <SelectItem key={gateway.id} value={gateway.gateway_type}>
+                      <div className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                          <span>{gateway.config?.display_name || gateway.gateway_type}</span>
+                          {gateway.is_default && (
+                            <Badge variant="default" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 capitalize">
+                          {gateway.gateway_type} • {gateway.config?.mode || gateway.config?.environment || 'configured'}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 capitalize">
-                        {gateway.gateway_type} • {gateway.config?.mode || gateway.config?.environment || 'configured'}
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            
+            {/* Clear Selection Button */}
+            {data.gatewaySelection.gateway_type && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleGatewayChange('')}
+                className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              >
+                <span className="mr-2">✕</span>
+                Clear Payment Gateway Selection
+              </Button>
+            )}
+          </div>
         ) : (
           <Card className="border-orange-200 bg-orange-50">
             <CardContent className="p-4">
@@ -720,22 +743,32 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
         {data.gatewaySelection.gateway_type && (
           <Card className="border-green-200 bg-green-50">
             <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-green-600" />
-                </div>
-                <div>
-                  <div className="font-medium">
-                    {tenantGateways.find(g => g.gateway_type === data.gatewaySelection.gateway_type)?.config?.display_name || 
-                     PAYMENT_GATEWAYS.find(g => g.id === data.gatewaySelection.gateway_type)?.name}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <CreditCard className="h-4 w-4 text-green-600" />
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Gateway ID: {data.gatewaySelection.gateway_id}
+                  <div>
+                    <div className="font-medium">
+                      {tenantGateways.find(g => g.gateway_type === data.gatewaySelection.gateway_type)?.config?.display_name || 
+                       PAYMENT_GATEWAYS.find(g => g.id === data.gatewaySelection.gateway_type)?.name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Gateway ID: {data.gatewaySelection.gateway_id}
+                    </div>
                   </div>
+                  <Badge className="bg-green-100 text-green-800">
+                    Configured
+                  </Badge>
                 </div>
-                <Badge className="bg-green-100 text-green-800">
-                  Configured
-                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleGatewayChange('')}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                >
+                  <span className="text-xs">Clear</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -863,14 +896,14 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
               </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowSetupModal(false)}>
+                <Button  variant='gradient' style={{color: 'white'}} onClick={() => setShowSetupModal(false)}>
                   Close
                 </Button>
                 <Button onClick={() => {
                   // Refresh gateways after setup
                   fetchTenantGateways();
                   setShowSetupModal(false);
-                }}>
+                }}  variant='gradient' style={{color: 'white'}}>
                   Refresh Gateways
                 </Button>
               </div>

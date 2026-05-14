@@ -243,6 +243,12 @@ class ItemsSingletonService extends TenantApiSingleton {
     // Invalidate platform dashboard cache since items affect stats
     await platformDashboardService.invalidateStatsCache();
     
+    // If this is a digital item, invalidate digital items cache
+    if (itemData.product_type === 'digital' && targetTenantId !== 'unknown') {
+      const { digitalDownloadPagesService } = await import('./DigitalDownloadPagesSingletonService');
+      await digitalDownloadPagesService.invalidateServiceCaches(targetTenantId);
+    }
+    
     return result.data || null;
   }
 

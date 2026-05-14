@@ -155,11 +155,24 @@ function calculateEngagementScore(metrics: StoreQualityMetrics): number {
     case 'enterprise':
       score += 7;
       break;
-    case 'pro':
+    case 'omnichannel':
+      score += 6;
+      break;
+    case 'professional':
       score += 5;
       break;
-    case 'starter':
+    case 'ecommerce':
+      score += 4;
+      break;
+    case 'commitment':
       score += 3;
+      break;
+    case 'storefront':
+      score += 2;
+      break;
+    case 'discovery':
+    case 'google_only':
+      score += 1;
       break;
     default:
       score += 0;
@@ -203,8 +216,12 @@ export const FEATURED_PRODUCTS_WITH_SCORING_QUERY = `
       -- Engagement (10 pts max)
       (CASE 
         WHEN subscription_tier = 'enterprise' THEN 7
-        WHEN subscription_tier = 'pro' THEN 5
-        WHEN subscription_tier = 'starter' THEN 3
+        WHEN subscription_tier = 'omnichannel' THEN 6
+        WHEN subscription_tier = 'professional' THEN 5
+        WHEN subscription_tier = 'ecommerce' THEN 4
+        WHEN subscription_tier = 'commitment' THEN 3
+        WHEN subscription_tier = 'storefront' THEN 2
+        WHEN subscription_tier IN ('discovery', 'google_only') THEN 1
         ELSE 0
       END) +
       (CASE WHEN website IS NOT NULL AND website != '' THEN 3 ELSE 0 END) as engagement_score

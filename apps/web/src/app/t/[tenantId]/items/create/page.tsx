@@ -178,42 +178,12 @@ export default function CreateItemPage({
       console.log(`[CreateItemPage] Product ${isEditing ? 'updated' : 'created'} successfully:`, result);
 
       // Only link photos for new items (existing items already have photos linked)
+      // NOTE: The POST /items endpoint already processes image_url and image_gallery fields
+      // and creates photo_assets records automatically. No need to upload photos separately.
       if (!isEditing) {
-        // Link photos to item in photo_assets table
-        const itemId = result.id;
-        if (itemId) {
-          // Link primary image (already uploaded to Supabase)
-          if (media.primaryImage?.url) {
-            try {
-              await itemsService.uploadPhoto(itemId, {
-                tenantId,
-                dataUrl: media.primaryImage.url, // Pass URL - backend will handle it
-                contentType: media.primaryImage.type || 'image/jpeg',
-              });
-              console.log('[CreateItemPage] Primary image linked');
-            } catch (uploadError) {
-              console.error('[CreateItemPage] Failed to link primary image:', uploadError);
-            }
-          }
-
-          // Link gallery images (already uploaded to Supabase)
-          if (media.galleryImages?.length > 0) {
-            for (const img of media.galleryImages) {
-              if (img.url) {
-                try {
-                  await itemsService.uploadPhoto(itemId, {
-                    tenantId,
-                    dataUrl: img.url, // Pass URL - backend will handle it
-                    contentType: img.type || 'image/jpeg',
-                  });
-                } catch (uploadError) {
-                  console.error('[CreateItemPage] Failed to link gallery image:', uploadError);
-                }
-              }
-            }
-            console.log(`[CreateItemPage] ${media.galleryImages.length} gallery images linked`);
-          }
-        }
+        console.log('[CreateItemPage] Photos are processed automatically by the POST /items endpoint');
+        console.log('[CreateItemPage] Primary image:', media.primaryImage?.url);
+        console.log('[CreateItemPage] Gallery images:', media.galleryImages?.length || 0);
       }
 
       // Clear draft

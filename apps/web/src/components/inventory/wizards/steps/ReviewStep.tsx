@@ -45,13 +45,11 @@ import { Separator } from '@/components/ui/Separator';
 import { Progress } from '@/components/ui/Progress';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/shadcn-select';
-import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 
-// Helper component to display category name by ID using CategorySingleton for caching
-function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCategoryId }: { categoryId: string; categoryName?: string; googleCategoryId?: string }) {
+// Helper component to display category name by ID using TenantCategoriesService (consistent with OrganizationStep)
+function CategoryNameDisplay({ categoryId, tenantId, categoryPath, categoryName: providedName, googleCategoryId }: { categoryId: string; tenantId?: string; categoryPath?: string; categoryName?: string; googleCategoryId?: string }) {
   const [categoryName, setCategoryName] = useState<string>(providedName || 'Loading...');
   const [fullCategoryPath, setFullCategoryPath] = useState<string>('');
-  const { state, actions } = useCategorySingleton();
 
   useEffect(() => {
     async function loadCategoryName() {
@@ -60,114 +58,70 @@ function CategoryNameDisplay({ categoryId, categoryName: providedName, googleCat
         return;
       }
 
-      // If name was provided directly, use it
-      if (providedName) {
-        setCategoryName(providedName);
-        // Still try to get taxonomy path if we have googleCategoryId
-        if (googleCategoryId) {
-          try {
-            const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-            const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
-            if (data && data.path && Array.isArray(data.path)) {
-              setFullCategoryPath(data.path.join(' > '));
-            }
-          } catch {
-            // Ignore taxonomy fetch errors
-          }
-        }
-        return;
-      }
-
-      // console.log('[CategoryNameDisplay] Looking for category:', categoryId, 'googleCategoryId:', googleCategoryId);
-
-      // First try to find in tenant categories (using CategorySingleton)
-      if (state.categories.length > 0) {
-        const category = actions.getCategoryById(categoryId);
-        if (category) {
-          // console.log('[CategoryNameDisplay] Found in tenant categories:', category.name);
-          setCategoryName(category.name);
-          // Use the category's googleCategoryId or the provided one for taxonomy path
-          const gcid =  googleCategoryId;
-          if (gcid) {
-            try {
-              const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-              const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(gcid);
-              if (data && data.path && Array.isArray(data.path)) {
-                setFullCategoryPath(data.path.join(' > '));
-              }
-            } catch {
-              // Ignore taxonomy fetch errors
-            }
-          }
-          return;
-        }
-      } else {
-        // Load tenant categories if not already loaded
+      // For tenant categories (scid- or itemcat- prefix), fetch from tenant service
+      if (categoryId.startsWith('scid-') || categoryId.startsWith('itemcat-')) {
         try {
-          await actions.fetchCategories({
-            includeChildren: true,
-            includeProductCount: false
-          });
+          const { tenantCategoriesService } = await import('@/services/TenantCategoriesService');
+          const categories = await tenantCategoriesService.getTenantCategories(tenantId || '');
+          const category = categories.find(cat => cat.id === categoryId);
 
-          const category = actions.getCategoryById(categoryId);
           if (category) {
-            // console.log('[CategoryNameDisplay] Found in tenant categories after load:', category.name);
             setCategoryName(category.name);
-            // Use the category's googleCategoryId or the provided one for taxonomy path
-            const gcid =  googleCategoryId;
-            if (gcid) {
+            // If category has googleCategoryId, fetch the full taxonomy path
+            if (category.googleCategoryId) {
               try {
                 const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-                const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(gcid);
+                const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(category.googleCategoryId);
                 if (data && data.path && Array.isArray(data.path)) {
                   setFullCategoryPath(data.path.join(' > '));
                 }
               } catch {
-                // Ignore taxonomy fetch errors
+                // Ignore taxonomy fetch errors for tenant categories
               }
             }
             return;
           }
         } catch (error) {
-          console.error('[CategoryNameDisplay] Error loading tenant categories:', error);
+          console.error('[ReviewStep CategoryNameDisplay] Error loading tenant category:', error);
         }
-      }
-
-      // If not found in tenant categories but we have googleCategoryId, use it for taxonomy lookup
-      if (googleCategoryId) {
-        // console.log('[CategoryNameDisplay] Using googleCategoryId for taxonomy lookup:', googleCategoryId);
+      } else {
+        // For Google categories (numeric IDs), fetch from Google taxonomy
         try {
           const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-          const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
+          const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
 
           if (data && data.path && Array.isArray(data.path)) {
             const pathString = data.path.join(' > ');
             const finalCategoryName = data.path[data.path.length - 1];
-            // console.log('[CategoryNameDisplay] Found in Google taxonomy:', pathString);
             setCategoryName(finalCategoryName);
             setFullCategoryPath(pathString);
             return;
           }
         } catch (error) {
-          console.error('[CategoryNameDisplay] Error fetching Google taxonomy:', error);
+          console.error('[ReviewStep CategoryNameDisplay] Error fetching Google taxonomy:', error);
         }
       }
 
-      // If still not found, show unknown category
-      console.log('[CategoryNameDisplay] Category not found anywhere:', categoryId);
+      // If not found anywhere, show unknown category
+      console.log('[ReviewStep CategoryNameDisplay] Category not found anywhere:', categoryId);
       setCategoryName('Unknown category');
     }
 
     loadCategoryName();
-  }, [categoryId, providedName, googleCategoryId, state.categories.length]);
+  }, [categoryId, tenantId, providedName, googleCategoryId]);
 
   return (
     <div className="space-y-1">
       <div className="font-medium">{categoryName}</div>
       <div className="text-xs text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded inline-block">ID: {categoryId}</div>
+      {categoryPath && (
+        <div className="text-xs text-green-600 dark:text-green-400 italic">
+          Category Path: {categoryPath}
+        </div>
+      )}
       {fullCategoryPath && categoryName !== 'Unknown category' && categoryName !== 'Loading...' && (
         <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-          Path: {fullCategoryPath}
+          Taxonomy Path: {fullCategoryPath}
         </div>
       )}
     </div>
@@ -667,12 +621,12 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
             </CardContent>
           </Card>
 
-          {/* Product Type */}
+          {/* Product Type & Inventory */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center space-x-2">
                 <Package className="h-4 w-4" />
-                <span>Product Type</span>
+                <span>Product Type & Inventory</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -682,11 +636,70 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
                   {data.productType.hasVariants ? 'With Variants' : 'Simple Product'}
                 </span>
               </div>
-              {data.productType.hasVariants && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Variants:</span>
-                  <span className="text-sm font-medium">{data.productType.variants.length}</span>
-                </div>
+              {data.productType.hasVariants ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Variants:</span>
+                    <span className="text-sm font-medium">{data.productType.variants.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Stock:</span>
+                    <span className="text-sm font-medium">
+                      {data.productType.variants.reduce((total: number, variant: any) => {
+                        const stock = variant.stock || variant.stock_quantity || 0;
+                        return total + (typeof stock === 'number' ? stock : parseInt(stock) || 0);
+                      }, 0)} units
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-gray-600">Variant Stock:</span>
+                    <div className="ml-2 space-y-1">
+                      {data.productType.variants.slice(0, 3).map((variant: any, index: number) => {
+                        const stock = variant.stock || variant.stock_quantity || 0;
+                        const stockNum = typeof stock === 'number' ? stock : parseInt(stock) || 0;
+                        const variantName = variant.name || variant.title || `Variant ${index + 1}`;
+                        return (
+                          <div key={index} className="flex justify-between text-xs">
+                            <span className="text-gray-500 truncate max-w-[120px]">{variantName}:</span>
+                            <span className={`font-medium ${
+                              stockNum === 0 ? 'text-red-600' : 
+                              stockNum < 5 ? 'text-orange-600' : 
+                              'text-green-600'
+                            }`}>
+                              {stockNum} units
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {data.productType.variants.length > 3 && (
+                        <div className="text-xs text-gray-500 italic">
+                          +{data.productType.variants.length - 3} more variants
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Stock Quantity:</span>
+                    <span className={`text-sm font-medium ${
+                      data.productType.stockQuantity === 0 ? 'text-red-600' : 
+                      data.productType.stockQuantity < 5 ? 'text-orange-600' : 
+                      'text-green-600'
+                    }`}>
+                      {data.productType.stockQuantity} units
+                    </span>
+                  </div>
+                  {data.inventorySettings.trackInventory && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Low Stock Alert:</span>
+                      <span className="text-sm font-medium text-orange-600">
+                        {data.inventorySettings.lowStockThreshold} units
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -817,7 +830,7 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
                   // });
                   return data.categoryId ? (
                     <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/20">
-                      <CategoryNameDisplay categoryId={data.categoryId} categoryName={data.categoryName} googleCategoryId={data.googleCategoryId} />
+                      <CategoryNameDisplay categoryId={data.categoryId} tenantId={tenantId} categoryName={data.categoryName} googleCategoryId={data.googleCategoryId} />
                     </div>
                   ) : (
                     <span className="text-sm font-medium text-gray-400">Not set</span>

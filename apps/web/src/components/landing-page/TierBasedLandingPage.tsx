@@ -1023,9 +1023,10 @@ interface TierBasedLandingPageProps {
   currentUrl?: string;
   productSlug?: string;
   slugType?: string;
+  disableQRCode?: boolean; // Override to disable QR code section
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl, productSlug, slugType }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl, productSlug, slugType, disableQRCode }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1317,7 +1318,76 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {!product.manufacturer && !product.tenantCategory && <div className="mb-3" />}
           {(product.manufacturer || product.tenantCategory) && <div className="mb-3" />}
           
-          {/* Variant Selector - Only show if variants exist */}
+          {/* 1. Availability Status - First thing customers see */}
+          {(() => {
+            if (product.variants && product.variants.length > 0) {
+              return (
+                <div className="mb-6">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-lg font-medium ${
+                    (selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {(selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+                  </span>
+                  {((selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock') && (
+                    <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
+                      {selectedVariant 
+                        ? (currentStock !== undefined && currentStock !== null ? `${currentStock} units available` : '')
+                        : (variantStockInfo ? `${variantStockInfo.totalStock} units across ${variantStockInfo.inStockCount} variant(s)` : '')
+                      }
+                    </span>
+                  )}
+                </div>
+              );
+            } else {
+              return (
+                <div className="mb-6">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    currentAvailability === 'in_stock' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {currentAvailability === 'in_stock' 
+                      ? `✓ In Stock (${currentStock} available)` 
+                      : '✗ Out of Stock'}
+                  </span>
+                </div>
+              );
+            }
+          })()}
+
+          {/* 2. Product Type Badge */}
+          {product.productType && (
+            <div className="mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-lg font-medium bg-gray-100 text-gray-800">
+                {product.productType === 'physical' && <Package size={20} className="mr-2" />}
+                {product.productType === 'digital' && <Download size={20} className="mr-2" />}
+                {product.productType === 'hybrid' && <Globe size={20} className="mr-2" />}
+                {product.productType.charAt(0).toUpperCase() + product.productType.slice(1)}
+              </span>
+            </div>
+          )}
+
+          {/* 3. Standard Description - Basic product information */}
+          {product.description && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-neutral-800 mb-3">
+                {safeFeatures.customMarketingDescription && product.marketingDescription ? 'Product Details' : 'Product Description'}
+              </h3>
+              <p className="text-neutral-700 whitespace-pre-wrap">{product.description}</p>
+            </div>
+          )}
+
+          {/* 4. Marketing Description - Enhanced marketing copy */}
+          {safeFeatures.customMarketingDescription && product.marketingDescription && (
+            <div className="prose prose-neutral max-w-none mb-6">
+              <h3 className="text-lg font-semibold text-neutral-800 mb-3">Marketing</h3>
+              <p className="text-lg text-neutral-700 whitespace-pre-wrap">{product.marketingDescription}</p>
+            </div>
+          )}
+
+          {/* 5. Variant Selector - After product info, before price */}
           {(() => {
             if (product.variants && product.variants.length > 0) {
               return (
@@ -1337,7 +1407,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
               return null;
             }
           })()}
-          
+
+          {/* 6. Price Display */}
           <div className="mb-6">
             {/* Show variant price range if has variants and no variant selected */}
             {variantPriceRange ? (
@@ -1361,67 +1432,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             <span className="text-sm text-neutral-500">SKU: {currentSku}</span>
           </div>
 
-          {/* Description - Marketing or Standard */}
-          {safeFeatures.customMarketingDescription && product.marketingDescription ? (
-            <div className="prose prose-neutral max-w-none mb-6">
-              <p className="text-lg text-neutral-700 whitespace-pre-wrap">{product.marketingDescription}</p>
-            </div>
-          ) : product.description ? (
-            <p className="text-neutral-700 mb-6">{product.description}</p>
-          ) : null}
-
-          {/* Product Type Badge */}
-          {product.productType && (
-            <div className="mb-6">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-lg font-medium bg-gray-100 text-gray-800">
-                {product.productType === 'physical' && <Package size={20} className="mr-2" />}
-                {product.productType === 'digital' && <Download size={20} className="mr-2" />}
-                {product.productType === 'hybrid' && <Globe size={20} className="mr-2" />}
-                {product.productType.charAt(0).toUpperCase() + product.productType.slice(1)}
-              </span>
-            </div>
-          )}
-
-          {/* Availability */}
-           {/* Variant Selector - Only show if variants exist */}
-          {(() => {
-            if (product.variants && product.variants.length > 0) {
-              return (
-                 <div className="mb-6">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-lg font-medium ${
-              (selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              {(selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
-            </span>
-            {((selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock') && (
-              <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
-                {selectedVariant 
-                  ? (currentStock !== undefined && currentStock !== null ? `${currentStock} units available` : '')
-                  : (variantStockInfo ? `${variantStockInfo.totalStock} units across ${variantStockInfo.inStockCount} variant(s)` : '')
-                }
-              </span>
-            )}
-          </div>
-              );
-            } else {
-              return (
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  currentAvailability === 'in_stock' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {currentAvailability === 'in_stock' 
-                    ? `✓ In Stock (${currentStock} available)` 
-                    : '✗ Out of Stock'}
-                </span>
-              );
-            }
-          })()}
-         
-
-          {/* Add to Cart Button - Only show if tenant has order processing enabled */}
+          {/* 7. Add to Cart Button - Final purchase action */}
           {!showStatusPanel && effectiveCanPurchase && (
             <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
@@ -1486,7 +1497,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
               />
             </div>
           )}
-
+          
           {/* Product Identifiers */}
           {(product.upc || product.gtin || product.mpn) && (
             <div className="mb-6 p-4 bg-neutral-50 rounded-lg">
@@ -1738,7 +1749,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
         )}
 
         {/* QR Code CTA Section - Professional+ Tier */}
-        {!showStatusPanel && safeFeatures.qrCodes && (
+        {!showStatusPanel && safeFeatures.qrCodes && !disableQRCode && (
           <PublicQRCodeSection
             productUrl={resolvedCurrentUrl}
             productName={product.name}

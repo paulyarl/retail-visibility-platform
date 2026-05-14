@@ -261,9 +261,11 @@ function getIndividualPriceForTier(tierName: string): number {
   const prices: Record<string, number> = {
     'Discovery': 29,
     'Storefront': 59,
-    'Commitment': 99,
+    'Commitment': 79,  // V2 pricing
+    'E-commerce': 99,   // V2 new tier
+    'Omnichannel': 149, // V2 new tier
     'Professional': 199,
-    'Enterprise': 499
+    'Enterprise': 499   // V2 pricing
   };
   return prices[tierName] || 99;
 }

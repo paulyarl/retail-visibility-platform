@@ -498,6 +498,32 @@ export function generateTenantKey(tenantId: string): string {
 }
 
 /**
+ * Generate an organization key from organization ID
+ * Converts organization ID to a 3-character alphanumeric key
+ */
+export function generateOrganizationKey(organizationId: string): string {
+  if (!organizationId) return 'UNK';
+  
+  // Use a simple hash to create consistent 3-char key from organization ID
+  let hash = 0;
+  for (let i = 0; i < organizationId.length; i++) {
+    hash = ((hash << 5) - hash) + organizationId.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert hash to 3-character alphanumeric key
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tempHash = Math.abs(hash);
+  let key = '';
+  for (let i = 0; i < 3; i++) {
+    key += chars[tempHash % chars.length];
+    tempHash = Math.floor(tempHash / chars.length);
+  }
+  
+  return key;
+}
+
+/**
  * Generate a customer key from customer ID
  * Converts customer ID to a 5-character alphanumeric key
  * Format: CUST-XXXXX (e.g., CUST-A3K9M)
@@ -784,6 +810,26 @@ export function generateDigitalAssetId(tenantId: string): string {
 export function generateDownloadLogId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `dlog-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate tenant commerce settings ID
+ * Format: cs-tid-abc123 (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateTenantCommerceSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate organization commerce settings ID
+ * Format: ocs-org-abc123 (18 chars)
+ * URL-safe, readable, unique, organization-traceable
+ */
+export function generateOrganizationCommerceSettingsId(organizationId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ocs-org-${generateOrganizationKey(organizationId)}-${nanoid()}`;
 }
 
 /**

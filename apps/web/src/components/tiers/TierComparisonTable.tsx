@@ -220,7 +220,9 @@ function getTierPrice(tier: string): string {
   const prices = {
     discovery: '$29/mo',
     storefront: '$59/mo',
-    commitment: '$99/mo',
+    commitment: '$79/mo',
+    ecommerce: '$99/mo',
+    omnichannel: '$149/mo',
     professional: '$199/mo',
     enterprise: '$499/mo'
   };

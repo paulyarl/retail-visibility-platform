@@ -169,28 +169,38 @@ export default function SignupWizardPage() {
   const tierOptions = [
     { 
       value: 'discovery', 
-      label: 'Tier 1 — Discovery ($29/mo)',
-      description: 'I want people to find my products on Google and in the directory'
+      label: 'Discovery ($29/mo)',
+      description: 'Get found on Google - perfect for starting your online presence'
     },
     { 
       value: 'storefront', 
-      label: 'Tier 2 — Storefront ($59/mo)',
-      description: 'I want a professional storefront where shoppers can browse my store'
+      label: 'Storefront ($59/mo)',
+      description: 'Professional storefront where shoppers can browse your products'
     },
     { 
       value: 'commitment', 
-      label: 'Tier 3 — Commitment ($99/mo)',
-      description: 'I want to sell online with add to cart and reservation features'
+      label: 'Commitment ($79/mo)',
+      description: 'Sell online with deposit-based commerce to drive foot traffic'
+    },
+    { 
+      value: 'ecommerce', 
+      label: 'E-commerce ($99/mo)',
+      description: 'Complete online sales with full payment processing and delivery'
+    },
+    { 
+      value: 'omnichannel', 
+      label: 'Omnichannel ($149/mo)',
+      description: 'Multi-channel retail with flexible payment options (deposit or full payment)'
     },
     { 
       value: 'professional', 
-      label: 'Tier 4 — Professional ($199/mo)',
-      description: 'I want complete online sales with payments and delivery'
+      label: 'Professional ($199/mo)',
+      description: 'Premium commerce platform with advanced features and multi-location support'
     },
     { 
       value: 'enterprise', 
-      label: 'Tier 5 — Enterprise ($499/mo)',
-      description: 'I need multi-location support and enterprise features'
+      label: 'Enterprise ($499/mo)',
+      description: 'Complete business solution with enterprise features and unlimited scaling'
     }
   ];
 

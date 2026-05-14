@@ -377,21 +377,10 @@ router.get('/failed-logins', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Get failed login attempts with user information
+    // Get failed login attempts
     const failedLogins = await basePrisma.login_attempts.findMany({
       where: {
         success: false
-      },
-      include: {
-        users: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-            role: true
-          }
-        }
       },
       orderBy: {
         created_at: 'desc'
@@ -399,6 +388,14 @@ router.get('/failed-logins', async (req, res) => {
       take: limit,
       skip: offset
     });
+
+    // Look up users separately since login_attempts has no users relation
+    const userIds = [...new Set(failedLogins.map(l => l.user_id).filter(Boolean))] as string[];
+    const users = userIds.length > 0 ? await basePrisma.users.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, email: true, first_name: true, last_name: true, role: true }
+    }) : [];
+    const userMap = new Map(users.map(u => [u.id, u]));
 
     // Get total count of failed logins
     const totalCount = await basePrisma.login_attempts.count({
@@ -408,23 +405,26 @@ router.get('/failed-logins', async (req, res) => {
     });
 
     // Transform the data for the response
-    const transformedLogins = failedLogins.map(login => ({
-      id: login.id,
-      userId: login.user_id,
-      email: login.email,
-      ipAddress: login.ip_address,
-      userAgent: login.user_agent,
-      failureReason: login.failure_reason,
-      metadata: login.metadata,
-      createdAt: login.created_at,
-      user: login.users ? {
-        id: login.users.id,
-        email: login.users.email,
-        firstName: login.users.first_name,
-        lastName: login.users.last_name,
-        role: login.users.role
+    const transformedLogins = failedLogins.map(login => {
+      const user = login.user_id ? userMap.get(login.user_id) : null;
+      return {
+        id: login.id,
+        userId: login.user_id,
+        email: login.email,
+        ipAddress: login.ip_address,
+        userAgent: login.user_agent,
+        failureReason: login.failure_reason,
+        metadata: login.metadata,
+        createdAt: login.created_at,
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role
       } : null
-    }));
+      };
+    });
 
     res.json({
       success: true,

@@ -206,7 +206,10 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         sku: '',
         priceCents: 0,
         stock: 0,
-        attributes: {},
+        attributes: data.variantConfig.attributeTypes.length > 0 ? {} : {
+          // For single-attribute variants, store the name as an attribute
+          option: newVariantName.trim()
+        },
         isActive: true,
         sortOrder: data.variants.length
       };

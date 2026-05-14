@@ -57,11 +57,12 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableCombinations, setAvailableCombinations] = useState<Set<string>>(new Set());
 
-  // Debug logging for variants
+  // Debug logging for variants (disabled in production)
   // console.log('[ProductVariantSelector] Received variants:', variants);
   // console.log('[ProductVariantSelector] Variants length:', variants.length);
   // console.log('[ProductVariantSelector] First variant structure:', variants[0]);
   // console.log('[ProductVariantSelector] First variant keys:', Object.keys(variants[0] || {}));
+  // console.log('[ProductVariantSelector] First variant attributes:', variants[0]?.attributes);
 
   // Group variants by dynamic attributes
   const getVariantGroups = (): VariantGroup[] => {
@@ -80,17 +81,12 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
         }
       });
       
-      // Also check for variant_name as a fallback for single-attribute variants
+      // Handle variant_name as a fallback for single-attribute variants
+      // This is the key fix - use variant_name when attributes are empty
       if ((variant as ProductVariant).variant_name && Object.keys(variantAttributes).length === 0) {
         if (!attributes.has('option')) attributes.set('option', new Set());
         attributes.get('option')!.add((variant as ProductVariant).variant_name);
       }
-      
-      // console.log(`[ProductVariantSelector] Processing variant ${(variant as ProductVariant).id}:`, {
-      //   variant_name: (variant as ProductVariant).variant_name,
-      //   attributes: variantAttributes,
-      //   stock: (variant as ProductVariant).stock
-      // });
     });
 
     // console.log('[ProductVariantSelector] Found attributes:', Array.from(attributes.keys()));
@@ -101,8 +97,15 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
         // Find variants with this attribute value
         const matchingVariants = variants.filter((v: any) => {
           const variantAttributes = (v as ProductVariant).attributes || {};
-          return variantAttributes[attributeName] === value || 
-                 (attributeName === 'option' && (v as ProductVariant).variant_name === value);
+          
+          // Handle both structured attributes and variant_name fallback
+          if (Object.keys(variantAttributes).length > 0) {
+            // Use structured attributes
+            return variantAttributes[attributeName] === value;
+          } else {
+            // Use variant_name fallback for single-attribute variants
+            return attributeName === 'option' && (v as ProductVariant).variant_name === value;
+          }
         });
         
         // console.log(`[ProductVariantSelector] Matching variants for ${attributeName}=${value}:`, matchingVariants);
@@ -189,11 +192,18 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
     // First, find variants that match ONLY the newly selected attribute
     const singleAttrVariants = variants.filter((variant: any) => {
       const variantAttributes = (variant as ProductVariant).attributes || {};
-      // Find the key that matches the attributeName (case-insensitive)
-      const matchingKey = Object.keys(variantAttributes).find(
-        k => k.toLowerCase() === attributeName.toLowerCase()
-      );
-      return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === value.toLowerCase();
+      
+      // Handle both structured attributes and variant_name fallback
+      if (Object.keys(variantAttributes).length > 0) {
+        // Use structured attributes
+        const matchingKey = Object.keys(variantAttributes).find(
+          k => k.toLowerCase() === attributeName.toLowerCase()
+        );
+        return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === value.toLowerCase();
+      } else {
+        // Use variant_name fallback for single-attribute variants
+        return attributeName === 'option' && (variant as ProductVariant).variant_name === value;
+      }
     });
     
     // If there's exactly ONE variant matching just this attribute, use ALL its attributes
@@ -202,13 +212,20 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
       const variantAttributes = matchingVariant.attributes || {};
       const allAttributeNames = Object.keys(variantAttributes);
       
-      // Build selections from ONLY this variant's attributes
+      // Build selections from variant data
       const updatedSelections: Record<string, string> = {};
-      allAttributeNames.forEach(attr => {
-        if (variantAttributes[attr]) {
-          updatedSelections[attr] = variantAttributes[attr];
-        }
-      });
+      
+      if (Object.keys(variantAttributes).length > 0) {
+        // Use structured attributes
+        allAttributeNames.forEach(attr => {
+          if (variantAttributes[attr]) {
+            updatedSelections[attr] = variantAttributes[attr];
+          }
+        });
+      } else {
+        // Use variant_name fallback
+        updatedSelections['option'] = (matchingVariant as ProductVariant).variant_name;
+      }
       
       setSelections(updatedSelections);
       onVariantChange(matchingVariant);
@@ -221,15 +238,24 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
     // Find matching variants with current selections
     const matchingVariants = variants.filter((variant: any) => {
       const variantAttributes = (variant as ProductVariant).attributes || {};
-      return Object.entries(newSelections).every(([key, val]) => {
-        const matchingKey = Object.keys(variantAttributes).find(
-          k => k.toLowerCase() === key.toLowerCase()
-        );
-        return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === val.toLowerCase();
-      });
+      
+      // Handle both structured attributes and variant_name fallback
+      if (Object.keys(variantAttributes).length > 0) {
+        // Use structured attributes
+        return Object.entries(newSelections).every(([key, val]) => {
+          const matchingKey = Object.keys(variantAttributes).find(
+            k => k.toLowerCase() === key.toLowerCase()
+          );
+          return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === val.toLowerCase();
+        });
+      } else {
+        // Use variant_name fallback for single-attribute variants
+        return newSelections['option'] && (variant as ProductVariant).variant_name === newSelections['option'];
+      }
     });
     
     const matchingVariant = matchingVariants.length > 0 ? matchingVariants[0] : null;
+    
     setSelections(newSelections);
     onVariantChange(matchingVariant);
   };
@@ -288,12 +314,20 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
               ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
             `}
           >
-            {option.label}
-            {option.price && option.price !== 0 && (
-              <span className={isSelected ? 'text-white' : 'text-gray-500'}>
-                {option.price > 0 ? ` +$${(option.price / 100).toFixed(2)}` : ` -$${Math.abs(option.price / 100).toFixed(2)}`}
-              </span>
-            )}
+            <div className="flex flex-col items-center">
+              <span className="text-sm">{option.label}</span>
+              {option.price !== undefined && (
+                <span className={`text-xs mt-1 ${isSelected ? 'text-white' : 'text-gray-500'}`}>
+                  {option.price === 0 ? (
+                    <span className="font-medium">Base</span>
+                  ) : option.price > 0 ? (
+                    `+$${(option.price / 100).toFixed(2)}`
+                  ) : (
+                    `-$${Math.abs(option.price / 100).toFixed(2)}`
+                  )}
+                </span>
+              )}
+            </div>
           </button>
         );
 
@@ -339,9 +373,15 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
               />
             )}
             <div className="text-sm font-medium">{option.label}</div>
-            {option.price && option.price !== 0 && (
-              <div className="text-xs text-gray-500">
-                {option.price > 0 ? `+$${(option.price / 100).toFixed(2)}` : `-$${Math.abs(option.price / 100).toFixed(2)}`}
+            {option.price !== undefined && (
+              <div className="text-xs text-gray-500 mt-1">
+                {option.price === 0 ? (
+                  <span className="font-medium text-gray-600">Base</span>
+                ) : option.price > 0 ? (
+                  <span className="text-green-600">+$${(option.price / 100).toFixed(2)}</span>
+                ) : (
+                  <span className="text-red-600">-$${Math.abs(option.price / 100).toFixed(2)}</span>
+                )}
               </div>
             )}
           </button>

@@ -1,8 +1,8 @@
 /**
- * Deposit Calculator for Tier 3 Commitment Checkout
+ * Deposit Calculator for Commerce-Enabled Tiers
  * 
- * Handles deposit/holding fee calculation for commitment commerce:
- * - 10-15% deposit collected at checkout
+ * Handles deposit/holding fee calculation for commerce-enabled tiers:
+ * - 5-50% deposit collected at checkout (merchant-configurable)
  * - Remaining balance paid at pickup
  * - Fee distribution on abandonment
  */
@@ -10,12 +10,13 @@
 import { Decimal } from '@prisma/client/runtime/library';
 
 /**
- * Deposit configuration for Tier 3 commitment
+ * Deposit configuration for commerce-enabled tiers
+ * Range matches commerce settings validation (5-50%)
  */
 export const DEPOSIT_CONFIG = {
-  DEFAULT_PERCENTAGE: 10, // 10% default deposit
-  MIN_PERCENTAGE: 10,
-  MAX_PERCENTAGE: 15,
+  DEFAULT_PERCENTAGE: 15, // 15% default deposit (matches commerce settings)
+  MIN_PERCENTAGE: 5,   // 5% minimum (matches commerce settings)
+  MAX_PERCENTAGE: 50,  // 50% maximum (matches commerce settings)
   PICKUP_DEADLINE_HOURS: 48, // 48 hours to pickup before forfeiture
   PLATFORM_FORFEIT_FEE_PERCENT: 20, // Platform takes 20-25% of forfeited deposits
   MAX_PLATFORM_FORFEIT_FEE_PERCENT: 25,
@@ -196,41 +197,30 @@ export function isEligibleForForfeiture(
 }
 
 /**
- * Get deposit percentage for tenant (can be customized via platform_fee_overrides)
+ * Get deposit percentage for tenant from commerce settings
  * 
- * For now, returns default percentage. In future, can check platform_fee_overrides table
- * for tenant-specific deposit percentages.
+ * Merchant-configured deposit percentage for their business needs.
+ * Platform fees are separate and handled in transaction processing.
  */
 export async function getDepositPercentageForTenant(
   tenantId: string,
   prisma: any
 ): Promise<number> {
-  // Check for tenant-specific override
-  const override = await prisma.platform_fee_overrides.findFirst({
-    where: {
-      tenant_id: tenantId,
-      is_active: true,
-      OR: [
-        { expires_at: null },
-        { expires_at: { gt: new Date() } }
-      ],
-      starts_at: { lte: new Date() }
-    },
-    select: {
-      fee_percentage: true,
-    }
+  // Check tenant's commerce settings for merchant-configured deposit percentage
+  const commerceSettings = await prisma.tenant_commerce_settings.findUnique({
+    where: { tenant_id: tenantId },
+    select: { deposit_percentage: true }
   });
   
-  // If override exists and has percentage, use it
-  if (override?.fee_percentage) {
-    const percentage = Number(override.fee_percentage);
+  // If commerce settings exist and deposit is enabled, use merchant's percentage
+  if (commerceSettings?.deposit_percentage) {
     return Math.max(
       DEPOSIT_CONFIG.MIN_PERCENTAGE,
-      Math.min(DEPOSIT_CONFIG.MAX_PERCENTAGE, percentage)
+      Math.min(DEPOSIT_CONFIG.MAX_PERCENTAGE, commerceSettings.deposit_percentage)
     );
   }
   
-  // Otherwise, return default
+  // Otherwise, return default percentage
   return DEPOSIT_CONFIG.DEFAULT_PERCENTAGE;
 }
 

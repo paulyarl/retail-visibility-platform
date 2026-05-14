@@ -31,6 +31,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { AvailableNearby } from '@/components/products/AvailableNearby';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
 
 import { tenantPublicService,SubscriptionStatusInfo,LocationStatusInfo,PublicTenantInfo,TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -63,6 +64,7 @@ interface ProductData {
   name: string;
   title: string;
   description: string;
+  marketingDescription?: string; // Add marketing description field
   price: number;
   priceCents: number;
   listPriceCents: number;
@@ -560,6 +562,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 }))}
                 totalProducts={totalProducts || 0}
               />
+              {/* QR Code - under categories */}
+              <TenantQRCode
+                url={currentUrl}
+                tenantId={product.tenantId}
+                label="Scan to Share"
+              />
             </div>
 
             {/* Mobile Category Dropdown */}
@@ -574,6 +582,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 }))}
                 totalProducts={totalProducts || 0}
               />
+              {/* QR Code - under categories */}
+              <TenantQRCode
+                url={currentUrl}
+                tenantId={product.tenantId}
+                label="Scan to Share"
+              />
             </div>
 
             {/* Product Description Section */}
@@ -581,13 +595,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="flex-1 min-w-0">
               <TenantPaymentProvider tenantId={product.tenantId}>
                 <TierBasedLandingPage 
+                disableQRCode
                 product={{
                   id: product.id,
                   tenantId: product.tenantId,
                   name: product.name,
                   title: product.title,
                   description: product.description,
-                  marketingDescription: product.metadata?.enhancedDescription,
+                  marketingDescription: product.marketingDescription || product.metadata?.enhancedDescription, // Use new field with fallback
                   price: product.price,
                   priceCents: product.priceCents,
                   listPriceCents: product.listPriceCents,
@@ -611,8 +626,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   gtin: undefined, // Not available in new API
                   mpn: undefined, // Not available in new API
                   defaultGatewayType: undefined, // Will be determined by tenant
-                  // Pass features from metadata
-                  features: product.metadata?.features,
+                  // Pass features from metadata, but disable QR codes (moved to sidebar)
+                  features: Object.assign({}, product.metadata?.features || {}, { qrCodes: false }),
                   specifications: product.metadata?.specifications, // Not available in current API
                   slug: product.tenant?.slug || '',
                   variants: product.variants,

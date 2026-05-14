@@ -24,6 +24,7 @@ import tenantsRoutes from '../tenants';
 import tenantTierRoutes from '../tenant-tier';
 import paymentGatewaysRoutes from '../payment-gateways';
 import digitalDownloadsRoutes from '../digital-downloads';
+import digitalDownloadPagesRoutes from '../tenant/digital-download-pages';
 import shopCategoriesRoutes from '../shop-categories';
 import tenantLogoRoutes from '../tenant-logo';
 import globalCatalogRoutes from '../global-catalog';
@@ -66,6 +67,9 @@ export function mountCoreRoutes(app: Express) {
   
   // IMPORTANT: Mount digital downloads WITHOUT auth - uses access tokens for security
   app.use('/api/download', digitalDownloadsRoutes);
+
+  // Digital download pages management (tenant-scoped CRUD)
+  app.use('/api/tenants', digitalDownloadPagesRoutes);
   
   app.use('/api/tenants', authenticateToken, tenantsRoutes);
   app.use('/api/tenants', authenticateToken, tenantUserRoutes);

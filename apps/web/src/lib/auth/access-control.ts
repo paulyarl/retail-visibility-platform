@@ -682,6 +682,18 @@ export const AccessPresets = {
   AUTHENTICATED: {
     allowPlatformAdminOverride: true,
   } as AccessControlOptions,
+
+  /** Can manage tenant billing (owner/admin), or platform admin */
+  CAN_MANAGE_TENANT_BILLING: {
+    requireTenantRole: [USER_ROLES.OWNER, USER_ROLES.ADMIN, USER_ROLES.TENANT_OWNER, USER_ROLES.TENANT_ADMIN],
+    allowPlatformAdminOverride: true,
+  } as AccessControlOptions,
+
+  /** Can manage tenant settings (owner/admin), or platform admin */
+  CAN_MANAGE_TENANT_SETTINGS: {
+    requireTenantRole: [USER_ROLES.OWNER, USER_ROLES.ADMIN, USER_ROLES.TENANT_OWNER, USER_ROLES.TENANT_ADMIN],
+    allowPlatformAdminOverride: true,
+  } as AccessControlOptions,
 };
 
 export function getAccessDeniedMessage(reason?: string, userRole?: string | null): {
