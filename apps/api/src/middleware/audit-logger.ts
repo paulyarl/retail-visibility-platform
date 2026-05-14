@@ -73,7 +73,7 @@ async function logAudit(req: Request, res: Response, requestId: string) {
         actor_type: user ? 'user' : 'system',
         entity_type: entityType,
         entity_id: entityId,
-        action,
+        action: action as any,
         request_id: requestId,
         ip: req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown',
         user_agent: (req.headers['user-agent'] as string) || null,

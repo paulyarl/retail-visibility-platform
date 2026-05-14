@@ -9,6 +9,7 @@ import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { generateItemId, generateTenantItemId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -150,7 +151,7 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
     // Create inventory item
     const inventoryItem = await prisma.inventory_items.create({
       data: {
-        id: `inv-${crypto.randomUUID()}`,
+        id: generateTenantItemId(tenantId),
         tenant_id: tenantId,
         sku,
         name: globalProduct.name,
@@ -174,7 +175,7 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         visibility: 'public',
         currency: 'USD',
         product_type: 'physical',
-        source: 'API_IMPORT',
+        source: 'API' as const,
         updated_at: new Date(),
         metadata: {
           global_product_id: globalProductId,
