@@ -7,7 +7,7 @@ COPY . .
 
 # Install dependencies
 RUN npm install -g pnpm
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # Build
 WORKDIR /app/apps/api
