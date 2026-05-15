@@ -1,7 +1,29 @@
 'use client';
 
 // Dynamic tier-based landing page component
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
+// Simple hook to detect screen width for responsive layouts
+function useResponsiveLayout() {
+  const [screenWidth, setScreenWidth] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    
+    // Set initial width
+    handleResize();
+    
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Return layout based on screen width
+  return screenWidth <= 475 ? 'stacked' : 'horizontal';
+}
+
 import QRCode from 'qrcode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
@@ -1036,6 +1058,9 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // Move all hooks to the top - Rules of Hooks
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
   
+  // Responsive layout for AddToCartButton
+  const layout = useResponsiveLayout();
+  
   // Get fresh payment gateway status from context
   const contextPayment = useTenantPaymentOptional();
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
@@ -1494,6 +1519,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 tenantLogo={businessLogo}
                 hasActivePaymentGateway={effectiveCanPurchase}
                 defaultGatewayType={effectiveGatewayType}
+                layout={layout}
               />
             </div>
           )}
