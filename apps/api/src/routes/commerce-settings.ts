@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
+import { getTenantCommerceCapabilities } from '../utils/commerce-capabilities';
 
 const router = Router();
 
@@ -35,48 +36,25 @@ router.get('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
   try {
     const { tenantId } = req.params;
 
-    const settings = await prisma.tenant_commerce_settings.findUnique({
-      where: { tenant_id: tenantId },
-    });
-
-    // If no settings exist, return defaults
-    if (!settings) {
-      return res.json({
-        success: true,
-        settings: {
-          deposit_enabled: true,
-          deposit_percentage: 15,
-          deposit_min_cents: 500,
-          deposit_max_cents: 5000,
-          full_payment_enabled: true,
-          auto_confirm_orders: true,
-          order_confirmation_minutes: 15,
-          show_payment_options: true,
-          require_payment_upfront: false,
-          allow_payment_on_pickup: true,
-          notify_on_payment: true,
-          notify_on_deposit: true,
-          notify_on_fulfillment: true,
-        },
-      });
-    }
+    // Get tenant commerce capabilities (respects tier features)
+    const capabilities = await getTenantCommerceCapabilities(tenantId);
 
     res.json({
       success: true,
       settings: {
-        deposit_enabled: settings.deposit_enabled,
-        deposit_percentage: settings.deposit_percentage,
-        deposit_min_cents: settings.deposit_min_cents,
-        deposit_max_cents: settings.deposit_max_cents,
-        full_payment_enabled: settings.full_payment_enabled,
-        auto_confirm_orders: settings.auto_confirm_orders,
-        order_confirmation_minutes: settings.order_confirmation_minutes,
-        show_payment_options: settings.show_payment_options,
-        require_payment_upfront: settings.require_payment_upfront,
-        allow_payment_on_pickup: settings.allow_payment_on_pickup,
-        notify_on_payment: settings.notify_on_payment,
-        notify_on_deposit: settings.notify_on_deposit,
-        notify_on_fulfillment: settings.notify_on_fulfillment,
+        deposit_enabled: capabilities.deposit_enabled,
+        deposit_percentage: capabilities.deposit_percentage,
+        deposit_min_cents: capabilities.deposit_min_cents,
+        deposit_max_cents: capabilities.deposit_max_cents,
+        full_payment_enabled: capabilities.full_payment_enabled,
+        auto_confirm_orders: capabilities.auto_confirm_orders,
+        order_confirmation_minutes: capabilities.order_confirmation_minutes,
+        show_payment_options: capabilities.show_payment_options,
+        require_payment_upfront: capabilities.require_payment_upfront,
+        allow_payment_on_pickup: capabilities.allow_payment_on_pickup,
+        notify_on_payment: capabilities.notify_on_payment,
+        notify_on_deposit: capabilities.notify_on_deposit,
+        notify_on_fulfillment: capabilities.notify_on_fulfillment,
       },
     });
   } catch (error) {
@@ -94,35 +72,22 @@ router.get('/public/tenant/:tenantId/commerce-settings', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const settings = await prisma.tenant_commerce_settings.findUnique({
-      where: { tenant_id: tenantId },
-      select: {
-        deposit_enabled: true,
-        deposit_percentage: true,
-        deposit_min_cents: true,
-        deposit_max_cents: true,
-        full_payment_enabled: true,
-        show_payment_options: true,
-        require_payment_upfront: true,
-        allow_payment_on_pickup: true,
-      },
-    });
+    // Get tenant commerce capabilities (respects tier features)
+    const capabilities = await getTenantCommerceCapabilities(tenantId);
 
-    // Return defaults if no settings exist
-    const defaultSettings = {
-      deposit_enabled: true,
-      deposit_percentage: 15,
-      deposit_min_cents: 500,
-      deposit_max_cents: 5000,
-      full_payment_enabled: true,
-      show_payment_options: true,
-      require_payment_upfront: false,
-      allow_payment_on_pickup: true,
-    };
-
+    // Return public capabilities
     res.json({
       success: true,
-      settings: settings || defaultSettings,
+      settings: {
+        deposit_enabled: capabilities.deposit_enabled,
+        deposit_percentage: capabilities.deposit_percentage,
+        deposit_min_cents: capabilities.deposit_min_cents,
+        deposit_max_cents: capabilities.deposit_max_cents,
+        full_payment_enabled: capabilities.full_payment_enabled,
+        show_payment_options: capabilities.show_payment_options,
+        require_payment_upfront: capabilities.require_payment_upfront,
+        allow_payment_on_pickup: capabilities.allow_payment_on_pickup,
+      },
     });
   } catch (error) {
     console.error('Error fetching public commerce settings:', error);

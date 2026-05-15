@@ -57,20 +57,31 @@ export async function getTenantCommerceCapabilities(
   prismaClient: any = prisma
 ): Promise<CommerceCapabilities> {
   // Get tenant tier and organization information
-  const tenantResponse = await prismaClient.$queryRaw`
-    SELECT 
-      t.subscription_tier as tier,
-      tt.features as tier_features,
-      t.organization_id as organization_id
-    FROM tenants t
-    LEFT JOIN subscription_tiers_list tt ON tt.tier_key = t.subscription_tier
-    WHERE t.id = ${tenantId}
-  `;
+  const tenant = await prismaClient.tenants.findUnique({
+    where: { id: tenantId },
+    select: {
+      subscription_tier: true,
+      organization_id: true,
+    },
+  });
 
-  const tenantData = tenantResponse[0] || {};
-  const tier = tenantData.tier || '';
-  const organizationId = tenantData.organization_id;
-  const tierFeatures = tenantData.tier_features || [];
+  const tier = tenant?.subscription_tier || '';
+  const organizationId = tenant?.organization_id;
+
+  // Get tier features separately
+  const tierData = await prismaClient.subscription_tiers_list.findUnique({
+    where: { tier_key: tier },
+    select: {
+      tier_features_list: {
+        select: {
+          feature_key: true,
+          is_enabled: true,
+        },
+      },
+    },
+  });
+
+  const tierFeatures = tierData?.tier_features_list || [];
 
   // Convert tier features to key-value object
   const tierCapabilities = tierFeatures.reduce((acc: any, feature: any) => {

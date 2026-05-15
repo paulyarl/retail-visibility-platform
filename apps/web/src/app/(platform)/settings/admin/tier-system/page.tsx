@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input,
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2,Pause, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Tier {
@@ -764,9 +764,10 @@ export default function TierSystemPage() {
                               </Button>
                               <Button
                                 onClick={() => handleToggleTier(tier.id, !tier.isActive)}
-                                variant={tier.isActive ? 'destructive' : 'default'}
-                                size="sm"
-                              >
+                                variant={tier.isActive ? 'gradient' : 'gradient'}
+                                style={tier.isActive ? {color: 'white'} : {color: 'white'}}
+                                size="md"
+                              > <Pause className="w-4 h-4"  style={tier.isActive ? {color: 'orange'} : {color: 'yellow'}}/>
                                 {tier.isActive ? 'Deactivate' : 'Activate'}
                               </Button>
                             </div>
