@@ -1168,4 +1168,155 @@ router.post('/:id/logo', authenticateToken, checkTenantAccess, async (req: Reque
 import tenantBillingRoutes from './tenant-billing';
 router.use('/:tenantId/billing', tenantBillingRoutes);
 
+/**
+ * PATCH /api/tenants/:id/status
+ * Update tenant location status with immediate cache invalidation
+ */
+router.patch('/:id/status', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    console.log('[PATCH /api/tenants/:id/status] Starting location status update:', { id, status });
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required'
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'status_required',
+        message: 'Status is required'
+      });
+    }
+
+    // Validate status transition using location status utility
+    const { validateStatusChange } = await import('../utils/location-status');
+    const tenant = await prisma.tenants.findUnique({
+      where: { id },
+      select: { location_status: true }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found'
+      });
+    }
+
+    const validation = validateStatusChange(tenant.location_status as any, status);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_status_transition',
+        message: validation.error
+      });
+    }
+
+    // Update tenant location status
+    console.log('[PATCH /api/tenants/:id/status] Updating location status in database...');
+    const updatedTenant = await prisma.tenants.update({
+      where: { id },
+      data: {
+        location_status: status,
+        status_changed_at: new Date()
+      }
+    });
+
+    console.log('[PATCH /api/tenants/:id/status] Database update successful:', {
+      id: updatedTenant.id,
+      oldStatus: tenant.location_status,
+      newStatus: status
+    });
+
+    // 🔥 CRITICAL: Invalidate all related caches immediately
+    await invalidateAllTenantCaches(id);
+
+    // Return updated tenant info
+    const transformedTenant = {
+      id: updatedTenant.id,
+      name: updatedTenant.name,
+      locationStatus: updatedTenant.location_status,
+      statusChangedAt: updatedTenant.status_changed_at,
+      subscriptionTier: updatedTenant.subscription_tier,
+      subscriptionStatus: updatedTenant.subscription_status,
+      createdAt: updatedTenant.created_at
+    };
+
+    console.log('[PATCH /api/tenants/:id/status] Cache invalidation complete, returning response');
+    res.json({
+      success: true,
+      data: transformedTenant,
+      message: `Location status updated to ${status} with immediate cache invalidation`
+    });
+
+  } catch (error: any) {
+    console.error('[PATCH /api/tenants/:id/status] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_server_error',
+      message: 'Failed to update location status',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Invalidate all tenant-related caches when location status changes
+ * This ensures immediate propagation across all three cache layers
+ */
+async function invalidateAllTenantCaches(tenantId: string) {
+  try {
+    console.log(`[Cache Invalidation] Starting cache invalidation for tenant ${tenantId}`);
+    
+    const { CacheService } = await import('../services/CacheService');
+    
+    // Get tenant info for additional cache keys
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { slug: true }
+    });
+
+    const invalidationPromises = [
+      // Direct tenant caches
+      CacheService.del(`tenant-info-${tenantId}`),
+      CacheService.del(`public-tenant-${tenantId}`),
+      
+      // MV discovery cache (affects product/directory pages)
+      CacheService.clear(`mv_global_discovery:*${tenantId}*`),
+      
+      // Shop-related caches
+      CacheService.del(`shop:tenantId:${tenantId}`),
+      ...(tenant?.slug ? [CacheService.del(`shop:slug:${tenant.slug}`)] : []),
+      
+      // Directory caches
+      CacheService.clear(`directory:*${tenantId}*`),
+      
+      // Public API caches
+      CacheService.del(`public-tenant-info-${tenantId}`),
+      CacheService.del(`public-tenant-profile-${tenantId}`),
+      CacheService.del(`tenant-hours-${tenantId}`),
+      
+      // Business hours cache
+      CacheService.del(`business-hours-${tenantId}`),
+      CacheService.del(`business-hours-v2-${tenantId}`),
+    ];
+
+    await Promise.all(invalidationPromises);
+    
+    console.log(`[Cache Invalidation] Cleared ${invalidationPromises.length} cache keys for tenant ${tenantId}`);
+    console.log(`[Cache Invalidation] Invalidated keys for slug: ${tenant?.slug || 'no-slug'}`);
+    
+  } catch (error) {
+    console.error(`[Cache Invalidation] Error invalidating caches for tenant ${tenantId}:`, error);
+    // Don't throw - cache invalidation failure shouldn't break the status update
+  }
+}
+
 export default router;

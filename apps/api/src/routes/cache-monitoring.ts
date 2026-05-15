@@ -293,12 +293,15 @@ router.get('/test', async (req, res) => {
     const { iterations = 100 } = req.query;
     const cache = UniversalIdentifierCache.getInstance();
     
+    // const testIdentifiers = [
+    //   'tid-m8ijkrnk',
+    //   'baraka-international-market-inc',
+    //   'ULCW',
+    //   'tid-r6cccpag',
+    //   'tid-mrsyk3w6'
+    // ];
     const testIdentifiers = [
-      'tid-m8ijkrnk',
-      'baraka-international-market-inc',
-      'ULCW',
-      'tid-r6cccpag',
-      'tid-mrsyk3w6'
+      ''
     ];
     
     const startTime = Date.now();

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { tenantInfoService } from '@/services/TenantInfoService';
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -96,7 +97,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }, { status: 400 });
     }
 
-    // console.log('[PATCH /api/tenants/:id] Updating tenant:', id, body);
+    console.log('[PATCH /api/tenants/:id] Updating tenant:', id, body);
     
     // Update tenant using service with automatic cache invalidation
     // Use appropriate update method based on data provided
@@ -105,6 +106,30 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     if (body.subdomain !== undefined) {
       updatedTenant = await tenantInfoService.updateTenantSubdomain(id, body.subdomain);
     } else if (body.status !== undefined) {
+      // 🔥 CRITICAL: Location status change - clear Next.js route cache
+      console.log('[PATCH /api/tenants/:id] Clearing Next.js route cache for status change');
+      
+      // Clear all affected pages for this tenant
+      revalidatePath(`/tenant/${id}`);
+      revalidatePath(`/shops/${id}`);
+      
+      // Get tenant info for slug-based revalidation
+      try {
+        const tenantInfo = await tenantInfoService.getTenantInfo(id);
+        if (tenantInfo?.slug) {
+          revalidatePath(`/shops/${tenantInfo.slug}`);
+          revalidatePath(`/directory/${tenantInfo.slug}`);
+          revalidatePath(`/products/${tenantInfo.slug}`); // If product pages use slug
+          console.log(`[PATCH /api/tenants/:id] Cleared routes for slug: ${tenantInfo.slug}`);
+        }
+      } catch (error) {
+        console.warn('[PATCH /api/tenants/:id] Could not get tenant info for slug revalidation:', error);
+      }
+      
+      // Clear tenant list pages
+      revalidatePath('/tenants');
+      revalidatePath('/admin/tenants');
+      
       updatedTenant = await tenantInfoService.updateTenantStatus(id, body.status);
     } else {
       // For partial updates, we could enhance this later
@@ -121,7 +146,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }, { status: 400 });
     }
     
-    // console.log('[PATCH /api/tenants/:id] Update successful');
+    console.log('[PATCH /api/tenants/:id] Update successful with route cache invalidation');
     return NextResponse.json(updatedTenant);
   } catch (error) {
     console.error('[PATCH /api/tenants/:id] Error:', error);

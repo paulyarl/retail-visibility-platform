@@ -18,9 +18,9 @@ const API_BASE = 'http://localhost:4000/api';
 
 // Test data
 const TEST_TENANT = {
-  id: 'tid-r6cccpag',
+  id: 'tid-fjwr30ib',
   name: 'Test Tenant for Digital Downloads',
-  slug: 'tid-r6cccpag',
+  slug: 'tid-fjwr30ib',
   location_status: 'active'
 };
 

@@ -241,42 +241,55 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     
     // console.log('[TenantPage] Shop info response:', shopInfo);
+    // console.log('[TenantPage] Tenant data:', tenant);
 
     const tenantData = (tenant as any)?.data || tenant;
+    // console.log('[TenantPage] Tenant data (after extraction):', tenantData);
+
+    const tenantDirectoryData = tenantData?.directoryData;
+    const tenantMetadata = tenantData?.metadata;
+    const tenantProfileData = tenantData?.profileData;
+    const tenantStatusInfo = tenantData?.statusInfo;
+    // console.log(`[TenantPage] tenantDirectoryData: `,tenantDirectoryData);
+    // console.log(`[TenantPage] tenantMetadata: `,tenantMetadata);
+    // console.log(`[TenantPage] tenantProfileData: `,tenantProfileData);
+    // console.log(`[TenantPage] tenantStatusInfo: `,tenantStatusInfo);
+
+
     // API returns { success: true, shop: {...} }
     const shopData = shopInfo?.success ? shopInfo.shop : null;
 
-    if (shopData) {
+    if (shopData||tenant) {
       tenantData.metadata = {
         ...tenantData.metadata,
-        businessName: shopData.business_name || tenantData.name,
-        phone: shopData.phone || null,
-        email: shopData.email || null,
-        website: shopData.website || null,
-        address: shopData.address && shopData.city && shopData.state && shopData.zip_code
-          ? `${shopData.address}, ${shopData.city}, ${shopData.state} ${shopData.zip_code}`
+        businessName: tenantProfileData?.business_name|| shopData?.business_name || tenantData.name,
+        phone: tenantProfileData?.phone_number||shopData?.phone || null,
+        email: tenantProfileData?.email||shopData?.email || null,
+        website:tenantProfileData?.website|| shopData?.website || null,
+        address:tenantProfileData?.address_line1|| shopData?.address && tenantProfileData?.city|| shopData?.city && tenantProfileData?.state|| shopData?.state && tenantProfileData?.postal_code|| shopData?.zip_code
+          ? `${tenantProfileData?.address_line1||shopData.address}, ${tenantProfileData?.city||shopData.city}, ${tenantProfileData?.state||shopData.state} ${tenantProfileData?.postal_code||shopData.zip_code}`
           : null,
-        logo_url: shopData.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
-        business_description: shopData.description || null,
-        defaultGatewayType: shopData.default_gateway_type || null,
-        hasActivePaymentGateway: shopData.has_active_payment_gateway || false,
-        isActive: shopData.is_active || false,
-        isFeatured: shopData.is_featured || false,
-        isArchived: shopData.is_archived || false,
-        isDeleted: shopData.is_deleted || false,
-        isPublished: shopData.is_published || false,
-        isHidden: shopData.is_hidden || false,
-        isDraft: shopData.is_draft || false,
-        isInactive: shopData.is_inactive || false,
+        logo_url:tenantProfileData?.logo_url|| shopData?.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
+        business_description: tenantProfileData?.business_description||shopData?.description || null,
+        defaultGatewayType: shopData?.default_gateway_type || null,
+        hasActivePaymentGateway: shopData?.has_active_payment_gateway || false,
+        isActive: shopData?.is_active || false,
+        isFeatured: shopData?.is_featured || false,
+        isArchived: shopData?.is_archived || false,
+        isDeleted: shopData?.is_deleted || false,
+        isPublished: tenantDirectoryData?.is_published || shopData?.is_published || false,
+        isHidden: shopData?.is_hidden || false,
+        isDraft: shopData?.is_draft || false,
+        isInactive: shopData?.is_inactive || false,
 
       };
       
     } else {
-      console.log('[TenantPage] No shop data found');
+      // console.log('[TenantPage] No shop data found');
      // console.log('[TenantPage] Raw shopInfo:', shopInfo);
     }
 
-    const hasLogo = !!tenantData.metadata?.logo_url;
+    const hasLogo = !!tenantProfileData?.logo_url||!!tenantData.metadata?.logo_url;
     const hasBranding = hasLogo || !!businessHours;
     const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
 

@@ -1301,7 +1301,7 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
-   * Update tenant status
+   * Update tenant status with immediate frontend cache invalidation
    */
   async updateTenantStatus(tenantId: string, status: string): Promise<any> {
     try {
@@ -1317,7 +1317,13 @@ class TenantInfoService extends TenantApiSingleton {
             status: status
           })
         },
-        `tenant-update-status-${tenantId}`
+        `tenant-update-status-${tenantId}`,
+        0, // No cache for updates
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to update tenant status:', result.error);
@@ -1326,10 +1332,60 @@ class TenantInfoService extends TenantApiSingleton {
         throw error;
       }
 
+      // 🔥 CRITICAL: Invalidate frontend singleton caches immediately
+      await this.invalidateAllTenantCaches(tenantId);
+
       return result.data;
     } catch (error) {
       console.error('[TenantInfoService] Failed to update tenant status:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Invalidate all frontend singleton caches for a tenant
+   * This ensures immediate propagation across browser and server caches
+   */
+  async invalidateAllTenantCaches(tenantId: string): Promise<void> {
+    try {
+      console.log(`[Frontend Cache] Starting cache invalidation for tenant ${tenantId}`);
+      
+      // Get tenant info for additional cache keys (slug-based invalidation)
+      const tenantInfo = await this.getTenantInfo(tenantId).catch(() => null);
+      const slug = tenantInfo?.slug;
+
+      const invalidations = [
+        // Primary tenant info caches (affects /tenant/[id] page)
+        this.invalidateCache(`public-tenant-info-${tenantId}`),
+        this.invalidateCache(`public-tenant-profile-${tenantId}`),
+        this.invalidateCache(`tenant-hours-${tenantId}`),
+        
+        // Shop caches (affects /shops/[slug] and /products/[id] pages)
+        slug ? this.invalidateCache(`shop-data-${slug}`) : null,
+        slug ? this.invalidateCache(`shop:slug:${slug}`) : null,
+        this.invalidateCache(`shop:tenantId:${tenantId}`),
+        
+        // Directory caches (affects /directory/[slug] page)
+        slug ? this.invalidateCache(`directory-listing-${slug}`) : null,
+        this.invalidateCache(`directory:*${tenantId}*`),
+        
+        // Pattern-based invalidation for comprehensive cleanup
+        this.invalidateCache(`*${tenantId}*`),
+        slug ? this.invalidateCache(`*${slug}*`) : null,
+        
+        // Business hours cache
+        this.invalidateCache(`business-hours-${tenantId}`),
+        this.invalidateCache(`business-hours-v2-${tenantId}`),
+      ].filter(Boolean);
+
+      await Promise.all(invalidations);
+      
+      console.log(`[Frontend Cache] Invalidated ${invalidations.length} cache keys for tenant ${tenantId}`);
+      console.log(`[Frontend Cache] Invalidated keys for slug: ${slug || 'no-slug'}`);
+      
+    } catch (error) {
+      console.error(`[Frontend Cache] Error invalidating caches for tenant ${tenantId}:`, error);
+      // Don't throw - cache invalidation failure shouldn't break the status update
     }
   }
 
