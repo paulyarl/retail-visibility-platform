@@ -548,7 +548,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       )}
 
 {/* Two-Column Layout: Categories + Product Description only */}
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Desktop Category Sidebar */}
             <div className="hidden lg:block lg:w-64 flex-shrink-0">
@@ -571,7 +571,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Mobile Category Dropdown */}
-            <div className="lg:hidden">
+            <div className="lg:hidden w-full">
               <CategoryMobileDropdown
                 tenantId={product.tenantId}
                 categories={storefrontCategories.categories.map((cat: any) => ({
@@ -592,7 +592,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
             {/* Product Description Section */}
            
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
               <TenantPaymentProvider tenantId={product.tenantId}>
                 <TierBasedLandingPage 
                 disableQRCode
