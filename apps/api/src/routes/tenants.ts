@@ -1275,7 +1275,8 @@ async function invalidateAllTenantCaches(tenantId: string) {
   try {
     console.log(`[Cache Invalidation] Starting cache invalidation for tenant ${tenantId}`);
     
-    const { CacheService } = await import('../services/CacheService');
+    const { getCacheService } = await import('../services/OverrideCacheService');
+    const cacheService = getCacheService();
     
     // Get tenant info for additional cache keys
     const tenant = await prisma.tenants.findUnique({
@@ -1283,34 +1284,15 @@ async function invalidateAllTenantCaches(tenantId: string) {
       select: { slug: true }
     });
 
-    const invalidationPromises = [
-      // Direct tenant caches
-      CacheService.del(`tenant-info-${tenantId}`),
-      CacheService.del(`public-tenant-${tenantId}`),
-      
-      // MV discovery cache (affects product/directory pages)
-      CacheService.clear(`mv_global_discovery:*${tenantId}*`),
-      
-      // Shop-related caches
-      CacheService.del(`shop:tenantId:${tenantId}`),
-      ...(tenant?.slug ? [CacheService.del(`shop:slug:${tenant.slug}`)] : []),
-      
-      // Directory caches
-      CacheService.clear(`directory:*${tenantId}*`),
-      
-      // Public API caches
-      CacheService.del(`public-tenant-info-${tenantId}`),
-      CacheService.del(`public-tenant-profile-${tenantId}`),
-      CacheService.del(`tenant-hours-${tenantId}`),
-      
-      // Business hours cache
-      CacheService.del(`business-hours-${tenantId}`),
-      CacheService.del(`business-hours-v2-${tenantId}`),
-    ];
-
-    await Promise.all(invalidationPromises);
+    // Use the built-in tenant invalidation which handles all cache patterns
+    await cacheService.invalidateTenant(tenantId);
     
-    console.log(`[Cache Invalidation] Cleared ${invalidationPromises.length} cache keys for tenant ${tenantId}`);
+    // Also invalidate slug-based caches if slug exists
+    if (tenant?.slug) {
+      await cacheService.invalidateTenant(tenant.slug);
+    }
+    
+    console.log(`[Cache Invalidation] Cleared cache keys for tenant ${tenantId}`);
     console.log(`[Cache Invalidation] Invalidated keys for slug: ${tenant?.slug || 'no-slug'}`);
     
   } catch (error) {
