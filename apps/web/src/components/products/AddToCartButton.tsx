@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Button } from '@/components/ui/Button';
-import { ShoppingCart, Check, ArrowRight } from 'lucide-react';
+import { ShoppingCart,DollarSign, Check, ArrowRight } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 
@@ -173,6 +173,7 @@ export function AddToCartButton({
           </Tooltip>
           <Tooltip content="Select options above to enable">
             <Button disabled className={`bg-white text-gray-900 border-gray-300 ${layout === 'stacked' ? 'w-full' : ''}`}>
+              <DollarSign className="mr-2 h-4 w-4" />
               Buy Now
             </Button>
           </Tooltip>
@@ -249,6 +250,7 @@ export function AddToCartButton({
           variant="outline"
           className={`bg-white text-gray-900 border-gray-300 hover:border-gray-400 ${layout === 'stacked' ? 'w-full' : ''}`}
         >
+              <DollarSign className="mr-2 h-4 w-4" />
           {hoursStatus && (
             <div
               className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}

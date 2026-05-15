@@ -404,7 +404,7 @@ export default function SmartProductCard({
   tenantState,
   tenantSlug,
   distanceKm,
-  variant = 'grid',
+  variant = 'featured',
   showCategory = true,
   showDescription = true,
   className = '',
@@ -412,7 +412,7 @@ export default function SmartProductCard({
   productCategorySlug,
   hasActivePaymentGateway: propHasActivePaymentGateway,
   defaultGatewayType: propDefaultGatewayType,
-  buttonLayout = 'horizontal',
+  buttonLayout = 'stacked',
 }: SmartProductCardProps) {
   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
@@ -615,7 +615,7 @@ export default function SmartProductCard({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <HoursStatusBadge status={hoursStatus} />
+       
 			
               </Link>
             )}
@@ -808,7 +808,7 @@ export default function SmartProductCard({
             <Link href={`/products/${product.id}`}>
               <h4 className="font-medium text-sm text-neutral-900 dark:text-white truncate">
               
-                <HoursStatusBadge status={hoursStatus} />
+             
 			
                 {displayTitle}
               </h4>
@@ -1101,7 +1101,7 @@ export default function SmartProductCard({
                     {displayTitle}
 
                              
-                <HoursStatusBadge status={hoursStatus} />
+              
                   </h3>
                 </Link>
               </div>

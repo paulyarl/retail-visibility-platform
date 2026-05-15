@@ -182,6 +182,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
         subscriptionEndsAt: tenant.subscription_ends_at,
         graceEndsAt: tenant.grace_ends_at,
         createdAt: tenant.created_at,
+        locationStatus: (tenant as any).location_status,
         // hasPublishedDirectory: hasPublishedDirectory,
         organization: (tenant as any).organizations_list ? {
           id: (tenant as any).organizations_list.id,

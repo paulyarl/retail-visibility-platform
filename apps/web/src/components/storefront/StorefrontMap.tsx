@@ -62,7 +62,7 @@ export default function StorefrontMap({ tenant, primaryCategory, productCount }:
             lat: tenant.metadata.latitude,
             lng: tenant.metadata.longitude
           }}
-          zoom={30}
+          zoom={50}
 
         />
       </div>

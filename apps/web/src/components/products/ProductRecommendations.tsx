@@ -5,6 +5,7 @@ import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { Button } from '../ui';
 
 interface RecommendedProduct {
   id: string;
@@ -116,13 +117,16 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
 
       {/* Browse More Link */}
       {recommendations.length >= 6 && (
-        <div className="mt-8 text-center">
-          <Link
-            href={tenantSlug ? `/tenant/${tenantSlug}` : `/tenant/${tenantId}`}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Browse All Our Products →
-          </Link>
+        <div className="mt-8 text-center">           
+          <Button    onClick={() => window.location.href = `/tenant/${tenantSlug ? tenantSlug : tenantId}`}
+                          variant="gradient" style={{ color: 'white' }} size='lg'
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                          Browse All Our Products
+          </Button>
         </div>
       )}
     </div>

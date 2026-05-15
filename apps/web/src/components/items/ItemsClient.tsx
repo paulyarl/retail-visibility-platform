@@ -572,7 +572,7 @@ export default function ItemsClient({
       {showQRModal && qrItem && (
         <QRCodeModal
           isOpen={showQRModal}
-          productUrl={`/tenant/${initialTenantId}/product/${qrItem.id}`}
+          productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/tenant/${initialTenantId}/product/${qrItem.id}`}
           productName={qrItem.name}
           onClose={closeQRModal}
           tenantId={initialTenantId}

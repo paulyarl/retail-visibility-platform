@@ -181,7 +181,7 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
     id: shopData.id,
     tenantId: shopData.id,
     name: shopData.name,
-    description: shopData.business_name || shopData.name,
+    description: shopData.businessDescription || shopData.name,
     imageUrl: shopData.imageUrl,
     logo_url: shopData.logo_url,
     bannerUrl: shopData.bannerUrl,
@@ -253,24 +253,24 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
                 )}
 
                 <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm text-gray-600 dark:text-gray-300">
-                  {shopData.rating && (
+                  {( shopData?.rating_count||0 > 0) && shopData?.rating_count && (  
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="font-medium">{shopData.rating.toFixed(1)}</span>
-                      {shopData.rating_count && (
-                        <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">({shopData.rating_count} reviews)</span>
+                      <span className="font-medium">{shopData?.rating?.toFixed(1)}</span>
+                      {shopData?.rating_count && (
+                        <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">({shopData?.rating_count} reviews)</span>
                       )}
                     </div>
                   )}
                   
                   <div className="flex items-center space-x-1">
                     <Package className="h-4 w-4" />
-                    <span>{shopData.productCount} products</span>
+                    <span>{shopData?.productCount} products</span>
                   </div>
 
-                  {(shopData.primary_category || shopData.category) && (
+                  {(shopData?.primary_category || shopData?.category) && (
                     <Badge variant="light" size="sm">
-                      {shopData.primary_category || shopData.category}
+                      {shopData?.primary_category || shopData?.category}
                     </Badge>
                   )}
                 </div>
@@ -307,11 +307,15 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
           <div className="lg:col-span-2 space-y-6">
 
             {/* Shop Description */}
-            {shopData.tenantName && (
+            {(shopData.businessDescription || shopData.tenantName) && (
               <Card withBorder padding="lg" radius="md">
                 <Text className="text-gray-700 leading-relaxed">
-                  Welcome to {shopData.name}! We're proud to be part of the {shopData.tenantName} family,
-                  offering carefully curated products and exceptional service.
+                  {shopData.businessDescription || (
+                    <>
+                      Welcome to {shopData.name}! We're proud to be part of the {shopData.tenantName} family,
+                      offering carefully curated products and exceptional service.
+                    </>
+                  )}
                 </Text>
               </Card>
             )}
@@ -437,11 +441,11 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
             </Card>
 
             {/* Shop Description */}
-            {shopData.business_name && (
+            {shopData.businessDescription && (
               <Card withBorder padding="lg" radius="md">
                 <Text fw={600} size="lg" mb="md">About Us</Text>
                 <Text className="text-gray-700 leading-relaxed">
-                  {shopData.business_name}
+                  {shopData.businessDescription}
                 </Text>
               </Card>
             )}
@@ -561,7 +565,7 @@ export default function ShopProfileClient({
     loadFeaturedCounts();
   }, [shopData?.id]);
   
-  //console.log(shopData);
+  // console.log(`[ShopProfileClient] shopData:`, shopData);
   // Check if shop data exists and is valid
   if (!shop || !shop.success || !shopData || !shopData.id) {
     return (
@@ -641,7 +645,7 @@ export default function ShopProfileClient({
             
             <div className="flex flex-wrap items-center gap-2">
               <Link href={`/shops/directory${shopData.primary_category||shopData.category ? `?category=${encodeURIComponent(shopData.primary_category||shopData.category)}` : ''}`}>
-                <Button variant="ghost" size="sm">
+                <Button size="sm" variant="gradient" style={{ color: 'white' }}>
                   Similar Shops
                 </Button>
               </Link>

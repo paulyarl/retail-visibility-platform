@@ -1053,7 +1053,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
   // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
   // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
-  const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
   const resolvedCurrentUrl = currentUrl || `${baseUrl}/products/${product.id}`;
   // console.log('[TierBasedLandingPage] Current URL:', resolvedCurrentUrl);
   
@@ -1776,15 +1776,16 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                   Browse our full catalog at {displayName}
                 </p>
               </div>
-              <a
-                href={`/tenant/${tenantSlug ? tenantSlug : tenant.id}`}
+              <Button
+                onClick={() => window.location.href = `/tenant/${tenantSlug ? tenantSlug : tenant.id}`}
+                variant="gradient" style={{ color: 'white' }} size='lg'
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
                 Browse All Products
-              </a>
+              </Button>
             </div>
           </div>
         )}

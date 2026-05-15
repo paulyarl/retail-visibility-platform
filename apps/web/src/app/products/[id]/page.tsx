@@ -328,7 +328,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
   const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : '') || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/products/${product.id}`;
 
   // Enhanced structured data with business profile and SEO tags

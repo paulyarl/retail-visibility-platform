@@ -148,7 +148,7 @@ export default function StorefrontClientWrapper({
   const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
 
-  const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/tenant/${tenantId}`;
   // console.log(`Storefront CurrentUrl: ${currentUrl}`);
   // console.log(`Storefront CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);

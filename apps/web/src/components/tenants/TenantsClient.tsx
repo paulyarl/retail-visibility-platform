@@ -508,14 +508,16 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
               {/* Chain Filter */}
               <Group>
                 <Button
-                  variant={chainFilter === 'all' ? 'filled' : 'light'}
+                  variant={chainFilter === 'all' ? 'gradient' : 'outline'}
+                  style={chainFilter === 'all' ? { color: 'white' } : {color: 'black'}}
                   size="sm"
-                  onClick={() => setChainFilter('all')} style={{ color: 'white' }}
+                  onClick={() => setChainFilter('all')} 
                 >
                   All Types
                 </Button>
                 <Button
-                  variant={chainFilter === 'chain' ? 'filled' : 'light'}
+                  variant={chainFilter === 'chain' ? 'gradient' : 'outline'}
+                  style={chainFilter === 'chain' ? { color: 'white' } : {color: 'black'}}
                   size="sm"
                   onClick={() => setChainFilter('chain')}
                   leftSection={<IconUsers size={16} />}
@@ -523,7 +525,8 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                   Chain
                 </Button>
                 <Button
-                  variant={chainFilter === 'standalone' ? 'filled' : 'light'}
+                  variant={chainFilter === 'standalone' ? 'gradient' : 'outline'}
+                  style={chainFilter === 'standalone' ? { color: 'white' } : {color: 'black'}}
                   size="sm"
                   onClick={() => setChainFilter('standalone')}
                 >
@@ -536,49 +539,56 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                 <Text size="sm" fw="500">Filter by Status</Text>
                 <Group>
                   <Button
-                    variant={statusFilter === 'all' ? 'filled' : 'light'}
-                    size="sm"
+                    variant={statusFilter === 'all' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'all' ? { color: 'white' } : {color: 'black'}}
+                    size="md"
                     onClick={() => setStatusFilter('all')}
                   >
                     All Statuses
                   </Button>
                   <Button
-                    variant={statusFilter === 'active' ? 'filled' : 'light'}
+                    variant={statusFilter === 'active' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'active' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
-                    onClick={() => setStatusFilter('active')} style={{ color: 'white' }}
+                    onClick={() => setStatusFilter('active')} 
                   >
                     ✅ Active
                   </Button>
                   <Button
-                    variant={statusFilter === 'trial' ? 'filled' : 'light'}
+                    variant={statusFilter === 'trial' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'trial' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
                     onClick={() => setStatusFilter('trial')}
                   >
                     🧪 Trial
                   </Button>
                   <Button
-                    variant={statusFilter === 'inactive' ? 'filled' : 'light'}
+                    variant={statusFilter === 'inactive' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'inactive' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
                     onClick={() => setStatusFilter('inactive')}
                   >
                     ⏸️ Inactive
                   </Button>
                   <Button
-                    variant={statusFilter === 'pending' ? 'filled' : 'light'}
+                    variant={statusFilter === 'pending' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'pending' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
                     onClick={() => setStatusFilter('pending')}
                   >
                     🚧 Pending
                   </Button>
                   <Button
-                    variant={statusFilter === 'closed' ? 'filled' : 'light'}
+                    variant={statusFilter === 'closed' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'closed' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
                     onClick={() => setStatusFilter('closed')}
                   >
                     🔒 Closed
                   </Button>
                   <Button
-                    variant={statusFilter === 'archived' ? 'filled' : 'light'}
+                    variant={statusFilter === 'archived' ? 'gradient' : 'outline'}
+                    style={statusFilter === 'archived' ? { color: 'white' } : {color: 'black'}}
                     size="sm"
                     onClick={() => setStatusFilter('archived')}
                   >

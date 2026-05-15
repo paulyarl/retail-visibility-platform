@@ -134,7 +134,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/category/${category}`;
 
   return (

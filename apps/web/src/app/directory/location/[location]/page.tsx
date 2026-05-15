@@ -128,7 +128,7 @@ export default async function LocationPage({ params, searchParams }: LocationPag
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/location/${location}`;
 
   return (

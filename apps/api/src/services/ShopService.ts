@@ -34,6 +34,7 @@ export interface Shop {
   is_published: boolean;
   primary_category?: string;
   created_at: Date;
+  businessDescription?: string;
   latitude?: number;
   longitude?: number;
   debug?: {
@@ -115,30 +116,32 @@ class ShopService extends UniversalSingleton {
       // Use mv_global_discovery for optimized shop data retrieval
       const query = `
         SELECT DISTINCT
-          tenant_id,
-          tenant_name,
-          tenant_slug,
-          tenant_logo_url,
-          tenant_address,
-          tenant_city,
-          tenant_state,
-          tenant_zip,
-          shop_category as primary_category,
-          subscription_tier,
-          store_average_rating,
-          store_review_count,
-          tenant_latitude,
-          tenant_longitude,
+          d.tenant_id,
+          d.tenant_name,
+          d.tenant_slug,
+          d.tenant_logo_url,
+          d.tenant_address,
+          d.tenant_city,
+          d.tenant_state,
+          d.tenant_zip,
+          bp.business_description,
+          d.shop_category as primary_category,
+          d.subscription_tier,
+          d.store_average_rating,
+          d.store_review_count,
+          d.tenant_latitude,
+          d.tenant_longitude,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
-        FROM mv_global_discovery
-        WHERE tenant_slug = $1
-          AND shop_category IS NOT NULL
+        FROM mv_global_discovery d
+        LEFT JOIN tenant_business_profiles_list bp ON d.tenant_id = bp.tenant_id
+        WHERE d.tenant_slug = $1
+          AND d.shop_category IS NOT NULL
         GROUP BY 
-          tenant_id, tenant_name, tenant_slug,
-          tenant_logo_url, tenant_address, tenant_city, tenant_state,
-          tenant_zip, shop_category, subscription_tier,
-          store_average_rating, store_review_count,
-          tenant_latitude, tenant_longitude
+          d.tenant_id, d.tenant_name, d.tenant_slug,
+          d.tenant_logo_url, d.tenant_address, d.tenant_city, d.tenant_state,
+          d.tenant_zip, bp.business_description, d.shop_category, d.subscription_tier,
+          d.store_average_rating, d.store_review_count,
+          d.tenant_latitude, d.tenant_longitude
         LIMIT 1
       `;
 
@@ -167,6 +170,7 @@ class ShopService extends UniversalSingleton {
         productCount: parseInt(row.product_count) || 0,
         is_published: true,
         primary_category: row.primary_category || undefined,
+        businessDescription: row.business_description || undefined,
         latitude: row.tenant_latitude ? parseFloat(row.tenant_latitude) : undefined,
         longitude: row.tenant_longitude ? parseFloat(row.tenant_longitude) : undefined,
         created_at: new Date()
@@ -215,6 +219,7 @@ class ShopService extends UniversalSingleton {
           bp.website,
           bp.social_links,
           bp.seo_tags,
+          bp.business_description,
           d.shop_category as primary_category,
           d.subscription_tier,
           d.store_average_rating,
@@ -230,7 +235,7 @@ class ShopService extends UniversalSingleton {
         GROUP BY 
           d.tenant_id, d.tenant_name, d.tenant_slug,
           d.tenant_logo_url, d.tenant_address, d.tenant_city, d.tenant_state,
-          d.tenant_zip, bp.phone_number, bp.email, bp.website, bp.social_links, bp.seo_tags,
+          d.tenant_zip, bp.phone_number, bp.email, bp.website, bp.social_links, bp.seo_tags, bp.business_description,
           d.shop_category, d.subscription_tier,
           d.store_average_rating, d.store_review_count,
           d.tenant_latitude, d.tenant_longitude,
@@ -268,6 +273,9 @@ class ShopService extends UniversalSingleton {
         productCount: parseInt(row.product_count) || 0,
         is_published: true,
         primary_category: row.primary_category || undefined,
+        businessDescription: row.business_description || undefined,
+        latitude: row.tenant_latitude ? parseFloat(row.tenant_latitude) : undefined,
+        longitude: row.tenant_longitude ? parseFloat(row.tenant_longitude) : undefined,
         created_at: new Date()
       };
 

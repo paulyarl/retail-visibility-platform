@@ -26,6 +26,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
         name: true,
         subscription_tier: true,
         subscription_status: true,
+        location_status: true,
         created_at: true,
         _count: {
           select: {
@@ -51,6 +52,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
       name: tenant.name,
       subscriptionTier: tenant.subscription_tier,
       subscriptionStatus: tenant.subscription_status,
+      locationStatus: tenant.location_status,
       createdAt: tenant.created_at,
       organization: tenant.organizations_list,
       stats: {
