@@ -47,6 +47,97 @@ export interface CheckoutMode {
 }
 
 /**
+ * Get comprehensive commerce capabilities for an organization
+ * Combines tier-based features from organization's tenants with organization commerce settings
+ * 
+ * Priority: Organization Settings → Platform Defaults
+ */
+export async function getOrganizationCommerceCapabilities(
+  organizationId: string,
+  prismaClient: any = prisma
+): Promise<CommerceCapabilities> {
+  // Get all tenants in the organization and their tiers
+  const tenants = await prismaClient.tenants.findMany({
+    where: { organization_id: organizationId },
+    select: {
+      subscription_tier: true,
+      subscription_tiers_list: {
+        select: {
+          tier_features_list: {
+            select: {
+              feature_key: true,
+              is_enabled: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Collect all unique features from all tenants' tiers
+  const allTierFeatures = new Set<string>();
+  tenants.forEach((tenant: { subscription_tiers_list: { tier_features_list: never[]; }; }) => {
+    const tierFeatures = tenant?.subscription_tiers_list?.tier_features_list || [];
+    tierFeatures.forEach((feature: { is_enabled: boolean; feature_key: string; }) => {
+      if (feature.is_enabled) {
+        allTierFeatures.add(feature.feature_key);
+      }
+    });
+  });
+
+  // Convert to capabilities object
+  const tierCapabilities: any = {};
+  allTierFeatures.forEach(feature => {
+    tierCapabilities[feature] = true;
+  });
+
+  // Get organization commerce settings
+  const organizationCommerceSettings = await prismaClient.organization_commerce_settings.findUnique({
+    where: { organization_id: organizationId }
+  });
+
+  const capabilities: CommerceCapabilities = {
+    // Commerce is enabled only if tier supports it AND organization has it enabled
+    commerce_enabled: tierCapabilities.commerce_enabled && (
+      organizationCommerceSettings?.deposit_enabled || organizationCommerceSettings?.full_payment_enabled || true
+    ),
+
+    // Payment options: Tier determines what's available, organization settings determine what's enabled
+    deposit_enabled: tierCapabilities.commerce_deposit_only && (
+      organizationCommerceSettings?.deposit_enabled ?? true
+    ),
+    full_payment_enabled: tierCapabilities.commerce_full_payment && (
+      organizationCommerceSettings?.full_payment_enabled ?? true
+    ),
+
+    // Deposit configuration
+    deposit_percentage: organizationCommerceSettings?.deposit_percentage ?? 15,
+    deposit_min_cents: organizationCommerceSettings?.deposit_min_cents ?? 500,
+    deposit_max_cents: organizationCommerceSettings?.deposit_max_cents ?? 5000,
+
+    // Order management
+    auto_confirm_orders: organizationCommerceSettings?.auto_confirm_orders ?? true,
+    order_confirmation_minutes: organizationCommerceSettings?.order_confirmation_minutes ?? 15,
+
+    // Payment display
+    show_payment_options: organizationCommerceSettings?.show_payment_options ?? true,
+    require_payment_upfront: organizationCommerceSettings?.require_payment_upfront ?? false,
+    allow_payment_on_pickup: organizationCommerceSettings?.allow_payment_on_pickup ?? true,
+
+    // Notifications
+    notify_on_payment: organizationCommerceSettings?.notify_on_payment ?? true,
+    notify_on_deposit: organizationCommerceSettings?.notify_on_deposit ?? true,
+    notify_on_fulfillment: organizationCommerceSettings?.notify_on_fulfillment ?? true,
+
+    // Metadata
+    source: 'combined',
+    tier: ''
+  };
+
+  return capabilities;
+}
+
+/**
  * Get comprehensive commerce capabilities for a tenant
  * Combines tier-based features with tenant-specific and organization commerce settings
  * 
