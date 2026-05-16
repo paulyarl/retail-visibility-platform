@@ -45,6 +45,16 @@ export interface PropagationProduct {
   isUniversal?: boolean;
   universalSku?: string;
   
+  // Enriched product content
+  features?: string[];
+  specifications?: Record<string, any>;
+  enhanced_description?: string;
+  
+  // Digital product fields
+  license_type?: string;
+  access_duration_days?: number;
+  download_limit?: number;
+  
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -157,7 +167,14 @@ export class VariantAwarePropagationService extends BaseService {
           has_variants: true,
           created_at: true,
           updated_at: true,
-          metadata: true
+          metadata: true,
+          // Add new enriched content fields
+          features: true,
+          specifications: true,
+          enhanced_description: true,
+          license_type: true,
+          access_duration_days: true,
+          download_limit: true
         },
         take: options?.batchSize || 1000
       });
@@ -235,6 +252,13 @@ export class VariantAwarePropagationService extends BaseService {
                 name: item.name,
                 sku: item.sku
               },
+              // Add enriched content fields
+              features: item.features || undefined,
+              specifications: (item.specifications as Record<string, any>) || undefined,
+              enhanced_description: item.enhanced_description || undefined,
+              license_type: item.license_type || undefined,
+              access_duration_days: item.access_duration_days || undefined,
+              download_limit: item.download_limit || undefined,
               createdAt: variant.created_at,
               updatedAt: variant.updated_at,
               metadata: {
@@ -260,6 +284,13 @@ export class VariantAwarePropagationService extends BaseService {
               imageUrl: item.image_url || undefined,
               hasVariants: item.has_variants || false,
               variantType: 'parent_item',
+              // Add enriched content fields
+              features: item.features || undefined,
+              specifications: (item.specifications as Record<string, any>) || undefined,
+              enhanced_description: item.enhanced_description || undefined,
+              license_type: item.license_type || undefined,
+              access_duration_days: item.access_duration_days || undefined,
+              download_limit: item.download_limit || undefined,
               createdAt: item.created_at,
               updatedAt: item.updated_at,
               metadata: item.metadata as Record<string, any> || undefined

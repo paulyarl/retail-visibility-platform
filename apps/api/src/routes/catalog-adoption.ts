@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { product_source } from '@prisma/client';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { generateItemId, generateTenantItemId } from '../lib/id-generator';
@@ -175,8 +176,16 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         visibility: 'public',
         currency: 'USD',
         product_type: 'physical',
-        source: 'API_IMPORT' as const,
+        source: product_source.API,
         updated_at: new Date(),
+        // Use specifications from global catalog (only field available there)
+        specifications: globalProduct.specifications || {},
+        // Fields not in global catalog - will be null for adopted products
+        features: [],
+        enhanced_description: null,
+        license_type: null,
+        access_duration_days: null,
+        download_limit: null,
         metadata: {
           global_product_id: globalProductId,
           product_slug: productSlug,

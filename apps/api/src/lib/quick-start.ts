@@ -900,12 +900,8 @@ export async function generateQuickStartProducts(
 
       const itemId = generateTenantItemId(tenant_id);
       
-      // Build metadata with enriched AI content (following scanner enrichment pattern)
-      const metadata: any = {};
+      // Extract enriched AI content for direct fields (following scanner enrichment pattern)
       const enrichedProduct = product as any;
-      if (enrichedProduct.enhancedDescription) metadata.enhancedDescription = enrichedProduct.enhancedDescription;
-      if (enrichedProduct.features && enrichedProduct.features.length > 0) metadata.features = enrichedProduct.features;
-      if (enrichedProduct.specifications && Object.keys(enrichedProduct.specifications).length > 0) metadata.specifications = enrichedProduct.specifications;
       
       const itemData = {
         id: itemId,
@@ -920,7 +916,15 @@ export async function generateQuickStartProducts(
         title: product.name,
         brand: product.brand || 'Generic',
         description: product.description || null,
-        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        // Add direct fields for enriched content
+        features: enrichedProduct.features || [],
+        specifications: enrichedProduct.specifications || {},
+        enhanced_description: enrichedProduct.enhancedDescription || null,
+        // Digital product fields (null for physical quick-start products)
+        license_type: null,
+        access_duration_days: null,
+        download_limit: null,
+        metadata: null, // Keep metadata clean, enriched data is now in direct fields
         price_cents: Math.round(Number(product.price)), // Ensure integer
         price: Number(product.price) / 100, // Ensure decimal
         currency: 'USD',
