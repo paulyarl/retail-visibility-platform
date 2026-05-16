@@ -1081,15 +1081,26 @@ export class SubscriptionBillingService {
     }
 
     try {
-      // Retrieve the charge to get the payment method
-      const charge = await this.stripe.charges.retrieve(chargeId);
+      let paymentMethodId: string | null = null;
       
-      if (!charge.payment_method) {
-        console.log('[SubscriptionBilling] No payment method on charge:', chargeId);
+      // Check if it's a payment intent (starts with 'pi_') or charge (starts with 'ch_')
+      if (chargeId.startsWith('pi_')) {
+        // Retrieve the payment intent to get the payment method
+        const paymentIntent = await this.stripe.paymentIntents.retrieve(chargeId);
+        paymentMethodId = paymentIntent.payment_method as string;
+      } else if (chargeId.startsWith('ch_')) {
+        // Retrieve the charge to get the payment method
+        const charge = await this.stripe.charges.retrieve(chargeId);
+        paymentMethodId = charge.payment_method as string;
+      } else {
+        console.log('[SubscriptionBilling] Invalid charge/payment intent ID format:', chargeId);
         return null;
       }
-
-      const paymentMethodId = charge.payment_method as string;
+      
+      if (!paymentMethodId) {
+        console.log('[SubscriptionBilling] No payment method on charge/payment intent:', chargeId);
+        return null;
+      }
 
       // Attach the payment method to the customer
       await this.stripe.paymentMethods.attach(paymentMethodId, {

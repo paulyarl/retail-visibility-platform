@@ -175,7 +175,7 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         visibility: 'public',
         currency: 'USD',
         product_type: 'physical',
-        source: 'API' as const,
+        source: 'API_IMPORT' as const,
         updated_at: new Date(),
         metadata: {
           global_product_id: globalProductId,

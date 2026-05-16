@@ -256,8 +256,8 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           // Helper to get QR code level from tier key
           const getQRCodeLevel = (tierKey: string): number => {
             if (!tierKey) return 0;
-            if (tierKey.includes('enterprise') || tierKey.includes('professional')) return 3; // qr_codes_2048
-            if (tierKey === 'commitment' ) return 2; // qr_codes_1024
+            if (tierKey.includes('enterprise') || tierKey.includes('professional') || tierKey.includes('omnichannel') ) return 3; // qr_codes_2048
+            if (tierKey.includes('commitment' )||(tierKey.includes('ecommerce' ))) return 2; // qr_codes_1024
             if (tierKey === 'chain_starter'|| tierKey === 'storefront') return 1; // qr_codes_512 only
             if (tierKey === 'starter' || tierKey === 'discovery') return 0;
             return 2; // default for professional/chain_professional
@@ -286,9 +286,11 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           // console.log(`[QR Code] Individual tier: ${effectiveTierPart} (level ${individualLevel}), Org tier: ${organizationTier} (level ${orgLevel}), Effective: ${effectiveTier}`);
           setTenantTier(effectiveTierPart);
           
-          // Get tenant profile for logo if professional or above (or chain tiers)
+          // Get tenant profile for logo if commitment or above (or chain tiers)
           if (effectiveTierPart === 'professional' 
             || effectiveTierPart === 'commitment' 
+            || effectiveTierPart === 'ecommerce'
+            || effectiveTierPart === 'omnichannel'
             || effectiveTierPart === 'enterprise' 
             || effectiveTierPart === 'organization' 
             || effectiveTierPart === 'chain_professional' 
@@ -296,7 +298,9 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
             || effectiveTierPart === 'chain_starter' 
             || effectiveTierPart === 'trial_professional'
             || effectiveTierPart === 'trial_commitment'
-            || effectiveTierPart === 'trial_enterprise') {
+            || effectiveTierPart === 'trial_enterprise'
+            || effectiveTierPart === 'trial_ecommerce'
+            || effectiveTierPart === 'trial_omnichannel') {
             try {
               // const profile = await storefrontService.getPublicTenantProfile(tenantId);
               const profile = await tenantPublicService.getPublicTenantInfo(tenantId)
@@ -442,6 +446,34 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         secondaryIcon: 'text-emerald-600 dark:emerald-800',
         primaryButton: 'bg-green-600 hover:bg-green-700',
         secondaryButton: 'text-green-600 hover:text-green-700'
+      }; 
+    } else if (tier === 'omnichannel') {
+      // Omnichannel gets green/emerald theme
+      return {
+        primary: 'indigo',
+        secondary: 'purple',
+        border: 'from-indigo-300 to-purple-300',
+        bg: 'from-indigo-50 to-purple-50',
+        dark: 'from-indigo-900/20 to-purple-900/20',
+        icon: 'from-indigo-500 to-purple-600',
+        primaryIcon: 'text-indigo-600 dark:indigo-800',
+        secondaryIcon: 'text-purple-600 dark:purple-800',
+        primaryButton: 'bg-indigo-600 hover:bg-indigo-700',
+        secondaryButton: 'text-indigo-600 hover:text-indigo-700'
+      };  
+     } else if (tier === 'ecommerce') {
+      // Ecommerce gets green/emerald theme
+      return {
+        primary: 'indigo',
+        secondary: 'cyan',
+        border: 'from-indigo-300 to-cyan-300',
+        bg: 'from-indigo-50 to-cyan-50',
+        dark: 'from-indigo-900/20 to-cyan-900/20',
+        icon: 'from-indigo-500 to-cyan-600',
+        primaryIcon: 'text-indigo-600 dark:indigo-800',
+        secondaryIcon: 'text-cyan-600 dark:cyan-800',
+        primaryButton: 'bg-indigo-600 hover:bg-indigo-700',
+        secondaryButton: 'text-indigo-600 hover:text-indigo-700'
       };
     } else if (tier === 'storefront') {
       // Storefront gets purple/indigo theme
@@ -521,6 +553,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         };
         
       case 'commitment':
+      case 'ecommerce':
       case 'chain_commitment':
         return {
           renderSize: baseSize,           // 256px display
@@ -532,6 +565,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         };
         
       case 'professional':
+      case 'omnichannel':
       case 'chain_professional':
         return {
           renderSize: baseSize,           // 256px display
@@ -607,6 +641,8 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       const shouldApplyLogo = (
         effectiveTier === 'commitment' ||
         effectiveTier === 'professional' ||
+        effectiveTier === 'ecommerce' || 
+        effectiveTier === 'omnichannel' || 
         effectiveTier === 'enterprise' ||
         effectiveTier === 'organization' ||
         tenantTier === 'chain_professional' ||
@@ -673,6 +709,8 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
     const shouldApplyLogo = (
       effectiveTier === 'commitment' ||
       effectiveTier === 'professional' ||
+      effectiveTier === 'ecommerce' ||
+      effectiveTier === 'omnichannel' ||
       effectiveTier === 'enterprise' ||
       effectiveTier === 'organization' ||
       tenantTier === 'chain_professional' ||
@@ -681,7 +719,10 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
 
     // Apply logo if eligible (all sizes for higher tiers, 512px+ for lower tiers)
     const logoMinSize = (
+      effectiveTier === 'commitment' ||
       effectiveTier === 'professional' ||
+      effectiveTier === 'ecommerce' ||
+      effectiveTier === 'omnichannel' ||
       effectiveTier === 'enterprise' ||
       effectiveTier === 'organization' ||
       tenantTier === 'chain_professional' ||
@@ -779,6 +820,8 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
                 const shouldShowLogo = (
                   effectiveTier === 'commitment' ||
                   effectiveTier === 'professional' ||
+                  effectiveTier === 'ecommerce' ||
+                  effectiveTier === 'omnichannel' ||
                   effectiveTier === 'enterprise' ||
                   effectiveTier === 'organization' ||
                   tenantTier === 'chain_professional' ||
@@ -845,6 +888,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
                         { size: 256, label: 'Small (256px)', description: 'Mobile friendly' },
                         { size: 512, label: 'Medium (512px)', description: 'Web quality' }
                       ];
+                    case 'ecommerce':
                     case 'commitment':
                     case 'chain_commitment':
                       return [
@@ -852,6 +896,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
                         { size: 512, label: 'Medium (512px)', description: 'Web quality' },
                         { size: 1024, label: 'Large (1024px)', description: 'Print quality' }
                       ];
+                    case 'omnichannel':
                     case 'professional':
                     case 'chain_professional':
                     case 'enterprise':
@@ -1054,6 +1099,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const [loading, setLoading] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
+  const productFeatures = product.features;
+  // console.log(`[TierBasedLandingPage] productFeatures: `, productFeatures);
   
   // Move all hooks to the top - Rules of Hooks
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
@@ -1412,175 +1459,6 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             </div>
           )}
 
-          {/* 5. Variant Selector - After product info, before price */}
-          {(() => {
-            if (product.variants && product.variants.length > 0) {
-              return (
-                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Package className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-blue-900">Select Options</span>
-                  </div>
-                  <ProductVariantSelector
-                    variants={product.variants || []}
-                    onVariantChange={setSelectedVariant}
-                    selectedVariant={selectedVariant}
-                  />
-                </div>
-              );
-            } else {
-              return null;
-            }
-          })()}
-
-          {/* 6. Price Display */}
-          <div className="mb-6">
-            {/* Show variant price range if has variants and no variant selected */}
-            {variantPriceRange ? (
-              <div className="mb-2">
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  From ${(variantPriceRange.minPrice / 100).toFixed(2)}
-                </span>
-                {variantPriceRange.hasSale && (
-                  <span className="ml-2 text-sm text-gray-500">(Sale available)</span>
-                )}
-              </div>
-            ) : (
-              <PriceDisplay
-                priceCents={currentListPriceCents}
-                salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
-                variant="large"
-                showSavingsBadge={true}
-                className="mb-1"
-              />
-            )}
-            <span className="text-sm text-neutral-500">SKU: {currentSku}</span>
-          </div>
-
-          {/* 7. Add to Cart Button - Final purchase action */}
-          {!showStatusPanel && effectiveCanPurchase && (
-            <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="flex items-center justify-center h-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add to Cart</span>
-              </div>
-              
-              {/* Quantity Selector */}
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-sm text-gray-600">Quantity:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
-                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    max={currentStock || 999}
-                    value={quantity}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      const max = currentStock || 999;
-                      setQuantity(Math.min(Math.max(1, val), max));
-                    }}
-                    className="w-16 h-8 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={() => setQuantity(Math.min(quantity + 1, currentStock || 999))}
-                    disabled={quantity >= (currentStock || 999)}
-                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    +
-                  </button>
-                </div>
-                {currentStock > 0 && (
-                  <span className="text-xs text-gray-400">max {currentStock}</span>
-                )}
-              </div>
-              
-              <AddToCartButton
-                product={{
-                  id: selectedVariant?.id || product.id,
-                  name: selectedVariant?.variant_name ? `${product.title} - ${selectedVariant.variant_name}` : product.title,
-                  sku: currentSku,
-                  priceCents: currentPriceCents,
-                  salePriceCents: selectedVariant?.sale_price_cents || product.salePriceCents,
-                  imageUrl: selectedVariant?.image_url || product.imageUrl,
-                  stock: currentAvailability === 'in_stock' ? (currentStock || 999) : 0,
-                  tenantId: product.tenantId,
-                  has_variants: hasVariants,
-                }}
-                variant={selectedVariant}
-                quantity={quantity}
-                tenantName={tenant.metadata?.businessName || tenant.name}
-                tenantLogo={businessLogo}
-                hasActivePaymentGateway={effectiveCanPurchase}
-                defaultGatewayType={effectiveGatewayType}
-                layout={layout}
-              />
-            </div>
-          )}
-          
-          {/* Product Identifiers */}
-          {(product.upc || product.gtin || product.mpn) && (
-            <div className="mb-6 p-4 bg-neutral-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-neutral-700 mb-2">Product Identifiers</h3>
-              <dl className="grid grid-cols-2 gap-2 text-sm">
-                {product.upc && (
-                  <>
-                    <dt className="text-neutral-500">UPC</dt>
-                    <dd className="text-neutral-900 font-mono">{product.upc}</dd>
-                  </>
-                )}
-                {product.gtin && (
-                  <>
-                    <dt className="text-neutral-500">GTIN</dt>
-                    <dd className="text-neutral-900 font-mono">{product.gtin}</dd>
-                  </>
-                )}
-                {product.mpn && (
-                  <>
-                    <dt className="text-neutral-500">MPN</dt>
-                    <dd className="text-neutral-900 font-mono">{product.mpn}</dd>
-                  </>
-                )}
-              </dl>
-            </div>
-          )}
-
-          {/* Multi-Location Availability */}
-          {tenant.organizationId && (
-            <div className="mb-6">
-              <LocationAvailabilitySection
-                productSlug={productSlug || product.product_slug || product.productSlug || product.sku || product.id}
-                slugType={slugType}
-                productName={product.name}
-                organizationId={tenant.organizationId}
-                preferredTenantId={product.tenantId}
-                maxDistance={50}
-                maxResults={5}
-                useSmartFallback={true} // Enable slug -> SKU fallback
-              />
-            </div>
-          )}
-
-          {/* Custom CTA */}
-          {!showStatusPanel && safeFeatures.customCta && product.customCta && (
-            <div className="mb-6">
-              <a
-                href={product.customCta.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                {product.customCta.text || 'Learn More'}
-              </a>
-            </div>
-          )}
- 
         </div>
 
         {/* Enriched Product Data - Instant Credibility */}
@@ -1773,6 +1651,177 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             </dl>
           </div>
         )}
+
+        
+          {/* 5. Variant Selector - After product info, before price */}
+          {(() => {
+            if (product.variants && product.variants.length > 0) {
+              return (
+                <div className="mb-6 p-4 bg-gradient-to-r from-rose-50 to-indigo-50 border border-rose-200 rounded-lg shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4 text-rose-600" />
+                    <span className="text-sm font-semibold text-rose-900">Select Options</span>
+                  </div>
+                  <ProductVariantSelector
+                    variants={product.variants || []}
+                    onVariantChange={setSelectedVariant}
+                    selectedVariant={selectedVariant}
+                  />
+                </div>
+              );
+            } else {
+              return null;
+            }
+          })()}
+
+          {/* 6. Price Display */}
+          <div className="mb-6">
+            {/* Show variant price range if has variants and no variant selected */}
+            {variantPriceRange ? (
+              <div className="mb-2">
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  From ${(variantPriceRange.minPrice / 100).toFixed(2)}
+                </span>
+                {variantPriceRange.hasSale && (
+                  <span className="ml-2 text-sm text-gray-500">(Sale available)</span>
+                )}
+              </div>
+            ) : (
+              <PriceDisplay
+                priceCents={currentListPriceCents}
+                salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
+                variant="large"
+                showSavingsBadge={true}
+                className="mb-1"
+              />
+            )}
+            <span className="text-sm text-neutral-500">SKU: {currentSku}</span>
+          </div>
+
+          {/* 7. Add to Cart Button - Final purchase action */}
+          {!showStatusPanel && effectiveCanPurchase && (
+            <div className="mb-6 p-5 bg-gradient-to-br from-green-50 to-indigo-50 dark:from-green-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-green-200 dark:border-green-800 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="flex items-center justify-center h-5 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-semibold text-green-700 dark:text-green-300">Add to Cart</span>
+              </div>
+              
+              {/* Quantity Selector */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-sm text-gray-600">Quantity:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max={currentStock || 999}
+                    value={quantity}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      const max = currentStock || 999;
+                      setQuantity(Math.min(Math.max(1, val), max));
+                    }}
+                    className="w-16 h-8 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => setQuantity(Math.min(quantity + 1, currentStock || 999))}
+                    disabled={quantity >= (currentStock || 999)}
+                    className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+                {currentStock > 0 && (
+                  <span className="text-xs text-gray-400">max {currentStock}</span>
+                )}
+              </div>
+              
+              <AddToCartButton
+                product={{
+                  id: selectedVariant?.id || product.id,
+                  name: selectedVariant?.variant_name ? `${product.title} - ${selectedVariant.variant_name}` : product.title,
+                  sku: currentSku,
+                  priceCents: currentPriceCents,
+                  salePriceCents: selectedVariant?.sale_price_cents || product.salePriceCents,
+                  imageUrl: selectedVariant?.image_url || product.imageUrl,
+                  stock: currentAvailability === 'in_stock' ? (currentStock || 999) : 0,
+                  tenantId: product.tenantId,
+                  has_variants: hasVariants,
+                }}
+                variant={selectedVariant}
+                quantity={quantity}
+                tenantName={tenant.metadata?.businessName || tenant.name}
+                tenantLogo={businessLogo}
+                hasActivePaymentGateway={effectiveCanPurchase}
+                defaultGatewayType={effectiveGatewayType}
+                layout={layout}
+              />
+            </div>
+          )}
+          
+          {/* Product Identifiers */}
+          {(product.upc || product.gtin || product.mpn) && (
+            <div className="mb-6 p-4 bg-neutral-50 rounded-lg">
+              <h3 className="text-sm font-semibold text-neutral-700 mb-2">Product Identifiers</h3>
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                {product.upc && (
+                  <>
+                    <dt className="text-neutral-500">UPC</dt>
+                    <dd className="text-neutral-900 font-mono">{product.upc}</dd>
+                  </>
+                )}
+                {product.gtin && (
+                  <>
+                    <dt className="text-neutral-500">GTIN</dt>
+                    <dd className="text-neutral-900 font-mono">{product.gtin}</dd>
+                  </>
+                )}
+                {product.mpn && (
+                  <>
+                    <dt className="text-neutral-500">MPN</dt>
+                    <dd className="text-neutral-900 font-mono">{product.mpn}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )}
+
+          {/* Multi-Location Availability */}
+          {tenant.organizationId && (
+            <div className="mb-6">
+              <LocationAvailabilitySection
+                productSlug={productSlug || product.product_slug || product.productSlug || product.sku || product.id}
+                slugType={slugType}
+                productName={product.name}
+                organizationId={tenant.organizationId}
+                preferredTenantId={product.tenantId}
+                maxDistance={50}
+                maxResults={5}
+                useSmartFallback={true} // Enable slug -> SKU fallback
+              />
+            </div>
+          )}
+
+          {/* Custom CTA */}
+          {!showStatusPanel && safeFeatures.customCta && product.customCta && (
+            <div className="mb-6">
+              <a
+                href={product.customCta.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                {product.customCta.text || 'Learn More'}
+              </a>
+            </div>
+          )}
+ 
 
         {/* QR Code CTA Section - Professional+ Tier */}
         {!showStatusPanel && safeFeatures.qrCodes && !disableQRCode && (

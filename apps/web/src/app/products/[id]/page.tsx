@@ -95,11 +95,10 @@ interface ProductData {
   manufacturer?: string;
   createdAt: string;
   updatedAt: string;
-  metadata?: {
-    features?: string[];
-    specifications?: Record<string, any>;
-    enhancedDescription?: string;
-  };
+  features?: string[];
+  specifications?: Record<string, any>;
+  enhanced_description?: string;
+  metadata?: Record<string, any>;
   tenantId: string;
   // NEW: Slug registry fields for cross-tenant matching
   productSlug?: string;
@@ -602,7 +601,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   name: product.name,
                   title: product.title,
                   description: product.description,
-                  marketingDescription: product.marketingDescription || product.metadata?.enhancedDescription, // Use new field with fallback
+                  marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
                   price: product.price,
                   priceCents: product.priceCents,
                   listPriceCents: product.listPriceCents,
@@ -626,9 +625,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   gtin: undefined, // Not available in new API
                   mpn: undefined, // Not available in new API
                   defaultGatewayType: undefined, // Will be determined by tenant
-                  // Pass features from metadata, but disable QR codes (moved to sidebar)
-                  features: Object.assign({}, product.metadata?.features || {}, { qrCodes: false }),
-                  specifications: product.metadata?.specifications, // Not available in current API
+                  // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
+                  features: product.features || [],
+                  specifications: product.specifications, // Now available from direct field
                   slug: product.tenant?.slug || '',
                   variants: product.variants,
                   productType: product.productType,

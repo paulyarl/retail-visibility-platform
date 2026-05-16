@@ -56,19 +56,28 @@ export async function getOrganizationCommerceCapabilities(
   organizationId: string,
   prismaClient: any = prisma
 ): Promise<CommerceCapabilities> {
-  // Get all tenants in the organization and their tiers
+  // Get all tenants in the organization and their tier keys
   const tenants = await prismaClient.tenants.findMany({
     where: { organization_id: organizationId },
     select: {
       subscription_tier: true,
-      subscription_tiers_list: {
+    },
+  });
+
+  // Get unique tier keys from tenants
+  const tierKeys = [...new Set(tenants.map((t: { subscription_tier: any; }) => t.subscription_tier).filter(Boolean))];
+
+  // Fetch tier features for all unique tiers
+  const tierFeatures = await prismaClient.subscription_tiers_list.findMany({
+    where: {
+      tier_key: { in: tierKeys },
+      is_active: true,
+    },
+    select: {
+      tier_features_list: {
         select: {
-          tier_features_list: {
-            select: {
-              feature_key: true,
-              is_enabled: true,
-            },
-          },
+          feature_key: true,
+          is_enabled: true,
         },
       },
     },
@@ -76,9 +85,8 @@ export async function getOrganizationCommerceCapabilities(
 
   // Collect all unique features from all tenants' tiers
   const allTierFeatures = new Set<string>();
-  tenants.forEach((tenant: { subscription_tiers_list: { tier_features_list: never[]; }; }) => {
-    const tierFeatures = tenant?.subscription_tiers_list?.tier_features_list || [];
-    tierFeatures.forEach((feature: { is_enabled: boolean; feature_key: string; }) => {
+  tierFeatures.forEach((tier: { tier_features_list: { feature_key: string; is_enabled: boolean }[]; }) => {
+    tier.tier_features_list.forEach((feature) => {
       if (feature.is_enabled) {
         allTierFeatures.add(feature.feature_key);
       }

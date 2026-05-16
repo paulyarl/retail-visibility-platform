@@ -39,7 +39,14 @@ export function QRCodeModal(props: QRCodeModalProps) {
           setTierId(effectiveTierId);
           
           // Set logo if professional or above
-          if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'chain_enterprise' || effectiveTierId === 'professional' || effectiveTierId === 'chain_professional') {
+          if (effectiveTierId === 'enterprise' 
+            || effectiveTierId === 'organization' 
+            || effectiveTierId === 'chain_enterprise' 
+            || effectiveTierId === 'professional' 
+            || effectiveTierId === 'ecommerce' 
+            || effectiveTierId === 'commitment' 
+            || effectiveTierId === 'omnichannel' 
+            || effectiveTierId === 'chain_professional') {
             setTenantLogo(profile?.logo_url || null);
           }
         }

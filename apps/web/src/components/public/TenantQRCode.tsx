@@ -60,7 +60,7 @@ export function TenantQRCode({
           
           const getQRCodeLevel = (tierKey: string): number => {
             if (!tierKey) return 0;
-            if (tierKey.includes('enterprise') || tierKey.includes('professional')) return 3;
+            if (tierKey.includes('enterprise')|| tierKey.includes('professional') || tierKey.includes('ecommerce') || tierKey.includes('omnichannel')) return 3;
             if (tierKey === 'commitment') return 2;
             if (tierKey === 'chain_starter' || tierKey === 'storefront') return 1;
             if (tierKey === 'starter' || tierKey === 'discovery') return 0;
@@ -90,7 +90,7 @@ export function TenantQRCode({
           
           // Get tenant logo for higher tiers
           const tiersWithLogo = [
-            'professional', 'commitment', 'enterprise', 'organization',
+            'professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
             'chain_professional', 'chain_enterprise', 'chain_starter',
             'trial_professional', 'trial_commitment', 'trial_enterprise'
           ];
@@ -216,6 +216,34 @@ export function TenantQRCode({
         primaryButton: 'bg-amber-600 hover:bg-amber-700',
         secondaryButton: 'text-amber-600 hover:text-amber-700'
       };
+    } else if (tier === 'omnichannel') {
+      // Professional gets amber/orange theme
+      return {
+        primary: 'amber',
+        secondary: 'orange',
+        border: 'from-amber-300 to-orange-300',
+        bg: 'from-amber-50 to-orange-50',
+        dark: 'from-amber-900/20 to-orange-900/20',
+        icon: 'from-amber-500 to-orange-600',
+        primaryIcon: 'text-amber-600 dark:amber-800',
+        secondaryIcon: 'text-orange-600 dark:orange-800',
+        primaryButton: 'bg-amber-600 hover:bg-amber-700',
+        secondaryButton: 'text-amber-600 hover:text-amber-700'
+      };
+    } else if (tier === 'ecommerce') {
+      // Professional gets amber/orange theme
+      return {
+        primary: 'amber',
+        secondary: 'orange',
+        border: 'from-amber-300 to-orange-300',
+        bg: 'from-amber-50 to-orange-50',
+        dark: 'from-amber-900/20 to-orange-900/20',
+        icon: 'from-amber-500 to-orange-600',
+        primaryIcon: 'text-amber-600 dark:amber-800',
+        secondaryIcon: 'text-orange-600 dark:orange-800',
+        primaryButton: 'bg-amber-600 hover:bg-amber-700',
+        secondaryButton: 'text-amber-600 hover:text-amber-700'
+      };
     } else if (tier === 'commitment') {
       // Commitment gets green/emerald theme
       return {
@@ -319,6 +347,8 @@ export function TenantQRCode({
         };
         
       case 'professional':
+      case 'ecommerce':
+      case 'omnichannel':
       case 'chain_professional':
         return {
           renderSize: Math.min(baseSize * 3, 2048),   // Up to 2048px
@@ -394,6 +424,8 @@ export function TenantQRCode({
       const shouldApplyLogo = (
         effectiveTier === 'commitment' ||
         effectiveTier === 'professional' ||
+        effectiveTier === 'ecommerce' ||
+        effectiveTier === 'omnichannel' ||
         effectiveTier === 'enterprise' ||
         effectiveTier === 'organization' ||
         tenantTier === 'chain_professional' ||
@@ -465,6 +497,8 @@ export function TenantQRCode({
     const shouldApplyLogo = (
       effectiveTier === 'commitment' ||
       effectiveTier === 'professional' ||
+      effectiveTier === 'ecommerce' ||
+      effectiveTier === 'omnichannel' ||
       effectiveTier === 'enterprise' ||
       effectiveTier === 'organization' ||
       tenantTier === 'chain_professional' ||
@@ -474,6 +508,8 @@ export function TenantQRCode({
     // Apply logo if eligible (all sizes for higher tiers, 512px+ for lower tiers)
     const logoMinSize = (
       effectiveTier === 'professional' ||
+      effectiveTier === 'ecommerce' ||
+      effectiveTier === 'omnichannel' ||
       effectiveTier === 'enterprise' ||
       effectiveTier === 'organization' ||
       tenantTier === 'chain_professional' ||
@@ -580,6 +616,8 @@ export function TenantQRCode({
                       { size: 512, label: 'Medium (512px)', description: 'Web quality' },
                       { size: 1024, label: 'Large (1024px)', description: 'Print quality' }
                     ];
+                  case 'ecommerce':
+                  case 'omnichannel':
                   case 'professional':
                   case 'chain_professional':
                   case 'enterprise':
@@ -639,6 +677,8 @@ export function TenantQRCode({
               const shouldShowLogo = (
                 effectiveTier === 'commitment' ||
                 effectiveTier === 'professional' ||
+                effectiveTier === 'ecommerce' ||
+                effectiveTier === 'omnichannel' ||
                 effectiveTier === 'enterprise' ||
                 effectiveTier === 'organization' ||
                 tenantTier === 'chain_professional' ||

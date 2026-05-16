@@ -93,6 +93,9 @@ export interface SingleProductResult {
     slug: string;
     googleCategoryId?: string | null;
   } | null;
+  features?: string[];
+  specifications?: any;
+  enhanced_description?: string;
 }
 
 export class SingleProductService {
@@ -134,6 +137,44 @@ export class SingleProductService {
       where: {
         id: productId,
         item_status: 'active' as const
+      },
+      select: {
+        // Select all fields that were previously selected by default
+        id: true,
+        tenant_id: true,
+        sku: true,
+        name: true,
+        description: true,
+        marketing_description: true,
+        price_cents: true,
+        sale_price_cents: true,
+        stock: true,
+        quantity: true,
+        created_at: true,
+        updated_at: true,
+        image_gallery: true,
+        image_url: true,
+        brand: true,
+        condition: true,
+        manufacturer: true,
+        currency: true,
+        directory_category_id: true,
+        item_status: true,
+        visibility: true,
+        metadata: true,
+        product_type: true,
+        digital_delivery_method: true,
+        digital_assets: true,
+        has_variants: true,
+        gtin: true,
+        mpn: true,
+        // Add the missing fields
+        features: true,
+        specifications: true,
+        enhanced_description: true,
+        license_type: true,
+        access_duration_days: true,
+        download_limit: true
       }
     });
 
@@ -327,6 +368,9 @@ export class SingleProductService {
         slug: category.slug,
         googleCategoryId: category.googleCategoryId
       } : undefined,
+      features: Array.isArray(product.features) ? product.features : [],
+      specifications: product.specifications || {},
+      enhanced_description: product.enhanced_description || '',
       // Add variants data
       variants: variants.map(v => ({
         id: v.id,
@@ -618,7 +662,10 @@ export class SingleProductService {
           product_category_slug,
           in_stock,
           item_status,
-          visibility
+          visibility,
+          features,
+          specifications,
+          enhanced_description
         FROM mv_global_discovery
         WHERE product_slug = $1
           AND item_status = 'active'
@@ -649,6 +696,42 @@ export class SingleProductService {
         where: {
           id: row.inventory_item_id,
           item_status: 'active'
+        },
+        select: {
+          id: true,
+          tenant_id: true,
+          sku: true,
+          name: true,
+          description: true,
+          marketing_description: true,
+          price_cents: true,
+          sale_price_cents: true,
+          stock: true,
+          quantity: true,
+          created_at: true,
+          updated_at: true,
+          image_gallery: true,
+          image_url: true,
+          brand: true,
+          condition: true,
+          manufacturer: true,
+          currency: true,
+          directory_category_id: true,
+          item_status: true,
+          visibility: true,
+          metadata: true,
+          product_type: true,
+          digital_delivery_method: true,
+          digital_assets: true,
+          has_variants: true,
+          gtin: true,
+          mpn: true,
+          features: true,
+          specifications: true,
+          enhanced_description: true,
+          license_type: true,
+          access_duration_days: true,
+          download_limit: true
         }
       });
 
@@ -753,6 +836,9 @@ export class SingleProductService {
           slug: category.slug,
           googleCategoryId: category.googleCategoryId
         } : undefined,
+        features: Array.isArray(fullProduct.features) ? fullProduct.features : [],
+        specifications: fullProduct.specifications || {},
+        enhanced_description: fullProduct.enhanced_description || '',
         variants: variants.map(v => ({
           id: v.id,
           sku: v.sku,

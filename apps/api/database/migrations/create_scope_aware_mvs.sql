@@ -60,6 +60,9 @@ SELECT
   ii.landing_page_theme,
   ii.image_url,
   ii.image_gallery as image_urls,
+  ii.features,
+  ii.specifications,
+  ii.enhanced_description,
   (ii.metadata->>'video_url')::text as video_url,
   (ii.metadata->>'gallery_urls')::jsonb as gallery_urls,
   (ii.metadata->>'thumbnail_url')::text as thumbnail_url,
@@ -156,7 +159,6 @@ SELECT
   (ii.metadata->>'is_shipping_required')::boolean as is_shipping_required,
   
   -- RICH METADATA (from inventory_items)
-  (ii.metadata->>'specifications')::jsonb as specifications,
   (ii.metadata->>'attributes')::jsonb as attributes,
   (ii.metadata->>'custom_fields')::jsonb as custom_fields,
   (ii.metadata->>'search_keywords')::jsonb as search_keywords,

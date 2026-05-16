@@ -91,6 +91,8 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
         };
       case 'commitment':
       case 'professional':
+      case 'ecommerce':
+      case 'omnichannel':
       case 'chain_professional': // Chain professional gets same features as individual professional
         return {
           enabled: true,

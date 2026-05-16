@@ -298,6 +298,13 @@ class SubscriptionBillingService extends TenantApiSingleton {
       'subscription-subscribe'
     );
     
+    if (!response.success) {
+      const errorMessage = typeof response.error === 'string' 
+        ? response.error 
+        : response.error?.message || 'Subscription failed';
+      throw new Error(errorMessage);
+    }
+    
     return response.data!;
   }
 
@@ -313,6 +320,10 @@ class SubscriptionBillingService extends TenantApiSingleton {
       },
       'subscription-confirm'
     );
+     if (!response.success){
+      console.log(`Failed to confirm subscription: ${response.error}`);
+      return { success: false, tier: '', status: '', error: response.error as string };
+    }
     
     const data = (response as any).data || response;
     return data;
@@ -330,6 +341,10 @@ class SubscriptionBillingService extends TenantApiSingleton {
       },
       'subscription-paypal-activate'
     );
+     if (!response.success){
+      console.log(`Failed to activate PayPal subscription: ${response.error}`);
+      return { success: false, error: response.error as string };
+    }
     
     const data = (response as any).data || response;
     return data;
@@ -430,6 +445,10 @@ class SubscriptionBillingService extends TenantApiSingleton {
       { method: 'GET' },
       'paypal-config'
     );
+    if (!response.success){
+      console.log(`Failed to get PayPal config: ${response.error}`);
+      return { configured: false, mode: 'sandbox' };
+    }
     
     // The response is nested: response.data.data.configured
     return response.data?.data || { configured: false, mode: 'sandbox' };
