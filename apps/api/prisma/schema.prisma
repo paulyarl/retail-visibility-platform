@@ -50,6 +50,10 @@ model audit_log {
   action       action
 
   @@index([tenant_id, occurred_at(sort: Desc)], map: "audit_log_tenant_id_occurred_at_sort_desc_idx")
+  @@index([actor_type, actor_id])
+  @@index([entity_type, entity_id])
+  @@index([request_id])
+  @@index([tenant_id, occurred_at(sort: Desc)])
 }
 
 model barcode_enrichment {
@@ -68,6 +72,10 @@ model barcode_enrichment {
   fetch_count         Int      @default(1)
   created_at          DateTime @default(now())
   updated_at          DateTime
+
+  @@index([barcode])
+  @@index([last_fetched_at])
+  @@index([source])
 }
 
 model barcode_lookup_log {
@@ -80,6 +88,9 @@ model barcode_lookup_log {
   latency_ms Int?
   error      String?
   created_at DateTime @default(now())
+
+  @@index([barcode])
+  @@index([tenant_id, created_at])
 }
 
 model business_hours_list {
@@ -130,9 +141,9 @@ model category_mirror_runs {
   job_id       String?
   started_at   DateTime  @default(now())
   completed_at DateTime?
-  tenants      tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
+  @@index([tenant_id, strategy, started_at(sort: Desc)])
 }
 
 model clover_category_mappings_list {
@@ -233,7 +244,6 @@ model consent_records {
   source       String   @default("web") @db.VarChar
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @default(now()) @db.Timestamptz(6)
-  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_consent_records_user")
 
   @@index([created_at], map: "idx_consent_records_created_at")
   @@index([user_id, consent_type], map: "idx_consent_records_user_type")
@@ -539,7 +549,6 @@ model directory_featured_listings_list {
   placement_priority Int      @default(5)
   created_by         String?
   created_at         DateTime @default(now())
-  users              users?   @relation(fields: [created_by], references: [id], onDelete: Cascade)
   tenants            tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([placement_priority, featured_from(sort: Desc)])
@@ -777,7 +786,6 @@ model featured_products {
   admin_approved      Boolean?        @default(false)
   approved_by         String?
   approved_at         DateTime?       @db.Timestamp(6)
-  users               users?          @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   inventory_items     inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_inventory_item")
   tenants             tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_tenant")
 
@@ -1276,10 +1284,10 @@ model inventory_items {
   featured_priority                                                               Int?                     @default(0)
   featured_type                                                                   String?                  @default("store_selection")
   product_slug                                                                    String?                  @db.VarChar(255)
+  seo_keywords                                                                    String[]                 @default([])
   download_page_id                                                                String?                  @db.VarChar(255)
   seo_title                                                                       String?
   seo_description                                                                 String?
-  seo_keywords                                                                    String[]
   enhanced_description                                                            String?
   tags                                                                            String[]
   video_url                                                                       String?
@@ -1294,7 +1302,6 @@ model inventory_items {
   digital_downloads                                                               digital_downloads[]
   featured_products                                                               featured_products[]
   digital_download_pages_inventory_items_download_page_idTodigital_download_pages digital_download_pages?  @relation("inventory_items_download_page_idTodigital_download_pages", fields: [download_page_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_download_page")
-  tenant_payment_gateways                                                         tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
   tenants                                                                         tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   order_items                                                                     order_items[]
   photo_assets                                                                    photo_assets[]
@@ -1336,7 +1343,6 @@ model inventory_sync_events {
   metadata                                           Json?           @default("{}")
   tenants_inventory_sync_events_location_idTotenants tenants         @relation("inventory_sync_events_location_idTotenants", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_location")
   tenants_inventory_sync_events_tenant_idTotenants   tenants         @relation("inventory_sync_events_tenant_idTotenants", fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_tenant")
-  users                                              users?          @relation(fields: [triggered_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_sync_events_triggered_by")
 
   @@index([location_id], map: "idx_inventory_sync_events_location")
   @@index([status], map: "idx_inventory_sync_events_status")
@@ -1357,7 +1363,6 @@ model inventory_transfer_logs {
   quantity_change     Int?
   notes               String?
   metadata            Json?               @default("{}")
-  users               users               @relation(fields: [performed_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_performed_by")
   tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_tenant")
   inventory_transfers inventory_transfers @relation(fields: [transfer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfer_logs_transfer")
 
@@ -1392,11 +1397,6 @@ model inventory_transfers {
   created_at                                              DateTime?                 @default(now()) @db.Timestamp(6)
   updated_at                                              DateTime?                 @default(now()) @db.Timestamp(6)
   inventory_transfer_logs                                 inventory_transfer_logs[]
-  users_inventory_transfers_approved_byTousers            users?                    @relation("inventory_transfers_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_approved_by")
-  users_inventory_transfers_cancelled_byTousers           users?                    @relation("inventory_transfers_cancelled_byTousers", fields: [cancelled_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_cancelled_by")
-  users_inventory_transfers_initiated_byTousers           users                     @relation("inventory_transfers_initiated_byTousers", fields: [initiated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_initiated_by")
-  users_inventory_transfers_received_byTousers            users?                    @relation("inventory_transfers_received_byTousers", fields: [received_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_received_by")
-  users_inventory_transfers_shipped_byTousers             users?                    @relation("inventory_transfers_shipped_byTousers", fields: [shipped_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_shipped_by")
   tenants_inventory_transfers_source_location_idTotenants tenants                   @relation("inventory_transfers_source_location_idTotenants", fields: [source_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_source")
   tenants_inventory_transfers_target_location_idTotenants tenants                   @relation("inventory_transfers_target_location_idTotenants", fields: [target_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_target")
   tenants_inventory_transfers_tenant_idTotenants          tenants                   @relation("inventory_transfers_tenant_idTotenants", fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_transfers_tenant")
@@ -1419,7 +1419,6 @@ model invitations {
   accepted_at DateTime?
   created_at  DateTime         @default(now())
   updated_at  DateTime         @default(now())
-  users       users            @relation(fields: [invited_by], references: [id], onDelete: Cascade)
   tenants     tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([email])
@@ -1452,20 +1451,20 @@ model location_inventory_pools {
 }
 
 model location_status_logs {
-  id             Int             @id @default(autoincrement())
-  tenant_id      String          @db.VarChar(255)
+  id             String          @id @default(dbgenerated("nextval('location_status_logs_id_seq'::regclass)"))
+  tenant_id      String
   old_status     location_status
   new_status     location_status
-  changed_by     String?         @db.VarChar(255)
+  changed_by     String
   reason         String?
-  reopening_date DateTime?       @db.Timestamp(6)
-  created_at     DateTime        @default(now()) @db.Timestamp(6)
-  updated_at     DateTime        @default(now()) @db.Timestamp(6)
+  reopening_date DateTime?
   metadata       Json?
-  tenants        tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  created_at     DateTime        @default(now())
 
   @@index([created_at(sort: Desc)], map: "idx_location_status_logs_created_at")
   @@index([tenant_id], map: "idx_location_status_logs_tenant_id")
+  @@index([changed_by])
+  @@index([tenant_id, created_at])
 }
 
 model login_attempts {
@@ -1478,7 +1477,6 @@ model login_attempts {
   failure_reason String?  @db.VarChar(100)
   metadata       Json?    @default("{}")
   created_at     DateTime @default(now())
-  users          users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([created_at])
   @@index([email])
@@ -1634,11 +1632,13 @@ model oauth_integrations {
   access_token  String
   refresh_token String?
   scopes        String[]  @default([])
-  expiresAt     DateTime? @db.Timestamptz(6)
-  isActive      Boolean?  @default(true)
+  expires_at    DateTime? @db.Timestamptz(6)
+  is_active     Boolean?  @default(true)
   metadata      Json?
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
   updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, is_active], map: "idx_oauth_integrations_provider")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -1718,7 +1718,6 @@ model order_status_history {
   notes              String?
   metadata           Json?         @default("{}")
   created_at         DateTime      @default(now()) @db.Timestamp(6)
-  users              users?        @relation(fields: [changed_by_user_id], references: [id], onUpdate: NoAction, map: "fk_order_status_history_changed_by_user_id")
   orders             orders        @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_status_history_order_id")
 
   @@index([changed_by_user_id], map: "idx_order_status_history_changed_by_user_id")
@@ -2484,7 +2483,6 @@ model security_alerts {
   user_email      String?   @db.VarChar(255)
   user_first_name String?   @db.VarChar(255)
   user_last_name  String?   @db.VarChar(255)
-  users           users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([created_at])
   @@index([dismissed])
@@ -2508,7 +2506,6 @@ model security_threats {
   resolved_by String?   @db.VarChar(255)
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
-  users       users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
   @@index([created_at])
   @@index([ip_address])
@@ -2650,7 +2647,6 @@ model shopping_carts {
   metadata            Json?                 @default("{}")
   shopping_cart_items shopping_cart_items[]
   tenants             tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_shopping_carts_tenant")
-  users               users?                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_shopping_carts_user")
 
   @@index([user_id, status, last_activity_at(sort: Desc)], map: "idx_shopping_carts_user_status")
 }
@@ -2812,10 +2808,14 @@ model storefront_mv_refresh_log {
 
 model stripe_webhook_events {
   id           String   @id
-  event_id     String
+  event_id     String   @unique
   event_type   String
   processed_at DateTime @default(now())
   created_at   DateTime @default(now())
+
+  @@index([event_id])
+  @@index([event_type])
+  @@index([processed_at])
 }
 
 model subscription_invoices {
@@ -3022,27 +3022,26 @@ model tenant_gbp_categories {
 }
 
 model tenant_payment_gateways {
-  id                       String            @id
+  id                       String    @id
   tenant_id                String
   gateway_type             String
-  is_active                Boolean?          @default(false)
-  is_default               Boolean?          @default(false)
+  is_active                Boolean?  @default(false)
+  is_default               Boolean?  @default(false)
   api_key_encrypted        String?
   api_secret_encrypted     String?
   webhook_secret_encrypted String?
-  config                   Json?             @default("{}")
-  default_flow             String?           @default("authorize_capture")
-  auto_capture_delay_hours Int?              @default(168)
-  last_verified_at         DateTime?         @db.Timestamp(6)
+  config                   Json?     @default("{}")
+  default_flow             String?   @default("authorize_capture")
+  auto_capture_delay_hours Int?      @default(168)
+  last_verified_at         DateTime? @db.Timestamp(6)
   verification_status      String?
   verification_error       String?
-  metadata                 Json?             @default("{}")
-  created_at               DateTime?         @default(now()) @db.Timestamp(6)
-  updated_at               DateTime?         @default(now()) @db.Timestamp(6)
-  oauth_connected          Boolean?          @default(false)
-  oauth_merchant_id        String?           @db.VarChar(255)
-  inventory_items          inventory_items[]
-  tenants                  tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_payment_gateways_tenant")
+  metadata                 Json?     @default("{}")
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  oauth_connected          Boolean?  @default(false)
+  oauth_merchant_id        String?   @db.VarChar(255)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_payment_gateways_tenant")
 
   @@unique([tenant_id, gateway_type], map: "uq_tenant_gateway_type")
   @@index([tenant_id, is_active], map: "idx_tenant_payment_gateways_active")
@@ -3151,7 +3150,6 @@ model tenants {
   effective_expires_source                                                               String?                            @default("automatic_trial") @db.VarChar(50)
   business_hours_list                                                                    business_hours_list?
   business_hours_special_list                                                            business_hours_special_list[]
-  category_mirror_runs                                                                   category_mirror_runs[]
   customer_tenant_relationships                                                          customer_tenant_relationships[]
   digital_access_grants                                                                  digital_access_grants[]
   digital_download_pages                                                                 digital_download_pages[]
@@ -3181,7 +3179,6 @@ model tenants {
   invitations                                                                            invitations[]
   location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]         @relation("location_inventory_pools_location_idTotenants")
   location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]         @relation("location_inventory_pools_tenant_idTotenants")
-  location_status_logs                                                                   location_status_logs[]
   merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]        @relation("merchant_billing_gateways_tenant_idTotenants")
   merchant_paypal_connections                                                            merchant_paypal_connections?
   merchant_stripe_connections                                                            merchant_stripe_connections?
@@ -3209,7 +3206,6 @@ model tenants {
   tenant_payment_gateways                                                                tenant_payment_gateways[]
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
   merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?         @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users                                                                                  users?                             @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organizations_list                                                                     organizations_list?                @relation(fields: [organization_id], references: [id])
   user_tenants                                                                           user_tenants[]
 
@@ -3230,9 +3226,6 @@ model tenants {
   @@index([service_level], map: "tenant_servicelevel_idx")
   @@index([slug], map: "tenant_slug_idx")
   @@index([subscription_status], map: "tenant_subscriptionstatus_idx")
-  @@index([directory_visible], map: "idx_tenant_directory_visible")
-  @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
-  @@index([slug], map: "idx_tenant_slug")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -3352,6 +3345,10 @@ model upgrade_requests {
   processed_at   DateTime?
   created_at     DateTime  @default(now())
   updated_at     DateTime
+
+  @@index([created_at])
+  @@index([status])
+  @@index([tenant_id])
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -3431,54 +3428,37 @@ model user_tenants {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model users {
-  id                                                          String                             @id
-  email                                                       String                             @unique
-  password_hash                                               String
-  first_name                                                  String?
-  last_name                                                   String?
-  role                                                        user_role                          @default(USER)
-  email_verified                                              Boolean                            @default(false)
-  email_verification_token                                    String?
-  password_reset_token                                        String?
-  password_reset_expires                                      DateTime?
-  last_login                                                  DateTime?
-  is_active                                                   Boolean                            @default(true)
-  created_at                                                  DateTime                           @default(now())
-  updated_at                                                  DateTime
-  mfa_enabled                                                 Boolean?                           @default(false)
-  mfa_secret                                                  String?
-  mfa_backup_codes                                            String[]
-  mfa_method                                                  String?                            @db.VarChar(50)
-  mfa_verified_at                                             DateTime?                          @db.Timestamp(6)
-  onboarding_completed                                        Boolean                            @default(false)
-  onboarding_step                                             String?                            @db.VarChar(50)
-  onboarding_data                                             Json?
-  auth0_id                                                    String?                            @unique @db.VarChar(255)
-  business_name                                               String?                            @db.VarChar(255)
-  business_type                                               String?                            @db.VarChar(100)
-  phone                                                       String?                            @db.VarChar(50)
-  picture                                                     String?                            @db.VarChar(500)
-  consent_records                                             consent_records[]
-  digital_download_pages                                      digital_download_pages[]
-  directory_featured_listings_list                            directory_featured_listings_list[]
-  featured_products                                           featured_products[]
-  inventory_sync_events                                       inventory_sync_events[]
-  inventory_transfer_logs                                     inventory_transfer_logs[]
-  inventory_transfers_inventory_transfers_approved_byTousers  inventory_transfers[]              @relation("inventory_transfers_approved_byTousers")
-  inventory_transfers_inventory_transfers_cancelled_byTousers inventory_transfers[]              @relation("inventory_transfers_cancelled_byTousers")
-  inventory_transfers_inventory_transfers_initiated_byTousers inventory_transfers[]              @relation("inventory_transfers_initiated_byTousers")
-  inventory_transfers_inventory_transfers_received_byTousers  inventory_transfers[]              @relation("inventory_transfers_received_byTousers")
-  inventory_transfers_inventory_transfers_shipped_byTousers   inventory_transfers[]              @relation("inventory_transfers_shipped_byTousers")
-  invitations                                                 invitations[]
-  login_attempts                                              login_attempts[]
-  order_status_history                                        order_status_history[]
-  security_alerts                                             security_alerts[]
-  security_threats                                            security_threats[]
-  shopping_carts                                              shopping_carts[]
-  tenants                                                     tenants[]
-  user_preferences                                            user_preferences[]
-  user_sessions_list                                          user_sessions_list[]
-  user_tenants                                                user_tenants[]
+  id                       String                   @id
+  email                    String                   @unique
+  password_hash            String
+  first_name               String?
+  last_name                String?
+  role                     user_role                @default(USER)
+  email_verified           Boolean                  @default(false)
+  email_verification_token String?
+  password_reset_token     String?
+  password_reset_expires   DateTime?
+  last_login               DateTime?
+  is_active                Boolean                  @default(true)
+  created_at               DateTime                 @default(now())
+  updated_at               DateTime
+  mfa_enabled              Boolean?                 @default(false)
+  mfa_secret               String?
+  mfa_backup_codes         String[]
+  mfa_method               String?                  @db.VarChar(50)
+  mfa_verified_at          DateTime?                @db.Timestamp(6)
+  onboarding_completed     Boolean                  @default(false)
+  onboarding_step          String?                  @db.VarChar(50)
+  onboarding_data          Json?
+  auth0_id                 String?                  @unique @db.VarChar(255)
+  business_name            String?                  @db.VarChar(255)
+  business_type            String?                  @db.VarChar(100)
+  phone                    String?                  @db.VarChar(50)
+  picture                  String?                  @db.VarChar(500)
+  digital_download_pages   digital_download_pages[]
+  user_preferences         user_preferences[]
+  user_sessions_list       user_sessions_list[]
+  user_tenants             user_tenants[]
 }
 
 model webhook_events {
@@ -3636,9 +3616,9 @@ enum action {
   update
   delete
   sync
-  policyApply
-  oauthConnect
-  oauthRefresh
+  policy_apply
+  oauth_connect
+  oauth_refresh
 }
 
 enum actor_type {
@@ -3680,11 +3660,9 @@ enum digital_delivery_status {
 }
 
 enum enrichment_status {
+  COMPLETE
   NEEDS_ENRICHMENT
   PARTIALLY_ENRICHED
-  PENDING
-  COMPLETE
-  FAILED
 }
 
 enum entity_status {
@@ -3716,6 +3694,7 @@ enum item_status {
   inactive
   archived
   trashed
+  draft
 }
 
 enum item_visibility {
@@ -3803,10 +3782,11 @@ enum product_condition {
 
 enum product_source {
   MANUAL
-  BARCODE_SCAN
-  BULK_UPLOAD
-  API_IMPORT
   QUICK_START_WIZARD
+  PRODUCT_SCAN
+  IMPORT
+  API
+  BULK_UPLOAD
   CLOVER_DEMO
 }
 
@@ -3873,12 +3853,12 @@ enum transfer_status {
 }
 
 enum user_role {
-  PLATFORM_ADMIN
-  PLATFORM_SUPPORT
-  PLATFORM_VIEWER
   ADMIN
   OWNER
   USER
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  PLATFORM_VIEWER
   TENANT_OWNER
   TENANT_ADMIN
   TENANT_MANAGER
@@ -3889,7 +3869,15 @@ enum user_role {
 enum user_tenant_role {
   OWNER
   ADMIN
-  SUPPORT
   MEMBER
   VIEWER
+  SUPPORT
+}
+
+enum LocationStatus {
+  pending
+  active
+  inactive
+  closed
+  archived
 }
