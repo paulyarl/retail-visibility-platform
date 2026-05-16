@@ -886,6 +886,10 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
               access_duration_days: sourceItem.access_duration_days,
               download_limit: sourceItem.download_limit,
               license_type: sourceItem.license_type,
+              // Add enriched content fields
+              features: sourceItem.features,
+              specifications: sourceItem.specifications as any,
+              enhanced_description: sourceItem.enhanced_description,
               has_variants: sourceItem.has_variants,
               is_featured: sourceItem.is_featured,
               featured_at: sourceItem.featured_at,
@@ -1108,6 +1112,10 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             access_duration_days: sourceItem.access_duration_days,
             download_limit: sourceItem.download_limit,
             license_type: sourceItem.license_type,
+            // Add enriched content fields
+            features: sourceItem.features,
+            specifications: sourceItem.specifications as any,
+            enhanced_description: sourceItem.enhanced_description,
             has_variants: sourceItem.has_variants,
             is_featured: sourceItem.is_featured,
             featured_at: sourceItem.featured_at,
@@ -1372,6 +1380,10 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
         access_duration_days: true,
         download_limit: true,
         license_type: true,
+        // Add enriched content fields
+        features: true,
+        specifications: true,
+        enhanced_description: true,
         has_variants: true,
         is_featured: true,
         featured_at: true,
@@ -1549,6 +1561,10 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
                 access_duration_days: sourceItem.access_duration_days,
                 download_limit: sourceItem.download_limit,
                 license_type: sourceItem.license_type,
+                // Add enriched content fields for propagation
+                features: sourceItem.features,
+                specifications: sourceItem.specifications as any,
+                enhanced_description: sourceItem.enhanced_description,
                 has_variants: sourceItem.has_variants,
                 is_featured: sourceItem.is_featured,
                 featured_at: sourceItem.featured_at,
