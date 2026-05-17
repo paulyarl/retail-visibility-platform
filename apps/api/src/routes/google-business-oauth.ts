@@ -670,6 +670,10 @@ router.post('/google/business/sync', async (req, res) => {
       select: {
         name: true,
         metadata: true,
+        gbp_primary_category_id: true,
+        gbp_primary_category_name: true,
+        gbp_secondary_categories: true,
+        gbp_categories_sync_status: true,
       }
     });
 
@@ -688,7 +692,7 @@ router.post('/google/business/sync', async (req, res) => {
 
     // Get secondary categories from tenant metadata
     const tenantMetadata = tenant.metadata as any || {};
-    const secondaryCategories = tenantMetadata?.gbp_categories?.secondary || [];
+    const secondaryCategories = tenant.gbp_secondary_categories || [];
 
     // Build sync payload from business profile
     const syncPayload: any = {};

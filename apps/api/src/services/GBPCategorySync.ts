@@ -232,24 +232,24 @@ export class GBPCategorySyncService {
         }
       }
 
-      // 7. Update tenant metadata with sync status
+      // 7. Update tenant with GBP categories and sync status using dedicated columns
       const syncStatus = unmappedCategories.length === 0 ? 'synced' : 'partial';
       
       await client.query(
         `UPDATE tenants 
-         SET metadata = jsonb_set(
-           jsonb_set(
-             COALESCE(metadata, '{}'::jsonb),
-             '{gbp_categories,sync_status}',
-             $1::jsonb
-           ),
-           '{gbp_categories,last_synced_at}',
-           $2::jsonb
-         )
-         WHERE id = $3`,
+         SET 
+           gbp_primary_category_id = $1,
+           gbp_primary_category_name = $2,
+           gbp_secondary_categories = $3,
+           gbp_categories_sync_status = $4,
+           gbp_categories_last_synced_at = $5
+         WHERE id = $6`,
         [
-          JSON.stringify(syncStatus),
-          JSON.stringify(new Date().toISOString()),
+          gbpCategories.primary.id,
+          gbpCategories.primary.name,
+          JSON.stringify(gbpCategories.secondary || []),
+          syncStatus,
+          new Date().toISOString(),
           tenantId,
         ]
       );
@@ -272,24 +272,15 @@ export class GBPCategorySyncService {
       await client.query('ROLLBACK');
       console.error('[GBP Sync] Error:', error);
 
-      // Update tenant metadata with error status
+      // Update tenant with error status using dedicated columns
       try {
         await this.pool.query(
           `UPDATE tenants 
-           SET metadata = jsonb_set(
-             jsonb_set(
-               COALESCE(metadata, '{}'::jsonb),
-               '{gbp_categories,sync_status}',
-               '"error"'::jsonb
-             ),
-             '{gbp_categories,directory_sync_error}',
-             $1::jsonb
-           )
-           WHERE id = $2`,
-          [
-            JSON.stringify(error instanceof Error ? error.message : 'Unknown error'),
-            tenantId,
-          ]
+           SET 
+             gbp_categories_sync_status = 'error',
+             gbp_categories_last_synced_at = NOW()
+           WHERE id = $1`,
+          [tenantId]
         );
       } catch (updateError) {
         console.error('[GBP Sync] Failed to update error status:', updateError);

@@ -99,7 +99,7 @@ router.get('/', async (req: Request, res: Response) => {
         sp.updated_at,
         t.name as tenant_name,
         t.slug as tenant_slug,
-        t.business_name
+        t.name as business_name
       FROM storefront_products sp
       JOIN tenants t ON sp.tenant_id = t.id
       WHERE ${whereClause}

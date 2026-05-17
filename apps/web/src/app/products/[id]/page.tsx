@@ -33,7 +33,7 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 
-import { tenantPublicService,SubscriptionStatusInfo,LocationStatusInfo,PublicTenantInfo,TenantProfile } from '@/services/TenantPublicService';
+import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
 
 // Define the product interface based on the API response
@@ -120,7 +120,7 @@ interface ProductData {
   licenseType?: string;
   accessDurationDays?: number;
   downloadLimit?: number;
-  featuredTypes?: string[]; 
+  featuredTypes?: string[];
 }
 
 // Force dynamic rendering for product pages
@@ -196,7 +196,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
-  
+
   // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
   const businessDescription = tenantProfile?.business_description;
@@ -204,7 +204,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   // Create enhanced description with business info
   const baseDescription = product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`;
-  const enhancedDescription = businessDescription 
+  const enhancedDescription = businessDescription
     ? `${baseDescription}. ${businessDescription}`
     : baseDescription;
 
@@ -279,7 +279,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
   const businessName = product.tenant?.name || 'Unknown Store';
-  
+
 
   // console.log(`tenant: `, tenant);
 
@@ -293,18 +293,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   })) || [];
   // console.log(`Convert images: ${gallery}`);
 
-  
 
-   const tenantInfoForStatus = {
-    id: product.tenant?.id||tenant?.id,
-    name: product.tenant?.name||tenant?.name,
-    slug: product.tenant?.slug||tenant?.slug,
+
+  const tenantInfoForStatus = {
+    id: product.tenant?.id || tenant?.id,
+    name: product.tenant?.name || tenant?.name,
+    slug: product.tenant?.slug || tenant?.slug,
     subscriptionStatus: tenant?.statusInfo?.status || 'unknown',
     subscriptionTier: tenant?.subscriptionTier,
     locationStatus: tenant?.locationStatus,
     statusInfo: tenant?.statusInfo,
     showSubscriptionPanel: tenant?.showSubscriptionPanel,
-    hasDirectory: tenant?.directoryData?.is_published||tenant?.hasDirectory||tenant?.statusInfo?.showInDirectory,
+    hasDirectory: tenant?.directoryData?.is_published || tenant?.hasDirectory || tenant?.statusInfo?.showInDirectory,
     createdAt: tenant?.createdAt,
     updatedAt: tenant?.updatedAt,
   } as any;
@@ -335,7 +335,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.title,
-    description: tenantProfile?.profileData?.business_description 
+    description: tenantProfile?.profileData?.business_description
       ? `${product.description}. ${tenantProfile?.profileData?.business_description}`
       : product.description,
     brand: {
@@ -373,113 +373,86 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-    <ProductLikeProvider>
-      {/* SEO Meta Tags */}
-      {tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
-        <>
-          {tenantProfile.directoryData.seo_keywords.map((tag: string, index: number) => (
-            <meta key={index} name="keywords" content={tag} />
-          ))}
-        </>
-      )}
+      <ProductLikeProvider>
+        {/* SEO Meta Tags */}
+        {tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
+          <>
+            {tenantProfile.directoryData.seo_keywords.map((tag: string, index: number) => (
+              <meta key={index} name="keywords" content={tag} />
+            ))}
+          </>
+        )}
 
-      {/* Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
+        {/* Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
 
-      {/* Product View Tracking */}
-      <ProductViewTracker 
-        productId={product.id}
-        tenantId={product.tenantId}
-        productName={product.name}
-        categoryId={product.category?.id}
-      />
+        {/* Product View Tracking */}
+        <ProductViewTracker
+          productId={product.id}
+          tenantId={product.tenantId}
+          productName={product.name}
+          categoryId={product.category?.id}
+        />
 
-      {/* Hero Header - Store Brand Identity, Navigation, Actions */}
-      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Main Header Row */}
-          <div className="flex items-center gap-4 py-4">
-            {/* Brand Identity */}
-            <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
-              {/* Store Logo */}
-              <div className="flex-shrink-0">
-                {tenantProfile?.profileData?.logoUrl || tenantProfile?.profileData?.logo_url ? (
-                  <div className="relative w-14 h-14">
-                    <Image
-                      src={tenantProfile.profileData.logoUrl || tenantProfile.profileData.logo_url}
-                      alt={tenantProfile.profileData.businessName||tenantProfile.profileData.business_name || businessName}
-                      fill
-                      className="object-contain rounded-lg shadow-sm"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
-                    <svg className="w-7 h-7 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-
-              {/* Store Name and Category */}
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
-                    {tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || businessName || 'Store'}
-                  </h1>
+        {/* Hero Header - Store Brand Identity, Navigation, Actions */}
+        <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Main Header Row */}
+            <div className="flex items-center gap-4 py-4">
+              {/* Brand Identity */}
+              <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
+                {/* Store Logo */}
+                <div className="flex-shrink-0">
+                  {tenantProfile?.profileData?.logoUrl || tenantProfile?.profileData?.logo_url ? (
+                    <div className="relative w-14 h-14">
+                      <Image
+                        src={tenantProfile.profileData.logoUrl || tenantProfile.profileData.logo_url}
+                        alt={tenantProfile.profileData.businessName || tenantProfile.profileData.business_name || businessName}
+                        fill
+                        className="object-contain rounded-lg shadow-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
+                      <svg className="w-7 h-7 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-                {product.category && (
-                  <a 
-                    title={`Browse to store's ${product.category.name} products`} 
-                    className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
-                    href={`/tenant/${product.tenantId}?category=${product.category.slug}`}
-                  >
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                      {product.category.name}
-                    </p>
-                  </a>
-                )}
+
+                {/* Store Name and Category */}
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
+                      {tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
+                    </h1>
+                  </div>
+                  {product.category && (
+                    <a
+                      title={`Browse to store's ${product.category.name} products`}
+                      className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
+                      href={`/tenant/${product.tenantId}?category=${product.category.slug}`}
+                    >
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {product.category.name}
+                      </p>
+                    </a>
+                  )}
+                </div>
               </div>
+
+
             </div>
-
             {/* Quick Actions */}
-            <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-              {/* Navigation Pills */}
-              <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                {tenantProfile?.slug && tenantProfile?.hasDirectory && !tenantProfile?.showSubscriptionPanel && (
-                  <a
-                    href={`/directory/${tenantProfile.slug}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View Store in Directory"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <span className="hidden lg:inline">Directory</span>
-                  </a>
-                )}
-                
-                {tenantProfile?.slug && (
-                  <a
-                    href={`/tenant/${product.tenantId}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
-                    title="View Products"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <span className="hidden lg:inline">Products</span>
-                  </a>
-                )}
-              </div>
-
+            <div className="hidden sm:flex justify-end mt-3">
               {/* Directory Actions */}
-              <DirectoryActions 
+              <DirectoryActions
                 listing={{
-                  business_name: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || '',
+                  business_name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || '',
                   slug: tenantProfile?.slug || '',
                   tenantId: product.tenantId || '',
                   id: product.id || ''
@@ -489,64 +462,80 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 variant="product"
               />
             </div>
-          </div>
+            {/* Navigation Pills */}
 
-          {/* Mobile Navigation */}
-          <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
-            {tenantProfile?.slug && (
-              <a
-                href={`/directory/${tenantProfile.slug}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                <span>Directory</span>
-              </a>
-            )}
-            {tenantProfile?.slug && (
-              <a
-                href={`/tenant/${product.tenantId}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                <span>Products</span>
-              </a>
-            )}
-          </div>
-        </div>
-      </header>
 
-      {/* Alert for non-public products (only shown to authenticated users) */}
-      {!isPubliclyAccessible && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
-            <div className="flex items-start gap-3">
-              <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
-                  This Product is Not Publicly Accessible
-                </h3>
-                <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
-                  <strong>Status:</strong> {statusLabel} | <strong>Visibility:</strong> {visibilityLabel}
-                </p>
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {product.itemStatus === 'draft' && 'This product is in draft mode. Activate it to make it publicly accessible.'}
-                  {product.itemStatus === 'archived' && 'This product is archived. Restore it to active status to make it publicly accessible.'}
-                  {product.itemStatus === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
-                  {product.visibility === 'private' && product.itemStatus === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
-                </p>
+            {/* Mobile Navigation */}
+            <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
+              {/* Directory Actions */}
+              <DirectoryActions
+                listing={{
+                  business_name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || '',
+                  slug: tenantProfile?.slug || '',
+                  tenantId: product.tenantId || '',
+                  id: product.id || ''
+                }}
+                currentUrl={currentUrl}
+                entity_name={product.name}
+                variant="product"
+              />
+              <div className="hidden sm:flex justify-end mt-3">
+                {tenantProfile?.slug && (
+                  <a
+                    href={`/tenant/${product.tenantId}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span>Store</span>
+                  </a>
+                )}
+                {tenantProfile?.slug && (
+                  <a
+                    href={`/directory/${tenantProfile.slug}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span>Directory</span>
+                  </a>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </header>
+
+        {/* Alert for non-public products (only shown to authenticated users) */}
+        {!isPubliclyAccessible && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                    This Product is Not Publicly Accessible
+                  </h3>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                    <strong>Status:</strong> {statusLabel} | <strong>Visibility:</strong> {visibilityLabel}
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    {product.itemStatus === 'draft' && 'This product is in draft mode. Activate it to make it publicly accessible.'}
+                    {product.itemStatus === 'archived' && 'This product is archived. Restore it to active status to make it publicly accessible.'}
+                    {product.itemStatus === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
+                    {product.visibility === 'private' && product.itemStatus === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-{/* Two-Column Layout: Categories + Product Description only */}
+        {/* Two-Column Layout: Categories + Product Description only */}
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Desktop Category Sidebar */}
@@ -590,72 +579,72 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Product Description Section */}
-           
+
             <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
               <TenantPaymentProvider tenantId={product.tenantId}>
-                <TierBasedLandingPage 
-                disableQRCode
-                product={{
-                  id: product.id,
-                  tenantId: product.tenantId,
-                  name: product.name,
-                  title: product.title,
-                  description: product.description,
-                  marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
-                  price: product.price,
-                  priceCents: product.priceCents,
-                  listPriceCents: product.listPriceCents,
-                  salePriceCents: product.salePriceCents,
-                  currency: product.currency,
-                  imageUrl: product.imageUrl,
-                  imageGallery: productWithGallery.imageGallery,
-                  brand: product.brand,
-                  sku: product.sku,
-                  stock: product.stock,
-                  availability: product.availability,
-                  condition: product.condition,
-                  tenantCategoryId: product.category?.id,
-                  tenantCategory: product.category ? {
-                    id: product.category.id,
-                    name: product.category.name,
-                    slug: product.category.slug,
-                  } : undefined,
-                  featuredTypes: product.featuredTypes,
-                  bucketCounts,
-                  gtin: undefined, // Not available in new API
-                  mpn: undefined, // Not available in new API
-                  defaultGatewayType: undefined, // Will be determined by tenant
-                  // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
-                  features: product.features || [],
-                  specifications: product.specifications, // Now available from direct field
-                  slug: product.tenant?.slug || '',
-                  variants: product.variants,
-                  productType: product.productType,
-                  digitalDeliveryMethod: product.digitalDeliveryMethod,
-                  digitalAssets: product.digitalAssets,
-                  licenseType: product.licenseType,
-                  accessDurationDays: product.accessDurationDays,
-                  downloadLimit: product.downloadLimit,
-                  productSlug: product.productSlug,
-                  slugType: product.slugType,
-                } as any}
-                tenant={{
-                  id: product.tenantId,
-                  name: product.tenant?.name,
-                  slug: product.tenant?.slug || '',
-                  subscriptionTier: product.tenant?.subscriptionTier,
-                  hasActivePaymentGateway: false, // Will be determined by service
-                  defaultGatewayType: undefined,
-                  trialEndsAt: tenantProfile?.trialEndsAt,
-                  locationStatus: tenantProfile?.locationStatus,
-                  statusInfo: tenantProfile?.statusInfo,
-                  organizationId: tenantProfile?.organizationId,
-                  subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
-                  showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
-                  hasDirectory: tenantProfile?.hasDirectory,
-                  directoryData: tenantProfile?.directoryData,
-                  profileData: tenantProfile?.profileData,
-                    businessName: product.tenant?.name||tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name,
+                <TierBasedLandingPage
+                  disableQRCode
+                  product={{
+                    id: product.id,
+                    tenantId: product.tenantId,
+                    name: product.name,
+                    title: product.title,
+                    description: product.description,
+                    marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
+                    price: product.price,
+                    priceCents: product.priceCents,
+                    listPriceCents: product.listPriceCents,
+                    salePriceCents: product.salePriceCents,
+                    currency: product.currency,
+                    imageUrl: product.imageUrl,
+                    imageGallery: productWithGallery.imageGallery,
+                    brand: product.brand,
+                    sku: product.sku,
+                    stock: product.stock,
+                    availability: product.availability,
+                    condition: product.condition,
+                    tenantCategoryId: product.category?.id,
+                    tenantCategory: product.category ? {
+                      id: product.category.id,
+                      name: product.category.name,
+                      slug: product.category.slug,
+                    } : undefined,
+                    featuredTypes: product.featuredTypes,
+                    bucketCounts,
+                    gtin: undefined, // Not available in new API
+                    mpn: undefined, // Not available in new API
+                    defaultGatewayType: undefined, // Will be determined by tenant
+                    // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
+                    features: product.features || [],
+                    specifications: product.specifications, // Now available from direct field
+                    slug: product.tenant?.slug || '',
+                    variants: product.variants,
+                    productType: product.productType,
+                    digitalDeliveryMethod: product.digitalDeliveryMethod,
+                    digitalAssets: product.digitalAssets,
+                    licenseType: product.licenseType,
+                    accessDurationDays: product.accessDurationDays,
+                    downloadLimit: product.downloadLimit,
+                    productSlug: product.productSlug,
+                    slugType: product.slugType,
+                  } as any}
+                  tenant={{
+                    id: product.tenantId,
+                    name: product.tenant?.name,
+                    slug: product.tenant?.slug || '',
+                    subscriptionTier: product.tenant?.subscriptionTier,
+                    hasActivePaymentGateway: false, // Will be determined by service
+                    defaultGatewayType: undefined,
+                    trialEndsAt: tenantProfile?.trialEndsAt,
+                    locationStatus: tenantProfile?.locationStatus,
+                    statusInfo: tenantProfile?.statusInfo,
+                    organizationId: tenantProfile?.organizationId,
+                    subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
+                    showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
+                    hasDirectory: tenantProfile?.hasDirectory,
+                    directoryData: tenantProfile?.directoryData,
+                    profileData: tenantProfile?.profileData,
+                    businessName: product.tenant?.name || tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
                     phone: tenantProfile?.profileData?.phone_number,
                     email: tenantProfile?.profileData?.email,
                     website: tenantProfile?.profileData?.website,
@@ -663,109 +652,109 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     logo_url: tenantProfile?.profileData?.logo_url,
                     social_links: tenantProfile?.profileData?.social_links,
 
-                  metadata: tenantProfile?.metadata,
-                } as any}
-                storeStatus={null}
+                    metadata: tenantProfile?.metadata,
+                  } as any}
+                  storeStatus={null}
                   gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                   fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
                   currentUrl={currentUrl}
                 />
               </TenantPaymentProvider>
             </div>
-          
+
           </div>
         </div>
         {/* Business Description - Merchant Branding - Full Width */}
-         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
-        <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-        
-      
-        {/* Business Information - Contact Us - Full Width */}
-       
-        <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-        {product.productType != 'digital' ? (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ProductBusinessInfoCollapsible 
-            product={product as any} 
-            tenant={ {
-              id: product.tenantId || tenantProfile?.id || '',
-              name: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || product.tenant?.name || '',
-              metadata: {
-                businessName: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name,
-                businessDescription: tenantProfile?.profileData?.business_description||tenantProfile?.profileData?.businessDescription,
-                phone: tenantProfile?.profileData?.phone_number,
-                email: tenantProfile?.profileData?.email,
-                website: tenantProfile?.profileData?.website,
-                address: tenantProfile?.profileData?.state == null ? '' : `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
+        <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
+          <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
 
-                logoUrl: tenantProfile?.profileData?.logo_url,
-                socialLinks: tenantProfile?.profileData?.social_links || undefined,
-              }
-            }} 
-          />
-        </div>
-        ) : (
-           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+
+          {/* Business Information - Contact Us - Full Width */}
+
+          <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+          {product.productType != 'digital' ? (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <ProductBusinessInfoCollapsible
+                product={product as any}
+                tenant={{
+                  id: product.tenantId || tenantProfile?.id || '',
+                  name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || product.tenant?.name || '',
+                  metadata: {
+                    businessName: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
+                    businessDescription: tenantProfile?.profileData?.business_description || tenantProfile?.profileData?.businessDescription,
+                    phone: tenantProfile?.profileData?.phone_number,
+                    email: tenantProfile?.profileData?.email,
+                    website: tenantProfile?.profileData?.website,
+                    address: tenantProfile?.profileData?.state == null ? '' : `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
+
+                    logoUrl: tenantProfile?.profileData?.logo_url,
+                    socialLinks: tenantProfile?.profileData?.social_links || undefined,
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
                 Digital Product
               </h2>
-               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
                 Download link will be available after successful checkout.
               </p>
-           </div>
-        )}
-      
-        {/* Featured Type Products - Full Width */}
-      <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <FeaturedTypeProducts 
-          currentProductId={product.id} 
-          tenantId={product.tenantId} 
-          featuredTypes={product.featuredTypes || []}
-        />
-      </div>
+            </div>
+          )}
 
-      {/* Available Nearby - Cross-Tenant Product Discovery */}
-      {product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-          <AvailableNearby 
-            productSlug={product.productSlug}
-            currentTenantId={product.tenantId}
-            className="w-full max-w-md mx-auto"
-          />
-        </div>
-      )}
+          {/* Featured Type Products - Full Width */}
+          <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <FeaturedTypeProducts
+              currentProductId={product.id}
+              tenantId={product.tenantId}
+              featuredTypes={product.featuredTypes || []}
+            />
+          </div>
 
-      {/* Product Recommendations - Full Width */}
-      <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
-      </div>
+          {/* Available Nearby - Cross-Tenant Product Discovery */}
+          {product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+              <AvailableNearby
+                productSlug={product.productSlug}
+                currentTenantId={product.tenantId}
+                className="w-full max-w-md mx-auto"
+              />
+            </div>
+          )}
 
-      {/* Product Reviews - Full Width */}
-      <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
-        </div>
-      </div>
+          {/* Product Recommendations - Full Width */}
+          <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
+          </div>
+
+          {/* Product Reviews - Full Width */}
+          <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+          <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+              <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
+            </div>
+          </div>
 
         </ProductPageStatusWrapper>
 
-      {/* Recently Viewed Products */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <LastViewed 
-          title="Recently Viewed Products"
-          entityType="product"
-          limit={4}
-          showEmptyState={false}
-          currentProductId={product.id}
-        />
-      </div>
+        {/* Recently Viewed Products */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <LastViewed
+            title="Recently Viewed Products"
+            entityType="product"
+            limit={4}
+            showEmptyState={false}
+            currentProductId={product.id}
+          />
+        </div>
 
-      {/* Platform Branding Footer */}
-      <PoweredByFooter />
-    </ProductLikeProvider>
-  </>
-);
+        {/* Platform Branding Footer */}
+        <PoweredByFooter />
+      </ProductLikeProvider>
+    </>
+  );
 }

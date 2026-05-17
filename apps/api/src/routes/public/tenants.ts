@@ -15,23 +15,24 @@ router.get('/', async (req: Request, res: Response) => {
         t.id,
         t.name,
         t.slug,
-        t.business_name,
+        t.name as business_name,
         t.logo_url,
         COUNT(DISTINCT sp.id) as product_count
       FROM tenants t
-      LEFT JOIN storefront_products sp ON t.id = sp.tenant_id
-        AND sp.is_public = true
-        AND sp.is_active = true
+      LEFT JOIN public.storefront_products sp ON t.id = sp.tenant_id
+        AND sp.visibility = 'public'
+        AND sp.item_status = 'active'
       WHERE t.is_active = true
+        AND t.location_status = 'active'
         AND EXISTS (
-          SELECT 1 FROM storefront_products sp2 
+          SELECT 1 FROM public.storefront_products sp2 
           WHERE sp2.tenant_id = t.id 
-            AND sp2.is_public = true 
-            AND sp2.is_active = true
+            AND sp2.visibility = 'public'
+            AND sp2.item_status = 'active'
         )
-      GROUP BY t.id, t.name, t.slug, t.business_name, t.logo_url
+      GROUP BY t.id, t.name, t.slug, t.logo_url
       HAVING COUNT(DISTINCT sp.id) > 0
-      ORDER BY t.business_name ASC, t.name ASC
+      ORDER BY t.id, t.name ASC
     `;
     
     const result = await getDirectPool().query(query);

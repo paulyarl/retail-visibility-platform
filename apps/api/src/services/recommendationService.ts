@@ -886,10 +886,10 @@ export async function getSimilarStoresInCategory(
         (SELECT COUNT(*) FROM tenant_gbp_categories WHERE tenant_id = $1) as secondary_count
     `;
     const debugResult = await pool.query(debugQuery, [storeId]);
-    console.log('[getSimilarStoresInCategory] Store categories:', debugResult.rows[0]);
+    // console.log('[getSimilarStoresInCategory] Store categories:', debugResult.rows[0]);
     
     const result = await pool.query(query, [storeId, limit]);
-    console.log('[getSimilarStoresInCategory] Query returned:', result.rows.length, 'rows');
+    // console.log('[getSimilarStoresInCategory] Query returned:', result.rows.length, 'rows');
     
     const recommendations: Recommendation[] = result.rows.map((row: any) => {
       const totalScore = row.total_category_score + row.location_score + (row.rating_avg || 0);
@@ -1064,15 +1064,17 @@ export async function getLastViewedItems(
                 WHEN sp.tenant_category_id IS NOT NULL THEN
                   json_build_object(
                     'id', sp.tenant_category_id,
-                    'name', mgd.product_category,
-                    'slug', mgd.product_category_slug
+                    'name', dc.name,
+                    'slug', dc.slug
                   )
                 ELSE NULL
               END
             )
             FROM storefront_products_mv sp
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
-            LEFT JOIN mv_global_discovery mgd ON sp.tenant_id = mgd.tenant_id
+            LEFT JOIN mv_global_discovery mgd ON sp.tenant_id = mgd.tenant_id 
+             AND mgd.inventory_item_id = sp.id
+            LEFT JOIN directory_category dc on dc.id = sp.tenant_category_id
             WHERE sp.id = rv.entity_id
               AND dcl.is_published = true
             LIMIT 1

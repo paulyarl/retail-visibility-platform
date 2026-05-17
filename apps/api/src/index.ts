@@ -1925,13 +1925,13 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
       display_map: bp?.display_map ?? md.display_map ?? false,
       map_privacy_mode: bp?.map_privacy_mode || md.map_privacy_mode || 'precise',
-      // GBP category fields from business profile and metadata
-      gbpCategoryId: bp?.gbp_category_id || null,
-      gbpCategoryName: bp?.gbp_category_name || null,
-      gbpCategoryLastMirrored: bp?.gbp_category_last_mirrored || null,
-      gbpCategorySyncStatus: bp?.gbp_category_sync_status || null,
-      // Secondary categories from metadata
-      gbpSecondaryCategories: md?.gbp_categories?.secondary || [],
+      // GBP category fields from new dedicated columns (with fallbacks)
+      gbpCategoryId: tenant.gbp_primary_category_id || bp?.gbp_category_id || null,
+      gbpCategoryName: tenant.gbp_primary_category_name || bp?.gbp_category_name || null,
+      gbpCategoryLastMirrored: tenant.gbp_categories_last_synced_at || bp?.gbp_category_last_mirrored || null,
+      gbpCategorySyncStatus: tenant.gbp_categories_sync_status || bp?.gbp_category_sync_status || null,
+      // Secondary categories from new dedicated column (with fallback)
+      gbpSecondaryCategories: tenant.gbp_secondary_categories || md?.gbp_categories?.secondary || [],
       // Slug from directory_settings_list
       slug,
       // Whether tenant has published directory listing
@@ -2011,27 +2011,25 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
     
     console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
     
-    // Also update tenants.metadata with both primary and secondary categories
-    // This is needed for backward compatibility during transition
-    const gbpMetadata = {
-      primary: {
-        id: primary.id,
-        name: primary.name
-      },
-      secondary: secondary || [],
-      sync_status: 'synced',
-      last_synced_at: new Date().toISOString()
-    };
-    
+    // Update tenants with new dedicated GBP columns instead of metadata
     await pool.query(
       `UPDATE tenants
-       SET metadata = COALESCE(metadata, '{}'::jsonb) || 
-         jsonb_build_object('gbp_categories', $1::jsonb)
-       WHERE id = $2`,
-      [JSON.stringify(gbpMetadata), tenantId]
+       SET 
+         gbp_primary_category_id = $1,
+         gbp_primary_category_name = $2,
+         gbp_secondary_categories = $3,
+         gbp_categories_sync_status = 'synced',
+         gbp_categories_last_synced_at = NOW()
+       WHERE id = $4`,
+      [
+        primary.id,
+        primary.name,
+        JSON.stringify(secondary || []),
+        tenantId
+      ]
     );
     
-    console.log('[PUT /api/tenant/gbp-category] Metadata updated with primary and secondary categories');
+    console.log('[PUT /api/tenant/gbp-category] Updated tenants table with dedicated GBP columns');
     
     // NEW: Update junction table with clean relational design
     // Delete existing categories for this tenant
@@ -2140,6 +2138,11 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
       metadata: tenant.metadata,
       location_status,
       reopening_date: tenant.reopening_date,
+      // Add GBP category fields
+      gbp_primary_category_id: tenant.gbp_primary_category_id,
+      gbp_primary_category_name: tenant.gbp_primary_category_name,
+      gbp_secondary_categories: tenant.gbp_secondary_categories,
+      gbp_categories_sync_status: tenant.gbp_categories_sync_status,
       access: {
         storefront: finalStorefrontAccess,
       },

@@ -475,14 +475,18 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
-  // console.log('[TenantPage Main] Store Categories:', storeCategories);
-  // console.log('[TenantPage Main] Product Categories:', productCategories);
+  // console.log('[TenantPage Main] 12 Store Categories:', storeCategories);
+  // console.log('[TenantPage Main] 11 Product Categories:', productCategories);
   
   // console.log('[TenantPage Main] Current Category:', currentCategory);
 
   // console.log('[TenantPage Main] Resolved Tenant ID:', resolvedTenantId);
-  // console.log('[TenantPage Main] Tenant:', tenant);
-  // console.log('[TenantPage Main] Products:', products);
+  // console.log('[TenantPage Main] 1 Tenant:', tenant);
+  // console.log('[TenantPage Main] 2 Products:', products);
+  // console.log('[TenantPage Main] 3 total:', total);
+  // console.log('[TenantPage Main] 4 limit:', limit);
+  // console.log('[TenantPage Main] 5 platformSettings:', platformSettings);
+  // console.log('[TenantPage Main] 10 categories:', categories);
 
 
   // Log what data we're passing to StorefrontClientWrapper
@@ -544,13 +548,22 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
 
   // Find primary store category for header badge
   // console.log('[TenantPage] Store Categories:', storeCategories);
-  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
-  // console.log('[TenantPage] Primary Store Category:', primaryStoreCategory);
+  // console.log('[TenantPage] Tenant Primary Category:', tenant);
+  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary) ;
+  // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary:', tenant?.metadata?.gbp_categories?.primary); 
+  // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary?.name:', tenant?.metadata?.gbp_categories?.primary?.name); 
+  // console.log('[TenantPage] tenant?.metadata?.gbpCategories?.primary?.name:', tenant?.metadata?.gbpCategories?.primary?.name); 
 
-  // Get GBP categories from tenant metadata (always available regardless of directory publish status)
-  const primaryGBPCategory = tenant?.primary_category || tenant?.metadata?.gbp_categories?.primary || tenant?.metadata?.gbpCategories?.primary;
-  const secondaryGBPCategories = tenant?.secondary_categories || tenant?.metadata?.gbp_categories?.secondary || tenant?.metadata?.gbpCategories?.secondary || [];
+  // Get GBP categories from new dedicated fields (fallback to metadata for backward compatibility)
+  const primaryGBPCategory = tenant?.metadata?.gbp_categories?.primary || 
+                           tenant?.metadata?.gbpCategories?.primary;
+  const secondaryGBPCategories = tenant?.gbp_secondary_categories || 
+                                tenant?.secondary_categories || 
+                                tenant?.metadata?.gbp_categories?.secondary || 
+                                tenant?.metadata?.gbpCategories?.secondary || [];
 
+  // console.log(`[TenantPage] Primary GBP Category: ${primaryGBPCategory}`);
+  // console.log(`[TenantPage] Secondary GBP Categories: ${JSON.stringify(secondaryGBPCategories)}`);
   // Fetch total product count for "All Products" using singleton service
   let totalAllProducts = 0;
   try {
