@@ -690,9 +690,9 @@ router.post('/google/business/sync', async (req, res) => {
       where: { tenant_id: tenantId },
     });
 
-    // Get secondary categories from tenant metadata
+    // Get secondary categories from tenant metadata or new dedicated column
     const tenantMetadata = tenant.metadata as any || {};
-    const secondaryCategories = tenant.gbp_secondary_categories || [];
+    const secondaryCategories = (tenant.gbp_secondary_categories as any[]) || tenantMetadata.gbp_categories?.secondary || [];
 
     // Build sync payload from business profile
     const syncPayload: any = {};
