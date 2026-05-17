@@ -414,6 +414,7 @@ export default function SmartProductCard({
   defaultGatewayType: propDefaultGatewayType,
   buttonLayout = 'stacked',
 }: SmartProductCardProps) {
+  // console.log(`Product: `,product);
   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
   

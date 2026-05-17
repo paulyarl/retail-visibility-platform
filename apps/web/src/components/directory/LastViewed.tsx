@@ -127,6 +127,7 @@ export default function LastViewed({
   const { userId, sessionId, isAuthenticated } = useLastViewedSession();
   
   const [items, setItems] = useState<LastViewedItem[]>([]);
+  // console.log(`Items: `,items);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

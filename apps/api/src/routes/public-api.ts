@@ -2626,7 +2626,7 @@ router.get('/catalog/tenants', async (req, res) => {
         t.id,
         t.name,
         t.slug,
-        t.business_name,
+        t.name as business_name,
         t.logo_url,
         COUNT(DISTINCT sp.id) as product_count
       FROM tenants t
@@ -2638,9 +2638,9 @@ router.get('/catalog/tenants', async (req, res) => {
           WHERE sp2.tenant_id = t.id 
             AND sp2.item_status = 'active'
         )
-      GROUP BY t.id, t.name, t.slug, t.business_name, t.logo_url
+      GROUP BY t.id, t.name, t.slug, t.name, t.logo_url
       HAVING COUNT(DISTINCT sp.id) > 0
-      ORDER BY t.business_name ASC, t.name ASC
+      ORDER BY t.id, t.name ASC
     `;
     
     const result = await pool.query(query);
@@ -2649,7 +2649,7 @@ router.get('/catalog/tenants', async (req, res) => {
       id: row.id,
       name: row.name,
       slug: row.slug,
-      business_name: row.business_name,
+      business_name: row.name,
       logo_url: row.logo_url
     }));
     

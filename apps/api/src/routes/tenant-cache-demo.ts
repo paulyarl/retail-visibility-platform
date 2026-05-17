@@ -36,7 +36,7 @@ router.get('/:tenantId/info', async (req, res) => {
     const query = `
       SELECT 
         t.id,
-        t.business_name,
+        t.name as business_name,
         t.slug,
         t.description,
         t.logo_url,

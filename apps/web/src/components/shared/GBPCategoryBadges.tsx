@@ -101,6 +101,7 @@ export default function GBPCategoryBadges({
   if (!categories || categories.length === 0) {
     return null;
   }
+  // console.log(`GBPCategoryBadges: ${JSON.stringify(categories)}`);
 
   const sizeClasses = SIZE_CLASSES[size];
 
@@ -117,13 +118,15 @@ export default function GBPCategoryBadges({
         const icon = CATEGORY_ICONS[category.name] || '🏢';
         const count = categoryCounts[category.slug];
         const key = category.id || `${category.slug}-${index}`;
-        // console.log('GBPCategoryBadges', category, count);
+        // console.log('GBPCategoryBadges: ', category);
 
+        // console.log(`Category name: ${category.name}`);
+        // console.log(`Category slug: ${category.slug}`);
         // console.log(`Category ID: ${category.id}`);
         
         const keyParts = category.id?.split(':') || [];
         const hasSlug = keyParts.length >= 2;
-        const keySlug = keyParts[1].split('_').join('-');
+        const keySlug = hasSlug ? keyParts[1].split('_').join('-'):category.slug;
 
         if (hasSlug){
           
