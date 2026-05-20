@@ -58,6 +58,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.917.0",
     "@google/genai": "^1.0.0",
+    "@platform/feature-definitions": "workspace:*",
     "@google/generative-ai": "^0.24.1",
     "@paypal/paypal-server-sdk": "^2.1.0",
     "@prisma/client": "^6.17.1",

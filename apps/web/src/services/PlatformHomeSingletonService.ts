@@ -1115,13 +1115,34 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         tierType: tier.type,
         isActive: tier.isActive !== undefined ? tier.isActive : true, // Use API field or default to true
         sortOrder: tier.sortOrder,
-        // Transform feature strings into feature objects
-        features: (tier.features || []).map((featureKey: string) => ({
-          featureKey,
-          featureName: featureKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          isEnabled: true,
-          isInherited: false
-        })),
+        // Preserve full feature objects with highlight fields (API now returns objects, not strings)
+        features: (tier.features || []).map((feature: any) => {
+          // Handle both object format (new) and string format (legacy fallback)
+          if (typeof feature === 'string') {
+            return {
+              id: feature,
+              featureKey: feature,
+              featureName: feature.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              isEnabled: true,
+              isInherited: false,
+              isHighlighted: false,
+              highlightOrder: 0,
+              highlightDescription: null,
+              marketingName: null
+            };
+          }
+          return {
+            id: feature.id,
+            featureKey: feature.featureKey,
+            featureName: feature.featureName,
+            isEnabled: feature.isEnabled ?? true,
+            isInherited: feature.isInherited ?? false,
+            isHighlighted: feature.isHighlighted ?? false,
+            highlightOrder: feature.highlightOrder ?? 0,
+            highlightDescription: feature.highlightDescription ?? null,
+            marketingName: feature.marketingName ?? null
+          };
+        }),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }));

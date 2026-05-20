@@ -36,8 +36,15 @@ router.get('/tiers', async (req, res) => {
         tier_features_list: {
           where: { is_enabled: true },
           select: {
+            id: true,
             feature_key: true,
             feature_name: true,
+            is_enabled: true,
+            is_inherited: true,
+            is_highlighted: true,
+            highlight_order: true,
+            highlight_description: true,
+            marketing_name: true,
           },
         },
       },
@@ -46,22 +53,42 @@ router.get('/tiers', async (req, res) => {
 
     // Group tiers by type with proxy pattern for trial tiers
     const groupedTiers = await Promise.all(tiers.map(async (tier) => {
-      let features: string[] = [];
+      let features: any[] = [];
       
       // Use TierService proxy pattern for trial tiers
       if (tier.tier_key.startsWith('trial_')) {
         try {
           const { getTierFeatures } = await import('../../services/TierService');
-          features = await getTierFeatures(tier.tier_key);
-          // console.log(`[Tier Management] Trial tier ${tier.tier_key} got ${features.length} features via proxy`);
+          const featureKeys = await getTierFeatures(tier.tier_key);
+          // Map to feature objects for consistency
+          features = featureKeys.map((featureKey: string, index: number) => ({
+            id: `proxy-${index}`,
+            featureKey: featureKey,
+            featureName: featureKey,
+            isEnabled: true,
+            isInherited: true,
+            isHighlighted: false,
+            highlightOrder: 0,
+            highlightDescription: null,
+            marketingName: null,
+          }));
         } catch (error) {
           console.warn(`[Tier Management] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
-          // Fallback to empty features
           features = [];
         }
       } else {
-        // Non-trial tiers: use stored features
-        features = tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key);
+        // Non-trial tiers: use stored features with highlight fields
+        features = tier.tier_features_list.map((f: any) => ({
+          id: f.id,
+          featureKey: f.feature_key,
+          featureName: f.feature_name,
+          isEnabled: f.is_enabled,
+          isInherited: f.is_inherited || false,
+          isHighlighted: f.is_highlighted || false,
+          highlightOrder: f.highlight_order || 0,
+          highlightDescription: f.highlight_description || null,
+          marketingName: f.marketing_name || null,
+        }));
       }
       
       return {

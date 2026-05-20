@@ -32,6 +32,7 @@ import catalogSlugsRoutes from '../catalog-slugs';
 import catalogAdoptionRoutes from '../catalog-adoption';
 import locationAvailabilityRoutes from '../location-availability';
 import crossTenantProductsRoutes from '../cross-tenant-products';
+import tenantCapabilitiesRoutes from '../tenant-capabilities';
 
 /**
  * Mount core business routes
@@ -64,6 +65,10 @@ export function mountCoreRoutes(app: Express) {
   // IMPORTANT: Mount payment gateways WITHOUT global auth middleware
   // Individual routes handle their own authentication (public vs authenticated)
   app.use('/api/tenants', paymentGatewaysRoutes);
+  
+  // IMPORTANT: Mount tenant capabilities WITHOUT global auth middleware
+  // Public endpoint for storefront/checkout capability resolution
+  app.use('/api/tenants', tenantCapabilitiesRoutes);
   
   // IMPORTANT: Mount digital downloads WITHOUT auth - uses access tokens for security
   app.use('/api/download', digitalDownloadsRoutes);

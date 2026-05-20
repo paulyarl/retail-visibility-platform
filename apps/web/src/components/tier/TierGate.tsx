@@ -30,7 +30,7 @@
 
 import React from 'react';
 import { useTierAccess } from '@/lib/tiers/useTierAccess';
-import { FEATURE_DISPLAY_NAMES, TIER_DISPLAY_NAMES } from '@/lib/tiers/tier-features';
+import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import Link from 'next/link';
 
 interface TierGateProps {
@@ -125,8 +125,9 @@ function TierUpgradePrompt({ feature, currentTier, upgrade, tenantId, className 
     ? `/t/${tenantId}/dashboard`
     : '/';
   
-  const featureDisplayName = FEATURE_DISPLAY_NAMES[feature] || feature;
-  const currentTierDisplay = currentTier ? TIER_DISPLAY_NAMES[currentTier] || currentTier : 'Unknown';
+  const tierConfig = useTierConfig();
+  const featureDisplayName = tierConfig.getFeatureDisplayName(feature);
+  const currentTierDisplay = currentTier ? tierConfig.getTierDisplayName(currentTier) : 'Unknown';
   
   return (
     <div className={className || "min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4"}>

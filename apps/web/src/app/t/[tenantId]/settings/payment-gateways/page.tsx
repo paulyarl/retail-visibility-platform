@@ -9,7 +9,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package, Crown } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantTierService } from '@/services/TenantTierService';
-import { checkTierFeature } from '@/lib/tiers/tier-features';
+import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
 
@@ -36,6 +36,7 @@ export default function PaymentGatewaysPage() {
     tenantId,
     AccessPresets.SUPPORT_OR_TENANT_ADMIN
   );
+  const tierConfig = useTierConfig();
 
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
   const [loading, setLoading] = useState(true);
@@ -446,7 +447,7 @@ export default function PaymentGatewaysPage() {
   const paypalGateways = gateways.filter(g => g.gateway_type === 'paypal');
   const squareGateways = gateways.filter(g => g.gateway_type === 'square');
   const stripeGateways = gateways.filter(g => g.gateway_type === 'stripe');
-  const canUseAdvancedPayment = checkTierFeature(tenantTier, 'payment_client_credentials');
+  const canUseAdvancedPayment = tierConfig.checkTierFeature(tenantTier, 'payment_client_credentials');
   
   // Check if OAuth connections exist (these show as gateways with empty config but OAuth status)
   const hasPayPalOAuth = oauthStatus.paypal?.connected;

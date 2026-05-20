@@ -882,10 +882,10 @@ export default function OfferingsPage() {
                     </div>
                   </div>
                   <ul className="space-y-1.5 text-xs">
-                    {service.features.map((feature, idx) => (
+                    {service.features.map((feature: any, idx) => (
                       <li key={idx} className="flex items-start gap-1.5">
                         <span className="text-green-500 mt-0.5 text-xs">✓</span>
-                        <span>{feature}</span>
+                        <span>{typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}</span>
                       </li>
                     ))}
                   </ul>

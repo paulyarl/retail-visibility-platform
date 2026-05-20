@@ -737,10 +737,10 @@ export function SelfServiceBilling({
                     )}
                     
                     <ul className="space-y-1 text-xs text-neutral-600">
-                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                      {(tier.features || []).slice(0, 3).map((feature: any, idx) => (
                         <li key={idx} className="flex items-start gap-1">
                           <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
-                          {feature}
+                          {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
                         </li>
                       ))}
                     </ul>
@@ -826,10 +826,10 @@ export function SelfServiceBilling({
                     </div>
                     
                     <ul className="space-y-1 text-xs text-neutral-600">
-                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                      {(tier.features || []).slice(0, 3).map((feature: any, idx) => (
                         <li key={idx} className="flex items-start gap-1">
                           <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
-                          {feature}
+                          {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
                         </li>
                       ))}
                     </ul>
@@ -931,10 +931,10 @@ export function SelfServiceBilling({
                     )}
                     
                     <ul className="space-y-1 text-xs text-neutral-600">
-                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                      {(tier.features || []).slice(0, 3).map((feature: any, idx) => (
                         <li key={idx} className="flex items-start gap-1">
                           <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
-                          {feature}
+                          {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
                         </li>
                       ))}
                     </ul>

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings } from 'lucide-react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { checkTierFeature } from '@/lib/tiers/tier-features';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface CommerceSettings {
   // Payment Options
@@ -60,6 +60,10 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
   const [currentTier, setCurrentTier] = useState<string>('');
   const [commerceFeatures, setCommerceFeatures] = useState<any>(null);
 
+  // Capability-aware resolution — supersedes legacy tier-based commerce feature detection
+  const commerceCap = useCommerceCapability(tenantId);
+  const paymentCap = usePaymentGatewayCapability(tenantId);
+
   // Preset deposit percentages
   const depositPresets = [
     { label: '10%', value: 10 },
@@ -72,11 +76,24 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     fetchSettings();
   }, [tenantId]);
 
+  // When capability data arrives, use it as the authoritative source for
+  // commerce feature state, overriding the legacy tier-based derivation.
+  useEffect(() => {
+    if (commerceCap.data) {
+      const { enabled, paymentType } = commerceCap.data;
+      setCommerceFeatures({
+        commerce_disabled: !enabled || paymentType === 'none',
+        commerce_deposit_only: enabled && (paymentType === 'deposit' || paymentType === 'both'),
+        commerce_full_payment: enabled && (paymentType === 'full' || paymentType === 'both'),
+      });
+    }
+  }, [commerceCap.data]);
+
   const fetchSettings = async () => {
     try {
       setLoading(true);
       
-      // Fetch tenant tier info to determine commerce capabilities
+      // Fetch tenant tier info for display (tier badge)
       const tierResponse = await fetch(`/api/tenants/${tenantId}/tier`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -88,19 +105,21 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
         const tierData = await tierResponse.json();
         const tier = tierData.tier || '';
         setCurrentTier(tier);
-        
-        // Extract commerce features from tenant tier data
-        const features = tierData.tenantTier?.features?.reduce((acc: any, feature: any) => {
-          acc[feature.feature_key] = feature.is_enabled;
-          return acc;
-        }, {}) || {};
-        
-        const commerceFeatures = {
-          commerce_disabled: !features.commerce_enabled,
-          commerce_deposit_only: features.commerce_deposit_only,
-          commerce_full_payment: features.commerce_full_payment,
-        };
-        setCommerceFeatures(commerceFeatures);
+
+        // Only fall back to tier-based commerce features if capability data
+        // hasn't resolved yet (backward compatibility)
+        if (!commerceCap.data) {
+          const features = tierData.tenantTier?.features?.reduce((acc: any, feature: any) => {
+            acc[feature.feature_key] = feature.is_enabled;
+            return acc;
+          }, {}) || {};
+
+          setCommerceFeatures({
+            commerce_disabled: !features.commerce_enabled,
+            commerce_deposit_only: features.commerce_deposit_only || features.commerce_both_options,
+            commerce_full_payment: features.commerce_full_payment || features.commerce_both_options,
+          });
+        }
       }
       
       // Fetch existing commerce settings

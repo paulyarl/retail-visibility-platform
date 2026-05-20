@@ -56,8 +56,13 @@ export class TenantFeatureService extends TenantPermissionService {
     const tier = await this.getTier(tenant.subscription_tier || '');
     const baseFeatures = tier?.features || [];
     
+    // Convert feature objects to strings for compatibility
+    const featureStrings = baseFeatures.map((feature: any) => 
+      typeof feature === 'object' ? feature.featureKey : feature
+    );
+    
     // TODO: Add override features
     
-    return baseFeatures;
+    return featureStrings;
   }
 }

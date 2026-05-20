@@ -133,10 +133,10 @@ export default function TrialSetupModal({ isOpen, onClose, onStartTrial, tenantI
                         )}
                       </div>
                       <ul className="space-y-2">
-                        {tier.features.map((feature, index) => (
+                        {tier.features.map((feature: any, index) => (
                           <li key={index} className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
                             <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                            {feature}
+                            {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
                           </li>
                         ))}
                       </ul>

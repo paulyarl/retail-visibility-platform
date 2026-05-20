@@ -15,13 +15,7 @@
 
 import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  checkTierFeature,
-  getTierFeatures,
-  calculateUpgradeRequirements,
-  getTierDisplayName,
-  getTierPricing,
-} from './tier-features';
+import { useTierConfig } from './useTierConfig';
 
 export interface TierAccessResult {
   /** Current tier */
@@ -75,13 +69,14 @@ export function useTierAccess(tenantTier: string | null | undefined): TierAccess
   
   const tier = tenantTier || 'starter';
   const { user } = useAuth();
+  const tierConfig = useTierConfig();
   
   // Check if user is platform admin or support
   const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' || user?.role === 'ADMIN' || user?.role === 'PLATFORM_SUPPORT';
   
   return useMemo(() => {
-    const tierDisplay = getTierDisplayName(tier);
-    const tierPrice = getTierPricing(tier);
+    const tierDisplay = tierConfig.getTierDisplayName(tier);
+    const tierPrice = tierConfig.getTierPricing(tier);
     
     return {
       tier,
@@ -89,19 +84,19 @@ export function useTierAccess(tenantTier: string | null | undefined): TierAccess
       tierPrice,
       
       // Platform admins bypass all tier checks
-      hasFeature: (feature: string) => isPlatformAdmin || checkTierFeature(tier, feature),
+      hasFeature: (feature: string) => isPlatformAdmin || tierConfig.checkTierFeature(tier, feature),
       
-      getFeatures: () => getTierFeatures(tier),
+      getFeatures: () => tierConfig.getTierFeatures(tier),
       
-      requiresUpgrade: (feature: string) => calculateUpgradeRequirements(tier, feature),
+      requiresUpgrade: (feature: string) => tierConfig.calculateUpgradeRequirements(tier, feature),
       
       // Platform admins bypass all tier checks
       hasAllFeatures: (features: string[]) => 
-        isPlatformAdmin || features.every(feature => checkTierFeature(tier, feature)),
+        isPlatformAdmin || features.every(feature => tierConfig.checkTierFeature(tier, feature)),
       
       // Platform admins bypass all tier checks
       hasAnyFeature: (features: string[]) => 
-        isPlatformAdmin || features.some(feature => checkTierFeature(tier, feature)),
+        isPlatformAdmin || features.some(feature => tierConfig.checkTierFeature(tier, feature)),
     };
-  }, [tier, isPlatformAdmin]);
+  }, [tier, isPlatformAdmin, tierConfig]);
 }

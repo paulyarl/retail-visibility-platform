@@ -181,7 +181,10 @@ export default function FeatureOverridesPage() {
   const getAllFeatures = () => {
     const featureSet = new Set<string>();
     tiers.forEach(tier => {
-      tier.features.forEach(feature => featureSet.add(feature));
+      tier.features.forEach(feature => {
+        const featureKey = typeof feature === 'object' ? feature.featureKey : feature;
+        featureSet.add(featureKey);
+      });
     });
     
     // Common feature mappings

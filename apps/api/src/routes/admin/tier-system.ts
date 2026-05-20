@@ -65,6 +65,10 @@ async function transformTier(tier: any) {
       featureName: feature.feature_name,
       isEnabled: feature.is_enabled,
       isInherited: feature.is_inherited,
+      isHighlighted: feature.is_highlighted || false,
+      highlightOrder: feature.highlight_order || 0,
+      highlightDescription: feature.highlight_description || null,
+      marketingName: feature.marketing_name || null,
     }));
   }
   
@@ -421,6 +425,10 @@ const updateTierSchema = z.object({
     featureName: z.string(),
     isEnabled: z.boolean(),
     isInherited: z.boolean().optional().default(false),
+    isHighlighted: z.boolean().optional().default(false),
+    highlightOrder: z.number().int().min(0).optional().default(0),
+    highlightDescription: z.string().nullable().optional(),
+    marketingName: z.string().nullable().optional(),
   })).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
 });
@@ -494,6 +502,10 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         feature_name: feature.featureName,
         is_enabled: feature.isEnabled,
         is_inherited: feature.isInherited || false,
+        is_highlighted: feature.isHighlighted || false,
+        highlight_order: feature.highlightOrder || 0,
+        highlight_description: feature.highlightDescription || null,
+        marketing_name: feature.marketingName || null,
       }));
 
       if (featuresToCreate.length > 0) {
@@ -609,6 +621,10 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         feature_name: feature.featureName,
         is_enabled: feature.isEnabled,
         is_inherited: feature.isInherited || false,
+        is_highlighted: feature.isHighlighted || false,
+        highlight_order: feature.highlightOrder || 0,
+        highlight_description: feature.highlightDescription || null,
+        marketing_name: feature.marketingName || null,
       }));
 
       if (featuresToCreate.length > 0) {

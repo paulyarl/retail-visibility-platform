@@ -2889,6 +2889,7 @@ model subscription_tiers_list {
   featured_trending        Int                        @default(0)
   featured_featured        Int                        @default(0)
   featured_recommended     Int                        @default(0)
+  capability_type_list     capability_type_list[]
   tier_catalog_permissions tier_catalog_permissions[]
   tier_features_list       tier_features_list[]
 }
@@ -3314,18 +3315,28 @@ model tier_change_logs_list {
 }
 
 model tier_features_list {
-  id                      String                  @id
-  tier_id                 String
-  feature_key             String
-  feature_name            String
-  is_enabled              Boolean                 @default(true)
-  is_inherited            Boolean                 @default(false)
-  metadata                Json?
-  created_at              DateTime                @default(now())
-  updated_at              DateTime                @default(now())
-  subscription_tiers_list subscription_tiers_list @relation(fields: [tier_id], references: [id], onDelete: Cascade)
+  id                         String                  @id
+  tier_id                    String
+  feature_key                String
+  feature_name               String
+  is_enabled                 Boolean                 @default(true)
+  is_inherited               Boolean                 @default(false)
+  metadata                   Json?
+  created_at                 DateTime                @default(now())
+  updated_at                 DateTime                @default(now())
+  is_highlighted             Boolean?                @default(false)
+  highlight_order            Int?                    @default(0)
+  highlight_description      String?
+  marketing_name             String?
+  capability_type_id         String?
+  tier_specific_restrictions Json?
+  created_by                 String?
+  updated_by                 String?
+  capability_type_list       capability_type_list?   @relation(fields: [capability_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subscription_tiers_list    subscription_tiers_list @relation(fields: [tier_id], references: [id], onDelete: Cascade)
 
   @@unique([tier_id, feature_key])
+  @@index([capability_type_id], map: "idx_tier_features_list_capability_type_id")
 }
 
 model tier_pricing {
@@ -3645,6 +3656,67 @@ model tenants_metadata_backup_gbp {
   backup_timestamp DateTime? @db.Timestamptz(6)
 
   @@ignore
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model capability_features_list {
+  id                   String               @id @default(dbgenerated("(gen_random_uuid())::text"))
+  capability_type_id   String
+  feature_id           String
+  restrictions         Json?
+  is_active            Boolean?             @default(true)
+  sort_order           Int?                 @default(0)
+  created_at           DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?            @default(now()) @db.Timestamp(6)
+  capability_type_list capability_type_list @relation(fields: [capability_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  features_list        features_list        @relation(fields: [feature_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([capability_type_id, feature_id])
+  @@index([feature_id], map: "idx_capability_features_list_feature_id")
+  @@index([capability_type_id], map: "idx_capability_features_list_type_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model capability_type_list {
+  id                       String                     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  key                      String                     @unique
+  name                     String
+  description              String?
+  category                 String?
+  tier_id                  String?
+  is_active                Boolean?                   @default(true)
+  sort_order               Int?                       @default(0)
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  capability_features_list capability_features_list[]
+  subscription_tiers_list  subscription_tiers_list?   @relation(fields: [tier_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tier_features_list       tier_features_list[]
+
+  @@index([category], map: "idx_capability_type_list_category")
+  @@index([key], map: "idx_capability_type_list_key")
+  @@index([tier_id], map: "idx_capability_type_list_tier_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model features_list {
+  id                       String                     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  key                      String                     @unique
+  name                     String
+  description              String?
+  category                 String
+  is_active                Boolean?                   @default(true)
+  sort_order               Int?                       @default(0)
+  marketing_name           String?
+  marketing_description    String?
+  icon_name                String?
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  created_by               String?
+  updated_by               String?
+  capability_features_list capability_features_list[]
+
+  @@index([category], map: "idx_features_list_category")
+  @@index([key], map: "idx_features_list_key")
 }
 
 enum action {
