@@ -90,11 +90,12 @@ async function main() {
   for (const key of allFeatureKeys) {
     await prisma.features_list.upsert({
       where: { key },
-      update: { name: featureKeyNames[key] || key, is_active: true },
+      update: { name: featureKeyNames[key] || key, is_active: true, category: 'barcode_scan_options' },
       create: {
         id: `feat_barcode_${key}`,
         key,
         name: featureKeyNames[key] || key,
+        category: 'barcode_scan_options',
         is_active: true,
       },
     });
@@ -119,7 +120,6 @@ async function main() {
         capability_type_id: barcodeCapType.id,
         feature_id: feature.id,
         is_active: true,
-        is_default: key !== 'barcode_disabled', // All features default to active except disabled
       },
     });
   }
