@@ -13,6 +13,9 @@ import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 interface OrganizationCommerceSettings {
+  // Overall commerce availability
+  commerce_enabled: boolean;
+  
   // Payment Options
   deposit_enabled: boolean;
   deposit_percentage: number;
@@ -57,11 +60,13 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
     notify_on_payment: true,
     notify_on_deposit: true,
     notify_on_fulfillment: true,
+    commerce_enabled: true,
   });
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [organizationTier, setOrganizationTier] = useState<string>('');
 
   useEffect(() => {
     const initializeData = async () => {
@@ -74,6 +79,10 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
         if (tenantResponse?.organization?.id) {
           setOrganizationId(tenantResponse.organization.id);
           
+          // Set organization tier from tenant response
+          const tier = tenantResponse.subscriptionTier || '';
+          setOrganizationTier(tier);
+
           // Fetch organization commerce settings
           const commerceSettings = await organizationsService.getOrganizationCommerceSettings(tenantResponse.organization.id);
           if (commerceSettings) {
@@ -151,15 +160,40 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
                   These settings apply to all locations in your organization unless overridden at the tenant level
                 </p>
               </div>
-              <Badge variant="outline" className="text-sm">
-                {getCommerceMode()}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-sm">
+                  Tier: {organizationTier}
+                </Badge>
+                <Badge variant="outline" className="text-sm">
+                  {getCommerceMode()}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
         </Card>
       </div>
 
+      {/* Commerce Disabled Warning */}
+      {!settings.commerce_enabled && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-yellow-800">Commerce Not Available</h3>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Your organization tier doesn't support commerce features. Upgrade your subscription to enable payment processing and checkout for all locations.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Payment Options */}
+      {settings.commerce_enabled && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -169,6 +203,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Deposit Settings */}
+          {settings.deposit_enabled && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -230,8 +265,10 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
               </div>
             )}
           </div>
+          )}
 
           {/* Full Payment Settings */}
+          {settings.full_payment_enabled && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -251,6 +288,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
               </label>
             </div>
           </div>
+          )}
 
           {/* Both Options Available Info */}
           {settings.deposit_enabled && settings.full_payment_enabled && (
@@ -268,8 +306,10 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Order Management */}
+      {settings.commerce_enabled && (
       <Card className="mt-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -314,6 +354,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Save Button */}
       <div className="mt-8 flex justify-end gap-4">
@@ -325,7 +366,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !settings.commerce_enabled}
           className="flex items-center gap-2"
         >
           {saving ? (

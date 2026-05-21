@@ -8,7 +8,7 @@
  * - URL generation helpers
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { slugify, unslugify, slugsMatch, getCategoryUrl, getStoreTypeUrl } from './slug';
 
 describe('Frontend Slug Utilities', () => {

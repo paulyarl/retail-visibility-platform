@@ -7,6 +7,9 @@
  * EMERGENCY: Created to fix mixed results where platform admins were incorrectly rejected.
  */
 
+import { useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+
 export interface User {
   id?: string;
   userId?: string;
@@ -182,4 +185,22 @@ export function forceAdminBypass(user: User | null | undefined, featureId: strin
   ];
   
   return criticalFeatures.includes(featureId);
+}
+
+/**
+ * Hook for accessing platform user information and bypass capabilities
+ */
+export function usePlatformUser() {
+  const { user } = useAuth();
+  
+  return useMemo(() => {
+    if (!user) return null;
+    
+    return {
+      canBypassTier: isPlatformAdmin(user),
+      canBypassRole: isPlatformAdmin(user),
+      isPlatformAdmin: isPlatformAdmin(user),
+      canAccessAllTenants: canAccessAllTenants(user)
+    };
+  }, [user]);
 }

@@ -19,6 +19,7 @@ import { useUpgradeRequests } from '@/hooks/useApiQueries';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
+import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Simple icon component for subscription page
 const SubscriptionIcon = () => (
@@ -127,6 +128,9 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
   // Use centralized subscription usage hook
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
+
+  // Capability-aware resolution for all three capability types
+  const allCapabilities = useAllCapabilities(tenantId || null, { forTenant: true });
 
   // Use dynamic tier system hook
   const { 
@@ -268,7 +272,9 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                           {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
                             <li key={idx} className="flex items-start gap-1.5">
                               <span className="text-green-500 mt-0.5">✓</span>
-                              <span className="text-neutral-700">{feature}</span>
+                              <span className="text-neutral-700">
+                                {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -341,10 +347,12 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                           </div>
                         </div>
                         <ul className="space-y-1.5 text-xs">
-                          {(tier.features || (info as any).features)?.slice(0, 4).map((feature: string, idx: number) => (
+                          {(tier.features || (info as any).features)?.slice(0, 4).map((feature: any, idx: number) => (
                             <li key={idx} className="flex items-start gap-1.5">
                               <span className="text-green-500 mt-0.5">✓</span>
-                              <span className="text-neutral-700">{feature}</span>
+                              <span className="text-neutral-700">
+                                {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -643,14 +651,77 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 mb-3">Your Plan Includes:</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {tierInfo.features.map((feature, idx) => (
+                {tierInfo.features.map((feature: any, idx) => (
                   <div key={idx} className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">✓</span>
-                    <span className="text-sm text-neutral-700">{feature}</span>
+                    <span className="text-sm text-neutral-700">
+                      {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* Capability Summary — shows resolved commerce, payment, and storefront states */}
+            {allCapabilities.data && (
+              <div className="pt-4 border-t border-neutral-200">
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Active Capabilities:</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Commerce */}
+                  <div className={`p-3 rounded-lg border ${allCapabilities.data.commerce.enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-medium ${allCapabilities.data.commerce.enabled ? 'text-green-800' : 'text-red-800'}`}>
+                        Commerce
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${allCapabilities.data.commerce.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {allCapabilities.data.commerce.enabled ? 'Active' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600">
+                      {allCapabilities.data.commerce.paymentType === 'none' ? 'No payment options' :
+                       allCapabilities.data.commerce.paymentType === 'deposit' ? 'Deposit only' :
+                       allCapabilities.data.commerce.paymentType === 'full' ? 'Full payment' :
+                       allCapabilities.data.commerce.paymentType === 'both' ? 'Deposit + Full payment' :
+                       'Standard'}
+                    </p>
+                  </div>
+                  {/* Payment Gateway */}
+                  <div className={`p-3 rounded-lg border ${allCapabilities.data.paymentGateway.enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-medium ${allCapabilities.data.paymentGateway.enabled ? 'text-green-800' : 'text-red-800'}`}>
+                        Payment Gateways
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${allCapabilities.data.paymentGateway.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {allCapabilities.data.paymentGateway.enabled ? 'Active' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600">
+                      {allCapabilities.data.paymentGateway.allowedGateways.length > 0
+                        ? allCapabilities.data.paymentGateway.allowedGateways.join(', ')
+                        : 'No gateways configured'}
+                    </p>
+                  </div>
+                  {/* Storefront */}
+                  <div className={`p-3 rounded-lg border ${allCapabilities.data.storefront.enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-medium ${allCapabilities.data.storefront.enabled ? 'text-green-800' : 'text-red-800'}`}>
+                        Storefront
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${allCapabilities.data.storefront.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {allCapabilities.data.storefront.enabled ? 'Active' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600">
+                      {allCapabilities.data.storefront.type === 'none' ? 'No storefront' :
+                       allCapabilities.data.storefront.type === 'online' ? 'Online only' :
+                       allCapabilities.data.storefront.type === 'retail' ? 'Retail only' :
+                       allCapabilities.data.storefront.type === 'both' ? 'Online + Retail' :
+                       'Standard'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             <div className="pt-4 border-t border-neutral-200 space-y-3">
@@ -1132,10 +1203,12 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </div>
 
                       <ul className="space-y-1.5 text-xs">
-                        {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
+                        {(tier.features || info.features)?.slice(0, 4).map((feature: any, idx) => (
                           <li key={idx} className="flex items-start gap-1.5">
                             <span className="text-green-500 mt-0.5"></span>
-                            <span className="text-neutral-700">{feature}</span>
+                            <span className="text-neutral-700">
+                              {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -1203,10 +1276,12 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </div>
 
                       <ul className="space-y-1.5 text-xs">
-                        {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
+                        {(tier.features || info.features)?.slice(0, 4).map((feature: any, idx) => (
                           <li key={idx} className="flex items-start gap-1.5">
                             <span className="text-green-500 mt-0.5"></span>
-                            <span className="text-neutral-700">{feature}</span>
+                            <span className="text-neutral-700">
+                              {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -1273,10 +1348,12 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </div>
 
                       <ul className="space-y-1.5 text-xs">
-                        {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
+                        {(tier.features || info.features)?.slice(0, 4).map((feature: any, idx) => (
                           <li key={idx} className="flex items-start gap-1.5">
                             <span className="text-green-500 mt-0.5"></span>
-                            <span className="text-neutral-700">{feature}</span>
+                            <span className="text-neutral-700">
+                              {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
+                            </span>
                           </li>
                         ))}
                       </ul>

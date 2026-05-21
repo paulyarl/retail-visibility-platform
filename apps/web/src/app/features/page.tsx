@@ -1697,12 +1697,12 @@ export default function FeaturesPage() {
                   </Button>
                 </a>
                 <ul className="space-y-3">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start text-sm text-neutral-700">
+                  {tier.features.map((feature: any, idx: number) => (
+                    <li key={idx} className="flex items-start text-sm text-neutral-700">
                       <svg className="w-5 h-5 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      {feature}
+                      {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
                     </li>
                   ))}
                 </ul>
@@ -2924,7 +2924,7 @@ export default function FeaturesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-neutral-50 border-b border-neutral-200">
-                    <th className="text-left p-4 font-semibold text-neutral-900 w-1/3">Capability</th>
+                    <th className="text-left p-4 font-semibold text-neutral-900 w-1/4">Capability</th>
                     <th className="text-center p-4 font-semibold text-neutral-900">
                       <div className="flex flex-col items-center">
                         <span className="text-blue-600 font-bold">Discovery</span>
@@ -2955,17 +2955,31 @@ export default function FeaturesPage() {
                         <span className="text-sm text-neutral-600 font-normal">$499/mo</span>
                       </div>
                     </th>
+                    <th className="text-center p-4 font-semibold text-neutral-900">
+                      <div className="flex flex-col items-center">
+                        <span className="text-cyan-600 font-bold">Ecommerce</span>
+                        <span className="text-sm text-neutral-600 font-normal">$99/mo</span>
+                      </div>
+                    </th>
+                    <th className="text-center p-4 font-semibold text-neutral-900">
+                      <div className="flex flex-col items-center">
+                        <span className="text-indigo-600 font-bold">Omnichannel</span>
+                        <span className="text-sm text-neutral-600 font-normal">$149/mo</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* CLOVER & INVENTORY */}
                   <tr className="border-b border-neutral-100">
-                    <td colSpan={6} className="p-4 bg-blue-50 font-semibold text-blue-900">
+                    <td colSpan={8} className="p-4 bg-blue-50 font-semibold text-blue-900">
                       🔗 Clover & Inventory
                     </td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Clover POS integration & real-time sync</td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -2979,16 +2993,20 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
 
                   {/* GOOGLE VISIBILITY */}
                   <tr className="border-b border-neutral-100">
-                    <td colSpan={6} className="p-4 bg-green-50 font-semibold text-green-900">
+                    <td colSpan={8} className="p-4 bg-green-50 font-semibold text-green-900">
                       🔍 Google Visibility
                     </td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Google Search indexing</td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3002,9 +3020,13 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Google Maps / SWIS</td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3014,12 +3036,14 @@ export default function FeaturesPage() {
 
                   {/* PLATFORM PRESENCE */}
                   <tr className="border-b border-neutral-100">
-                    <td colSpan={6} className="p-4 bg-purple-50 font-semibold text-purple-900">
+                    <td colSpan={8} className="p-4 bg-purple-50 font-semibold text-purple-900">
                       🏪 Platform Presence
                     </td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Directory listing</td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3033,6 +3057,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Branded storefront page</td>
@@ -3041,9 +3067,13 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">QR codes (product, storefront, directory)</td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3057,11 +3087,13 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
 
                   {/* COMMERCE & CONVERSION */}
                   <tr className="border-b border-neutral-100">
-                    <td colSpan={6} className="p-4 bg-amber-50 font-semibold text-amber-900">
+                    <td colSpan={8} className="p-4 bg-amber-50 font-semibold text-amber-900">
                       🛒 Commerce & Conversion
                     </td>
                   </tr>
@@ -3069,6 +3101,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-neutral-900">Add to cart</td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3080,6 +3114,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Holding / commitment fee (10–15%)</td>
@@ -3088,12 +3124,16 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-amber-600">🔄</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Full online payment collection</td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
@@ -3104,11 +3144,13 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
 
                   {/* MANAGEMENT & GROWTH */}
                   <tr className="border-b border-neutral-100">
-                    <td colSpan={6} className="p-4 bg-cyan-50 font-semibold text-cyan-900">
+                    <td colSpan={8} className="p-4 bg-cyan-50 font-semibold text-cyan-900">
                       📈 Management & Growth
                     </td>
                   </tr>
@@ -3116,6 +3158,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-neutral-900">Conversion analytics & reporting</td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
@@ -3127,12 +3171,16 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">API access & custom integrations</td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
@@ -3143,6 +3191,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                   </tr>
                   <tr className="border-b border-neutral-100">
                     <td className="p-4 text-neutral-900">Dedicated onboarding & support</td>
@@ -3150,6 +3200,8 @@ export default function FeaturesPage() {
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
                     <td className="p-4 text-center"><span className="text-red-400">❌</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
+                    <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                     <td className="p-4 text-center"><span className="text-green-600">✅</span></td>
                   </tr>
                 </tbody>

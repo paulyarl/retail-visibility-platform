@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
+import { useCapabilityGate } from '@/hooks/useCapabilityGate';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 import CategoryAssignmentModal from './CategoryAssignmentModal';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
@@ -137,6 +138,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
+
+  // Capability gating for product types
+  const productTypesCapability = useCapabilityGate('product_types');
 
   // Helper function to detect variant changes using simple in/out comparison
   const detectVariantChanges = () => {
@@ -668,6 +672,12 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
           value={productType}
           onChange={setProductType}
           disabled={saving}
+          capabilityGate={{
+            capabilities: productTypesCapability.capabilities 
+              ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat()
+              : [],
+            restrictions: productTypesCapability.restrictions
+          }}
         />
 
         {/* Digital Product Configuration */}

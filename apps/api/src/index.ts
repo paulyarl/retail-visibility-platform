@@ -172,6 +172,7 @@ import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import cachedProductsRoutes from './routes/cached-products';
 import featureOverridesRoutes from './routes/admin/feature-overrides';
+import capabilityRoutes from './routes/admin/capability-routes';
 import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
@@ -7067,9 +7068,18 @@ import adminEnrichmentRoutes from './routes/admin-enrichment';
 app.use('/api/admin/enrichment', authenticateToken, requireAdmin, adminEnrichmentRoutes);
 console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
 
+/* ------------------------------ tier config (tenant-accessible) ------------------------------ */
+import tierConfigRoutes from './routes/tier-config';
+app.use('/api/tier-config', authenticateToken, tierConfigRoutes);
+console.log('✅ Tier config routes mounted at /api/tier-config');
+
 /* ------------------------------ admin tier system ------------------------------ */
 app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
 console.log('✅ Admin tier system routes mounted at /api/admin/tier-system');
+
+/* ------------------------------ admin capabilities ------------------------------ */
+app.use('/api/admin/capabilities', authenticateToken, requireAdmin, capabilityRoutes);
+console.log('✅ Admin capabilities routes mounted at /api/admin/capabilities');
 
 /* ------------------------------ admin tier management ------------------------------ */
 import tierManagementRoutes from './routes/admin/tier-management';

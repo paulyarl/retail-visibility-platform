@@ -28,7 +28,12 @@ export abstract class TenantPermissionService extends BasePermissionService {
     const tier = await this.getTier(tenant.subscription_tier || '');
     if (!tier) return false;
     
-    return tier.features.includes(target);
+    // Convert features to strings for comparison
+    const featureStrings = tier.features.map((feature: any) => 
+      typeof feature === 'object' ? feature.featureKey : feature
+    );
+    
+    return featureStrings.includes(target);
   }
   
   /**

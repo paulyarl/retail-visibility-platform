@@ -12,6 +12,7 @@
   "dependencies": {
     "@auth0/nextjs-auth0": "~4.16.0",
     "@hookform/resolvers": "^5.2.2",
+    "@platform/feature-definitions": "workspace:*",
     "@mantine/carousel": "^8.3.16",
     "@mantine/core": "^8.3.16",
     "@mantine/dates": "^8.3.16",

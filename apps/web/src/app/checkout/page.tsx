@@ -18,6 +18,7 @@ import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { CustomerAuthProvider } from '@/contexts/CustomerAuthContext';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -55,6 +56,11 @@ function CheckoutPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
   const [isInitialized, setIsInitialized] = useState(false);
   const [availableGateways, setAvailableGateways] = useState<PaymentMethod[]>([]);
+
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(tenantId);
+  const paymentCap = usePaymentGatewayCapability(tenantId);
+
   // Tier 3 Commitment - Deposit state
   const [tenantTier, setTenantTier] = useState<string | null>(null);
   const [checkoutMode, setCheckoutMode] = useState<'deposit' | 'full_payment' | 'disabled'>('full_payment');
@@ -241,6 +247,50 @@ function CheckoutPageContent() {
 
     fetchPaymentGatewaysAndTier();
   }, [tenantId]);
+
+  // Capability-aware override: when capability data is available, use it as the
+  // authoritative source for checkout mode and gateway filtering, superseding
+  // the legacy commerce_features / tier-based logic above.
+  useEffect(() => {
+    if (!tenantId) return;
+
+    // Commerce capability overrides checkout mode
+    if (commerceCap.data) {
+      const { enabled, paymentType } = commerceCap.data;
+      if (!enabled || paymentType === 'none') {
+        setCheckoutMode('disabled');
+        setDepositOption('none');
+        fetchTenantContact(tenantId);
+      } else if (paymentType === 'deposit') {
+        setCheckoutMode('deposit');
+        setDepositOption('required');
+      } else if (paymentType === 'both') {
+        setCheckoutMode('full_payment');
+        setDepositOption('optional');
+      } else {
+        // 'full' or fallback
+        setCheckoutMode('full_payment');
+        setDepositOption('none');
+      }
+    }
+
+    // Payment gateway capability filters available gateways
+    if (paymentCap.data && paymentCap.data.enabled) {
+      const { allowedGateways } = paymentCap.data;
+      const mapped = allowedGateways.filter((g): g is PaymentMethod =>
+        ['square', 'paypal', 'stripe'].includes(g)
+      );
+      if (mapped.length > 0) {
+        setAvailableGateways(prev => {
+          // Only override if capability gateways are a subset (more restrictive)
+          const hasRestriction = prev.length === 0 || mapped.length < prev.length;
+          return hasRestriction ? mapped : prev;
+        });
+        // Set default if current selection not in allowed list
+        setPaymentMethod(prev => mapped.includes(prev) ? prev : mapped[0]);
+      }
+    }
+  }, [tenantId, commerceCap.data, paymentCap.data]);
 
   // Fetch tenant contact info for disabled checkout
   const fetchTenantContact = async (tid: string) => {

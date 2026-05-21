@@ -45,6 +45,7 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
     res.json({
       success: true,
       settings: {
+        commerce_enabled: capabilities.commerce_enabled,
         deposit_enabled: capabilities.deposit_enabled,
         deposit_percentage: capabilities.deposit_percentage,
         deposit_min_cents: capabilities.deposit_min_cents,

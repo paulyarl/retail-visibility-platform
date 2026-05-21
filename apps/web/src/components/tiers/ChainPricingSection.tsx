@@ -204,10 +204,10 @@ export function ChainPricingSection({ compact = false }: ChainPricingSectionProp
             <div>
               <h4 className="font-semibold text-neutral-900 mb-2">What's Included:</h4>
               <ul className="space-y-1">
-                {selectedTier.features.slice(0, compact ? 5 : undefined).map((feature, index) => (
+                {selectedTier.features.slice(0, compact ? 5 : undefined).map((feature: any, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
                     <span className="text-green-500 mt-0.5">✓</span>
-                    <span>{feature}</span>
+                    <span>{typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}</span>
                   </li>
                 ))}
                 {!compact && selectedTier.features.length > 5 && (
@@ -222,10 +222,10 @@ export function ChainPricingSection({ compact = false }: ChainPricingSectionProp
               <div>
                 <h4 className="font-semibold text-neutral-900 mb-2">Not Included:</h4>
                 <ul className="space-y-1">
-                  {selectedTier.excluded.map((feature, index) => (
+                  {selectedTier.excluded.map((feature: any, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-neutral-500">
                       <span className="text-neutral-400 mt-0.5">—</span>
-                      <span>{feature}</span>
+                      <span>{typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}</span>
                     </li>
                   ))}
                 </ul>

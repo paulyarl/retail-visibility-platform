@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input,
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { Edit2, Save, X, Plus, Trash2,Pause, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2, Pause, ChevronDown, ChevronUp, CreditCard, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Tier {
@@ -31,6 +31,10 @@ interface TierFeature {
   featureName: string;
   isEnabled: boolean;
   isInherited: boolean;
+  isHighlighted?: boolean;
+  highlightOrder?: number;
+  highlightDescription?: string | null;
+  marketingName?: string | null;
 }
 
 interface TierSystem {
@@ -59,6 +63,13 @@ export default function TierSystemPage() {
   const [showInactiveTiers, setShowInactiveTiers] = useState(false);
   const [showCommerceManager, setShowCommerceManager] = useState(false);
   const [editingCommerceTier, setEditingCommerceTier] = useState<Tier | null>(null);
+  const [showHighlightModal, setShowHighlightModal] = useState(false);
+  const [editingFeature, setEditingFeature] = useState<TierFeature | null>(null);
+  const [highlightForm, setHighlightForm] = useState({
+    marketingName: '',
+    highlightDescription: '',
+    highlightOrder: 1
+  });
   const { toast, toasts, removeToast } = useToast();
   const [newTier, setNewTier] = useState<Partial<Tier>>({
     tierKey: '',
@@ -370,6 +381,63 @@ export default function TierSystemPage() {
       features: editingData.features.map(f => 
         f.featureKey === featureKey ? { ...f, isEnabled: enabled } : f
       )
+    });
+  };
+
+  const handleToggleHighlight = (featureKey: string) => {
+    if (!editingData) return;
+    
+    const feature = editingData.features.find(f => f.featureKey === featureKey);
+    if (!feature) return;
+    
+    if (feature.isHighlighted) {
+      // Remove highlight
+      setEditingData({
+        ...editingData,
+        features: editingData.features.map(f => 
+          f.featureKey === featureKey 
+            ? { ...f, isHighlighted: false, highlightOrder: 0, highlightDescription: null, marketingName: null }
+            : f
+        )
+      });
+    } else {
+      // Add highlight - open modal to configure
+      setEditingFeature(feature);
+      setHighlightForm({
+        marketingName: feature.featureName,
+        highlightDescription: '',
+        highlightOrder: Math.max(...editingData.features
+          .filter(f => f.isHighlighted)
+          .map(f => f.highlightOrder || 0), 0) + 1
+      });
+      setShowHighlightModal(true);
+    }
+  };
+
+  const handleSaveHighlight = () => {
+    if (!editingData || !editingFeature) return;
+    
+    setEditingData({
+      ...editingData,
+      features: editingData.features.map(f => 
+        f.featureKey === editingFeature.featureKey 
+          ? { 
+              ...f, 
+              isHighlighted: true, 
+              highlightOrder: highlightForm.highlightOrder,
+              highlightDescription: highlightForm.highlightDescription || null,
+              marketingName: highlightForm.marketingName || f.featureName
+            }
+          : f
+      )
+    });
+    
+    setShowHighlightModal(false);
+    setEditingFeature(null);
+    setHighlightForm({
+      marketingName: '',
+      highlightDescription: '',
+      highlightOrder: 1
     });
   };
 
@@ -983,6 +1051,41 @@ export default function TierSystemPage() {
                             <div className="space-y-3">
                               {tier.features && tier.features.length > 0 ? (
                                 <>
+                                  {/* Highlighted features - Key selling points */}
+                                  {tier.features.filter(f => f.isHighlighted).length > 0 && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                      <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 mb-2">
+                                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                                        Key Selling Points
+                                      </div>
+                                      <div className="space-y-2">
+                                        {tier.features
+                                          .filter(f => f.isHighlighted)
+                                          .sort((a, b) => (a.highlightOrder || 0) - (b.highlightOrder || 0))
+                                          .map((feature, index) => (
+                                            <div 
+                                              key={feature.featureKey || `highlight-${index}`}
+                                              className="flex items-start gap-2"
+                                            >
+                                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">
+                                                {index + 1}
+                                              </span>
+                                              <div>
+                                                <div className="font-medium text-sm text-gray-900">
+                                                  {feature.marketingName || feature.featureName}
+                                                </div>
+                                                {feature.highlightDescription && (
+                                                  <div className="text-xs text-gray-600">
+                                                    {feature.highlightDescription}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {/* Direct features */}
                                   {tier.features.filter(f => !f.isInherited).length > 0 && (
                                     <div>
@@ -994,8 +1097,9 @@ export default function TierSystemPage() {
                                             <Badge 
                                               key={feature.featureKey || `${feature.featureName}-${index}`} 
                                               variant="success" 
-                                              className="text-xs"
+                                              className={`text-xs ${feature.isHighlighted ? 'ring-2 ring-amber-400' : ''}`}
                                             >
+                                              {feature.isHighlighted && <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />}
                                               {feature.featureName}
                                             </Badge>
                                           ))}
@@ -1162,14 +1266,38 @@ export default function TierSystemPage() {
                     {editingData.features
                       .filter(f => !f.isInherited)
                       .map((feature, index) => (
-                        <div key={feature.featureKey || `${feature.featureName}-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <div className="font-medium">{feature.featureName}</div>
+                        <div key={feature.featureKey || `${feature.featureName}-${index}`} className="flex items-start justify-between p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">{feature.featureName}</div>
+                              {feature.isHighlighted && (
+                                <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                              )}
+                            </div>
                             <div className="text-sm text-gray-500">
                               {feature.featureKey} • Direct
+                              {feature.isHighlighted && ` • Order: ${feature.highlightOrder}`}
                             </div>
+                            {feature.isHighlighted && feature.marketingName && (
+                              <div className="text-sm text-amber-700 mt-1">
+                                Marketing: {feature.marketingName}
+                              </div>
+                            )}
+                            {feature.isHighlighted && feature.highlightDescription && (
+                              <div className="text-xs text-gray-600 mt-1">
+                                {feature.highlightDescription}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
+                            <Button
+                              onClick={() => handleToggleHighlight(feature.featureKey)}
+                              variant={feature.isHighlighted ? "default" : "outline"}
+                              size="sm"
+                              title={feature.isHighlighted ? "Remove highlight" : "Add as highlight"}
+                            >
+                              <Star className="w-4 h-4" />
+                            </Button>
                             <Button
                               onClick={() => handleToggleFeature(feature.featureKey, !feature.isEnabled)}
                               variant={feature.isEnabled ? "default" : "outline"}
@@ -1589,6 +1717,75 @@ export default function TierSystemPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Highlight Configuration Modal */}
+      <Modal
+        isOpen={showHighlightModal}
+        onClose={() => setShowHighlightModal(false)}
+        title="Configure Feature Highlight"
+        size="md"
+      >
+        <div className="space-y-4">
+          {editingFeature && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">Feature</label>
+                <div className="p-2 bg-gray-50 rounded">
+                  <div className="font-medium">{editingFeature.featureName}</div>
+                  <div className="text-sm text-gray-500">{editingFeature.featureKey}</div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Marketing Name</label>
+                <Input
+                  value={highlightForm.marketingName}
+                  onChange={(e) => setHighlightForm({ ...highlightForm, marketingName: e.target.value })}
+                  placeholder="Customer-friendly feature name"
+                />
+                <p className="text-xs text-gray-500 mt-1">This name will be displayed to customers</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Display Order</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={highlightForm.highlightOrder}
+                  onChange={(e) => setHighlightForm({ ...highlightForm, highlightOrder: parseInt(e.target.value) || 1 })}
+                  placeholder="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first in highlights</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  rows={3}
+                  value={highlightForm.highlightDescription}
+                  onChange={(e) => setHighlightForm({ ...highlightForm, highlightDescription: e.target.value })}
+                  placeholder="Brief description of why this feature matters to customers"
+                />
+                <p className="text-xs text-gray-500 mt-1">Explain the benefit of this feature</p>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleSaveHighlight}>
+                  <Star className="w-4 h-4 mr-1" />
+                  Add Highlight
+                </Button>
+                <Button 
+                  onClick={() => setShowHighlightModal(false)} 
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />

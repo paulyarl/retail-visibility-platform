@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { CreditCard, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/Label';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface Gateway {
   id: string;
@@ -41,6 +42,9 @@ export default function PaymentGatewaySelector({
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Capability-aware gateway filtering
+  const paymentCap = usePaymentGatewayCapability(tenantId);
   const [selection, setSelection] = useState<'default' | 'square' | 'paypal'>(
     value.gateway_type ? (value.gateway_type as 'square' | 'paypal') : 'default'
   );
@@ -61,7 +65,15 @@ export default function PaymentGatewaySelector({
         }
 
         // Filter active gateways
-        const activeGateways = gateways.filter(g => g.is_active);
+        let activeGateways = gateways.filter(g => g.is_active);
+
+        // If payment gateway capability data is available, restrict to allowed gateways
+        if (paymentCap.data?.enabled && paymentCap.data.allowedGateways.length > 0) {
+          activeGateways = activeGateways.filter(g =>
+            paymentCap.data!.allowedGateways.includes(g.gateway_type as import('@/services/CapabilityResolutionService').GatewayType)
+          );
+        }
+
         setGateways(activeGateways);
 
         // Auto-select default gateway if available

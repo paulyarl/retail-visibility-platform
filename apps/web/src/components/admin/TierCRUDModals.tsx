@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button, Spinner, Badge, Tooltip } from '@/components/ui';
-import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
+import { tenantTierService, TierFeature as TierSystemFeature } from '@/services/TenantTierService';
 
 interface TierFeature {
   id: string;
@@ -800,7 +800,7 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
   const loadFeatures = async () => {
     setLoadingFeatures(true);
     try {
-      const features = await adminSecurityMonitoringService.getTierSystemFeatures();
+      const features = await tenantTierService.getTierSystemFeaturesList();
       setExistingFeatures(features);
     } catch (error) {
       console.error('Failed to load tier features:', error);

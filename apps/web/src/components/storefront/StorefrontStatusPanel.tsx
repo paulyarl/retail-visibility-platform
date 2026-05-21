@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { tenantPublicService, PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
 import { AlertCircle, Clock, PauseCircle, XCircle, Archive, MapPin } from 'lucide-react';
+import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 /**
  * Status panel configuration for different location statuses
@@ -98,6 +99,9 @@ export interface StorefrontStatusPanelProps {
  * Hook to fetch and cache storefront status
  */
 export function useStorefrontStatus(tenantId?: string, tenantInfo?: PublicTenantInfo) {
+  // Capability-aware storefront resolution
+  const storefrontCap = useStorefrontCapability(tenantId || null);
+
   // Calculate initial state synchronously for SSR
   const initialShouldShow = tenantInfo ? shouldShowStatusPanel(tenantInfo) : false;
   const initialPanelType = getPanelType(tenantInfo);
@@ -106,7 +110,7 @@ export function useStorefrontStatus(tenantId?: string, tenantInfo?: PublicTenant
     tenant: PublicTenantInfo | null;
     isLoading: boolean;
     shouldShowPanel: boolean;
-    panelType: 'google_only' | 'status' | 'subscription' | null;
+    panelType: 'google_only' | 'status' | 'subscription' | 'capability_gated' | null;
   }>({
     tenant: tenantInfo || null,
     isLoading: !tenantInfo && !!tenantId,
@@ -147,6 +151,27 @@ export function useStorefrontStatus(tenantId?: string, tenantInfo?: PublicTenant
       }
     });
   }, [tenantId, tenantInfo]);
+
+  // Capability-aware override: when storefront_types capability data is available,
+  // use it as the authoritative source for storefront visibility.
+  useEffect(() => {
+    if (!storefrontCap.data) return;
+
+    const { enabled, type } = storefrontCap.data;
+
+    setStatusInfo(prev => {
+      if (!prev.tenant) return prev;
+
+      // If capability says storefront is disabled or type is 'none', force panel on
+      if (!enabled || type === 'none') {
+        return { ...prev, shouldShowPanel: true, panelType: 'capability_gated' };
+      }
+
+      // If capability says storefront is enabled, let existing logic stand
+      // (location status, subscription issues, etc. may still warrant a panel)
+      return prev;
+    });
+  }, [storefrontCap.data]);
 
   return statusInfo;
 }
@@ -214,6 +239,27 @@ export function StorefrontStatusPanel({
 
   if (!shouldShowPanel || !tenant) {
     return null;
+  }
+
+  // Capability-gated panel (storefront disabled by capability type)
+  if (panelType === 'capability_gated') {
+    return (
+      <div className={`bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-800 rounded-lg p-6 ${className}`}>
+        <div className="flex items-start gap-4">
+          <div className="text-gray-600 dark:text-gray-400 flex-shrink-0">
+            <Archive className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+              Online Storefront Unavailable
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 opacity-90 mb-4">
+              This store does not currently offer an online storefront experience. Please visit the physical location or contact the store directly.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Google-only tier panel

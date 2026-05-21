@@ -19,7 +19,6 @@ import securityRoutes from '../security';
 import platformSettingsRoutes from '../admin/platform-settings';
 import tickerConfigRoutes from '../admin/ticker-config';
 import tickerMessagesRoutes from '../admin/ticker-messages';
-import tiersRoutes from '../admin/tiers';
 import adminAnalyticsRoutes from '../admin-analytics';
 import adminSecurityMonitoringRoutes from '../admin/security-monitoring';
 import navigationLinksRoutes from '../admin/navigation-links';
@@ -27,6 +26,11 @@ import categoriesPropagateRoutes from '../admin/categories-propagate';
 import adminTenantBillingRoutes from '../admin/tenant-billing';
 import adminPlatformBillingRoutes from '../admin/platform-billing';
 import adminAutomationRoutes from '../admin/automation';
+import capabilityTypesRoutes from '../admin/capability-types';
+import featuresRoutes from '../admin/features';
+import capabilitiesRoutes from '../admin/capabilities';
+import tierCapabilitiesRoutes from '../admin/tier-capabilities';
+import adminTiersRoutes from '../admin/admin-tiers';
 
 /**
  * Mount admin routes
@@ -51,7 +55,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/tenants', authenticateToken,  adminTenantsRoutes);
   app.use('/api/admin/ticker-config', authenticateToken,  tickerConfigRoutes);
   app.use('/api/admin/ticker-messages', authenticateToken,  tickerMessagesRoutes);
-  app.use('/api/admin/tiers', authenticateToken,  tiersRoutes);
+  app.use('/api/admin/tiers', authenticateToken, adminTiersRoutes);
   app.use('/api/admin/trials', authenticateToken, trialManagementRoutes);
   app.use('/api/admin/analytics', authenticateToken, adminAnalyticsRoutes);
   app.use('/api/admin/security', authenticateToken,  adminSecurityMonitoringRoutes);
@@ -60,6 +64,10 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/billing', authenticateToken, adminTenantBillingRoutes);
   app.use('/api/admin/billing', authenticateToken, adminPlatformBillingRoutes);
   app.use('/api/admin/billing', authenticateToken, adminAutomationRoutes);
+  app.use('/api/admin/capability-types', authenticateToken, capabilityTypesRoutes);
+  app.use('/api/admin/features', authenticateToken, featuresRoutes);
+  app.use('/api/admin/capabilities', authenticateToken, capabilitiesRoutes);
+  app.use('/api/admin/tier-capabilities', authenticateToken, tierCapabilitiesRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);

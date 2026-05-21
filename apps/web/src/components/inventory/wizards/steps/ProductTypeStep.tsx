@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle, Upload, Image, Loader2, X } from 'lucide-react';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
+import { useCapabilityGate } from '@/hooks/useCapabilityGate';
 
 import { Label } from '@/components/ui/Label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
@@ -83,6 +84,22 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [skuError, setSkuError] = useState<string>('');
   const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
   const variantImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Capability gating for product types
+  const productTypesCapability = useCapabilityGate('product_types');
+
+  // Auto-switch to physical if current type is not available
+  useEffect(() => {
+    const availableCapabilities = productTypesCapability.capabilities 
+      ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat()
+      : [];
+    
+    if (data.type === 'digital' && !availableCapabilities.includes('digital')) {
+      handleTypeChange('physical');
+    } else if (data.type === 'hybrid' && !availableCapabilities.includes('hybrid')) {
+      handleTypeChange('physical');
+    }
+  }, [data.type, productTypesCapability.capabilities]);
 
   const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid') => {
     // Auto-adjust stock quantity based on product type
@@ -441,41 +458,91 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </CardContent>
           </Card>
 
-          <Card className={`cursor-pointer transition-all ${data.type === 'digital' ? 'border-purple-500 bg-purple-50' : 'hover:border-gray-300'}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <RadioGroupItem value="digital" id="digital" />
-                <Label htmlFor="digital" className="cursor-pointer flex-1">
-                  <div className="flex items-center space-x-2">
-                    {getTypeIcon('digital')}
-                    <span className="font-medium">Digital</span>
+          {/* Digital Product Type - Gated */}
+          {productTypesCapability.capabilities 
+            ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat().includes('digital')
+            : false ? (
+            <Card className={`cursor-pointer transition-all ${data.type === 'digital' ? 'border-purple-500 bg-purple-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="digital" id="digital" />
+                  <Label htmlFor="digital" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('digital')}
+                      <span className="font-medium">Digital</span>
+                    </div>
+                    {getTypeBadge('digital')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('digital')}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('digital')}
+                      <span className="font-medium text-gray-500">Digital</span>
+                      <Badge variant="outline" className="text-xs">
+                        {productTypesCapability.restrictions?.blockedOperations?.includes('digital') ? 'Unavailable' : 'Upgrade Required'}
+                      </Badge>
+                    </div>
                   </div>
-                  {getTypeBadge('digital')}
-                </Label>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                {getTypeDescription('digital')}
-              </p>
-            </CardContent>
-          </Card>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Digital products require a higher tier subscription
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card className={`cursor-pointer transition-all ${data.type === 'hybrid' ? 'border-green-500 bg-green-50' : 'hover:border-gray-300'}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <RadioGroupItem value="hybrid" id="hybrid" />
-                <Label htmlFor="hybrid" className="cursor-pointer flex-1">
-                  <div className="flex items-center space-x-2">
-                    {getTypeIcon('hybrid')}
-                    <span className="font-medium">Hybrid</span>
+          {/* Hybrid Product Type - Gated */}
+          {productTypesCapability.capabilities 
+            ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat().includes('hybrid')
+            : false ? (
+            <Card className={`cursor-pointer transition-all ${data.type === 'hybrid' ? 'border-green-500 bg-green-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="hybrid" id="hybrid" />
+                  <Label htmlFor="hybrid" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('hybrid')}
+                      <span className="font-medium">Hybrid</span>
+                    </div>
+                    {getTypeBadge('hybrid')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('hybrid')}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('hybrid')}
+                      <span className="font-medium text-gray-500">Hybrid</span>
+                      <Badge variant="outline" className="text-xs">
+                        {productTypesCapability.restrictions?.blockedOperations?.includes('hybrid') ? 'Unavailable' : 'Upgrade Required'}
+                      </Badge>
+                    </div>
                   </div>
-                  {getTypeBadge('hybrid')}
-                </Label>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                {getTypeDescription('hybrid')}
-              </p>
-            </CardContent>
-          </Card>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Hybrid products require a higher tier subscription
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </RadioGroup>
       </div>
 

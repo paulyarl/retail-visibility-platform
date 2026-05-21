@@ -3,6 +3,7 @@
  * Allows merchants to choose between Physical, Digital, or Hybrid products
  */
 
+import React from 'react';
 import { Store, Download, Gift } from 'lucide-react';
 
 export type ProductType = 'physical' | 'digital' | 'hybrid';
@@ -11,9 +12,17 @@ interface ProductTypeSelectorProps {
   value: ProductType;
   onChange: (type: ProductType) => void;
   disabled?: boolean;
+  capabilityGate?: {
+    capabilities: string[];
+    restrictions?: {
+      maxItems?: number;
+      allowedTypes?: string[];
+      blockedOperations?: string[];
+    };
+  };
 }
 
-export default function ProductTypeSelector({ value, onChange, disabled }: ProductTypeSelectorProps) {
+export default function ProductTypeSelector({ value, onChange, disabled, capabilityGate }: ProductTypeSelectorProps) {
   const options = [
     {
       value: 'physical' as ProductType,
@@ -35,29 +44,71 @@ export default function ProductTypeSelector({ value, onChange, disabled }: Produ
     },
   ];
 
+  // Filter options based on capability gate
+  const filteredOptions = options.map(option => {
+    const isAvailable = capabilityGate?.capabilities?.includes(option.value);
+    const isBlocked = capabilityGate?.restrictions?.blockedOperations?.includes(option.value);
+    
+    return {
+      ...option,
+      isAvailable: isAvailable || option.value === 'physical', // Physical is always available
+      isBlocked,
+      isDisabled: disabled || (!isAvailable && !isBlocked)
+    };
+  });
+
+  // Auto-switch to physical if current type is not available
+  React.useEffect(() => {
+    if (capabilityGate && value !== 'physical') {
+      const currentOption = filteredOptions.find(opt => opt.value === value);
+      if (currentOption?.isDisabled) {
+        onChange('physical');
+      }
+    }
+  }, [value, capabilityGate, onChange]);
+
   return (
     <div className="space-y-3">
       <label className="block text-sm font-medium text-gray-700">
         Product Type
       </label>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {options.map((option) => {
+        {filteredOptions.map((option) => {
           const Icon = option.icon;
           const isSelected = value === option.value;
+          
+          if (!option.isAvailable && !option.isBlocked) {
+            // Show gated option
+            return (
+              <div
+                key={option.value}
+                className="relative flex flex-col items-start p-4 border-2 border-gray-200 rounded-lg opacity-50"
+              >
+                <div className="absolute top-2 right-2">
+                  <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded">
+                    Upgrade Required
+                  </span>
+                </div>
+                <Icon className="w-6 h-6 text-gray-400 mb-2" />
+                <h4 className="font-medium text-gray-500">{option.label}</h4>
+                <p className="text-sm text-gray-400 mt-1">{option.description}</p>
+              </div>
+            );
+          }
           
           return (
             <button
               key={option.value}
               type="button"
-              onClick={() => !disabled && onChange(option.value)}
-              disabled={disabled}
+              onClick={() => !option.isDisabled && onChange(option.value)}
+              disabled={option.isDisabled}
               className={`
                 relative flex flex-col items-start p-4 border-2 rounded-lg transition-all
                 ${isSelected
                   ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50'
                   : 'border-gray-200 bg-white hover:border-gray-300'
                 }
-                ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                ${option.isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               `}
             >
               {/* Selection indicator */}

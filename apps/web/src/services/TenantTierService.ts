@@ -2,6 +2,23 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { getErrorMessage, RequestType } from '../providers/base/FlexibleApiSingleton';
 
+export interface TierFeature {
+  id: string;
+  featureKey: string;
+  featureName: string;
+  isEnabled: boolean;
+  isInherited: boolean;
+  isHighlighted: boolean;
+  highlightOrder: number;
+  highlightDescription: string | null;
+  marketingName: string | null;
+}
+
+export interface TierSystemFeature {
+  featureKey: string;
+  featureName: string;
+}
+
 export interface DbTier {
   id: string;
   name: string;
@@ -12,7 +29,7 @@ export interface DbTier {
   maxLocations: number;
   type: string;
   sortOrder: number;
-  features: string[];
+  features: TierFeature[];
 }
 
 export interface Tier {
@@ -20,14 +37,14 @@ export interface Tier {
   tierKey: string;
   name: string;
   displayName: string;
-  description: string;
+  description: string | null;
   priceMonthly: number;
-  maxSkus: number;
-  maxLocations: number;
+  maxSkus: number | null;
+  maxLocations: number | null;
   tierType: string;
   isActive: boolean;
   sortOrder: number;
-  features: string[];
+  features: TierFeature[];
   createdAt: string;
   updatedAt: string;
 }
@@ -403,13 +420,15 @@ export class TenantTierService extends AdminApiSingleton {
   /**
    * Create tier
    */
-  async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tier | null> {
+  async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'> & { reason?: string }): Promise<Tier | null> {
+    const { reason, ...tierFields } = tierData as any;
     const result = await this.makeDefaultRequest<Tier>(
       '/api/admin/tier-system/tiers',
       { 
         method: 'POST',
         body: JSON.stringify({
-          ...tierData,
+          ...tierFields,
+          reason: reason || 'Created via admin UI',
           id: `tier_${tierData.tierKey}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -432,14 +451,17 @@ export class TenantTierService extends AdminApiSingleton {
   /**
    * Delete tier
    */
-  async deleteTier(tierId: string): Promise<void> {
+  async deleteTier(tierId: string, reason?: string, hardDelete?: boolean): Promise<void> {
     if (!tierId) {
       throw new Error('Tier ID is required');
     }
 
     const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}`,
-      { method: 'DELETE' },
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ reason: reason || 'Deleted via admin UI', hardDelete: hardDelete || false })
+      },
       `platform-delete-tier-${tierId}`
     );
 
@@ -450,6 +472,106 @@ export class TenantTierService extends AdminApiSingleton {
 
     // Invalidate tier system cache
     await this.invalidateTierCachePatterns();
+  }
+
+  /**
+   * Get tier system tiers via /api/admin/tier-system/tiers
+   * Returns full tier data including isActive, all features (enabled+disabled), etc.
+   */
+  async getTierSystemTiersList(): Promise<Tier[]> {
+    const result = await this.makeDefaultRequest<{ tiers: Tier[] }>(
+      '/api/admin/tier-system/tiers',
+      {},
+      'platform-tier-system-tiers-list',
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN,
+        requestType: RequestType.AUTHENTICATED
+      }
+    );
+
+    if (!result.success) {
+      console.error('[TenantTierService] Failed to get tier system tiers list:', result.error);
+      return [];
+    }
+
+    return result.data?.tiers || [];
+  }
+
+  /**
+   * Get tier system features via /api/admin/tier-system/features
+   * Returns all unique features across all tiers
+   */
+  async getTierSystemFeaturesList(): Promise<TierSystemFeature[]> {
+    const result = await this.makeDefaultRequest<{ features: TierSystemFeature[] }>(
+      '/api/admin/tier-system/features',
+      {},
+      'platform-tier-system-features-list',
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN,
+        requestType: RequestType.AUTHENTICATED
+      }
+    );
+
+    if (!result.success) {
+      console.error('[TenantTierService] Failed to get tier system features list:', result.error);
+      return [];
+    }
+
+    return result.data?.features || [];
+  }
+
+  /**
+   * Patch tier with features support via /api/admin/tier-system/tiers/:tierKey
+   * Supports partial updates including feature arrays
+   */
+  async patchTier(tierKey: string, tierData: {
+    name?: string;
+    displayName?: string;
+    description?: string;
+    priceMonthly?: number;
+    maxSkus?: number | null;
+    maxLocations?: number | null;
+    tierType?: string;
+    isActive?: boolean;
+    sortOrder?: number;
+    features?: Array<{
+      id?: string;
+      featureKey: string;
+      featureName: string;
+      isEnabled: boolean;
+      isInherited?: boolean;
+      isHighlighted?: boolean;
+      highlightOrder?: number;
+      highlightDescription?: string | null;
+      marketingName?: string | null;
+    }>;
+    reason: string;
+  }): Promise<Tier | null> {
+    if (!tierKey) {
+      throw new Error('Tier key is required');
+    }
+
+    const result = await this.makeDefaultRequest<Tier>(
+      `/api/admin/tier-system/tiers/${tierKey}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(tierData)
+      },
+      `platform-patch-tier-${tierKey}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantTierService] Failed to patch tier:', result.error);
+      throw result.error;
+    }
+
+    await this.invalidateTierCachePatterns();
+
+    return result.data || null;
   }
 
   /**

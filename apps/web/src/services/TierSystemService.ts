@@ -9,6 +9,18 @@ import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import TiersSingleton from '../providers/platform/TiersSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
+export interface TierFeatureObject {
+  id: string;
+  featureKey: string;
+  featureName: string;
+  isEnabled: boolean;
+  isInherited: boolean;
+  isHighlighted: boolean;
+  highlightOrder: number;
+  highlightDescription: string | null;
+  marketingName: string | null;
+}
+
 export interface Tier {
   id: string;
   name: string;
@@ -18,7 +30,7 @@ export interface Tier {
   maxSkus: number; // Direct property, not nested under limits
   maxLocations: number; // Direct property, not nested under limits
   type: 'individual' | 'organization';
-  features: string[];
+  features: TierFeatureObject[];
   sortOrder: number;
   isActive: boolean;
   // Optional properties that might exist but not in current API response
@@ -34,6 +46,10 @@ export interface TierFeature {
   feature_name: string;
   is_inherited: boolean;
   is_enabled?: boolean;
+  is_highlighted?: boolean;
+  highlight_order?: number;
+  highlight_description?: string | null;
+  marketing_name?: string | null;
 }
 
 export interface TierInfo {
@@ -374,12 +390,46 @@ export class TierSystemService extends AdminApiSingleton {
       
       // Add features from the tier
       if (tier.features && Array.isArray(tier.features)) {
-        tier.features.forEach((featureKey: string) => {
-          gains.push({
-            name: this.formatFeatureName(featureKey),
-            description: this.getFeatureDescription(featureKey)
-          });
+        // Separate highlighted and regular features
+        const highlightedFeatures: any[] = [];
+        const regularFeatures: any[] = [];
+        
+        tier.features.forEach((feature: any) => {
+          // Handle both string format (legacy) and object format (new)
+          const featureKey = typeof feature === 'string' ? feature : feature.featureKey;
+          const featureName = typeof feature === 'object' && feature.featureName 
+            ? feature.featureName 
+            : this.formatFeatureName(featureKey);
+          
+          const featureObj = {
+            name: typeof feature === 'object' && feature.marketingName 
+              ? feature.marketingName 
+              : featureName,
+            description: typeof feature === 'object' && feature.highlightDescription
+              ? feature.highlightDescription
+              : this.getFeatureDescription(featureKey),
+            order: typeof feature === 'object' && feature.highlightOrder 
+              ? feature.highlightOrder 
+              : 999
+          };
+          
+          if (typeof feature === 'object' && feature.isHighlighted) {
+            highlightedFeatures.push(featureObj);
+          } else {
+            regularFeatures.push(featureObj);
+          }
         });
+        
+        // Sort highlighted features by order, then add regular features
+        highlightedFeatures.sort((a, b) => a.order - b.order);
+        regularFeatures.sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Add highlighted features first (up to 3)
+        highlightedFeatures.slice(0, 3).forEach(gain => gains.push(gain));
+        
+        // Add regular features if we have room (up to 5 total)
+        const remainingSlots = Math.max(0, 5 - highlightedFeatures.length);
+        regularFeatures.slice(0, remainingSlots).forEach(gain => gains.push(gain));
       }
 
       // Add limits as features

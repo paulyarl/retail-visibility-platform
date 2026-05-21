@@ -213,17 +213,24 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
                 {orgGains ? '🏢 Organization Capabilities:' : '🎯 Your Features:'}
               </h4>
               {primaryGains.gains.slice(0, showAllPrimary ? primaryGains.gains.length : 5).map((gain: any, index: number) => (
-                <div key={"primary-" + index} className="flex items-start gap-3">
+                <div key={"primary-" + index} className={`flex items-start gap-3 ${index < 3 ? 'bg-amber-50/50 p-3 rounded-lg border border-amber-200' : ''}`}>
                   <div className="flex-shrink-0 mt-0.5">
-                    <svg className={"w-5 h-5 " + colors.primaryIcon + " fill=\"currentColor\" viewBox=\"0 0 20 20\""}>
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
+                    {index < 3 ? (
+                      <div className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">
+                        {index + 1}
+                      </div>
+                    ) : (
+                      <svg className={"w-5 h-5 " + colors.primaryIcon + " fill=\"currentColor\" viewBox=\"0 0 20 20\""}>
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  <div>
-                    <p className="font-semibold text-neutral-900  text-sm">
+                  <div className="flex-1">
+                    <p className={`font-semibold text-sm ${index < 3 ? 'text-amber-900' : 'text-neutral-900'}`}>
+                      {index < 3 && <span className="mr-2">⭐</span>}
                       {gain.name}
                     </p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-700">
+                    <p className={`text-xs ${index < 3 ? 'text-amber-700' : 'text-neutral-600'} dark:text-neutral-700`}>
                       {gain.description}
                     </p>
                   </div>
@@ -260,17 +267,24 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
                   🏪 Your Individual Tenant Features:
                 </h4>
                 {secondaryGains.gains.slice(0, showAllSecondary ? secondaryGains.gains.length : 5).map((gain: any, index: number) => (
-                  <div key={"secondary-" + index} className="flex items-start gap-3">
+                  <div key={"secondary-" + index} className={`flex items-start gap-3 ${index < 3 ? 'bg-amber-50/30 p-3 rounded-lg border border-amber-200' : ''}`}>
                     <div className="flex-shrink-0 mt-0.5">
-                      <svg className={"w-5 h-5 " + colors.secondaryIcon + " fill=\"currentColor\" viewBox=\"0 0 20 20\""}>
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                      {index < 3 ? (
+                        <div className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">
+                          {index + 1}
+                        </div>
+                      ) : (
+                        <svg className={"w-5 h-5 " + colors.secondaryIcon + " fill=\"currentColor\" viewBox=\"0 0 20 20\""}>
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      )}
                     </div>
-                    <div>
-                      <p className="font-semibold text-neutral-900  text-sm">
+                    <div className="flex-1">
+                      <p className={`font-semibold text-sm ${index < 3 ? 'text-amber-900' : 'text-neutral-900'}`}>
+                        {index < 3 && <span className="mr-2">⭐</span>}
                         {gain.name}
                       </p>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-700">
+                      <p className={`text-xs ${index < 3 ? 'text-amber-700' : 'text-neutral-600'} dark:text-neutral-700`}>
                         {gain.description}
                       </p>
                     </div>

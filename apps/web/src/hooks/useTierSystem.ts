@@ -87,14 +87,19 @@ function getFallbackTierInfo(tierKey: string): TierLimits | ChainTierLimits {
  * Convert API Tier to TierLimits format for compatibility
  */
 function tierToLimits(tier: Tier): TierLimits {
+  // Convert features from objects to strings for backward compatibility
+  const features = (tier.features || []).map((feature: any) => 
+    typeof feature === 'object' ? feature.featureName || feature.featureKey : feature
+  );
+  
   return {
     name: tier.displayName,
     price: tier.priceMonthly === 0 ? 'Free / 14-day' : `$${tier.priceMonthly}/month`,
     pricePerMonth: tier.priceMonthly,
     maxSkus: tier.maxSkus || Infinity,
     maxLocations: tier.maxLocations || 1,
-    description: tier.description,
-    features: tier.features,
+    description: tier.description || '',
+    features: features,
     color: getTierColor(tier.tierType, tier.tierKey),
   };
 }

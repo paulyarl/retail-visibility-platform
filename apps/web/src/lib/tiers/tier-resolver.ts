@@ -4,6 +4,9 @@
  * Resolves effective tier from organization and tenant levels
  */
 
+import { checkTierFeature } from './tier-features';
+import { getCapabilityTypeForFeature } from '@/services/CapabilityResolutionService';
+
 export interface TierFeature {
   id: string;
   name: string;
@@ -39,6 +42,13 @@ export interface ResolvedTier {
   isChain: boolean;
   canUpgrade: boolean;
   upgradeOptions?: string[];
+  /**
+   * Capability-aware feature overrides keyed by feature name.
+   * Populated asynchronously by CapabilityResolutionService.
+   * When present, hasFeature() prioritizes these over flat tier features
+   * for any feature belonging to a capability type.
+   */
+  capabilityFeatures?: Record<string, boolean>;
 }
 
 /**
@@ -245,10 +255,16 @@ function getDefaultTier(): TierInfo {
  * Checks if a specific feature is enabled in the resolved tier
  */
 export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boolean {
+  // Capability-aware gating: if this feature belongs to a capability type
+  // and capability overrides are available, use them as the source of truth.
+  const capType = getCapabilityTypeForFeature(featureId);
+  if (capType && resolvedTier?.capabilityFeatures && featureId in resolvedTier.capabilityFeatures) {
+    return resolvedTier.capabilityFeatures[featureId];
+  }
+
   // Safety check for undefined features
   if (!resolvedTier?.effective?.features) {
     // Fallback to static tier features if API doesn't provide features
-    const { checkTierFeature } = require('./tier-features');
     const tierKey = resolvedTier?.effective?.id || 'starter';
     return checkTierFeature(tierKey, featureId);
   }
@@ -266,7 +282,6 @@ export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boole
 
   // API features exist but don't include this feature - check static tier features
   // This handles cases where API doesn't include inherited features
-  const { checkTierFeature } = require('./tier-features');
   const tierKey = resolvedTier?.effective?.id || 'starter';
   return checkTierFeature(tierKey, featureId);
 }

@@ -30,6 +30,18 @@ function getBaseTierForTrial(tierKey: string): string | null {
   return trialToBaseMap[tierKey] || null;
 }
 
+interface TierFeature {
+  id: string;
+  feature_key: string;
+  feature_name: string;
+  is_enabled: boolean;
+  is_inherited: boolean;
+  is_highlighted: boolean;
+  highlight_order: number;
+  highlight_description: string | null;
+  marketing_name: string | null;
+}
+
 interface TierWithFeatures {
   id: string;
   tier_key: string;
@@ -41,13 +53,7 @@ interface TierWithFeatures {
   tier_type: string;
   is_active: boolean;
   sort_order: number;
-  features: Array<{
-    id: string;
-    feature_key: string;
-    feature_name: string;
-    is_enabled: boolean;
-    is_inherited: boolean;
-  }>;
+  features: TierFeature[];
 }
 
 // Cache for tier data (refresh every 5 minutes)
@@ -96,6 +102,10 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
         feature_name: f.feature_name || f.feature_key,
         is_enabled: f.is_enabled,
         is_inherited: f.is_inherited || false,
+        is_highlighted: f.is_highlighted || false,
+        highlight_order: f.highlight_order || 0,
+        highlight_description: f.highlight_description || null,
+        marketing_name: f.marketing_name || null,
       })),
     };
     cache.set(tier.tier_key, tierWithFeatures);
@@ -252,6 +262,19 @@ export async function getValidTierKeys(): Promise<string[]> {
 }
 
 /**
+ * Get highlighted features for a tier (key selling points)
+ * Returns features sorted by highlight_order
+ */
+export async function getTierHighlightedFeatures(tierKey: string): Promise<TierFeature[]> {
+  const tier = await getTierByKey(tierKey);
+  if (!tier) return [];
+
+  return tier.features
+    .filter(f => f.is_highlighted && f.is_enabled)
+    .sort((a, b) => a.highlight_order - b.highlight_order);
+}
+
+/**
  * Clear tier cache (call this after tier updates)
  */
 export function clearTierCache(): void {
@@ -352,6 +375,7 @@ export default {
   getAllTiers,
   checkTierFeatureAccess,
   getTierFeatures,
+  getTierHighlightedFeatures,
   getTierSKULimit,
   getTierPrice,
   getTierDisplayName,

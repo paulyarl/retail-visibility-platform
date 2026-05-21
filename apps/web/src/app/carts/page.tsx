@@ -9,6 +9,7 @@ import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Pac
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { useCommerceCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface Gateway {
   id: string;
@@ -29,6 +30,7 @@ export default function MultiCartPage() {
   const [expandedCart, setExpandedCart] = useState<string | null>(null);
   const [tenantGateways, setTenantGateways] = useState<Record<string, Gateway[]>>({});
   const [tenantInfo, setTenantInfo] = useState<Record<string, TenantInfo>>({});
+  const [tenantCommerceState, setTenantCommerceState] = useState<Record<string, { enabled: boolean; cartVisible: boolean }>>({});
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
@@ -72,19 +74,25 @@ export default function MultiCartPage() {
     router.push(`/checkout?tenantId=${tenantId}&gatewayType=${gatewayType}`);
   };
 
-  // Fetch tenant info (name, logo) and available gateways for each tenant
+  // Fetch tenant info (name, logo), available gateways, and commerce capability for each tenant
   useEffect(() => {
     const fetchTenantData = async () => {
       const tenantIds = [...new Set(carts.map(c => c.cart.tenant_id))];
       const gatewayData: Record<string, Gateway[]> = {};
       const tenantInfoData: Record<string, TenantInfo> = {};
+      const commerceData: Record<string, { enabled: boolean; cartVisible: boolean }> = {};
+
+      // Lazy-load the service to avoid circular import issues
+      const { CapabilityResolutionService } = await import('@/services/CapabilityResolutionService');
+      const capService = CapabilityResolutionService.getInstance();
       
       for (const tenantId of tenantIds) {
         try {
-          // Fetch gateways and tenant profile in parallel
-          const [gateways, profile] = await Promise.all([
+          // Fetch gateways, tenant profile, and commerce capability in parallel
+          const [gateways, profile, commerceState] = await Promise.all([
             publicTenantInfoService.getPaymentGateways(tenantId),
-            publicTenantInfoService.getTenantProfile(tenantId).catch(() => null)
+            publicTenantInfoService.getTenantProfile(tenantId).catch(() => null),
+            capService.getCommerceState(tenantId).catch(() => null)
           ]);
           
           gatewayData[tenantId] = gateways.filter((g: Gateway) => g.is_active);
@@ -100,15 +108,28 @@ export default function MultiCartPage() {
               name: tenantId
             };
           }
+
+          // Store commerce capability state
+          if (commerceState) {
+            commerceData[tenantId] = {
+              enabled: commerceState.enabled,
+              cartVisible: commerceState.cartVisible,
+            };
+          } else {
+            // Fallback: if capability fetch fails, assume commerce is enabled
+            commerceData[tenantId] = { enabled: true, cartVisible: true };
+          }
         } catch (err) {
           console.warn(`Failed to fetch data for tenant ${tenantId}:`, err);
           gatewayData[tenantId] = [];
           tenantInfoData[tenantId] = { name: tenantId };
+          commerceData[tenantId] = { enabled: true, cartVisible: true };
         }
       }
       
       setTenantGateways(gatewayData);
       setTenantInfo(tenantInfoData);
+      setTenantCommerceState(commerceData);
     };
     
     if (carts.length > 0) {
@@ -192,6 +213,8 @@ export default function MultiCartPage() {
             const info = tenantInfo[cart.tenant_id];
             const displayName = info?.name || cart.tenant_name;
             const displayLogo = info?.logo_url || cart.tenant_logo;
+            const commerceState = tenantCommerceState[cart.tenant_id];
+            const commerceDisabled = commerceState && !commerceState.enabled;
             
             return (
               <Card key={cartSummary.key} className="hover:shadow-lg transition-shadow">
@@ -221,8 +244,17 @@ export default function MultiCartPage() {
                     </div>
                   </div>
                   
-                  {/* Payment Options */}
-                  {availableGateways.length > 0 && (
+                  {/* Payment Options — gated by commerce capability */}
+                  {commerceDisabled ? (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800 font-medium">
+                        Online checkout is not available for this store.
+                      </p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        Please contact the store directly to arrange purchase.
+                      </p>
+                    </div>
+                  ) : availableGateways.length > 0 && (
                     <div className="mb-4">
                       <p className="text-sm font-medium text-gray-700 mb-2">Choose Payment Method:</p>
                       <div className="flex flex-wrap gap-2">

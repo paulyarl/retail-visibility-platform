@@ -252,10 +252,10 @@ export default function PromotionSettingsPage() {
                   </div>
 
                   <ul className="space-y-3">
-                    {tier.features.map((feature, index) => (
+                    {tier.features.map((feature: any, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
                         <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
+                        <span>{typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}</span>
                       </li>
                     ))}
                   </ul>
