@@ -18,10 +18,12 @@ import {
   CommerceState,
   PaymentGatewayState,
   StorefrontState,
+  BarcodeScanState,
   AllCapabilitiesState,
   resolveCommerceState,
   resolvePaymentGatewayState,
   resolveStorefrontState,
+  resolveBarcodeScanState,
   getCapabilityTypeForFeature,
 } from '@/services/CapabilityResolutionService';
 
@@ -137,6 +139,38 @@ export function useStorefrontCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useBarcodeScanCapability
+// ====================
+
+export function useBarcodeScanCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<BarcodeScanState> {
+  const [data, setData] = useState<BarcodeScanState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getBarcodeScanState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch barcode scan capability');
     } finally {
       setLoading(false);
     }

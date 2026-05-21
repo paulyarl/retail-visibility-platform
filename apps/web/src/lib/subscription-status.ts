@@ -95,9 +95,10 @@ export function deriveInternalStatus(tenant: {
     }
 
     // Check if this is google_only tier (internal maintenance tier)
-    if (tier === 'google_only' || tier === 'discovery') {
-      // This shouldn't happen (google_only should have status='expired')
-      // but handle it gracefully
+    // Note: 'discovery' is a paid tier and should NOT be treated as maintenance
+    // when the subscription is active. Only 'google_only' is the post-trial
+    // downgrade tier that operates in maintenance mode.
+    if (tier === 'google_only') {
       const maintenanceState = getMaintenanceState({
         tier,
         status,
@@ -136,7 +137,9 @@ export function getMaintenanceState(ctx: {
 
   let inMaintenanceWindow = false;
 
-  if ((tier === 'google_only' || tier === 'discovery') && !isInactive) {
+  // Only google_only tier enters maintenance when status is not inactive.
+  // 'discovery' is a paid tier — active subscription means full access.
+  if (tier === 'google_only' && !isInactive) {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true; // No boundary = always maintenance
     } else {
@@ -147,7 +150,8 @@ export function getMaintenanceState(ctx: {
     }
   }
 
-  // For google_only with expired status, check maintenance window
+  // For google_only or discovery with expired status, check maintenance window
+  // Both tiers can enter a maintenance grace period before full freeze
   if ((tier === 'google_only' || tier === 'discovery') && status === 'expired') {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true;
@@ -160,7 +164,7 @@ export function getMaintenanceState(ctx: {
   }
 
   const isFullyFrozen = (isInactive && (tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow) || 
-                        ((tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow);
+                        (tier === 'google_only' && !inMaintenanceWindow);
 
   if (inMaintenanceWindow) return 'maintenance';
   if (isFullyFrozen) return 'freeze';

@@ -29,7 +29,7 @@ export const TIER_FEATURES = {
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
     'quick_start_wizard',       // Saves 400+ hours, worth $10K+
-    'barcode_scan',          // Worth $375/mo in labor (FIXED: was 'product_scanning')
+    'barcode_scan',          // DEPRECATED: superseded by barcode_scan_options capability. Still used by TierGate fallback.
     'gbp_integration',           // Worth $200-300/mo
     'custom_branding',
     'business_logo',
@@ -83,7 +83,7 @@ export const TIER_FEATURES = {
   ],
   chain_professional: [
     'quick_start_wizard',
-    'barcode_scan',           // Canonically named 'barcode_scan' (not 'product_scanning')
+    'barcode_scan',           // DEPRECATED: superseded by barcode_scan_options capability. Still used by TierGate fallback.
     'gbp_integration',
     'custom_branding',
     'qr_codes_1024',
@@ -130,7 +130,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
-  barcode_scan: 'professional',  // FIXED: was 'product_scanning'
+  barcode_scan: 'professional',  // DEPRECATED: superseded by barcode_scan_options capability
   gbp_integration: 'professional',
   custom_branding: 'professional',
   qr_codes_1024: 'professional',
@@ -190,7 +190,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'quick_start_wizard_full': 'Product Quick Start (Full Access)',
   'category_quick_start': 'Category Quick Start',
   'image_finder': 'Product Image Finder',
-  'barcode_scan': 'Product Scanning',  // FIXED: canonical name is 'barcode_scan'
+  'barcode_scan': 'Product Scanning',  // DEPRECATED: superseded by barcode_scan_options capability
   'gbp_integration': 'Google Business Profile Integration',
   'api_access': 'API Access',
   'white_label': 'White Label Branding',

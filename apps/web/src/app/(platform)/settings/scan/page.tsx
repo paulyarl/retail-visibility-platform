@@ -7,7 +7,7 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
-import { Flags } from '@/lib/flags';
+import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { UserTenantSelector } from '@/components/tenant/UserTenantSelector';
 
 
@@ -31,6 +31,14 @@ export default function ScanPage() {
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('usb');
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
   const [cleaningUp, setCleaningUp] = useState(false);
+
+  // Capability-based barcode scan access (supersedes Flags env var control)
+  const barcodeCap = useBarcodeScanCapability(selectedTenant || undefined, { forTenant: true });
+  const barcodeEnabled = barcodeCap.data?.enabled ?? null; // null = still loading
+  const barcodeModes = barcodeCap.data?.allowedModes ?? [];
+  const usbAllowed = barcodeModes.includes('usb');
+  const cameraAllowed = barcodeModes.includes('camera');
+  const manualAllowed = barcodeModes.includes('manual');
 
   useEffect(() => {
     // Initialize selected tenant from localStorage
@@ -109,8 +117,8 @@ export default function ScanPage() {
   };
 
   const startNewSession = async () => {
-    if (!Flags.SKU_SCANNING) {
-      alert('SKU scanning is not enabled. Please contact your administrator.');
+    if (!barcodeEnabled) {
+      alert('Barcode scanning is not enabled for this tenant. Please upgrade your plan or contact your administrator.');
       return;
     }
 
@@ -149,8 +157,8 @@ export default function ScanPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Feature Flag Check */}
-        {!Flags.SKU_SCANNING && (
+        {/* Capability Disabled Warning */}
+        {barcodeEnabled === false && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,10 +166,10 @@ export default function ScanPage() {
               </svg>
               <div>
                 <p className="text-sm font-medium text-yellow-900 dark:text-yellow-300">
-                  SKU Scanning Disabled
+                  Barcode Scanning Disabled
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-400 mt-1">
-                  The SKU scanning feature is not enabled for your account. Contact your administrator to enable it.
+                  Barcode scanning is not enabled for this tenant. Upgrade your plan or contact your administrator to enable it.
                 </p>
               </div>
             </div>
@@ -197,15 +205,15 @@ export default function ScanPage() {
                   Scanning Method
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* USB Scanner */}
+                  {/* USB Scanner - requires barcode_usb capability */}
                   <button
                     onClick={() => setSelectedDevice('usb')}
-                    disabled={!Flags.SCAN_USB}
+                    disabled={!usbAllowed}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'usb'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_USB ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!usbAllowed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -215,21 +223,24 @@ export default function ScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Fast and reliable
                       </p>
-                      {selectedDevice === 'usb' && (
+                      {!usbAllowed && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
+                      )}
+                      {usbAllowed && selectedDevice === 'usb' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
                   </button>
 
-                  {/* Camera */}
+                  {/* Camera - requires barcode_camera capability */}
                   <button
                     onClick={() => setSelectedDevice('camera')}
-                    disabled={!Flags.SCAN_CAMERA}
+                    disabled={!cameraAllowed}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'camera'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_CAMERA ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!cameraAllowed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -240,23 +251,24 @@ export default function ScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Use device camera
                       </p>
-                      {!Flags.SCAN_CAMERA && (
-                        <Badge variant="default" className="mt-2 text-xs">Disabled</Badge>
+                      {!cameraAllowed && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
                       )}
-                      {selectedDevice === 'camera' && Flags.SCAN_CAMERA && (
+                      {cameraAllowed && selectedDevice === 'camera' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
                   </button>
 
-                  {/* Manual Entry */}
+                  {/* Manual Entry - requires barcode_manual capability */}
                   <button
                     onClick={() => setSelectedDevice('manual')}
-                    className={`p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                    disabled={!manualAllowed}
+                    className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'manual'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    }`}
+                    } ${!manualAllowed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -266,7 +278,10 @@ export default function ScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Type barcodes
                       </p>
-                      {selectedDevice === 'manual' && (
+                      {!manualAllowed && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
+                      )}
+                      {manualAllowed && selectedDevice === 'manual' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
@@ -281,7 +296,7 @@ export default function ScanPage() {
                 </p>
                 <Button
                   onClick={startNewSession}
-                  disabled={creating || !Flags.SKU_SCANNING}
+                  disabled={creating || barcodeEnabled === false}
                   loading={creating}
                   variant='gradient'
                   style={{color:'white',hover:{color:'indigo'}}}

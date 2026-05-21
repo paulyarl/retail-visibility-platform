@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package, Crown } from 'lucide-react';
+import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package, Crown, Info } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantTierService } from '@/services/TenantTierService';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
 
@@ -37,6 +38,16 @@ export default function PaymentGatewaysPage() {
     AccessPresets.SUPPORT_OR_TENANT_ADMIN
   );
   const tierConfig = useTierConfig();
+
+  // Capability-aware resolution
+  const commerceCap = useCommerceCapability(tenantId);
+  const paymentCap = usePaymentGatewayCapability(tenantId);
+
+  // Derived capability flags (null = still loading)
+  const commerceDisabled = commerceCap.data ? !commerceCap.data.enabled || commerceCap.data.paymentType === 'none' : null;
+  const paypalAllowed = paymentCap.data ? paymentCap.data.allowedGateways.includes('paypal') : null;
+  const squareAllowed = paymentCap.data ? paymentCap.data.allowedGateways.includes('square') : null;
+  const stripeAllowed = paymentCap.data ? paymentCap.data.allowedGateways.includes('stripe') : null;
 
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
   const [loading, setLoading] = useState(true);
@@ -557,6 +568,23 @@ export default function PaymentGatewaysPage() {
       ) : (
         <div className="space-y-6">
         {/* PayPal Gateways */}
+        {paypalAllowed === false ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-yellow-800">PayPal Not Available</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      PayPal is not available on your current subscription tier. Upgrade to access PayPal payment processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -759,8 +787,26 @@ export default function PaymentGatewaysPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Square Gateways */}
+        {squareAllowed === false ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-yellow-800">Square Not Available</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Square is not available on your current subscription tier. Upgrade to access Square payment processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -1081,8 +1127,26 @@ export default function PaymentGatewaysPage() {
             </Card>
           )}
         </div>
+        )}
 
         {/* Stripe Checkout Gateway */}
+        {stripeAllowed === false ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-yellow-800">Stripe Not Available</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Stripe is not available on your current subscription tier. Upgrade to access Stripe payment processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -1221,6 +1285,7 @@ export default function PaymentGatewaysPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Stripe Connect for Payouts (Legacy Info) */}
         <div className="hidden">

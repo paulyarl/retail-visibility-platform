@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
-import { Flags } from '@/lib/flags';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { TierGate } from '@/components/tier/TierGate';
+import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Button } from '@mantine/core';
 
 interface ScanSession {
@@ -34,6 +34,15 @@ export default function TenantScanPage() {
   const { canAccess, getFeatureBadgeWithPermission, tier, loading: tierLoading } = useTenantTier(tenantId);
   const hasScannerAccess = canAccess('barcode_scan', 'canEdit');
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
+
+  // Capability-based barcode scan access (supersedes Flags env var control)
+  const barcodeCap = useBarcodeScanCapability(tenantId, { forTenant: true });
+  const barcodeEnabled = barcodeCap.data?.enabled ?? null; // null = still loading
+  const barcodeModes = barcodeCap.data?.allowedModes ?? [];
+  const usbAllowed = barcodeModes.includes('usb');
+  const cameraAllowed = barcodeModes.includes('camera');
+  const manualAllowed = barcodeModes.includes('manual');
+  const scanAllowed = barcodeModes.includes('scan');
   
   const [sessions, setSessions] = useState<ScanSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,13 +71,18 @@ export default function TenantScanPage() {
   };
 
   const startNewSession = async () => {
-    if (!Flags.SKU_SCANNING) {
-      alert('SKU scanning is not enabled. Please contact your administrator.');
+    if (barcodeEnabled === false) {
+      alert('Barcode scanning is not enabled for your account. Please contact your administrator or upgrade your plan.');
       return;
     }
 
-    if (selectedDevice === 'camera' && !Flags.SCAN_CAMERA) {
-      alert('Camera scanning is not enabled. Please select USB or manual mode.');
+    if (selectedDevice === 'camera' && !cameraAllowed) {
+      alert('Camera scanning is not enabled for your plan. Please select USB or manual mode.');
+      return;
+    }
+
+    if (selectedDevice === 'usb' && !usbAllowed) {
+      alert('USB scanning is not enabled for your plan. Please select manual mode.');
       return;
     }
 
@@ -162,8 +176,8 @@ export default function TenantScanPage() {
           tenant={{ id: tenantId, name: '' }}
           contextLabel="Barcode Entry"
         />
-        {/* Feature Flag Check */}
-        {!Flags.SKU_SCANNING && (
+        {/* Capability Disabled Warning */}
+        {barcodeEnabled === false && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -171,10 +185,10 @@ export default function TenantScanPage() {
               </svg>
               <div>
                 <p className="text-sm font-medium text-yellow-900 dark:text-yellow-300">
-                  SKU Scanning Disabled
+                  Barcode Scanning Disabled
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-400 mt-1">
-                  The SKU scanning feature is not enabled for your account. Contact your administrator to enable it.
+                  Barcode scanning is not enabled for your current plan. Upgrade to access scanning features.
                 </p>
               </div>
             </div>
@@ -197,15 +211,15 @@ export default function TenantScanPage() {
                   Scanning Method
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* USB Scanner - Professional+ tier required */}
+                  {/* USB Scanner - requires barcode_usb capability */}
                   <button
                     onClick={() => setSelectedDevice('usb')}
-                    disabled={!Flags.SCAN_USB || !hasScannerAccess}
+                    disabled={!usbAllowed || !hasScannerAccess}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'usb'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_USB || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!usbAllowed || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -215,24 +229,24 @@ export default function TenantScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Fast and reliable
                       </p>
-                      {!hasScannerAccess && (
+                      {(!usbAllowed || !hasScannerAccess) && (
                         <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
                       )}
-                      {hasScannerAccess && selectedDevice === 'usb' && (
+                      {usbAllowed && hasScannerAccess && selectedDevice === 'usb' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
                   </button>
 
-                  {/* Camera - Professional+ tier required */}
+                  {/* Camera - requires barcode_camera capability */}
                   <button
                     onClick={() => setSelectedDevice('camera')}
-                    disabled={!Flags.SCAN_CAMERA || !hasScannerAccess}
+                    disabled={!cameraAllowed || !hasScannerAccess}
                     className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'camera'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    } ${!Flags.SCAN_CAMERA || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${!cameraAllowed || !hasScannerAccess ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,23 +257,24 @@ export default function TenantScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Use device camera
                       </p>
-                      {!hasScannerAccess && (
+                      {(!cameraAllowed || !hasScannerAccess) && (
                         <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
                       )}
-                      {hasScannerAccess && selectedDevice === 'camera' && Flags.SCAN_CAMERA && (
+                      {cameraAllowed && hasScannerAccess && selectedDevice === 'camera' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
                   </button>
 
-                  {/* Manual Entry */}
+                  {/* Manual Entry - requires barcode_manual capability */}
                   <button
                     onClick={() => setSelectedDevice('manual')}
-                    className={`p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                    disabled={!manualAllowed}
+                    className={`p-4 border-2 rounded-lg transition-all ${
                       selectedDevice === 'manual'
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-                    }`}
+                    } ${!manualAllowed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex flex-col items-center text-center">
                       <svg className="w-8 h-8 mb-2 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -269,7 +284,10 @@ export default function TenantScanPage() {
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                         Type barcodes
                       </p>
-                      {selectedDevice === 'manual' && (
+                      {!manualAllowed && (
+                        <Badge variant="default" className="mt-2 text-xs bg-amber-100 text-amber-800">Pro+</Badge>
+                      )}
+                      {manualAllowed && selectedDevice === 'manual' && (
                         <Badge variant="success" className="mt-2 text-xs">Selected</Badge>
                       )}
                     </div>
@@ -310,7 +328,7 @@ export default function TenantScanPage() {
                 </p>
                 <Button
                   onClick={startNewSession}
-                  disabled={creating || !Flags.SKU_SCANNING}
+                  disabled={creating || barcodeEnabled === false}
                   variant='gradient'
                   style={{color:'white',hover:{color:'indigo'},fontWeight:'bold'}}
                   loading={creating}

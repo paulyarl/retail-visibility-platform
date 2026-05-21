@@ -47,7 +47,9 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
 
   let inMaintenanceWindow = false;
 
-  if ((tier === 'google_only' || tier === 'discovery') && !isInactive) {
+  // Only google_only tier enters maintenance when status is not inactive.
+  // 'discovery' is a paid tier — active subscription means full access.
+  if (tier === 'google_only' && !isInactive) {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true;
     } else {
@@ -58,7 +60,21 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
     }
   }
 
-  const isFullyFrozen = isInactive || ((tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow);
+  // For google_only or discovery with expired status, check maintenance window
+  // Both tiers can enter a maintenance grace period before full freeze
+  if ((tier === 'google_only' || tier === 'discovery') && status === 'expired') {
+    if (!ctx.trialEndsAt) {
+      inMaintenanceWindow = true;
+    } else {
+      const boundary = new Date(ctx.trialEndsAt);
+      if (!Number.isNaN(boundary.getTime()) && now < boundary) {
+        inMaintenanceWindow = true;
+      }
+    }
+  }
+
+  const isFullyFrozen = (isInactive && (tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow) || 
+                        (tier === 'google_only' && !inMaintenanceWindow);
 
   if (inMaintenanceWindow) return 'maintenance';
   if (isFullyFrozen) return 'freeze';

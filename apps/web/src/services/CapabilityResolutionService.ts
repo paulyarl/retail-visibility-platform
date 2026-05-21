@@ -72,6 +72,22 @@ export interface StorefrontState {
   features: Record<string, boolean>;
 }
 
+// --- Barcode Scan Options ---
+
+export type BarcodeScanMode = 'scan' | 'manual' | 'usb' | 'camera' | 'none';
+
+export interface BarcodeScanState {
+  enabled: boolean;
+  /** Available scan modes based on capability features */
+  allowedModes: BarcodeScanMode[];
+  /** Whether barcode scanning is flexible (all modes available) */
+  isFlexible: boolean;
+  /** Whether at least one scan mode is available */
+  scanAvailable: boolean;
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Combined ---
 
 export interface AllCapabilitiesState {
@@ -79,6 +95,7 @@ export interface AllCapabilitiesState {
   commerce: CommerceState;
   paymentGateway: PaymentGatewayState;
   storefront: StorefrontState;
+  barcodeScan: BarcodeScanState;
   uncategorizedFeatures: string[];
 }
 
@@ -90,6 +107,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce_types',
   payment_gateway_: 'payment_gateway_options',
   storefront_: 'storefront_types',
+  barcode_: 'barcode_scan_options',
 };
 
 /**
@@ -158,6 +176,36 @@ export function resolvePaymentGatewayState(features: Record<string, boolean>): P
     allowedGateways,
     isFlexible: flexible,
     checkoutAvailable: enabled && allowedGateways.length > 0,
+    features,
+  };
+}
+
+/**
+ * Resolve barcode scan state from raw capability features
+ */
+export function resolveBarcodeScanState(features: Record<string, boolean>): BarcodeScanState {
+  const enabled = !!features.barcode_enabled;
+  const flexible = !!features.barcode_flexible;
+  const disabled = !!features.barcode_disabled;
+
+  const allowedModes: BarcodeScanMode[] = [];
+  if (features.barcode_scan) allowedModes.push('scan');
+  if (features.barcode_manual) allowedModes.push('manual');
+  if (features.barcode_usb) allowedModes.push('usb');
+  if (features.barcode_camera) allowedModes.push('camera');
+
+  // If flexible, all modes are available regardless of individual flags
+  if (flexible) {
+    allowedModes.push('scan', 'manual', 'usb', 'camera');
+  }
+
+  const uniqueModes = [...new Set(allowedModes)];
+
+  return {
+    enabled: enabled && !disabled,
+    allowedModes: disabled ? [] : uniqueModes,
+    isFlexible: flexible,
+    scanAvailable: enabled && !disabled && uniqueModes.length > 0,
     features,
   };
 }
@@ -284,6 +332,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get barcode scan state for a tenant
+   */
+  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.barcodeScan;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -306,12 +362,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const commerceFeatures = data.capabilities?.commerce_types?.features || {};
     const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
+    const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
 
     return {
       tierKey: data.tier_key,
       commerce: resolveCommerceState(commerceFeatures),
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
+      barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -398,6 +456,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get barcode scan state for a tenant
+   */
+  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.barcodeScan;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -417,12 +483,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const commerceFeatures = data.capabilities?.commerce_types?.features || {};
     const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
+    const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
 
     return {
       tierKey: data.tier_key,
       commerce: resolveCommerceState(commerceFeatures),
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
+      barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

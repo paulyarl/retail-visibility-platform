@@ -1,10 +1,10 @@
 /**
- * Scan Products Layout with Tier Gating
+ * Scan Products Layout with Capability Gating
  * 
- * Wraps the Scan Products page with tier-based access control.
- * Requires 'barcode_scan' feature (Professional tier or higher).
+ * Wraps the Scan Products page with capability-based access control.
+ * Uses the barcode_scan_options capability type to determine access.
  * 
- * MIGRATED: Now uses useTenantAccess for dynamic database tier data.
+ * MIGRATED: Now uses useBarcodeScanCapability for capability-based gating.
  */
 
 'use client';
@@ -12,13 +12,17 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useTenantAccess } from '@/hooks/tenant-access/useTenantAccess';
+import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 export default function ScanLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const tenantId = params.tenantId as string;
   
-  // Use new hook for dynamic tier data from database
-  const { tier, loading, hasFeature } = useTenantAccess(tenantId);
+  // Use hooks for dynamic tier data and capability-based access
+  const { tier, loading: tierLoading } = useTenantAccess(tenantId);
+  const barcodeCap = useBarcodeScanCapability(tenantId, { forTenant: true });
+
+  const loading = tierLoading || barcodeCap.loading;
 
   if (loading) {
     return (
@@ -28,8 +32,8 @@ export default function ScanLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // Check feature access directly from hook (includes platform admin bypass)
-  if (hasFeature('barcode_scan')) {
+  // Check capability-based access (barcode_enabled and at least one mode available)
+  if (barcodeCap.data?.enabled && barcodeCap.data.scanAvailable) {
     return <>{children}</>;
   }
 
