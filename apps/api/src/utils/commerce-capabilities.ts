@@ -165,32 +165,41 @@ export async function getTenantCommerceCapabilities(
     select: {
       subscription_tier: true,
       organization_id: true,
-    },
-  });
-
-  const tier = tenant?.subscription_tier || '';
-  const organizationId = tenant?.organization_id;
-
-  // Get tier features separately
-  const tierData = await prismaClient.subscription_tiers_list.findUnique({
-    where: { tier_key: tier },
-    select: {
-      tier_features_list: {
-        select: {
-          feature_key: true,
-          is_enabled: true,
-        },
+      organizations_list: {
+        select: { subscription_tier: true },
       },
     },
   });
 
-  const tierFeatures = tierData?.tier_features_list || [];
+  const tenantTierKey = tenant?.subscription_tier || '';
+  const orgTierKey = tenant?.organizations_list?.subscription_tier || null;
+  const organizationId = tenant?.organization_id;
 
-  // Convert tier features to key-value object
-  const tierCapabilities = tierFeatures.reduce((acc: any, feature: any) => {
-    acc[feature.feature_key] = feature.is_enabled;
-    return acc;
-  }, {});
+  // Fetch features from both org and tenant tiers, then merge (most-permissive-wins)
+  const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+  const tiersData = tierKeys.length > 0
+    ? await prismaClient.subscription_tiers_list.findMany({
+        where: { tier_key: { in: tierKeys }, is_active: true },
+        select: {
+          tier_features_list: {
+            select: {
+              feature_key: true,
+              is_enabled: true,
+            },
+          },
+        },
+      })
+    : [];
+
+  // Merge features from all applicable tiers: enabled in ANY tier → enabled in result
+  const tierCapabilities: Record<string, boolean> = {};
+  for (const tier of tiersData) {
+    for (const feature of tier.tier_features_list) {
+      if (feature.is_enabled) {
+        tierCapabilities[feature.feature_key] = true;
+      }
+    }
+  }
 
   // Get tenant commerce settings
   const tenantCommerceSettings = await prismaClient.tenant_commerce_settings.findUnique({
@@ -296,7 +305,7 @@ export async function getTenantCommerceCapabilities(
     ),
     
     // Metadata
-    tier,
+    tier: tenantTierKey || orgTierKey || '',
     source: tenantCommerceSettings ? 'tenant_settings' : (organizationCommerceSettings ? 'organization_settings' : 'tier_features')
   };
 

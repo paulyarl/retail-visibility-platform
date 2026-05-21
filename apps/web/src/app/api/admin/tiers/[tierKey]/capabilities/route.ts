@@ -29,10 +29,10 @@ export interface TierCapability {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tierKey: string } }
+  { params }: { params: Promise<{ tierKey: string }> }
 ) {
   try {
-    const { tierKey } = params;
+    const { tierKey } = await params;
     
     // Import CapabilityGatingService dynamically to avoid SSR issues
     const { CapabilityGatingService } = await import('@platform/feature-definitions');
@@ -72,12 +72,13 @@ export async function GET(
 
     return NextResponse.json(tierCapabilities);
   } catch (error) {
-    console.error(`Admin tier capabilities API error for tier ${params.tierKey}:`, error);
+    const { tierKey: errTierKey } = await params;
+    console.error(`Admin tier capabilities API error for tier ${errTierKey}:`, error);
     
     // Fallback to mock data if CapabilityGatingService fails
-    console.warn(`Falling back to mock data for tier ${params.tierKey} due to CapabilityGatingService error`);
+    console.warn(`Falling back to mock data for tier ${errTierKey} due to CapabilityGatingService error`);
     
-    const { tierKey } = params;
+    const tierKey = errTierKey;
     const fallbackTierCapabilities: TierCapability[] = [
       {
         tier_key: tierKey,
@@ -107,10 +108,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { tierKey: string } }
+  { params }: { params: Promise<{ tierKey: string }> }
 ) {
   try {
-    const { tierKey } = params;
+    const { tierKey } = await params;
     const body = await request.json();
     
     // Mock update response - in production this would update the database

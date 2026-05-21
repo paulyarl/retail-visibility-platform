@@ -70,32 +70,53 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    // Determine effective tier (org tier overrides for chain members)
-    const effectiveTierKey = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const orgTierKey = tenant.organizations_list?.subscription_tier || null;
+    const tenantTierKey = tenant.subscription_tier || null;
 
-    // Look up the tier
-    const tier = await prisma.subscription_tiers_list.findUnique({
-      where: { tier_key: effectiveTierKey },
+    // Fetch features from both org tier and tenant tier, then merge (most-permissive-wins)
+    const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { tier_key: { in: tierKeys } },
     });
 
-    if (!tier) {
-      return res.json({
-        tier_key: effectiveTierKey,
-        capabilities: {},
-        uncategorized_features: [],
+    // Build a map of tier_key -> tier record
+    const tierMap = new Map(tiers.map(t => [t.tier_key, t]));
+
+    // Collect features from all applicable tiers
+    const allTierIds = tiers.map(t => t.id);
+
+    let tierFeatures: any[] = [];
+    if (allTierIds.length > 0) {
+      tierFeatures = await prisma.tier_features_list.findMany({
+        where: { tier_id: { in: allTierIds }, is_enabled: true },
+        include: {
+          capability_type_list: { select: { key: true, name: true, category: true } },
+        },
+        orderBy: { capability_type_id: 'asc' },
       });
     }
 
-    // Fetch all enabled tier features with their capability type info
-    const tierFeatures = await prisma.tier_features_list.findMany({
-      where: { tier_id: tier.id, is_enabled: true },
-      include: {
-        capability_type_list: { select: { key: true, name: true, category: true } },
-      },
-      orderBy: { capability_type_id: 'asc' },
-    });
+    // Merge features: tenant features override org features for same key (most-permissive-wins)
+    // If a feature is enabled in ANY tier, it's enabled in the merged result
+    const mergedFeatures = new Map<string, { feature_key: string; is_enabled: boolean; is_highlighted: boolean; capability_type_list: any }>();
 
-    // Group features by capability type
+    for (const tf of tierFeatures) {
+      const existing = mergedFeatures.get(tf.feature_key);
+      if (existing) {
+        // Union: enabled if enabled in either tier, highlighted if highlighted in either
+        existing.is_enabled = existing.is_enabled || tf.is_enabled;
+        existing.is_highlighted = existing.is_highlighted || (tf.is_highlighted ?? false);
+      } else {
+        mergedFeatures.set(tf.feature_key, {
+          feature_key: tf.feature_key,
+          is_enabled: tf.is_enabled,
+          is_highlighted: tf.is_highlighted ?? false,
+          capability_type_list: tf.capability_type_list,
+        });
+      }
+    }
+
+    // Group merged features by capability type
     const capabilities: Record<string, {
       capability_enabled: boolean;
       is_highlighted: boolean;
@@ -104,28 +125,29 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
 
     const uncategorizedFeatures: string[] = [];
 
-    for (const tf of tierFeatures) {
+    for (const tf of mergedFeatures.values()) {
       const capKey = tf.capability_type_list?.key;
 
       if (capKey && tf.capability_type_list?.category) {
-        // This feature belongs to a capability type
         if (!capabilities[capKey]) {
           capabilities[capKey] = {
             capability_enabled: true,
-            is_highlighted: tf.is_highlighted ?? false,
+            is_highlighted: false,
             features: {},
           };
         }
         capabilities[capKey].features[tf.feature_key] = tf.is_enabled;
-        // Update is_highlighted if any feature in this capability is highlighted
         if (tf.is_highlighted) {
           capabilities[capKey].is_highlighted = true;
         }
       } else {
-        // Uncategorized feature (no capability type or empty key)
         uncategorizedFeatures.push(tf.feature_key);
       }
     }
+
+    // Report the higher tier as the effective tier_key
+    // If tenant has a higher tier than org, tenant tier is the effective one
+    const effectiveTierKey = tenantTierKey || orgTierKey || 'starter';
 
     res.json({
       tier_key: effectiveTierKey,
