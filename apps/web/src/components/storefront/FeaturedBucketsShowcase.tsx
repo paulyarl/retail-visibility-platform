@@ -18,6 +18,7 @@ interface FeaturedBucketsShowcaseProps {
   // Payment gateway status from parent page
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  commerceDisabled?: boolean;
 }
 
 /**
@@ -30,7 +31,8 @@ export default function FeaturedBucketsShowcase({
   featuredData, 
   tenantId,
   hasActivePaymentGateway,
-  defaultGatewayType
+  defaultGatewayType,
+  commerceDisabled
 }: FeaturedBucketsShowcaseProps) {
   if (!featuredData) {
     return null;
@@ -187,6 +189,7 @@ export default function FeaturedBucketsShowcase({
           initialLimit={3}
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          commerceDisabled={commerceDisabled}
         />
       ))}
     </div>

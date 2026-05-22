@@ -8,6 +8,7 @@ import { useProductSingleton } from '@/providers/data/ProductSingleton';
 import { useStoreData } from '@/providers/StoreProviderSingleton';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { AddToCartButton } from './AddToCartButton';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { HoursStatusBadge } from '@/components/storefront/HoursStatusBadge';
 
 // ====================
@@ -24,6 +25,7 @@ interface UniversalProductCardProps {
   // Payment gateway status from parent page/shop
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  commerceDisabled?: boolean;
 }
 
 // Featured type configuration
@@ -75,6 +77,7 @@ export function UniversalProductCard({
   productData, // Pre-fetched product data
   hasActivePaymentGateway: propHasActivePaymentGateway, // From parent page
   defaultGatewayType: propDefaultGatewayType, // From parent page
+  commerceDisabled: propCommerceDisabled = false,
 }: UniversalProductCardProps) {
    const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
     // Status indicator color
@@ -126,7 +129,16 @@ export function UniversalProductCard({
 
   // Payment gateway status: check for gateway_type instead of boolean
   const defaultGatewayType = propDefaultGatewayType ?? product?.defaultGatewayType;
-  const hasActivePaymentGateway = !!defaultGatewayType; // Has gateway if gateway_type exists
+  const hasGateway = !!defaultGatewayType;
+
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(tenantId || null);
+  const paymentCap = usePaymentGatewayCapability(tenantId || null);
+  const commerceEnabled = commerceCap.data?.enabled ?? true;
+  const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
+  const capabilityCommerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
+  const commerceDisabled = propCommerceDisabled || capabilityCommerceDisabled;
+  const effectiveCanPurchase = hasGateway && commerceEnabled && gatewayCapEnabled;
 
   // Format price - handle both raw values and pre-formatted values
   const formatPrice = (value: number | string | undefined): string => {
@@ -453,9 +465,9 @@ export function UniversalProductCard({
         {/* Quick Actions */}
         {showQuickActions && (
           <div className="flex items-center gap-2">
-            {hasActivePaymentGateway ? (
+            {(effectiveCanPurchase || commerceDisabled) ? (
               <>
-                {product.has_variants ? (
+                {(product.has_variants && !commerceDisabled) ? (
                   <Link
                     href={`/products/${product.id}`}
                     className="inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
@@ -465,8 +477,9 @@ export function UniversalProductCard({
                 ) : (
                   <AddToCartButton
                     product={product}
-                    hasActivePaymentGateway={hasActivePaymentGateway}
+                    hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={defaultGatewayType}
+                    commerceDisabled={commerceDisabled}
                     tenantName={product.tenantName}
                     className="flex-1"
                   />

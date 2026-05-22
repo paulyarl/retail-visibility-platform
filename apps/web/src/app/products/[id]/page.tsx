@@ -16,7 +16,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
-import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
+import ProductBusinessInfoWrapper from '@/components/products/ProductBusinessInfoWrapper';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 // import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsWrapper';
@@ -281,7 +281,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const businessName = product.tenant?.name || 'Unknown Store';
 
 
-  // console.log(`tenant: `, tenant);
+    // console.log(`tenant: `, tenant);
 
   // Convert images to gallery format for ProductGallery component
   // console.log(`Product 1 JSON: ${JSON.stringify(product)}`);
@@ -674,7 +674,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
           {product.productType != 'digital' ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <ProductBusinessInfoCollapsible
+              <ProductBusinessInfoWrapper
                 product={product as any}
                 tenant={{
                   id: product.tenantId || tenantProfile?.id || '',

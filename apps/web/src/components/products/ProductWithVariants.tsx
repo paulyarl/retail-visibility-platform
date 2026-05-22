@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import VariantSelector, { ProductVariant } from './VariantSelector';
 import VariantAttributeDisplay, { VariantComparisonGrid } from './VariantAttributeDisplay';
 import { AddToCartButton } from './AddToCartButton';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { SalePrice } from './SalePrice';
 import { FeaturedTypeBadges } from './FeaturedTypeBadges';
 import { Badge } from '@/components/ui/Badge';
@@ -33,6 +34,7 @@ interface ProductWithVariantsProps {
   tenantLogo?: string;
   defaultGatewayType?: string;
   hasActivePaymentGateway?: boolean;
+  commerceDisabled?: boolean;
   className?: string;
   showImage?: boolean;
   onImageChange?: (imageUrl: string | undefined) => void;
@@ -47,6 +49,7 @@ export default function ProductWithVariants({
   tenantLogo,
   defaultGatewayType,
   hasActivePaymentGateway,
+  commerceDisabled = false,
   className = '',
   showImage = false,
   onImageChange,
@@ -344,6 +347,7 @@ export default function ProductWithVariants({
               tenantLogo={tenantLogo}
               defaultGatewayType={defaultGatewayType}
               hasActivePaymentGateway={hasActivePaymentGateway}
+              commerceDisabled={commerceDisabled}
               className="w-full"
               layout="stacked"
             />

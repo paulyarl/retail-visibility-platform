@@ -50,6 +50,7 @@ import { useRouter } from 'next/navigation';
 // store status
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface StoreDetailPageProps {
   params: Promise<{
@@ -62,22 +63,22 @@ async function getConsolidatedDirectoryData(identifier: string) {
     // First, try to load as a slug (most common case)
     try {
       const data = await directoryService.getDirectoryConsolidated(identifier);
-    //  let tenantLogo; 
-      
+      //  let tenantLogo; 
+
       // Check if data has listing property - if not, might be tenant ID case
       if (!data?.listing) {
         // More flexible pattern - tenant IDs start with 'tid-' followed by alphanumeric characters
         const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
-        
+
         if (isTenantId) {
           // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
           const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
-          
+
           if (resolvedSlug) {
             // console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
             const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
             // console.log(`[Directory] Resolved data:`, resolvedData);
-         //   tenantlogo = await publicTenantInfoService.getTenantLogoFromDiscovery(identifier);
+            //   tenantlogo = await publicTenantInfoService.getTenantLogoFromDiscovery(identifier);
             return resolvedData;
           } else {
             // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
@@ -87,22 +88,22 @@ async function getConsolidatedDirectoryData(identifier: string) {
           return data; // Return original data (will trigger 404)
         }
       }
-      
+
       return data;
     } catch (slugError) {
       // If slug fails, check if it might be a tenant ID and try resolution
       const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
-      
+
       if (isTenantId) {
         // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
         const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
         // console.log(`[Directory] Resolved tenant ID to slug: ${resolvedSlug}`);
-        
+
         if (!resolvedSlug) {
           // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
           return null;
         }
-        
+
         const data = await directoryService.getDirectoryConsolidated(resolvedSlug);
         // console.log(`[Directory] Resolved data:`, data);
         return data;
@@ -150,14 +151,14 @@ async function getBusinessHours(tenantId: string) {
   try {
     const data = await directoryService.getBusinessHours(tenantId);
     if (!data || !data.success || !data.data) return null;
-    
+
     const hoursData = data.data;
-    
+
     // Handle both response formats: periods array or day-based object
     if (hoursData.periods && Array.isArray(hoursData.periods)) {
       const { periods, timezone } = hoursData;
       const hours: any = { timezone };
-      
+
       // Convert periods to day-based format for BusinessHoursDisplay
       periods.forEach((period: any) => {
         const dayName = period.day?.toUpperCase(); // Keep uppercase for BusinessHoursDisplay
@@ -168,12 +169,12 @@ async function getBusinessHours(tenantId: string) {
           };
         }
       });
-      
+
       // Include periods array for BusinessHoursDisplay to handle multiple periods
       if (periods.length > 0) {
         hours.periods = periods;
       }
-      
+
       return hours;
     } else {
       // Assume data is already in day-based format
@@ -231,10 +232,10 @@ async function trackStoreView(tenantId: string, categories: any[] = []) {
   try {
     // Get user location (reuse existing logic)
     const location = await getUserLocation();
-    
+
     // Get primary category for context
     const primaryCategory = categories.find((c: any) => c.isPrimary) || categories[0];
-    
+
     await recommendationsService.trackRecommendations({
       entityType: 'store',
       entityId: tenantId,
@@ -247,9 +248,9 @@ async function trackStoreView(tenantId: string, categories: any[] = []) {
       locationLat: location?.latitude,
       locationLng: location?.longitude,
       referrer: typeof document !== 'undefined' ? document.referrer : '',
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-        pageType: 'directory_detail'
-      });
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      pageType: 'directory_detail'
+    });
   } catch (error) {
     console.error('Error tracking store view:', error);
     // Don't throw - tracking failures shouldn't break the page
@@ -261,18 +262,18 @@ async function getStoreRecommendations(tenantId: string, categorySlug?: string) 
   try {
     // Get user location
     const location = await getUserLocation();
-    
+
     const params: any = {};
     if (categorySlug) params.category = categorySlug;
     if (location) {
       params.lat = location.latitude.toString();
       params.lng = location.longitude.toString();
     }
-    
+
     const response = await recommendationsService.getStorefrontRecommendations(tenantId, params);
-    
+
     if (!response) return { recommendations: [] };
-    
+
     return response;
   } catch (error) {
     console.error('Error getting recommendations:', error);
@@ -296,25 +297,25 @@ async function getUserLocation(): Promise<{
           enableHighAccuracy: true
         });
       });
-      
+
       const { latitude, longitude } = position.coords;
-      
+
       // Reverse geocoding to get city/state using service
       const data = await externalApiService.reverseGeocode(latitude, longitude, { usePublicContext: true });
-      
+
       if (data && data.address) {
         const address = data.address;
         const city = address.city || address.town || address.village || 'Unknown';
         const state = address.state || 'Unknown';
         return { latitude, longitude, city, state };
       }
-      
+
       return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
     }
   } catch (error) {
     console.warn('Geolocation failed, falling back to IP-based location');
   }
-  
+
   // Fallback to IP-based location
   try {
     // Get user context for unique cache key to prevent cross-contamination
@@ -322,14 +323,14 @@ async function getUserLocation(): Promise<{
       if (typeof window !== 'undefined') {
         const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
         if (userId) return userId;
-        
+
         const cookies = document.cookie.split(';');
         const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
         if (userIdCookie) return userIdCookie.split('=')[1]?.trim();
       }
       return null;
     };
-    
+
     const getSessionIdFromContext = () => {
       if (typeof window !== 'undefined') {
         let sessionId = sessionStorage.getItem('sessionId');
@@ -341,19 +342,19 @@ async function getUserLocation(): Promise<{
       }
       return null;
     };
-    
+
     const userId = getUserIdFromContext();
     const sessionId = getSessionIdFromContext();
     const userContext = userId || sessionId || 'anonymous';
     const cacheKey = `ip-geolocation-${userContext}`;
-    
+
     const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
-    
+
     if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
       console.warn('Invalid location data received from external API');
       return null;
     }
-    
+
     return {
       latitude: ipLocation.latitude,
       longitude: ipLocation.longitude,
@@ -383,11 +384,20 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   // console.log(`[Directory] tenantInfo:`, tenantInfo);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
-  
+
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
-  
+
+  // Storefront capability-driven content control
+  const storefrontCap = useStorefrontCapability(consolidatedData?.listing?.tenantId || null);
+  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
+  const showsLocation = storefrontCap.data?.showsLocation ?? true;
+  const showsMap = storefrontCap.data?.showsMap ?? true;
+  const showsHours = storefrontCap.data?.showsHours ?? true;
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -400,13 +410,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           notFound();
           return;
         }
-        
+
         setConsolidatedData(data);
-        
+
         // Fetch tenant logo
         const logo = await publicTenantInfoService.getTenantLogoFromDiscovery(data.listing.tenantId);
         setTenantLogo(logo);
-        
+
         // Get primary category for additional data fetching
         const primaryCategory = data.listing.categories?.find((c: any) => c.isPrimary) || data.listing.categories?.[0];
 
@@ -424,36 +434,36 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId)
         ]);
-        
+
         setBusinessProfile(profile?.data);
         setBusinessHours(hours);
         setRelatedProducts(related);
         setStorefrontCategories(categories);
         setActualProductCount(productCount);
-        
+
         // Fetch tenant info for status panel
         const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
         setTenantInfo(info);
-        
+
         // Resolve slug for RelatedStores using publicDirectoryService
         const idResolvedBySlug = await publicDirectoryService.resolveBySlug(identifier);
         setSlugForRelated(idResolvedBySlug || identifier);
-        
+
         // Track user behavior for recommendations (fire and forget, don't await)
-        trackStoreView(data.listing.tenantId, data.listing.categories).catch(err => 
+        trackStoreView(data.listing.tenantId, data.listing.categories).catch(err =>
           console.error('Failed to track store view:', err)
         );
-        
+
       } catch (error) {
         console.error('Error fetching store data:', error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, [params]);
-  
+
   if (loading || !consolidatedData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -461,7 +471,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
       </div>
     );
   }
-  
+
   const listing = consolidatedData.listing;
   const featuredProductsRaw = consolidatedData.featuredProducts || [];
   // TODO: Remove this temporary logging once we confirm the data is being fetched correctly
@@ -476,10 +486,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     const productId = product.id || product.inventory_item_id;
     return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
   });
-  
+
   // Compute store status from business hours data
   const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
-  
+
   const fullAddress = [
     listing.address,
     listing.city,
@@ -495,14 +505,14 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
   // Server-side check: show panel for google_only tier, non-active status, or subscription issues
   const showStatusPanel = tenantInfo ? (
-    tenantInfo.subscriptionTier === 'google_only' || 
+    tenantInfo.subscriptionTier === 'google_only' ||
     tenantInfo.subscriptionTier === 'discovery' ||
     (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
     (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
     tenantInfo.showSubscriptionPanel === true
   ) : false;
 
- // Handle view cart
+  // Handle view cart
   const handleViewCart = () => {
     router.push('/carts');
   };
@@ -526,15 +536,15 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         {/* Header with Visit Storefront Banner */}
         <div className="bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <Link 
+            <Link
               href="/directory"
               className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Directory
             </Link>
-            
-            
+
+
             {/* Status Panel or Visit Storefront Hero Banner */}
             {showStatusPanel && tenantInfo ? (
               <div className="mt-4">
@@ -556,24 +566,26 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     <Globe className="w-5 h-5" />
                     Visit Storefront
                   </Link>
-                   { storefrontCategories.categories.length > 0 && (
-                      <div className="mt-4">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
-                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
-                        </span>
-                      </div>
-                    )}
+                  {storefrontCategories.categories.length > 0 && (
+                    <div className="mt-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                        <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
+                      </span>
+                    </div>
+                  )}
                 </div>
-                
+
                 <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
 
-                  
-               {/* Hours Badge - Status */}
-                      <HoursStatusBadge status={hoursStatus} size='lg' /> 
-                      
+
+                  {/* Hours Badge - Status */}
+                  {!showStatusPanel && showsHours && isRetailStore && (
+                    <HoursStatusBadge status={hoursStatus} size='lg' />
+                  )}
+
                 </div>
               </div>
             )}
@@ -585,140 +597,123 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             {/* Main Content Column */}
             <div className="space-y-6">
               {/* Store Header */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-start gap-6">
-                  {tenantLogo?.toString() || listing.logoUrl ? (
-                    <img
-                      src={tenantLogo?.toString() || listing.logoUrl}
-                      alt={listing.businessName}
-                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ) : null}
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900">
-                      {listing.businessName}
-                    </h1>
-                
-                    {/* GBP Categories - Clean badges below store name */}
-                    {listing.categories && listing.categories.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 mt-3">
-                        {listing.categories
-                          .sort((a: any, b: any) => {
-                            if (a.isPrimary && !b.isPrimary) return -1;
-                            if (!a.isPrimary && b.isPrimary) return 1;
-                            return a.name.localeCompare(b.name);
-                          })
-                          .map((category: any, index: number) => (
-                            <Link
-                              key={category.id || index}
-                              href={`/directory/categories/${category.slug}`}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                                category.isPrimary
-                                  ? 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
-                                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                              }`}
-                              title={`Browse all ${category.name} stores`}
-                            >
-                              <span className="text-base">
-                                {category.name === 'Grocery store' && '🏪'}
-                                {category.name === 'Electronics store' && '🛍️'}
-                                {category.name === 'Shoe store' && '👟'}
-                                {category.name === 'Supermarket' && '🛒'}
-                                {category.name === 'Clothing store' && '👕'}
-                                {category.name === 'Hardware store' && '🔧'}
-                                {category.name === 'Restaurant' && '🍽️'}
-                                {category.name === 'Pharmacy' && '💊'}
-                                {category.name === 'Bookstore' && '📚'}
-                                {category.name === 'Pet store' && '🐕'}
-                                {category.name === 'Specialty food store' && '🍱'}
-                                {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store', 'Specialty food store'].includes(category.name) && '🏢'}
-                              </span>
-                              <span>{category.name}</span>
-                            </Link>
-                          ))}
-                      </div>
+              {tenantLogo && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div className="flex items-start gap-6">
+                    {listing.logoUrl && (
+                      <img
+                        src={listing.logoUrl}
+                        alt={listing.businessName}
+                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                      />
                     )}
-                     <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-                
-                    {/* Keywords */}
-                    { listing.keywords && listing.keywords.length > 0 && (
-                      <div className="mt-3">
-                        <DirectoryKeywordTags keywords={listing.keywords} />
-                      </div>
-                    )}
-                
-                   
+                    <div className="flex-1">
+                      <h1 className="text-3xl font-bold text-gray-900">
+                        {listing.businessName}
+                      </h1>
+
+                      {/* GBP Categories - Clean badges below store name */}
+                      {tenantInfo && listing.categories && listing.categories.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          {listing.categories && (
+                            listing.categories
+                              .sort((a: any, b: any) => {
+                                if (a.isPrimary && !b.isPrimary) return -1;
+                                if (!a.isPrimary && b.isPrimary) return 1;
+                                return a.name.localeCompare(b.name);
+                              }).map((category: any, index: number) => (
+                                <Link
+                                  key={category.id || index}
+                                  href={`/directory/categories/${category.slug}`}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${category.isPrimary
+                                    ? 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
+                                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                                    }`}
+                                  title={`Browse all ${category.name} stores`}>
+                                  <span className="text-base">
+                                    {category.name === 'Grocery store' && '🏪'}
+                                    {category.name === 'Electronics store' && '🛍️'}
+                                    {category.name === 'Shoe store' && '👟'}
+                                    {category.name === 'Supermarket' && '🛒'}
+                                    {category.name === 'Clothing store' && '👕'}
+                                    {category.name === 'Hardware store' && '🔧'}
+                                    {category.name === 'Restaurant' && '🍽️'}
+                                    {category.name === 'Pharmacy' && '💊'}
+                                    {category.name === 'Bookstore' && '📚'}
+                                    {category.name === 'Pet store' && '🐕'}
+                                    {category.name === 'Specialty food store' && '🍱'}
+                                    {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store', 'Specialty food store'].includes(category.name) && '🏢'}
+                                  </span>
+                                  <span>{category.name}</span>
+                                </Link>
+                              ))
+                          )
+                          }
+                        </div>
+                      )}
+                      <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+
+                      {/* Keywords */}
+                      {listing.keywords && listing.keywords.length > 0 && (
+                        <div className="mt-3">
+                          <DirectoryKeywordTags keywords={listing.keywords} />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                  {!showStatusPanel && showsHours && isRetailStore && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                      <a href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                        className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                        title="View Store Products">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                        <span className="hidden lg:inline">Products</span>
+                      </a>
+                      <a href={`/shops/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                        className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                        title="View Store in Shops">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                        </svg>
+                        <span className="hidden lg:inline">Shop</span>
+                      </a>
 
-                {/* Action Buttons - Clean inline layout */}
-                <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
-                  {/* Visit Storefront - Left side */}
-                  <a
-                    href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
-                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View Store Products"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <span className="hidden lg:inline">Products</span>
-                  </a>
-              
-                   {showStatusPanel && (
-                 
-                  <a
-                    href={`/shops/${slugForRelated ? slugForRelated : listing.tenantId}`}
-                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View Store in Shops"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
-                  </svg>
-                    <span className="hidden lg:inline">Shop</span>
-                  </a>
+                      <a onClick={() => {
+                        const reviewsSection = document.getElementById('hours-section');
+                        if (reviewsSection) {
+                          reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                        title="View Store Hours">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="hidden lg:inline">Hours</span>
+                      </a>
+                      {/* Share/Print Actions - Right side */}
+                      {!showStatusPanel && (
+                        <DirectoryActions
+                          listing={{
+                            business_name: listing.businessName,
+                            slug: listing.slug,
+                            tenantId: listing.tenantId,
+                            id: listing.id
+                          }}
+                          currentUrl={currentUrl}
+                        />
+                      )}
+                    </div>
                   )}
 
-                  
-                
-				  
-                  <a
-                    onClick={() => {
-                    const reviewsSection = document.getElementById('hours-section');
-                    if (reviewsSection) {
-                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                    title="View Store Hours"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                    <span className="hidden lg:inline">Hours</span>
-                  </a>
-				  
-                 
-                  
-                  {/* Share/Print Actions - Right side */}
-                  {!showStatusPanel && (
-                  <DirectoryActions 
-                    listing={{
-                      business_name: listing.businessName,
-                      slug: listing.slug,
-                      tenantId: listing.tenantId,
-                      id: listing.id
-                    }}
-                    currentUrl={currentUrl}
-                  />
-                  )}
                 </div>
-              </div>
+              )}
 
               {/* Featured Products - hidden when status panel shows */}
               {!showStatusPanel && featuredProducts.length > 0 && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
-                   <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
+                  <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
@@ -737,32 +732,32 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             key={`directory-featured-${product.id}`}
                             tenantId={listing.tenantId}
                             product={{
-                            id: product.id,
-                            sku: product.sku || product.id,
-                            name: product.name || product.title,
-                            title: product.title || product.name,
-                            brand: product.brand,
-                            description: product.description,
-                            priceCents: product.priceCents || Math.round((product.price || 0) * 100),
-                            salePriceCents: product.salePriceCents,
-                            stock: product.stock || 999,
-                            imageUrl: product.imageUrl || product.image_url,
-                            tenantId: listing.tenantId,
-                            availability: product.availability || 'in_stock',
-                            tenantCategory: product.tenantCategory,
-                            productCategory: product.category_name,
-                            has_variants: product.has_variants,
-                            // Use fresh payment gateway status from consolidated data instead of inconsistent context
-                            payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
-                          }}
-                          tenantName={listing.businessName}
-                          tenantLogo={tenantLogo?.toString() || listing.logoUrl}
-                          defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
-                          variant="featured"
-                          showCategory={true}
-                          showDescription={true}
-                          
-                        />
+                              id: product.id,
+                              sku: product.sku || product.id,
+                              name: product.name || product.title,
+                              title: product.title || product.name,
+                              brand: product.brand,
+                              description: product.description,
+                              priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                              salePriceCents: product.salePriceCents,
+                              stock: product.stock || 999,
+                              imageUrl: product.imageUrl || product.image_url,
+                              tenantId: listing.tenantId,
+                              availability: product.availability || 'in_stock',
+                              tenantCategory: product.tenantCategory,
+                              productCategory: product.category_name,
+                              has_variants: product.has_variants,
+                              // Use fresh payment gateway status from consolidated data instead of inconsistent context
+                              payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
+                            }}
+                            tenantName={listing.businessName}
+                            tenantLogo={tenantLogo?.toString() || listing.logoUrl}
+                            defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
+                            variant="featured"
+                            showCategory={true}
+                            showDescription={true}
+
+                          />
                         ))
                       })()}
                     </div>
@@ -771,12 +766,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               )}
 
               {/* Business Description - Brief Trust Building */}
-              { (businessProfile?.business_description || businessProfile?.businessDescription) && (
+              {(!showStatusPanel && (businessProfile?.business_description || businessProfile?.businessDescription)) && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">
                     <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
-                      {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200 
+                      {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200
                         ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
                         : (businessProfile.business_description || businessProfile.businessDescription)
                       }
@@ -784,13 +779,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   </div>
                 </div>
               )}
-              
+
 
               {/* Photo Gallery - Visual Proof */}
-              { !showStatusPanel && (
+              {!showStatusPanel && (
                 <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
-             
+
 
               {/* Product Categories - Browse More */}
               {!showStatusPanel && storefrontCategories.categories.length > 0 && (
@@ -813,26 +808,29 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   />
                 </div>
               )}
-              
+
 
               {/* Store Ratings and Reviews - Social Proof */}
-               <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-              {<StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
+              {!showStatusPanel && (
+                <div id="reviews-section" className="flex w-full">
+                  <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />
+                </div>
+              )}
             </div>
-           
+
             {/* Right Column - Contact Info */}
-            { !showStatusPanel && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Contact
-                </h2>
-                <div>
-                            <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} initialExpanded={true} />
-                             <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-                          </div>
-                
-                  
+            {!showStatusPanel && showsHours && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Contact
+                  </h2>
+                  <div>
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={isRetailStore} />
+                    <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+                  </div>
+
+
                   {/* Social Links */}
                   {(businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
                     <div className="pt-3 border-t border-neutral-200 dark:border-neutral-600 mt-3">
@@ -921,44 +919,46 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   )}
                 </div>
               </div>
-              )}
+            )}
 
-              {/* Business Hours - Collapsible */}
-              {!showStatusPanel && businessHours && (
-                <>
-                  <BusinessHoursCollapsible businessHours={businessHours} />
-                  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-                </>
-              )}
- 
-              {/* Map Location */}
-              {!showStatusPanel && listing.address && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Our Location
-                  </h2>
-                  <GoogleMapEmbed address={listing.address} />
-                </div>
-              )}
-            </div>
+            {/* Business Hours - Collapsible */}
+            {!showStatusPanel && showsHours && businessHours && isRetailStore && (
+              <>
+                <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
+                <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+              </>
+            )}
+
+            {/* Map Location */}
+            {!showStatusPanel && showsMap && listing.address && isRetailStore && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Our Location
+                </h2>
+                <GoogleMapEmbed address={listing.address} />
+              </div>
+            )}
           </div>
         </div>
+      </div >
 
       {/* Related Stores */}
-      {!showStatusPanel && (
-      <RelatedStores 
-        currentSlug={slugForRelated} 
-        limit={3}
-        title="Similar Stores"
-      />
-      )}
+      {
+        !showStatusPanel && (
+          <RelatedStores
+            currentSlug={slugForRelated}
+            limit={3}
+            title="Similar Stores"
+          />
+        )
+      }
 
       {/* Recently Viewed */}
       <LastViewed />
 
-            {/* Platform Branding Footer */}
-            <PoweredByFooter />
+      {/* Platform Branding Footer */}
+      <PoweredByFooter />
     </>
   );
 }

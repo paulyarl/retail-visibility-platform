@@ -51,6 +51,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
@@ -175,6 +176,15 @@ export default function StorefrontClientWrapper({
 
   // Check if storefront status panel should be shown
   const storefrontStatus = useStorefrontStatus(tenantId, tenantInfoForStatus as any);
+
+  // Storefront capability-driven content control
+  const storefrontCap = useStorefrontCapability(tenantId);
+  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true; // default to true while loading
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
+  const showsLocation = storefrontCap.data?.showsLocation ?? true; // default to true while loading
+  const showsMap = storefrontCap.data?.showsMap ?? true;
+  const showsHours = storefrontCap.data?.showsHours ?? true;
 
   // Status indicator color
   // const getStatusColor = () => {
@@ -304,7 +314,7 @@ export default function StorefrontClientWrapper({
             <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
               {/* Navigation Pills */}
               <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                {directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
                   <a
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -317,7 +327,7 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
 
-                {directoryPublished && tenantSlug && storefrontStatus.shouldShowPanel && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
                   <a
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -330,23 +340,23 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
 
-                {/* {directoryPublished && tenantSlug && (  */}
-                <a
-                  onClick={() => {
-                    const hoursSection = document.getElementById('hours-section');
-                    if (hoursSection) {
-                      hoursSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                  title="View Store Hours"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="hidden lg:inline">Hours</span>
-                </a>
-                {/*   )}  */}
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore &&   (
+                  <a
+                    onClick={() => {
+                      const hoursSection = document.getElementById('hours-section');
+                      if (hoursSection) {
+                        hoursSection.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Hours"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="hidden lg:inline">Hours</span>
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -361,9 +371,11 @@ export default function StorefrontClientWrapper({
             </div>
           )}
           {/* Action Buttons - Below categories for better responsive behavior */}
-          {tenantSlug && (
+          {!storefrontStatus.shouldShowPanel && tenantSlug && (
             <div className="hidden sm:flex justify-end mt-3">
-              <HoursStatusBadge status={hoursStatus} size="lg" />
+              {showsHours && isRetailStore && (
+                <HoursStatusBadge status={hoursStatus} size="lg" />
+              )}
               <DirectoryActions
                 listing={{
                   business_name: tenant.name,
@@ -377,7 +389,7 @@ export default function StorefrontClientWrapper({
           )}
           {/* Mobile Navigation */}
           <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
-            {directoryPublished && tenantSlug && (
+            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
               <a
                 href={`/directory/${tenantSlug}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
@@ -388,7 +400,7 @@ export default function StorefrontClientWrapper({
                 <span>Directory</span>
               </a>
             )}
-            {directoryPublished && tenantSlug && storefrontStatus.shouldShowPanel && (
+            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
               <a
                 href={`/shops/${tenantSlug}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
@@ -399,52 +411,57 @@ export default function StorefrontClientWrapper({
                 <span>Shop</span>
               </a>
             )}
-
-            <a
-              onClick={() => {
-                const reviewsSection = document.getElementById('reviews-section');
-                if (reviewsSection) {
-                  reviewsSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-              title="View Store Reviews"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-              </svg>
-              <span className="hidden lg:inline">Reviews</span>
-            </a>
-            <a
-              onClick={() => {
-                const hoursSection = document.getElementById('hours-section');
-                if (hoursSection) {
-                  hoursSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-              title="View Store Hours"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="hidden lg:inline">Hours</span>
-            </a>
-            <a
-              onClick={handleViewCart}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-              title="View Shopping Cart"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
-              </svg>
-              {cartTotalItems > 0 && (
-                <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
-                  {cartTotalItems > 99 ? '99+' : cartTotalItems}
-                </span>
-              )}
-              <span className="hidden lg:inline">Cart</span>
-            </a>
+            {!storefrontStatus.shouldShowPanel && (
+              <a
+                onClick={() => {
+                  const reviewsSection = document.getElementById('reviews-section');
+                  if (reviewsSection) {
+                    reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                title="View Store Reviews"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                <span className="hidden lg:inline">Reviews</span>
+              </a>
+            )}
+            {!storefrontStatus.shouldShowPanel && showsHours && isRetailStore && (
+              <a
+                onClick={() => {
+                  const hoursSection = document.getElementById('hours-section');
+                  if (hoursSection) {
+                    hoursSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                title="View Store Hours"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="hidden lg:inline">Hours</span>
+              </a>
+            )}
+            {!storefrontStatus.shouldShowPanel && (
+              <a
+                onClick={handleViewCart}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                title="View Shopping Cart"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                </svg>
+                {cartTotalItems > 0 && (
+                  <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                    {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                  </span>
+                )}
+                <span className="hidden lg:inline">Cart</span>
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -456,7 +473,7 @@ export default function StorefrontClientWrapper({
             {/* Shop Description */}
             <div className="lg:col-span-2">
               <div className="space-y-6">
-                {tenant.profileData?.business_description || tenant.profileData?.businessDescription || tenant.metadata?.businessDescription && (
+                {!storefrontStatus.shouldShowPanel && (tenant.profileData?.business_description || tenant.profileData?.businessDescription || tenant.metadata?.businessDescription) && (
                   <div>
                     <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">About {businessName}</h2>
                     <div className="prose prose-neutral dark:prose-invert max-w-none">
@@ -469,7 +486,7 @@ export default function StorefrontClientWrapper({
                 )}
 
                 {/* Social Links */}
-                {tenant.profileData?.social_links && (
+                {!storefrontStatus.shouldShowPanel && tenant.profileData?.social_links && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
                     <div className="flex flex-wrap gap-3">
@@ -533,7 +550,7 @@ export default function StorefrontClientWrapper({
 
             {/* Store Image/Logo Display */}
             <div>
-              {(tenant.metadata.logo_url || tenant.metadata.logoUrl) && (
+              {!storefrontStatus.shouldShowPanel && (tenant.metadata.logo_url || tenant.metadata.logoUrl) && (
                 <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden">
                   {tenant.metadata?.logo_url ? (
                     <div className="relative aspect-square">
@@ -711,7 +728,7 @@ export default function StorefrontClientWrapper({
         </div>
       )}
       {/* Main Product Catalog Section - PRIMARY CONTENT (Above-the-Fold) */}
-      {!isProductsOnly && products.length > 0 && !storefrontStatus.shouldShowPanel && (
+      {!storefrontStatus.shouldShowPanel && !isProductsOnly && products.length > 0 && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
           <div className="py-8">
 
@@ -880,16 +897,13 @@ export default function StorefrontClientWrapper({
                 {/* Single Map Display */}
                 {/* Business Hours */}
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Our Store Hours
-                  </h3>
-                  {!storefrontStatus.shouldShowPanel && businessHours ? (
-                    <BusinessHoursCollapsible businessHours={businessHours} />
-                  ) : (
-                    <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
+                  {!storefrontStatus.shouldShowPanel && showsHours && businessHours && isRetailStore && (
+                    <><h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Our Store Hours
+                    </h3><BusinessHoursCollapsible businessHours={businessHours} /></>
                   )}
                 </div>
               </div>
@@ -898,62 +912,57 @@ export default function StorefrontClientWrapper({
             {/* Contact & Hours Sidebar */}
             <div className="space-y-6">
               {/* Contact Information */}
-              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Contact
-                </h3>
-                <div className="space-y-3 text-sm">
-                  {contactInfo.phone && (
-                    <a href={`tel:${contactInfo.phone}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
-                      <span>📞</span> {contactInfo.phone}
-                    </a>
-                  )}
-                  {contactInfo.email && (
-                    <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
-                      <span>✉️</span> {contactInfo.email}
-                    </a>
-                  )}
-                  {contactInfo.website && (
-                    <a href={contactInfo.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
-                      <span>🌐</span> Website
-                    </a>
-                  )}
-                  {!contactInfo.phone && !contactInfo.email && !contactInfo.website && (
-                    <p className="text-neutral-500 dark:text-neutral-400 italic">Contact information not available</p>
-                  )}
+              {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
+                <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Contact
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    {contactInfo.phone && (
+                      <a href={`tel:${contactInfo.phone}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        <span>📞</span> {contactInfo.phone}
+                      </a>
+                    )}
+                    {contactInfo.email && (
+                      <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        <span>✉️</span> {contactInfo.email}
+                      </a>
+                    )}
+                    {contactInfo.website && (
+                      <a href={contactInfo.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        <span>🌐</span> Website
+                      </a>
+                    )}
+                    {!contactInfo.phone && !contactInfo.email && !contactInfo.website && (
+                      <p className="text-neutral-500 dark:text-neutral-400 italic">Contact information not available</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-
+              )}
               {/* Map & Location */}
               <div className="lg:col-span-2">
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
                   <div className="p-6">
-                    <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                      Visit Our Store
-                    </h3>
-                    {contactInfo.address && (
-                      <p className="text-neutral-600 dark:text-neutral-400 mb-4">
-                        {contactInfo.address}
-                      </p>
+                    {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
+                      <><h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
+                        Visit Our Store
+                      </h3><p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                          {contactInfo.address}
+                        </p><div className="flex items-center gap-2">
+                          <HoursStatusBadge status={hoursStatus} size="lg" />
+                        </div><div className="flex items-center gap-2">
+                          {hoursStatus?.label}
+                        </div></>
                     )}
-
-                    {/* Hours Badge - Status */}
-                    <div className="flex items-center gap-2">
-                      <HoursStatusBadge status={hoursStatus} size="lg" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {hoursStatus?.label}
-                    </div>
-
                   </div>
 
                   {/* Single Map Display */}
-                  {mapLocation ? (
+                  {!storefrontStatus.shouldShowPanel && showsMap && mapLocation ? (
                     <TenantMapSection location={mapLocation} />
-                  ) : contactInfo.address ? (
+                  ) : !storefrontStatus.shouldShowPanel && showsMap && contactInfo.address ? (
                     <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
                   ) : tenant && (
                     <StorefrontMap
@@ -1015,28 +1024,33 @@ export default function StorefrontClientWrapper({
           />
         </div>
       )}
+      {!storefrontStatus.shouldShowPanel && (
 
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
-        <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+            <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
+          </div>
         </div>
-      </div>
-
+      )}
 
 
       {/* Storefront Recommendations */}
+      {!storefrontStatus.shouldShowPanel && (
 
-      <StorefrontRecommendations tenantId={tenantId} />
+        <StorefrontRecommendations tenantId={tenantId} />
 
-
+      )}
 
 
       {/* Recently Viewed - always last for consistency with other public pages */}
-      <div className="mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
+
+      {!storefrontStatus.shouldShowPanel && (
+
         <LastViewed />
-      </div>
+
+
+      )}
 
       {/* Tier-Based Footer */}
 
@@ -1049,7 +1063,7 @@ export default function StorefrontClientWrapper({
                 Quick Links
               </h3>
               <div className="flex flex-wrap gap-4">
-                {directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
                   <Link
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
@@ -1060,7 +1074,7 @@ export default function StorefrontClientWrapper({
                     View in Directory
                   </Link>
                 )}
-                {directoryPublished && tenantSlug && !storefrontStatus.shouldShowPanel && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
                   <Link
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"

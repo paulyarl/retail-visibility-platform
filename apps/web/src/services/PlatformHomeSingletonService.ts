@@ -740,6 +740,10 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     await this.invalidateCachePattern(`platform-tenant-fulfillment-settings-${tenantId}*`);
     await this.invalidateCachePattern('platform-organizations*');
 
+    // Invalidate public tenant cache so storefront picks up tier/status changes immediately
+    const { tenantPublicService } = await import('./TenantPublicService');
+    await tenantPublicService.invalidatePublicTenantCache(tenantId);
+
     // Non-blocking MV refresh for tenant-related views only
     // this.refreshMaterializedView(['mv_global_discovery', 'directory_category_listings', 'directory_gbp_listings']).catch(err => {
     //   console.warn('[PlatformHomeSingleton] Background MV refresh failed:', err);

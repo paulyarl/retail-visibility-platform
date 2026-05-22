@@ -229,6 +229,11 @@ export function StorefrontStatusPanel({
   const { tenant, isLoading, shouldShowPanel, panelType } = useStorefrontStatus(tenantId, providedTenantInfo);
   console.log(``)
 
+  console.log(`tenant: `, tenant)
+  console.log(`isLoading: `, isLoading)
+  console.log(`shouldShowPanel: `, shouldShowPanel)
+  console.log(`panelType: `, panelType)
+
   if (isLoading) {
     return (
       <div className={`animate-pulse ${className}`}>

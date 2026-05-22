@@ -41,6 +41,7 @@ interface AddToCartButtonProps {
   hasActivePaymentGateway?: boolean; // Simple boolean from MV - does tenant have payment gateway?
   defaultGatewayType?: string; // Tenant's default gateway type (no hardcoded fallback)
   layout?: 'horizontal' | 'stacked'; // Layout for buttons in narrow cards
+  commerceDisabled?: boolean; // Commerce capability is disabled for this tenant
 }
 
 export function AddToCartButton({ 
@@ -53,6 +54,7 @@ export function AddToCartButton({
   hasActivePaymentGateway = false, // Keep for backward compatibility
   defaultGatewayType, // No default fallback - must come from tenant
   layout = 'horizontal', // Default to side-by-side layout
+  commerceDisabled = false, // Commerce capability disabled
 }: AddToCartButtonProps) {
   const router = useRouter();
   const { addToCart, getCartByTenant } = useMultiCart();
@@ -143,6 +145,29 @@ export function AddToCartButton({
     handleAddToCart();
     router.push('/carts');
   };
+
+  // If commerce capability is disabled, show disabled buttons with explanation
+  if (commerceDisabled) {
+    return (
+      <div className={className}>
+        <div className={`flex gap-2 ${layout === 'stacked' ? 'flex-col' : 'flex-row'}`}>
+          <Tooltip content="Commerce is not available for this store">
+            <Button disabled className={`bg-white text-gray-900 border-gray-300 ${layout === 'stacked' ? 'w-full' : ''}`}>
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Add to Cart
+            </Button>
+          </Tooltip>
+          <Tooltip content="Commerce is not available for this store">
+            <Button disabled className={`bg-white text-gray-900 border-gray-300 ${layout === 'stacked' ? 'w-full' : ''}`}>
+              <DollarSign className="mr-2 h-4 w-4" />
+              Buy Now
+            </Button>
+          </Tooltip>
+        </div>
+        <p className="text-xs text-gray-500 mt-1.5 text-center">Commerce not available for this store</p>
+      </div>
+    );
+  }
 
   // Simple check: if tenant doesn't have payment gateway, don't show button
   // Note: Tier validation is enforced at checkout API level

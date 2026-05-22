@@ -1,6 +1,7 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { getErrorMessage, RequestType } from '../providers/base/FlexibleApiSingleton';
+import { tenantPublicService } from './TenantPublicService';
 
 export interface TierFeature {
   id: string;
@@ -190,6 +191,8 @@ export class TenantTierService extends AdminApiSingleton {
       // Invalidate tier system cache
     await this.invalidateTierCachePatterns();
 
+    // Invalidate public tenant cache so storefront picks up tier change immediately
+    await tenantPublicService.invalidatePublicTenantCache(tenantId);
 
     return result.data || null;
   }

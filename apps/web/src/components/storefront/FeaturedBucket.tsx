@@ -15,6 +15,7 @@ interface FeaturedBucketProps {
   // Payment gateway status from parent page
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  commerceDisabled?: boolean;
 }
 
 /**
@@ -33,7 +34,8 @@ export default function FeaturedBucket({
   tenantId,
   initialLimit = 3,
   hasActivePaymentGateway,
-  defaultGatewayType
+  defaultGatewayType,
+  commerceDisabled
 }: FeaturedBucketProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = initialLimit;
@@ -98,6 +100,7 @@ export default function FeaturedBucket({
             productData={product}
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
+            commerceDisabled={commerceDisabled}
           />
         ))}
       </div>

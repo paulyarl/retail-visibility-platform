@@ -327,6 +327,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   public async invalidatePublicTenantCache(tenantId: string): Promise<void> {
     const patterns = [
+      `public-tenant-info-${tenantId}`,
       `public-tenant-profile-${tenantId}`,
       `tenant-hours-${tenantId}`
     ];

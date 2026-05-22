@@ -297,6 +297,8 @@ const updateTenantTierSchema = z.object({
     'starter',
     'storefront',
     'commitment',
+    'ecommerce',
+    'omnichannel',
     'professional',
     'enterprise',
     'organization',
@@ -373,6 +375,8 @@ router.patch('/tenants/:tenantId', async (req, res) => {
         starter: 500,
         storefront: 2500,
         commitment: 5000,
+        ecommerce: 5000,
+        omnichannel: 5000,
         professional: 5000,
         enterprise: Infinity,
         organization: 10000,
@@ -589,7 +593,7 @@ router.get('/stats', async (req, res) => {
     });
 
     const estimatedMRR = activeTenants.reduce((sum, tenant) => {
-      const tier = tenant.subscription_tier || 'starter';
+      const tier = tenant.subscription_tier || 'discovery';
       return sum + (tierPricing[tier] || 0);
     }, 0);
 
@@ -626,6 +630,8 @@ const bulkUpdateSchema = z.object({
     'starter',
     'storefront',
     'commitment',
+    'ecommerce',
+    'omnichannel',
     'professional',
     'enterprise',
     'organization',

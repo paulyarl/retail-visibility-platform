@@ -2,12 +2,14 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface TenantPaymentContextValue {
   canPurchase: boolean;
   defaultGatewayType?: string;
   loading: boolean;
   error?: string;
+  commerceDisabled?: boolean;
   refreshPaymentStatus: () => Promise<void>;
 }
 
@@ -23,6 +25,10 @@ export function TenantPaymentProvider({ tenantId, children }: TenantPaymentProvi
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
+
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(tenantId);
+  const paymentCap = usePaymentGatewayCapability(tenantId);
 
   const checkPurchaseAbility = async () => {
     try {
@@ -61,11 +67,18 @@ export function TenantPaymentProvider({ tenantId, children }: TenantPaymentProvi
     }
   }, [tenantId]);
 
+  // Capability-aware override: commerce must be enabled AND gateway must be active
+  const commerceEnabled = commerceCap.data?.enabled ?? true; // default to true while loading
+  const commerceDisabled = commerceCap.data ? !commerceCap.data.enabled : false;
+  const gatewayCapEnabled = paymentCap.data ? paymentCap.data.enabled : true; // default to true while loading
+  const effectiveCanPurchase = canPurchase && commerceEnabled && gatewayCapEnabled;
+
   const value: TenantPaymentContextValue = {
-    canPurchase,
-    loading,
+    canPurchase: effectiveCanPurchase,
+    loading: loading || commerceCap.loading || paymentCap.loading,
     error,
     defaultGatewayType,
+    commerceDisabled,
     refreshPaymentStatus
   };
 

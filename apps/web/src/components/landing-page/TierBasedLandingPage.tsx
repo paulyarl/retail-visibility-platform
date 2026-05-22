@@ -26,6 +26,7 @@ function useResponsiveLayout() {
 
 import QRCode from 'qrcode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { useCommerceCapability, usePaymentGatewayCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';
@@ -1112,8 +1113,25 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const contextPayment = useTenantPaymentOptional();
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
-  const effectiveCanPurchase = contextCanPurchase ?? tenant.hasActivePaymentGateway ?? false;
+  const effectiveCanPurchaseLegacy = contextCanPurchase ?? tenant.hasActivePaymentGateway ?? false;
   const effectiveGatewayType = contextGatewayType ?? (product as any).defaultGatewayType;
+
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(product.tenantId);
+  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceEnabled = commerceCap.data?.enabled ?? true;
+  const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
+  const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
+  const effectiveCanPurchase = effectiveCanPurchaseLegacy && commerceEnabled && gatewayCapEnabled;
+
+  // Storefront capability-driven content control
+  const storefrontCap = useStorefrontCapability(product.tenantId);
+  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
+  const showsLocation = storefrontCap.data?.showsLocation ?? true;
+  const showsMap = storefrontCap.data?.showsMap ?? true;
+  const showsHours = storefrontCap.data?.showsHours ?? true;
   // console.log(`[TierBasedLandingPage] Effective can purchase: ${effectiveCanPurchase}`);
   // console.log(`[TierBasedLandingPage] Effective gateway type: ${effectiveGatewayType}`);
   // console.log(`[TierBasedLandingPage] Context payment: ${JSON.stringify(contextPayment, null, 2)}`);
@@ -1360,6 +1378,10 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           tenant={tenant}
           productUrl={resolvedCurrentUrl}
           variant="product"
+          showHours={showsHours}
+          showLocation={showsLocation}
+          showMap={showsMap}
+          isRetailStore={isRetailStore}
         />
 
         {/* Product Info */}
@@ -1699,7 +1721,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           </div>
 
           {/* 7. Add to Cart Button - Final purchase action */}
-          {!showStatusPanel && effectiveCanPurchase && (
+          {!showStatusPanel && (effectiveCanPurchase || commerceDisabled) && (
             <div className="mb-6 p-5 bg-gradient-to-br from-green-50 to-indigo-50 dark:from-green-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-green-200 dark:border-green-800 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Package className="flex items-center justify-center h-5 text-green-600 dark:text-green-400" />
@@ -1760,6 +1782,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 tenantLogo={businessLogo}
                 hasActivePaymentGateway={effectiveCanPurchase}
                 defaultGatewayType={effectiveGatewayType}
+                commerceDisabled={commerceDisabled}
                 layout={layout}
               />
             </div>
@@ -1792,8 +1815,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             </div>
           )}
 
-          {/* Multi-Location Availability */}
-          {tenant.organizationId && (
+          {/* Multi-Location Availability - only for retail/both storefronts */}
+          {isRetailStore && tenant.organizationId && (
             <div className="mb-6">
               <LocationAvailabilitySection
                 productSlug={productSlug || product.product_slug || product.productSlug || product.sku || product.id}

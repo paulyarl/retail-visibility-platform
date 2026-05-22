@@ -77,8 +77,14 @@ export class CacheEncryption {
       combined.set(iv, salt.length);
       combined.set(new Uint8Array(encrypted), salt.length + iv.length);
 
-      // Return as base64 string
-      return btoa(String.fromCharCode(...Array.from(combined)));
+      // Return as base64 string (chunked to avoid RangeError with large data)
+      const CHUNK_SIZE = 8192;
+      let binary = '';
+      for (let i = 0; i < combined.length; i += CHUNK_SIZE) {
+        const chunk = combined.subarray(i, Math.min(i + CHUNK_SIZE, combined.length));
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      return btoa(binary);
     } catch (error) {
       console.warn('[CacheEncryption] Encryption failed:', error);
       // Fallback to plain data if encryption fails (for development/debugging)

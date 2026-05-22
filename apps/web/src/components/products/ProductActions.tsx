@@ -25,9 +25,13 @@ interface ProductActionsProps {
   tenant: PublicTenantInfo;
   productUrl: string;
   variant?: 'product' | 'storefront';
+  showHours?: boolean;
+  showLocation?: boolean;
+  showMap?: boolean;
+  isRetailStore?: boolean;
 }
 
-export default function ProductActions({ product, tenant, productUrl, variant = 'product' }: ProductActionsProps) {
+export default function ProductActions({ product, tenant, productUrl, variant = 'product', showHours = true, showLocation = true, showMap = true,isRetailStore=true }: ProductActionsProps) {
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const [favorited, setFavorited] = useState(false);
@@ -37,12 +41,13 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
 
   const productTitle = product.title || product.name;
   const businessName = tenant.metadata?.businessName || tenant.name;
-  const shareText = variant === 'product' 
+  const shareText = variant === 'product'
     ? `Check out "${productTitle}" from ${businessName} - $${product.price}`
     : `Check out ${businessName} - great products and deals!`;
   const shareUrl = productUrl;
-   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
-    // Status indicator color
+  const showStoreHours = showHours && isRetailStore;
+  const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  // Status indicator color
   const getStatusColor = () => {
     if (!hoursStatus) return 'bg-gray-400';
     switch (hoursStatus.status) {
@@ -56,13 +61,13 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
 
   // console.log(`ProductActions - tenant:`, tenant);
   // console.log(`ProductActions - product:`, product);
-  
+
 
   // Load favorite status from localStorage
   useEffect(() => {
     const favorites = JSON.parse(localStorage.getItem('product_favorites') || '{}');
     setFavorited(!!favorites[product.id]);
-    
+
     // Load favorite count
     const counts = JSON.parse(localStorage.getItem('product_favorite_counts') || '{}');
     setFavoriteCount(counts[product.id] || 0);
@@ -112,7 +117,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
   const handleFavorite = () => {
     const favorites = JSON.parse(localStorage.getItem('product_favorites') || '{}');
     const counts = JSON.parse(localStorage.getItem('product_favorite_counts') || '{}');
-    
+
     if (favorited) {
       delete favorites[product.id];
       counts[product.id] = Math.max(0, (counts[product.id] || 0) - 1);
@@ -124,7 +129,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
       setFavorited(true);
       setFavoriteCount(counts[product.id]);
     }
-    
+
     localStorage.setItem('product_favorites', JSON.stringify(favorites));
     localStorage.setItem('product_favorite_counts', JSON.stringify(counts));
   };
@@ -133,9 +138,9 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     // Scroll to the reviews section
     const reviewsSection = document.getElementById('product-reviews-section');
     if (reviewsSection) {
-      reviewsSection.scrollIntoView({ 
+      reviewsSection.scrollIntoView({
         behavior: 'smooth',
-        block: 'start' 
+        block: 'start'
       });
       // Add a small delay to account for smooth scrolling
       setTimeout(() => {
@@ -159,7 +164,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-            {/* Visit Storefront Link - Only on product pages */}
+          {/* Visit Storefront Link - Only on product pages */}
           {variant === 'product' && (
             <a
               href={`/tenant/${tenant.slug ? tenant.slug : product.tenantId}`}
@@ -183,9 +188,9 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
         </div>
 
         <div className="flex items-center gap-2">
-      
-           <HoursStatusBadge status={hoursStatus} size='lg' />
-
+          {showStoreHours && showLocation && (
+            <HoursStatusBadge status={hoursStatus} size='lg' />
+          )}
           {/* Write Review Button - Only on product pages */}
           {/* {variant === 'product' && (
             <button

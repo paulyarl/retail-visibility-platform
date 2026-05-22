@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { ShopCard } from '@/components/shops/ShopCard';
 
 /**
@@ -156,6 +157,10 @@ export function ProductBucket({
   className = ''
 }: ProductBucketProps) {
   const displayProducts = products.slice(0, maxItems);
+  const tenantId = displayProducts[0]?.tenantId || displayProducts[0]?.tenant_id || null;
+  const commerceCap = useCommerceCapability(tenantId);
+  const paymentCap = usePaymentGatewayCapability(tenantId);
+  const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
 
   return (
     <BucketSection
@@ -454,7 +459,7 @@ export function ProductBucket({
               <div className={`p-4 pt-0 ${viewMode === 'list' ? 'w-48 flex-shrink-0' : ''}`}>
                 <div className="space-y-2">
                   {/* Payment Gateway Status */}
-                  {product.hasActivePaymentGateway && (
+                  {(product.hasActivePaymentGateway && !commerceDisabled) && (
                     <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                       <span>Secure checkout available</span>
@@ -478,6 +483,7 @@ export function ProductBucket({
                     tenantName={product.tenantName || product.tenant_name || 'Shop'}
                     hasActivePaymentGateway={product.hasActivePaymentGateway}
                     defaultGatewayType={product.defaultGatewayType}
+                    commerceDisabled={commerceDisabled}
                     className="w-full text-sm"
                   />
                 </div>

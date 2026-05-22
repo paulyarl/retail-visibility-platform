@@ -6,11 +6,13 @@ import { getTodaySpecialHours } from '@/lib/hours-utils';
 
 interface BusinessHoursCollapsibleProps {
   businessHours?: any;
+  isRetailStore?: boolean;
 }
 
 
 export default function BusinessHoursCollapsible({
   businessHours,
+  isRetailStore = true
 }: BusinessHoursCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Changed to true for open by default
 
@@ -39,7 +41,7 @@ export default function BusinessHoursCollapsible({
       </button>
 
       {/* Collapsible Content */}
-      {isExpanded && (
+      {isExpanded && isRetailStore && (
         <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
           <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
             <div className="grid grid-cols-1 gap-3">

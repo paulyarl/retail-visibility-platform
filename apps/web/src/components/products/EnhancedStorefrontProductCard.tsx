@@ -20,6 +20,7 @@ import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import VariantPopupModal from './VariantPopupModal';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Enhanced product interface matching the new API response
 export interface EnhancedProductData {
@@ -139,7 +140,15 @@ export default function EnhancedStorefrontProductCard({
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
   // Simplified: Check for gateway_type instead of boolean status
   const effectiveGatewayType = contextGatewayType ?? defaultGatewayType ?? product.defaultGatewayType;
-  const effectiveCanPurchase = !!effectiveGatewayType; // Has gateway if gateway_type exists
+  const hasGateway = !!effectiveGatewayType;
+
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(product.tenantId);
+  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceEnabled = commerceCap.data?.enabled ?? true;
+  const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
+  const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
+  const effectiveCanPurchase = hasGateway && commerceEnabled && gatewayCapEnabled;
 
   // Get display images
   const getDisplayImages = () => {
@@ -565,7 +574,7 @@ export default function EnhancedStorefrontProductCard({
                 >
                   View Details
                 </Button>
-                {effectiveCanPurchase && (
+                {(effectiveCanPurchase || commerceDisabled) && (
                   <AddToCartButton
                     product={{
                       id: product.id,
@@ -577,9 +586,10 @@ export default function EnhancedStorefrontProductCard({
                       imageUrl: product.imageUrl,
                       tenantId: product.tenantId,
                     }}
-                    tenantName={tenantId} // Using tenantId as fallback since tenantName not available
+                    tenantName={tenantId}
                     hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
+                    commerceDisabled={commerceDisabled}
                   />
                 )}
               </Group>
@@ -829,8 +839,8 @@ export default function EnhancedStorefrontProductCard({
               </Group>
 
               {/* Add to Cart Button */}
-              {effectiveCanPurchase && (
-                (product.variants && product.variants.length > 0) ? (
+              {(effectiveCanPurchase || commerceDisabled) && (
+                (product.variants && product.variants.length > 0 && !commerceDisabled) ? (
                   <Link
                     href={`/products/${product.id}`}
                     className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors mt-2"
@@ -852,6 +862,7 @@ export default function EnhancedStorefrontProductCard({
                     tenantName={tenantId}
                     hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
+                    commerceDisabled={commerceDisabled}
                     layout="stacked"
                     className="w-full mt-2"
                   />
@@ -917,6 +928,7 @@ export default function EnhancedStorefrontProductCard({
           }
         }}
         hasActivePaymentGateway={effectiveCanPurchase}
+        tenantId={product.tenantId}
       />
     </>
   );

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Text, Group, Stack, Divider, Badge } from '@mantine/core';
 import { X, Package, Check } from 'lucide-react';
 import ProductVariantSelector from './ProductVariantSelector';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface VariantPopupModalProps {
   opened: boolean;
@@ -40,6 +41,7 @@ interface VariantPopupModalProps {
   onProductSelect?: (product: any) => void;
   tenantName?: string;
   hasActivePaymentGateway?: boolean;
+  tenantId?: string;
 }
 
 export default function VariantPopupModal({
@@ -49,7 +51,8 @@ export default function VariantPopupModal({
   onVariantSelect,
   onProductSelect,
   tenantName,
-  hasActivePaymentGateway = false
+  hasActivePaymentGateway = false,
+  tenantId
 }: VariantPopupModalProps) {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -94,8 +97,16 @@ export default function VariantPopupModal({
   // Determine if cart is available - use modal prop first, then product field
   const hasGateway = hasActivePaymentGateway || product.hasActivePaymentGateway;
 
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(tenantId || null);
+  const paymentCap = usePaymentGatewayCapability(tenantId || null);
+  const commerceEnabled = commerceCap.data?.enabled ?? true;
+  const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
+  const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
+  const canAddToCart = hasGateway && commerceEnabled && gatewayCapEnabled;
+
   // Determine if button should be disabled
-  const isButtonDisabled = hasVariants ? (!selectedVariant || currentStock <= 0) : (currentStock <= 0);
+  const isButtonDisabled = commerceDisabled || (hasVariants ? (!selectedVariant || currentStock <= 0) : (currentStock <= 0));
 
   // Check if on sale
   const isOnSale = hasVariants
@@ -246,7 +257,7 @@ export default function VariantPopupModal({
             ) : (
               <>
                 <Package size={16} />
-                <span>{hasGateway ? 'Add to Cart' : 'View Details'}</span>
+                <span>{canAddToCart ? 'Add to Cart' : commerceDisabled ? 'Commerce Unavailable' : 'View Details'}</span>
               </>
             )}
           </Button>

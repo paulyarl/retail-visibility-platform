@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
+import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
 import type { PriceRange, AvailableAttributes } from '@/types/variants';
@@ -429,9 +430,19 @@ export default function SmartProductCard({
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : product.payment_gateway_type ?? defaultGatewayType;
 
+  // Capability-aware commerce and payment gateway resolution
+  const commerceCap = useCommerceCapability(product.tenantId);
+  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+
   // Simplified: Check for gateway_type instead of boolean status
   const effectiveGatewayType = contextGatewayType ?? propDefaultGatewayType ?? product.payment_gateway_type ?? defaultGatewayType;
-  const effectiveCanPurchase = !!effectiveGatewayType; // Has gateway if gateway_type exists
+  const hasGateway = !!effectiveGatewayType; // Has gateway if gateway_type exists
+
+  // Capability gating: commerce must be enabled AND gateway capability must be enabled AND gateway must exist
+  const commerceEnabled = commerceCap.data?.enabled ?? true; // default to true while loading
+  const gatewayCapEnabled = paymentCap.data?.enabled ?? true; // default to true while loading
+  const effectiveCanPurchase = hasGateway && commerceEnabled && gatewayCapEnabled;
+  const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
   
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
    // Status indicator color
@@ -750,9 +761,9 @@ export default function SmartProductCard({
                 effectiveCanPurchase,
                 hasVariants: product.has_variants
               }); */
-              return effectiveCanPurchase && (
+              return (effectiveCanPurchase || commerceDisabled) && (
                 <div className="mt-4">
-                  {(product.has_variants === true) ? (
+                  {(product.has_variants === true && !commerceDisabled) ? (
                     <Link
                       href={`/products/${product.id}`}
                       className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
@@ -768,6 +779,7 @@ export default function SmartProductCard({
                         hasActivePaymentGateway={effectiveCanPurchase||propHasActivePaymentGateway}
                         defaultGatewayType={effectiveGatewayType||propDefaultGatewayType}
                         layout={buttonLayout}
+                        commerceDisabled={commerceDisabled}
                         className="w-full"
                       />
                     </>
@@ -975,9 +987,9 @@ export default function SmartProductCard({
               )}
             </div>
             
-            {effectiveCanPurchase && (
+            {(effectiveCanPurchase || commerceDisabled) && (
               <div className="mt-2">
-                {(product.has_variants === true) ? (
+                {(product.has_variants === true && !commerceDisabled) ? (
                   <Link
                     href={`/products/${product.id}`}
                     className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
@@ -992,6 +1004,7 @@ export default function SmartProductCard({
                     hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
                     layout={buttonLayout}
+                    commerceDisabled={commerceDisabled}
                     className="text-xs py-1"
                   />
                 )}
@@ -1165,8 +1178,8 @@ export default function SmartProductCard({
                 </span>
               )}
             </div>
-            {effectiveCanPurchase && (
-              (product.has_variants === true) ? (
+            {(effectiveCanPurchase || commerceDisabled) && (
+              (product.has_variants === true && !commerceDisabled) ? (
                 <Link
                   href={`/products/${product.id}`}
                   className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
@@ -1181,6 +1194,7 @@ export default function SmartProductCard({
                   hasActivePaymentGateway={effectiveCanPurchase}
                   defaultGatewayType={effectiveGatewayType}
                   layout={buttonLayout}
+                  commerceDisabled={commerceDisabled}
                 />
               )
             )}
@@ -1322,8 +1336,8 @@ export default function SmartProductCard({
           </div>
         </div>
 
-        {effectiveCanPurchase && (
-            (product.has_variants === true) ? (
+        {(effectiveCanPurchase || commerceDisabled) && (
+            (product.has_variants === true && !commerceDisabled) ? (
               <Link
                 href={`/products/${product.id}`}
                 className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
@@ -1338,6 +1352,7 @@ export default function SmartProductCard({
                 hasActivePaymentGateway={effectiveCanPurchase}
                 defaultGatewayType={effectiveGatewayType}
                 layout={buttonLayout}
+                commerceDisabled={commerceDisabled}
                 className="w-full"
               />
             )
