@@ -136,16 +136,16 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
  * Update directory listing settings
  */
 router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
-  console.log('[PATCH /tenants/:id/directory/listing] ===== REQUEST RECEIVED =====');
-  console.log('[PATCH /tenants/:id/directory/listing] Tenant ID:', req.params.id);
-  console.log('[PATCH /tenants/:id/directory/listing] User:', req.user?.userId);
-  console.log('[PATCH /tenants/:id/directory/listing] Body:', JSON.stringify(req.body, null, 2));
-  console.log('[PATCH /tenants/:id/directory/listing] Headers:', {
-    'content-type': req.headers['content-type'],
-    'authorization': req.headers.authorization ? 'PRESENT' : 'MISSING',
-    'x-csrf-token': req.headers['x-csrf-token'] ? 'PRESENT' : 'MISSING',
-    'x-tenant-id': req.headers['x-tenant-id']
-  });
+  // console.log('[PATCH /tenants/:id/directory/listing] ===== REQUEST RECEIVED =====');
+  // console.log('[PATCH /tenants/:id/directory/listing] Tenant ID:', req.params.id);
+  // console.log('[PATCH /tenants/:id/directory/listing] User:', req.user?.userId);
+  // console.log('[PATCH /tenants/:id/directory/listing] Body:', JSON.stringify(req.body, null, 2));
+  // console.log('[PATCH /tenants/:id/directory/listing] Headers:', {
+  //   'content-type': req.headers['content-type'],
+  //   'authorization': req.headers.authorization ? 'PRESENT' : 'MISSING',
+  //   'x-csrf-token': req.headers['x-csrf-token'] ? 'PRESENT' : 'MISSING',
+  //   'x-tenant-id': req.headers['x-tenant-id']
+  // });
   try {
     const { id: tenantId } = req.params;
     
@@ -166,8 +166,8 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    console.log('[PATCH /tenants/:id/directory/listing] Validation passed. Parsed data:', JSON.stringify(parsed.data, null, 2));
-    console.log('[PATCH /tenants/:id/directory/listing] About to upsert...');
+    // console.log('[PATCH /tenants/:id/directory/listing] Validation passed. Parsed data:', JSON.stringify(parsed.data, null, 2));
+    // console.log('[PATCH /tenants/:id/directory/listing] About to upsert...');
 
     const updated = await prisma.directory_settings_list.upsert({
       where: { tenant_id: tenantId },

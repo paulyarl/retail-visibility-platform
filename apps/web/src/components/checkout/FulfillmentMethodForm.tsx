@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@mantine/core';
 import { MapPin, Truck, Package, Clock, DollarSign } from 'lucide-react';
 import { publicFulfillmentService, type FulfillmentSettings } from '@/services/PublicFulfillmentService';
+import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 export type FulfillmentMethod = 'pickup' | 'delivery' | 'shipping';
 
@@ -20,6 +21,13 @@ export default function FulfillmentMethodForm({
   onSubmit,
   initialMethod,
 }: FulfillmentMethodFormProps) {
+  // Fulfillment capability-driven content control
+  const fulfillmentCap = useFulfillmentCapability(tenantId);
+  const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
+  const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
+  const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;
+  const showsShipping = fulfillmentCap.data?.showsShipping ?? true;
+
   const [selectedMethod, setSelectedMethod] = useState<FulfillmentMethod | null>(initialMethod || null);
   const [settings, setSettings] = useState<FulfillmentSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +115,7 @@ export default function FulfillmentMethodForm({
       </p>
 
       {/* Pickup Option */}
-      {settings.pickup_enabled && (
+      {settings.pickup_enabled && showsPickup && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
             selectedMethod === 'pickup'
@@ -147,7 +155,7 @@ export default function FulfillmentMethodForm({
       )}
 
       {/* Delivery Option */}
-      {settings.delivery_enabled && (
+      {settings.delivery_enabled && showsDelivery && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
             selectedMethod === 'delivery'
@@ -204,7 +212,7 @@ export default function FulfillmentMethodForm({
       )}
 
       {/* Shipping Option */}
-      {settings.shipping_enabled && settings.shipping_flat_rate_cents && (
+      {settings.shipping_enabled && settings.shipping_flat_rate_cents && showsShipping && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
             selectedMethod === 'shipping'

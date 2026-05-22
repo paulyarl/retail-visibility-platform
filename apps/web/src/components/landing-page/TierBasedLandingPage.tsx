@@ -1129,6 +1129,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
+  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
   const showsLocation = storefrontCap.data?.showsLocation ?? true;
   const showsMap = storefrontCap.data?.showsMap ?? true;
   const showsHours = storefrontCap.data?.showsHours ?? true;

@@ -531,37 +531,66 @@ export default function PaymentGatewaysPage() {
         </div>
       </div>
 
-      {/* Tier-based Checkout Behavior Warning */}
-      <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-amber-900 mb-2">Checkout Behavior by Subscription Tier</h3>
-            <div className="space-y-2 text-sm text-amber-800">
-              <div className="flex items-start gap-2">
-                <span className="font-medium min-w-[120px]">Storefront:</span>
-                <span>Checkout is <strong>disabled</strong> - customers can browse but cannot place orders online.</span>
+      {/* Capability-based Checkout Behavior Info */}
+      {commerceCap.data && paymentCap.data && (
+        <div className={`mb-6 rounded-lg p-4 ${
+          commerceCap.data.enabled && paymentCap.data.checkoutAvailable
+            ? 'bg-green-50 border border-green-200'
+            : 'bg-amber-50 border border-amber-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            {commerceCap.data.enabled && paymentCap.data.checkoutAvailable ? (
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            )}
+            <div>
+              <h3 className={`font-semibold mb-2 ${
+                commerceCap.data.enabled && paymentCap.data.checkoutAvailable
+                  ? 'text-green-900'
+                  : 'text-amber-900'
+              }`}>Checkout Capability Status</h3>
+              <div className="space-y-2 text-sm">
+                {!commerceCap.data.enabled && (
+                  <div className="flex items-start gap-2 text-amber-800">
+                    <span className="font-medium min-w-[120px]">Commerce:</span>
+                    <span>Checkout is <strong>disabled</strong> - customers can browse but cannot place orders online.</span>
+                  </div>
+                )}
+                {commerceCap.data.enabled && commerceCap.data.paymentType === 'deposit' && (
+                  <div className="flex items-start gap-2 text-amber-800">
+                    <span className="font-medium min-w-[120px]">Commerce:</span>
+                    <span>Deposit checkout only - customers pay a deposit to reserve items, with balance due at pickup.</span>
+                  </div>
+                )}
+                {commerceCap.data.enabled && (commerceCap.data.paymentType === 'full' || commerceCap.data.paymentType === 'both') && (
+                  <div className="flex items-start gap-2 text-green-800">
+                    <span className="font-medium min-w-[120px]">Commerce:</span>
+                    <span>Full checkout available - customers can complete full payment{commerceCap.data.paymentType === 'both' ? ' or deposit payment' : ''} at checkout.</span>
+                  </div>
+                )}
+                {paymentCap.data.checkoutAvailable && (
+                  <div className="flex items-start gap-2 text-green-800">
+                    <span className="font-medium min-w-[120px]">Payment:</span>
+                    <span>At least one payment gateway is available - checkout is operational.</span>
+                  </div>
+                )}
+                {!paymentCap.data.checkoutAvailable && (
+                  <div className="flex items-start gap-2 text-amber-800">
+                    <span className="font-medium min-w-[120px]">Payment:</span>
+                    <span>No active payment gateways - configure a gateway below to enable checkout.</span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-2">
-                <span className="font-medium min-w-[120px]">Commitment:</span>
-                <span>Deposit checkout only - customers pay a deposit to reserve items, with balance due at pickup.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="font-medium min-w-[120px]">Professional+:</span>
-                <span>Full checkout available - customers can complete full payment or deposit payment at checkout.</span>
-              </div>
-            </div>
-            <p className="text-xs text-amber-600 mt-3">
-              Your current tier: <strong className="capitalize">{tenantTier}</strong>.
-              {['professional', 'enterprise', 'organization', 'chain_starter', 'chain_professional', 'chain_enterprise'].includes(tenantTier) ? (
-                <span className="text-green-700"> You have full checkout capabilities enabled.</span>
-              ) : (
-                <span> Upgrade your plan to unlock additional checkout options.</span>
+              {commerceCap.data.isFlexible && (
+                <p className="text-xs text-green-700 mt-3">
+                  Your plan supports flexible checkout options across all payment types.
+                </p>
               )}
-            </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {loading ? (
         <div className="h-64 bg-neutral-200 rounded animate-pulse"></div>

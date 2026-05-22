@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Truck, MapPin, CreditCard, CheckCircle2 } from 'lucide-react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -32,6 +33,13 @@ interface FulfillmentOptionsPaneProps {
 }
 
 export default function FulfillmentOptionsPane({ tenantId, compact = false, paymentGateways: propPaymentGateways }: FulfillmentOptionsPaneProps) {
+  // Fulfillment capability-driven content control
+  const fulfillmentCap = useFulfillmentCapability(tenantId);
+  const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
+  const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
+  const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;
+  const showsShipping = fulfillmentCap.data?.showsShipping ?? true;
+
   const [fulfillmentSettings, setFulfillmentSettings] = useState<FulfillmentSettings | null>(null);
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>(propPaymentGateways || []);
   const [loading, setLoading] = useState(!propPaymentGateways); // Only loading if payment gateways not provided
@@ -86,9 +94,9 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
 
   // Don't show if no fulfillment options or payment gateways are configured
   const hasFulfillmentOptions = fulfillmentSettings && (
-    fulfillmentSettings.pickup_enabled ||
-    fulfillmentSettings.delivery_enabled ||
-    fulfillmentSettings.shipping_enabled
+    (fulfillmentSettings.pickup_enabled && showsPickup) ||
+    (fulfillmentSettings.delivery_enabled && showsDelivery) ||
+    (fulfillmentSettings.shipping_enabled && showsShipping)
   );
 
   const hasPaymentOptions = paymentGateways.length > 0;
@@ -108,19 +116,19 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <span className="font-medium text-gray-700">Available:</span>
               <div className="flex gap-2">
-                {fulfillmentSettings?.pickup_enabled && (
+                {fulfillmentSettings?.pickup_enabled && showsPickup && (
                   <span className="px-2 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-gray-200">
                     <Package className="inline h-3 w-3 mr-1" />
                     Pickup
                   </span>
                 )}
-                {fulfillmentSettings?.delivery_enabled && (
+                {fulfillmentSettings?.delivery_enabled && showsDelivery && (
                   <span className="px-2 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-gray-200">
                     <Truck className="inline h-3 w-3 mr-1" />
                     Delivery
                   </span>
                 )}
-                {fulfillmentSettings?.shipping_enabled && (
+                {fulfillmentSettings?.shipping_enabled && showsShipping && (
                   <span className="px-2 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-gray-200">
                     <MapPin className="inline h-3 w-3 mr-1" />
                     Shipping
@@ -158,7 +166,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
               How You Can Get Your Order
             </h3>
             <div className="space-y-3">
-              {fulfillmentSettings?.pickup_enabled && (
+              {fulfillmentSettings?.pickup_enabled && showsPickup && (
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
                   <Package className="h-5 w-5 text-green-600 mt-0.5" />
                   <div className="flex-1">
@@ -176,7 +184,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                 </div>
               )}
 
-              {fulfillmentSettings?.delivery_enabled && (
+              {fulfillmentSettings?.delivery_enabled && showsDelivery && (
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
                   <Truck className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div className="flex-1">
@@ -200,7 +208,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                 </div>
               )}
 
-              {fulfillmentSettings?.shipping_enabled && (
+              {fulfillmentSettings?.shipping_enabled && showsShipping && (
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
                   <MapPin className="h-5 w-5 text-purple-600 mt-0.5" />
                   <div className="flex-1">

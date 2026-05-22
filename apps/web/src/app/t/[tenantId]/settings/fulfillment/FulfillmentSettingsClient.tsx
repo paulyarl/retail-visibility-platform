@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Truck, MapPin, Save, AlertCircle, ShoppingBag, CreditCard } from 'lucide-react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
 
 interface FulfillmentSettings {
@@ -29,6 +30,14 @@ interface FulfillmentSettingsClientProps {
 }
 
 export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSettingsClientProps) {
+  // Fulfillment capability-driven content control
+  const fulfillmentCap = useFulfillmentCapability(tenantId, { forTenant: true });
+  const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
+  const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
+  const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;
+  const showsShipping = fulfillmentCap.data?.showsShipping ?? true;
+  const showsService = fulfillmentCap.data?.showsService ?? true;
+
   const [settings, setSettings] = useState<FulfillmentSettings>({
     pickup_enabled: true,
     pickup_instructions: null,
@@ -170,9 +179,16 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
         </div>
       )}
 
+      {!isFulfillmentEnabled && (
+        <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-600" />
+          <span className="text-amber-800">Fulfillment options are disabled for your current plan. Upgrade to enable fulfillment settings.</span>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* In-Store Pickup */}
-        <Card>
+        {showsPickup && <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary-600" />
@@ -300,10 +316,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               </>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Local Delivery */}
-        <Card>
+        {showsDelivery && <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-primary-600" />
@@ -407,10 +423,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               </>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Shipping */}
-        <Card>
+        {showsShipping && <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary-600" />
@@ -490,7 +506,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               </>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Save Button */}
         <div className="flex justify-end">

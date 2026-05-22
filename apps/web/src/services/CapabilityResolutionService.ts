@@ -59,7 +59,7 @@ export interface PaymentGatewayState {
 
 // --- Storefront Types ---
 
-export type StorefrontType = 'online' | 'retail' | 'both' | 'none';
+export type StorefrontType = 'online' | 'retail' | 'service' | 'both' | 'none';
 
 export interface StorefrontState {
   enabled: boolean;
@@ -88,6 +88,19 @@ export interface BarcodeScanState {
   features: Record<string, boolean>;
 }
 
+// --- Fulfillment Options ---
+
+export interface FulfillmentState {
+  enabled: boolean;
+  showsPickup: boolean;
+  showsDelivery: boolean;
+  showsShipping: boolean;
+  showsService: boolean;
+  isFlexible: boolean;
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Combined ---
 
 export interface AllCapabilitiesState {
@@ -96,6 +109,7 @@ export interface AllCapabilitiesState {
   paymentGateway: PaymentGatewayState;
   storefront: StorefrontState;
   barcodeScan: BarcodeScanState;
+  fulfillment: FulfillmentState;
   uncategorizedFeatures: string[];
 }
 
@@ -108,6 +122,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   payment_gateway_: 'payment_gateway_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
+  fulfillment_: 'fulfillment_options',
 };
 
 /**
@@ -211,31 +226,63 @@ export function resolveBarcodeScanState(features: Record<string, boolean>): Barc
 }
 
 /**
+ * Resolve fulfillment state from raw capability features
+ */
+export function resolveFulfillmentState(features: Record<string, boolean>): FulfillmentState {
+  const enabled = !!features.fulfillment_enabled;
+  const disabled = !!features.fulfillment_disabled;
+  const flexible = !!features.fulfillment_flexible;
+  const pickup = !!features.fulfillment_pickup;
+  const delivery = !!features.fulfillment_delivery;
+  const shipping = !!features.fulfillment_shipping;
+  const service = !!features.fulfillment_service;
+
+  // If flexible, all options are available regardless of individual flags
+  const showsPickup = flexible || pickup;
+  const showsDelivery = flexible || delivery;
+  const showsShipping = flexible || shipping;
+  const showsService = flexible || service;
+
+  return {
+    enabled: enabled && !disabled,
+    showsPickup,
+    showsDelivery,
+    showsShipping,
+    showsService,
+    isFlexible: flexible,
+    features,
+  };
+}
+
+/**
  * Resolve storefront state from raw capability features
  */
 export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
   const enabled = !!features.storefront_enabled;
   const online = !!features.storefront_online;
   const retail = !!features.storefront_retail;
+  const service = !!features.storefront_service;
   const bothOptions = !!features.storefront_both_options;
 
   let type: StorefrontType = 'none';
-  if (!enabled && !online && !retail) {
+  if (!enabled && !online && !retail && !service) {
     type = 'none';
-  } else if (bothOptions || (online && retail)) {
+  } else if (bothOptions || (online && retail) || (online && service) || (retail && service)) {
     type = 'both';
   } else if (online) {
     type = 'online';
   } else if (retail) {
     type = 'retail';
+  } else if (service) {
+    type = 'service';
   }
 
   const showsLocation = retail || bothOptions;
-  const showsHours = retail || bothOptions || online;
+  const showsHours = retail || bothOptions || online || service;
   const showsMap = retail || bothOptions;
 
   return {
-    enabled: enabled || online || retail,
+    enabled: enabled || online || retail || service,
     type,
     showsLocation,
     showsHours,
@@ -340,6 +387,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get fulfillment state for a tenant
+   */
+  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.fulfillment;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -363,6 +418,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
+    const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -370,6 +426,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
+      fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -464,6 +521,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get fulfillment state for a tenant
+   */
+  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.fulfillment;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -484,6 +549,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
+    const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -491,6 +557,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
+      fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

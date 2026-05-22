@@ -153,7 +153,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     }
 
     const result = await this.makeDefaultRequest<void>(
-      `/api/tenants/${tenantId}/directory/listing/unpublish`,
+      `/api/tenants/${tenantId}/directory/unpublish`,
       { method: 'POST' },
       `directory-unpublish-${tenantId}`
     );
