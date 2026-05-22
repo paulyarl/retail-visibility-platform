@@ -733,6 +733,20 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
+                      {/* Enable/Disable Checkbox */}
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <input
+                          type="checkbox"
+                          id={`paypal-enable-${gateway.id}`}
+                          checked={gateway.is_active}
+                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
+                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                        />
+                        <label htmlFor={`paypal-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
+                          Enable PayPal payments
+                        </label>
+                      </div>
+
                       {gateway.config?.client_id && (
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
@@ -889,6 +903,20 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
+                      {/* Enable/Disable Checkbox */}
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <input
+                          type="checkbox"
+                          id={`square-enable-${gateway.id}`}
+                          checked={gateway.is_active}
+                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
+                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                        />
+                        <label htmlFor={`square-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
+                          Enable Square payments
+                        </label>
+                      </div>
+
                       {gateway.config?.application_id && (
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
@@ -1216,6 +1244,21 @@ export default function PaymentGatewaysPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="space-y-4">
+                      {/* Enable/Disable Checkbox */}
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <input
+                          type="checkbox"
+                          id={`stripe-enable-${gateway.id}`}
+                          checked={gateway.is_active}
+                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
+                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                        />
+                        <label htmlFor={`stripe-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
+                          Enable Stripe payments
+                        </label>
+                      </div>
+                    </div>
                     <div className="flex gap-2 pt-4 border-t">
                       <Button variant="outline" size="sm" onClick={() => handleToggleActive(gateway.id, gateway.is_active)}>
                         {gateway.is_active ? 'Deactivate' : 'Activate'}
