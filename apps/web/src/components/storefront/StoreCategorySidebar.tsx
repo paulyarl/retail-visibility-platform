@@ -37,13 +37,13 @@ export default function StoreCategorySidebar({ tenantId, categories, totalProduc
           Browse by Store Type
         </h2>
         <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
-          Store Categories
+          Store Aisles
         </span>
       </div>
       
       <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
         <p className="text-sm text-blue-700 dark:text-blue-300">
-          <strong>Note:</strong> Store categories include all {totalProducts} products in this store.
+          <strong>Note:</strong> Store aisles include all {totalProducts} products in this store.
         </p>
       </div>
       
@@ -57,7 +57,7 @@ export default function StoreCategorySidebar({ tenantId, categories, totalProduc
               : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
           }`}
         >
-          <span>All Products</span>
+          <span>All Aisles</span>
           <span className={`text-sm ${
             !currentCategory
               ? 'text-primary-600 dark:text-primary-400'
@@ -100,7 +100,7 @@ export default function StoreCategorySidebar({ tenantId, categories, totalProduc
       {/* Empty State */}
       {categories.length === 0 && (
         <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-4">
-          No store categories yet
+          No store aisles yet
         </p>
       )}
     </div>

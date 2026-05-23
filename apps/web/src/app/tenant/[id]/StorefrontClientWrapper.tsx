@@ -793,12 +793,12 @@ export default function StorefrontClientWrapper({
                   {/* Section Header */}
                   <div className="mb-6">
                     <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-                      Our Products
+                      Store Inventory
                     </h2>
                     <p className="text-lg text-neutral-600 dark:text-neutral-400">
                       Browse our complete catalog of {totalItems} products
                       {search && ` matching "${search}"`}
-                      {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
+                      {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`} aisle
                     </p>
 
 

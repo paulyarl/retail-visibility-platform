@@ -688,7 +688,7 @@ function CatalogPageContent() {
         <div className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
           <div className="text-center text-gray-600 dark:text-gray-400">
             <p className="mb-2">
-              Browse our complete catalog with {totalItems} products from {tenants.length} stores across {categories.length} categories
+              Browse our complete catalog with {totalItems} products from {tenants.length} stores across {categories.length} aisles
             </p>
             <p className="text-sm">
               Quality products, fast shipping, and excellent customer service guaranteed.
