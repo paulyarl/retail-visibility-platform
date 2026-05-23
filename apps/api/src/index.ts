@@ -164,6 +164,7 @@ import tenantsRoutes from './routes/tenants';
 import paymentGatewaysRoutes from './routes/payment-gateways';
 import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
 import commerceSettingsRoutes from './routes/commerce-settings';
+import productOptionsSettingsRoutes from './routes/product-options-settings';
 import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
 import buyerOrdersRoutes from './routes/buyer-orders';
 import tenantOrdersRoutes from './routes/tenant-orders';
@@ -7319,6 +7320,10 @@ console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/f
 app.use('/api/tenants', commerceSettingsRoutes);
 app.use('/api', commerceSettingsRoutes);
 console.log('✅ Commerce settings routes mounted at /api/tenants/:tenantId/commerce-settings and /api/public/tenant/:tenantId/commerce-settings');
+
+/* ------------------------------ product options settings ------------------------------ */
+app.use('/api/tenants', productOptionsSettingsRoutes);
+console.log('✅ Product options settings routes mounted at /api/tenants/:tenantId/product-options');
 
 /* ------------------------------ organization commerce settings ------------------------------ */
 app.use('/api/organizations', organizationCommerceSettingsRoutes);

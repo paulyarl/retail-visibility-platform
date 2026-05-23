@@ -9,6 +9,15 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 // import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
 // import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
 // import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
+
+// store status
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { Badge as MantineBadge } from '@mantine/core';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+
+import DirectoryActions from '@/components/directory/DirectoryActions';
+
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
@@ -49,13 +58,6 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
-// store status
-import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { Badge as MantineBadge } from '@mantine/core';
-import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
-
-import DirectoryActions from '@/components/directory/DirectoryActions';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -341,7 +343,7 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
 
-                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore &&   (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <a
                     onClick={() => {
                       const hoursSection = document.getElementById('hours-section');
@@ -889,30 +891,24 @@ export default function StorefrontClientWrapper({
       <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-            {/* Map & Location */}
-            <div className="lg:col-span-2">
-              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
-
-
-                {/* Single Map Display */}
-                {/* Business Hours */}
-                <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-                  {!storefrontStatus.shouldShowPanel && showsHours && businessHours && isRetailStore && (
+            {!storefrontStatus.shouldShowPanel && showsHours && businessHours && isRetailStore && (
+              <div className="lg:col-span-2">
+                <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
+                  <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
                     <><h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
                       <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Our Store Hours
                     </h3><BusinessHoursCollapsible businessHours={businessHours} /></>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
 
+              </div>
+            )}
             {/* Contact & Hours Sidebar */}
             <div className="space-y-6">
-              {/* Contact Information */}
+              
               {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
@@ -946,8 +942,8 @@ export default function StorefrontClientWrapper({
               {/* Map & Location */}
               <div className="lg:col-span-2">
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
-                  <div className="p-6">
-                    {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
+                  {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
+                    <div className="p-6">
                       <><h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
                         Visit Our Store
                       </h3><p className="text-neutral-600 dark:text-neutral-400 mb-4">
@@ -957,9 +953,8 @@ export default function StorefrontClientWrapper({
                         </div><div className="flex items-center gap-2">
                           {hoursStatus?.label}
                         </div></>
-                    )}
-                  </div>
-
+                    </div>
+                  )}
                   {/* Single Map Display */}
                   {!storefrontStatus.shouldShowPanel && showsMap && mapLocation ? (
                     <TenantMapSection location={mapLocation} />
@@ -987,24 +982,16 @@ export default function StorefrontClientWrapper({
                   )}
                 </div>
               </div>
-
-
-
-
-              {/* Fulfillment Options */}
-              {!storefrontStatus.shouldShowPanel && (
-                <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
-              )}
             </div>
           </div>
+          {/* Fulfillment Options */}
+          {!storefrontStatus.shouldShowPanel && (
+            <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
+          )}
         </div>
       </div>
       {/* Store Ratings and Reviews */}
       {/* Gradient border line */}
-
-
-
-
       {/* Advanced Catalog Navigation */}
       {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -1026,7 +1013,6 @@ export default function StorefrontClientWrapper({
         </div>
       )}
       {!storefrontStatus.shouldShowPanel && (
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
@@ -1035,24 +1021,15 @@ export default function StorefrontClientWrapper({
         </div>
       )}
 
-
       {/* Storefront Recommendations */}
       {!storefrontStatus.shouldShowPanel && (
-
         <StorefrontRecommendations tenantId={tenantId} />
-
       )}
-
-
       {/* Recently Viewed - always last for consistency with other public pages */}
 
       {!storefrontStatus.shouldShowPanel && (
-
         <LastViewed />
-
-
       )}
-
       {/* Tier-Based Footer */}
 
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
@@ -1107,7 +1084,6 @@ export default function StorefrontClientWrapper({
               </div>
             </div>
           </div>
-
           {/* Platform Branding */}
           {!features.removePlatformBranding && (
             <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">

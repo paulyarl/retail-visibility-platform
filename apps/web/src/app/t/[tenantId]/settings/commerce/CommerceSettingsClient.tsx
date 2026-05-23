@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
@@ -276,15 +277,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                       Require customers to pay a deposit to reserve items
                     </p>
                   </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center gap-2">
+                    <Switch
                       checked={settings.deposit_enabled}
-                      onChange={(e) => setSettings({ ...settings, deposit_enabled: e.target.checked })}
-                      className="mr-2"
+                      onCheckedChange={(checked) => setSettings({ ...settings, deposit_enabled: checked })}
                     />
                     <span className="text-sm">Enable deposits</span>
-                  </label>
+                  </div>
                 </div>
 
                 {settings.deposit_enabled && (
@@ -356,15 +355,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                       Allow customers to pay the full amount upfront
                     </p>
                   </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center gap-2">
+                    <Switch
                       checked={settings.full_payment_enabled}
-                      onChange={(e) => setSettings({ ...settings, full_payment_enabled: e.target.checked })}
-                      className="mr-2"
+                      onCheckedChange={(checked) => setSettings({ ...settings, full_payment_enabled: checked })}
                     />
                     <span className="text-sm">Enable full payment</span>
-                  </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -405,15 +402,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Automatically confirm orders when payment is received
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.auto_confirm_orders}
-                  onChange={(e) => setSettings({ ...settings, auto_confirm_orders: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, auto_confirm_orders: checked })}
                 />
                 <span className="text-sm">Auto-confirm</span>
-              </label>
+              </div>
             </div>
 
             <div>
@@ -451,15 +446,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Display available payment options to customers
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.show_payment_options}
-                  onChange={(e) => setSettings({ ...settings, show_payment_options: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, show_payment_options: checked })}
                 />
                 <span className="text-sm">Show options</span>
-              </label>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -469,15 +462,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Require payment before order confirmation
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.require_payment_upfront}
-                  onChange={(e) => setSettings({ ...settings, require_payment_upfront: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, require_payment_upfront: checked })}
                 />
                 <span className="text-sm">Require upfront</span>
-              </label>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -487,15 +478,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Allow customers to pay when they pick up their order
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.allow_payment_on_pickup}
-                  onChange={(e) => setSettings({ ...settings, allow_payment_on_pickup: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, allow_payment_on_pickup: checked })}
                 />
                 <span className="text-sm">Allow pickup payment</span>
-              </label>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -518,15 +507,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Notify when full payment is received
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.notify_on_payment}
-                  onChange={(e) => setSettings({ ...settings, notify_on_payment: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, notify_on_payment: checked })}
                 />
                 <span className="text-sm">Enable</span>
-              </label>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -536,15 +523,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Notify when deposit payment is received
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.notify_on_deposit}
-                  onChange={(e) => setSettings({ ...settings, notify_on_deposit: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, notify_on_deposit: checked })}
                 />
                 <span className="text-sm">Enable</span>
-              </label>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -554,15 +539,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   Notify when order is ready for pickup/delivery
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2">
+                <Switch
                   checked={settings.notify_on_fulfillment}
-                  onChange={(e) => setSettings({ ...settings, notify_on_fulfillment: e.target.checked })}
-                  className="mr-2"
+                  onCheckedChange={(checked) => setSettings({ ...settings, notify_on_fulfillment: checked })}
                 />
                 <span className="text-sm">Enable</span>
-              </label>
+              </div>
             </div>
           </CardContent>
         </Card>

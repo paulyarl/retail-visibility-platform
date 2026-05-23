@@ -46,9 +46,9 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
   ): Promise<string> {
     const cacheKey = `resolved-${type}:${identifier}`;
     
-    // Use existing working endpoint for tenant resolution
+    // Use tenant-specific resolver (queries tenants table, no directory dependency)
     const endpoint = type === AppContext.TENANT 
-      ? `/api/directory/resolve-slug/${identifier}`
+      ? `/api/tenants/resolve/${identifier}`
       : `/api/resolver/${type}/${identifier}`; // Fallback for other types
     
   //  console.log(`[PublicApiSingleton] Resolving ${type}/${identifier} via endpoint: ${endpoint}`);
@@ -64,28 +64,34 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
           isolation: CacheIsolation.SHOP
         }
       );
+      if (!response.success){
+        console.error(`[PublicApiSingleton] Failed to resolve ${type}/${identifier}:`, response);
+        return identifier;
+      }
 
     //  console.log(`[PublicApiSingleton] Resolver response for ${type}/${identifier}:`, response);
 
       // Handle different response formats
-      let resolvedId: string;
-      
+      let resolvedId: string; 
+
+      resolvedId = response?.data?.data?.tenantId;  
+      // console.log(`[PublicApiSingleton] resolvedId:`, { resolvedId });
       if (type === AppContext.TENANT) {
-        // Directory resolve-slug endpoint returns { success: true, tenantId: "tid-..." }
-        if (!response?.success || !response?.data.tenantId) {
+        // Tenant resolve endpoint returns { success: true, data: { tenantId: "tid-..." } }
+        if (!response?.success || !resolvedId) {
           // console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
           //throw new Error(`${type} not found for identifier: ${identifier}`);
           return identifier;
         }
-        resolvedId = response.data.tenantId;
+        
       } else {
         // Other resolvers return { success: true, data: { resolvedId: "..." } }
-        if (!response?.success || !response?.data?.resolvedId) {
+        if (!response?.success || !resolvedId) {
           // console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
           //throw new Error(`${type} not found for identifier: ${identifier}`);
           return identifier;
         }
-        resolvedId = response.data.resolvedId;
+       
       }
 
     //  console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);

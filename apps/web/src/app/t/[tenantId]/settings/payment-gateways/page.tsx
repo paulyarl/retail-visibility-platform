@@ -7,6 +7,7 @@ import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package, Crown, Info } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantTierService } from '@/services/TenantTierService';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
@@ -681,11 +682,10 @@ export default function PaymentGatewaysPage() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Switch
                     id="is_active"
                     checked={paypalForm.is_active}
-                    onChange={(e) => setPaypalForm({...paypalForm, is_active: e.target.checked})}
+                    onCheckedChange={(checked) => setPaypalForm({...paypalForm, is_active: checked})}
                   />
                   <label htmlFor="is_active" className="text-sm">Activate immediately</label>
                 </div>
@@ -733,14 +733,12 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* Enable/Disable Checkbox */}
+                      {/* Enable/Disable Toggle */}
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                        <input
-                          type="checkbox"
+                        <Switch
                           id={`paypal-enable-${gateway.id}`}
                           checked={gateway.is_active}
-                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
-                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                          onCheckedChange={() => handleToggleActive(gateway.id, gateway.is_active)}
                         />
                         <label htmlFor={`paypal-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
                           Enable PayPal payments
@@ -903,14 +901,12 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* Enable/Disable Checkbox */}
+                      {/* Enable/Disable Toggle */}
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                        <input
-                          type="checkbox"
+                        <Switch
                           id={`square-enable-${gateway.id}`}
                           checked={gateway.is_active}
-                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
-                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                          onCheckedChange={() => handleToggleActive(gateway.id, gateway.is_active)}
                         />
                         <label htmlFor={`square-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
                           Enable Square payments
@@ -1011,20 +1007,18 @@ export default function PaymentGatewaysPage() {
                   <p className="text-xs text-neutral-500 mt-1">The location where payments will be processed</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Switch
                     id="square_is_active"
                     checked={squareForm.is_active}
-                    onChange={(e) => setSquareForm({...squareForm, is_active: e.target.checked})}
+                    onCheckedChange={(checked) => setSquareForm({...squareForm, is_active: checked})}
                   />
                   <label htmlFor="square_is_active" className="text-sm">Activate immediately</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Switch
                     id="square_is_default"
                     checked={squareForm.is_default}
-                    onChange={(e) => setSquareForm({...squareForm, is_default: e.target.checked})}
+                    onCheckedChange={(checked) => setSquareForm({...squareForm, is_default: checked})}
                   />
                   <label htmlFor="square_is_default" className="text-sm">Set as default payment method</label>
                 </div>
@@ -1245,14 +1239,12 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* Enable/Disable Checkbox */}
+                      {/* Enable/Disable Toggle */}
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                        <input
-                          type="checkbox"
+                        <Switch
                           id={`stripe-enable-${gateway.id}`}
                           checked={gateway.is_active}
-                          onChange={() => handleToggleActive(gateway.id, gateway.is_active)}
-                          className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                          onCheckedChange={() => handleToggleActive(gateway.id, gateway.is_active)}
                         />
                         <label htmlFor={`stripe-enable-${gateway.id}`} className="text-sm font-medium text-neutral-900">
                           Enable Stripe payments

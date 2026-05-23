@@ -281,7 +281,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const businessName = product.tenant?.name || 'Unknown Store';
 
 
-    // console.log(`tenant: `, tenant);
+  // console.log(`tenant: `, tenant);
 
   // Convert images to gallery format for ProductGallery component
   // console.log(`Product 1 JSON: ${JSON.stringify(product)}`);
@@ -666,12 +666,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
         {/* Business Description - Merchant Branding - Full Width */}
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
-          <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-
-
+                  
           {/* Business Information - Contact Us - Full Width */}
 
-          <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
           {product.productType != 'digital' ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <ProductBusinessInfoWrapper
@@ -705,7 +702,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Featured Type Products - Full Width */}
-          <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <FeaturedTypeProducts
               currentProductId={product.id}
@@ -726,7 +723,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Product Recommendations - Full Width */}
-          <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+          {/* You Might Also Like */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
           </div>

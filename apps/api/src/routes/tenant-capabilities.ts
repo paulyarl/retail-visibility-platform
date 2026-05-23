@@ -26,6 +26,28 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
 };
 
 /**
+ * Resolve a slug or tenant ID to a tenant ID using the tenants table directly.
+ * No dependency on directory_listings_list — works even if directory is unpublished.
+ */
+async function resolveTenantIdentifier(identifier: string): Promise<{ id: string; slug: string | null } | null> {
+  // If it starts with 'tid-', it's already a tenant ID
+  if (identifier.startsWith('tid-')) {
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: identifier },
+      select: { id: true, slug: true },
+    });
+    return tenant;
+  }
+
+  // Otherwise, look up by slug in the tenants table
+  const tenant = await prisma.tenants.findFirst({
+    where: { slug: identifier },
+    select: { id: true, slug: true },
+  });
+  return tenant;
+}
+
+/**
  * GET /api/tenants/:tenantId/capabilities
  * 
  * Returns the tenant's tier capabilities grouped by capability type.
@@ -45,6 +67,51 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
  *   uncategorized_features: ["business_logo", ...]
  * }
  */
+/**
+ * GET /api/tenants/resolve/:identifier
+ * Resolve a slug or tenant ID to a tenant ID using the tenants table directly.
+ * No dependency on directory_listings_list — works even if directory is unpublished.
+ * Public access (no auth required) for storefront use.
+ */
+router.get('/resolve/:identifier', async (req: Request, res: Response) => {
+  try {
+    const { identifier } = req.params;
+
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'identifier_required' });
+    }
+
+    const resolved = await resolveTenantIdentifier(identifier);
+
+    if (!resolved) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        tenantId: resolved.id,
+        slug: resolved.slug,
+        identifierType: identifier.startsWith('tid-') ? 'tenant_id' : 'slug'
+      }
+    });
+  } catch (error: any) {
+    console.error('[GET /api/tenants/resolve/:identifier] Error:', error);
+    return res.status(500).json({ success: false, error: 'failed_to_resolve_tenant' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/capabilities
+ *
+ * Returns the tenant's tier capabilities grouped by capability type.
+ * Accepts both tenant IDs (tid-...) and slugs as the :tenantId parameter.
+ * Accessible with tenant auth (for dashboard) or public (for storefront).
+ */
 router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
@@ -52,9 +119,16 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenantId required' });
     }
 
-    // Look up tenant and their tier
+    // Resolve identifier: could be a tenant ID or a slug
+    const resolved = await resolveTenantIdentifier(tenantId);
+
+    if (!resolved) {
+      return res.status(404).json({ error: 'tenant_not_found' });
+    }
+
+    // Look up tenant and their tier using the resolved ID
     const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
+      where: { id: resolved.id },
       select: {
         id: true,
         subscription_tier: true,

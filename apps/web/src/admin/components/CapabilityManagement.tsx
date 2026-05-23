@@ -28,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { AlertCircle } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/Switch';
 import { Pagination } from '@/components/ui/Pagination';
@@ -95,6 +96,10 @@ export default function CapabilityManagement() {
   const [tierCapSearch, setTierCapSearch] = useState('');
   const [tierCapPage, setTierCapPage] = useState(1);
   const [tierCapPageSize, setTierCapPageSize] = useState(10);
+
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'feature' | 'capType' | 'tierCap'; key: string; tierKey?: string; label: string } | null>(null);
 
   // Tier Capability dialog state
   const [tierCapDialogOpen, setTierCapDialogOpen] = useState(false);
@@ -243,15 +248,23 @@ export default function CapabilityManagement() {
     }
   };
 
-  const handleTierCapDelete = async (tierKey: string, capabilityTypeKey: string) => {
-    if (!confirm(`Remove "${capabilityTypeKey}" capability from tier "${tierKey}"?`)) return;
+  const handleTierCapDelete = (tierKey: string, capabilityTypeKey: string) => {
+    setDeleteTarget({ type: 'tierCap', key: capabilityTypeKey, tierKey, label: `${capabilityTypeKey} from tier ${tierKey}` });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleTierCapDeleteConfirm = async () => {
+    if (!deleteTarget || deleteTarget.type !== 'tierCap' || !deleteTarget.tierKey) return;
     try {
-      await adminCapabilityService.deleteTierCapability(tierKey, capabilityTypeKey);
-      await loadTierCapabilities(tierKey);
+      await adminCapabilityService.deleteTierCapability(deleteTarget.tierKey, deleteTarget.key);
+      await loadTierCapabilities(deleteTarget.tierKey);
       await loadData();
     } catch (err) {
       console.error('Failed to delete tier capability:', err);
       setError('Failed to delete tier capability');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -291,14 +304,22 @@ export default function CapabilityManagement() {
     }
   };
 
-  const handleFeatureDelete = async (featureKey: string) => {
-    if (!confirm('Are you sure you want to delete this feature?')) return;
+  const handleFeatureDelete = (featureKey: string) => {
+    setDeleteTarget({ type: 'feature', key: featureKey, label: featureKey });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleFeatureDeleteConfirm = async () => {
+    if (!deleteTarget || deleteTarget.type !== 'feature') return;
     try {
-      await adminCapabilityService.deleteFeature(featureKey);
+      await adminCapabilityService.deleteFeature(deleteTarget.key);
       await loadData();
     } catch (err) {
       console.error('Failed to delete feature:', err);
       setError('Failed to delete feature');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -368,14 +389,23 @@ export default function CapabilityManagement() {
     }
   };
 
-  const handleCapTypeDelete = async (key: string) => {
-    if (!confirm('Are you sure you want to delete this capability type?')) return;
+  const handleCapTypeDelete = (key: string) => {
+    const capType = capabilityTypes.find(ct => ct.capability_type_key === key);
+    setDeleteTarget({ type: 'capType', key, label: capType?.capability_type_name || key });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCapTypeDeleteConfirm = async () => {
+    if (!deleteTarget || deleteTarget.type !== 'capType') return;
     try {
-      await adminCapabilityService.deleteCapabilityType(key);
+      await adminCapabilityService.deleteCapabilityType(deleteTarget.key);
       await loadData();
     } catch (err) {
       console.error('Failed to delete capability type:', err);
       setError('Failed to delete capability type');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -1789,6 +1819,57 @@ export default function CapabilityManagement() {
               disabled={saving || !tierCapForm.tier_key || !tierCapForm.capability_type_key || (tierCapForm.features.length > 0 && !tierCapForm.features.some(f => f.is_enabled))}
             >
               {saving ? 'Saving...' : editingTierCap ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Delete Confirmation Dialog ===== */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              {deleteTarget?.type === 'feature' && (
+                <>Are you sure you want to delete the feature <strong className="text-gray-900">{deleteTarget.label}</strong>? This action cannot be undone.</>
+              )}
+              {deleteTarget?.type === 'capType' && (
+                <>Are you sure you want to delete the capability type <strong className="text-gray-900">{deleteTarget.label}</strong>? This will also remove it from any tier assignments. This action cannot be undone.</>
+              )}
+              {deleteTarget?.type === 'tierCap' && (
+                <>Are you sure you want to remove <strong className="text-gray-900">{deleteTarget.label}</strong>? This will disable the capability and all its features for the affected tier.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800">
+                  {deleteTarget?.type === 'capType' ? 'Capability types are critical infrastructure.' : 'This is a critical operation.'}
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  {deleteTarget?.type === 'capType'
+                    ? 'Deleting a capability type will break tier assignments and may affect merchant feature availability.'
+                    : deleteTarget?.type === 'feature'
+                    ? 'Deleting a feature will remove it from all capability type collections that reference it.'
+                    : 'Removing a tier capability will disable features for merchants on that tier.'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeleteTarget(null); }}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTarget?.type === 'feature') handleFeatureDeleteConfirm();
+                else if (deleteTarget?.type === 'capType') handleCapTypeDeleteConfirm();
+                else if (deleteTarget?.type === 'tierCap') handleTierCapDeleteConfirm();
+              }}
+            >
+              {deleteTarget?.type === 'tierCap' ? 'Remove' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

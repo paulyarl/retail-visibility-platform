@@ -13,6 +13,7 @@ interface EditBusinessProfileModalProps {
   onClose: () => void;
   profile: BusinessProfile | Partial<BusinessProfile> | null;
   onSave?: (profile: BusinessProfile) => void;
+  tenantId?: string;
 }
 
 
@@ -21,7 +22,8 @@ export default function EditBusinessProfileModal({
   isOpen, 
   onClose, 
   profile,
-  onSave 
+  onSave,
+  tenantId
 }: EditBusinessProfileModalProps) {
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(profile || {});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -416,7 +418,7 @@ export default function EditBusinessProfileModal({
               state: formData.state,
               country: formData.country_code,
             }}
-            tenantId={typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined}
+            tenantId={tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined)}
             selectedSlug={(formData as any).slug || ''}
             onSlugSelect={(slug) => handleChange('slug' as any, slug)}
           />

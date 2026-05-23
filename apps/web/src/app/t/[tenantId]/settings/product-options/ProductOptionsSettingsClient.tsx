@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Image, Video, Copy } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
 import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Link from 'next/link';
 
 interface ProductOptionsSettings {
@@ -53,20 +55,17 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/tenants/${tenantId}/product-options`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.settings) {
-          setSettings({
-            product_physical_enabled: data.settings.product_physical_enabled ?? true,
-            product_digital_enabled: data.settings.product_digital_enabled ?? true,
-            product_hybrid_enabled: data.settings.product_hybrid_enabled ?? true,
-            product_service_enabled: data.settings.product_service_enabled ?? false,
-            product_variant_enabled: data.settings.product_variant_enabled ?? true,
-            product_gallery_enabled: data.settings.product_gallery_enabled ?? true,
-            product_video_enabled: data.settings.product_video_enabled ?? true,
-          });
-        }
+      const settings = await platformHomeService.getTenantProductOptionsSettings(tenantId);
+      if (settings) {
+        setSettings({
+          product_physical_enabled: settings.product_physical_enabled ?? true,
+          product_digital_enabled: settings.product_digital_enabled ?? true,
+          product_hybrid_enabled: settings.product_hybrid_enabled ?? true,
+          product_service_enabled: settings.product_service_enabled ?? false,
+          product_variant_enabled: settings.product_variant_enabled ?? true,
+          product_gallery_enabled: settings.product_gallery_enabled ?? true,
+          product_video_enabled: settings.product_video_enabled ?? true,
+        });
       }
     } catch (err) {
       console.error('Failed to load product options settings:', err);
@@ -80,13 +79,9 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
       setSaving(true);
       setMessage(null);
 
-      const response = await fetch(`/api/tenants/${tenantId}/product-options`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
+      const result = await platformHomeService.updateTenantProductOptionsSettings(tenantId, settings);
 
-      if (!response.ok) {
+      if (!result) {
         throw new Error('Failed to save product options settings');
       }
 
@@ -149,13 +144,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!allowedTypes.includes('physical') && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="physical-toggle"
                   checked={settings.product_physical_enabled}
-                  onChange={() => handleToggle('product_physical_enabled')}
+                  onCheckedChange={() => handleToggle('product_physical_enabled')}
                   disabled={!allowedTypes.includes('physical')}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -173,13 +166,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!allowedTypes.includes('digital') && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="digital-toggle"
                   checked={settings.product_digital_enabled}
-                  onChange={() => handleToggle('product_digital_enabled')}
+                  onCheckedChange={() => handleToggle('product_digital_enabled')}
                   disabled={!allowedTypes.includes('digital')}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -197,13 +188,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!allowedTypes.includes('hybrid') && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="hybrid-toggle"
                   checked={settings.product_hybrid_enabled}
-                  onChange={() => handleToggle('product_hybrid_enabled')}
+                  onCheckedChange={() => handleToggle('product_hybrid_enabled')}
                   disabled={!allowedTypes.includes('hybrid')}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -221,13 +210,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!allowedTypes.includes('service') && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="service-toggle"
                   checked={settings.product_service_enabled}
-                  onChange={() => handleToggle('product_service_enabled')}
+                  onCheckedChange={() => handleToggle('product_service_enabled')}
                   disabled={!allowedTypes.includes('service')}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -261,13 +248,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!showsVariants && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="variant-toggle"
                   checked={settings.product_variant_enabled}
-                  onChange={() => handleToggle('product_variant_enabled')}
+                  onCheckedChange={() => handleToggle('product_variant_enabled')}
                   disabled={!showsVariants}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -285,13 +270,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!showsGallery && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="gallery-toggle"
                   checked={settings.product_gallery_enabled}
-                  onChange={() => handleToggle('product_gallery_enabled')}
+                  onCheckedChange={() => handleToggle('product_gallery_enabled')}
                   disabled={!showsGallery}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -309,13 +292,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 {!showsVideo && (
                   <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                 )}
-                <input
-                  type="checkbox"
+                <Switch
                   id="video-toggle"
                   checked={settings.product_video_enabled}
-                  onChange={() => handleToggle('product_video_enabled')}
+                  onCheckedChange={() => handleToggle('product_video_enabled')}
                   disabled={!showsVideo}
-                  className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
                 />
               </div>
             </div>

@@ -53,7 +53,7 @@ export default function ProductCategorySidebar({
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
-          Product Categories
+          Store Aisle
         </h2>
         <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
           Product Categories

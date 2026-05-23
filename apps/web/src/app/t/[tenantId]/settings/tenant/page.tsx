@@ -194,6 +194,7 @@ export default function TenantBusinessProfilePage() {
           loading={loading}
           onUpdate={handleUpdate}
           tenantName={tenantName}
+          tenantId={tenantId}
         />
         
         {/* GBP Location Linking */}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Truck, MapPin, Save, AlertCircle, ShoppingBag, CreditCard } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
@@ -197,12 +198,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
+              <Switch
                 id="pickup_enabled"
                 checked={settings.pickup_enabled ?? false}
-                onChange={(e) => setSettings({ ...settings, pickup_enabled: e.target.checked })}
-                className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                onCheckedChange={(checked) => setSettings({ ...settings, pickup_enabled: checked })}
               />
               <label htmlFor="pickup_enabled" className="text-sm font-medium text-neutral-900">
                 Enable in-store pickup (Free)
@@ -328,12 +327,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
+              <Switch
                 id="delivery_enabled"
                 checked={settings.delivery_enabled ?? false}
-                onChange={(e) => setSettings({ ...settings, delivery_enabled: e.target.checked })}
-                className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                onCheckedChange={(checked) => setSettings({ ...settings, delivery_enabled: checked })}
               />
               <label htmlFor="delivery_enabled" className="text-sm font-medium text-neutral-900">
                 Enable local delivery
@@ -435,12 +432,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
+              <Switch
                 id="shipping_enabled"
                 checked={settings.shipping_enabled ?? false}
-                onChange={(e) => setSettings({ ...settings, shipping_enabled: e.target.checked })}
-                className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
+                onCheckedChange={(checked) => setSettings({ ...settings, shipping_enabled: checked })}
               />
               <label htmlFor="shipping_enabled" className="text-sm font-medium text-neutral-900">
                 Enable shipping
