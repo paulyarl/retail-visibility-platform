@@ -13,9 +13,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle, Upload, Image, Loader2, X } from 'lucide-react';
+import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle, Upload, Image, Loader2, X, Wrench } from 'lucide-react';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
-import { useCapabilityGate } from '@/hooks/useCapabilityGate';
+import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 import { Label } from '@/components/ui/Label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
@@ -34,7 +34,7 @@ import { itemsService } from '@/services/ItemsSingletonService';
 
 interface ProductTypeStepProps {
   data: {
-    type: 'physical' | 'digital' | 'hybrid';
+    type: 'physical' | 'digital' | 'hybrid' | 'service';
     sku: string;
     hasVariants: boolean;
     stockQuantity: number;
@@ -85,23 +85,24 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
   const variantImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Capability gating for product types
-  const productTypesCapability = useCapabilityGate('product_types');
+  // Product options capability gating
+  const productOptionsCap = useProductOptionsCapability(tenantId || null, { forTenant: true });
+  const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
+  const showsVariants = productOptionsCap.data?.showsVariants ?? true;
+  const isProductEnabled = productOptionsCap.data?.enabled ?? true;
 
   // Auto-switch to physical if current type is not available
   useEffect(() => {
-    const availableCapabilities = productTypesCapability.capabilities 
-      ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat()
-      : [];
-    
-    if (data.type === 'digital' && !availableCapabilities.includes('digital')) {
+    if (data.type === 'digital' && !allowedTypes.includes('digital')) {
       handleTypeChange('physical');
-    } else if (data.type === 'hybrid' && !availableCapabilities.includes('hybrid')) {
+    } else if (data.type === 'hybrid' && !allowedTypes.includes('hybrid')) {
+      handleTypeChange('physical');
+    } else if (data.type === 'service' && !allowedTypes.includes('service')) {
       handleTypeChange('physical');
     }
-  }, [data.type, productTypesCapability.capabilities]);
+  }, [data.type, allowedTypes]);
 
-  const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid') => {
+  const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
     // Auto-adjust stock quantity based on product type
     let newStockQuantity = data.stockQuantity;
     
@@ -109,8 +110,12 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
     if (type === 'digital') {
       newStockQuantity = 9999;
     }
-    // Physical products default to 0 if coming from digital
-    else if (type === 'physical' && data.type === 'digital') {
+    // Service products get unlimited stock
+    else if (type === 'service') {
+      newStockQuantity = 9999;
+    }
+    // Physical products default to 0 if coming from digital/service
+    else if (type === 'physical' && (data.type === 'digital' || data.type === 'service')) {
       newStockQuantity = 0;
     }
     // Hybrid keeps current value or defaults to 0
@@ -366,6 +371,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         return <Download className="h-5 w-5" />;
       case 'hybrid':
         return <Layers className="h-5 w-5" />;
+      case 'service':
+        return <Wrench className="h-5 w-5" />;
       default:
         return <Package className="h-5 w-5" />;
     }
@@ -379,6 +386,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         return 'Digital product that can be downloaded or accessed online';
       case 'hybrid':
         return 'Product with both physical and digital components';
+      case 'service':
+        return 'Bookable service, appointment, or consultation';
       default:
         return '';
     }
@@ -392,6 +401,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         return <Badge className="bg-purple-100 text-purple-800">Digital</Badge>;
       case 'hybrid':
         return <Badge className="bg-green-100 text-green-800">Hybrid</Badge>;
+      case 'service':
+        return <Badge className="bg-orange-100 text-orange-800">Service</Badge>;
       default:
         return null;
     }
@@ -438,8 +449,9 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         <RadioGroup
           value={data.type}
           onValueChange={handleTypeChange}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
+          {/* Physical - always available as default */}
           <Card className={`cursor-pointer transition-all ${data.type === 'physical' ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-300'}`}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -458,10 +470,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </CardContent>
           </Card>
 
-          {/* Digital Product Type - Gated */}
-          {productTypesCapability.capabilities 
-            ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat().includes('digital')
-            : false ? (
+          {/* Digital Product Type - Gated by allowedTypes */}
+          {allowedTypes.includes('digital') ? (
             <Card className={`cursor-pointer transition-all ${data.type === 'digital' ? 'border-purple-500 bg-purple-50' : 'hover:border-gray-300'}`}>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -488,9 +498,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                     <div className="flex items-center space-x-2">
                       {getTypeIcon('digital')}
                       <span className="font-medium text-gray-500">Digital</span>
-                      <Badge variant="outline" className="text-xs">
-                        {productTypesCapability.restrictions?.blockedOperations?.includes('digital') ? 'Unavailable' : 'Upgrade Required'}
-                      </Badge>
+                      <Badge variant="outline" className="text-xs">Upgrade Required</Badge>
                     </div>
                   </div>
                 </div>
@@ -501,10 +509,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </Card>
           )}
 
-          {/* Hybrid Product Type - Gated */}
-          {productTypesCapability.capabilities 
-            ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat().includes('hybrid')
-            : false ? (
+          {/* Hybrid Product Type - Gated by allowedTypes */}
+          {allowedTypes.includes('hybrid') ? (
             <Card className={`cursor-pointer transition-all ${data.type === 'hybrid' ? 'border-green-500 bg-green-50' : 'hover:border-gray-300'}`}>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -531,14 +537,51 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                     <div className="flex items-center space-x-2">
                       {getTypeIcon('hybrid')}
                       <span className="font-medium text-gray-500">Hybrid</span>
-                      <Badge variant="outline" className="text-xs">
-                        {productTypesCapability.restrictions?.blockedOperations?.includes('hybrid') ? 'Unavailable' : 'Upgrade Required'}
-                      </Badge>
+                      <Badge variant="outline" className="text-xs">Upgrade Required</Badge>
                     </div>
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
                   Hybrid products require a higher tier subscription
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Service Product Type - Gated by allowedTypes */}
+          {allowedTypes.includes('service') ? (
+            <Card className={`cursor-pointer transition-all ${data.type === 'service' ? 'border-orange-500 bg-orange-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="service" id="service" />
+                  <Label htmlFor="service" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('service')}
+                      <span className="font-medium">Service</span>
+                    </div>
+                    {getTypeBadge('service')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('service')}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('service')}
+                      <span className="font-medium text-gray-500">Service</span>
+                      <Badge variant="outline" className="text-xs">Upgrade Required</Badge>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Service products require a higher tier subscription
                 </p>
               </CardContent>
             </Card>
@@ -586,7 +629,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
           )}
         </div>
         <p className="text-xs text-gray-500">
-          SKU will be auto-generated by the API if left empty. {data.sku && `Will include product type: ${data.type === 'physical' ? 'PHYS' : data.type === 'digital' ? 'DIGI' : 'HYBR'}`}
+          SKU will be auto-generated by the API if left empty. {data.sku && `Will include product type: ${data.type === 'physical' ? 'PHYS' : data.type === 'digital' ? 'DIGI' : data.type === 'service' ? 'SERV' : 'HYBR'}`}
         </p>
       </div>
 
@@ -671,7 +714,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
 
       <Separator />
 
-      {/* Variants Configuration */}
+      {/* Variants Configuration - Gated by showsVariants capability */}
+      {showsVariants && (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label className="text-base font-medium">Product Variants</Label>
@@ -1128,6 +1172,23 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
           </div>
         )}
       </div>
+      )}
+
+      {!showsVariants && (
+        <Card className="opacity-50 border-gray-200 bg-gray-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <Copy className="h-5 w-5 text-gray-400" />
+              <div>
+                <h4 className="font-medium text-gray-500">Product Variants</h4>
+                <p className="text-sm text-gray-400">
+                  Variants are not available on your current plan. Upgrade to enable product variants.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Validation Summary */}
       <Card className={isFormValid() ? 'border-green-200 bg-green-50' : 'border-gray-200'}>

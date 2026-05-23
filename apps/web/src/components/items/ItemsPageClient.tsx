@@ -8,6 +8,7 @@ import { useItemsViewMode } from "@/hooks/useItemsViewMode";
 import { useItemsModals } from "@/hooks/useItemsModals";
 import { useItemsActions } from "@/hooks/useItemsActions";
 import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
+import { useProductOptionsCapability } from "@/hooks/tenant-access/useCapabilityAccess";
 import StoreInventoryHeader from "@/components/items/StoreInventoryHeader";
 import ItemsPagination from "@/components/items/ItemsPagination";
 import ItemsGrid from "@/components/items/ItemsGrid";
@@ -212,7 +213,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       createParam: params.get('create'),
       shouldOpenModal: params.get('create') === 'true'
     }); */
-    if (params.get('create') === 'true') {
+    if (params.get('create') === 'true' && isProductEnabled) {
       console.log('[ItemsPageClient] Opening create modal...');
       openCreateModal();
     }
@@ -455,7 +456,12 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     }
   };
 
+  // Product options capability gating
+  const productOptionsCap = useProductOptionsCapability(tenantId, { forTenant: true });
+  const isProductEnabled = productOptionsCap.data?.enabled ?? true;
+
   const handleCreateClick = () => {
+    if (!isProductEnabled) return;
     window.location.href = `/t/${tenantId}/items?create=true`;
   };
 
@@ -554,6 +560,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         onCreateClick={handleCreateClick}
         onBulkUploadClick={handleBulkUploadClick}
         tenantId={tenantId}
+        isProductEnabled={isProductEnabled}
       />
 
       {/* Filters */}

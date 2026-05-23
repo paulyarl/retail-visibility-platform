@@ -20,6 +20,7 @@ interface StoreInventoryHeaderProps {
   onCreateClick: () => void;
   onBulkUploadClick: () => void;
   tenantId: string;
+  isProductEnabled?: boolean;
 }
 
 interface TenantInfo {
@@ -37,6 +38,7 @@ export default function StoreInventoryHeader({
   onCreateClick,
   onBulkUploadClick,
   tenantId,
+  isProductEnabled = true,
 }: StoreInventoryHeaderProps) {
   const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,13 +176,15 @@ export default function StoreInventoryHeader({
       <div className="flex flex-wrap gap-3 mb-8">
         <Button
           onClick={onCreateClick}
-          className="bg-primary-600 hover:bg-primary-700 text-white"
+          disabled={!isProductEnabled}
+          className="bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Add Product
         </Button>
         <Button
-          onClick={() => window.open(`/t/${tenantId}/items/create`, '_self')}
-          className="bg-primary-600 hover:bg-primary-700 text-white"
+          onClick={() => isProductEnabled && window.open(`/t/${tenantId}/items/create`, '_self')}
+          disabled={!isProductEnabled}
+          className="bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Product Wizard
         </Button>

@@ -10,7 +10,7 @@
 
 export interface SKUGenerationParams {
   tenantKey?: string; // 4-character tenant identifier
-  productType: 'physical' | 'digital' | 'hybrid';
+  productType: 'physical' | 'digital' | 'hybrid' | 'service';
   deliveryMethod?: 'direct_download' | 'external_link' | 'email_delivery' | 'license_key' | 'access_grant' | 'shipping' | 'pickup' | 'delivery';
   accessControl?: 'personal' | 'commercial' | 'enterprise' | 'educational' | 'public' | 'subscription';
 }
@@ -19,6 +19,7 @@ const PRODUCT_TYPE_CODES: Record<string, string> = {
   physical: 'PHYS',
   digital: 'DIGI',
   hybrid: 'HYBR',
+  service: 'SERV',
 };
 
 const DELIVERY_METHOD_CODES: Record<string, string> = {

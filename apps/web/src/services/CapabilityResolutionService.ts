@@ -101,6 +101,26 @@ export interface FulfillmentState {
   features: Record<string, boolean>;
 }
 
+// --- Product Options ---
+
+export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
+
+export interface ProductOptionsState {
+  enabled: boolean;
+  /** Available product types based on capability features */
+  allowedTypes: ProductType[];
+  /** Whether variants are available during creation */
+  showsVariants: boolean;
+  /** Whether image gallery is available during creation */
+  showsGallery: boolean;
+  /** Whether video attachment is available during creation */
+  showsVideo: boolean;
+  /** Whether all product options are available (flexible tier) */
+  isFlexible: boolean;
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Combined ---
 
 export interface AllCapabilitiesState {
@@ -110,6 +130,7 @@ export interface AllCapabilitiesState {
   storefront: StorefrontState;
   barcodeScan: BarcodeScanState;
   fulfillment: FulfillmentState;
+  productOptions: ProductOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -123,6 +144,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
   fulfillment_: 'fulfillment_options',
+  product_: 'product_options',
 };
 
 /**
@@ -249,6 +271,39 @@ export function resolveFulfillmentState(features: Record<string, boolean>): Fulf
     showsDelivery,
     showsShipping,
     showsService,
+    isFlexible: flexible,
+    features,
+  };
+}
+
+/**
+ * Resolve product options state from raw capability features
+ */
+export function resolveProductOptionsState(features: Record<string, boolean>): ProductOptionsState {
+  const enabled = !!features.product_enabled;
+  const disabled = !!features.product_disabled;
+  const flexible = !!features.product_flexible;
+  const physical = !!features.product_physical;
+  const digital = !!features.product_digital;
+  const hybrid = !!features.product_hybrid;
+  const service = !!features.product_service;
+  const variant = !!features.product_variant;
+  const gallery = !!features.product_gallery;
+  const video = !!features.product_video;
+
+  // If flexible, all options are available regardless of individual flags
+  const allowedTypes: ProductType[] = [];
+  if (flexible || physical) allowedTypes.push('physical');
+  if (flexible || digital) allowedTypes.push('digital');
+  if (flexible || hybrid) allowedTypes.push('hybrid');
+  if (flexible || service) allowedTypes.push('service');
+
+  return {
+    enabled: enabled && !disabled,
+    allowedTypes,
+    showsVariants: flexible || variant,
+    showsGallery: flexible || gallery,
+    showsVideo: flexible || video,
     isFlexible: flexible,
     features,
   };
@@ -395,6 +450,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get product options state for a tenant
+   */
+  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.productOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -419,6 +482,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
+    const productOptionsFeatures = data.capabilities?.product_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -427,6 +491,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
+      productOptions: resolveProductOptionsState(productOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -529,6 +594,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get product options state for a tenant
+   */
+  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.productOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -550,6 +623,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
+    const productOptionsFeatures = data.capabilities?.product_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -558,6 +632,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
+      productOptions: resolveProductOptionsState(productOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

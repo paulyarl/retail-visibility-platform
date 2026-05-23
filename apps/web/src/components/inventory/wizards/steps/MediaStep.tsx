@@ -16,6 +16,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { 
   Image, 
   Camera, 
@@ -144,6 +145,12 @@ function getVideoEmbedUrl(url: string): string | null {
 export default function MediaStep({ data, errors, productType, variants, onChange }: MediaStepProps) {
   const params = useParams();
   const tenantId = params.tenantId as string;
+
+  // Product options capability gating for gallery and video
+  const productOptionsCap = useProductOptionsCapability(tenantId || null, { forTenant: true });
+  const showsGallery = productOptionsCap.data?.showsGallery ?? true;
+  const showsVideo = productOptionsCap.data?.showsVideo ?? true;
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -558,7 +565,8 @@ export default function MediaStep({ data, errors, productType, variants, onChang
         )}
       </div>
 
-      {/* Gallery Images */}
+      {/* Gallery Images - Gated by showsGallery capability */}
+      {showsGallery && (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label className="text-base font-medium">Gallery Images</Label>
@@ -635,8 +643,26 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           </div>
         )}
       </div>
+      )}
 
-      {/* Video URL */}
+      {!showsGallery && (
+        <Card className="opacity-50 border-gray-200 bg-gray-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <Image className="h-5 w-5 text-gray-400" />
+              <div>
+                <h4 className="font-medium text-gray-500">Image Gallery</h4>
+                <p className="text-sm text-gray-400">
+                  Gallery images are not available on your current plan. Upgrade to enable multiple product images.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Video URL - Gated by showsVideo capability */}
+      {showsVideo && (
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
           <Video className="h-4 w-4 text-blue-600" />
@@ -710,6 +736,23 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           </>
         )}
       </div>
+      )}
+
+      {!showsVideo && (
+        <Card className="opacity-50 border-gray-200 bg-gray-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <Video className="h-5 w-5 text-gray-400" />
+              <div>
+                <h4 className="font-medium text-gray-500">Product Video</h4>
+                <p className="text-sm text-gray-400">
+                  Video attachments are not available on your current plan. Upgrade to enable product videos.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Variant Media Configuration */}
       {productType.hasVariants && (
