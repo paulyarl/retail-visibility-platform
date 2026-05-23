@@ -908,7 +908,7 @@ export default function StorefrontClientWrapper({
             )}
             {/* Contact & Hours Sidebar */}
             <div className="space-y-6">
-              
+
               {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
