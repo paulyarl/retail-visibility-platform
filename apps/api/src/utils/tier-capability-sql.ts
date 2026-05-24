@@ -75,29 +75,35 @@ export const TIER_FEATURED_ACCESS_JOIN = `LEFT JOIN tier_featured_access tfa ON 
  *   3. Platform-controlled group gate (NOT disabled AND (flexible OR enabled OR individual key in allowed_type_keys))
  */
 export const TIER_FEATURED_ACCESS_WHERE = `
-  -- Capability gate: tier must have featured enabled and not disabled
-  AND (tfa.featured_enabled = true AND tfa.featured_disabled = false)
-  -- Group gate: tenant-controlled types (enabled → all, untouched → individual keys, disabled → none)
+  -- Fail-open: when no tier config exists (tfa is NULL), skip all capability gating
   AND (
-    mgd.featured_type NOT IN ('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured')
+    tfa.tier_key IS NULL
     OR (
-      tfa.tenant_disabled = false
+      -- Capability gate: tier must have featured enabled and not disabled
+      tfa.featured_enabled = true AND tfa.featured_disabled = false
+      -- Group gate: tenant-controlled types (enabled → all, untouched → individual keys, disabled → none)
       AND (
-        tfa.is_flexible = true
-        OR tfa.tenant_enabled = true
-        OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+        mgd.featured_type NOT IN ('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured')
+        OR (
+          tfa.tenant_disabled = false
+          AND (
+            tfa.is_flexible = true
+            OR tfa.tenant_enabled = true
+            OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+          )
+        )
       )
-    )
-  )
-  -- Group gate: platform-controlled types (enabled → all, untouched → individual keys, disabled → none)
-  AND (
-    mgd.featured_type NOT IN ('bestseller', 'trending', 'recommended', 'random_featured')
-    OR (
-      tfa.platform_disabled = false
+      -- Group gate: platform-controlled types (enabled → all, untouched → individual keys, disabled → none)
       AND (
-        tfa.is_flexible = true
-        OR tfa.platform_enabled = true
-        OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+        mgd.featured_type NOT IN ('bestseller', 'trending', 'recommended', 'random_featured')
+        OR (
+          tfa.platform_disabled = false
+          AND (
+            tfa.is_flexible = true
+            OR tfa.platform_enabled = true
+            OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+          )
+        )
       )
     )
   )

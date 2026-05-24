@@ -14,7 +14,6 @@ interface QueryParams {
   limit?: string;
   lat?: string;
   lng?: string;
-  radius?: string;
 }
 
 // Get random featured products from ALL stores
@@ -24,28 +23,10 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(params.limit || '20'), 100); // Cap at 100
     const lat = params.lat ? parseFloat(params.lat) : null;
     const lng = params.lng ? parseFloat(params.lng) : null;
-    const radius = params.radius ? parseFloat(params.radius) : 50; // 50km default radius
-
     const { getDirectPool } = await import('../utils/db-pool');
     const pool = getDirectPool();
 
     const hasLocation = lat !== null && lng !== null;
-
-    // Build location-dependent SQL fragments only when coordinates are provided
-    // This avoids "could not determine data type of parameter $2" when no location
-    const locationFilter = hasLocation ? `
-        AND (
-          tenant_latitude IS NOT NULL 
-          AND tenant_longitude IS NOT NULL
-          AND (
-            6371 * acos(
-              least(1.0, cos(radians($2)) * cos(radians(tenant_latitude)) * 
-              cos(radians(tenant_longitude) - radians($3)) + 
-              sin(radians($2)) * sin(radians(tenant_latitude)))
-            ) <= $4
-          )
-        )
-      ` : '';
 
     const distanceColumn = hasLocation ? `
           6371 * acos(
@@ -54,7 +35,8 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
             sin(radians($2)) * sin(radians(tenant_latitude)))
           ) as distanceKm` : 'NULL::double precision as distanceKm';
 
-    const locationOrder = hasLocation ? ', distanceKm' : '';
+    // Sort closest-first when location provided, otherwise pure random
+    const outerOrderBy = hasLocation ? 'distanceKm ASC, RANDOM()' : 'RANDOM()'
 
     // Tier-capability-aware query: JOIN against tier_features_list to ensure
     // the tenant's tier actually allows the featured_type before showing it.
@@ -63,7 +45,7 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
       SELECT * FROM (
         SELECT DISTINCT ON (inventory_item_id)
           inventory_item_id as id,
-          tenant_id,
+          mgd.tenant_id,
           sku,
           product_name as name,
           product_title as title,
@@ -102,16 +84,15 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
           AND stock > 0
           ${TIER_FEATURED_ACCESS_WHERE}
           ${TENANT_PREFS_WHERE}
-          ${locationFilter}
         ORDER BY 
           inventory_item_id,
           featured_priority DESC
       ) deduped
-      ORDER BY RANDOM()${locationOrder}
+      ORDER BY ${outerOrderBy}
       LIMIT $1
     `;
 
-    const queryParams = hasLocation ? [limit, lat, lng, radius] : [limit];
+    const queryParams = hasLocation ? [limit, lat, lng] : [limit];
     const result = await pool.query(query, queryParams);
 
     // Transform to match frontend expected format (flat structure like old endpoint)
@@ -158,7 +139,7 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
       data: {
         products,
         total: products.length,
-        location: lat && lng ? { lat, lng, radius } : null
+        location: lat && lng ? { lat, lng } : null
       }
     });
 
