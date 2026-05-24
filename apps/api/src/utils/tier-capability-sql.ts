@@ -71,27 +71,35 @@ export const TIER_FEATURED_ACCESS_JOIN = `LEFT JOIN tier_featured_access tfa ON 
  *
  * Gates:
  *   1. featured_enabled = true AND featured_disabled = false
- *   2. Specific featured_type allowed (flexible OR featured_{type} in allowed_type_keys)
- *   3. Tenant-controlled group gate (tenant_enabled AND NOT tenant_disabled)
- *   4. Platform-controlled group gate (platform_enabled AND NOT platform_disabled)
+ *   2. Tenant-controlled group gate (NOT disabled AND (flexible OR enabled OR individual key in allowed_type_keys))
+ *   3. Platform-controlled group gate (NOT disabled AND (flexible OR enabled OR individual key in allowed_type_keys))
  */
 export const TIER_FEATURED_ACCESS_WHERE = `
   -- Capability gate: tier must have featured enabled and not disabled
   AND (tfa.featured_enabled = true AND tfa.featured_disabled = false)
-  -- Capability gate: specific featured_type must be allowed
-  AND (
-    tfa.is_flexible = true
-    OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
-  )
-  -- Group gate: tenant-controlled types
+  -- Group gate: tenant-controlled types (enabled → all, untouched → individual keys, disabled → none)
   AND (
     mgd.featured_type NOT IN ('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured')
-    OR (tfa.tenant_enabled = true AND tfa.tenant_disabled = false)
+    OR (
+      tfa.tenant_disabled = false
+      AND (
+        tfa.is_flexible = true
+        OR tfa.tenant_enabled = true
+        OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+      )
+    )
   )
-  -- Group gate: platform-controlled types
+  -- Group gate: platform-controlled types (enabled → all, untouched → individual keys, disabled → none)
   AND (
     mgd.featured_type NOT IN ('bestseller', 'trending', 'recommended', 'random_featured')
-    OR (tfa.platform_enabled = true AND tfa.platform_disabled = false)
+    OR (
+      tfa.platform_disabled = false
+      AND (
+        tfa.is_flexible = true
+        OR tfa.platform_enabled = true
+        OR ('featured_' || mgd.featured_type) = ANY(tfa.allowed_type_keys)
+      )
+    )
   )
 `;
 
@@ -112,7 +120,7 @@ export const TENANT_PREFS_JOIN = `LEFT JOIN tenant_featured_options_settings tfo
  * When no settings row exists (new tenant), defaults apply:
  *   - featured_enabled = true
  *   - Tenant-controlled types = true (on by default)
- *   - Platform-controlled types = false (off by default)
+ *   - Platform-controlled types = true (on by default)
  *
  * Gates:
  *   1. Tenant must have featured_enabled = true (or no row = default true)
@@ -130,10 +138,10 @@ export const TENANT_PREFS_WHERE = `
     WHEN 'staff_pick' THEN COALESCE(tfos.featured_staff_pick, true)
     WHEN 'clearance' THEN COALESCE(tfos.featured_clearance, true)
     WHEN 'featured' THEN COALESCE(tfos.featured_featured, true)
-    WHEN 'bestseller' THEN COALESCE(tfos.featured_bestseller, false)
-    WHEN 'trending' THEN COALESCE(tfos.featured_trending, false)
-    WHEN 'recommended' THEN COALESCE(tfos.featured_recommended, false)
-    WHEN 'random_featured' THEN COALESCE(tfos.featured_random_featured, false)
+    WHEN 'bestseller' THEN COALESCE(tfos.featured_bestseller, true)
+    WHEN 'trending' THEN COALESCE(tfos.featured_trending, true)
+    WHEN 'recommended' THEN COALESCE(tfos.featured_recommended, true)
+    WHEN 'random_featured' THEN COALESCE(tfos.featured_random_featured, true)
     ELSE false
   END = true
 `;

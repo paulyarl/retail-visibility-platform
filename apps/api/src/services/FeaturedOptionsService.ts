@@ -159,36 +159,56 @@ class FeaturedOptionsService {
     const enabled = !!features.featured_enabled;
     const disabled = !!features.featured_disabled;
     const flexible = !!features.featured_flexible;
-    const tenantEnabled = !!features.featured_tenant_enabled && !features.featured_tenant_disabled;
-    const platformEnabled = !!features.featured_platform_enabled && !features.featured_platform_disabled;
+    const tenantGroupEnabled = !!features.featured_tenant_enabled;
+    const tenantGroupDisabled = !!features.featured_tenant_disabled;
+    const platformGroupEnabled = !!features.featured_platform_enabled;
+    const platformGroupDisabled = !!features.featured_platform_disabled;
+
+    // Three states per group: enabled → all types, untouched → individual features, disabled → none
+    const tenantEnabled = tenantGroupEnabled && !tenantGroupDisabled;
+    const tenantUntouched = !tenantGroupEnabled && !tenantGroupDisabled;
+    const platformEnabled = platformGroupEnabled && !platformGroupDisabled;
+    const platformUntouched = !platformGroupEnabled && !platformGroupDisabled;
 
     // Tenant-controlled types
     const allowedTenantTypes: FeaturedType[] = [];
-    if (flexible || features.featured_store_selection) allowedTenantTypes.push('store_selection');
-    if (flexible || features.featured_new_arrival) allowedTenantTypes.push('new_arrival');
-    if (flexible || features.featured_seasonal) allowedTenantTypes.push('seasonal');
-    if (flexible || features.featured_sale) allowedTenantTypes.push('sale');
-    if (flexible || features.featured_staff_pick) allowedTenantTypes.push('staff_pick');
-    if (flexible || features.featured_clearance) allowedTenantTypes.push('clearance');
-    if (flexible || features.featured_featured) allowedTenantTypes.push('featured');
+    if (flexible || tenantEnabled) {
+      // Group enabled or flexible → all tenant types
+      allowedTenantTypes.push('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured');
+    } else if (tenantUntouched) {
+      // Group untouched → only explicitly listed features
+      if (features.featured_store_selection) allowedTenantTypes.push('store_selection');
+      if (features.featured_new_arrival) allowedTenantTypes.push('new_arrival');
+      if (features.featured_seasonal) allowedTenantTypes.push('seasonal');
+      if (features.featured_sale) allowedTenantTypes.push('sale');
+      if (features.featured_staff_pick) allowedTenantTypes.push('staff_pick');
+      if (features.featured_clearance) allowedTenantTypes.push('clearance');
+      if (features.featured_featured) allowedTenantTypes.push('featured');
+    }
+    // else: tenantGroupDisabled → no tenant types
 
     // Platform-controlled types
     const allowedPlatformTypes: FeaturedType[] = [];
-    if (flexible || features.featured_bestseller) allowedPlatformTypes.push('bestseller');
-    if (flexible || features.featured_trending) allowedPlatformTypes.push('trending');
-    if (flexible || features.featured_recommended) allowedPlatformTypes.push('recommended');
-    if (flexible || features.featured_random_featured) allowedPlatformTypes.push('random_featured');
+    if (flexible || platformEnabled) {
+      // Group enabled or flexible → all platform types
+      allowedPlatformTypes.push('bestseller', 'trending', 'recommended', 'random_featured');
+    } else if (platformUntouched) {
+      // Group untouched → only explicitly listed features
+      if (features.featured_bestseller) allowedPlatformTypes.push('bestseller');
+      if (features.featured_trending) allowedPlatformTypes.push('trending');
+      if (features.featured_recommended) allowedPlatformTypes.push('recommended');
+      if (features.featured_random_featured) allowedPlatformTypes.push('random_featured');
+    }
+    // else: platformGroupDisabled → no platform types
 
-    const effectiveTenantTypes = tenantEnabled ? allowedTenantTypes : [];
-    const effectivePlatformTypes = platformEnabled ? allowedPlatformTypes : [];
-    const allTypes = [...effectiveTenantTypes, ...effectivePlatformTypes];
+    const allTypes = [...allowedTenantTypes, ...allowedPlatformTypes];
 
     return {
       enabled: enabled && !disabled,
       tenantEnabled,
       platformEnabled,
-      allowedTenantTypes: effectiveTenantTypes,
-      allowedPlatformTypes: effectivePlatformTypes,
+      allowedTenantTypes,
+      allowedPlatformTypes,
       allowedTypes: allTypes,
       isFlexible: flexible,
       featuredAvailable: enabled && !disabled && allTypes.length > 0,
