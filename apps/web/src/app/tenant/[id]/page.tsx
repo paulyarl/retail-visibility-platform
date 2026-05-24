@@ -193,17 +193,17 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // console.log(`[getTenantWithProducts] Resolved tenant ID: ${idResolvedBySlug}`);
 
     const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
-    
+
     // Extract business hours data from API response
     const rawBusinessHours = hoursResponse?.data || hoursResponse;
-    
+
     // Transform business hours data to handle periods format
     let businessHours = null;
     if (rawBusinessHours) {
       if (rawBusinessHours.periods && Array.isArray(rawBusinessHours.periods)) {
         const { periods, timezone } = rawBusinessHours;
         const hours: any = { timezone };
-        
+
         // Convert periods to day-based format for BusinessHoursDisplay
         periods.forEach((period: any) => {
           const dayName = period.day?.toUpperCase();
@@ -214,7 +214,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
             };
           }
         });
-        
+
         // Include periods array for BusinessHoursDisplay to handle multiple periods
         hours.periods = periods;
         businessHours = hours;
@@ -223,7 +223,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         businessHours = rawBusinessHours;
       }
     }
-    
+
     // Fetch full shop details using the resolved tenant ID
 
     const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
@@ -239,7 +239,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // }
 
 
-    
+
     // console.log('[TenantPage] Shop info response:', shopInfo);
     // console.log('[TenantPage] Tenant data:', tenant);
 
@@ -259,18 +259,18 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // API returns { success: true, shop: {...} }
     const shopData = shopInfo?.success ? shopInfo.shop : null;
 
-    if (shopData||tenant) {
+    if (shopData || tenant) {
       tenantData.metadata = {
         ...tenantData.metadata,
-        businessName: tenantProfileData?.business_name|| shopData?.business_name || tenantData.name,
-        phone: tenantProfileData?.phone_number||shopData?.phone || null,
-        email: tenantProfileData?.email||shopData?.email || null,
-        website:tenantProfileData?.website|| shopData?.website || null,
-        address:tenantProfileData?.address_line1|| shopData?.address && tenantProfileData?.city|| shopData?.city && tenantProfileData?.state|| shopData?.state && tenantProfileData?.postal_code|| shopData?.zip_code
-          ? `${tenantProfileData?.address_line1||shopData.address}, ${tenantProfileData?.city||shopData.city}, ${tenantProfileData?.state||shopData.state} ${tenantProfileData?.postal_code||shopData.zip_code}`
+        businessName: tenantProfileData?.business_name || shopData?.business_name || tenantData.name,
+        phone: tenantProfileData?.phone_number || shopData?.phone || null,
+        email: tenantProfileData?.email || shopData?.email || null,
+        website: tenantProfileData?.website || shopData?.website || null,
+        address: tenantProfileData?.address_line1 || shopData?.address && tenantProfileData?.city || shopData?.city && tenantProfileData?.state || shopData?.state && tenantProfileData?.postal_code || shopData?.zip_code
+          ? `${tenantProfileData?.address_line1 || shopData.address}, ${tenantProfileData?.city || shopData.city}, ${tenantProfileData?.state || shopData.state} ${tenantProfileData?.postal_code || shopData.zip_code}`
           : null,
-        logo_url:tenantProfileData?.logo_url|| shopData?.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
-        business_description: tenantProfileData?.business_description||shopData?.description || null,
+        logo_url: tenantProfileData?.logo_url || shopData?.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
+        business_description: tenantProfileData?.business_description || shopData?.description || null,
         defaultGatewayType: shopData?.default_gateway_type || null,
         hasActivePaymentGateway: shopData?.has_active_payment_gateway || false,
         isActive: shopData?.is_active || false,
@@ -283,13 +283,13 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         isInactive: shopData?.is_inactive || false,
 
       };
-      
+
     } else {
       // console.log('[TenantPage] No shop data found');
-     // console.log('[TenantPage] Raw shopInfo:', shopInfo);
+      // console.log('[TenantPage] Raw shopInfo:', shopInfo);
     }
 
-    const hasLogo = !!tenantProfileData?.logo_url||!!tenantData.metadata?.logo_url;
+    const hasLogo = !!tenantProfileData?.logo_url || !!tenantData.metadata?.logo_url;
     const hasBranding = hasLogo || !!businessHours;
     const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
 
@@ -335,7 +335,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch products using singleton service (use resolved tenant ID)
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
     const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
-    
+
     let productsData;
     if (featured) {
       // Use the featured products API when filtering by featured type
@@ -362,7 +362,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // console.log('[TenantPage] Raw products:', rawProducts);
 
     // Deduplicate products by ID to prevent React key conflicts
-    const uniqueRawProducts = rawProducts.filter((product, index, arr) => 
+    const uniqueRawProducts = rawProducts.filter((product, index, arr) =>
       arr.findIndex(p => p.id === product.id) === index
     );
 
@@ -388,7 +388,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
     // console.log(`${featured ? 'Featured' : 'Regular'} Products Data:`, productsData);
 
-    const total = featured 
+    const total = featured
       ? ('count' in productsData ? productsData.count : 0) || products.length // Featured API uses count field
       : ('pagination' in productsData ? productsData.pagination?.totalItems : ('total' in productsData ? productsData.total : 0)) || products.length;
 
@@ -442,8 +442,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   // console.log(`[TenantStorefrontPage] searchParams:`, searchParams);
   const currentPage = parseInt(pageParam || '1', 10);
   // console.log(`[TenantStorefrontPage] currentPage:`, currentPage);
-  
-  
+
+
   // Check if products_only mode is enabled
   const isProductsOnly = products_only === 'true';
   // console.log(`[TenantStorefrontPage] isProductsOnly:`, isProductsOnly);
@@ -468,7 +468,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
       case 'clearance': return 'Clearance Items';
       case 'recommended': return 'Recommended Items';
       case 'featured': return 'Featured Items';
-      
+
       default: return 'Products';
     }
   };
@@ -477,7 +477,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   const businessName = tenant.metadata?.businessName || tenant.name;
   // console.log('[TenantPage Main] 12 Store Categories:', storeCategories);
   // console.log('[TenantPage Main] 11 Product Categories:', productCategories);
-  
+
   // console.log('[TenantPage Main] Current Category:', currentCategory);
 
   // console.log('[TenantPage Main] Resolved Tenant ID:', resolvedTenantId);
@@ -516,11 +516,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   const totalPages = Math.ceil(total / limit);
 
   // API base URL for additional calls
- // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   // Fetch directory publish status and actual slug using singleton services
-  let directoryPublished = tenant?.hasDirectory||false;
-  let tenantSlug = tenant?.slug||id;
+  let directoryPublished = tenant?.hasDirectory || false;
+  let tenantSlug = tenant?.slug || id;
 
   // try {
   //   // Use tenant directory service to get the actual slug from the API
@@ -528,42 +528,45 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   //  console.log(`[TenantPage] Tenant ID: ${tenant?.id}`);
   //  console.log(`[TenantPage] Tenant slug: ${tenant?.slug}`);
   //  console.log(`[TenantPage] Tenant: ${JSON.stringify(tenant)}`);
-    // const apiSlug = await tenantDirectoryService.getTenantSlug(id);
+  // const apiSlug = await tenantDirectoryService.getTenantSlug(id);
   // const apiSlug = tenant?.slug;
   //  console.log('[TenantPage] API slug:', apiSlug);
 
-    // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
-    // directoryPublished = tenant.hasPublishedDirectory ?? false;
+  // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
+  // directoryPublished = tenant.hasPublishedDirectory ?? false;
 
-    // Use API slug if available, otherwise generate from business name or use tenant ID
-    // tenantSlug = apiSlug || data.tenant?.slug || id;
-    // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
+  // Use API slug if available, otherwise generate from business name or use tenant ID
+  // tenantSlug = apiSlug || data.tenant?.slug || id;
+  // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
   // } catch (e) {
-    // Directory page doesn't exist or error - store is not published
-    // console.warn('[TenantPage] Directory service failed:', e);
-    // directoryPublished = false;
-    // Fallback to generated slug
-    // tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  // Directory page doesn't exist or error - store is not published
+  // console.warn('[TenantPage] Directory service failed:', e);
+  // directoryPublished = false;
+  // Fallback to generated slug
+  // tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   // }
 
   // Find primary store category for header badge
   // console.log('[TenantPage] Store Categories:', storeCategories);
   // console.log('[TenantPage] Tenant Primary Category:', tenant);
-  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary) ;
+  const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
   // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary:', tenant?.metadata?.gbp_categories?.primary); 
   // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary?.name:', tenant?.metadata?.gbp_categories?.primary?.name); 
   // console.log('[TenantPage] tenant?.metadata?.gbpCategories?.primary?.name:', tenant?.metadata?.gbpCategories?.primary?.name); 
 
-  // Get GBP categories from new dedicated fields (fallback to metadata for backward compatibility)
-  const primaryGBPCategory = tenant?.metadata?.gbp_categories?.primary || 
-                           tenant?.metadata?.gbpCategories?.primary;
-  const secondaryGBPCategories = tenant?.gbp_secondary_categories || 
-                                tenant?.secondary_categories || 
-                                tenant?.metadata?.gbp_categories?.secondary || 
-                                tenant?.metadata?.gbpCategories?.secondary || [];
+  // Get GBP categories from dedicated API fields (top-level on tenant object)
+  const primaryGBPCategory = tenant?.gbpPrimaryCategoryName
+    ? { id: tenant.gbpPrimaryCategoryId, name: tenant.gbpPrimaryCategoryName }
+    : tenant?.metadata?.gbp_categories?.primary ||
+      tenant?.metadata?.gbpCategories?.primary;
+  const secondaryGBPCategories = tenant?.gbpSecondaryCategories ||
+    tenant?.gbp_secondary_categories ||
+    tenant?.secondary_categories ||
+    tenant?.metadata?.gbp_categories?.secondary ||
+    tenant?.metadata?.gbpCategories?.secondary || [];
 
-  // console.log(`[TenantPage] Primary GBP Category: ${primaryGBPCategory}`);
-  // console.log(`[TenantPage] Secondary GBP Categories: ${JSON.stringify(secondaryGBPCategories)}`);
+  console.log(`[TenantPage] Primary GBP Category: ${primaryGBPCategory}`);
+  console.log(`[TenantPage] Secondary GBP Categories: ${JSON.stringify(secondaryGBPCategories)}`);
   // Fetch total product count for "All Products" using singleton service
   let totalAllProducts = 0;
   try {
@@ -661,7 +664,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   return (
     <ProductSingletonProvider>
       <TenantPaymentProvider tenantId={resolvedTenantId || tenant.id || id}>
-        <StorefrontClientWrapper 
+        <StorefrontClientWrapper
           tenantId={resolvedTenantId || tenant.id || id}
           tenant={tenant}
           platformSettings={platformSettings}
@@ -678,7 +681,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
           category={category}
           featured={featured}
           view={view}
-          isProductsOnly={isProductsOnly} 
+          isProductsOnly={isProductsOnly}
           directoryPublished={directoryPublished}
           tenantSlug={tenantSlug}
           primaryGBPCategory={primaryGBPCategory}

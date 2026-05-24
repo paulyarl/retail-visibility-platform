@@ -11,7 +11,8 @@ interface RecommendedProduct {
   id: string;
   name: string;
   title: string;
-  price: number;
+  priceCents: number;
+  salePriceCents?: number | null;
   currency: string;
   imageUrl?: string;
   brand?: string;
@@ -90,7 +91,8 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
                 name: product.name,
                 title: product.title,
                 brand: product.brand,
-                priceCents: Math.round(product.price * 100),
+                priceCents: product.priceCents,
+                salePriceCents: product.salePriceCents ?? undefined,
                 stock: 999,
                 imageUrl: product.imageUrl,
                 tenantId: product.tenantId,

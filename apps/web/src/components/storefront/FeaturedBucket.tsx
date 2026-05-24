@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UniversalProductCard } from '@/components/products/UniversalProductCard';
+import SmartProductCard from '@/components/products/SmartProductCard';
 
 interface FeaturedBucketProps {
   title: string;
@@ -93,14 +93,29 @@ export default function FeaturedBucket({
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {currentProducts.map((product: any) => (
-          <UniversalProductCard
+          <SmartProductCard
             key={product.id}
-            productId={product.id}
             tenantId={tenantId}
-            productData={product}
+            product={{
+              id: product.id,
+              sku: product.sku,
+              name: product.name,
+              title: product.title || product.name,
+              brand: product.brand || '',
+              description: product.description || '',
+              priceCents: product.priceCents,
+              salePriceCents: product.salePriceCents,
+              stock: product.stock,
+              imageUrl: product.imageUrl,
+              tenantId: product.tenantId,
+              availability: product.availability || 'in_stock',
+              has_variants: product.hasVariants || false,
+              has_active_payment_gateway: hasActivePaymentGateway,
+              payment_gateway_type: defaultGatewayType
+            }}
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
-            commerceDisabled={commerceDisabled}
+            variant="featured"
           />
         ))}
       </div>

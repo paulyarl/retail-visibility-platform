@@ -727,7 +727,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {(() => {
-                        // console.log('[Directory Page] Mapping featured products:', featuredProducts);
+                        // console.log('[Directory Page] Mapping featured products:', featuredProducts.map((p: any) => ({
+                        //   id: p.id,
+                        //   name: p.name,
+                        //   priceCents: p.priceCents,
+                        //   salePriceCents: p.salePriceCents,
+                        //   hasSale: !!p.salePriceCents
+                        // })));
                         return featuredProducts.map((product: any) => (
                           <SmartProductCard
                             key={`directory-featured-${product.id}`}

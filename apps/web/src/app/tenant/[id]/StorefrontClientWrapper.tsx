@@ -129,20 +129,12 @@ export default function StorefrontClientWrapper({
   locationStatus,
   statusInfo,
 }: StorefrontClientWrapperProps) {
-  // Extract contact information from tenant metadata with fallbacks
-  const contactInfo = {
-    phone: tenant?.metadata?.phone || tenant?.phone || null,
-    email: tenant?.metadata?.email || tenant?.email || null,
-    address: tenant?.metadata?.address ||
-      (tenant?.address_line1 ? `${tenant.address_line1}${tenant.city ? ', ' + tenant.city : ''}${tenant.state ? ', ' + tenant.state : ''}${tenant.postal_code ? ' ' + tenant.postal_code : ''}` : null),
-    website: tenant?.metadata?.website || tenant?.website || null
-  };
-  // console.log(`[StorefrontClientWrapper] tenant info:`, tenant);
-  // console.log(`[StorefrontClientWrapper] tenant category:`, category);
-  // console.log(`[StorefrontClientWrapper] tenant primaryGBPCategory:`, primaryGBPCategory);
-  // console.log(`[StorefrontClientWrapper] tenant secondaryGBPCategories:`, secondaryGBPCategories);
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
+
+  // console.log(`primaryGBPCategory    : ${JSON.stringify(primaryGBPCategory)}`);
+  // console.log(`secondaryGBPCategories: ${JSON.stringify(secondaryGBPCategories)}`);
+  // console.log(`locationStatus        : ${locationStatus}`);
 
   const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({});
 
@@ -188,6 +180,20 @@ export default function StorefrontClientWrapper({
   const showsLocation = storefrontCap.data?.showsLocation ?? true; // default to true while loading
   const showsMap = storefrontCap.data?.showsMap ?? true;
   const showsHours = storefrontCap.data?.showsHours ?? true;
+
+  // Extract contact information from tenant metadata with fallbacks
+  // Lazy: wait for storefrontCap to resolve before computing, so capability-driven
+  // visibility (showsLocation, showsMap) is available before first render that uses it
+  const contactInfo = useMemo(() => {
+    if (storefrontCap.loading) return { phone: null, email: null, address: null, website: null };
+    return {
+      phone: tenant?.metadata?.phone || tenant?.phone || null,
+      email: tenant?.metadata?.email || tenant?.email || null,
+      address: tenant?.metadata?.address ||
+        (tenant?.address_line1 ? `${tenant.address_line1}${tenant.city ? ', ' + tenant.city : ''}${tenant.state ? ', ' + tenant.state : ''}${tenant.postal_code ? ' ' + tenant.postal_code : ''}` : null),
+      website: tenant?.metadata?.website || tenant?.website || null
+    };
+  }, [storefrontCap.loading, tenant]);
 
   // Status indicator color
   // const getStatusColor = () => {
@@ -364,7 +370,7 @@ export default function StorefrontClientWrapper({
             </div>
           </div>
           {/* Category Badges */}
-          {primaryGBPCategory && (
+          {primaryGBPCategory && isRetailStore && (
             <div className="flex-1">
               <GBPCategoryBadges
                 categories={[primaryGBPCategory, ...secondaryGBPCategories]}
@@ -374,7 +380,7 @@ export default function StorefrontClientWrapper({
             </div>
           )}
           {/* Action Buttons - Below categories for better responsive behavior */}
-          {!storefrontStatus.shouldShowPanel && tenantSlug && (
+          {!storefrontStatus.shouldShowPanel && tenantSlug && isRetailStore && (
             <div className="hidden sm:flex justify-end mt-3">
               {showsHours && isRetailStore && (
                 <HoursStatusBadge status={hoursStatus} size="lg" />
@@ -392,7 +398,7 @@ export default function StorefrontClientWrapper({
           )}
           {/* Mobile Navigation */}
           <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
-            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
               <a
                 href={`/directory/${tenantSlug}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
@@ -403,7 +409,7 @@ export default function StorefrontClientWrapper({
                 <span>Directory</span>
               </a>
             )}
-            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+            {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
               <a
                 href={`/shops/${tenantSlug}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
@@ -941,9 +947,9 @@ export default function StorefrontClientWrapper({
               )}
               {/* Map & Location */}
               <div className="lg:col-span-2">
-                <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
-                  {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
-                    <div className="p-6">
+                <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden"  >
+                  {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && isRetailStore && (
+                    <div className="p-6" >
                       <><h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
                         Visit Our Store
                       </h3><p className="text-neutral-600 dark:text-neutral-400 mb-4">
@@ -956,9 +962,9 @@ export default function StorefrontClientWrapper({
                     </div>
                   )}
                   {/* Single Map Display */}
-                  {!storefrontStatus.shouldShowPanel && showsMap && mapLocation ? (
+                  {!storefrontStatus.shouldShowPanel && showsMap && isRetailStore && mapLocation ? (
                     <TenantMapSection location={mapLocation} />
-                  ) : !storefrontStatus.shouldShowPanel && showsMap && contactInfo.address ? (
+                  ) : !storefrontStatus.shouldShowPanel && showsMap && isRetailStore && contactInfo.address ? (
                     <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
                   ) : tenant && (
                     <StorefrontMap
@@ -978,6 +984,7 @@ export default function StorefrontClientWrapper({
                       }}
                       primaryCategory={primaryGBPCategory?.name}
                       productCount={totalItems}
+
                     />
                   )}
                 </div>
@@ -1041,7 +1048,7 @@ export default function StorefrontClientWrapper({
                 Quick Links
               </h3>
               <div className="flex flex-wrap gap-4">
-                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <Link
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
@@ -1052,7 +1059,7 @@ export default function StorefrontClientWrapper({
                     View in Directory
                   </Link>
                 )}
-                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <Link
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
@@ -1063,24 +1070,25 @@ export default function StorefrontClientWrapper({
                     View in Shops
                   </Link>
                 )}
-                <Link
-                  href="/directory"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Browse Directory
-                </Link>
-                <Link
-                  href="/shops"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4z" />
-                  </svg>
-                  Browse Shops
-                </Link>
+                {!storefrontStatus.shouldShowPanel && isRetailStore && (
+                  <><Link
+                    href="/directory"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Browse Directory
+                  </Link><Link
+                    href="/shops"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
+                  >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4z" />
+                      </svg>
+                      Browse Shops
+                    </Link></>
+                )}
               </div>
             </div>
           </div>

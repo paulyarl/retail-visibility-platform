@@ -171,8 +171,8 @@ export function useSubscriptionUsage(tenantIdProp?: string, props?: Subscription
         trialEndsAt: tenant.trialEndsAt,
       });
 
-      // Extract GBP primary category from metadata
-      const gbpPrimaryCategory = tenant.metadata?.gbp_categories?.primary?.name || null;
+      // Extract GBP primary category from dedicated API fields (fallback to metadata)
+      const gbpPrimaryCategory = tenant.gbpPrimaryCategoryName || tenant.metadata?.gbp_categories?.primary?.name || null;
 
       return {
         tenantId,

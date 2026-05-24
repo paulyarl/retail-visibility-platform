@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Package, ShoppingCart, Star, Store } from 'lucide-react';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
@@ -285,27 +286,19 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
 
         {/* Price */}
         <div className="flex items-center justify-between">
-          <div>
-            {isOnSale ? (
-              <>
-                <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                  ${formattedPrice}
-                </span>
-                <span className="ml-2 text-xl font-bold text-red-600 dark:text-red-400">
-                  ${formattedSalePrice}
-                </span>
-              </>
-            ) : (
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
-                ${formattedPrice}
+          <div className="flex items-center justify-between">
+            <PriceDisplay 
+              priceCents={product.priceCents}
+              salePriceCents={product.salePriceCents}
+              variant="default"
+              showSavingsBadge={true}
+            />
+            {product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents && (
+              <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                Sale
               </span>
             )}
           </div>
-          {isOnSale && (
-            <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
-                          Sale
-            </span>
-          )}
         </div>
         {/* Add to Cart Button */}
         {hasGateway && (
@@ -580,19 +573,16 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
         {/* Price Section */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-baseline gap-2">
-              {isOnSale ? (
-                <>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                    ${formattedPrice}
-                  </span>
-                  <span className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    ${formattedSalePrice}
-                  </span>
-                </>
-              ) : (
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${formattedPrice}
+            <div className="flex items-center justify-between">
+              <PriceDisplay 
+                priceCents={product.priceCents}
+                salePriceCents={product.salePriceCents}
+                variant="large"
+                showSavingsBadge={true}
+              />
+              {product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents && (
+                <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                  Sale
                 </span>
               )}
             </div>
@@ -821,19 +811,16 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
 
             {/* Price and Stock */}
             <div className="flex items-center justify-between mt-2">
-              <div>
-                {isOnSale ? (
-                  <>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 line-through">
-                      ${formattedPrice}
-                    </span>
-                    <span className="ml-1 text-sm font-semibold text-red-600 dark:text-red-400">
-                      ${formattedSalePrice}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    ${formattedPrice}
+              <div className="flex items-center justify-between">
+                <PriceDisplay 
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="compact"
+                  showSavingsBadge={true}
+                />
+                {product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents && (
+                  <span className="bg-red-600 text-white px-1.5 py-0.5 rounded-full text-xs font-medium">
+                    Sale
                   </span>
                 )}
               </div>
@@ -1125,26 +1112,20 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-baseline gap-3">
-                {isOnSale ? (
-                  <>
-                    <span className="text-xl text-gray-500 dark:text-gray-400 line-through">
-                      ${formattedPrice}
-                    </span>
-                    <span className="text-3xl font-bold text-red-600 dark:text-red-400">
-                      ${formattedSalePrice}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                    ${formattedPrice}
+                <div className="flex items-center justify-between">
+                <PriceDisplay 
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="large"
+                  showSavingsBadge={true}
+                />
+                {product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents && (
+                  <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    Sale
                   </span>
                 )}
               </div>
-              {isOnSale && (
-                <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-1">
-                  Save ${(product.priceCents - product.salePriceCents!) / 100}
-                </p>
-              )}
+            </div>
             </div>
             
             {/* Premium Action Button */}

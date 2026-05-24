@@ -75,51 +75,40 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
         [slug]
       ),
 
-      // 2. Featured products from materialized view
+      // 2. Featured products from mv_global_discovery with sales price support
       pool.query(
-        `SELECT 
-          id,
+        `SELECT DISTINCT ON (inventory_item_id)
+          inventory_item_id as id,
           tenant_id,
           sku,
-          name,
-          title,
-          description,
-          price,
-          price_cents,
-          currency,
+          product_name as name,
+          product_title as title,
+          product_description as description,
+          list_price_cents as price_cents,
+          sale_price_cents,
           stock,
-          quantity,
-          availability,
           image_url,
-          image_gallery,
           brand,
-          manufacturer,
-          condition,
-          gtin,
-          mpn,
-          metadata,
-          custom_cta,
-          social_links,
-          landing_page_theme,
-          category_id,
-          category_name,
-          category_slug,
-          is_featured,
+          item_status,
+          availability,
+          product_category_name_lower as category_name,
+          product_category as category_slug,
+          featured_type,
+          featured_priority,
           featured_at,
           featured_until,
-          featured_priority,
-          is_actively_featured,
-          has_image,
-          in_stock,
-          has_gallery,
-          has_active_payment_gateway,
-          default_gateway_type,
+          featured_is_active as is_actively_featured,
+          is_on_sale,
+          discount_percentage,
+          currency,
           created_at,
           updated_at
-        FROM storefront_products
+        FROM mv_global_discovery
         WHERE tenant_id = (SELECT tenant_id FROM directory_listings_list WHERE slug = $1 AND is_published = true LIMIT 1)
-          AND is_actively_featured = true
-        ORDER BY featured_priority DESC, featured_at DESC
+          AND featured_is_active = true
+          AND item_status = 'active'
+          AND visibility = 'public'
+        ORDER BY inventory_item_id, featured_priority DESC, featured_at DESC
         LIMIT 6`,
         [slug]
       ),
@@ -144,34 +133,31 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
 
       // 5. Random featured products
       pool.query(
-        `SELECT 
-          sp.id,
-          sp.name,
-          sp.price_cents,
-          sp.currency,
-          sp.image_url,
-          sp.brand,
-          sp.description,
-          sp.stock,
-          sp.availability,
-          sp.tenant_id,
-          sp.category_name,
-          sp.category_slug,
-          sp.has_active_payment_gateway,
-          sp.default_gateway_type,
+        `SELECT DISTINCT ON (inventory_item_id)
+          inventory_item_id as id,
+          product_name as name,
+          list_price_cents as price_cents,
+          sale_price_cents,
+          currency,
+          image_url,
+          brand,
+          product_description as description,
+          stock,
+          availability,
+          tenant_id,
           dsl.slug as store_slug,
           dsl.business_name as store_name,
           dsl.logo_url as store_logo,
           dsl.city as store_city,
           dsl.state as store_state,
-          sp.updated_at
-        FROM storefront_products sp
-        JOIN directory_listings_list dsl ON dsl.tenant_id = sp.tenant_id
-        WHERE sp.is_actively_featured = true 
+          mv.updated_at
+        FROM mv_global_discovery mv
+        JOIN directory_listings_list dsl ON mv.tenant_id = dsl.tenant_id
+        WHERE mv.featured_is_active = true 
           AND dsl.is_published = true
-          AND sp.has_image = true
-          AND sp.stock > 0
-        ORDER BY RANDOM() 
+          AND mv.item_status = 'active'
+          AND mv.visibility = 'public'
+        ORDER BY inventory_item_id, RANDOM()
         LIMIT 12`,
         []
       ),
@@ -188,8 +174,34 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       : null;
 
     const featuredProducts = featuredProductsResult.status === 'fulfilled' 
-      ? featuredProductsResult.value.rows 
-      : [];
+      ? featuredProductsResult.value.rows.map((row: any) => ({
+          id: row.id,
+          tenantId: row.tenant_id,
+          sku: row.sku,
+          name: row.name,
+          title: row.title,
+          description: row.description,
+          priceCents: row.price_cents,
+          salePriceCents: row.sale_price_cents,
+          stock: row.stock,
+          imageUrl: row.image_url,
+          brand: row.brand,
+          itemStatus: row.item_status,
+          availability: row.availability,
+          categoryName: row.category_name,
+          categorySlug: row.category_slug,
+          featuredType: row.featured_type,
+          featuredPriority: row.featured_priority,
+          featuredAt: row.featured_at,
+          featuredUntil: row.featured_until,
+          isFeaturedActive: row.is_actively_featured,
+          isOnSale: row.is_on_sale,
+          discountPercentage: row.discount_percentage,
+          currency: row.currency,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        }))
+      : (console.error('[Directory Consolidated] Featured products query failed:', featuredProductsResult.reason), []);
 
     const storeTypes = storeTypesResult.status === 'fulfilled' 
       ? storeTypesResult.value 
@@ -204,6 +216,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           id: row.id,
           name: row.name,
           priceCents: row.price_cents,
+          salePriceCents: row.sale_price_cents,
           currency: row.currency,
           imageUrl: row.image_url,
           brand: row.brand,

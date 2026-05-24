@@ -176,7 +176,7 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
         visibility: 'public',
         currency: 'USD',
         product_type: 'physical',
-        source: product_source.API,
+        source: product_source.API_IMPORT,
         updated_at: new Date(),
         // Use specifications from global catalog (only field available there)
         specifications: globalProduct.specifications || {},

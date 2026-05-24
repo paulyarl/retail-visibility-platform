@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useProduct } from '@/providers/ProductProvider';
-import { UniversalProductCard } from '@/components/products/UniversalProductCard';
+import SmartProductCard from '@/components/products/SmartProductCard';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
 import { storefrontService } from '@/services/StorefrontService';
 
@@ -130,10 +130,25 @@ export default function FeaturedProductsSection({
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {displayProducts.map((product: any) => (
-          <UniversalProductCard
+          <SmartProductCard
             key={product.id}
-            productId={product.id}
             tenantId={product.tenantId}
+            product={{
+              id: product.id,
+              sku: product.sku,
+              name: product.name,
+              title: product.title || product.name,
+              brand: product.brand || '',
+              description: product.description || '',
+              priceCents: product.priceCents,
+              salePriceCents: product.salePriceCents,
+              stock: product.stock,
+              imageUrl: product.imageUrl,
+              tenantId: product.tenantId,
+              availability: product.availability || 'in_stock',
+              has_variants: product.hasVariants || false
+            }}
+            variant="compact"
           />
         ))}
       </div>

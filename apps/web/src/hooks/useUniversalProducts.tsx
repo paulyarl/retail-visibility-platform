@@ -72,7 +72,7 @@ export function useUniversalProducts(
         if (enhanceWithSingleton) {
           try {
             // Fetch products using the singleton
-            baseProducts = await productSingleton.fetchProducts({ tenantId });
+            baseProducts = await productSingleton.fetchProducts({ storeId: tenantId });
           } catch (productError) {
             console.warn('Failed to load products from singleton:', productError);
             // Continue without product data
@@ -182,18 +182,17 @@ export function useUniversalProducts(
    * Get combined metrics from both singletons
    */
   const getCombinedMetrics = (featuredData: any) => {
-    const productMetrics = productSingleton.getMetrics();
-    const featuredMetrics = featuredProductsSingleton.getMetrics();
+    const featuredMetrics = featuredProductsSingleton.getMetrics?.() || { cacheHits: 0, cacheMisses: 0, apiCalls: 0 };
     
     return {
-      products: productMetrics,
+      products: featuredMetrics,
       featured: featuredMetrics,
       combined: {
-        totalCacheHits: productMetrics.cacheHits + featuredMetrics.cacheHits,
-        totalCacheMisses: productMetrics.cacheMisses + featuredMetrics.cacheMisses,
-        totalApiCalls: productMetrics.apiCalls + featuredMetrics.apiCalls,
-        overallCacheHitRate: (productMetrics.cacheHits + featuredMetrics.cacheHits) / 
-                           (productMetrics.cacheHits + featuredMetrics.cacheMisses + productMetrics.apiCalls + featuredMetrics.apiCalls) || 0,
+        totalCacheHits: featuredMetrics.cacheHits,
+        totalCacheMisses: featuredMetrics.cacheMisses,
+        totalApiCalls: featuredMetrics.apiCalls,
+        overallCacheHitRate: featuredMetrics.cacheHits / 
+                           (featuredMetrics.cacheHits + featuredMetrics.cacheMisses + featuredMetrics.apiCalls) || 0,
         totalCachedProducts: featuredData ? featuredData.totalCount : 0
       }
     };

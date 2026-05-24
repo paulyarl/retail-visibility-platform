@@ -105,14 +105,14 @@ router.get('/', async (req: Request, res: Response) => {
     // Query featured products directly from mv_global_discovery
     const tenantFilter = tenantId ? 'AND tenant_id = $2' : '';
     const query = `
-      SELECT 
+      SELECT DISTINCT ON (inventory_item_id)
         inventory_item_id,
         tenant_id,
         sku,
         product_name,
         product_title,
         product_description,
-        current_price_cents,
+        list_price_cents,
         sale_price_cents,
         stock,
         image_url,
@@ -142,7 +142,7 @@ router.get('/', async (req: Request, res: Response) => {
         AND item_status = 'active'
         AND visibility = 'public'
         ${tenantFilter}
-      ORDER BY featured_priority DESC, featured_at DESC
+      ORDER BY inventory_item_id, featured_priority DESC, featured_at DESC
       LIMIT $1
     `;
     
@@ -204,7 +204,7 @@ router.get('/', async (req: Request, res: Response) => {
         name: product.product_name,
         title: product.product_title,
         description: product.product_description,
-        priceCents: product.current_price_cents,
+        priceCents: product.list_price_cents,
         salePriceCents: product.sale_price_cents,
         stock: product.stock,
         imageUrl: product.image_url,

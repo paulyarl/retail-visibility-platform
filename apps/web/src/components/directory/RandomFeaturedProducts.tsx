@@ -12,13 +12,13 @@ import { distanceUtils } from '@/lib/utils';
 export default function RandomFeaturedProducts() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isClient, setIsClient] = useState(false);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+
   // Use the new ProductSingleton hook
   const { products, loading, error, refetch } = useRandomFeaturedProducts(userLocation || undefined, 20);
   // console.log(`RandomFeaturedProducts products:`, products);
   const { actions } = useProductSingleton();
-  
+
   // Get user location on component mount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
@@ -30,7 +30,7 @@ export default function RandomFeaturedProducts() {
           });
         },
         (error) => {
-       //   console.log('Geolocation not available, using default location');
+          //   console.log('Geolocation not available, using default location');
           // Default to New York if geolocation fails 
           setUserLocation({ lat: 40.7128, lng: -74.0060 });
         }
@@ -69,6 +69,10 @@ export default function RandomFeaturedProducts() {
       storeState: p.storeInfo?.storeState
     }))); */
   }, [products]);
+
+  let randomListPrice =null;
+  let randomSalesPrice = null;
+  // console.log(`RandomFeaturedProducts: randomListPrice: ${randomListPrice}, randomSalesPrice: ${randomSalesPrice}`);
 
   if (loading) {
     return (
@@ -162,22 +166,20 @@ export default function RandomFeaturedProducts() {
             <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
               <button
                 onClick={() => handleViewModeChange('grid')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  viewMode === 'grid'
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'grid'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <Grid3x3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Grid</span>
               </button>
               <button
                 onClick={() => handleViewModeChange('list')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  viewMode === 'list'
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'list'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <List className="w-4 h-4" />
                 <span className="hidden sm:inline">List</span>
@@ -200,11 +202,15 @@ export default function RandomFeaturedProducts() {
                   name: product.name,
                   title: product.title || product.name,
                   brand: product.brand || '',
-                  description: product.distanceKm !== null 
+                  description: product.distanceKm !== null
                     ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
                   salePriceCents: product.salePriceCents,
+                  isOnSale: !!(product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents),
+                  discountPercentage: (product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents)
+                    ? String(Math.round(((product?.priceCents - product?.salePriceCents) / product?.priceCents) * 100))
+                    : undefined,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
@@ -221,21 +227,21 @@ export default function RandomFeaturedProducts() {
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
                   payment_gateway_type: product.defaultGatewayType,
-                  categoryName: product.categoryName,
-                  categorySlug: product.categorySlug,
-                  productCategory: product.productCategory,
-                  productCategorySlug: product.productCategorySlug,
+                  categoryName: product.category?.name,
+                  categorySlug: product.category?.slug,
+                  productCategory: product.category?.name,
+                  productCategorySlug: product.category?.slug,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
                 defaultGatewayType={product.defaultGatewayType}
-                tenantName={product.storeInfo?.storeName}
-                tenantLogo={product.storeInfo?.storeLogo}
-                tenantCity={product.storeInfo?.storeCity}
-                tenantState={product.storeInfo?.storeState}
-                tenantSlug={product.storeInfo?.storeSlug}
+                tenantName={product.storeName}
+                tenantLogo={product.storeLogo}
+                tenantCity={product.storeCity}
+                tenantState={product.storeState}
+                tenantSlug={product.storeSlug}
                 distanceKm={product.distanceKm}
                 buttonLayout="stacked"
               />
@@ -254,17 +260,21 @@ export default function RandomFeaturedProducts() {
                   name: product.name,
                   title: product.title || product.name,
                   brand: product.brand || '',
-                  description: product.distanceKm !== null 
+                  description: product.distanceKm !== null
                     ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
                   salePriceCents: product.salePriceCents,
+                  isOnSale: !!(product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents),
+                  discountPercentage: (product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents)
+                    ? String(Math.round(((product.priceCents - product.salePriceCents) / product.priceCents) * 100))
+                    : undefined,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
-                  
+
                   // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
                   featuredPriority: product.featuredPriority,
@@ -276,21 +286,21 @@ export default function RandomFeaturedProducts() {
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
                   payment_gateway_type: product.defaultGatewayType,
-                  categoryName: product.categoryName,
-                  categorySlug: product.categorySlug,
-                  productCategory: product.productCategory,
-                  productCategorySlug: product.productCategorySlug,
+                  categoryName: product.category?.name,
+                  categorySlug: product.category?.slug,
+                  productCategory: product.category?.name,
+                  productCategorySlug: product.category?.slug,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
                 defaultGatewayType={product.defaultGatewayType}
-                tenantName={product.storeInfo?.storeName}
-                tenantLogo={product.storeInfo?.storeLogo}
-                tenantCity={product.storeInfo?.storeCity}
-                tenantState={product.storeInfo?.storeState}
-                tenantSlug={product.storeInfo?.storeSlug}
+                tenantName={product.storeName}
+                tenantLogo={product.storeLogo}
+                tenantCity={product.storeCity}
+                tenantState={product.storeState}
+                tenantSlug={product.storeSlug}
                 distanceKm={product.distanceKm}
                 buttonLayout="stacked"
               />
@@ -298,25 +308,28 @@ export default function RandomFeaturedProducts() {
           </div>
         )}
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+        {/* Gradient border line */}
+        <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
         {/* Store Attribution Section */}
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Random Featured Stores</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from(new Set(products.map(p => p.storeInfo?.storeName))).map((storeName, index) => {
-              const product = products.find(p => p.storeInfo?.storeName === storeName);
-              const store = product?.storeInfo;
+            {Array.from(new Set(products.map(p => p.storeName))).filter(Boolean).map((storeName, index) => {
+              const product = products.find(p => p.storeName === storeName);
+              const storeSlug = product?.storeSlug;
+              const storeLogo = product?.storeLogo;
+              const storeCity = product?.storeCity;
+              const storeState = product?.storeState;
               return (
                 <Link
-                  key={`${store?.storeSlug}-${index}`}
-                  href={`/directory/${store?.storeSlug}`}
+                  key={`${storeSlug}-${index}`}
+                  href={storeSlug ? `/shops/${storeSlug}` : '#'}
                   className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
                 >
-                  {store?.storeLogo ? (
+                  {storeLogo ? (
                     <Image
-                      src={store.storeLogo}
-                      alt={store.storeName}
+                      src={storeLogo}
+                      alt={storeName || ''}
                       width={32}
                       height={32}
                       className="w-8 h-8 rounded-full object-cover"
@@ -329,11 +342,11 @@ export default function RandomFeaturedProducts() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{storeName}</p>
-                    {(store?.storeCity || store?.storeState) && (
+                    {(storeCity || storeState) && (
                       <p className="text-xs text-gray-500">
-                        {store.storeCity && store.storeState 
-                          ? `${store.storeCity}, ${store.storeState}`
-                          : store.storeCity || store.storeState
+                        {storeCity && storeState
+                          ? `${storeCity}, ${storeState}`
+                          : storeCity || storeState
                         }
                       </p>
                     )}

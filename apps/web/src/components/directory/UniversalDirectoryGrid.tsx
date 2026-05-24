@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { UniversalProvider } from '@/providers/UniversalProvider';
 import { UniversalStoreCard } from '@/components/stores/UniversalStoreCard';
-import { UniversalProductCard } from '@/components/products/UniversalProductCard';
+import SmartProductCard from '@/components/products/SmartProductCard';
 import { Skeleton } from '@/components/ui';
 
 // ====================
@@ -106,11 +106,11 @@ export default function UniversalDirectoryGrid({
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {productIds.slice(0, 8).map((productId) => (
-                <UniversalProductCard
+                <SmartProductCard
                   key={productId}
-                  productId={productId}
+                  product={{ id: productId, name: '', priceCents: 0 } as any}
+                  tenantId={productId}
                   variant="compact"
-                  showStoreInfo={true}
                 />
               ))}
             </div>

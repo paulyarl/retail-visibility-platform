@@ -800,7 +800,10 @@ router.get('/tenant/:identifier', async (req, res) => {
           manual_subscription_reason: true,
           organization_id: true,
           location_status: true,
-          status_changed_at: true
+          status_changed_at: true,
+          gbp_primary_category_id: true,
+          gbp_primary_category_name: true,
+          gbp_secondary_categories: true
         }
       });
 
@@ -938,7 +941,11 @@ router.get('/tenant/:identifier', async (req, res) => {
         // Effective expiration fields
         effectiveExpiresAt: effectiveExpiration?.expiresAt,
         effectiveExpiresType: effectiveExpiration?.type,
-        effectiveExpiresSource: effectiveExpiration?.source
+        effectiveExpiresSource: effectiveExpiration?.source,
+        // GBP categories from dedicated columns
+        gbpPrimaryCategoryId: tenant.gbp_primary_category_id,
+        gbpPrimaryCategoryName: tenant.gbp_primary_category_name,
+        gbpSecondaryCategories: tenant.gbp_secondary_categories || []
       },
       metadata: {
         tenant: {

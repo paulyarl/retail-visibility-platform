@@ -30,6 +30,9 @@ export interface TenantProfile {
   latitude?: number;
   longitude?: number;
   gbpCategoryName?: string;
+  gbpPrimaryCategoryId?: string | null;
+  gbpPrimaryCategoryName?: string | null;
+  gbpSecondaryCategories?: any;
   countryCode?: string;
   postalCode?: string;
   contactPerson?: string;
@@ -168,7 +171,10 @@ export class TenantService {
           trial_ends_at: true,
           subscription_ends_at: true, 
           organization_id: true,           
-          location_status: true
+          location_status: true,
+          gbp_primary_category_id: true,
+          gbp_primary_category_name: true,
+          gbp_secondary_categories: true
         }
       });
 
@@ -265,6 +271,9 @@ export class TenantService {
         latitude: profileResult?.latitude,
         longitude: profileResult?.longitude,
         gbpCategoryName: profileResult?.gbp_category_name,
+        gbpPrimaryCategoryId: tenant.gbp_primary_category_id,
+        gbpPrimaryCategoryName: tenant.gbp_primary_category_name,
+        gbpSecondaryCategories: tenant.gbp_secondary_categories || [],
         countryCode: profileResult?.country_code,
         postalCode: profileResult?.postal_code,
         contactPerson: profileResult?.contact_person,

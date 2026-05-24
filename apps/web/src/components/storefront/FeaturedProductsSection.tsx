@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
 import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
 import { PublicProduct } from '@/providers/data/ProductSingleton';
-import { UniversalProductCard } from '@/components/products/UniversalProductCard';
+import SmartProductCard from '@/components/products/SmartProductCard';
 import { useProduct } from '@/providers/ProductProvider';
 
 interface FeaturedProductsSectionProps {
@@ -63,9 +63,9 @@ export default function FeaturedProductsSection({
               salePriceCents: product.salePriceCents || undefined,
               stock: product.stock,
               imageUrl: product.imageUrl,
-              availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | 'discontinued',
+              availability: (product.availability === 'discontinued' ? 'out_of_stock' : product.availability) as 'in_stock' | 'out_of_stock' | 'preorder' | 'discontinued',
               hasVariants: product.hasVariants,
-              featuredType: product.featuredType,
+              featuredType: product.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | undefined,
               featuredPriority: product.featuredPriority,
               featuredAt: product.featuredAt,
               featuredExpiresAt: product.featuredExpiresAt,
@@ -151,10 +151,25 @@ export default function FeaturedProductsSection({
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {featuredData.products.map((product: PublicProduct) => (
-          <UniversalProductCard
+          <SmartProductCard
             key={product.id}
-            productId={product.id}
             tenantId={product.tenantId}
+            product={{
+              id: product.id,
+              sku: product.sku,
+              name: product.name,
+              title: product.title || product.name,
+              brand: product.brand || '',
+              description: product.description || '',
+              priceCents: product.priceCents,
+              salePriceCents: product.salePriceCents,
+              stock: product.stock,
+              imageUrl: product.imageUrl,
+              tenantId: product.tenantId,
+              availability: (product.availability === 'discontinued' ? 'out_of_stock' : product.availability) || 'in_stock',
+              has_variants: product.hasVariants || false
+            }}
+            variant="featured"
           />
         ))}
       </div>

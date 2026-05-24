@@ -415,8 +415,17 @@ export default function SmartProductCard({
   defaultGatewayType: propDefaultGatewayType,
   buttonLayout = 'stacked',
 }: SmartProductCardProps) {
-  // console.log(`Product: `,product);
-  // Try to use context first (performance optimization)
+  // Debug: Log tenant info for directory featured products
+  // if (variant === 'featured') {
+  //   console.log(`[SmartProductCard] Featured product tenant info:`, {
+  //     id: product.id,
+  //     name: product.name,
+  //     tenantName,
+  //     tenantLogo,
+  //     tenantSlug
+  //   });
+  // }
+  //   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
   
   // Fallback state for when context is not available
@@ -909,17 +918,19 @@ export default function SmartProductCard({
                   size="sm"
                 />
               ) : (
-                // <PriceDisplay
-                //   priceCents={product.priceCents}
-                //   salePriceCents={product.salePriceCents}
-                //   variant="compact"
-                // />
-                <div>Price: ${product.priceCents / 100}</div>
-              )}
-              {product.salePriceCents && !product.has_variants && (
-                <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 px-1.5 py-0.5 rounded">
-                  {product.discountPercentage ? `${product.discountPercentage}% OFF` : 'Sale'}
-                </span>
+                <div className="flex items-center justify-between">
+                  <PriceDisplay
+                    priceCents={product.priceCents}
+                    salePriceCents={product.salePriceCents}
+                    variant="compact"
+                    showSavingsBadge={true}
+                  />
+                  {product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents && (
+                    <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                      Sale
+                    </span>
+                  )}
+                </div>
               )}
               {product.has_variants && product.variant_count && (
                 <VariantBadge 

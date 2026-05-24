@@ -57,6 +57,9 @@ interface Tenant {
   created_at?: string; // snake_case version
   service_level?: string; // snake_case version
   reopening_date?: string; // snake_case version
+  gbpPrimaryCategoryId?: string;
+  gbpPrimaryCategoryName?: string;
+  gbpSecondaryCategories?: any;
   _count?: {
     items: number;
     users: number;

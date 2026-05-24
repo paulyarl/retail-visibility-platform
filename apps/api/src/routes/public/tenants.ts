@@ -152,6 +152,9 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
           manual_subscription_reason: true,
           organization_id: true,
           location_status: true,
+          gbp_primary_category_id: true,
+          gbp_primary_category_name: true,
+          gbp_secondary_categories: true,
         }
       } as any)
     ]);
@@ -239,6 +242,9 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         latitude: null, // Could be added from address geocoding
         longitude: null,
         gbpCategoryName: profile.business?.category,
+        gbpPrimaryCategoryId: tenantData?.gbp_primary_category_id,
+        gbpPrimaryCategoryName: tenantData?.gbp_primary_category_name,
+        gbpSecondaryCategories: tenantData?.gbp_secondary_categories || [],
         countryCode: profile.contact?.address?.country,
         postalCode: profile.contact?.address?.zipCode,
         contactPerson: profile.name,

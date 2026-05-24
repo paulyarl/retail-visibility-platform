@@ -63,32 +63,19 @@ export default function MigrationMetrics({ testResults }: MigrationMetricsProps)
 
   // Create stable dependencies for useEffect
   const metricsDependencies = useMemo(() => ({
-    productCacheHits: productMetrics.metrics?.cacheHits || 0,
-    productCacheMisses: productMetrics.metrics?.cacheMisses || 0,
-    productTotalRequests: productMetrics.metrics?.totalRequests || 0,
-    productAvgResponseTime: productMetrics.metrics?.averageResponseTime || 0,
-    categoryCacheHits: categoryMetrics.metrics?.cacheHits || 0,
-    categoryCacheMisses: categoryMetrics.metrics?.cacheMisses || 0,
-    categoryTotalRequests: categoryMetrics.metrics?.totalRequests || 0,
-    categoryAvgResponseTime: categoryMetrics.metrics?.averageResponseTime || 0,
-    storeCacheHits: storeMetrics.metrics?.cacheHits || 0,
-    storeCacheMisses: storeMetrics.metrics?.cacheMisses || 0,
-    storeTotalRequests: storeMetrics.metrics?.totalRequests || 0,
-    storeAvgResponseTime: storeMetrics.metrics?.averageResponseTime || 0,
-  }), [
-    productMetrics.metrics?.cacheHits,
-    productMetrics.metrics?.cacheMisses,
-    productMetrics.metrics?.totalRequests,
-    productMetrics.metrics?.averageResponseTime,
-    categoryMetrics.metrics?.cacheHits,
-    categoryMetrics.metrics?.cacheMisses,
-    categoryMetrics.metrics?.totalRequests,
-    categoryMetrics.metrics?.averageResponseTime,
-    storeMetrics.metrics?.cacheHits,
-    storeMetrics.metrics?.cacheMisses,
-    storeMetrics.metrics?.totalRequests,
-    storeMetrics.metrics?.averageResponseTime,
-  ]);
+    productCacheHits: 0,
+    productCacheMisses: 0,
+    productTotalRequests: 0,
+    productAvgResponseTime: 0,
+    categoryCacheHits: 0,
+    categoryCacheMisses: 0,
+    categoryTotalRequests: 0,
+    categoryAvgResponseTime: 0,
+    storeCacheHits: 0,
+    storeCacheMisses: 0,
+    storeTotalRequests: 0,
+    storeAvgResponseTime: 0,
+  }), []);
 
   // Update real-time metrics when singleton data changes
   useEffect(() => {

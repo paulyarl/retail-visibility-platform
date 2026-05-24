@@ -172,14 +172,13 @@ export class CategoryDirectoryService {
             },
           });
 
-          // Get tenant with metadata for GBP category
-          const tenantWithMetadata = await prisma.tenants.findUnique({
+          // Get tenant with GBP category from dedicated columns
+          const tenantWithGBP = await prisma.tenants.findUnique({
             where: { id: store.id },
-            select: { metadata: true },
+            select: { gbp_primary_category_name: true },
           });
 
-          const gbpPrimaryCategoryName = 
-            (tenantWithMetadata?.metadata as any)?.gbp_categories?.primary?.name || null;
+          const gbpPrimaryCategoryName = tenantWithGBP?.gbp_primary_category_name || null;
 
           return {
             id: store.id,

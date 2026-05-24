@@ -4077,6 +4077,11 @@ app.use('/api/directory', directoryRandomFeaturedRoutes);
 console.log('✅ Directory random featured routes mounted at /api/directory');
 console.log('✅ Direct random-featured route handler registered');
 
+// Mount global random featured products route
+import directoryRandomFeaturedGlobalRoutes from './routes/directory-random-featured-global';
+app.use('/api/directory', directoryRandomFeaturedGlobalRoutes);
+console.log('✅ Directory random featured global routes mounted at /api/directory');
+
 // Mount store-types route BEFORE any other /api/directory routes
 // VERY SIMPLE TEST - This should definitely work
 app.get('/api/directory/simple-test', (req, res) => {
