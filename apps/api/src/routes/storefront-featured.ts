@@ -10,6 +10,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
 import { getDirectPool } from '../utils/db-pool';
+import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 
 const router = Router();
 
@@ -62,16 +63,20 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const showExpired = includeExpired === 'true';
     
-    // Single query to get ALL featured products data using mv_global_discovery
-    // Remove DISTINCT to handle multiple featured types per product properly
+    // Tier-capability-aware query: only return featured types allowed by tenant's tier
     const query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT 
         mv.*
       FROM mv_global_discovery mv
+      ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+      ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = $1
         AND mv.featured_is_active = true
         AND mv.item_status = 'active'
         AND mv.visibility = 'public'
+        ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
       ORDER BY mv.featured_priority DESC, mv.featured_at DESC
       LIMIT $2
     `;
@@ -328,16 +333,21 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
       return res.status(400).json({ error: 'invalid_featured_type', validTypes: getValidFeaturedTypes() });
     }
     
-    // Query specific bucket using mv_global_discovery with ALL columns
+    // Tier-capability-aware query: only return featured types allowed by tenant's tier
     const query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT 
         mv.*
       FROM mv_global_discovery mv
+      ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+      ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = $1
         AND mv.featured_type = $2
         AND mv.featured_is_active = true
         AND mv.item_status = 'active'
         AND mv.visibility = 'public'
+        ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
       ORDER BY mv.featured_priority DESC, mv.featured_at DESC
       LIMIT $3
     `;

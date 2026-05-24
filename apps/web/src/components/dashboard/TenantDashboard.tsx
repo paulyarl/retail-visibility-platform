@@ -14,6 +14,7 @@ import UserProfileBadge from "./UserProfileBadge";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 import { SubscriptionDisplayCard } from "@/components/subscription/SubscriptionDisplayCard";
+import PlanSummaryPanel from "@/components/settings/PlanSummaryPanel";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
 import { useState, useEffect, useCallback } from "react";
 import { tenantSlugService } from '../../services/TenantSlugService';
@@ -22,6 +23,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
@@ -72,6 +74,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const [tenantBanner, setTenantBanner] = useState<{ bannerUrl?: string; name: string; socialLinks?: { facebook?: string; instagram?: string } } | null>(null);
 
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
+
+  // Capability-aware plan summary
+  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
   
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
@@ -452,6 +457,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             }}
           />
         )}
+
+        {/* Capability-Aware Plan Summary */}
+        <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} />
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (

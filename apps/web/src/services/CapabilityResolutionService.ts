@@ -20,6 +20,8 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TenantCapabilitiesResponse {
   tier_key: string;
+  tier_name?: string;
+  tier_description?: string;
   capabilities: Record<string, CapabilityGroup>;
   uncategorized_features: string[];
 }
@@ -101,6 +103,36 @@ export interface FulfillmentState {
   features: Record<string, boolean>;
 }
 
+// --- Featured Options ---
+
+export type FeaturedType =
+  // Tenant-controlled
+  | 'store_selection' | 'new_arrival' | 'seasonal' | 'sale'
+  | 'staff_pick' | 'clearance' | 'featured'
+  // Platform-controlled
+  | 'bestseller' | 'trending' | 'recommended' | 'random_featured';
+
+export interface FeaturedOptionsState {
+  /** Whether the featured capability is enabled at all */
+  enabled: boolean;
+  /** Whether tenant-controlled featured types are enabled as a group */
+  tenantEnabled: boolean;
+  /** Whether platform-controlled featured types are enabled as a group */
+  platformEnabled: boolean;
+  /** Individual tenant-controlled featured types allowed by tier */
+  allowedTenantTypes: FeaturedType[];
+  /** Individual platform-controlled featured types allowed by tier */
+  allowedPlatformTypes: FeaturedType[];
+  /** All allowed featured types (union of tenant + platform) */
+  allowedTypes: FeaturedType[];
+  /** Whether all featured options are available (flexible tier) */
+  isFlexible: boolean;
+  /** Whether at least one featured type is available */
+  featuredAvailable: boolean;
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Product Options ---
 
 export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
@@ -125,12 +157,15 @@ export interface ProductOptionsState {
 
 export interface AllCapabilitiesState {
   tierKey: string;
+  tierName: string;
+  tierDescription: string;
   commerce: CommerceState;
   paymentGateway: PaymentGatewayState;
   storefront: StorefrontState;
   barcodeScan: BarcodeScanState;
   fulfillment: FulfillmentState;
   productOptions: ProductOptionsState;
+  featuredOptions: FeaturedOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -145,6 +180,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   barcode_: 'barcode_scan_options',
   fulfillment_: 'fulfillment_options',
   product_: 'product_options',
+  featured_: 'featured_options',
 };
 
 /**
@@ -310,6 +346,70 @@ export function resolveProductOptionsState(features: Record<string, boolean>): P
 }
 
 /**
+ * Resolve featured options state from raw capability features
+ */
+export function resolveFeaturedOptionsState(features: Record<string, boolean>): FeaturedOptionsState {
+  const enabled = !!features.featured_enabled;
+  const disabled = !!features.featured_disabled;
+  const flexible = !!features.featured_flexible;
+  const tenantGroupEnabled = !!features.featured_tenant_enabled;
+  const tenantGroupDisabled = !!features.featured_tenant_disabled;
+  const platformGroupEnabled = !!features.featured_platform_enabled;
+  const platformGroupDisabled = !!features.featured_platform_disabled;
+
+  // Three states per group: enabled → all types, untouched → individual features, disabled → none
+  const tenantEnabled = tenantGroupEnabled && !tenantGroupDisabled;
+  const tenantUntouched = !tenantGroupEnabled && !tenantGroupDisabled;
+  const platformEnabled = platformGroupEnabled && !platformGroupDisabled;
+  const platformUntouched = !platformGroupEnabled && !platformGroupDisabled;
+
+  // Tenant-controlled types
+  const allowedTenantTypes: FeaturedType[] = [];
+  if (flexible || tenantEnabled) {
+    // Group enabled or flexible → all tenant types
+    allowedTenantTypes.push('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured');
+  } else if (tenantUntouched) {
+    // Group untouched → only explicitly listed features
+    if (features.featured_store_selection) allowedTenantTypes.push('store_selection');
+    if (features.featured_new_arrival) allowedTenantTypes.push('new_arrival');
+    if (features.featured_seasonal) allowedTenantTypes.push('seasonal');
+    if (features.featured_sale) allowedTenantTypes.push('sale');
+    if (features.featured_staff_pick) allowedTenantTypes.push('staff_pick');
+    if (features.featured_clearance) allowedTenantTypes.push('clearance');
+    if (features.featured_featured) allowedTenantTypes.push('featured');
+  }
+  // else: tenantGroupDisabled → no tenant types
+
+  // Platform-controlled types
+  const allowedPlatformTypes: FeaturedType[] = [];
+  if (flexible || platformEnabled) {
+    // Group enabled or flexible → all platform types
+    allowedPlatformTypes.push('bestseller', 'trending', 'recommended', 'random_featured');
+  } else if (platformUntouched) {
+    // Group untouched → only explicitly listed features
+    if (features.featured_bestseller) allowedPlatformTypes.push('bestseller');
+    if (features.featured_trending) allowedPlatformTypes.push('trending');
+    if (features.featured_recommended) allowedPlatformTypes.push('recommended');
+    if (features.featured_random_featured) allowedPlatformTypes.push('random_featured');
+  }
+  // else: platformGroupDisabled → no platform types
+
+  const allTypes = [...allowedTenantTypes, ...allowedPlatformTypes];
+
+  return {
+    enabled: enabled && !disabled,
+    tenantEnabled,
+    platformEnabled,
+    allowedTenantTypes,
+    allowedPlatformTypes,
+    allowedTypes: allTypes,
+    isFlexible: flexible,
+    featuredAvailable: enabled && !disabled && allTypes.length > 0,
+    features,
+  };
+}
+
+/**
  * Resolve storefront state from raw capability features
  */
 export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
@@ -458,6 +558,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get featured options state for a tenant
+   */
+  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.featuredOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -483,15 +591,19 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
+    const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
 
     return {
       tierKey: data.tier_key,
+      tierName: data.tier_name || data.tier_key,
+      tierDescription: data.tier_description || '',
       commerce: resolveCommerceState(commerceFeatures),
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
+      featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -602,6 +714,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get featured options state for a tenant
+   */
+  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.featuredOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -624,15 +744,19 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
+    const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
 
     return {
       tierKey: data.tier_key,
+      tierName: data.tier_name || data.tier_key,
+      tierDescription: data.tier_description || '',
       commerce: resolveCommerceState(commerceFeatures),
       paymentGateway: resolvePaymentGatewayState(paymentFeatures),
       storefront: resolveStorefrontState(storefrontFeatures),
       barcodeScan: resolveBarcodeScanState(barcodeFeatures),
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
+      featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

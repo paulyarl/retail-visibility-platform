@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
+import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 
 const router = Router();
 
@@ -110,77 +111,83 @@ router.get('/', async (req, res) => {
     // Build query for premium featured types only
     const premiumTypes = ['trending', 'recommended', 'bestseller', 'random_featured'];
     let whereConditions = [
-      'mv.is_actively_featured = true',
-      'mv.has_image = true',
-      'mv.in_stock = true'
+      'mgd.is_actively_featured = true',
+      'mgd.has_image = true',
+      'mgd.in_stock = true'
     ];
     
     if (type && typeof type === 'string' && premiumTypes.includes(type)) {
-      whereConditions.push(`mv.featured_type = $${queryParams.length + 1}`);
+      whereConditions.push(`mgd.featured_type = $${queryParams.length + 1}`);
       queryParams.push(type);
     } else {
       // Get all premium types
-      whereConditions.push(`mv.featured_type IN ('${premiumTypes.join("','")}')`);
+      whereConditions.push(`mgd.featured_type IN ('${premiumTypes.join("','")}')`);
     }
     
+    // Tier-capability-aware query: only return featured types allowed by each tenant's tier
     query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT 
-        mv.inventory_item_id as id,
-        mv.tenant_id,
-        mv.sku,
-        mv.product_name as name,
-        mv.product_title as title,
-        mv.product_description as description,
-        mv.list_price_cents as price_cents,
-        mv.sale_price_cents,
-        mv.stock,
-        mv.image_url,
-        mv.brand,
-        mv.item_status,
-        mv.availability,
-        mv.product_category as category_name,
-        mv.product_category_slug as category_slug,
-        mv.product_google_category_id as google_category_id,
-        mv.has_gallery,
-        mv.has_description,
-        mv.has_brand,
-        mv.has_price,
-        mv.has_active_payment_gateway,
-        mv.default_gateway_type,
-        mv.featured_type,
-        mv.featured_priority,
-        mv.featured_at,
-        mv.featured_until as featured_expires_at,
-        mv.is_actively_featured as is_featured_active,
-        mv.created_at,
-        mv.updated_at,
-        mv.tenant_slug as store_slug,
-        mv.tenant_name as store_name,
-        mv.tenant_logo_url as store_logo,
-        mv.tenant_city as store_city,
-        mv.tenant_state as store_state,
+        mgd.inventory_item_id as id,
+        mgd.tenant_id,
+        mgd.sku,
+        mgd.product_name as name,
+        mgd.product_title as title,
+        mgd.product_description as description,
+        mgd.list_price_cents as price_cents,
+        mgd.sale_price_cents,
+        mgd.stock,
+        mgd.image_url,
+        mgd.brand,
+        mgd.item_status,
+        mgd.availability,
+        mgd.product_category as category_name,
+        mgd.product_category_slug as category_slug,
+        mgd.product_google_category_id as google_category_id,
+        mgd.has_gallery,
+        mgd.has_description,
+        mgd.has_brand,
+        mgd.has_price,
+        mgd.has_active_payment_gateway,
+        mgd.default_gateway_type,
+        mgd.featured_type,
+        mgd.featured_priority,
+        mgd.featured_at,
+        mgd.featured_until as featured_expires_at,
+        mgd.is_actively_featured as is_featured_active,
+        mgd.created_at,
+        mgd.updated_at,
+        mgd.tenant_slug as store_slug,
+        mgd.tenant_name as store_name,
+        mgd.tenant_logo_url as store_logo,
+        mgd.tenant_city as store_city,
+        mgd.tenant_state as store_state,
         -- Type-specific metrics
         CASE 
-          WHEN mv.featured_type = 'trending' THEN mv.trending_score
-          WHEN mv.featured_type = 'recommended' THEN mv.product_average_rating
-          WHEN mv.featured_type = 'bestseller' THEN mv.units_sold::numeric
+          WHEN mgd.featured_type = 'trending' THEN mgd.trending_score
+          WHEN mgd.featured_type = 'recommended' THEN mgd.product_average_rating
+          WHEN mgd.featured_type = 'bestseller' THEN mgd.units_sold::numeric
           ELSE NULL
         END as score,
-        mv.product_average_rating as rating,
-        mv.units_sold as sales,
+        mgd.product_average_rating as rating,
+        mgd.units_sold as sales,
         -- Dynamic trending score for random_featured
         CASE 
-          WHEN mv.featured_type = 'random_featured' THEN mv.trending_score
+          WHEN mgd.featured_type = 'random_featured' THEN mgd.trending_score
           ELSE NULL
         END as random_score
-      FROM mv_global_discovery mv
+      FROM mv_global_discovery mgd
+      ${TIER_FEATURED_ACCESS_JOIN}
+      ${TENANT_PREFS_JOIN}
       WHERE ${whereConditions.join(' AND ')}
+        ${TIER_FEATURED_ACCESS_WHERE}
+        ${TENANT_PREFS_WHERE}
       ORDER BY 
         CASE 
-          WHEN mv.featured_type = 'trending' THEN mv.trending_score
-          WHEN mv.featured_type = 'recommended' THEN (mv.product_average_rating * 100 + mv.product_reviews_count_live)
-          WHEN mv.featured_type = 'bestseller' THEN mv.units_sold
-          WHEN mv.featured_type = 'random_featured' THEN RANDOM()
+          WHEN mgd.featured_type = 'trending' THEN mgd.trending_score
+          WHEN mgd.featured_type = 'recommended' THEN (mgd.product_average_rating * 100 + mgd.product_reviews_count_live)
+          WHEN mgd.featured_type = 'bestseller' THEN mgd.units_sold
+          WHEN mgd.featured_type = 'random_featured' THEN RANDOM()
           ELSE 0
         END DESC
       LIMIT $1
@@ -236,9 +243,14 @@ router.get('/', async (req, res) => {
     
     // Get total count
     const countQuery = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT COUNT(*) as total
-      FROM mv_global_discovery mv
+      FROM mv_global_discovery mgd
+      ${TIER_FEATURED_ACCESS_JOIN}
+      ${TENANT_PREFS_JOIN}
       WHERE ${whereConditions.join(' AND ')}
+        ${TIER_FEATURED_ACCESS_WHERE}
+        ${TENANT_PREFS_WHERE}
     `;
     
     const countResult = await pool.query(countQuery, queryParams.slice(0, -1));

@@ -23,6 +23,7 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
   commerce_types: 'commerce_',
   payment_gateway_options: 'payment_gateway_',
   storefront_types: 'storefront_',
+  featured_options: 'featured_',
 };
 
 /**
@@ -223,8 +224,15 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
     // If tenant has a higher tier than org, tenant tier is the effective one
     const effectiveTierKey = tenantTierKey || orgTierKey || 'starter';
 
+    // Look up tier display metadata
+    const effectiveTier = tierMap.get(effectiveTierKey);
+    const tierName = effectiveTier?.name || effectiveTierKey;
+    const tierDescription = effectiveTier?.description || '';
+
     res.json({
       tier_key: effectiveTierKey,
+      tier_name: tierName,
+      tier_description: tierDescription,
       capabilities,
       uncategorized_features: uncategorizedFeatures,
     });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
+import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 
 const router = Router();
 
@@ -16,9 +17,10 @@ router.get('/', async (req, res) => {
     const maxDistance = parseFloat(req.query.maxDistance as string) || 500; // Default: 500km
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 12));
     
-    // Query for random featured products with proximity weighting from mv_global_discovery
+    // Tier-capability-aware query: only return featured types allowed by each tenant's tier
     const query = `
-      WITH featured_products AS (
+      WITH ${TIER_FEATURED_ACCESS_CTE},
+      featured_products AS (
         SELECT 
           mv.inventory_item_id as id,
           mv.product_name as name,
@@ -66,12 +68,16 @@ router.get('/', async (req, res) => {
             ELSE 0.1 -- No location info
           END as geographic_relevance
         FROM mv_global_discovery mv
+        ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
         JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
         WHERE mv.is_actively_featured = true 
           AND mv.featured_type IN ('store_selection', 'featured')
           AND dsl.is_published = true
           AND mv.has_image = true
           AND mv.in_stock = true
+          ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+          ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
       ),
       weighted_products AS (
         SELECT *,
@@ -256,64 +262,65 @@ router.get('/available', async (req, res) => {
     
     // Build where conditions for mv_global_discovery
     const whereConditions = [
-      'mv.is_actively_featured = true', 
-      'mv.featured_type IN (\'store_selection\', \'featured\')',
-      'mv.has_image = true', 
-      'mv.in_stock = true',
+      'mgd.is_actively_featured = true', 
+      'mgd.featured_type IN (\'store_selection\', \'featured\')',
+      'mgd.has_image = true', 
+      'mgd.in_stock = true',
       'dsl.is_published = true'
     ];
     let queryParams: (string | number)[] = [limitNum, offset];
     
     if (category) {
-      whereConditions.push('mv.product_category_slug = $' + (queryParams.length + 1));
+      whereConditions.push('mgd.product_category_slug = $' + (queryParams.length + 1));
       queryParams.push(category as string);
     }
     
     if (search) {
-      whereConditions.push('(mv.product_name ILIKE $' + (queryParams.length + 1) + ' OR mv.brand ILIKE $' + (queryParams.length + 2) + ')');
+      whereConditions.push('(mgd.product_name ILIKE $' + (queryParams.length + 1) + ' OR mgd.brand ILIKE $' + (queryParams.length + 2) + ')');
       queryParams.push('%' + search + '%', '%' + search + '%');
     }
     
     const whereClause = whereConditions.join(' AND ');
     
-    // Simple query - let JavaScript handle the randomization
+    // Tier-capability-aware query: only return featured types allowed by each tenant's tier
     const query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT 
-        mv.inventory_item_id as id,
-        mv.tenant_id,
-        mv.sku,
-        mv.product_name as name,
-        mv.product_title as title,
-        mv.product_description as description,
-        mv.list_price_cents as price_cents,
-        mv.sale_price_cents,
-        mv.stock,
-        mv.image_url,
-        mv.brand,
-        mv.item_status,
-        mv.availability,
-        mv.is_variant,
+        mgd.inventory_item_id as id,
+        mgd.tenant_id,
+        mgd.sku,
+        mgd.product_name as name,
+        mgd.product_title as title,
+        mgd.product_description as description,
+        mgd.list_price_cents as price_cents,
+        mgd.sale_price_cents,
+        mgd.stock,
+        mgd.image_url,
+        mgd.brand,
+        mgd.item_status,
+        mgd.availability,
+        mgd.is_variant,
         null as tenant_category_id, -- Not available in mv_global_discovery
-        mv.featured_type,
-        mv.featured_priority,
-        mv.featured_at,
-        mv.featured_until as featured_expires_at,
-        mv.is_actively_featured as is_featured_active,
+        mgd.featured_type,
+        mgd.featured_priority,
+        mgd.featured_at,
+        mgd.featured_until as featured_expires_at,
+        mgd.is_actively_featured as is_featured_active,
         null as days_until_expiration, -- Not available in mv_global_discovery
         null as is_expired, -- Not available in mv_global_discovery
         null as is_expiring_soon, -- Not available in mv_global_discovery
-        mv.product_metadata,
-        mv.product_category_name_lower as category_name,
-        mv.product_category_slug as category_slug,
-        mv.product_google_category_id as google_category_id,
-        mv.has_gallery,
-        mv.has_description,
-        mv.has_brand,
-        mv.has_price,
-        mv.has_active_payment_gateway,
-        mv.default_gateway_type,
-        mv.created_at,
-        mv.updated_at,
+        mgd.product_metadata,
+        mgd.product_category_name_lower as category_name,
+        mgd.product_category_slug as category_slug,
+        mgd.product_google_category_id as google_category_id,
+        mgd.has_gallery,
+        mgd.has_description,
+        mgd.has_brand,
+        mgd.has_price,
+        mgd.has_active_payment_gateway,
+        mgd.default_gateway_type,
+        mgd.created_at,
+        mgd.updated_at,
         dsl.slug as store_slug,
         dsl.business_name as store_name,
         dsl.logo_url as store_logo,
@@ -321,9 +328,13 @@ router.get('/available', async (req, res) => {
         dsl.state as store_state,
         dsl.website as store_website,
         dsl.phone as store_phone
-      FROM mv_global_discovery mv
-      JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
+      FROM mv_global_discovery mgd
+      ${TIER_FEATURED_ACCESS_JOIN}
+      ${TENANT_PREFS_JOIN}
+      JOIN directory_listings_list dsl ON dsl.tenant_id = mgd.tenant_id
       WHERE ${whereClause}
+        ${TIER_FEATURED_ACCESS_WHERE}
+        ${TENANT_PREFS_WHERE}
       LIMIT $1 OFFSET $2
     `;
     
@@ -331,10 +342,15 @@ router.get('/available', async (req, res) => {
     
     // Get total count for pagination
     const countQuery = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT COUNT(*) as total
-      FROM mv_global_discovery mv
-      JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
+      FROM mv_global_discovery mgd
+      ${TIER_FEATURED_ACCESS_JOIN}
+      ${TENANT_PREFS_JOIN}
+      JOIN directory_listings_list dsl ON dsl.tenant_id = mgd.tenant_id
       WHERE ${whereClause}
+        ${TIER_FEATURED_ACCESS_WHERE}
+        ${TENANT_PREFS_WHERE}
     `;
     
     const countResult = await pool.query(countQuery, queryParams.slice(0, -2)); // Remove limit/offset for count

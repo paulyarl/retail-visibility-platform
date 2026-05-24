@@ -3252,6 +3252,29 @@ model tenant_product_options_settings {
   @@index([tenant_id], map: "idx_product_options_tenant")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_featured_options_settings {
+  id                       String    @id @db.VarChar(255)
+  tenant_id                String    @unique @db.VarChar(255)
+  featured_enabled         Boolean?  @default(true)
+  featured_store_selection Boolean?  @default(true)
+  featured_new_arrival     Boolean?  @default(true)
+  featured_seasonal        Boolean?  @default(true)
+  featured_sale            Boolean?  @default(true)
+  featured_staff_pick      Boolean?  @default(true)
+  featured_clearance       Boolean?  @default(true)
+  featured_featured        Boolean?  @default(true)
+  featured_bestseller      Boolean?  @default(false)
+  featured_trending        Boolean?  @default(false)
+  featured_recommended     Boolean?  @default(false)
+  featured_random_featured Boolean?  @default(false)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_options_tenant")
+
+  @@index([tenant_id], map: "idx_featured_options_tenant")
+}
+
 model tenant_shipping_carriers {
   id                       String    @id
   tenant_id                String
@@ -3409,6 +3432,7 @@ model tenants {
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_commerce_settings                                                               tenant_commerce_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
+  tenant_featured_options_settings                                                       tenant_featured_options_settings?
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
   tenant_payment_gateways                                                                tenant_payment_gateways[]
   tenant_product_options_settings                                                        tenant_product_options_settings?

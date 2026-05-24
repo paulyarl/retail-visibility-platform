@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 
 const router = Router();
 
@@ -102,12 +103,13 @@ router.get('/', async (req: Request, res: Response) => {
     const sortBy = params.sortBy || 'trending';
     const tenantId = params.tenantId;
     
-    // Query featured products directly from mv_global_discovery
-    const tenantFilter = tenantId ? 'AND tenant_id = $2' : '';
+    // Tier-capability-aware query: only return featured types allowed by each tenant's tier
+    const tenantFilter = tenantId ? 'AND mgd.tenant_id = $2' : '';
     const query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT ON (inventory_item_id)
         inventory_item_id,
-        tenant_id,
+        mgd.tenant_id,
         sku,
         product_name,
         product_title,
@@ -137,10 +139,14 @@ router.get('/', async (req: Request, res: Response) => {
         product_metadata,
         has_active_payment_gateway,
         default_gateway_type
-      FROM mv_global_discovery
+      FROM mv_global_discovery mgd
+      ${TIER_FEATURED_ACCESS_JOIN}
+      ${TENANT_PREFS_JOIN}
       WHERE featured_is_active = true
         AND item_status = 'active'
         AND visibility = 'public'
+        ${TIER_FEATURED_ACCESS_WHERE}
+        ${TENANT_PREFS_WHERE}
         ${tenantFilter}
       ORDER BY inventory_item_id, featured_priority DESC, featured_at DESC
       LIMIT $1

@@ -7,6 +7,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface FeaturedProduct {
   id: string;
@@ -781,6 +782,10 @@ export default function StorefrontFeaturedProducts({
   const [allProducts, setAllProducts] = useState<FeaturedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Capability-aware featured options filtering
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const featuredOptionsState = featuredCap.data;
+
   useEffect(() => {
     let isMounted = true;
 
@@ -998,7 +1003,7 @@ export default function StorefrontFeaturedProducts({
     return null;
   }
 
-  // Get all unique featured types from the products
+  // Get all unique featured types from the products, filtered by capability
   const allFeaturedTypes = useMemo(() => {
     const types = new Set<string>();
     allProducts.forEach(product => {
@@ -1009,8 +1014,13 @@ export default function StorefrontFeaturedProducts({
         product.featuredTypes.forEach(type => types.add(type));
       }
     });
+    // Filter out types not allowed by capability state
+    if (featuredOptionsState && featuredOptionsState.enabled) {
+      return Array.from(types).filter(type => featuredOptionsState.allowedTypes.includes(type as any));
+    }
+    // If capability not loaded or disabled, show all types (graceful fallback)
     return Array.from(types);
-  }, [allProducts]);
+  }, [allProducts, featuredOptionsState]);
 
   // Filter products by type dynamically
   const productsByType = useMemo(() => {

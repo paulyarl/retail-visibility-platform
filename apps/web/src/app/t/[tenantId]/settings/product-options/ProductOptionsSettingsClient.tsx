@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Image, Video, Copy } from 'lucide-react';
 import { Switch } from '@/components/ui/Switch';
-import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useProductOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Link from 'next/link';
+import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface ProductOptionsSettings {
   product_physical_enabled: boolean;
@@ -26,6 +27,7 @@ interface ProductOptionsSettingsClientProps {
 export default function ProductOptionsSettingsClient({ tenantId }: ProductOptionsSettingsClientProps) {
   // Product options capability-driven content control
   const productOptionsCap = useProductOptionsCapability(tenantId, { forTenant: true });
+  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
   const isProductOptionsEnabled = productOptionsCap.data?.enabled ?? true;
   const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
   const showsVariants = productOptionsCap.data?.showsVariants ?? true;
@@ -109,6 +111,9 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
 
   return (
     <div className="space-y-6">
+      {/* Plan Summary */}
+      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="product_options" />
+
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${
           message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
@@ -142,11 +147,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!allowedTypes.includes('physical') && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="physical-toggle"
-                  checked={settings.product_physical_enabled}
+                  checked={allowedTypes.includes('physical') && settings.product_physical_enabled}
                   onCheckedChange={() => handleToggle('product_physical_enabled')}
                   disabled={!allowedTypes.includes('physical')}
                 />
@@ -164,11 +169,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!allowedTypes.includes('digital') && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="digital-toggle"
-                  checked={settings.product_digital_enabled}
+                  checked={allowedTypes.includes('digital') && settings.product_digital_enabled}
                   onCheckedChange={() => handleToggle('product_digital_enabled')}
                   disabled={!allowedTypes.includes('digital')}
                 />
@@ -186,11 +191,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!allowedTypes.includes('hybrid') && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="hybrid-toggle"
-                  checked={settings.product_hybrid_enabled}
+                  checked={allowedTypes.includes('hybrid') && settings.product_hybrid_enabled}
                   onCheckedChange={() => handleToggle('product_hybrid_enabled')}
                   disabled={!allowedTypes.includes('hybrid')}
                 />
@@ -208,11 +213,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!allowedTypes.includes('service') && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="service-toggle"
-                  checked={settings.product_service_enabled}
+                  checked={allowedTypes.includes('service') && settings.product_service_enabled}
                   onCheckedChange={() => handleToggle('product_service_enabled')}
                   disabled={!allowedTypes.includes('service')}
                 />
@@ -246,11 +251,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!showsVariants && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="variant-toggle"
-                  checked={settings.product_variant_enabled}
+                  checked={showsVariants && settings.product_variant_enabled}
                   onCheckedChange={() => handleToggle('product_variant_enabled')}
                   disabled={!showsVariants}
                 />
@@ -268,11 +273,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!showsGallery && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="gallery-toggle"
-                  checked={settings.product_gallery_enabled}
+                  checked={showsGallery && settings.product_gallery_enabled}
                   onCheckedChange={() => handleToggle('product_gallery_enabled')}
                   disabled={!showsGallery}
                 />
@@ -290,11 +295,11 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
               </div>
               <div className="flex items-center gap-3">
                 {!showsVideo && (
-                  <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                 )}
                 <Switch
                   id="video-toggle"
-                  checked={settings.product_video_enabled}
+                  checked={showsVideo && settings.product_video_enabled}
                   onCheckedChange={() => handleToggle('product_video_enabled')}
                   disabled={!showsVideo}
                 />

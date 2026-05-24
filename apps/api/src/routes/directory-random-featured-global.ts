@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 
 const router = Router();
 
@@ -55,9 +56,10 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
 
     const locationOrder = hasLocation ? ', distanceKm' : '';
 
-    // Two-step query: first deduplicate by inventory_item_id (highest priority),
-    // then randomize the deduplicated results
+    // Tier-capability-aware query: JOIN against tier_features_list to ensure
+    // the tenant's tier actually allows the featured_type before showing it.
     const query = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT * FROM (
         SELECT DISTINCT ON (inventory_item_id)
           inventory_item_id as id,
@@ -91,11 +93,15 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
           has_active_payment_gateway,
           default_gateway_type,
           ${distanceColumn}
-        FROM mv_global_discovery
+        FROM mv_global_discovery mgd
+        ${TIER_FEATURED_ACCESS_JOIN}
+        ${TENANT_PREFS_JOIN}
         WHERE featured_is_active = true
           AND item_status = 'active'
           AND visibility = 'public'
           AND stock > 0
+          ${TIER_FEATURED_ACCESS_WHERE}
+          ${TENANT_PREFS_WHERE}
           ${locationFilter}
         ORDER BY 
           inventory_item_id,

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Package, Calendar, DollarSign, Star, TrendingUp, Award, Zap, Flame, Crown, ThumbsUp, Sparkles } from 'lucide-react';
 
 interface FeaturedTypeProduct {
@@ -124,8 +125,17 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
   const [productsByType, setProductsByType] = useState<Record<string, FeaturedTypeProduct[]>>({});
   const [loading, setLoading] = useState(true);
 
+  // Capability-aware featured options filtering
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const featuredOptionsState = featuredCap.data;
+
+  // Filter input featuredTypes by capability state
+  const allowedFeaturedTypes = featuredOptionsState && featuredOptionsState.enabled
+    ? featuredTypes.filter(type => featuredOptionsState.allowedTypes.includes(type as any))
+    : featuredTypes;
+
   useEffect(() => {
-    if (!featuredTypes || featuredTypes.length === 0) {
+    if (!allowedFeaturedTypes || allowedFeaturedTypes.length === 0) {
       setLoading(false);
       return;
     }
@@ -161,11 +171,11 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
           const grouped: Record<string, FeaturedTypeProduct[]> = {};
           
           // Determine which types to process
-          // When showAllBuckets is true, show all buckets with products
-          // Otherwise, only show types the current product belongs to
+          // When showAllBuckets is true, show all buckets with products (filtered by capability)
+          // Otherwise, only show types the current product belongs to (filtered by capability)
           const typesToProcess = showAllBuckets 
-            ? Object.keys(groupedProducts || {})
-            : featuredTypes;
+            ? Object.keys(groupedProducts || {}).filter(type => allowedFeaturedTypes.includes(type))
+            : allowedFeaturedTypes;
           
           // Process each featured type
           for (const type of typesToProcess) {

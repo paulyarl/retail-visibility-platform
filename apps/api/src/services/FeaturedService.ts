@@ -173,8 +173,10 @@ export class FeaturedService {
   private async getFeaturedProductsFromMV(query: FeaturedProductQuery, limit: number): Promise<FeaturedProduct[]> {
     const { getDirectPool } = await import('../utils/db-pool');
     const pool = getDirectPool();
+    const { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } = await import('../utils/tier-capability-sql');
 
     const sqlQuery = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT
         mv.*,
         t.name as tenant_name,
@@ -186,6 +188,8 @@ export class FeaturedService {
         dsl.latitude as tenant_latitude,
         dsl.longitude as tenant_longitude
       FROM mv_global_discovery mv
+      ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+      ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       JOIN tenants t ON t.id = mv.tenant_id
       LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
       WHERE mv.tenant_id = COALESCE($1, mv.tenant_id)
@@ -193,6 +197,8 @@ export class FeaturedService {
         AND mv.item_status = 'active'
         AND mv.visibility = 'public'
         AND t.subscription_status = 'active'
+        ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
       ORDER BY mv.featured_priority DESC, mv.featured_at DESC
       LIMIT $2
     `;
@@ -208,15 +214,21 @@ export class FeaturedService {
   private async getFeaturedProductsFallback(query: FeaturedProductQuery, limit: number): Promise<FeaturedProduct[]> {
     const { getDirectPool } = await import('../utils/db-pool');
     const pool = getDirectPool();
+    const { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } = await import('../utils/tier-capability-sql');
 
     const fallbackQuery = `
+      WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT
         mv.*
       FROM mv_global_discovery mv
+      ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+      ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = COALESCE($1, mv.tenant_id)
         AND mv.featured_is_active = true
         AND mv.item_status = 'active'
         AND mv.visibility = 'public'
+        ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
       ORDER BY mv.featured_priority DESC, mv.featured_at DESC
       LIMIT $2
     `;
