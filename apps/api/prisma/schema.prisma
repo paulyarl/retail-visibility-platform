@@ -3950,6 +3950,7 @@ enum product_source {
   API
   BULK_UPLOAD
   CLOVER_DEMO
+  API_IMPORT
 }
 
 enum product_type {
