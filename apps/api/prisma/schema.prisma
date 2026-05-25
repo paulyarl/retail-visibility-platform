@@ -3937,6 +3937,7 @@ enum product_type {
   physical
   digital
   hybrid
+  service
 }
 
 enum review_status {

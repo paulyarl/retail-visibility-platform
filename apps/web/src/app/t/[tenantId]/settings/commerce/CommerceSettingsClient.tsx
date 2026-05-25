@@ -83,7 +83,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     if (commerceCap.data) {
       const { enabled, paymentType } = commerceCap.data;
       setCommerceFeatures({
-        commerce_disabled: !enabled || paymentType === 'none',
+        commerce_disabled: !enabled,
         commerce_deposit_only: enabled && (paymentType === 'deposit' || paymentType === 'both'),
         commerce_full_payment: enabled && (paymentType === 'full' || paymentType === 'both'),
       });

@@ -221,8 +221,8 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
     }
 
     // Report the higher tier as the effective tier_key
-    // If tenant has a higher tier than org, tenant tier is the effective one
-    const effectiveTierKey = tenantTierKey || orgTierKey || 'starter';
+    // Org tier overrides tenant tier (same logic as /tenants/:id/tier endpoint)
+    const effectiveTierKey = orgTierKey || tenantTierKey || 'starter';
 
     // Look up tier display metadata
     const effectiveTier = tierMap.get(effectiveTierKey);
