@@ -1935,6 +1935,47 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get tenant integration options settings
+   */
+  async getTenantIntegrationOptionsSettings(tenantId: string): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/integration-options`,
+      {},
+      `platform-tenant-integration-options-settings-${tenantId}`,
+      this.cacheTTL
+    );
+
+    return result.data?.settings || null;
+  }
+
+  /**
+   * Update tenant integration options settings
+   */
+  async updateTenantIntegrationOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/integration-options`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      },
+      `platform-tenant-integration-options-settings-${tenantId}`
+    );
+
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
+
+    return result.data?.settings || null;
+  }
+
+  /**
    * Get consolidated dashboard data for tenant
    */
   async getDashboardConsolidated(tenantId: string): Promise<any> {

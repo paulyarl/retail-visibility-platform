@@ -166,6 +166,7 @@ import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
 import commerceSettingsRoutes from './routes/commerce-settings';
 import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
+import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
 import buyerOrdersRoutes from './routes/buyer-orders';
 import tenantOrdersRoutes from './routes/tenant-orders';
@@ -7334,6 +7335,10 @@ console.log('✅ Product options settings routes mounted at /api/tenants/:tenant
 /* ------------------------------ featured options settings ------------------------------ */
 app.use('/api/tenants', featuredOptionsSettingsRoutes);
 console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options');
+
+/* ------------------------------ integration options settings ------------------------------ */
+app.use('/api/tenants', integrationOptionsSettingsRoutes);
+console.log('✅ Integration options settings routes mounted at /api/tenants/:tenantId/integration-options');
 
 /* ------------------------------ organization commerce settings ------------------------------ */
 app.use('/api/organizations', organizationCommerceSettingsRoutes);

@@ -24,6 +24,7 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
   payment_gateway_options: 'payment_gateway_',
   storefront_types: 'storefront_',
   featured_options: 'featured_',
+  integration_options: 'integration_',
 };
 
 /**

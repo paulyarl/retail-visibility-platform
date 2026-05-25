@@ -153,6 +153,36 @@ export interface ProductOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- Integration Options ---
+
+export type IntegrationType =
+  | 'clover' | 'square' | 'gbp'
+  | 'google_shopping' | 'google_merchant_center' | 'gmc_sync'
+  | 'propagation_gbp';
+
+export type IntegrationGroup = 'pos' | 'google';
+
+export interface IntegrationOptionsState {
+  /** Whether the integration capability is enabled at all */
+  enabled: boolean;
+  /** Whether POS integrations are enabled as a group */
+  posEnabled: boolean;
+  /** Whether Google integrations are enabled as a group */
+  googleEnabled: boolean;
+  /** Individual POS integration types allowed by tier */
+  allowedPosTypes: IntegrationType[];
+  /** Individual Google integration types allowed by tier */
+  allowedGoogleTypes: IntegrationType[];
+  /** All allowed integration types (union of pos + google + org) */
+  allowedTypes: IntegrationType[];
+  /** Whether all integration options are available (flexible tier) */
+  isFlexible: boolean;
+  /** Whether at least one integration type is available */
+  integrationsAvailable: boolean;
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Combined ---
 
 export interface AllCapabilitiesState {
@@ -166,6 +196,7 @@ export interface AllCapabilitiesState {
   fulfillment: FulfillmentState;
   productOptions: ProductOptionsState;
   featuredOptions: FeaturedOptionsState;
+  integrationOptions: IntegrationOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -181,6 +212,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   fulfillment_: 'fulfillment_options',
   product_: 'product_options',
   featured_: 'featured_options',
+  integration_: 'integration_options',
 };
 
 /**
@@ -410,6 +442,64 @@ export function resolveFeaturedOptionsState(features: Record<string, boolean>): 
 }
 
 /**
+ * Resolve integration options state from raw capability features
+ */
+export function resolveIntegrationState(features: Record<string, boolean>): IntegrationOptionsState {
+  const enabled = !!features.integration_enabled;
+  const disabled = !!features.integration_disabled;
+  const flexible = !!features.integration_flexible;
+  const posGroupEnabled = !!features.integration_pos_enabled;
+  const posGroupDisabled = !!features.integration_pos_disabled;
+  const googleGroupEnabled = !!features.integration_google_enabled;
+  const googleGroupDisabled = !!features.integration_google_disabled;
+
+  // Three states per group: enabled → all types, untouched → individual features, disabled → none
+  const posEnabled = posGroupEnabled && !posGroupDisabled;
+  const posUntouched = !posGroupEnabled && !posGroupDisabled;
+  const googleEnabled = googleGroupEnabled && !googleGroupDisabled;
+  const googleUntouched = !googleGroupEnabled && !googleGroupDisabled;
+
+  // POS integration types
+  const allowedPosTypes: IntegrationType[] = [];
+  if (flexible || posEnabled) {
+    allowedPosTypes.push('clover', 'square');
+  } else if (posUntouched) {
+    if (features.integration_clover) allowedPosTypes.push('clover');
+    if (features.integration_square) allowedPosTypes.push('square');
+  }
+
+  // Google integration types
+  const allowedGoogleTypes: IntegrationType[] = [];
+  if (flexible || googleEnabled) {
+    allowedGoogleTypes.push('google_shopping', 'google_merchant_center', 'gbp', 'gmc_sync');
+  } else if (googleUntouched) {
+    if (features.integration_google_shopping) allowedGoogleTypes.push('google_shopping');
+    if (features.integration_google_merchant_center) allowedGoogleTypes.push('google_merchant_center');
+    if (features.integration_gbp) allowedGoogleTypes.push('gbp');
+    if (features.integration_gmc_sync) allowedGoogleTypes.push('gmc_sync');
+  }
+
+  const allTypes: IntegrationType[] = [...allowedPosTypes, ...allowedGoogleTypes];
+
+  // Organization-only: propagation_gbp (not part of pos/google groups)
+  if (features.integration_propagation_gbp) {
+    allTypes.push('propagation_gbp');
+  }
+
+  return {
+    enabled: enabled && !disabled,
+    posEnabled,
+    googleEnabled,
+    allowedPosTypes,
+    allowedGoogleTypes,
+    allowedTypes: allTypes,
+    isFlexible: flexible,
+    integrationsAvailable: enabled && !disabled && allTypes.length > 0,
+    features,
+  };
+}
+
+/**
  * Resolve storefront state from raw capability features
  */
 export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
@@ -566,6 +656,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get integration options state for a tenant
+   */
+  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.integrationOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -592,6 +690,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
+    const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -604,6 +703,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
+      integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -722,6 +822,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get integration options state for a tenant
+   */
+  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.integrationOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -745,6 +853,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
+    const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -757,6 +866,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
+      integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

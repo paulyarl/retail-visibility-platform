@@ -275,6 +275,7 @@ function buildTenantNav(
       icon: <Icon.Integrations />,
       requiredGroup: 'IS_TENANT_ADMIN',
       children: [
+        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integration-options` },
         { label: 'Google Merchant Center', href: `/t/${currentTenantId}/settings/integrations/google` },
         { label: 'Feed Validation', href: `/t/${currentTenantId}/feed-validation` },
         { label: 'Clover POS', href: `/t/${currentTenantId}/settings/integrations/clover` },

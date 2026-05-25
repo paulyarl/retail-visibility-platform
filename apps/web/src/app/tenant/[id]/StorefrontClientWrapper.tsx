@@ -323,7 +323,7 @@ export default function StorefrontClientWrapper({
             <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
               {/* Navigation Pills */}
               <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <a
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -336,7 +336,7 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
 
-                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && (
+                {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <a
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -375,7 +375,7 @@ export default function StorefrontClientWrapper({
               <GBPCategoryBadges
                 categories={[primaryGBPCategory, ...secondaryGBPCategories]}
                 showCount={true}
-                size="md"
+                size="sm"
               />  {/* Store Status Badge */}
             </div>
           )}
@@ -1000,7 +1000,7 @@ export default function StorefrontClientWrapper({
       {/* Store Ratings and Reviews */}
       {/* Gradient border line */}
       {/* Advanced Catalog Navigation */}
-      {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
+      {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && isRetailStore && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <CollapsibleCatalogSidebar
             tenantId={tenantId}
@@ -1029,7 +1029,7 @@ export default function StorefrontClientWrapper({
       )}
 
       {/* Storefront Recommendations */}
-      {!storefrontStatus.shouldShowPanel && (
+      {!storefrontStatus.shouldShowPanel && isRetailStore && (
         <StorefrontRecommendations tenantId={tenantId} />
       )}
       {/* Recently Viewed - always last for consistency with other public pages */}
@@ -1044,20 +1044,19 @@ export default function StorefrontClientWrapper({
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             {/* Quick Links */}
             <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                Quick Links
-              </h3>
               <div className="flex flex-wrap gap-4">
                 {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
-                  <Link
+                  <><h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Quick Links
+                  </h3><Link
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    View in Directory
-                  </Link>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      View in Directory
+                    </Link></>
                 )}
                 {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <Link

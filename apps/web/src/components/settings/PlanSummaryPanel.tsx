@@ -9,6 +9,7 @@ import {
   ProductType,
   GatewayType,
   BarcodeScanMode,
+  IntegrationType,
 } from '@/services/CapabilityResolutionService';
 import { getFeaturedTypeMeta } from '@/utils/featuredOptions';
 
@@ -65,6 +66,16 @@ const STOREFRONT_TYPE_LABELS: Record<string, string> = {
   none: '',
 };
 
+const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
+  clover: 'Clover POS',
+  square: 'Square POS',
+  gbp: 'Google Business Profile',
+  google_shopping: 'Google Shopping',
+  google_merchant_center: 'Merchant Center',
+  gmc_sync: 'GMC Sync',
+  propagation_gbp: 'GBP Propagation',
+};
+
 // --- Capability display config ---
 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string }> = {
@@ -75,6 +86,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string }> = {
   fulfillment_options: { label: 'Fulfillment', icon: '📦' },
   product_options: { label: 'Product Options', icon: '🏷️' },
   featured_options: { label: 'Featured Options', icon: '⭐' },
+  integration_options: { label: 'Integrations', icon: '🔗' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -216,6 +228,24 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: fo.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'featured_options',
+    });
+  }
+
+  // Integration Options
+  const io = caps.integrationOptions;
+  if (Object.keys(io.features).length > 0) {
+    const specifics: string[] = [];
+    io.allowedTypes.forEach(t => {
+      const label = INTEGRATION_TYPE_LABELS[t];
+      if (label) specifics.push(label);
+    });
+    summaries.push({
+      key: 'integration_options',
+      label: CAPABILITY_DISPLAY.integration_options.label,
+      icon: CAPABILITY_DISPLAY.integration_options.icon,
+      enabled: io.enabled,
+      specificFeatures: specifics,
+      isHighlighted: highlight === 'integration_options',
     });
   }
 

@@ -184,9 +184,9 @@ export const FEATURE_OPERATIONS: Record<string, FeatureOperation> = {
   
   // Integration Operations
   'clover_sync': {
-    canonicalKey: 'clover_sync',
+    canonicalKey: 'integration_clover',
     requiredPermission: 'canManage',
-    tierRequirement: 'discovery',
+    tierRequirement: 'starter',
     apiEndpoints: ['/api/clover/sync', '/api/integrations/clover'],
     components: ['CloverSyncButton', 'IntegrationSettings'],
     riskLevel: 'high',
@@ -195,9 +195,9 @@ export const FEATURE_OPERATIONS: Record<string, FeatureOperation> = {
   },
   
   'square_sync': {
-    canonicalKey: 'square_sync',
+    canonicalKey: 'integration_square',
     requiredPermission: 'canManage',
-    tierRequirement: 'discovery',
+    tierRequirement: 'ecommerce',
     apiEndpoints: ['/api/square/sync', '/api/integrations/square'],
     components: ['SquareSyncButton', 'IntegrationSettings'],
     riskLevel: 'high',
@@ -206,13 +206,46 @@ export const FEATURE_OPERATIONS: Record<string, FeatureOperation> = {
   },
   
   'google_shopping': {
-    canonicalKey: 'google_shopping',
+    canonicalKey: 'integration_google_shopping',
     requiredPermission: 'canManage',
     tierRequirement: 'discovery',
     apiEndpoints: ['/api/google/shopping', '/api/google/merchant-center'],
     components: ['GoogleShoppingSettings', 'MerchantCenterConnect'],
     riskLevel: 'medium',
     description: 'List products on Google Shopping',
+    category: 'integration'
+  },
+  
+  'google_merchant_center': {
+    canonicalKey: 'integration_google_merchant_center',
+    requiredPermission: 'canManage',
+    tierRequirement: 'discovery',
+    apiEndpoints: ['/api/google/merchant-center', '/api/gmc/sync'],
+    components: ['MerchantCenterConnect', 'GMCSyncSettings'],
+    riskLevel: 'medium',
+    description: 'Sync inventory to Google Merchant Center',
+    category: 'integration'
+  },
+  
+  'gbp_integration': {
+    canonicalKey: 'integration_gbp',
+    requiredPermission: 'canManage',
+    tierRequirement: 'ecommerce',
+    apiEndpoints: ['/api/gbp/sync', '/api/integrations/gbp'],
+    components: ['GBPIntegrationSettings', 'GBPSyncButton'],
+    riskLevel: 'medium',
+    description: 'Sync inventory to Google Business Profile',
+    category: 'integration'
+  },
+  
+  'gmc_sync': {
+    canonicalKey: 'integration_gmc_sync',
+    requiredPermission: 'canManage',
+    tierRequirement: 'commitment',
+    apiEndpoints: ['/api/gmc/sync', '/api/gmc/variants'],
+    components: ['GMCSyncButton', 'GMCSyncSettings'],
+    riskLevel: 'medium',
+    description: 'Advanced GMC sync with variant support',
     category: 'integration'
   },
   
@@ -382,9 +415,16 @@ export class FeatureGateEngine {
       'analytics': 5,          // professional+
       'api_access': 5,         // professional+
       'branding_suite': 5,     // professional+
-      'clover_sync': 2,        // discovery+
-      'square_sync': 2,        // discovery+
-      'google_shopping': 2,    // discovery+
+      'integration_clover': 2,     // starter+
+      'integration_square': 4,     // ecommerce+
+      'integration_google_shopping': 1, // discovery+
+      'integration_google_merchant_center': 1, // discovery+
+      'integration_gbp': 4,        // ecommerce+
+      'integration_gmc_sync': 4,   // commitment+
+      'integration_propagation_gbp': 7, // organization+
+      'clover_sync': 2,            // legacy alias → integration_clover
+      'square_sync': 4,            // legacy alias → integration_square
+      'google_shopping': 1,        // legacy alias → integration_google_shopping
       'qr_codes': 2,           // discovery+
       'storefront': 2,         // discovery+
       'quick_setup': 2         // discovery+

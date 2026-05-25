@@ -163,7 +163,18 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   propagation_rollback: 'organization',
   organization_dashboard: 'organization',
   hero_location: 'organization',
-  strategic_testing: 'organization',
+  // Integrations (canonical keys)
+  integration_enabled: 'discovery',
+  integration_google_enabled: 'discovery',
+  integration_google_shopping: 'discovery',
+  integration_google_merchant_center: 'discovery',
+  integration_clover: 'starter',
+  integration_gmc_sync: 'commitment',
+  integration_square: 'ecommerce',
+  integration_gbp: 'ecommerce',
+  integration_pos_enabled: 'ecommerce',
+  integration_flexible: 'enterprise',
+  integration_propagation_gbp: 'organization',
 };
 
 // Tier display names
@@ -262,7 +273,18 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'strategic_testing': 'Strategic Testing',
   'shared_sku_pool': 'Shared SKU Pool',
   'centralized_control': 'Centralized Control',
-  'basic_propagation': 'Basic Propagation',
+  // Integration options (canonical keys)
+  'integration_enabled': 'Integrations Enabled',
+  'integration_clover': 'Clover POS Integration',
+  'integration_square': 'Square POS Integration',
+  'integration_gbp': 'Google Business Profile',
+  'integration_google_shopping': 'Google Shopping Feed',
+  'integration_google_merchant_center': 'Google Merchant Center',
+  'integration_gmc_sync': 'Advanced GMC Sync',
+  'integration_propagation_gbp': 'GBP Propagation',
+  'integration_flexible': 'Integration Flexible Mode',
+  'integration_pos_enabled': 'POS Integrations',
+  'integration_google_enabled': 'Google Integrations',
 };
 
 // Tier pricing (monthly)

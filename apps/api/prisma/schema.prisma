@@ -3225,6 +3225,24 @@ model tenant_gbp_categories {
   @@index([category_type], map: "idx_tenant_gbp_categories_type")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_integration_settings {
+  id                                 String    @id @db.VarChar(255)
+  tenant_id                          String    @unique @db.VarChar(255)
+  integration_enabled                Boolean?  @default(true)
+  integration_clover                 Boolean?  @default(false)
+  integration_square                 Boolean?  @default(false)
+  integration_gbp                    Boolean?  @default(false)
+  integration_google_shopping        Boolean?  @default(true)
+  integration_google_merchant_center Boolean?  @default(true)
+  integration_gmc_sync               Boolean?  @default(false)
+  created_at                         DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                         DateTime? @default(now()) @db.Timestamp(6)
+  tenants                            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_integration_settings_tenant")
+}
+
 model tenant_payment_gateways {
   id                       String            @id
   tenant_id                String
@@ -3434,6 +3452,7 @@ model tenants {
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_featured_options_settings                                                       tenant_featured_options_settings?
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
+  tenant_integration_settings                                                            tenant_integration_settings?
   tenant_payment_gateways                                                                tenant_payment_gateways[]
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
