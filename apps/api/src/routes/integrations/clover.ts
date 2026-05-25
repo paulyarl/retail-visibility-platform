@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
+import { requireTierFeature } from '../../middleware/tier-access';
 import { 
   getDemoItems,
   getDemoItem,
@@ -37,7 +38,7 @@ const router = Router();
  * Enable demo mode for a tenant
  * Creates a CloverIntegration record and imports demo items
  */
-router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/enable', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = (req as any).user;
@@ -245,7 +246,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
  * Disable demo mode for a tenant
  * Removes demo items and deactivates integration
  */
-router.post('/:tenantId/clover/demo/disable', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/disable', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { keepItems = false } = req.body; // Option to keep demo items
@@ -426,7 +427,7 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
  * Get OAuth authorization URL
  * Initiates the OAuth flow by generating the Clover authorization URL
  */
-router.get('/:tenantId/clover/oauth/authorize', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/oauth/authorize', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = (req as any).user;
@@ -1694,7 +1695,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
  * Imports items and categories from connected Clover account into Visible Shelf inventory
  * Supports 2-way category sync
  */
-router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { 
@@ -1994,7 +1995,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
 /**
  * Disconnect Clover integration (Production Mode)
  */
-router.post('/:tenantId/clover/disconnect', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/disconnect', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { keepItems = true } = req.body;

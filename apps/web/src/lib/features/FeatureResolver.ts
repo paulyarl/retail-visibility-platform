@@ -151,7 +151,86 @@ const CANONICAL_FEATURES: Record<string, FeatureCapability> = {
     name: 'Square POS Integration',
     description: 'Real-time sync with Square POS',
     category: 'inventory'
-  }
+  },
+
+  // Integration Options (canonical keys)
+  'integration_clover': {
+    key: 'integration_clover',
+    name: 'Clover POS Sync',
+    description: 'Real-time inventory sync with Clover POS',
+    category: 'integration',
+    metadata: { group: 'pos', minTier: 'starter' }
+  },
+  'integration_square': {
+    key: 'integration_square',
+    name: 'Square POS Sync',
+    description: 'Real-time inventory sync with Square POS',
+    category: 'integration',
+    metadata: { group: 'pos', minTier: 'ecommerce' }
+  },
+  'integration_gbp': {
+    key: 'integration_gbp',
+    name: 'Google Business Profile',
+    description: 'Sync inventory to Google Business Profile',
+    category: 'integration',
+    metadata: { group: 'google', minTier: 'ecommerce' }
+  },
+  'integration_google_shopping': {
+    key: 'integration_google_shopping',
+    name: 'Google Shopping Feed',
+    description: 'List products on Google Shopping',
+    category: 'integration',
+    metadata: { group: 'google', minTier: 'discovery' }
+  },
+  'integration_google_merchant_center': {
+    key: 'integration_google_merchant_center',
+    name: 'Google Merchant Center',
+    description: 'Sync inventory to Google Merchant Center',
+    category: 'integration',
+    metadata: { group: 'google', minTier: 'discovery' }
+  },
+  'integration_gmc_sync': {
+    key: 'integration_gmc_sync',
+    name: 'Advanced GMC Sync',
+    description: 'Advanced GMC sync with variant and propagation support',
+    category: 'integration',
+    metadata: { group: 'google', minTier: 'commitment' }
+  },
+  'integration_propagation_gbp': {
+    key: 'integration_propagation_gbp',
+    name: 'GBP Propagation',
+    description: 'Propagate GBP data across organization locations',
+    category: 'integration',
+    metadata: { group: 'organization', minTier: 'organization' }
+  },
+  'integration_enabled': {
+    key: 'integration_enabled',
+    name: 'Integrations Enabled',
+    description: 'Master switch for integration access',
+    category: 'integration',
+    metadata: { structural: true }
+  },
+  'integration_flexible': {
+    key: 'integration_flexible',
+    name: 'Integration Flexible Mode',
+    description: 'All integrations available regardless of individual toggles',
+    category: 'integration',
+    metadata: { structural: true }
+  },
+  'integration_pos_enabled': {
+    key: 'integration_pos_enabled',
+    name: 'POS Integrations Enabled',
+    description: 'POS integration group enabled',
+    category: 'integration',
+    metadata: { structural: true, group: 'pos' }
+  },
+  'integration_google_enabled': {
+    key: 'integration_google_enabled',
+    name: 'Google Integrations Enabled',
+    description: 'Google integration group enabled',
+    category: 'integration',
+    metadata: { structural: true, group: 'google' }
+  },
 };
 
 // Feature groupings
@@ -172,7 +251,13 @@ const FEATURE_GROUPS: Record<string, FeatureGroup> = {
     id: 'pos_integrations',
     name: 'POS Integrations',
     description: 'Connect with popular POS systems',
-    features: ['clover_sync', 'square_sync']
+    features: ['integration_clover', 'integration_square', 'clover_sync', 'square_sync']
+  },
+  'google_integrations': {
+    id: 'google_integrations',
+    name: 'Google Integrations',
+    description: 'Connect with Google services',
+    features: ['integration_google_shopping', 'integration_google_merchant_center', 'integration_gbp', 'integration_gmc_sync', 'google_shopping', 'google_merchant_center']
   }
 };
 
@@ -224,8 +309,18 @@ const LEGACY_FEATURE_MAP: Record<string, string> = {
   'categories': 'categories',
   'manual_entry': 'manual_entry',
   'manual_barcode': 'manual_barcode',
-  'google_sync': 'google_sync',
-  'gbp_integration': 'gbp_integration',
+  'google_sync': 'integration_gbp',
+  'gbp_integration': 'integration_gbp',
+  'clover_pos': 'integration_clover',
+  'square_pos': 'integration_square',
+  'gmc_sync': 'integration_gmc_sync',
+  'propagation_gbp_sync': 'integration_propagation_gbp',
+
+  // Integration legacy aliases (old keys → canonical integration_* keys)
+  'clover_sync': 'integration_clover',
+  'square_sync': 'integration_square',
+  'google_shopping': 'integration_google_shopping',
+  'google_merchant_center': 'integration_google_merchant_center',
   'interactive_maps': 'interactive_maps',
   'privacy_mode': 'privacy_mode',
   'payment_client_credentials': 'payment_client_credentials',

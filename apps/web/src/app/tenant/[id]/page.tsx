@@ -475,31 +475,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
-  // console.log('[TenantPage Main] 12 Store Categories:', storeCategories);
-  // console.log('[TenantPage Main] 11 Product Categories:', productCategories);
-
-  // console.log('[TenantPage Main] Current Category:', currentCategory);
-
-  // console.log('[TenantPage Main] Resolved Tenant ID:', resolvedTenantId);
-  // console.log('[TenantPage Main] 1 Tenant:', tenant);
-  // console.log('[TenantPage Main] 2 Products:', products);
-  // console.log('[TenantPage Main] 3 total:', total);
-  // console.log('[TenantPage Main] 4 limit:', limit);
-  // console.log('[TenantPage Main] 5 platformSettings:', platformSettings);
-  // console.log('[TenantPage Main] 10 categories:', categories);
-
-
-  // Log what data we're passing to StorefrontClientWrapper
-  // console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
-  // console.log('[TenantPage Main] Tenant phone:', tenant.metadata?.phone);
-  // console.log('[TenantPage Main] Tenant email:', tenant.metadata?.email);
-  // console.log('[TenantPage Main] Tenant address:', tenant.metadata?.address);
-  // console.log('[TenantPage Main] Business hours:', businessHours);
-
-  // Track storefront view for recommendations (fire and forget)
-  // console.log('[TenantPage Main] Tracking storefront view');
-  // console.log('[TenantPage Main] Category:', category);
-  // console.log('[TenantPage Main] Current Category:', currentCategory);
+ 
   if (category && currentCategory) {
     // Track category browse on storefront
     import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
@@ -522,37 +498,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
   let directoryPublished = tenant?.hasDirectory || false;
   let tenantSlug = tenant?.slug || id;
 
-  // try {
-  //   // Use tenant directory service to get the actual slug from the API
-  //  console.log('[TenantPage] Calling getTenantSlug...');
-  //  console.log(`[TenantPage] Tenant ID: ${tenant?.id}`);
-  //  console.log(`[TenantPage] Tenant slug: ${tenant?.slug}`);
-  //  console.log(`[TenantPage] Tenant: ${JSON.stringify(tenant)}`);
-  // const apiSlug = await tenantDirectoryService.getTenantSlug(id);
-  // const apiSlug = tenant?.slug;
-  //  console.log('[TenantPage] API slug:', apiSlug);
-
-  // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
-  // directoryPublished = tenant.hasPublishedDirectory ?? false;
-
-  // Use API slug if available, otherwise generate from business name or use tenant ID
-  // tenantSlug = apiSlug || data.tenant?.slug || id;
-  // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
-  // } catch (e) {
-  // Directory page doesn't exist or error - store is not published
-  // console.warn('[TenantPage] Directory service failed:', e);
-  // directoryPublished = false;
-  // Fallback to generated slug
-  // tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
-  // }
-
-  // Find primary store category for header badge
-  // console.log('[TenantPage] Store Categories:', storeCategories);
+  
   // console.log('[TenantPage] Tenant Primary Category:', tenant);
   const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
-  // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary:', tenant?.metadata?.gbp_categories?.primary); 
-  // console.log('[TenantPage] tenant?.metadata?.gbp_categories?.primary?.name:', tenant?.metadata?.gbp_categories?.primary?.name); 
-  // console.log('[TenantPage] tenant?.metadata?.gbpCategories?.primary?.name:', tenant?.metadata?.gbpCategories?.primary?.name); 
+ 
 
   // Get GBP categories from dedicated API fields (top-level on tenant object)
   const primaryGBPCategory = tenant?.gbpPrimaryCategoryName
@@ -565,8 +514,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     tenant?.metadata?.gbp_categories?.secondary ||
     tenant?.metadata?.gbpCategories?.secondary || [];
 
-  console.log(`[TenantPage] Primary GBP Category: ${primaryGBPCategory}`);
-  console.log(`[TenantPage] Secondary GBP Categories: ${JSON.stringify(secondaryGBPCategories)}`);
   // Fetch total product count for "All Products" using singleton service
   let totalAllProducts = 0;
   try {

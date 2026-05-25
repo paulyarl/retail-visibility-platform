@@ -666,7 +666,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             {allCapabilities.data && (
               <div className="pt-4 border-t border-neutral-200">
                 <h3 className="text-sm font-semibold text-neutral-900 mb-3">Active Capabilities:</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Commerce */}
                   <div className={`p-3 rounded-lg border ${allCapabilities.data.commerce.enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                     <div className="flex items-center gap-2 mb-1">
@@ -717,6 +717,29 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                        allCapabilities.data.storefront.type === 'retail' ? 'Retail only' :
                        allCapabilities.data.storefront.type === 'both' ? 'Online + Retail' :
                        'Standard'}
+                    </p>
+                  </div>
+                  {/* Integrations */}
+                  <div className={`p-3 rounded-lg border ${allCapabilities.data.integrationOptions.enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-medium ${allCapabilities.data.integrationOptions.enabled ? 'text-green-800' : 'text-red-800'}`}>
+                        Integrations
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${allCapabilities.data.integrationOptions.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {allCapabilities.data.integrationOptions.enabled ? 'Active' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600">
+                      {allCapabilities.data.integrationOptions.allowedTypes.length > 0
+                        ? allCapabilities.data.integrationOptions.allowedTypes.map(t => {
+                            const labels: Record<string, string> = {
+                              clover: 'Clover', square: 'Square', gbp: 'GBP',
+                              google_shopping: 'Shopping', google_merchant_center: 'GMC',
+                              gmc_sync: 'GMC Sync', propagation_gbp: 'GBP Prop'
+                            };
+                            return labels[t] || t;
+                          }).join(', ')
+                        : 'No integrations available'}
                     </p>
                   </div>
                 </div>

@@ -172,6 +172,33 @@ const FEATURE_TIER_MAP: Record<string, string> = {
   organization_dashboard: 'organization',
   hero_location: 'organization',
   strategic_testing: 'organization',
+
+  // Integration options (canonical keys)
+  integration_enabled: 'discovery',
+  integration_google_enabled: 'discovery',
+  integration_google_shopping: 'discovery',
+  integration_google_merchant_center: 'discovery',
+  integration_clover: 'starter',
+  integration_gmc_sync: 'commitment',
+  integration_square: 'ecommerce',
+  integration_gbp: 'ecommerce',
+  integration_pos_enabled: 'ecommerce',
+  integration_flexible: 'enterprise',
+  integration_propagation_gbp: 'organization',
+};
+
+// Legacy feature key aliases → canonical integration_* keys
+const INTEGRATION_LEGACY_ALIASES: Record<string, string> = {
+  clover_sync: 'integration_clover',
+  clover_pos: 'integration_clover',
+  square_sync: 'integration_square',
+  square_pos: 'integration_square',
+  gbp_integration: 'integration_gbp',
+  google_sync: 'integration_gbp',
+  google_shopping: 'integration_google_shopping',
+  google_merchant_center: 'integration_google_merchant_center',
+  gmc_sync: 'integration_gmc_sync',
+  propagation_gbp_sync: 'integration_propagation_gbp',
 };
 
 /**
@@ -179,26 +206,39 @@ const FEATURE_TIER_MAP: Record<string, string> = {
  * Now uses database-driven tiers with fallback to hardcoded values
  */
 export async function checkTierAccess(tier: string, feature: string): Promise<boolean> {
+  // Resolve legacy aliases to canonical integration_* keys
+  const canonicalFeature = INTEGRATION_LEGACY_ALIASES[feature] || feature;
+
   try {
     // Try database first
-    const hasAccess = await TierService.checkTierFeatureAccess(tier, feature);
+    const hasAccess = await TierService.checkTierFeatureAccess(tier, canonicalFeature);
     return hasAccess;
   } catch (error) {
     console.warn('[checkTierAccess] Database lookup failed, using fallback:', error);
     
     // Fallback to hardcoded values
+    const resolvedFeature = INTEGRATION_LEGACY_ALIASES[canonicalFeature] || canonicalFeature;
     const tierFeatures = TIER_FEATURES[tier as keyof typeof TIER_FEATURES] || [];
     
-    if ((tierFeatures as readonly string[]).includes(feature)) {
+    if ((tierFeatures as readonly string[]).includes(resolvedFeature) || (tierFeatures as readonly string[]).includes(feature)) {
       return true;
     }
     
     const inheritedTiers = TIER_HIERARCHY[tier] || [];
     for (const inheritedTier of inheritedTiers) {
       const inheritedFeatures = TIER_FEATURES[inheritedTier as keyof typeof TIER_FEATURES] || [];
-      if ((inheritedFeatures as readonly string[]).includes(feature)) {
+      if ((inheritedFeatures as readonly string[]).includes(resolvedFeature) || (inheritedFeatures as readonly string[]).includes(feature)) {
         return true;
       }
+    }
+    
+    // Check FEATURE_TIER_MAP as last fallback
+    const requiredTier = FEATURE_TIER_MAP[resolvedFeature] || FEATURE_TIER_MAP[feature];
+    if (requiredTier) {
+      const tierOrder = ['google_only', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
+      const tierIndex = tierOrder.indexOf(tier);
+      const requiredIndex = tierOrder.indexOf(requiredTier);
+      return tierIndex >= requiredIndex;
     }
     
     return false;
@@ -209,7 +249,8 @@ export async function checkTierAccess(tier: string, feature: string): Promise<bo
  * Get the minimum required tier for a feature
  */
 export function getRequiredTier(feature: string): string {
-  return FEATURE_TIER_MAP[feature] || 'professional';
+  const canonical = INTEGRATION_LEGACY_ALIASES[feature] || feature;
+  return FEATURE_TIER_MAP[canonical] || FEATURE_TIER_MAP[feature] || 'professional';
 }
 
 /**

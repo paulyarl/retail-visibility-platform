@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
+import { requireTierFeature } from '../../middleware/tier-access';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/:tenantId/square/status', authenticateToken, async (req: Request, r
 /**
  * Get Square OAuth authorization URL
  */
-router.get('/:tenantId/square/oauth/authorize', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/square/oauth/authorize', authenticateToken, requireTierFeature('integration_square'), async (req: Request, res: Response) => {
   try {
     // Square OAuth not yet implemented
     return res.status(501).json({ 
@@ -90,7 +91,7 @@ router.get('/:tenantId/square/oauth/callback', async (req: Request, res: Respons
 /**
  * Disconnect Square integration
  */
-router.post('/:tenantId/square/disconnect', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/square/disconnect', authenticateToken, requireTierFeature('integration_square'), async (req: Request, res: Response) => {
   try {
     // Square integration not yet implemented
     return res.status(501).json({ 
@@ -106,7 +107,7 @@ router.post('/:tenantId/square/disconnect', authenticateToken, async (req: Reque
 /**
  * Trigger Square sync
  */
-router.post('/:tenantId/square/sync', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/square/sync', authenticateToken, requireTierFeature('integration_square'), async (req: Request, res: Response) => {
   try {
     // Square sync not yet implemented
     return res.status(501).json({ 
