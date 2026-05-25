@@ -3159,6 +3159,29 @@ model tenant_feature_overrides_list {
   @@unique([tenant_id, feature])
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_featured_options_settings {
+  id                       String    @id @db.VarChar(255)
+  tenant_id                String    @unique @db.VarChar(255)
+  featured_enabled         Boolean?  @default(true)
+  featured_store_selection Boolean?  @default(true)
+  featured_new_arrival     Boolean?  @default(true)
+  featured_seasonal        Boolean?  @default(true)
+  featured_sale            Boolean?  @default(true)
+  featured_staff_pick      Boolean?  @default(true)
+  featured_clearance       Boolean?  @default(true)
+  featured_featured        Boolean?  @default(true)
+  featured_bestseller      Boolean?  @default(false)
+  featured_trending        Boolean?  @default(false)
+  featured_recommended     Boolean?  @default(false)
+  featured_random_featured Boolean?  @default(false)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_featured_options_tenant")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenant_fulfillment_settings {
   id                        String    @id
@@ -3250,29 +3273,6 @@ model tenant_product_options_settings {
   tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_product_options_tenant")
 
   @@index([tenant_id], map: "idx_product_options_tenant")
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model tenant_featured_options_settings {
-  id                       String    @id @db.VarChar(255)
-  tenant_id                String    @unique @db.VarChar(255)
-  featured_enabled         Boolean?  @default(true)
-  featured_store_selection Boolean?  @default(true)
-  featured_new_arrival     Boolean?  @default(true)
-  featured_seasonal        Boolean?  @default(true)
-  featured_sale            Boolean?  @default(true)
-  featured_staff_pick      Boolean?  @default(true)
-  featured_clearance       Boolean?  @default(true)
-  featured_featured        Boolean?  @default(true)
-  featured_bestseller      Boolean?  @default(false)
-  featured_trending        Boolean?  @default(false)
-  featured_recommended     Boolean?  @default(false)
-  featured_random_featured Boolean?  @default(false)
-  created_at               DateTime? @default(now()) @db.Timestamp(6)
-  updated_at               DateTime? @default(now()) @db.Timestamp(6)
-  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_options_tenant")
-
-  @@index([tenant_id], map: "idx_featured_options_tenant")
 }
 
 model tenant_shipping_carriers {
@@ -3947,6 +3947,7 @@ enum product_type {
   physical
   digital
   hybrid
+  service
 }
 
 enum review_status {

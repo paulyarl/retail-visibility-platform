@@ -4,6 +4,9 @@
 -- Consumer-optimized MVs for the scope system
 -- All data pre-computed and optimized for discovery
 
+-- Add 'service' to product_type enum (required before MV definitions)
+ALTER TYPE public.product_type ADD VALUE IF NOT EXISTS 'service';
+
 -- ========================================
 -- CLEANUP (Drop existing views if they exist)
 -- ========================================
@@ -63,7 +66,7 @@ SELECT
   ii.features,
   ii.specifications,
   ii.enhanced_description,
-  (ii.metadata->>'video_url')::text as video_url,
+  ii.video_url,
   (ii.metadata->>'gallery_urls')::jsonb as gallery_urls,
   (ii.metadata->>'thumbnail_url')::text as thumbnail_url,
   (ii.metadata->>'featured_image_url')::text as featured_image_url,
@@ -148,10 +151,10 @@ SELECT
   dc.slug as product_category_slug,
   dc."googleCategoryId" as product_google_category_id,
   dc."parentId" as product_parent_category_id,
-  (ii.metadata->>'is_digital_product')::boolean as is_digital_product,
-  (ii.metadata->>'is_physical_product')::boolean as is_physical_product,
-  (ii.metadata->>'is_service')::boolean as is_service,
-  (ii.metadata->>'is_variant')::boolean as is_variant,
+  (ii.product_type = 'digital') as is_digital_product,
+  (ii.product_type = 'physical') as is_physical_product,
+  (ii.product_type = 'service') as is_service,
+  ii.has_variants as is_variant,
   (ii.metadata->>'is_bundle')::boolean as is_bundle,
   (ii.metadata->>'is_customizable')::boolean as is_customizable,
   (ii.metadata->>'is_trackable')::boolean as is_trackable,
@@ -162,21 +165,21 @@ SELECT
   (ii.metadata->>'attributes')::jsonb as attributes,
   (ii.metadata->>'custom_fields')::jsonb as custom_fields,
   (ii.metadata->>'search_keywords')::jsonb as search_keywords,
-  (ii.metadata->>'seo_title')::text as seo_title,
-  (ii.metadata->>'seo_description')::text as seo_description,
-  (ii.metadata->>'seo_keywords')::jsonb as seo_keywords,
-  (ii.metadata->>'tags')::jsonb as tags,
+  ii.seo_title,
+  ii.seo_description,
+  to_jsonb(ii.seo_keywords) as seo_keywords,
+  to_jsonb(ii.tags) as tags,
   (ii.metadata->>'weight')::numeric as weight,
   (ii.metadata->>'dimensions')::text as dimensions,
   
   -- INVENTORY AND STOCK (from inventory_items)
   ii.stock as inventory_quantity,
   (ii.metadata->>'inventory_policy')::text as inventory_policy,
-  (ii.metadata->>'inventory_tracking')::boolean as inventory_tracking,
+  ii.track_inventory as inventory_tracking,
   (ii.metadata->>'inventory_quantity_tracked')::boolean as inventory_quantity_tracked,
-  (ii.metadata->>'allow_backorder')::boolean as allow_backorder,
+  ii.allow_backorder,
   (ii.metadata->>'backorder_quantity')::numeric as backorder_quantity,
-  (ii.metadata->>'low_stock_threshold')::numeric as low_stock_threshold,
+  ii.low_stock_threshold,
   (ii.metadata->>'requires_shipping')::boolean as requires_shipping,
   (ii.metadata->>'weight_unit')::text as weight_unit,
   (ii.metadata->>'length')::numeric as length,
@@ -215,21 +218,21 @@ SELECT
   -- Product Category Search Helper (from directory_category)
   LOWER(dc.name) as product_category_name_lower,
   
-  -- Category counts and validation
-  jsonb_array_length(COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)) as gbp_secondary_category_count,
+  -- Category counts and validation (from elevated columns, not metadata)
+  jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) as gbp_secondary_category_count,
   CASE 
-    WHEN (t.metadata->'gbp_categories'->'primary') IS NOT NULL THEN 1
+    WHEN t.gbp_primary_category_id IS NOT NULL THEN 1
     ELSE 0
-  END + jsonb_array_length(COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)) as gbp_total_category_count,
+  END + jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) as gbp_total_category_count,
   
   -- Tenant Information (from tenants)
   t.id as tenant_id,
   t.name as tenant_name,
   t.slug as tenant_slug,
   t.subscription_tier,
-  (t.metadata->'gbp_categories'->'primary'->>'name') as shop_category,
-  (t.metadata->'gbp_categories'->'primary'->>'id') as shop_category_id,
-  (t.metadata->'gbp_categories'->'primary'->>'id') as shop_google_category_id,
+  t.gbp_primary_category_name as shop_category,
+  t.gbp_primary_category_id as shop_category_id,
+  t.gbp_primary_category_id as shop_google_category_id,
   
   -- Location Information (from tenant_business_profiles_list - Phase 5C)
   COALESCE(tbp.city, dsl.city) as tenant_city,
@@ -408,15 +411,15 @@ SELECT
     -- Quality signals
     CASE WHEN ii.stock > 0 THEN 0.15 ELSE 0 END,
     CASE WHEN ii.image_url IS NOT NULL THEN 0.10 ELSE 0 END,
-    CASE WHEN (ii.metadata->>'sale_price_cents')::numeric IS NOT NULL THEN 0.10 ELSE 0 END,
+    CASE WHEN ii.sale_price_cents IS NOT NULL THEN 0.10 ELSE 0 END,
     CASE WHEN (ii.metadata->>'average_rating')::numeric >= 4.0 THEN 0.10 ELSE 0 END,
     0
   ) as trending_score,
   
   -- Price Status (computed)
   CASE 
-    WHEN (ii.metadata->>'sale_price_cents')::numeric IS NOT NULL 
-    AND (ii.metadata->>'sale_price_cents')::numeric < ii.price_cents THEN 'on_sale'
+    WHEN ii.sale_price_cents IS NOT NULL 
+    AND ii.sale_price_cents < ii.price_cents THEN 'on_sale'
     WHEN (ii.metadata->>'compare_at_price_cents')::numeric IS NOT NULL 
     AND (ii.metadata->>'compare_at_price_cents')::numeric > ii.price_cents THEN 'discounted'
     ELSE 'regular'
@@ -425,7 +428,7 @@ SELECT
   -- Stock Status (computed)
   CASE 
     WHEN ii.stock <= 0 THEN 'out_of_stock'
-    WHEN ii.stock <= (ii.metadata->>'low_stock_threshold')::numeric THEN 'low_stock'
+    WHEN ii.stock <= ii.low_stock_threshold THEN 'low_stock'
     ELSE 'in_stock'
   END as stock_status,
   
@@ -491,15 +494,15 @@ SELECT
   -- ALL FIELDS FROM GLOBAL MV (inherits rich product data)
   g.*,
   
-  -- Get secondary categories from tenant metadata
-  t.metadata->'gbp_categories'->'secondary' as gbp_secondary_categories_array,
+  -- Get secondary categories from elevated column
+  t.gbp_secondary_categories as gbp_secondary_categories_array,
   
-  -- Category Type Classification
+  -- Category Type Classification (from elevated columns)
   CASE 
-    WHEN g.shop_category IS NOT NULL AND g.shop_category != '' 
-     AND jsonb_array_length(COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)) > 0 THEN 'both'
-    WHEN g.shop_category IS NOT NULL AND g.shop_category != '' THEN 'primary'
-    WHEN jsonb_array_length(COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)) > 0 THEN 'secondary'
+    WHEN t.gbp_primary_category_name IS NOT NULL AND t.gbp_primary_category_name != '' 
+     AND jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) > 0 THEN 'both'
+    WHEN t.gbp_primary_category_name IS NOT NULL AND t.gbp_primary_category_name != '' THEN 'primary'
+    WHEN jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) > 0 THEN 'secondary'
     ELSE 'none'
   END as gbp_category_type,
   
@@ -508,9 +511,9 @@ SELECT
   COALESCE(g.shop_category_id, '') as gbp_primary_category_id,
   COALESCE(g.shop_google_category_id, '') as gbp_primary_google_category_id,
   
-  -- Secondary category IDs (extract from array)
+  -- Secondary category IDs (extract from elevated column)
   COALESCE(
-    (SELECT jsonb_agg(elem->>'id') FROM jsonb_array_elements(t.metadata->'gbp_categories'->'secondary') elem),
+    (SELECT jsonb_agg(elem->>'id') FROM jsonb_array_elements(t.gbp_secondary_categories) elem),
     '[]'::jsonb
   ) as gbp_secondary_category_ids_array,
   
@@ -520,7 +523,7 @@ SELECT
   -- Array search support (check if any secondary category name matches common terms)
   EXISTS(
     SELECT 1 
-    FROM jsonb_array_elements(COALESCE(t.metadata->'gbp_categories'->'secondary', '[]'::jsonb)) elem
+    FROM jsonb_array_elements(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) elem
     WHERE LOWER(elem->>'name') ILIKE ANY(ARRAY['%grocery%', '%market%', '%store%', '%restaurant%'])
   ) as has_matching_secondary_category
 
@@ -882,7 +885,7 @@ LIMIT 12;
 
 -- Shop-specific discovery (pre-computed!)
 SELECT * FROM mv_shop_discovery 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
   AND featured_type = 'trending'
 ORDER BY shop_rank
 LIMIT 12;
@@ -891,37 +894,37 @@ LIMIT 12;
 
 -- Merchant-controlled types
 SELECT * FROM mv_featured_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY featured_priority DESC, featured_at DESC 
 LIMIT 8;
 
 SELECT * FROM mv_staff_pick_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY featured_priority DESC, featured_at DESC 
 LIMIT 8;
 
 SELECT * FROM mv_clearance_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY featured_priority DESC, featured_at DESC 
 LIMIT 8;
 
 SELECT * FROM mv_store_selection_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY featured_priority DESC, featured_at DESC 
 LIMIT 8;
 
 -- Platform-controlled types (algorithmic)
 SELECT * FROM mv_recommended_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY product_average_rating DESC, product_reviews_count_live DESC 
 LIMIT 8;
 
 SELECT * FROM mv_bestseller_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY units_sold DESC, revenue_cents DESC 
 LIMIT 8;
 
 SELECT * FROM mv_random_discovery_products 
-WHERE tenant_id = 'tid-123'
+WHERE tenant_id = 'tid-jcvzufq2'
 ORDER BY RANDOM()
 LIMIT 8;

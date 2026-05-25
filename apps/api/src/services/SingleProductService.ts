@@ -53,7 +53,7 @@ export interface SingleProductResult {
     height?: number;
   };
   tags?: string[];
-  productType?: 'physical' | 'digital' | 'hybrid';
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
   digitalDeliveryMethod?: string;
   digitalAssets?: any[];
   licenseType?: string;
