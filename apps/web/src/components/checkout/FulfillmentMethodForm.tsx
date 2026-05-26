@@ -39,12 +39,12 @@ export default function FulfillmentMethodForm({
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      
+
       const settings = await publicFulfillmentService.getFulfillmentSettings(tenantId);
-      
+
       if (settings) {
         setSettings(settings);
-        
+
         // Auto-select first available method if none selected
         if (!selectedMethod) {
           if (settings.pickup_enabled) {
@@ -70,21 +70,21 @@ export default function FulfillmentMethodForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedMethod) return;
-    
+
     let fee = 0;
     if (selectedMethod === 'delivery') {
       fee = getDeliveryFee();
     } else if (selectedMethod === 'shipping' && settings?.shipping_flat_rate_cents) {
       fee = settings.shipping_flat_rate_cents;
     }
-    
+
     onSubmit(selectedMethod, fee);
   };
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-  
+
   const formatTime = (minutes: number) => {
     return publicFulfillmentService['formatTime'](minutes); // Access private method via service
   };
@@ -117,11 +117,10 @@ export default function FulfillmentMethodForm({
       {/* Pickup Option */}
       {settings.pickup_enabled && showsPickup && (
         <label
-          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
-            selectedMethod === 'pickup'
-              ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-neutral-200 hover:border-primary-300'
-          }`}
+          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'pickup'
+            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-neutral-200 hover:border-primary-300'
+            }`}
         >
           <div className="flex items-start gap-4">
             <input
@@ -157,11 +156,10 @@ export default function FulfillmentMethodForm({
       {/* Delivery Option */}
       {settings.delivery_enabled && showsDelivery && (
         <label
-          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
-            selectedMethod === 'delivery'
-              ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-neutral-200 hover:border-primary-300'
-          }`}
+          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'delivery'
+            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-neutral-200 hover:border-primary-300'
+            }`}
         >
           <div className="flex items-start gap-4">
             <input
@@ -214,11 +212,10 @@ export default function FulfillmentMethodForm({
       {/* Shipping Option */}
       {settings.shipping_enabled && settings.shipping_flat_rate_cents && showsShipping && (
         <label
-          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
-            selectedMethod === 'shipping'
-              ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-neutral-200 hover:border-primary-300'
-          }`}
+          className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'shipping'
+            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-neutral-200 hover:border-primary-300'
+            }`}
         >
           <div className="flex items-start gap-4">
             <input

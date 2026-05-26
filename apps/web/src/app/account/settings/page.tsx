@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import customerAuthService from '@/services/CustomerAuthService';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Lock, 
-  Save, 
+import {
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Save,
   Loader2,
   CheckCircle,
   AlertCircle
@@ -84,7 +84,7 @@ export default function SettingsPage() {
 
   const handlePasswordSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -211,7 +211,9 @@ export default function SettingsPage() {
 
             {/* Save Button */}
             <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving}
+                variant='gradient' style={{ color: 'white' }}
+              >
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -313,8 +315,8 @@ export default function SettingsPage() {
             <div>
               <p className="font-medium text-gray-900">Email Verification</p>
               <p className="text-sm text-gray-600">
-                {customer?.emailVerified 
-                  ? 'Your email is verified' 
+                {customer?.emailVerified
+                  ? 'Your email is verified'
                   : 'Verify your email address'}
               </p>
             </div>
