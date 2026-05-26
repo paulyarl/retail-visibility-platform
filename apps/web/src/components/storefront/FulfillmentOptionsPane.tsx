@@ -56,7 +56,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
 
   const fetchFulfillmentSettings = async () => {
     setLoading(true);
-    
+
     try {
       // Fetch fulfillment settings only
       const fulfillmentSettings = await publicTenantInfoService.getFulfillmentSettings(tenantId);
@@ -172,7 +172,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">In-Store Pickup</p>
                     <p className="text-sm text-gray-600">
-                      {fulfillmentSettings.pickup_ready_time_minutes 
+                      {fulfillmentSettings.pickup_ready_time_minutes
                         ? `Ready in ${Math.floor(fulfillmentSettings.pickup_ready_time_minutes / 60)}h ${fulfillmentSettings.pickup_ready_time_minutes % 60}m`
                         : 'Pick up at store location'}
                     </p>
@@ -190,7 +190,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">Local Delivery</p>
                     <p className="text-sm text-gray-600">
-                      {fulfillmentSettings.delivery_radius_miles 
+                      {fulfillmentSettings.delivery_radius_miles
                         ? `Within ${fulfillmentSettings.delivery_radius_miles} miles`
                         : 'Available in local area'}
                     </p>
@@ -201,7 +201,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                     )}
                   </div>
                   <span className="text-blue-600 font-semibold text-sm">
-                    {fulfillmentSettings.delivery_fee_cents 
+                    {fulfillmentSettings.delivery_fee_cents
                       ? formatCurrency(fulfillmentSettings.delivery_fee_cents)
                       : 'FREE'}
                   </span>
@@ -214,13 +214,13 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">Shipping</p>
                     <p className="text-sm text-gray-600">
-                      {fulfillmentSettings.shipping_provider 
+                      {fulfillmentSettings.shipping_provider
                         ? `Ships via ${fulfillmentSettings.shipping_provider}`
                         : 'Ships nationwide'}
                     </p>
                   </div>
                   <span className="text-purple-600 font-semibold text-sm">
-                    {fulfillmentSettings.shipping_flat_rate_cents 
+                    {fulfillmentSettings.shipping_flat_rate_cents
                       ? formatCurrency(fulfillmentSettings.shipping_flat_rate_cents)
                       : 'Calculated'}
                   </span>

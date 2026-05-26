@@ -44,7 +44,7 @@ function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const tenantId = searchParams?.get('tenantId');
   const gatewayType = searchParams?.get('gatewayType') as PaymentMethod | null;
-  
+
   const { carts } = useMultiCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('review');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
@@ -100,7 +100,7 @@ function CheckoutPageContent() {
   useEffect(() => {
     const fetchTenantProfile = async () => {
       if (!tenantId) return;
-      
+
       try {
         const profile = await tenantPublicService.getPublicTenantProfile(tenantId);
         if (profile) {
@@ -112,7 +112,7 @@ function CheckoutPageContent() {
         console.warn('[Checkout] Failed to fetch tenant profile:', error);
       }
     };
-    
+
     fetchTenantProfile();
   }, [tenantId]);
 
@@ -120,28 +120,28 @@ function CheckoutPageContent() {
   useEffect(() => {
     const fetchPaymentGatewaysAndTier = async () => {
       if (!tenantId) return;
-      
+
       try {
         console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
         // Use CustomerOrderService for public checkout - no auth required
         const { gateways, tenant_tier, commerce_features } = await customerOrderService.getPaymentGateways(tenantId);
-        
+
         // console.log('[Checkout] Payment gateways data:', gateways, 'Tenant tier:', tenant_tier);
-        
+
         // Extract active gateway types
         const activeTypes = gateways
           .filter((gateway: any) => gateway.is_active)
           .map((gateway: any) => gateway.gateway_type as PaymentMethod);
-        
+
         // console.log('[Checkout] Active gateway types:', activeTypes);
         setAvailableGateways(activeTypes);
-        
+
         // Extract Square config from active Square gateway
         const squareGateway = gateways.find((g: any) => g.gateway_type === 'square' && g.is_active);
         // console.log('[Checkout] Square gateway found:', squareGateway);
         // console.log('[Checkout] Square gateway config:', squareGateway?.config);
         // console.log('[Checkout] Square gateway config keys:', squareGateway?.config ? Object.keys(squareGateway.config) : 'no config');
-        
+
         if (squareGateway?.config) {
           const config = squareGateway.config;
           // console.log('[Checkout] Config fields:', {
@@ -150,7 +150,7 @@ function CheckoutPageContent() {
           //   applicationId: config.applicationId, // Check alternative field name
           //   locationId: config.locationId, // Check alternative field name
           // });
-          
+
           if (config.application_id && config.location_id) {
             // console.log('[Checkout] Setting Square config:', {
             //   applicationId: config.application_id,
@@ -166,7 +166,7 @@ function CheckoutPageContent() {
         } else {
           console.log('[Checkout] No Square config found, squareGateway:', squareGateway);
         }
-        
+
         // Set default payment method to first available if current selection is not available
         if (activeTypes.length > 0 && !activeTypes.includes(paymentMethod)) {
           console.log('[Checkout] Setting default payment method to:', activeTypes[0]);
@@ -175,7 +175,7 @@ function CheckoutPageContent() {
 
         // Fetch tenant tier information for deposit calculation
         const tier = tenant_tier;
-        
+
         if (tier) {
           setTenantTier(tier);
         }
@@ -219,7 +219,7 @@ function CheckoutPageContent() {
         } else if (tier) {
           // Fallback: tier-based logic for backward compatibility
           const effectiveTier = tier.startsWith('trial_') ? tier.replace('trial_', '') : tier;
-          
+
           if (effectiveTier === 'storefront' || effectiveTier === 'starter' || effectiveTier === 'google_only' || effectiveTier === 'discovery') {
             setCheckoutMode('disabled');
             setDepositOption('none');
@@ -228,7 +228,7 @@ function CheckoutPageContent() {
           else if (effectiveTier === 'commitment') {
             setCheckoutMode('deposit');
             setDepositOption('required');
-          } 
+          }
           else if (effectiveTier === 'professional' || effectiveTier === 'enterprise') {
             setCheckoutMode('full_payment');
             setDepositOption('optional');
@@ -238,7 +238,7 @@ function CheckoutPageContent() {
             setDepositOption('none');
           }
         }
-        
+
         // console.log('[Checkout] Tenant tier:', tier, 'Commerce features:', commerce_features, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
       } catch (error) {
         console.error('[Checkout] Failed to fetch payment gateways:', error);
@@ -342,7 +342,7 @@ function CheckoutPageContent() {
       //   tenantId: cart.tenant_id,
       //   itemCount: cart.items.length
       // });
-      
+
       // Valid cart - mark as initialized
       if (!isInitialized) {
         // console.log('[Checkout] Valid cart, initializing checkout');
@@ -361,7 +361,7 @@ function CheckoutPageContent() {
           setIsInitialized(true);
         }
       }, 300);
-      
+
       return () => clearTimeout(timer);
     }
   }, [tenantId, gatewayType, cart, router, isInitialized]);
@@ -377,14 +377,14 @@ function CheckoutPageContent() {
       const remainingBalanceCents = total - depositCents;
       const pickupDeadline = new Date();
       pickupDeadline.setHours(pickupDeadline.getHours() + 48); // 48 hours
-      
+
       setDepositInfo({
         depositPercentage,
         depositCents,
         remainingBalanceCents,
         pickupDeadline,
       });
-      
+
       // console.log('[Checkout] Deposit calculated:', {
       //   total,
       //   depositPercentage,
@@ -430,7 +430,7 @@ function CheckoutPageContent() {
   const handleFulfillmentSubmit = (method: FulfillmentMethod, fee: number) => {
     setFulfillmentMethod(method);
     setFulfillmentFee(fee);
-    
+
     // If pickup, skip shipping address and go to payment
     if (method === 'pickup') {
       setCurrentStep('payment');
@@ -455,15 +455,15 @@ function CheckoutPageContent() {
     //   tenantId,
     //   gatewayType
     // });
-    
+
     // Clear the cart after successful payment
     if (tenantId) {
       clearCart(tenantId);
-      
+
       // Trigger cart update event
       window.dispatchEvent(new Event('cart-updated'));
     }
-    
+
     // Save customer email/phone to localStorage for order history lookup
     if (customerInfo?.email) {
       localStorage.setItem('buyer_email', customerInfo.email);
@@ -471,7 +471,7 @@ function CheckoutPageContent() {
     if (customerInfo?.phone) {
       localStorage.setItem('buyer_phone', customerInfo.phone);
     }
-    
+
     // Redirect to order history (account page if logged in, my-orders for guests)
     const { customerAuthService } = await import('@/services/CustomerAuthService');
     const isLoggedIn = customerAuthService.isAuthenticated();
@@ -493,147 +493,147 @@ function CheckoutPageContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
-          <div className="mb-8">
-            {/* Navigation Options */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Button
-                variant="ghost"
-                onClick={handleBack}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/carts')}
-              >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Edit Cart
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/tenant/${tenantId}`)}
-              >
-                <Store className="mr-2 h-4 w-4" />
-                Back to Store
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/directory')}
-              >
-                Continue Shopping
-              </Button>
-            </div>
-            
-            {/* Store Branding */}
-            <div className="flex items-center gap-3 mb-4 p-4 bg-white rounded-lg border">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {(tenantDisplayLogo || cart.tenant_logo) ? (
-                  <img
-                    src={tenantDisplayLogo || cart.tenant_logo || ''}
-                    alt={tenantDisplayName || cart.tenant_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Store className="h-6 w-6 text-gray-400" />
-                )}
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Purchasing from</p>
-                <p className="font-semibold text-gray-900">{tenantDisplayName || cart.tenant_name}</p>
-              </div>
-            </div>
-            
-            <h1 className="text-3xl font-bold">Checkout</h1>
+        {/* Header */}
+        <div className="mb-8">
+          {/* Navigation Options */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/carts')}
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Edit Cart
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/tenant/${tenantId}`)}
+            >
+              <Store className="mr-2 h-4 w-4" />
+              Back to Store
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/directory')}
+            >
+              Continue Shopping
+            </Button>
           </div>
 
-          {/* Progress Indicator */}
-          <CheckoutProgress currentStep={currentStep} />
+          {/* Store Branding */}
+          <div className="flex items-center gap-3 mb-4 p-4 bg-white rounded-lg border">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+              {(tenantDisplayLogo || cart.tenant_logo) ? (
+                <img
+                  src={tenantDisplayLogo || cart.tenant_logo || ''}
+                  alt={tenantDisplayName || cart.tenant_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Store className="h-6 w-6 text-gray-400" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Purchasing from</p>
+              <p className="font-semibold text-gray-900">{tenantDisplayName || cart.tenant_name}</p>
+            </div>
+          </div>
 
-          {/* Checkout Disabled Panel for Storefront/Starter tier */}
-          {checkoutMode === 'disabled' && (
-            <Card className="mt-6 border-amber-200 bg-amber-50">
-              <CardHeader>
-                <CardTitle className="text-amber-800 flex items-center gap-2">
-                  <Store className="h-5 w-5" />
-                  Online Checkout Unavailable
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-amber-700">
-                  This store is currently unable to process online payments. However, you can still contact them directly to place your order!
-                </p>
-                
-                {tenantContact && (
-                  <div className="bg-white rounded-lg p-4 border border-amber-200">
-                    <h3 className="font-semibold text-gray-900 mb-3">Contact {tenantContact.business_name}</h3>
-                    <div className="space-y-2 text-sm">
-                      {tenantContact.phone_number && (
-                        <a 
-                          href={`tel:${tenantContact.phone_number}`}
-                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
-                        >
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          {tenantContact.phone_number}
-                        </a>
-                      )}
-                      {tenantContact.email && (
-                        <a 
-                          href={`mailto:${tenantContact.email}`}
-                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
-                        >
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          {tenantContact.email}
-                        </a>
-                      )}
-                      {tenantContact.website && (
-                        <a 
-                          href={tenantContact.website.startsWith('http') ? tenantContact.website : `https://${tenantContact.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
-                        >
-                          <Globe className="h-4 w-4 text-gray-400" />
-                          {tenantContact.website}
-                        </a>
-                      )}
-                      {tenantContact.address && (
-                        <div className="flex items-start gap-2 text-gray-700">
-                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <span>
-                            {tenantContact.address.street}
-                            {tenantContact.address.city && `, ${tenantContact.address.city}`}
-                            {tenantContact.address.state && `, ${tenantContact.address.state}`}
-                            {tenantContact.address.zip && ` ${tenantContact.address.zip}`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+          <h1 className="text-3xl font-bold">Checkout</h1>
+        </div>
+
+        {/* Progress Indicator */}
+        <CheckoutProgress currentStep={currentStep} />
+
+        {/* Checkout Disabled Panel for Storefront/Starter tier */}
+        {checkoutMode === 'disabled' && (
+          <Card className="mt-6 border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="text-amber-800 flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Online Checkout Unavailable
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-amber-700">
+                This store is currently unable to process online payments. However, you can still contact them directly to place your order!
+              </p>
+
+              {tenantContact && (
+                <div className="bg-white rounded-lg p-4 border border-amber-200">
+                  <h3 className="font-semibold text-gray-900 mb-3">Contact {tenantContact.business_name}</h3>
+                  <div className="space-y-2 text-sm">
+                    {tenantContact.phone_number && (
+                      <a
+                        href={`tel:${tenantContact.phone_number}`}
+                        className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                      >
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        {tenantContact.phone_number}
+                      </a>
+                    )}
+                    {tenantContact.email && (
+                      <a
+                        href={`mailto:${tenantContact.email}`}
+                        className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                      >
+                        <Mail className="h-4 w-4 text-gray-400" />
+                        {tenantContact.email}
+                      </a>
+                    )}
+                    {tenantContact.website && (
+                      <a
+                        href={tenantContact.website.startsWith('http') ? tenantContact.website : `https://${tenantContact.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                      >
+                        <Globe className="h-4 w-4 text-gray-400" />
+                        {tenantContact.website}
+                      </a>
+                    )}
+                    {tenantContact.address && (
+                      <div className="flex items-start gap-2 text-gray-700">
+                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                        <span>
+                          {tenantContact.address.street}
+                          {tenantContact.address.city && `, ${tenantContact.address.city}`}
+                          {tenantContact.address.state && `, ${tenantContact.address.state}`}
+                          {tenantContact.address.zip && ` ${tenantContact.address.zip}`}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-                
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/tenant/${tenantId}`)}
-                  >
-                    <Store className="mr-2 h-4 w-4" />
-                    Continue Browsing
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => router.push('/directory')}
-                  >
-                    Explore Other Stores
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
 
-          {/* Main Content - Only show if checkout is enabled */}
-          {checkoutMode !== 'disabled' && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/tenant/${tenantId}`)}
+                >
+                  <Store className="mr-2 h-4 w-4" />
+                  Continue Browsing
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => router.push('/directory')}
+                >
+                  Explore Other Stores
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Content - Only show if checkout is enabled */}
+        {checkoutMode !== 'disabled' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
             {/* Left Column - Forms */}
             <div className="lg:col-span-2 space-y-6">
@@ -688,160 +688,157 @@ function CheckoutPageContent() {
               {currentStep === 'payment' && customerInfo && fulfillmentMethod && (
                 fulfillmentMethod === 'pickup' || shippingAddress
               ) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Payment Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Payment Method Selector */}
-                    <div className="space-y-3">
-                      <h3 className="font-medium text-neutral-900 dark:text-white">
-                        Select Payment Method
-                      </h3>
-                      
-                      {/* Only show available payment gateways */}
-                      {availableGateways.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                          <CreditCard className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                          <p>No payment methods are configured</p>
-                          <p className="text-sm">Please contact the store to set up payment options</p>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Square Option - Only show if configured */}
-                          {availableGateways.includes('square') && (
-                            <button
-                              onClick={() => setPaymentMethod('square')}
-                              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                                paymentMethod === 'square'
-                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <CreditCard className="h-6 w-6 text-primary-600" />
-                                <div className="text-left flex-1">
-                                  <div className="font-medium text-neutral-900 dark:text-white">
-                                    Credit or Debit Card
-                                  </div>
-                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                                    Visa, Mastercard, Amex, Discover
-                                  </div>
-                                </div>
-                                {paymentMethod === 'square' && (
-                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                )}
-                              </div>
-                            </button>
-                          )}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Payment Method Selector */}
+                      <div className="space-y-3">
+                        <h3 className="font-medium text-neutral-900 dark:text-white">
+                          Select Payment Method
+                        </h3>
 
-                          {/* PayPal Option - Only show if configured */}
-                          {availableGateways.includes('paypal') && (
-                            <button
-                              onClick={() => setPaymentMethod('paypal')}
-                              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                                paymentMethod === 'paypal'
-                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Wallet className="h-6 w-6 text-[#0070BA]" />
-                                <div className="text-left flex-1">
-                                  <div className="font-medium text-neutral-900 dark:text-white">
-                                    PayPal
+                        {/* Only show available payment gateways */}
+                        {availableGateways.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <CreditCard className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                            <p>No payment methods are configured</p>
+                            <p className="text-sm">Please contact the store to set up payment options</p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Square Option - Only show if configured */}
+                            {availableGateways.includes('square') && (
+                              <button
+                                onClick={() => setPaymentMethod('square')}
+                                className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'square'
+                                    ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <CreditCard className="h-6 w-6 text-primary-600" />
+                                  <div className="text-left flex-1">
+                                    <div className="font-medium text-neutral-900 dark:text-white">
+                                      Credit or Debit Card
+                                    </div>
+                                    <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                      Visa, Mastercard, Amex, Discover
+                                    </div>
                                   </div>
-                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                                    Pay with your PayPal account
-                                  </div>
+                                  {paymentMethod === 'square' && (
+                                    <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
                                 </div>
-                                {paymentMethod === 'paypal' && (
-                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
+                              </button>
+                            )}
+
+                            {/* PayPal Option - Only show if configured */}
+                            {availableGateways.includes('paypal') && (
+                              <button
+                                onClick={() => setPaymentMethod('paypal')}
+                                className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'paypal'
+                                    ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Wallet className="h-6 w-6 text-[#0070BA]" />
+                                  <div className="text-left flex-1">
+                                    <div className="font-medium text-neutral-900 dark:text-white">
+                                      PayPal
+                                    </div>
+                                    <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                      Pay with your PayPal account
+                                    </div>
                                   </div>
-                                )}
-                              </div>
-                            </button>
-                          )}
-                          {/* Stripe Option - Only show if configured */}
-                          {availableGateways.includes('stripe') && (
-                            <button
-                              onClick={() => setPaymentMethod('stripe')}
-                              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                                paymentMethod === 'stripe'
-                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
-                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <CreditCard className="h-6 w-6 text-purple-600" />
-                                <div className="text-left flex-1">
-                                  <div className="font-medium text-neutral-900 dark:text-white">
-                                    Credit or Debit Card (Stripe)
-                                  </div>
-                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                                    Visa, Mastercard, Amex, Discover
-                                  </div>
+                                  {paymentMethod === 'paypal' && (
+                                    <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
                                 </div>
-                                {paymentMethod === 'stripe' && (
-                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
+                              </button>
+                            )}
+                            {/* Stripe Option - Only show if configured */}
+                            {availableGateways.includes('stripe') && (
+                              <button
+                                onClick={() => setPaymentMethod('stripe')}
+                                className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'stripe'
+                                    ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <CreditCard className="h-6 w-6 text-purple-600" />
+                                  <div className="text-left flex-1">
+                                    <div className="font-medium text-neutral-900 dark:text-white">
+                                      Credit or Debit Card (Stripe)
+                                    </div>
+                                    <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                      Visa, Mastercard, Amex, Discover
+                                    </div>
                                   </div>
-                                )}
-                              </div>
-                            </button>
-                          )}
-                        </>
+                                  {paymentMethod === 'stripe' && (
+                                    <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Conditional Payment Form - only show if gateways are available */}
+                      {availableGateways.length > 0 && (
+                        paymentMethod === 'square' ? (
+                          <SquarePaymentForm
+                            amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                            customerInfo={customerInfo}
+                            shippingAddress={shippingAddress ?? undefined}
+                            fulfillmentMethod={fulfillmentMethod}
+                            cartItems={mappedCartItems}
+                            onSuccess={handlePaymentSuccess}
+                            onBack={() => setCurrentStep('shipping')}
+                            squareConfig={squareConfig}
+                          />
+                        ) : paymentMethod === 'stripe' ? (
+                          <StripePaymentForm
+                            amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                            customerInfo={customerInfo}
+                            shippingAddress={shippingAddress ?? undefined}
+                            fulfillmentMethod={fulfillmentMethod}
+                            cartItems={mappedCartItems}
+                            onSuccess={handlePaymentSuccess}
+                            onBack={() => setCurrentStep('shipping')}
+                            tenantId={tenantId || ''}
+                          />
+                        ) : (
+                          <PayPalPaymentForm
+                            amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                            customerInfo={customerInfo}
+                            shippingAddress={shippingAddress ?? undefined}
+                            fulfillmentMethod={fulfillmentMethod}
+                            cartItems={mappedCartItems}
+                            onSuccess={handlePaymentSuccess}
+                            onBack={() => setCurrentStep('shipping')}
+                          />
+                        )
                       )}
-                    </div>
-
-                    {/* Conditional Payment Form - only show if gateways are available */}
-                    {availableGateways.length > 0 && (
-                      paymentMethod === 'square' ? (
-                        <SquarePaymentForm
-                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
-                          customerInfo={customerInfo}
-                          shippingAddress={shippingAddress ?? undefined}
-                          fulfillmentMethod={fulfillmentMethod}
-                          cartItems={mappedCartItems}
-                          onSuccess={handlePaymentSuccess}
-                          onBack={() => setCurrentStep('shipping')}
-                          squareConfig={squareConfig}
-                        />
-                      ) : paymentMethod === 'stripe' ? (
-                        <StripePaymentForm
-                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
-                          customerInfo={customerInfo}
-                          shippingAddress={shippingAddress ?? undefined}
-                          fulfillmentMethod={fulfillmentMethod}
-                          cartItems={mappedCartItems}
-                          onSuccess={handlePaymentSuccess}
-                          onBack={() => setCurrentStep('shipping')}
-                          tenantId={tenantId || ''}
-                        />
-                      ) : (
-                        <PayPalPaymentForm
-                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
-                          customerInfo={customerInfo}
-                          shippingAddress={shippingAddress ?? undefined}
-                          fulfillmentMethod={fulfillmentMethod}
-                          cartItems={mappedCartItems}
-                          onSuccess={handlePaymentSuccess}
-                          onBack={() => setCurrentStep('shipping')}
-                        />
-                      )
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                )}
             </div>
 
             {/* Right Column - Order Summary */}
@@ -869,9 +866,9 @@ function CheckoutPageContent() {
               </div>
             </div>
           </div>
-          )}
-        </div>
+        )}
       </div>
+    </div>
   );
 }
 

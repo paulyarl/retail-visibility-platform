@@ -256,7 +256,7 @@ const featuredTypeConfig = {
     buttonColor: 'bg-indigo-600 hover:bg-indigo-700',
     badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
   },
-  
+
   // Platform-controlled types (algorithmic)
   trending: {
     title: 'Trending Now',
@@ -320,7 +320,7 @@ function FeaturedTypeBadges({ featuredTypes }: { featuredTypes?: string[] }) {
           icon: <Star className="w-4 h-4" />,
           title: type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
         };
-        
+
         return (
           <span
             key={type}
@@ -353,10 +353,10 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
   const contextPayment = useTenantPaymentOptional();
-  
+
   // Filter products by type (already done at parent level, but keep for safety)
-  const typeProducts = products.filter(p => 
-    p.featuredType === type || 
+  const typeProducts = products.filter(p =>
+    p.featuredType === type ||
     (p.featuredTypes && p.featuredTypes.includes(type))
   ).slice(0, maxProducts);
 
@@ -450,9 +450,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
-                  tenantCategory: product.tenantCategory||product.shopCategory,
+                  tenantCategory: product.tenantCategory || product.shopCategory,
                   isFeatured: product.isFeatured,
-                  
+
                   // Enhanced fields for rich display
                   averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
                   reviewCount: product.reviewCount,
@@ -462,13 +462,13 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isOnSale: product.isOnSale,
                   discountPercentage: product.discountPercentage,
                   currency: product.currency,
-                  
+
                   // NEW LIVE REVIEW AGGREGATIONS
                   productRatingLive: typeof product.productRatingLive === 'string' ? parseFloat(product.productRatingLive) : product.productRatingLive,
                   productReviewsCountLive: product.productReviewsCountLive,
                   productHelpfulCountLive: product.productHelpfulCountLive,
                   productReviewsApprovedLive: product.productReviewsApprovedLive,
-                  
+
                   // Media fields
                   hasGallery: product.hasGallery,
                   videoUrl: product.videoUrl,
@@ -476,7 +476,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   galleryUrls: product.galleryUrls,
                   thumbnailUrl: product.thumbnailUrl,
                   featuredImageUrl: product.featuredImageUrl,
-                  
+
                   // Product details
                   manufacturer: product.manufacturer,
                   condition: product.condition,
@@ -487,12 +487,12 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   customFields: product.customFields,
                   searchKeywords: product.searchKeywords,
                   tags: product.tags,
-                  
+
                   // SEO fields
                   seoTitle: product.seoTitle,
                   seoDescription: product.seoDescription,
                   seoKeywords: product.seoKeywords,
-                  
+
                   // Physical properties
                   weight: product.weight,
                   dimensions: product.dimensions,
@@ -501,15 +501,15 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   width: product.width,
                   height: product.height,
                   dimensionUnit: product.dimensionUnit,
-                  
+
                   // Categories
-                  categoryName: product.categoryName||product.productCategory,
-                  categorySlug: product.categorySlug||product.productCategorySlug,
-                  productCategory: product.productCategory||product.categoryName,
-                  productCategorySlug: product.productCategorySlug||product.categorySlug,
+                  categoryName: product.categoryName || product.productCategory,
+                  categorySlug: product.categorySlug || product.productCategorySlug,
+                  productCategory: product.productCategory || product.categoryName,
+                  productCategorySlug: product.productCategorySlug || product.categorySlug,
                   googleCategoryId: product.googleCategoryId,
                   productParentCategoryId: product.productParentCategoryId,
-                  
+
                   // Variants
                   has_variants: product.hasVariants,
                   variantId: product.variantId,
@@ -519,7 +519,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   variantSize: product.variantSize,
                   variantMaterial: product.variantMaterial,
                   variantStyle: product.variantStyle,
-                  
+
                   // Product types
                   productType: product.productType,
                   isDigitalProduct: product.isDigitalProduct,
@@ -528,17 +528,17 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isBundle: product.isBundle,
                   isCustomizable: product.isCustomizable,
                   isTrackable: product.isTrackable,
-                  
+
                   // Rich descriptions
                   marketingDescription: product.marketingDescription,
-                  
+
                   // Shop info
                   tenantName: product.tenantName,
                   tenantLogoUrl: product.tenantLogoUrl,
                   shopCategory: product.shopCategory,
                   shopCategoryId: product.shopCategoryId,
                   shopGoogleCategoryId: product.shopGoogleCategoryId,
-                  
+
                   // Location
                   tenantCity: product.tenantCity,
                   tenantState: product.tenantState,
@@ -548,27 +548,27 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   tenantLatitude: product.tenantLatitude,
                   tenantLongitude: product.tenantLongitude,
                   timezone: product.timezone,
-                  
+
                   // Business info
                   businessType: product.businessType,
                   businessCategory: product.businessCategory,
                   businessSize: product.businessSize,
                   establishedYear: product.establishedYear,
-                  
+
                   // Status indicators
                   inStock: product.inStock,
                   stockStatus: product.stockStatus,
                   priceStatus: product.priceStatus,
-                  
+
                   // Analytics
                   bucketPriority: product.bucketPriority,
                   trendingScore: product.trendingScore,
-                  
+
                   // Timestamps
                   createdAt: product.createdAt,
                   updatedAt: product.updatedAt,
                   publishedAt: product.publishedAt,
-                  
+
                   // Featured system
                   featuredType: product.featuredType,
                   featuredTypes: product.featuredTypes,
@@ -580,7 +580,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isExpired: product.isExpired,
                   isExpiringSoon: product.isExpiringSoon,
                   autoUnfeature: product.autoUnfeature,
-                  
+
                   // Legacy metadata
                   metadata: {
                     featuredTypes: product.featuredTypes
@@ -618,9 +618,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
-                  tenantCategory: product.tenantCategory||product.shopCategory,
+                  tenantCategory: product.tenantCategory || product.shopCategory,
                   isFeatured: product.isFeatured,
-                  
+
                   // Enhanced fields for rich display
                   averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
                   reviewCount: product.reviewCount,
@@ -630,13 +630,13 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isOnSale: product.isOnSale,
                   discountPercentage: product.discountPercentage,
                   currency: product.currency,
-                  
+
                   // NEW LIVE REVIEW AGGREGATIONS
                   productRatingLive: typeof product.productRatingLive === 'string' ? parseFloat(product.productRatingLive) : product.productRatingLive,
                   productReviewsCountLive: product.productReviewsCountLive,
                   productHelpfulCountLive: product.productHelpfulCountLive,
                   productReviewsApprovedLive: product.productReviewsApprovedLive,
-                  
+
                   // Media fields
                   hasGallery: product.hasGallery,
                   videoUrl: product.videoUrl,
@@ -644,7 +644,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   galleryUrls: product.galleryUrls,
                   thumbnailUrl: product.thumbnailUrl,
                   featuredImageUrl: product.featuredImageUrl,
-                  
+
                   // Product details
                   manufacturer: product.manufacturer,
                   condition: product.condition,
@@ -655,12 +655,12 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   customFields: product.customFields,
                   searchKeywords: product.searchKeywords,
                   tags: product.tags,
-                  
+
                   // SEO fields
                   seoTitle: product.seoTitle,
                   seoDescription: product.seoDescription,
                   seoKeywords: product.seoKeywords,
-                  
+
                   // Physical properties
                   weight: product.weight,
                   dimensions: product.dimensions,
@@ -669,7 +669,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   width: product.width,
                   height: product.height,
                   dimensionUnit: product.dimensionUnit,
-                  
+
                   // Categories
                   categoryName: product.categoryName,
                   categorySlug: product.categorySlug,
@@ -677,7 +677,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   productCategorySlug: product.productCategorySlug,
                   googleCategoryId: product.googleCategoryId,
                   productParentCategoryId: product.productParentCategoryId,
-                  
+
                   // Variants
                   has_variants: product.hasVariants,
                   variantId: product.variantId,
@@ -687,7 +687,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   variantSize: product.variantSize,
                   variantMaterial: product.variantMaterial,
                   variantStyle: product.variantStyle,
-                  
+
                   // Product types
                   productType: product.productType,
                   isDigitalProduct: product.isDigitalProduct,
@@ -696,17 +696,17 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isBundle: product.isBundle,
                   isCustomizable: product.isCustomizable,
                   isTrackable: product.isTrackable,
-                  
+
                   // Rich descriptions
                   marketingDescription: product.marketingDescription,
-                  
+
                   // Shop info
                   tenantName: product.tenantName,
                   tenantLogoUrl: product.tenantLogoUrl,
                   shopCategory: product.shopCategory,
                   shopCategoryId: product.shopCategoryId,
                   shopGoogleCategoryId: product.shopGoogleCategoryId,
-                  
+
                   // Location
                   tenantCity: product.tenantCity,
                   tenantState: product.tenantState,
@@ -716,27 +716,27 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   tenantLatitude: product.tenantLatitude,
                   tenantLongitude: product.tenantLongitude,
                   timezone: product.timezone,
-                  
+
                   // Business info
                   businessType: product.businessType,
                   businessCategory: product.businessCategory,
                   businessSize: product.businessSize,
                   establishedYear: product.establishedYear,
-                  
+
                   // Status indicators
                   inStock: product.inStock,
                   stockStatus: product.stockStatus,
                   priceStatus: product.priceStatus,
-                  
+
                   // Analytics
                   bucketPriority: product.bucketPriority,
                   trendingScore: product.trendingScore,
-                  
+
                   // Timestamps
                   createdAt: product.createdAt,
                   updatedAt: product.updatedAt,
                   publishedAt: product.publishedAt,
-                  
+
                   // Featured system
                   featuredType: product.featuredType,
                   featuredTypes: product.featuredTypes,
@@ -748,7 +748,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   isExpired: product.isExpired,
                   isExpiringSoon: product.isExpiringSoon,
                   autoUnfeature: product.autoUnfeature,
-                  
+
                   // Legacy metadata
                   metadata: {
                     featuredTypes: product.featuredTypes
@@ -768,14 +768,14 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
   );
 }
 
-export default function StorefrontFeaturedProducts({ 
-  tenantId, 
-  hasActivePaymentGateway, 
+export default function StorefrontFeaturedProducts({
+  tenantId,
+  hasActivePaymentGateway,
   defaultGatewayType,
   instanceId = 'default'
-}: { 
-  tenantId: string; 
-  hasActivePaymentGateway?: boolean; 
+}: {
+  tenantId: string;
+  hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
   instanceId?: string;
 }) {
@@ -796,10 +796,10 @@ export default function StorefrontFeaturedProducts({
           console.warn('[StorefrontFeaturedProducts] No tenantId available, skipping featured products fetch');
           return;
         }
-        
+
         // Use the service method for caching and context awareness
         const products = await storefrontSingletonService.getPublicProducts(tenantId, { limit: 50 });
-        
+
         if (products && products.length > 0 && isMounted) {
           // Transform the data to match the expected format with all rich fields
           const transformedProducts = products.map((product: any) => ({
@@ -809,7 +809,7 @@ export default function StorefrontFeaturedProducts({
             name: product.name,
             title: product.title,
             description: product.description,
-            
+
             // Pricing
             price: (product.priceCents || 0) / 100, // Convert cents to dollars for display
             priceCents: product.priceCents,
@@ -817,13 +817,13 @@ export default function StorefrontFeaturedProducts({
             salePriceCents: product.salePriceCents,
             listPriceCents: product.listPriceCents,
             currency: product.currency || 'USD',
-            
+
             // Inventory & Availability
             stock: product.stock || 0,
             inventoryQuantity: product.inventoryQuantity,
             availability: product.availability,
             itemStatus: product.itemStatus,
-            
+
             // Media
             imageUrl: product.imageUrl,
             imageUrls: product.imageUrls || [],
@@ -832,14 +832,14 @@ export default function StorefrontFeaturedProducts({
             thumbnailUrl: product.thumbnailUrl,
             featuredImageUrl: product.featuredImageUrl,
             hasGallery: product.hasGallery,
-            
+
             // Product Details
             brand: product.brand,
             manufacturer: product.manufacturer,
             condition: product.condition,
             gtin: product.gtin,
             mpn: product.mpn,
-            
+
             // Categories
             categoryName: product.categoryName,
             categorySlug: product.categorySlug,
@@ -847,7 +847,7 @@ export default function StorefrontFeaturedProducts({
             productCategorySlug: product.productCategorySlug,
             googleCategoryId: product.googleCategoryId,
             productParentCategoryId: product.productParentCategoryId,
-            
+
             // Variants
             hasVariants: product.has_variants,
             variantId: product.variantId,
@@ -857,7 +857,7 @@ export default function StorefrontFeaturedProducts({
             variantSize: product.variantSize,
             variantMaterial: product.variantMaterial,
             variantStyle: product.variantStyle,
-            
+
             // Product Types
             productType: product.productType,
             isDigitalProduct: product.isDigitalProduct,
@@ -866,7 +866,7 @@ export default function StorefrontFeaturedProducts({
             isBundle: product.isBundle,
             isCustomizable: product.isCustomizable,
             isTrackable: product.isTrackable,
-            
+
             // Featured Status
             featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
             featuredType: product.featuredType,
@@ -875,11 +875,11 @@ export default function StorefrontFeaturedProducts({
             featuredExpiresAt: product.featuredExpiresAt,
             isFeaturedActive: product.isFeaturedActive,
             isFeatured: true,
-            
+
             // Sales & Discounts
             isOnSale: product.isOnSale,
             discountPercentage: product.discountPercentage,
-            
+
             // Rich Data
             marketingDescription: product.marketingDescription,
             specifications: product.specifications,
@@ -888,12 +888,12 @@ export default function StorefrontFeaturedProducts({
             searchKeywords: product.searchKeywords,
             tags: product.tags,
             metadata: product.metadata,
-            
+
             // SEO
             seoTitle: product.seoTitle,
             seoDescription: product.seoDescription,
             seoKeywords: product.seoKeywords,
-            
+
             // Physical Properties
             weight: product.weight,
             dimensions: product.dimensions,
@@ -902,7 +902,7 @@ export default function StorefrontFeaturedProducts({
             width: product.width,
             height: product.height,
             dimensionUnit: product.dimensionUnit,
-            
+
             // Inventory Management
             inventoryPolicy: product.inventoryPolicy,
             inventoryTracking: product.inventoryTracking,
@@ -911,16 +911,16 @@ export default function StorefrontFeaturedProducts({
             backorderQuantity: product.backorderQuantity,
             lowStockThreshold: product.lowStockThreshold,
             requiresShipping: product.requiresShipping,
-            
+
             // Shop/Tenant Info
             tenantId: product.tenantId,
             tenantName: product.tenantName,
             tenantLogoUrl: product.tenantLogoUrl,
-            tenantCategory: product.tenantCategory||product.shopCategory,
+            tenantCategory: product.tenantCategory || product.shopCategory,
             shopCategory: product.shopCategory,
             shopCategoryId: product.shopCategoryId,
             shopGoogleCategoryId: product.shopGoogleCategoryId,
-            
+
             // Location
             tenantCity: product.tenantCity,
             tenantState: product.tenantState,
@@ -930,13 +930,13 @@ export default function StorefrontFeaturedProducts({
             tenantLatitude: product.tenantLatitude,
             tenantLongitude: product.tenantLongitude,
             timezone: product.timezone,
-            
+
             // Business Info
             businessType: product.businessType,
             businessCategory: product.businessCategory,
             businessSize: product.businessSize,
             establishedYear: product.establishedYear,
-            
+
             // Analytics
             viewCount: product.viewCount,
             uniqueViewers: product.uniqueViewers,
@@ -944,22 +944,22 @@ export default function StorefrontFeaturedProducts({
             conversionCount: product.conversionCount,
             revenueCents: product.revenueCents,
             unitsSold: product.unitsSold,
-            
+
             // Reviews & Social
             averageRating: product.averageRating,
             reviewCount: product.reviewCount,
             wishlistCount: product.wishlistCount,
             shareCount: product.shareCount,
-            
+
             // Payment
             hasActivePaymentGateway: product.hasActivePaymentGateway,
             paymentGatewayType: product.defaultGatewayType,
-            
+
             // Timestamps
             createdAt: product.createdAt,
             updatedAt: product.updatedAt,
             publishedAt: product.publishedAt,
-            
+
             // Status Indicators
             hasDescription: product.hasDescription,
             hasBrand: product.hasBrand,
@@ -967,18 +967,18 @@ export default function StorefrontFeaturedProducts({
             inStock: product.inStock,
             stockStatus: product.stockStatus,
             priceStatus: product.priceStatus,
-            
+
             // Featured Analytics
             bucketPriority: product.bucketPriority,
             trendingScore: product.trendingScore,
-            
+
             // Featured Expiration
             daysUntilExpiration: product.daysUntilExpiration,
             isExpired: product.isExpired,
             isExpiringSoon: product.isExpiringSoon,
             autoUnfeature: product.autoUnfeature
           }));
-          
+
           setAllProducts(transformedProducts);
         }
       } catch (error: unknown) {
@@ -1026,7 +1026,7 @@ export default function StorefrontFeaturedProducts({
   const productsByType = useMemo(() => {
     const byType: Record<string, any[]> = {};
     allFeaturedTypes.forEach((type: string) => {
-      byType[type] = allProducts.filter(p => 
+      byType[type] = allProducts.filter(p =>
         p.featuredType === type || (p.featuredTypes && p.featuredTypes.includes(type))
       );
     });
@@ -1051,9 +1051,9 @@ export default function StorefrontFeaturedProducts({
       {allFeaturedTypes.map(type => {
         const products = productsByType[type];
         if (products.length === 0) return null;
-        
+
         const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig] || getDefaultConfig(type);
-        
+
         return (
           <FeaturedSection
             key={type}

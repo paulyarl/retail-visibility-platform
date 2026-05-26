@@ -85,7 +85,7 @@ export default function MultiCartPage() {
       // Lazy-load the service to avoid circular import issues
       const { CapabilityResolutionService } = await import('@/services/CapabilityResolutionService');
       const capService = CapabilityResolutionService.getInstance();
-      
+
       for (const tenantId of tenantIds) {
         try {
           // Fetch gateways, tenant profile, and commerce capability in parallel
@@ -94,9 +94,9 @@ export default function MultiCartPage() {
             publicTenantInfoService.getTenantProfile(tenantId).catch(() => null),
             capService.getCommerceState(tenantId).catch(() => null)
           ]);
-          
+
           gatewayData[tenantId] = gateways.filter((g: Gateway) => g.is_active);
-          
+
           if (profile) {
             const data = (profile as any).data || profile;
             tenantInfoData[tenantId] = {
@@ -126,12 +126,12 @@ export default function MultiCartPage() {
           commerceData[tenantId] = { enabled: true, cartVisible: true };
         }
       }
-      
+
       setTenantGateways(gatewayData);
       setTenantInfo(tenantInfoData);
       setTenantCommerceState(commerceData);
     };
-    
+
     if (carts.length > 0) {
       fetchTenantData();
     }
@@ -215,7 +215,7 @@ export default function MultiCartPage() {
             const displayLogo = info?.logo_url || cart.tenant_logo;
             const commerceState = tenantCommerceState[cart.tenant_id];
             const commerceDisabled = commerceState && !commerceState.enabled;
-            
+
             return (
               <Card key={cartSummary.key} className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
@@ -243,7 +243,7 @@ export default function MultiCartPage() {
                       <p className="text-2xl font-bold text-gray-900">{formatCurrency(total_cents)}</p>
                     </div>
                   </div>
-                  
+
                   {/* Payment Options — gated by commerce capability */}
                   {commerceDisabled ? (
                     <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -283,7 +283,7 @@ export default function MultiCartPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Cart Items */}
                   <div className="space-y-3">
                     {/* Item Preview */}
@@ -302,7 +302,7 @@ export default function MultiCartPage() {
                         )}
                       </div>
                     )}
-                    
+
                     {/* Edit Controls */}
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -323,7 +323,7 @@ export default function MultiCartPage() {
                         Clear Cart
                       </Button>
                     </div>
-                    
+
                     {/* Expandable Cart Items */}
                     {isExpanded && (
                       <div className="mt-3 space-y-2">
@@ -415,7 +415,7 @@ export default function MultiCartPage() {
           </Button>
         </div>
       </div>
-      
+
       {/* Powered By Footer */}
       <PoweredByFooter />
     </div>
