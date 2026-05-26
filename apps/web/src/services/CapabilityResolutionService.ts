@@ -40,6 +40,15 @@ export interface CommerceState {
   enabled: boolean;
   cartVisible: boolean;
   paymentType: CommercePaymentType;
+  /** Effective payment type after applying merchant preferences */
+  effectivePaymentType: CommercePaymentType;
+  /** Whether cart is visible after applying merchant preferences */
+  effectiveCartVisible: boolean;
+  /** Merchant preference toggles for commerce */
+  merchantPreferences: {
+    deposit_enabled: boolean;
+    full_payment_enabled: boolean;
+  };
   isFlexible: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -51,9 +60,20 @@ export type GatewayType = 'stripe' | 'paypal' | 'square' | 'clover';
 
 export interface PaymentGatewayState {
   enabled: boolean;
+  /** Gateways allowed by tier capability (hard gate) */
   allowedGateways: GatewayType[];
+  /** Gateways effectively enabled after applying merchant preferences (tier allows AND merchant enabled) */
+  effectiveGateways: GatewayType[];
+  /** Merchant preference toggles per gateway type */
+  merchantPreferences: {
+    gateway_enabled: boolean;
+    stripe_enabled: boolean;
+    paypal_enabled: boolean;
+    square_enabled: boolean;
+    clover_enabled: boolean;
+  };
   isFlexible: boolean;
-  /** Whether checkout is available (at least one gateway enabled) */
+  /** Whether checkout is available (at least one effective gateway) */
   checkoutAvailable: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -94,10 +114,21 @@ export interface BarcodeScanState {
 
 export interface FulfillmentState {
   enabled: boolean;
+  /** Tier-allowed fulfillment methods (hard gate) */
   showsPickup: boolean;
   showsDelivery: boolean;
   showsShipping: boolean;
   showsService: boolean;
+  /** Effective fulfillment methods after applying merchant preferences (tier allows AND merchant enabled) */
+  effectiveShowsPickup: boolean;
+  effectiveShowsDelivery: boolean;
+  effectiveShowsShipping: boolean;
+  /** Merchant preference toggles for fulfillment */
+  merchantPreferences: {
+    pickup_enabled: boolean;
+    delivery_enabled: boolean;
+    shipping_enabled: boolean;
+  };
   isFlexible: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -119,16 +150,39 @@ export interface FeaturedOptionsState {
   tenantEnabled: boolean;
   /** Whether platform-controlled featured types are enabled as a group */
   platformEnabled: boolean;
-  /** Individual tenant-controlled featured types allowed by tier */
+  /** Individual tenant-controlled featured types allowed by tier (hard gate) */
   allowedTenantTypes: FeaturedType[];
-  /** Individual platform-controlled featured types allowed by tier */
+  /** Individual platform-controlled featured types allowed by tier (hard gate) */
   allowedPlatformTypes: FeaturedType[];
-  /** All allowed featured types (union of tenant + platform) */
+  /** All allowed featured types (union of tenant + platform, hard gate) */
   allowedTypes: FeaturedType[];
+  /** Tenant-controlled featured types effectively enabled (tier allows AND merchant enabled) */
+  effectiveTenantTypes: FeaturedType[];
+  /** Platform-controlled featured types effectively enabled (tier allows AND merchant enabled) */
+  effectivePlatformTypes: FeaturedType[];
+  /** All effectively enabled featured types (union of effective tenant + platform) */
+  effectiveTypes: FeaturedType[];
+  /** Merchant preference toggles for featured options */
+  merchantPreferences: {
+    featured_enabled: boolean;
+    featured_store_selection: boolean;
+    featured_new_arrival: boolean;
+    featured_seasonal: boolean;
+    featured_sale: boolean;
+    featured_staff_pick: boolean;
+    featured_clearance: boolean;
+    featured_featured: boolean;
+    featured_bestseller: boolean;
+    featured_trending: boolean;
+    featured_recommended: boolean;
+    featured_random_featured: boolean;
+  };
   /** Whether all featured options are available (flexible tier) */
   isFlexible: boolean;
-  /** Whether at least one featured type is available */
+  /** Whether at least one featured type is available (tier-only) */
   featuredAvailable: boolean;
+  /** Whether at least one effective featured type is available */
+  effectiveFeaturedAvailable: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -139,14 +193,32 @@ export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
 
 export interface ProductOptionsState {
   enabled: boolean;
-  /** Available product types based on capability features */
+  /** Available product types based on capability features (tier-allowed, hard gate) */
   allowedTypes: ProductType[];
-  /** Whether variants are available during creation */
+  /** Product types effectively enabled after applying merchant preferences (tier allows AND merchant enabled) */
+  effectiveTypes: ProductType[];
+  /** Whether variants are available during creation (tier-allowed) */
   showsVariants: boolean;
-  /** Whether image gallery is available during creation */
+  /** Whether image gallery is available during creation (tier-allowed) */
   showsGallery: boolean;
-  /** Whether video attachment is available during creation */
+  /** Whether video attachment is available during creation (tier-allowed) */
   showsVideo: boolean;
+  /** Whether variants are effectively available after merchant preferences */
+  effectiveShowsVariants: boolean;
+  /** Whether image gallery is effectively available after merchant preferences */
+  effectiveShowsGallery: boolean;
+  /** Whether video attachment is effectively available after merchant preferences */
+  effectiveShowsVideo: boolean;
+  /** Merchant preference toggles for product options */
+  merchantPreferences: {
+    product_physical_enabled: boolean;
+    product_digital_enabled: boolean;
+    product_hybrid_enabled: boolean;
+    product_service_enabled: boolean;
+    product_variant_enabled: boolean;
+    product_gallery_enabled: boolean;
+    product_video_enabled: boolean;
+  };
   /** Whether all product options are available (flexible tier) */
   isFlexible: boolean;
   /** Raw feature map from backend */
@@ -169,16 +241,34 @@ export interface IntegrationOptionsState {
   posEnabled: boolean;
   /** Whether Google integrations are enabled as a group */
   googleEnabled: boolean;
-  /** Individual POS integration types allowed by tier */
+  /** Individual POS integration types allowed by tier (hard gate) */
   allowedPosTypes: IntegrationType[];
-  /** Individual Google integration types allowed by tier */
+  /** Individual Google integration types allowed by tier (hard gate) */
   allowedGoogleTypes: IntegrationType[];
-  /** All allowed integration types (union of pos + google + org) */
+  /** All allowed integration types (union of pos + google + org, hard gate) */
   allowedTypes: IntegrationType[];
+  /** POS integration types effectively enabled (tier allows AND merchant enabled) */
+  effectivePosTypes: IntegrationType[];
+  /** Google integration types effectively enabled (tier allows AND merchant enabled) */
+  effectiveGoogleTypes: IntegrationType[];
+  /** All effectively enabled integration types */
+  effectiveTypes: IntegrationType[];
+  /** Merchant preference toggles for integration options */
+  merchantPreferences: {
+    integration_enabled: boolean;
+    integration_clover: boolean;
+    integration_square: boolean;
+    integration_gbp: boolean;
+    integration_google_shopping: boolean;
+    integration_google_merchant_center: boolean;
+    integration_gmc_sync: boolean;
+  };
   /** Whether all integration options are available (flexible tier) */
   isFlexible: boolean;
-  /** Whether at least one integration type is available */
+  /** Whether at least one integration type is available (tier-only) */
   integrationsAvailable: boolean;
+  /** Whether at least one effective integration type is available */
+  effectiveIntegrationsAvailable: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -233,7 +323,10 @@ export function getCapabilityTypeForFeature(featureKey: string): string | null {
 /**
  * Resolve commerce state from raw capability features
  */
-export function resolveCommerceState(features: Record<string, boolean>): CommerceState {
+export function resolveCommerceState(
+  features: Record<string, boolean>,
+  merchantPrefs?: { deposit_enabled?: boolean; full_payment_enabled?: boolean } | null
+): CommerceState {
   const enabled = !!features.commerce_enabled;
   const bothOptions = !!features.commerce_both_options;
   const fullPayment = !!features.commerce_full_payment;
@@ -254,33 +347,90 @@ export function resolveCommerceState(features: Record<string, boolean>): Commerc
   // Cart is visible if any commerce option is enabled (except disabled)
   const cartVisible = enabled && !disabled && (fullPayment || depositOnly || bothOptions);
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    deposit_enabled: merchantPrefs?.deposit_enabled !== false,
+    full_payment_enabled: merchantPrefs?.full_payment_enabled !== false,
+  };
+
+  // Effective payment type: apply merchant preferences on top of tier-allowed type
+  let effectivePaymentType: CommercePaymentType = 'none';
+  if (disabled || !enabled) {
+    effectivePaymentType = 'none';
+  } else if (paymentType === 'both') {
+    // Tier allows both → merchant can disable either
+    if (prefs.deposit_enabled && prefs.full_payment_enabled) effectivePaymentType = 'both';
+    else if (prefs.full_payment_enabled) effectivePaymentType = 'full';
+    else if (prefs.deposit_enabled) effectivePaymentType = 'deposit';
+    else effectivePaymentType = 'none';
+  } else if (paymentType === 'full') {
+    effectivePaymentType = prefs.full_payment_enabled ? 'full' : 'none';
+  } else if (paymentType === 'deposit') {
+    effectivePaymentType = prefs.deposit_enabled ? 'deposit' : 'none';
+  }
+
+  const effectiveCartVisible = enabled && !disabled && effectivePaymentType !== 'none';
+
   return {
     enabled: enabled && !disabled,
     cartVisible,
     paymentType,
+    effectivePaymentType,
+    effectiveCartVisible,
+    merchantPreferences: prefs,
     isFlexible: bothOptions,
     features,
   };
 }
 
 /**
- * Resolve payment gateway state from raw capability features
+ * Resolve payment gateway state from raw capability features + merchant preferences
+ * Tier capability = hard gate (allowed/disallowed by plan)
+ * Merchant preference = soft toggle (merchant can disable even if tier allows)
+ * Effective = tier allows AND merchant preference enabled
  */
-export function resolvePaymentGatewayState(features: Record<string, boolean>): PaymentGatewayState {
+export function resolvePaymentGatewayState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    gateway_enabled?: boolean;
+    stripe_enabled?: boolean;
+    paypal_enabled?: boolean;
+    square_enabled?: boolean;
+    clover_enabled?: boolean;
+  } | null
+): PaymentGatewayState {
   const enabled = !!features.payment_gateway_enabled;
   const flexible = !!features.payment_gateway_flexible;
 
+  // Tier-allowed gateways (hard gate)
   const allowedGateways: GatewayType[] = [];
   if (features.payment_gateway_stripe) allowedGateways.push('stripe');
   if (features.payment_gateway_paypal) allowedGateways.push('paypal');
   if (features.payment_gateway_square) allowedGateways.push('square');
   if (features.payment_gateway_clover) allowedGateways.push('clover');
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    gateway_enabled: merchantPrefs?.gateway_enabled !== false,
+    stripe_enabled: merchantPrefs?.stripe_enabled !== false,
+    paypal_enabled: merchantPrefs?.paypal_enabled !== false,
+    square_enabled: merchantPrefs?.square_enabled !== false,
+    clover_enabled: merchantPrefs?.clover_enabled !== false,
+  };
+
+  // Effective gateways = tier allows AND merchant enabled AND master gateway switch on
+  const effectiveGateways = allowedGateways.filter(gw => {
+    if (!prefs.gateway_enabled) return false;
+    return prefs[`${gw}_enabled` as keyof typeof prefs];
+  });
+
   return {
-    enabled,
+    enabled: enabled && prefs.gateway_enabled,
     allowedGateways,
+    effectiveGateways,
+    merchantPreferences: prefs,
     isFlexible: flexible,
-    checkoutAvailable: enabled && allowedGateways.length > 0,
+    checkoutAvailable: enabled && prefs.gateway_enabled && effectiveGateways.length > 0,
     features,
   };
 }
@@ -318,7 +468,10 @@ export function resolveBarcodeScanState(features: Record<string, boolean>): Barc
 /**
  * Resolve fulfillment state from raw capability features
  */
-export function resolveFulfillmentState(features: Record<string, boolean>): FulfillmentState {
+export function resolveFulfillmentState(
+  features: Record<string, boolean>,
+  merchantPrefs?: { pickup_enabled?: boolean; delivery_enabled?: boolean; shipping_enabled?: boolean } | null
+): FulfillmentState {
   const enabled = !!features.fulfillment_enabled;
   const disabled = !!features.fulfillment_disabled;
   const flexible = !!features.fulfillment_flexible;
@@ -333,12 +486,28 @@ export function resolveFulfillmentState(features: Record<string, boolean>): Fulf
   const showsShipping = flexible || shipping;
   const showsService = flexible || service;
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    pickup_enabled: merchantPrefs?.pickup_enabled !== false,
+    delivery_enabled: merchantPrefs?.delivery_enabled !== false,
+    shipping_enabled: merchantPrefs?.shipping_enabled !== false,
+  };
+
+  // Effective fulfillment methods = tier allows AND merchant enabled
+  const effectiveShowsPickup = showsPickup && prefs.pickup_enabled;
+  const effectiveShowsDelivery = showsDelivery && prefs.delivery_enabled;
+  const effectiveShowsShipping = showsShipping && prefs.shipping_enabled;
+
   return {
     enabled: enabled && !disabled,
     showsPickup,
     showsDelivery,
     showsShipping,
     showsService,
+    effectiveShowsPickup,
+    effectiveShowsDelivery,
+    effectiveShowsShipping,
+    merchantPreferences: prefs,
     isFlexible: flexible,
     features,
   };
@@ -347,7 +516,18 @@ export function resolveFulfillmentState(features: Record<string, boolean>): Fulf
 /**
  * Resolve product options state from raw capability features
  */
-export function resolveProductOptionsState(features: Record<string, boolean>): ProductOptionsState {
+export function resolveProductOptionsState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    product_physical_enabled?: boolean;
+    product_digital_enabled?: boolean;
+    product_hybrid_enabled?: boolean;
+    product_service_enabled?: boolean;
+    product_variant_enabled?: boolean;
+    product_gallery_enabled?: boolean;
+    product_video_enabled?: boolean;
+  } | null
+): ProductOptionsState {
   const enabled = !!features.product_enabled;
   const disabled = !!features.product_disabled;
   const flexible = !!features.product_flexible;
@@ -366,12 +546,36 @@ export function resolveProductOptionsState(features: Record<string, boolean>): P
   if (flexible || hybrid) allowedTypes.push('hybrid');
   if (flexible || service) allowedTypes.push('service');
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    product_physical_enabled: merchantPrefs?.product_physical_enabled !== false,
+    product_digital_enabled: merchantPrefs?.product_digital_enabled !== false,
+    product_hybrid_enabled: merchantPrefs?.product_hybrid_enabled !== false,
+    product_service_enabled: merchantPrefs?.product_service_enabled !== false,
+    product_variant_enabled: merchantPrefs?.product_variant_enabled !== false,
+    product_gallery_enabled: merchantPrefs?.product_gallery_enabled !== false,
+    product_video_enabled: merchantPrefs?.product_video_enabled !== false,
+  };
+
+  // Effective types = tier allows AND merchant enabled
+  const effectiveTypes = allowedTypes.filter(t => prefs[`product_${t}_enabled` as keyof typeof prefs]);
+
+  // Effective variant/gallery/video = tier allows AND merchant enabled
+  const effectiveShowsVariants = (flexible || variant) && prefs.product_variant_enabled;
+  const effectiveShowsGallery = (flexible || gallery) && prefs.product_gallery_enabled;
+  const effectiveShowsVideo = (flexible || video) && prefs.product_video_enabled;
+
   return {
     enabled: enabled && !disabled,
     allowedTypes,
+    effectiveTypes,
     showsVariants: flexible || variant,
     showsGallery: flexible || gallery,
     showsVideo: flexible || video,
+    effectiveShowsVariants,
+    effectiveShowsGallery,
+    effectiveShowsVideo,
+    merchantPreferences: prefs,
     isFlexible: flexible,
     features,
   };
@@ -380,7 +584,23 @@ export function resolveProductOptionsState(features: Record<string, boolean>): P
 /**
  * Resolve featured options state from raw capability features
  */
-export function resolveFeaturedOptionsState(features: Record<string, boolean>): FeaturedOptionsState {
+export function resolveFeaturedOptionsState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    featured_enabled?: boolean;
+    featured_store_selection?: boolean;
+    featured_new_arrival?: boolean;
+    featured_seasonal?: boolean;
+    featured_sale?: boolean;
+    featured_staff_pick?: boolean;
+    featured_clearance?: boolean;
+    featured_featured?: boolean;
+    featured_bestseller?: boolean;
+    featured_trending?: boolean;
+    featured_recommended?: boolean;
+    featured_random_featured?: boolean;
+  } | null
+): FeaturedOptionsState {
   const enabled = !!features.featured_enabled;
   const disabled = !!features.featured_disabled;
   const flexible = !!features.featured_flexible;
@@ -428,6 +648,46 @@ export function resolveFeaturedOptionsState(features: Record<string, boolean>): 
 
   const allTypes = [...allowedTenantTypes, ...allowedPlatformTypes];
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    featured_enabled: merchantPrefs?.featured_enabled !== false,
+    featured_store_selection: merchantPrefs?.featured_store_selection !== false,
+    featured_new_arrival: merchantPrefs?.featured_new_arrival !== false,
+    featured_seasonal: merchantPrefs?.featured_seasonal !== false,
+    featured_sale: merchantPrefs?.featured_sale !== false,
+    featured_staff_pick: merchantPrefs?.featured_staff_pick !== false,
+    featured_clearance: merchantPrefs?.featured_clearance !== false,
+    featured_featured: merchantPrefs?.featured_featured !== false,
+    featured_bestseller: merchantPrefs?.featured_bestseller !== false,
+    featured_trending: merchantPrefs?.featured_trending !== false,
+    featured_recommended: merchantPrefs?.featured_recommended !== false,
+    featured_random_featured: merchantPrefs?.featured_random_featured !== false,
+  };
+
+  // Map featured type to merchant pref key
+  const typeToPrefKey: Record<FeaturedType, keyof typeof prefs> = {
+    store_selection: 'featured_store_selection',
+    new_arrival: 'featured_new_arrival',
+    seasonal: 'featured_seasonal',
+    sale: 'featured_sale',
+    staff_pick: 'featured_staff_pick',
+    clearance: 'featured_clearance',
+    featured: 'featured_featured',
+    bestseller: 'featured_bestseller',
+    trending: 'featured_trending',
+    recommended: 'featured_recommended',
+    random_featured: 'featured_random_featured',
+  };
+
+  // Effective types = tier allows AND merchant enabled AND master switch on
+  const effectiveTenantTypes = prefs.featured_enabled
+    ? allowedTenantTypes.filter(t => prefs[typeToPrefKey[t]])
+    : [];
+  const effectivePlatformTypes = prefs.featured_enabled
+    ? allowedPlatformTypes.filter(t => prefs[typeToPrefKey[t]])
+    : [];
+  const effectiveTypes = [...effectiveTenantTypes, ...effectivePlatformTypes];
+
   return {
     enabled: enabled && !disabled,
     tenantEnabled,
@@ -435,8 +695,13 @@ export function resolveFeaturedOptionsState(features: Record<string, boolean>): 
     allowedTenantTypes,
     allowedPlatformTypes,
     allowedTypes: allTypes,
+    effectiveTenantTypes,
+    effectivePlatformTypes,
+    effectiveTypes,
+    merchantPreferences: prefs,
     isFlexible: flexible,
     featuredAvailable: enabled && !disabled && allTypes.length > 0,
+    effectiveFeaturedAvailable: enabled && !disabled && effectiveTypes.length > 0,
     features,
   };
 }
@@ -444,7 +709,18 @@ export function resolveFeaturedOptionsState(features: Record<string, boolean>): 
 /**
  * Resolve integration options state from raw capability features
  */
-export function resolveIntegrationState(features: Record<string, boolean>): IntegrationOptionsState {
+export function resolveIntegrationState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    integration_enabled?: boolean;
+    integration_clover?: boolean;
+    integration_square?: boolean;
+    integration_gbp?: boolean;
+    integration_google_shopping?: boolean;
+    integration_google_merchant_center?: boolean;
+    integration_gmc_sync?: boolean;
+  } | null
+): IntegrationOptionsState {
   const enabled = !!features.integration_enabled;
   const disabled = !!features.integration_disabled;
   const flexible = !!features.integration_flexible;
@@ -486,6 +762,36 @@ export function resolveIntegrationState(features: Record<string, boolean>): Inte
     allTypes.push('propagation_gbp');
   }
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    integration_enabled: merchantPrefs?.integration_enabled !== false,
+    integration_clover: merchantPrefs?.integration_clover !== false,
+    integration_square: merchantPrefs?.integration_square !== false,
+    integration_gbp: merchantPrefs?.integration_gbp !== false,
+    integration_google_shopping: merchantPrefs?.integration_google_shopping !== false,
+    integration_google_merchant_center: merchantPrefs?.integration_google_merchant_center !== false,
+    integration_gmc_sync: merchantPrefs?.integration_gmc_sync !== false,
+  };
+
+  // Map integration type to merchant pref key
+  const typeToPrefKey: Record<string, keyof typeof prefs> = {
+    clover: 'integration_clover',
+    square: 'integration_square',
+    gbp: 'integration_gbp',
+    google_shopping: 'integration_google_shopping',
+    google_merchant_center: 'integration_google_merchant_center',
+    gmc_sync: 'integration_gmc_sync',
+  };
+
+  // Effective types = tier allows AND merchant enabled AND master switch on
+  const effectivePosTypes = prefs.integration_enabled
+    ? allowedPosTypes.filter(t => prefs[typeToPrefKey[t]] !== false)
+    : [];
+  const effectiveGoogleTypes = prefs.integration_enabled
+    ? allowedGoogleTypes.filter(t => prefs[typeToPrefKey[t]] !== false)
+    : [];
+  const effectiveTypes: IntegrationType[] = [...effectivePosTypes, ...effectiveGoogleTypes];
+
   return {
     enabled: enabled && !disabled,
     posEnabled,
@@ -493,8 +799,13 @@ export function resolveIntegrationState(features: Record<string, boolean>): Inte
     allowedPosTypes,
     allowedGoogleTypes,
     allowedTypes: allTypes,
+    effectivePosTypes,
+    effectiveGoogleTypes,
+    effectiveTypes,
+    merchantPreferences: prefs,
     isFlexible: flexible,
     integrationsAvailable: enabled && !disabled && allTypes.length > 0,
+    effectiveIntegrationsAvailable: enabled && !disabled && effectiveTypes.length > 0,
     features,
   };
 }
@@ -600,19 +911,44 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
-   * Get commerce state for a tenant
+   * Get commerce state for a tenant, merging tier capability with merchant preferences
    */
   async getCommerceState(tenantId: string): Promise<CommerceState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.commerce;
+    const tierState = all.commerce;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getCommerceSettings(tenantId);
+      if (prefs) {
+        return resolveCommerceState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch commerce merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get payment gateway state for a tenant
+   * Get payment gateway state for a tenant, merging tier capability with merchant preferences
    */
   async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.paymentGateway;
+    const tierState = all.paymentGateway;
+
+    // Fetch merchant preferences and re-resolve with them
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getPaymentGatewaySettings(tenantId);
+      if (prefs) {
+        return resolvePaymentGatewayState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
@@ -632,35 +968,83 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
-   * Get fulfillment state for a tenant
+   * Get fulfillment state for a tenant, merging tier capability with merchant preferences
    */
   async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.fulfillment;
+    const tierState = all.fulfillment;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getFulfillmentSettings(tenantId);
+      if (prefs) {
+        return resolveFulfillmentState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch fulfillment merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get product options state for a tenant
+   * Get product options state for a tenant, merging tier capability with merchant preferences
    */
   async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.productOptions;
+    const tierState = all.productOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveProductOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch product options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get featured options state for a tenant
+   * Get featured options state for a tenant, merging tier capability with merchant preferences
    */
   async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.featuredOptions;
+    const tierState = all.featuredOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getFeaturedOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveFeaturedOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch featured options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get integration options state for a tenant
+   * Get integration options state for a tenant, merging tier capability with merchant preferences
    */
   async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.integrationOptions;
+    const tierState = all.integrationOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveIntegrationState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
@@ -776,12 +1160,37 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
 
   async getCommerceState(tenantId: string): Promise<CommerceState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.commerce;
+    const tierState = all.commerce;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getCommerceSettings(tenantId);
+      if (prefs) {
+        return resolveCommerceState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch commerce merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.paymentGateway;
+    const tierState = all.paymentGateway;
+
+    // Fetch merchant preferences and re-resolve with them
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getPaymentGatewaySettings(tenantId);
+      if (prefs) {
+        return resolvePaymentGatewayState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   async getStorefrontState(tenantId: string): Promise<StorefrontState> {
@@ -798,35 +1207,83 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
-   * Get fulfillment state for a tenant
+   * Get fulfillment state for a tenant, merging tier capability with merchant preferences
    */
   async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.fulfillment;
+    const tierState = all.fulfillment;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getFulfillmentSettings(tenantId);
+      if (prefs) {
+        return resolveFulfillmentState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch fulfillment merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get product options state for a tenant
+   * Get product options state for a tenant, merging tier capability with merchant preferences
    */
   async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.productOptions;
+    const tierState = all.productOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveProductOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch product options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get featured options state for a tenant
+   * Get featured options state for a tenant, merging tier capability with merchant preferences
    */
   async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.featuredOptions;
+    const tierState = all.featuredOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getFeaturedOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveFeaturedOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch featured options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get integration options state for a tenant
+   * Get integration options state for a tenant, merging tier capability with merchant preferences
    */
   async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.integrationOptions;
+    const tierState = all.integrationOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveIntegrationState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
   }
 
   /**

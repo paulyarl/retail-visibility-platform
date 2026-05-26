@@ -21,12 +21,12 @@ export default function FulfillmentMethodForm({
   onSubmit,
   initialMethod,
 }: FulfillmentMethodFormProps) {
-  // Fulfillment capability-driven content control
+  // Fulfillment capability-driven content control (effective = tier allows AND merchant enabled)
   const fulfillmentCap = useFulfillmentCapability(tenantId);
   const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
-  const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
-  const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;
-  const showsShipping = fulfillmentCap.data?.showsShipping ?? true;
+  const showsPickup = fulfillmentCap.data?.effectiveShowsPickup ?? fulfillmentCap.data?.showsPickup ?? true;
+  const showsDelivery = fulfillmentCap.data?.effectiveShowsDelivery ?? fulfillmentCap.data?.showsDelivery ?? true;
+  const showsShipping = fulfillmentCap.data?.effectiveShowsShipping ?? fulfillmentCap.data?.showsShipping ?? true;
 
   const [selectedMethod, setSelectedMethod] = useState<FulfillmentMethod | null>(initialMethod || null);
   const [settings, setSettings] = useState<FulfillmentSettings | null>(null);

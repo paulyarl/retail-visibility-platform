@@ -2,9 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, Check, X, Crown } from 'lucide-react';
+import { Shield, Check, X, Crown, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   AllCapabilitiesState,
+  CommerceState,
+  StorefrontState,
   FeaturedType,
   ProductType,
   GatewayType,
@@ -18,6 +21,8 @@ interface PlanSummaryPanelProps {
   loading?: boolean;
   /** Which capability section to highlight (e.g. 'featured_options' or 'product_options') */
   highlightCapability?: string;
+  /** Tenant ID for building settings page navigation links */
+  tenantId?: string;
 }
 
 // --- Display label helpers ---
@@ -58,12 +63,37 @@ const COMMERCE_PAYMENT_LABELS: Record<string, string> = {
   none: '',
 };
 
+/** Individual features that comprise each commerce payment group */
+const COMMERCE_GROUP_FEATURES: Record<string, string[]> = {
+  full: ['Full Payment'],
+  deposit: ['Deposit Only'],
+  both: ['Full Payment', 'Deposit'],
+};
+
+const COMMERCE_DETAIL_LABELS: Record<string, string> = {
+  cartVisible: 'Cart',
+};
+
 const STOREFRONT_TYPE_LABELS: Record<string, string> = {
   online: 'Online',
   retail: 'Retail',
   both: 'Both',
   service: 'Service',
   none: '',
+};
+
+/** Features that comprise each storefront type group */
+const STOREFRONT_GROUP_FEATURES: Record<string, string[]> = {
+  online: ['Online'],
+  retail: ['Retail'],
+  both: ['Online', 'Retail'],
+  service: ['Service'],
+};
+
+const STOREFRONT_DETAIL_LABELS: Record<string, string> = {
+  showsLocation: 'Location',
+  showsHours: 'Hours',
+  showsMap: 'Map',
 };
 
 const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
@@ -78,15 +108,15 @@ const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
 
 // --- Capability display config ---
 
-const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string }> = {
-  commerce_types: { label: 'Commerce', icon: '💰' },
-  payment_gateway_options: { label: 'Payment Gateway', icon: '💳' },
-  storefront_types: { label: 'Storefront', icon: '🏪' },
+const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
+  commerce_types: { label: 'Commerce', icon: '💰', settingsPath: '/settings/commerce' },
+  payment_gateway_options: { label: 'Payment Gateway', icon: '💳', settingsPath: '/settings/payment-gateways' },
+  storefront_types: { label: 'Storefront', icon: '🏪', settingsPath: '/settings/directory' },
   barcode_scan_options: { label: 'Barcode Scanning', icon: '📱' },
-  fulfillment_options: { label: 'Fulfillment', icon: '📦' },
-  product_options: { label: 'Product Options', icon: '🏷️' },
-  featured_options: { label: 'Featured Options', icon: '⭐' },
-  integration_options: { label: 'Integrations', icon: '🔗' },
+  fulfillment_options: { label: 'Fulfillment', icon: '📦', settingsPath: '/settings/fulfillment' },
+  product_options: { label: 'Product Options', icon: '🏷️', settingsPath: '/settings/product-options' },
+  featured_options: { label: 'Featured Options', icon: '⭐', settingsPath: '/settings/featured-options' },
+  integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -100,20 +130,31 @@ interface CapabilitySummary {
   specificFeatures: string[];
   /** Whether this capability is highlighted in the current view */
   isHighlighted: boolean;
+  /** Relative path to the settings page for this capability (null if no dedicated page) */
+  settingsPath: string | null;
 }
 
 function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: string): CapabilitySummary[] {
   const summaries: CapabilitySummary[] = [];
 
-  // Commerce
+  // Commerce — expand group labels into individual features like Featured Options
   const c = caps.commerce;
   if (Object.keys(c.features).length > 0) {
     const specifics: string[] = [];
+    // Expand payment type group into constituent features
     if (c.paymentType && c.paymentType !== 'none') {
-      const label = COMMERCE_PAYMENT_LABELS[c.paymentType];
-      if (label) specifics.push(label);
+      const groupFeatures = COMMERCE_GROUP_FEATURES[c.paymentType];
+      if (groupFeatures) {
+        groupFeatures.forEach(f => specifics.push(f));
+      } else {
+        const label = COMMERCE_PAYMENT_LABELS[c.paymentType];
+        if (label) specifics.push(label);
+      }
     }
-    if (c.cartVisible) specifics.push('Cart');
+    // Add detail features
+    Object.entries(COMMERCE_DETAIL_LABELS).forEach(([key, label]) => {
+      if (c[key as keyof CommerceState]) specifics.push(label);
+    });
     summaries.push({
       key: 'commerce_types',
       label: CAPABILITY_DISPLAY.commerce_types.label,
@@ -121,6 +162,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: c.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'commerce_types',
+      settingsPath: CAPABILITY_DISPLAY.commerce_types.settingsPath ?? null,
     });
   }
 
@@ -134,20 +176,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: pg.enabled,
       specificFeatures: pg.allowedGateways.map(g => GATEWAY_LABELS[g] || g),
       isHighlighted: highlight === 'payment_gateway_options',
+      settingsPath: CAPABILITY_DISPLAY.payment_gateway_options.settingsPath ?? null,
     });
   }
 
-  // Storefront
+  // Storefront — expand group labels into individual features like Featured Options
   const sf = caps.storefront;
   if (Object.keys(sf.features).length > 0) {
     const specifics: string[] = [];
+    // Expand storefront type group into constituent features
     if (sf.type && sf.type !== 'none') {
-      const label = STOREFRONT_TYPE_LABELS[sf.type];
-      if (label) specifics.push(label);
+      const groupFeatures = STOREFRONT_GROUP_FEATURES[sf.type];
+      if (groupFeatures) {
+        groupFeatures.forEach(f => specifics.push(f));
+      } else {
+        const label = STOREFRONT_TYPE_LABELS[sf.type];
+        if (label) specifics.push(label);
+      }
     }
-    if (sf.showsLocation) specifics.push('Location');
-    if (sf.showsHours && (sf.type === 'retail' || sf.type === 'both')) specifics.push('Hours');
-    if (sf.showsMap) specifics.push('Map');
+    // Add detail features (location, hours, map)
+    Object.entries(STOREFRONT_DETAIL_LABELS).forEach(([key, label]) => {
+      if (sf[key as keyof StorefrontState]) specifics.push(label);
+    });
     summaries.push({
       key: 'storefront_types',
       label: CAPABILITY_DISPLAY.storefront_types.label,
@@ -155,6 +205,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: sf.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'storefront_types',
+      settingsPath: CAPABILITY_DISPLAY.storefront_types.settingsPath ?? null,
     });
   }
 
@@ -168,6 +219,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: bc.enabled,
       specificFeatures: bc.allowedModes.filter(m => m !== 'none').map(m => BARCODE_MODE_LABELS[m] || m),
       isHighlighted: highlight === 'barcode_scan_options',
+      settingsPath: CAPABILITY_DISPLAY.barcode_scan_options.settingsPath ?? null,
     });
   }
 
@@ -186,6 +238,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: fl.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'fulfillment_options',
+      settingsPath: CAPABILITY_DISPLAY.fulfillment_options.settingsPath ?? null,
     });
   }
 
@@ -204,6 +257,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: po.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'product_options',
+      settingsPath: CAPABILITY_DISPLAY.product_options.settingsPath ?? null,
     });
   }
 
@@ -228,14 +282,31 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: fo.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'featured_options',
+      settingsPath: CAPABILITY_DISPLAY.featured_options.settingsPath ?? null,
     });
   }
 
-  // Integration Options
+  // Integration Options — list individual types grouped by POS/Google like Featured Options groups
   const io = caps.integrationOptions;
   if (Object.keys(io.features).length > 0) {
     const specifics: string[] = [];
-    io.allowedTypes.forEach(t => {
+    // POS group types
+    if (io.allowedPosTypes.length > 0) {
+      io.allowedPosTypes.forEach(t => {
+        const label = INTEGRATION_TYPE_LABELS[t];
+        if (label) specifics.push(label);
+      });
+    }
+    // Google group types
+    if (io.allowedGoogleTypes.length > 0) {
+      io.allowedGoogleTypes.forEach(t => {
+        const label = INTEGRATION_TYPE_LABELS[t];
+        if (label) specifics.push(label);
+      });
+    }
+    // Org-only types (not in pos/google groups)
+    const groupTypes = new Set([...io.allowedPosTypes, ...io.allowedGoogleTypes]);
+    io.allowedTypes.filter(t => !groupTypes.has(t)).forEach(t => {
       const label = INTEGRATION_TYPE_LABELS[t];
       if (label) specifics.push(label);
     });
@@ -246,13 +317,15 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       enabled: io.enabled,
       specificFeatures: specifics,
       isHighlighted: highlight === 'integration_options',
+      settingsPath: CAPABILITY_DISPLAY.integration_options.settingsPath ?? null,
     });
   }
 
   return summaries;
 }
 
-export default function PlanSummaryPanel({ capabilities, loading, highlightCapability }: PlanSummaryPanelProps) {
+export default function PlanSummaryPanel({ capabilities, loading, highlightCapability, tenantId }: PlanSummaryPanelProps) {
+  const router = useRouter();
   if (loading || !capabilities) {
     return (
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -295,20 +368,26 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
 
         {/* Capability grid with resolved features */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-          {summaries.map(cap => (
+          {summaries.map(cap => {
+            const href = cap.settingsPath && tenantId ? `/t/${tenantId}${cap.settingsPath}` : null;
+            return (
             <div
               key={cap.key}
               className={`rounded-lg p-3 border ${
                 cap.isHighlighted
                   ? 'bg-white border-blue-300 ring-1 ring-blue-200'
                   : 'bg-white/60 border-transparent'
-              }`}
+              } ${href ? 'cursor-pointer hover:bg-white/80 hover:border-blue-200 transition-colors' : ''}`}
+              onClick={() => href && router.push(href)}
             >
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="text-sm">{cap.icon}</span>
                 <span className={`text-xs font-semibold ${cap.isHighlighted ? 'text-blue-800' : 'text-neutral-700'}`}>
                   {cap.label}
                 </span>
+                {href && (
+                  <ExternalLink className="h-3 w-3 text-blue-500 ml-0.5" />
+                )}
                 {!cap.enabled && (
                   <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">Off</Badge>
                 )}
@@ -331,7 +410,7 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
                 </span>
               )}
             </div>
-          ))}
+          );})}
         </div>
       </CardContent>
     </Card>

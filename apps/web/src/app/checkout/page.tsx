@@ -254,17 +254,18 @@ function CheckoutPageContent() {
   useEffect(() => {
     if (!tenantId) return;
 
-    // Commerce capability overrides checkout mode
+    // Commerce capability overrides checkout mode (use effective state = tier allows AND merchant enabled)
     if (commerceCap.data) {
-      const { enabled, paymentType } = commerceCap.data;
-      if (!enabled || paymentType === 'none') {
+      const effectivePaymentType = commerceCap.data.effectivePaymentType ?? commerceCap.data.paymentType;
+      const { enabled } = commerceCap.data;
+      if (!enabled || effectivePaymentType === 'none') {
         setCheckoutMode('disabled');
         setDepositOption('none');
         fetchTenantContact(tenantId);
-      } else if (paymentType === 'deposit') {
+      } else if (effectivePaymentType === 'deposit') {
         setCheckoutMode('deposit');
         setDepositOption('required');
-      } else if (paymentType === 'both') {
+      } else if (effectivePaymentType === 'both') {
         setCheckoutMode('full_payment');
         setDepositOption('optional');
       } else {
@@ -275,9 +276,10 @@ function CheckoutPageContent() {
     }
 
     // Payment gateway capability filters available gateways
+    // Use effectiveGateways (tier-allowed AND merchant-enabled) when available
     if (paymentCap.data && paymentCap.data.enabled) {
-      const { allowedGateways } = paymentCap.data;
-      const mapped = allowedGateways.filter((g): g is PaymentMethod =>
+      const effectiveGateways = paymentCap.data.effectiveGateways ?? paymentCap.data.allowedGateways;
+      const mapped = effectiveGateways.filter((g): g is PaymentMethod =>
         ['square', 'paypal', 'stripe'].includes(g)
       );
       if (mapped.length > 0) {

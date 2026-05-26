@@ -1014,9 +1014,9 @@ export default function StorefrontFeaturedProducts({
         product.featuredTypes.forEach(type => types.add(type));
       }
     });
-    // Filter out types not allowed by capability state
+    // Filter out types not effectively enabled (tier allows AND merchant enabled)
     if (featuredOptionsState && featuredOptionsState.enabled) {
-      return Array.from(types).filter(type => featuredOptionsState.allowedTypes.includes(type as any));
+      return Array.from(types).filter(type => featuredOptionsState.effectiveTypes.includes(type as any));
     }
     // If capability not loaded or disabled, show all types (graceful fallback)
     return Array.from(types);

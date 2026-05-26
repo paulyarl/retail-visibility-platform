@@ -103,6 +103,13 @@ export default function PaymentGatewaysPage() {
     feePercent?: number;
   } | null>(null);
   const [stripeOnboardingLoading, setStripeOnboardingLoading] = useState(false);
+  const [gatewaySettings, setGatewaySettings] = useState<{
+    gateway_enabled: boolean;
+    stripe_enabled: boolean;
+    paypal_enabled: boolean;
+    square_enabled: boolean;
+    clover_enabled: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (hasAccess && tenantId) {
@@ -110,6 +117,7 @@ export default function PaymentGatewaysPage() {
       loadOAuthStatus();
       loadTenantTier();
       checkAdminStatus();
+      loadGatewaySettings();
     }
   }, [hasAccess, tenantId]);
 
@@ -358,6 +366,28 @@ export default function PaymentGatewaysPage() {
       setSaveError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const loadGatewaySettings = async () => {
+    try {
+      const settings = await tenantInfoService.getPaymentGatewaySettings(tenantId);
+      if (settings) {
+        setGatewaySettings(settings);
+      }
+    } catch (err) {
+      console.error('Failed to load gateway settings:', err);
+    }
+  };
+
+  const handleGatewayPreferenceToggle = async (key: 'stripe_enabled' | 'paypal_enabled' | 'square_enabled' | 'clover_enabled' | 'gateway_enabled', value: boolean) => {
+    try {
+      const result = await tenantInfoService.updatePaymentGatewaySettings(tenantId, { [key]: value });
+      if (result) {
+        setGatewaySettings(result);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update gateway preference');
     }
   };
 
@@ -626,14 +656,27 @@ export default function PaymentGatewaysPage() {
                 <p className="text-sm text-neutral-600">Accept payments via PayPal</p>
               </div>
             </div>
-            {canUseAdvancedPayment && paypalGateways.length > 0 && (
+            {/* Merchant preference toggle */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <Switch
+                id="paypal-preference-toggle"
+                checked={gatewaySettings?.paypal_enabled !== false}
+                onCheckedChange={(checked) => handleGatewayPreferenceToggle('paypal_enabled', checked)}
+              />
+              <label htmlFor="paypal-preference-toggle" className="text-sm font-medium text-neutral-900">
+                PayPal enabled
+              </label>
+            </div>
+          </div>
+          {canUseAdvancedPayment && paypalGateways.length > 0 && (
+            <div className="mb-4">
               <Button onClick={() => setShowPayPalForm(true)} size="sm"
               variant='gradient' style={{color: 'white'}}>
                 <CreditCard className="w-5 h-5 text-white mt-0.5" />
                 Add Another PayPal Account
               </Button>
-            )}
-          </div>
+            </div>
+          )}
           
           {showPayPalForm ? (
             <Card>
@@ -782,7 +825,8 @@ export default function PaymentGatewaysPage() {
               <CardContent className="text-center py-8">
                 <p className="text-neutral-600 mb-4">No PayPal accounts configured</p>
                 {canUseAdvancedPayment ? (
-                  <Button onClick={() => setShowPayPalForm(true)}>
+                  <Button onClick={() => setShowPayPalForm(true)}
+                  variant='gradient' style={{color: 'white'}}>
                     Add PayPal Account
                   </Button>
                 ) : (
@@ -859,14 +903,27 @@ export default function PaymentGatewaysPage() {
                 <p className="text-sm text-neutral-600">Accept credit/debit cards via Square</p>
               </div>
             </div>
-            {canUseAdvancedPayment && squareGateways.length > 0 && (
+            {/* Merchant preference toggle */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <Switch
+                id="square-preference-toggle"
+                checked={gatewaySettings?.square_enabled !== false}
+                onCheckedChange={(checked) => handleGatewayPreferenceToggle('square_enabled', checked)}
+              />
+              <label htmlFor="square-preference-toggle" className="text-sm font-medium text-neutral-900">
+                Square enabled
+              </label>
+            </div>
+          </div>
+          {canUseAdvancedPayment && squareGateways.length > 0 && (
+            <div className="mb-4">
               <Button onClick={() => setShowSquareForm(true)} size="sm"
               variant='gradient' style={{color: 'white'}}>
                 <CreditCard className="w-5 h-5 text-white mt-0.5" />
                 Add Another Square Account
               </Button>
-            )}
-          </div>
+            </div>
+          )}
           
           {squareGateways.length > 0 || hasSquareOAuth ? (
             <div className="space-y-4">
@@ -1208,6 +1265,17 @@ export default function PaymentGatewaysPage() {
                 <h2 className="text-xl font-bold">Stripe</h2>
                 <p className="text-sm text-neutral-600">Accept credit/debit cards via Stripe checkout</p>
               </div>
+            </div>
+            {/* Merchant preference toggle */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <Switch
+                id="stripe-preference-toggle"
+                checked={gatewaySettings?.stripe_enabled !== false}
+                onCheckedChange={(checked) => handleGatewayPreferenceToggle('stripe_enabled', checked)}
+              />
+              <label htmlFor="stripe-preference-toggle" className="text-sm font-medium text-neutral-900">
+                Stripe enabled
+              </label>
             </div>
           </div>
           

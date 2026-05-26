@@ -145,7 +145,7 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
   return (
     <div className="space-y-6">
       {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="integration_options" />
+      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="integration_options" tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${

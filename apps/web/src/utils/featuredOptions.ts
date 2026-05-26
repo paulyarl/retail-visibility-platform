@@ -187,6 +187,17 @@ export function filterAllowedFeaturedTypes(
 }
 
 /**
+ * Filter a list of featured types to only those effectively enabled (tier allows AND merchant enabled).
+ */
+export function filterEffectiveFeaturedTypes(
+  types: FeaturedType[],
+  state: FeaturedOptionsState
+): FeaturedType[] {
+  if (!state.enabled) return [];
+  return types.filter(t => state.effectiveTypes.includes(t));
+}
+
+/**
  * Get all tenant-controlled types allowed by capability state.
  */
 export function getAllowedTenantTypes(state: FeaturedOptionsState): FeaturedType[] {
@@ -207,6 +218,13 @@ export function getAllowedPlatformTypes(state: FeaturedOptionsState): FeaturedTy
  */
 export function isFeaturedTypeAllowed(type: FeaturedType, state: FeaturedOptionsState): boolean {
   return state.enabled && state.allowedTypes.includes(type);
+}
+
+/**
+ * Check if a specific featured type is effectively enabled (tier allows AND merchant enabled).
+ */
+export function isFeaturedTypeEffective(type: FeaturedType, state: FeaturedOptionsState): boolean {
+  return state.enabled && state.effectiveTypes.includes(type);
 }
 
 /**
