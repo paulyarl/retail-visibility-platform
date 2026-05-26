@@ -12,6 +12,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface OrganizationCommerceSettings {
   // Payment Options
@@ -62,10 +63,10 @@ export default function OrganizationCommerceSettingsPage() {
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const response = await fetch('/api/auth/me');
-        const data = await response.json();
-        if (data.user?.role) {
-          setUserRole(data.user.role);
+        // Use organizationsService which has proper caching and authentication
+        const result = await tenantInfoService.getCurrentUser();
+        if (result.success && result.data?.user?.role) {
+          setUserRole(result.data.user.role);
         }
       } catch (error) {
         console.error('Failed to fetch user role:', error);

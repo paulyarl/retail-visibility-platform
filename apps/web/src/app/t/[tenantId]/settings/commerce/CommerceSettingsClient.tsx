@@ -94,16 +94,9 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     try {
       setLoading(true);
       
-      // Fetch tenant tier info for display (tier badge)
-      const tierResponse = await fetch(`/api/tenants/${tenantId}/tier`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (tierResponse.ok) {
-        const tierData = await tierResponse.json();
+      // Fetch tenant tier info for display (tier badge) using the same service as subscription page
+      try {
+        const tierData = await platformHomeService.getTenantTier(tenantId);
         const tier = tierData.tier || '';
         setCurrentTier(tier);
 
@@ -121,6 +114,10 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
             commerce_full_payment: features.commerce_full_payment || features.commerce_both_options,
           });
         }
+      } catch (tierError) {
+        console.error('Error fetching tenant tier:', tierError);
+        // Set default tier if fetch fails
+        setCurrentTier('');
       }
       
       // Fetch existing commerce settings

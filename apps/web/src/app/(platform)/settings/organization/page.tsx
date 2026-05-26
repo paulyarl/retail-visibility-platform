@@ -10,6 +10,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { apiQueriesService } from '@/services/ApiQueriesSingletonService';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useOrganizationData } from '@/hooks/useApiQueries';
@@ -74,16 +75,13 @@ export default function OrganizationPage() {
     true // Fetch organization data
   );
 
-  // Fetch user role directly for platform admin detection
+  // Fetch user role using singleton service for consistent caching
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        // This would need to be implemented - for now, we'll use a simple approach
-        // In a real implementation, you'd have a user service that gets the current user's role
-        const response = await fetch('/api/auth/me');
-        const data = await response.json();
-        if (data.user?.role) {
-          setUserRole(data.user.role);
+        const result = await tenantInfoService.getCurrentUser();
+        if (result.success && result.data?.user?.role) {
+          setUserRole(result.data.user.role);
         }
       } catch (error) {
         console.error('Failed to fetch user role:', error);
