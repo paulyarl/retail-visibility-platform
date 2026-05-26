@@ -1552,6 +1552,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       response = await fetch(fullUrl, {
         ...options,
         credentials: this.defaultIncludeCredentials !== false ? 'include' : 'omit', // Use service default
+        next: { revalidate: 0 }, // Prevent Next.js Data Cache from persisting dynamic API responses
       });
     } catch (fetchError: any) {
       // Handle timeout/abort errors gracefully - log and return error response
