@@ -33,12 +33,12 @@ interface FulfillmentOptionsPaneProps {
 }
 
 export default function FulfillmentOptionsPane({ tenantId, compact = false, paymentGateways: propPaymentGateways }: FulfillmentOptionsPaneProps) {
-  // Fulfillment capability-driven content control
+  // Fulfillment capability-driven content control (effective = tier allows AND merchant enabled)
   const fulfillmentCap = useFulfillmentCapability(tenantId);
   const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
-  const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
-  const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;
-  const showsShipping = fulfillmentCap.data?.showsShipping ?? true;
+  const showsPickup = fulfillmentCap.data?.effectiveShowsPickup ?? fulfillmentCap.data?.showsPickup ?? true;
+  const showsDelivery = fulfillmentCap.data?.effectiveShowsDelivery ?? fulfillmentCap.data?.showsDelivery ?? true;
+  const showsShipping = fulfillmentCap.data?.effectiveShowsShipping ?? fulfillmentCap.data?.showsShipping ?? true;
 
   const [fulfillmentSettings, setFulfillmentSettings] = useState<FulfillmentSettings | null>(null);
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>(propPaymentGateways || []);

@@ -85,22 +85,25 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
   const variantImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Product options capability gating
+  // Product options capability gating (effective = tier allows AND merchant enabled)
   const productOptionsCap = useProductOptionsCapability(tenantId || null, { forTenant: true });
   const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
-  const showsVariants = productOptionsCap.data?.showsVariants ?? true;
+  const effectiveTypes = productOptionsCap.data?.effectiveTypes ?? allowedTypes;
+  const showsVariants = productOptionsCap.data?.effectiveShowsVariants ?? productOptionsCap.data?.showsVariants ?? true;
+  const showsGallery = productOptionsCap.data?.effectiveShowsGallery ?? productOptionsCap.data?.showsGallery ?? true;
+  const showsVideo = productOptionsCap.data?.effectiveShowsVideo ?? productOptionsCap.data?.showsVideo ?? true;
   const isProductEnabled = productOptionsCap.data?.enabled ?? true;
 
-  // Auto-switch to physical if current type is not available
+  // Auto-switch to physical if current type is not effectively available
   useEffect(() => {
-    if (data.type === 'digital' && !allowedTypes.includes('digital')) {
+    if (data.type === 'digital' && !effectiveTypes.includes('digital')) {
       handleTypeChange('physical');
-    } else if (data.type === 'hybrid' && !allowedTypes.includes('hybrid')) {
+    } else if (data.type === 'hybrid' && !effectiveTypes.includes('hybrid')) {
       handleTypeChange('physical');
-    } else if (data.type === 'service' && !allowedTypes.includes('service')) {
+    } else if (data.type === 'service' && !effectiveTypes.includes('service')) {
       handleTypeChange('physical');
     }
-  }, [data.type, allowedTypes]);
+  }, [data.type, effectiveTypes]);
 
   const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
     // Auto-adjust stock quantity based on product type
@@ -470,26 +473,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </CardContent>
           </Card>
 
-          {/* Digital Product Type - Gated by allowedTypes */}
-          {allowedTypes.includes('digital') ? (
-            <Card className={`cursor-pointer transition-all ${data.type === 'digital' ? 'border-purple-500 bg-purple-50' : 'hover:border-gray-300'}`}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="digital" id="digital" />
-                  <Label htmlFor="digital" className="cursor-pointer flex-1">
-                    <div className="flex items-center space-x-2">
-                      {getTypeIcon('digital')}
-                      <span className="font-medium">Digital</span>
-                    </div>
-                    {getTypeBadge('digital')}
-                  </Label>
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {getTypeDescription('digital')}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
+          {/* Digital Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {!allowedTypes.includes('digital') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -507,28 +492,46 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </p>
               </CardContent>
             </Card>
-          )}
-
-          {/* Hybrid Product Type - Gated by allowedTypes */}
-          {allowedTypes.includes('hybrid') ? (
-            <Card className={`cursor-pointer transition-all ${data.type === 'hybrid' ? 'border-green-500 bg-green-50' : 'hover:border-gray-300'}`}>
+          ) : !effectiveTypes.includes('digital') ? (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="hybrid" id="hybrid" />
-                  <Label htmlFor="hybrid" className="cursor-pointer flex-1">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      {getTypeIcon('hybrid')}
-                      <span className="font-medium">Hybrid</span>
+                      {getTypeIcon('digital')}
+                      <span className="font-medium text-gray-500">Digital</span>
+                      <Badge variant="outline" className="text-xs">Disabled</Badge>
                     </div>
-                    {getTypeBadge('hybrid')}
-                  </Label>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {getTypeDescription('hybrid')}
+                <p className="text-sm text-gray-400 mt-2">
+                  Digital products are disabled in your product options settings
                 </p>
               </CardContent>
             </Card>
           ) : (
+            <Card className={`cursor-pointer transition-all ${data.type === 'digital' ? 'border-purple-500 bg-purple-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="digital" id="digital" />
+                  <Label htmlFor="digital" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('digital')}
+                      <span className="font-medium">Digital</span>
+                    </div>
+                    {getTypeBadge('digital')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('digital')}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Hybrid Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {!allowedTypes.includes('hybrid') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -546,28 +549,46 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </p>
               </CardContent>
             </Card>
-          )}
-
-          {/* Service Product Type - Gated by allowedTypes */}
-          {allowedTypes.includes('service') ? (
-            <Card className={`cursor-pointer transition-all ${data.type === 'service' ? 'border-orange-500 bg-orange-50' : 'hover:border-gray-300'}`}>
+          ) : !effectiveTypes.includes('hybrid') ? (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="service" id="service" />
-                  <Label htmlFor="service" className="cursor-pointer flex-1">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      {getTypeIcon('service')}
-                      <span className="font-medium">Service</span>
+                      {getTypeIcon('hybrid')}
+                      <span className="font-medium text-gray-500">Hybrid</span>
+                      <Badge variant="outline" className="text-xs">Disabled</Badge>
                     </div>
-                    {getTypeBadge('service')}
-                  </Label>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {getTypeDescription('service')}
+                <p className="text-sm text-gray-400 mt-2">
+                  Hybrid products are disabled in your product options settings
                 </p>
               </CardContent>
             </Card>
           ) : (
+            <Card className={`cursor-pointer transition-all ${data.type === 'hybrid' ? 'border-green-500 bg-green-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="hybrid" id="hybrid" />
+                  <Label htmlFor="hybrid" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('hybrid')}
+                      <span className="font-medium">Hybrid</span>
+                    </div>
+                    {getTypeBadge('hybrid')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('hybrid')}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Service Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {!allowedTypes.includes('service') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -582,6 +603,42 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
                   Service products require a higher tier subscription
+                </p>
+              </CardContent>
+            </Card>
+          ) : !effectiveTypes.includes('service') ? (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('service')}
+                      <span className="font-medium text-gray-500">Service</span>
+                      <Badge variant="outline" className="text-xs">Disabled</Badge>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Service products are disabled in your product options settings
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className={`cursor-pointer transition-all ${data.type === 'service' ? 'border-orange-500 bg-orange-50' : 'hover:border-gray-300'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="service" id="service" />
+                  <Label htmlFor="service" className="cursor-pointer flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('service')}
+                      <span className="font-medium">Service</span>
+                    </div>
+                    {getTypeBadge('service')}
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {getTypeDescription('service')}
                 </p>
               </CardContent>
             </Card>

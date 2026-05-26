@@ -1632,6 +1632,250 @@ class TenantInfoService extends TenantApiSingleton {
   /**
    * Get organizations
    */
+  async getPaymentGatewaySettings(tenantId: string): Promise<{
+    gateway_enabled: boolean;
+    stripe_enabled: boolean;
+    paypal_enabled: boolean;
+    square_enabled: boolean;
+    clover_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] getPaymentGatewaySettings: tenantId is required');
+        return null;
+      }
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: {
+          gateway_enabled: boolean;
+          stripe_enabled: boolean;
+          paypal_enabled: boolean;
+          square_enabled: boolean;
+          clover_enabled: boolean;
+        };
+      }>(
+        `/api/tenants/${tenantId}/payment-gateway-settings`,
+        {},
+        `tenant-gateway-settings-${tenantId}`,
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to get payment gateway settings:', result.error);
+        return null;
+      }
+
+      return result.data?.settings ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get payment gateway settings:', error);
+      return null;
+    }
+  }
+
+  async updatePaymentGatewaySettings(tenantId: string, settings: {
+    gateway_enabled?: boolean;
+    stripe_enabled?: boolean;
+    paypal_enabled?: boolean;
+    square_enabled?: boolean;
+    clover_enabled?: boolean;
+  }): Promise<{
+    gateway_enabled: boolean;
+    stripe_enabled: boolean;
+    paypal_enabled: boolean;
+    square_enabled: boolean;
+    clover_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] updatePaymentGatewaySettings: tenantId is required');
+        return null;
+      }
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: {
+          gateway_enabled: boolean;
+          stripe_enabled: boolean;
+          paypal_enabled: boolean;
+          square_enabled: boolean;
+          clover_enabled: boolean;
+        };
+      }>(
+        `/api/tenants/${tenantId}/payment-gateway-settings`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-gateway-settings-update-${tenantId}`
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to update payment gateway settings:', result.error);
+        return null;
+      }
+
+      return result.data?.settings ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update payment gateway settings:', error);
+      return null;
+    }
+  }
+
+  async getProductOptionsSettings(tenantId: string): Promise<{
+    product_physical_enabled: boolean;
+    product_digital_enabled: boolean;
+    product_hybrid_enabled: boolean;
+    product_service_enabled: boolean;
+    product_variant_enabled: boolean;
+    product_gallery_enabled: boolean;
+    product_video_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: {
+          product_physical_enabled: boolean;
+          product_digital_enabled: boolean;
+          product_hybrid_enabled: boolean;
+          product_service_enabled: boolean;
+          product_variant_enabled: boolean;
+          product_gallery_enabled: boolean;
+          product_video_enabled: boolean;
+        };
+      }>(
+        `/api/tenants/${tenantId}/product-options`,
+        {},
+        `tenant-product-options-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get product options settings:', error);
+      return null;
+    }
+  }
+
+  async getFeaturedOptionsSettings(tenantId: string): Promise<{
+    featured_enabled: boolean;
+    featured_store_selection: boolean;
+    featured_new_arrival: boolean;
+    featured_seasonal: boolean;
+    featured_sale: boolean;
+    featured_staff_pick: boolean;
+    featured_clearance: boolean;
+    featured_featured: boolean;
+    featured_bestseller: boolean;
+    featured_trending: boolean;
+    featured_recommended: boolean;
+    featured_random_featured: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, boolean>;
+      }>(
+        `/api/tenants/${tenantId}/featured-options`,
+        {},
+        `tenant-featured-options-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get featured options settings:', error);
+      return null;
+    }
+  }
+
+  async getIntegrationOptionsSettings(tenantId: string): Promise<{
+    integration_enabled: boolean;
+    integration_clover: boolean;
+    integration_square: boolean;
+    integration_gbp: boolean;
+    integration_google_shopping: boolean;
+    integration_google_merchant_center: boolean;
+    integration_gmc_sync: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, boolean>;
+      }>(
+        `/api/tenants/${tenantId}/integration-options`,
+        {},
+        `tenant-integration-options-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get integration options settings:', error);
+      return null;
+    }
+  }
+
+  async getCommerceSettings(tenantId: string): Promise<{
+    deposit_enabled: boolean;
+    full_payment_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/commerce-settings`,
+        {},
+        `tenant-commerce-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      const s = result.data?.settings;
+      return s ? { deposit_enabled: !!s.deposit_enabled, full_payment_enabled: !!s.full_payment_enabled } : null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get commerce settings:', error);
+      return null;
+    }
+  }
+
+  async getFulfillmentSettings(tenantId: string): Promise<{
+    pickup_enabled: boolean;
+    delivery_enabled: boolean;
+    shipping_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/fulfillment-settings`,
+        {},
+        `tenant-fulfillment-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      const s = result.data?.settings;
+      return s ? { pickup_enabled: !!s.pickup_enabled, delivery_enabled: !!s.delivery_enabled, shipping_enabled: !!s.shipping_enabled } : null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get fulfillment settings:', error);
+      return null;
+    }
+  }
+
   async getOrganizations(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(

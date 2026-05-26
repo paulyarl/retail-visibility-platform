@@ -459,7 +459,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         )}
 
         {/* Capability-Aware Plan Summary */}
-        <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} />
+        <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (

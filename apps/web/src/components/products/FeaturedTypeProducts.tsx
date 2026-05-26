@@ -129,9 +129,9 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
   const featuredCap = useFeaturedOptionsCapability(tenantId);
   const featuredOptionsState = featuredCap.data;
 
-  // Filter input featuredTypes by capability state
+  // Filter input featuredTypes by effective capability state (tier allows AND merchant enabled)
   const allowedFeaturedTypes = featuredOptionsState && featuredOptionsState.enabled
-    ? featuredTypes.filter(type => featuredOptionsState.allowedTypes.includes(type as any))
+    ? featuredTypes.filter(type => featuredOptionsState.effectiveTypes.includes(type as any))
     : featuredTypes;
 
   useEffect(() => {

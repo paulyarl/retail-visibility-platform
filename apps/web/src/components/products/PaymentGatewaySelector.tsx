@@ -67,10 +67,12 @@ export default function PaymentGatewaySelector({
         // Filter active gateways
         let activeGateways = gateways.filter(g => g.is_active);
 
-        // If payment gateway capability data is available, restrict to allowed gateways
-        if (paymentCap.data?.enabled && paymentCap.data.allowedGateways.length > 0) {
+        // If payment gateway capability data is available, restrict to effective gateways
+        // (tier-allowed AND merchant-enabled)
+        const effectiveGateways = paymentCap.data?.effectiveGateways ?? paymentCap.data?.allowedGateways ?? [];
+        if (paymentCap.data?.enabled && effectiveGateways.length > 0) {
           activeGateways = activeGateways.filter(g =>
-            paymentCap.data!.allowedGateways.includes(g.gateway_type as import('@/services/CapabilityResolutionService').GatewayType)
+            effectiveGateways.includes(g.gateway_type as import('@/services/CapabilityResolutionService').GatewayType)
           );
         }
 

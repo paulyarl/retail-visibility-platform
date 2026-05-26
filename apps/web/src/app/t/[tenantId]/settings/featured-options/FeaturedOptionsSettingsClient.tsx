@@ -144,7 +144,7 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
   return (
     <div className="space-y-6">
       {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="featured_options" />
+      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="featured_options" tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${

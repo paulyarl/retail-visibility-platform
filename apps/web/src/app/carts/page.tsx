@@ -109,11 +109,11 @@ export default function MultiCartPage() {
             };
           }
 
-          // Store commerce capability state
+          // Store commerce capability state (effective = tier allows AND merchant enabled)
           if (commerceState) {
             commerceData[tenantId] = {
               enabled: commerceState.enabled,
-              cartVisible: commerceState.cartVisible,
+              cartVisible: commerceState.effectiveCartVisible ?? commerceState.cartVisible,
             };
           } else {
             // Fallback: if capability fetch fails, assume commerce is enabled
