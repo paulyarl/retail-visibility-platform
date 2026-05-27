@@ -273,6 +273,60 @@ export interface IntegrationOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- Quickstart Options ---
+
+export type QuickstartProductType = 'wizard' | 'image_gen';
+export type QuickstartCategoryType = 'category_generator';
+export type QuickstartAIType = 'ai_openai' | 'ai_gemini' | 'wizard_ai' | 'image_hd';
+
+export interface QuickstartOptionsState {
+  /** Main gate (hard) — quickstart_enabled */
+  enabled: boolean;
+  /** Master gate — quickstart_flexible unlocks all feature gates */
+  isFlexible: boolean;
+  /** Product feature gate on (tier-level) */
+  productEnabled: boolean;
+  /** Product types allowed by tier: wizard (static), image_gen (attach image to product) */
+  allowedProductTypes: QuickstartProductType[];
+  /** Category feature gate on (tier-level) */
+  categoryEnabled: boolean;
+  /** Category types allowed by tier */
+  allowedCategoryTypes: QuickstartCategoryType[];
+  /** AI feature gate on (tier-level) */
+  aiEnabled: boolean;
+  /** AI types allowed by tier: ai_openai, ai_gemini, wizard_ai (AI wizard), image_hd (HD quality) */
+  allowedAITypes: QuickstartAIType[];
+  /** Effective: can use static product wizard */
+  canUseWizard: boolean;
+  /** Effective: can use AI product wizard (requires AI feature gate + wizard_ai) */
+  canUseAIWizard: boolean;
+  /** Effective: can use category generator */
+  canUseCategoryGenerator: boolean;
+  /** Effective: can attach images to products during generation (product feature) */
+  canGenerateImages: boolean;
+  /** Effective: can use OpenAI models */
+  canUseOpenAI: boolean;
+  /** Effective: can use Gemini models */
+  canUseGemini: boolean;
+  /** Effective: can use HD image quality (AI feature, requires image_gen) */
+  canUseHDImages: boolean;
+  /** Merchant preference toggles (soft gate on top of tier hard gate) */
+  merchantPreferences: {
+    quickstart_enabled: boolean;
+    quickstart_wizard: boolean;
+    quickstart_image_gen: boolean;
+    quickstart_category_generator: boolean;
+    quickstart_wizard_ai: boolean;
+    quickstart_ai_openai: boolean;
+    quickstart_ai_gemini: boolean;
+    quickstart_image_hd: boolean;
+    default_text_model: string;
+    default_image_model: string;
+    default_image_quality: string;
+  };
+  features: Record<string, boolean>;
+}
+
 // --- Combined ---
 
 export interface AllCapabilitiesState {
@@ -287,6 +341,7 @@ export interface AllCapabilitiesState {
   productOptions: ProductOptionsState;
   featuredOptions: FeaturedOptionsState;
   integrationOptions: IntegrationOptionsState;
+  quickstartOptions: QuickstartOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -303,6 +358,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   product_: 'product_options',
   featured_: 'featured_options',
   integration_: 'integration_options',
+  quickstart_: 'quickstart_options',
 };
 
 /**
@@ -811,6 +867,133 @@ export function resolveIntegrationState(
 }
 
 /**
+ * Resolve quickstart options state from raw capability features
+ */
+export function resolveQuickstartOptionsState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    quickstart_enabled?: boolean;
+    quickstart_wizard?: boolean;
+    quickstart_image_gen?: boolean;
+    quickstart_category_generator?: boolean;
+    quickstart_wizard_ai?: boolean;
+    quickstart_ai_openai?: boolean;
+    quickstart_ai_gemini?: boolean;
+    quickstart_image_hd?: boolean;
+    default_text_model?: string;
+    default_image_model?: string;
+    default_image_quality?: string;
+  } | null
+): QuickstartOptionsState {
+  // Main gate (hard) — must be on for any quickstart feature
+  const enabled = !!features.quickstart_enabled;
+  const disabled = !!features.quickstart_disabled;
+  // Master gate — unlocks all feature gates
+  const flexible = !!features.quickstart_flexible;
+
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    quickstart_enabled: merchantPrefs?.quickstart_enabled !== false,
+    quickstart_wizard: merchantPrefs?.quickstart_wizard !== false,
+    quickstart_image_gen: merchantPrefs?.quickstart_image_gen !== false,
+    quickstart_category_generator: merchantPrefs?.quickstart_category_generator !== false,
+    quickstart_wizard_ai: merchantPrefs?.quickstart_wizard_ai !== false,
+    quickstart_ai_openai: merchantPrefs?.quickstart_ai_openai !== false,
+    quickstart_ai_gemini: merchantPrefs?.quickstart_ai_gemini !== false,
+    quickstart_image_hd: merchantPrefs?.quickstart_image_hd !== false,
+    default_text_model: merchantPrefs?.default_text_model || 'openai',
+    default_image_model: merchantPrefs?.default_image_model || 'openai',
+    default_image_quality: merchantPrefs?.default_image_quality || 'standard',
+  };
+
+  // --- Product feature gate ---
+  // Gates: wizard (static product wizard), image_gen (attach image to product)
+  const productGroupEnabled = !!features.quickstart_product_enabled;
+  const productGroupDisabled = !!features.quickstart_product_disabled;
+  const productEnabled = productGroupEnabled && !productGroupDisabled;
+  const productUntouched = !productGroupEnabled && !productGroupDisabled;
+
+  const allowedProductTypes: QuickstartProductType[] = [];
+  if (flexible || productEnabled) {
+    allowedProductTypes.push('wizard', 'image_gen');
+  } else if (productUntouched) {
+    if (features.quickstart_wizard) allowedProductTypes.push('wizard');
+    if (features.quickstart_image_gen) allowedProductTypes.push('image_gen');
+  }
+
+  // --- Category feature gate ---
+  // Gates: category_generator
+  const categoryGroupEnabled = !!features.quickstart_category_enabled;
+  const categoryGroupDisabled = !!features.quickstart_category_disabled;
+  const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
+  const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
+
+  const allowedCategoryTypes: QuickstartCategoryType[] = [];
+  if (flexible || categoryEnabled) {
+    allowedCategoryTypes.push('category_generator');
+  } else if (categoryUntouched) {
+    if (features.quickstart_category_generator) allowedCategoryTypes.push('category_generator');
+  }
+
+  // --- AI feature gate ---
+  // Gates: ai_openai, ai_gemini, wizard_ai (AI wizard), image_hd (HD quality)
+  const aiGroupEnabled = !!features.quickstart_ai_enabled;
+  const aiGroupDisabled = !!features.quickstart_ai_disabled;
+  const aiGroupOn = aiGroupEnabled && !aiGroupDisabled;
+  const aiUntouched = !aiGroupEnabled && !aiGroupDisabled;
+
+  const allowedAITypes: QuickstartAIType[] = [];
+  if (flexible || aiGroupOn) {
+    allowedAITypes.push('ai_openai', 'ai_gemini', 'wizard_ai', 'image_hd');
+  } else if (aiUntouched) {
+    if (features.quickstart_ai_openai) allowedAITypes.push('ai_openai');
+    if (features.quickstart_ai_gemini) allowedAITypes.push('ai_gemini');
+    if (features.quickstart_wizard_ai) allowedAITypes.push('wizard_ai');
+    if (features.quickstart_image_hd) allowedAITypes.push('image_hd');
+  }
+
+  // aiEnabled = group flag OR any individual AI type allowed
+  const aiEnabled = (aiGroupOn || allowedAITypes.length > 0) && !aiGroupDisabled;
+
+  // --- Cross-group dependencies ---
+  // wizard_ai (AI group) requires product feature gate — it generates products
+  const hasAIModel = allowedAITypes.includes('ai_openai') || allowedAITypes.includes('ai_gemini');
+  const effectivelyCanUseAIWizard = allowedAITypes.includes('wizard_ai') && productEnabled && hasAIModel;
+  // image_hd (AI group) requires image_gen from product group — HD only if images are attached
+  const effectivelyCanUseHDImages = allowedAITypes.includes('image_hd') && allowedProductTypes.includes('image_gen');
+
+  // --- Effective flags = main gate AND tier allows AND merchant enabled AND master switch ---
+  const masterOn = prefs.quickstart_enabled;
+  const effectiveCanUseWizard = masterOn && allowedProductTypes.includes('wizard') && prefs.quickstart_wizard;
+  const effectiveCanGenerateImages = masterOn && allowedProductTypes.includes('image_gen') && prefs.quickstart_image_gen;
+  const effectiveCanUseAIWizard = masterOn && effectivelyCanUseAIWizard && prefs.quickstart_wizard_ai;
+  const effectiveCanUseCategoryGenerator = masterOn && allowedCategoryTypes.includes('category_generator') && prefs.quickstart_category_generator;
+  const effectiveCanUseOpenAI = masterOn && allowedAITypes.includes('ai_openai') && prefs.quickstart_ai_openai;
+  const effectiveCanUseGemini = masterOn && allowedAITypes.includes('ai_gemini') && prefs.quickstart_ai_gemini;
+  const effectiveCanUseHDImages = masterOn && effectivelyCanUseHDImages && prefs.quickstart_image_hd;
+
+  return {
+    enabled: enabled && !disabled,
+    isFlexible: flexible,
+    productEnabled,
+    allowedProductTypes,
+    categoryEnabled,
+    allowedCategoryTypes,
+    aiEnabled,
+    allowedAITypes,
+    canUseWizard: enabled && !disabled && effectiveCanUseWizard,
+    canUseAIWizard: enabled && !disabled && effectiveCanUseAIWizard,
+    canUseCategoryGenerator: enabled && !disabled && effectiveCanUseCategoryGenerator,
+    canGenerateImages: enabled && !disabled && effectiveCanGenerateImages,
+    canUseOpenAI: enabled && !disabled && effectiveCanUseOpenAI,
+    canUseGemini: enabled && !disabled && effectiveCanUseGemini,
+    canUseHDImages: enabled && !disabled && effectiveCanUseHDImages,
+    merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
  * Resolve storefront state from raw capability features
  */
 export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
@@ -1048,6 +1231,26 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get quickstart options state for a tenant, merging tier capability with merchant preferences
+   */
+  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    const tierState = all.quickstartOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveQuickstartOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch quickstart options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -1075,6 +1278,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
+    const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -1088,6 +1292,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
+      quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -1287,6 +1492,26 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get quickstart options state for a tenant, merging tier capability with merchant preferences
+   */
+  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    const tierState = all.quickstartOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveQuickstartOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch quickstart options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -1311,6 +1536,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
+    const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -1324,6 +1550,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
+      quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

@@ -163,8 +163,8 @@ export async function getTenantsApproachingExpiry(): Promise<{
       FROM tenants t
       JOIN users u ON u.tenant_id = t.id AND u.role = 'owner'
       WHERE t.subscription_status = 'past_due'
-        AND t.status_changed_at >= ${startOfDay.toISOString()}::timestamp
-        AND t.status_changed_at <= ${endOfDay.toISOString()}::timestamp
+        AND t.status_changed_at >= ${startOfDay}
+        AND t.status_changed_at <= ${endOfDay}
     `;
   };
 

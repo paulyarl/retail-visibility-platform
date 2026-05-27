@@ -325,6 +325,9 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
 /**
  * GET /api/v1/tenants/:tenantId/quick-start/eligibility
  * Check if tenant is eligible for quick start
+ * 
+ * Capability-aware: checks if tenant's tier includes quickstart_options.
+ * If not, returns capabilityTiers listing which tiers offer Quick Start.
  */
 router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, async (req, res) => {
   try {
@@ -346,6 +349,84 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     const userIsPlatformViewer = user.role === user_role.PLATFORM_VIEWER;
     const userCanView = canViewAllTenants(user);
 
+    // --- Capability gating ---
+    // Resolve tenant's effective tier and check quickstart_options capability
+    let capabilityEnabled = false;
+    let capabilityTiers: { tier_key: string; tier_name: string }[] = [];
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        organization_id: true,
+        organizations_list: { select: { subscription_tier: true } },
+      },
+    });
+
+    if (tenant) {
+      const orgTierKey = tenant.organizations_list?.subscription_tier || null;
+      const tenantTierKey = tenant.subscription_tier || null;
+      const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+
+      if (tierKeys.length > 0) {
+        const tiers = await prisma.subscription_tiers_list.findMany({
+          where: { tier_key: { in: tierKeys } },
+          select: { id: true, tier_key: true },
+        });
+        const tierIds = tiers.map(t => t.id);
+
+        // Check if any of the tenant's tiers have quickstart_enabled feature
+        const quickstartFeature = await prisma.tier_features_list.findFirst({
+          where: {
+            tier_id: { in: tierIds },
+            feature_key: 'quickstart_enabled',
+            is_enabled: true,
+          },
+        });
+        capabilityEnabled = !!quickstartFeature;
+      }
+
+      // Always fetch tiers that have this capability (for upgrade messaging and informational display)
+      const capType = await prisma.capability_type_list.findUnique({ where: { key: 'quickstart_options' } });
+      if (capType) {
+        const tierFeatures = await prisma.tier_features_list.findMany({
+          where: { capability_type_id: capType.id, is_enabled: true, feature_key: 'quickstart_enabled' },
+          include: { subscription_tiers_list: { select: { tier_key: true, name: true } } },
+        });
+        const seen = new Set<string>();
+        for (const tf of tierFeatures) {
+          const tk = tf.subscription_tiers_list?.tier_key;
+          if (tk && !seen.has(tk)) {
+            seen.add(tk);
+            capabilityTiers.push({
+              tier_key: tk,
+              tier_name: tf.subscription_tiers_list?.name || tk,
+            });
+          }
+        }
+      }
+    }
+
+    // Platform admin/support bypass capability check
+    if (userCanPerformSupport) {
+      capabilityEnabled = true;
+    }
+
+    // If capability not enabled, short-circuit — not eligible regardless of rate limits
+    if (!capabilityEnabled) {
+      return res.json({
+        eligible: false,
+        capabilityEnabled: false,
+        capabilityTiers,
+        productCount: 0,
+        productLimit: 0,
+        isPlatformAdmin: userIsPlatformAdmin,
+        canView: userCanView,
+        rateLimitReached: false,
+        recommendation: 'Your current plan does not include Quick Start. Upgrade to access this feature.',
+      });
+    }
+
     // Check rate limit (admin/support bypass this - they're helping customers)
     const rateLimit = userCanPerformSupport ? { allowed: true } : checkRateLimit(tenantId);
     
@@ -361,6 +442,8 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
 
     res.json({
       eligible,
+      capabilityEnabled: true,
+      capabilityTiers,
       productCount,
       productLimit,
       isPlatformAdmin: userIsPlatformAdmin,

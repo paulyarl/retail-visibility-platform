@@ -166,6 +166,7 @@ import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
 import commerceSettingsRoutes from './routes/commerce-settings';
 import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
+import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
 import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
@@ -7336,6 +7337,10 @@ console.log('✅ Product options settings routes mounted at /api/tenants/:tenant
 /* ------------------------------ featured options settings ------------------------------ */
 app.use('/api/tenants', featuredOptionsSettingsRoutes);
 console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options');
+
+/* ------------------------------ quickstart options settings ------------------------------ */
+app.use('/api/tenants', quickstartOptionsSettingsRoutes);
+console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
 
 /* ------------------------------ integration options settings ------------------------------ */
 app.use('/api/tenants', integrationOptionsSettingsRoutes);

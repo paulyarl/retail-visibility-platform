@@ -23,6 +23,7 @@ import {
   ProductOptionsState,
   FeaturedOptionsState,
   IntegrationOptionsState,
+  QuickstartOptionsState,
   AllCapabilitiesState,
   resolveCommerceState,
   resolvePaymentGatewayState,
@@ -32,6 +33,7 @@ import {
   resolveProductOptionsState,
   resolveFeaturedOptionsState,
   resolveIntegrationState,
+  resolveQuickstartOptionsState,
   getCapabilityTypeForFeature,
 } from '@/services/CapabilityResolutionService';
 
@@ -307,6 +309,38 @@ export function useIntegrationOptionsCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch integration options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useQuickstartOptionsCapability
+// ====================
+
+export function useQuickstartOptionsCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<QuickstartOptionsState> {
+  const [data, setData] = useState<QuickstartOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getQuickstartOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch quickstart options capability');
     } finally {
       setLoading(false);
     }

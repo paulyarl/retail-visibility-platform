@@ -25,6 +25,7 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
   storefront_types: 'storefront_',
   featured_options: 'featured_',
   integration_options: 'integration_',
+  quickstart_options: 'quickstart_',
 };
 
 /**
@@ -240,6 +241,68 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[GET /api/tenants/:tenantId/capabilities] Error:', error);
     res.status(500).json({ error: 'failed_to_get_tenant_capabilities' });
+  }
+});
+
+/**
+ * GET /api/tenants/capabilities/tiers-by-capability?capabilityTypeKey=...
+ *
+ * Returns all tiers that have a given capability type enabled.
+ * Accessible with tenant auth (for upgrade messaging in tenant UI).
+ *
+ * Response: [{ tier_key, tier_name, tier_description, capability_enabled, features: [...] }]
+ */
+router.get('/capabilities/tiers-by-capability', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { capabilityTypeKey } = req.query;
+    if (!capabilityTypeKey || typeof capabilityTypeKey !== 'string') {
+      return res.status(400).json({ error: 'capabilityTypeKey required' });
+    }
+
+    const capType = await prisma.capability_type_list.findUnique({ where: { key: capabilityTypeKey } });
+    if (!capType) return res.status(404).json({ error: 'capability_type_not_found' });
+
+    const tierFeatures = await prisma.tier_features_list.findMany({
+      where: { capability_type_id: capType.id, is_enabled: true },
+      include: {
+        subscription_tiers_list: { select: { tier_key: true, name: true, description: true } },
+      },
+      orderBy: { tier_id: 'asc' },
+    });
+
+    // Group by tier
+    const tierMap = new Map<string, {
+      tier_key: string;
+      tier_name: string;
+      tier_description: string;
+      capability_enabled: boolean;
+      features: { feature_key: string; feature_name: string; is_enabled: boolean }[];
+    }>();
+
+    for (const tf of tierFeatures) {
+      const tierKey = tf.subscription_tiers_list?.tier_key;
+      if (!tierKey) continue;
+
+      if (!tierMap.has(tierKey)) {
+        tierMap.set(tierKey, {
+          tier_key: tierKey,
+          tier_name: tf.subscription_tiers_list?.name || tierKey,
+          tier_description: tf.subscription_tiers_list?.description || '',
+          capability_enabled: true,
+          features: [],
+        });
+      }
+      tierMap.get(tierKey)!.features.push({
+        feature_key: tf.feature_key,
+        feature_name: tf.feature_name,
+        is_enabled: tf.is_enabled,
+      });
+    }
+
+    res.json(Array.from(tierMap.values()));
+  } catch (error) {
+    console.error('[GET /api/tenants/capabilities/tiers-by-capability] Error:', error);
+    res.status(500).json({ error: 'failed_to_list_tiers_by_capability' });
   }
 });
 

@@ -1825,6 +1825,65 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getQuickstartOptionsSettings(tenantId: string): Promise<{
+    quickstart_enabled: boolean;
+    quickstart_wizard: boolean;
+    quickstart_wizard_ai: boolean;
+    quickstart_category_generator: boolean;
+    quickstart_ai_openai: boolean;
+    quickstart_ai_gemini: boolean;
+    quickstart_image_gen: boolean;
+    quickstart_image_hd: boolean;
+    default_text_model: string;
+    default_image_model: string;
+    default_image_quality: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/quickstart-options`,
+        {},
+        `tenant-quickstart-options-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get quickstart options settings:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all tiers that have a given capability type enabled.
+   * Reusable for any capability — used for "upgrade to access" messaging.
+   */
+  async getTiersWithCapability(capabilityTypeKey: string): Promise<{
+    tier_key: string;
+    tier_name: string;
+    tier_description: string;
+    capability_enabled: boolean;
+    features: { feature_key: string; feature_name: string; is_enabled: boolean }[];
+  }[] | null> {
+    try {
+      const result = await this.makeDefaultRequest<any[]>(
+        `/api/tenants/capabilities/tiers-by-capability?capabilityTypeKey=${encodeURIComponent(capabilityTypeKey)}`,
+        {},
+        `tenant-tiers-by-capability-${capabilityTypeKey}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      return Array.isArray(result.data) ? result.data : null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get tiers with capability:', error);
+      return null;
+    }
+  }
+
   async getCommerceSettings(tenantId: string): Promise<{
     deposit_enabled: boolean;
     full_payment_enabled: boolean;

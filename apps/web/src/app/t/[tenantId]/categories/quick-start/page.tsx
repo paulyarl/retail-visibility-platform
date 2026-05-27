@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { adminCategoriesService } from '@/services/AdminCategoriesService';
 
 type BusinessType = 
@@ -193,8 +194,10 @@ export default function CategoryQuickStartPage() {
 
   // Check tier AND role access for category quick start (Starter+ tier, MANAGER+ role)
   const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
-  const hasCategoryQuickStart = canAccess('category_quick_start', 'canManage');
-  const quickStartBadge = getFeatureBadgeWithPermission('category_quick_start', 'canManage', 'generate categories');
+
+  // Capability-based quickstart state
+  const { data: quickstartState, loading: capabilityLoading } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const hasCategoryQuickStart = quickstartState?.canUseCategoryGenerator ?? false;
 
   const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
   const [categoryCount, setCategoryCount] = useState<number>(15);
@@ -233,8 +236,8 @@ export default function CategoryQuickStartPage() {
     }
   };
 
-  // Show tier gate for Google-Only users
-  if (quickStartBadge) {
+  // Show capability gate if category quick start is not available
+  if (!capabilityLoading && !hasCategoryQuickStart) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <motion.div
@@ -246,14 +249,14 @@ export default function CategoryQuickStartPage() {
             <div className="text-6xl mb-4 text-center">🔒</div>
             <h1 className="text-3xl font-bold text-center mb-4 text-gray-900">
               Category Quick Start
-              <span className={`ml-3 text-sm px-3 py-1 rounded ${quickStartBadge.colorClass} text-white font-semibold`}>
-                {quickStartBadge.text}
+              <span className="ml-3 text-sm px-3 py-1 rounded bg-purple-600 text-white font-semibold">
+                Upgrade Required
               </span>
             </h1>
             
             <div className="bg-blue-50 rounded-lg p-6 mb-6">
               <p className="text-center text-gray-700 text-lg">
-                {quickStartBadge.tooltip}
+                Your current plan does not include Category Quick Start. Upgrade to Starter or higher to generate categories automatically.
               </p>
             </div>
 

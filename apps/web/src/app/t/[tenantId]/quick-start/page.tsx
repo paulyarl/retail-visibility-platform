@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Button } from '@mantine/core';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 import { api } from '@/lib/api';
@@ -41,6 +42,8 @@ type Scenario = {
 
 type EligibilityResponse = {
   eligible: boolean;
+  capabilityEnabled: boolean;
+  capabilityTiers: { tier_key: string; tier_name: string }[];
   productCount: number;
   productLimit: number;
   isPlatformAdmin: boolean;
@@ -59,10 +62,18 @@ export default function QuickStartPage() {
 
   // Check tier AND role access for full Quick Start wizard (Professional+ tier, MANAGER+ role)
   const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
-  const hasFullQuickStart = canAccess('quick_start_wizard_full', 'canManage');
   const hasBarcodeScanning = canAccess('barcode_scan', 'canEdit');
-  const wizardBadge = getFeatureBadgeWithPermission('quick_start_wizard_full', 'canManage', 'use Quick Start');
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
+
+  // Capability-based quickstart state
+  const { data: quickstartState } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const hasFullQuickStart = quickstartState?.canUseAIWizard ?? false;
+  const hasStaticQuickStart = quickstartState?.canUseWizard ?? false;
+  const canUseAI = (quickstartState?.canUseOpenAI || quickstartState?.canUseGemini) ?? false;
+  const canUseOpenAI = quickstartState?.canUseOpenAI ?? false;
+  const canUseGemini = quickstartState?.canUseGemini ?? false;
+  const canGenerateImages = quickstartState?.canGenerateImages ?? false;
+  const canUseHDImages = quickstartState?.canUseHDImages ?? false;
 
   // All 19 business type scenarios (aligned with backend)
   // Max 25 products - Quick Start is for sample products to get tenants started, not a product factory
@@ -94,8 +105,9 @@ export default function QuickStartPage() {
   const [productCount, setProductCount] = useState<number>(25);
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
-  const [textModel, setTextModel] = useState<'openai' | 'google'>('openai');
-  const [imageModel, setImageModel] = useState<'openai' | 'google'>('openai');
+  // Default to first available AI model based on capability
+  const [textModel, setTextModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
+  const [imageModel, setImageModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
   
   // Check if any Google model is selected (for warning display)
   const usesGoogle = textModel === 'google' || (generateImages && imageModel === 'google');
@@ -234,6 +246,22 @@ export default function QuickStartPage() {
                 Common reasons:
               </h3>
               <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Plan Limit:</strong> {eligibility && !eligibility.capabilityEnabled
+                    ? (() => {
+                        const tierNames = eligibility.capabilityTiers.map(t => t.tier_name);
+                        const tierList = tierNames.length === 1
+                          ? `the ${tierNames[0]} plan`
+                          : tierNames.length === 2
+                            ? `the ${tierNames[0]} or ${tierNames[1]} plans`
+                            : tierNames.length > 2
+                              ? `the ${tierNames.slice(0, -1).join(', ')}, or ${tierNames[tierNames.length - 1]} plans`
+                              : 'a higher plan';
+                        return `Your plan does not include Quick Start. Upgrade to ${tierList}.`;
+                      })()
+                    : 'Your current plan does not include Quick Start'}</span>
+                </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">•</span>
                   <span><strong>Authentication:</strong> You must be logged in to use Quick Start</span>
@@ -510,9 +538,21 @@ export default function QuickStartPage() {
               <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  {eligibility.rateLimitReached
-                    ? 'Rate limit reached. You can use Quick Start once per 24 hours.'
-                    : eligibility.recommendation}
+                  {!eligibility.capabilityEnabled
+                    ? (() => {
+                        const tierNames = eligibility.capabilityTiers.map(t => t.tier_name);
+                        const tierList = tierNames.length === 1
+                          ? `the ${tierNames[0]} plan`
+                          : tierNames.length === 2
+                            ? `the ${tierNames[0]} or ${tierNames[1]} plans`
+                            : tierNames.length > 2
+                              ? `the ${tierNames.slice(0, -1).join(', ')}, or ${tierNames[tierNames.length - 1]} plans`
+                              : 'a higher plan';
+                        return `Your current plan does not include Quick Start. Upgrade to ${tierList} to access this feature.`;
+                      })()
+                    : eligibility.rateLimitReached
+                      ? 'Rate limit reached. You can use Quick Start once per 24 hours.'
+                      : eligibility.recommendation}
                 </p>
               </div>
             </div>
@@ -623,11 +663,13 @@ export default function QuickStartPage() {
           </div>
 
           {/* AI Provider Selection */}
+          {canUseAI && (
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               AI Provider for Product Generation
             </label>
             <div className="flex gap-2 mb-2">
+              {canUseOpenAI && (
               <button
                 onClick={() => setTextModel('openai')}
                 className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -641,6 +683,8 @@ export default function QuickStartPage() {
                 </span>
                 <span className="text-xs opacity-75 mt-1 block">Fast & reliable</span>
               </button>
+              )}
+              {canUseGemini && (
               <button
                 onClick={() => setTextModel('google')}
                 className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -654,6 +698,7 @@ export default function QuickStartPage() {
                 </span>
                 <span className="text-xs opacity-75 mt-1 block">Free tier available</span>
               </button>
+              )}
             </div>
             
             {/* Google Warning */}
@@ -670,8 +715,10 @@ export default function QuickStartPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Photo Generation Toggle */}
+          {canGenerateImages && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -703,6 +750,7 @@ export default function QuickStartPage() {
                     AI Model
                   </label>
                   <div className="flex gap-2">
+                    {canUseOpenAI && (
                     <button
                       onClick={() => setImageModel('openai')}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
@@ -715,6 +763,8 @@ export default function QuickStartPage() {
                         🤖 DALL-E 3
                       </span>
                     </button>
+                    )}
+                    {canUseGemini && (
                     <button
                       onClick={() => setImageModel('google')}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
@@ -727,6 +777,7 @@ export default function QuickStartPage() {
                         🎨 Imagen 3
                       </span>
                     </button>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                     {imageModel === 'openai' 
@@ -761,6 +812,7 @@ export default function QuickStartPage() {
                     >
                       Standard
                     </button>
+                    {canUseHDImages && (
                     <button
                       onClick={() => setImageQuality('hd')}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
@@ -771,11 +823,13 @@ export default function QuickStartPage() {
                     >
                       HD (Slower)
                     </button>
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </div>
+          )}
 
           {/* Features */}
           <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg">
