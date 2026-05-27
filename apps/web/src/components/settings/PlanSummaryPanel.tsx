@@ -13,6 +13,9 @@ import {
   GatewayType,
   BarcodeScanMode,
   IntegrationType,
+  QuickstartProductType,
+  QuickstartCategoryType,
+  QuickstartAIType,
 } from '@/services/CapabilityResolutionService';
 import { getFeaturedTypeMeta } from '@/utils/featuredOptions';
 
@@ -106,6 +109,22 @@ const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
   propagation_gbp: 'GBP Propagation',
 };
 
+const QUICKSTART_PRODUCT_LABELS: Record<QuickstartProductType, string> = {
+  wizard: 'Static Wizard',
+  image_gen: 'Image Gen',
+};
+
+const QUICKSTART_CATEGORY_LABELS: Record<QuickstartCategoryType, string> = {
+  category_generator: 'Category Gen',
+};
+
+const QUICKSTART_AI_LABELS: Record<QuickstartAIType, string> = {
+  ai_openai: 'OpenAI',
+  ai_gemini: 'Gemini',
+  wizard_ai: 'AI Wizard',
+  image_hd: 'HD Images',
+};
+
 // --- Capability display config ---
 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
@@ -117,6 +136,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   product_options: { label: 'Product Options', icon: '🏷️', settingsPath: '/settings/product-options' },
   featured_options: { label: 'Featured Options', icon: '⭐', settingsPath: '/settings/featured-options' },
   integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
+  quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -318,6 +338,36 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       specificFeatures: specifics,
       isHighlighted: highlight === 'integration_options',
       settingsPath: CAPABILITY_DISPLAY.integration_options.settingsPath ?? null,
+    });
+  }
+
+  // Quickstart Options — list product, category, and AI types
+  const qo = caps.quickstartOptions;
+  if (Object.keys(qo.features).length > 0) {
+    const specifics: string[] = [];
+    // Product group
+    qo.allowedProductTypes.forEach(t => {
+      const label = QUICKSTART_PRODUCT_LABELS[t];
+      if (label) specifics.push(label);
+    });
+    // Category group
+    qo.allowedCategoryTypes.forEach(t => {
+      const label = QUICKSTART_CATEGORY_LABELS[t];
+      if (label) specifics.push(label);
+    });
+    // AI group
+    qo.allowedAITypes.forEach(t => {
+      const label = QUICKSTART_AI_LABELS[t];
+      if (label) specifics.push(label);
+    });
+    summaries.push({
+      key: 'quickstart_options',
+      label: CAPABILITY_DISPLAY.quickstart_options.label,
+      icon: CAPABILITY_DISPLAY.quickstart_options.icon,
+      enabled: qo.enabled,
+      specificFeatures: specifics,
+      isHighlighted: highlight === 'quickstart_options',
+      settingsPath: CAPABILITY_DISPLAY.quickstart_options.settingsPath ?? null,
     });
   }
 
