@@ -2017,6 +2017,46 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get tenant storefront type settings
+   */
+  async getTenantStorefrontTypeSettings(tenantId: string): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/storefront-type`,
+      {},
+      `platform-tenant-storefront-type-settings-${tenantId}`,
+      this.cacheTTL
+    );
+
+    return result.data?.settings || null;
+  }
+
+  /**
+   * Update tenant storefront type settings
+   */
+  async updateTenantStorefrontTypeSettings(tenantId: string, settings: any): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/storefront-type`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      },
+      `platform-tenant-storefront-type-settings-${tenantId}`
+    );
+
+    await this.invalidateTenantCaches(tenantId);
+
+    return result.data?.settings || null;
+  }
+
+  /**
    * Get consolidated dashboard data for tenant
    */
   async getDashboardConsolidated(tenantId: string): Promise<any> {

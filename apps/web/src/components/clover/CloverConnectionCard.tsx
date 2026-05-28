@@ -61,7 +61,7 @@ export function CloverConnectionCard({
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
     const diffHours = Math.floor(diffMins / 60);
@@ -93,7 +93,7 @@ export function CloverConnectionCard({
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <CloverStatusBadge status={status} size="md" />
             <Link
@@ -145,7 +145,8 @@ export function CloverConnectionCard({
               </p>
               {onConnect && showActions && (
                 <Button
-                  variant="primary"
+                  variant="gradient"
+                  style={{ color: 'white' }}  
                   onClick={onConnect}
                   disabled={isLoading}
                   className="bg-green-600 hover:bg-green-700"
@@ -199,7 +200,8 @@ export function CloverConnectionCard({
               <div className="flex gap-2">
                 {onSync && (
                   <Button
-                    variant="primary"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     size="sm"
                     onClick={onSync}
                     disabled={isLoading}
@@ -209,16 +211,18 @@ export function CloverConnectionCard({
                   </Button>
                 )}
                 <Button
-                  variant="secondary"
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   size="sm"
-                  onClick={() => {/* Navigate to settings */}}
+                  onClick={() => {/* Navigate to settings */ }}
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </Button>
                 {onDisconnect && (
                   <Button
-                    variant="danger"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     size="sm"
                     onClick={onDisconnect}
                     disabled={isLoading}
@@ -250,7 +254,8 @@ export function CloverConnectionCard({
               <div className="flex gap-2">
                 {onConnect && (
                   <Button
-                    variant="primary"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     onClick={onConnect}
                     disabled={isLoading}
                     className="bg-green-600 hover:bg-green-700"
@@ -261,7 +266,8 @@ export function CloverConnectionCard({
                 )}
                 {onDisableDemo && (
                   <Button
-                    variant="secondary"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     size="sm"
                     onClick={() => handleDemoToggle(false)}
                     disabled={isLoading}

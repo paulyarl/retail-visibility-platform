@@ -181,7 +181,7 @@ export const TIER_PROGRESSIONS = {
     identity: 'I am selling online',
     realization: 'Shoppers reserve and show up — but some want to pay fully online',
     upgradeTrigger: 'I want to close the full sale online',
-    tagline: 'Capture Intent & Drive Foot Traffic'
+    tagline: 'Capture Intent and Drive Foot Traffic'
   },
   professional: {
     identity: 'I am a full online retailer',

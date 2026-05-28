@@ -177,7 +177,7 @@ const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
   commerce_types: { label: 'Commerce', icon: '💰', settingsPath: '/settings/commerce' },
   payment_gateway_options: { label: 'Payment Gateway', icon: '💳', settingsPath: '/settings/payment-gateways' },
-  storefront_types: { label: 'Storefront', icon: '🏪', settingsPath: '/settings/directory' },
+  storefront_types: { label: 'Storefront', icon: '🏪', settingsPath: '/settings/storefront-type-options' },
   barcode_scan_options: { label: 'Barcode Scanning', icon: '📱', settingsPath: '/settings/barcode-scan-options' },
   fulfillment_options: { label: 'Fulfillment', icon: '📦', settingsPath: '/settings/fulfillment' },
   product_options: { label: 'Product Options', icon: '🏷️', settingsPath: '/settings/product-options' },

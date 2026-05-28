@@ -101,7 +101,7 @@ export const CHAIN_TIERS: ChainTier[] = [
     name: 'Chain Commitment',
     price: '$69',
     period: '/location/month',
-    tagline: 'Capture Intent & Drive Foot Traffic',
+    tagline: 'Capture Intent and Drive Foot Traffic',
     description: 'Commerce features with holding deposits for multi-location retailers',
     identity: 'I am selling online',
     realization: 'Shoppers reserve and show up — but some want to pay fully online',

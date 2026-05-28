@@ -32,8 +32,8 @@ export default function ScanLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // Check capability-based access (barcode_enabled and at least one mode available)
-  if (barcodeCap.data?.enabled && barcodeCap.data.scanAvailable) {
+  // Check capability-based access (barcode_enabled and at least one effective mode available)
+  if (barcodeCap.data?.enabled && barcodeCap.data.effectiveScanAvailable) {
     return <>{children}</>;
   }
 
