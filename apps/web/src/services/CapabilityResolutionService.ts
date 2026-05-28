@@ -85,8 +85,18 @@ export type StorefrontType = 'online' | 'retail' | 'service' | 'both' | 'none';
 
 export interface StorefrontState {
   enabled: boolean;
+  /** Type determined by tier features (online/retail/service/both/none) */
   type: StorefrontType;
+  /** Type effectively used after applying merchant preferences */
+  effectiveType: StorefrontType;
   isFlexible: boolean;
+  /** Whether the merchant has selected a specific type when multiple are available */
+  hasMerchantSelection: boolean;
+  /** Merchant preference for storefront type */
+  merchantPreferences: {
+    storefront_type_enabled: boolean;
+    selected_storefront_type: StorefrontType;
+  };
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -97,12 +107,23 @@ export type BarcodeScanMode = 'scan' | 'manual' | 'usb' | 'camera' | 'none';
 
 export interface BarcodeScanState {
   enabled: boolean;
-  /** Available scan modes based on capability features */
+  /** Available scan modes based on capability features (tier-allowed, hard gate) */
   allowedModes: BarcodeScanMode[];
+  /** Scan modes effectively enabled after applying merchant preferences (tier allows AND merchant enabled) */
+  effectiveModes: BarcodeScanMode[];
   /** Whether barcode scanning is flexible (all modes available) */
   isFlexible: boolean;
-  /** Whether at least one scan mode is available */
+  /** Whether at least one scan mode is available (tier-allowed) */
   scanAvailable: boolean;
+  /** Whether at least one scan mode is effectively available after merchant preferences */
+  effectiveScanAvailable: boolean;
+  /** Merchant preference toggles for barcode scan modes */
+  merchantPreferences: {
+    barcode_scan_enabled: boolean;
+    barcode_manual_enabled: boolean;
+    barcode_usb_enabled: boolean;
+    barcode_camera_enabled: boolean;
+  };
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -585,7 +606,15 @@ export function resolvePaymentGatewayState(
 /**
  * Resolve barcode scan state from raw capability features
  */
-export function resolveBarcodeScanState(features: Record<string, boolean>): BarcodeScanState {
+export function resolveBarcodeScanState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    barcode_scan_enabled?: boolean;
+    barcode_manual_enabled?: boolean;
+    barcode_usb_enabled?: boolean;
+    barcode_camera_enabled?: boolean;
+  } | null
+): BarcodeScanState {
   const enabled = !!features.barcode_enabled;
   const flexible = !!features.barcode_flexible;
   const disabled = !!features.barcode_disabled;
@@ -603,11 +632,33 @@ export function resolveBarcodeScanState(features: Record<string, boolean>): Barc
 
   const uniqueModes = [...new Set(allowedModes)];
 
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    barcode_scan_enabled: merchantPrefs?.barcode_scan_enabled !== false,
+    barcode_manual_enabled: merchantPrefs?.barcode_manual_enabled !== false,
+    barcode_usb_enabled: merchantPrefs?.barcode_usb_enabled !== false,
+    barcode_camera_enabled: merchantPrefs?.barcode_camera_enabled !== false,
+  };
+
+  // Effective modes = tier allows AND merchant enabled
+  const effectiveModes = uniqueModes.filter((m) => {
+    switch (m) {
+      case 'scan': return prefs.barcode_scan_enabled;
+      case 'manual': return prefs.barcode_manual_enabled;
+      case 'usb': return prefs.barcode_usb_enabled;
+      case 'camera': return prefs.barcode_camera_enabled;
+      default: return true;
+    }
+  });
+
   return {
     enabled: enabled && !disabled,
     allowedModes: disabled ? [] : uniqueModes,
+    effectiveModes: disabled ? [] : effectiveModes,
     isFlexible: flexible,
     scanAvailable: enabled && !disabled && uniqueModes.length > 0,
+    effectiveScanAvailable: enabled && !disabled && effectiveModes.length > 0,
+    merchantPreferences: prefs,
     features,
   };
 }
@@ -1349,15 +1400,39 @@ export function resolveStorefrontOptionsState(
 /**
  * Resolve storefront state from raw capability features
  */
-export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
-  const enabled = !!features.storefront_enabled;
+export function resolveStorefrontState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    storefront_type_enabled?: boolean;
+    selected_storefront_type?: string;
+  } | null
+): StorefrontState {
+  // Master gates (explicit activation/deactivation)
+  const masterActivate = !!features.storefront || !!features.storefront_enabled;
+  const masterDeactivate = !!features.storefront_disabled;
+
+  // Feature gates (implicit activation)
   const online = !!features.storefront_online;
   const retail = !!features.storefront_retail;
   const service = !!features.storefront_service;
+
+  // Flexible gate
   const bothOptions = !!features.storefront_both_options;
 
+  // Determine enabled state
+  // 1. Deactivation master gate takes highest priority
+  // 2. Activation master gates enable explicitly
+  // 3. Feature/flexible gates enable implicitly when master gates are untouched
+  const hasAnyFeatureGate = online || retail || service || bothOptions;
+  const isEnabled = masterDeactivate
+    ? false
+    : masterActivate
+      ? true
+      : hasAnyFeatureGate;
+
+  // Determine type from feature gates
   let type: StorefrontType = 'none';
-  if (!enabled && !online && !retail && !service) {
+  if (!isEnabled) {
     type = 'none';
   } else if (bothOptions || (online && retail) || (online && service) || (retail && service)) {
     type = 'both';
@@ -1369,10 +1444,37 @@ export function resolveStorefrontState(features: Record<string, boolean>): Store
     type = 'service';
   }
 
+  // Merchant preferences
+  const prefs = {
+    storefront_type_enabled: merchantPrefs?.storefront_type_enabled !== false,
+    selected_storefront_type: (merchantPrefs?.selected_storefront_type as StorefrontType) || 'online',
+  };
+
+  // Compute effective type: if merchant selected a specific type and tier allows it, use it
+  let effectiveType: StorefrontType = type;
+  let hasMerchantSelection = false;
+
+  if (type === 'both' && prefs.storefront_type_enabled) {
+    const selected = prefs.selected_storefront_type;
+    if (selected === 'online' && online) {
+      effectiveType = 'online';
+      hasMerchantSelection = true;
+    } else if (selected === 'retail' && retail) {
+      effectiveType = 'retail';
+      hasMerchantSelection = true;
+    } else if (selected === 'service' && service) {
+      effectiveType = 'service';
+      hasMerchantSelection = true;
+    }
+  }
+
   return {
-    enabled: enabled || online || retail || service,
+    enabled: isEnabled && prefs.storefront_type_enabled,
     type,
+    effectiveType,
     isFlexible: bothOptions,
+    hasMerchantSelection,
+    merchantPreferences: prefs,
     features,
   };
 }
@@ -1481,19 +1583,43 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
-   * Get storefront state for a tenant
+   * Get storefront state for a tenant, merging tier capability with merchant preferences
    */
   async getStorefrontState(tenantId: string): Promise<StorefrontState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.storefront;
+    const tierState = all.storefront;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getStorefrontTypeSettings(tenantId);
+      if (prefs) {
+        return resolveStorefrontState(tierState.features, prefs);
+      }
+    } catch (e) {
+      console.warn('[CapabilityResolutionService] Failed to fetch storefront type settings, falling back to tier state:', e);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get barcode scan state for a tenant
+   * Get barcode scan state for a tenant, merging tier capability with merchant preferences
    */
   async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.barcodeScan;
+    const tierState = all.barcodeScan;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
+      if (prefs) {
+        return resolveBarcodeScanState(tierState.features, prefs);
+      }
+    } catch (e) {
+      console.warn('[CapabilityResolutionService] Failed to fetch barcode scan settings, falling back to tier state:', e);
+    }
+
+    return tierState;
   }
 
   /**
@@ -1768,15 +1894,39 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
 
   async getStorefrontState(tenantId: string): Promise<StorefrontState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.storefront;
+    const tierState = all.storefront;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getStorefrontTypeSettings(tenantId);
+      if (prefs) {
+        return resolveStorefrontState(tierState.features, prefs);
+      }
+    } catch (e) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch storefront type settings, falling back to tier state:', e);
+    }
+
+    return tierState;
   }
 
   /**
-   * Get barcode scan state for a tenant
+   * Get barcode scan state for a tenant, merging tier capability with merchant preferences
    */
   async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
     const all = await this.getAllCapabilities(tenantId);
-    return all.barcodeScan;
+    const tierState = all.barcodeScan;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
+      if (prefs) {
+        return resolveBarcodeScanState(tierState.features, prefs);
+      }
+    } catch (e) {
+      console.warn('[CapabilityResolutionService] Failed to fetch barcode scan settings, falling back to tier state:', e);
+    }
+
+    return tierState;
   }
 
   /**

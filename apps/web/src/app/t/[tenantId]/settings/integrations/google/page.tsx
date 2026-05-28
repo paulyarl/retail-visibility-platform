@@ -3,13 +3,14 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Button } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { 
-  CheckCircle, 
-  Circle, 
-  ExternalLink, 
-  RefreshCw, 
+import {
+  CheckCircle,
+  Circle,
+  ExternalLink,
+  RefreshCw,
   AlertTriangle,
   Store,
   ShoppingBag,
@@ -315,16 +316,14 @@ export default function GoogleIntegrationsPage() {
         <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                setupStatus?.isReady 
-                  ? 'bg-green-100 dark:bg-green-900/30' 
-                  : 'bg-amber-100 dark:bg-amber-900/30'
-              }`}>
-                <ShoppingBag className={`w-6 h-6 ${
-                  setupStatus?.isReady 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-amber-600 dark:text-amber-400'
-                }`} />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${setupStatus?.isReady
+                ? 'bg-green-100 dark:bg-green-900/30'
+                : 'bg-amber-100 dark:bg-amber-900/30'
+                }`}>
+                <ShoppingBag className={`w-6 h-6 ${setupStatus?.isReady
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-amber-600 dark:text-amber-400'
+                  }`} />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
@@ -355,19 +354,17 @@ export default function GoogleIntegrationsPage() {
           {/* Setup Steps */}
           <div className="space-y-4 mb-6">
             {Array.isArray(setupStatus?.setupSteps) && setupStatus.setupSteps.map((step, index) => (
-              <div 
-                key={step.id} 
-                className={`flex items-start gap-4 p-4 rounded-lg border ${
-                  step.completed 
-                    ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
-                    : 'bg-neutral-50 dark:bg-neutral-900/50 border-neutral-200 dark:border-neutral-700'
-                }`}
+              <div
+                key={step.id}
+                className={`flex items-start gap-4 p-4 rounded-lg border ${step.completed
+                  ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                  : 'bg-neutral-50 dark:bg-neutral-900/50 border-neutral-200 dark:border-neutral-700'
+                  }`}
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                  step.completed 
-                    ? 'bg-green-100 dark:bg-green-900/30' 
-                    : 'bg-neutral-200 dark:bg-neutral-700'
-                }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${step.completed
+                  ? 'bg-green-100 dark:bg-green-900/30'
+                  : 'bg-neutral-200 dark:bg-neutral-700'
+                  }`}>
                   {step.completed ? (
                     <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                   ) : (
@@ -375,18 +372,16 @@ export default function GoogleIntegrationsPage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className={`font-medium ${
-                    step.completed 
-                      ? 'text-green-800 dark:text-green-200' 
-                      : 'text-neutral-900 dark:text-neutral-100'
-                  }`}>
+                  <p className={`font-medium ${step.completed
+                    ? 'text-green-800 dark:text-green-200'
+                    : 'text-neutral-900 dark:text-neutral-100'
+                    }`}>
                     {step.label}
                   </p>
-                  <p className={`text-sm ${
-                    step.completed 
-                      ? 'text-green-700 dark:text-green-300' 
-                      : 'text-neutral-600 dark:text-neutral-400'
-                  }`}>
+                  <p className={`text-sm ${step.completed
+                    ? 'text-green-700 dark:text-green-300'
+                    : 'text-neutral-600 dark:text-neutral-400'
+                    }`}>
                     {step.description}
                   </p>
                 </div>
@@ -400,7 +395,9 @@ export default function GoogleIntegrationsPage() {
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
             {!setupStatus?.hasGoogleAccount ? (
-              <button
+              <Button
+                variant="gradient"
+                style={{ color: 'white' }}
                 onClick={handleConnectGoogle}
                 disabled={connecting}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
@@ -411,29 +408,31 @@ export default function GoogleIntegrationsPage() {
                   <LinkIcon className="w-4 h-4" />
                 )}
                 {connecting ? 'Connecting...' : 'Connect Google Account'}
-              </button>
+              </Button>
             ) : setupStatus?.isReady ? (
               <>
-                <button
+                <Button
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   onClick={fetchSetupStatus}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Refresh Status
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDisconnect}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 font-medium rounded-lg transition-colors border border-red-200 dark:border-red-800"
                 >
                   <Unlink className="w-4 h-4" />
                   Disconnect
-                </button>
+                </Button>
               </>
             ) : (
               <>
                 {/* If Google account connected but no merchant link, show Link Merchant button */}
                 {setupStatus?.hasGoogleAccount && !setupStatus?.hasMerchantLink ? (
-                  <button
+                  <Button
                     onClick={fetchMerchants}
                     disabled={loadingMerchants}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
@@ -444,9 +443,9 @@ export default function GoogleIntegrationsPage() {
                       <LinkIcon className="w-4 h-4" />
                     )}
                     {loadingMerchants ? 'Loading...' : 'Link Merchant Center'}
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     onClick={handleConnectGoogle}
                     disabled={connecting}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
@@ -457,15 +456,15 @@ export default function GoogleIntegrationsPage() {
                       <LinkIcon className="w-4 h-4" />
                     )}
                     {connecting ? 'Connecting...' : 'Continue Setup'}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={fetchSetupStatus}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Refresh
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -480,9 +479,9 @@ export default function GoogleIntegrationsPage() {
                 <div className="text-sm text-neutral-600 dark:text-neutral-400">
                   <p className="mb-2">No Merchant Center accounts found.</p>
                   <p>Make sure you have created a Google Merchant Center account at{' '}
-                    <a 
-                      href="https://merchants.google.com/" 
-                      target="_blank" 
+                    <a
+                      href="https://merchants.google.com/"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline"
                     >
@@ -493,7 +492,7 @@ export default function GoogleIntegrationsPage() {
               ) : (
                 <div className="space-y-2">
                   {merchants.map((merchant) => (
-                    <button
+                    <Button
                       key={merchant.id}
                       onClick={() => handleLinkMerchant(merchant)}
                       disabled={linkingMerchant}
@@ -513,16 +512,16 @@ export default function GoogleIntegrationsPage() {
                       ) : (
                         <LinkIcon className="w-4 h-4 text-blue-600" />
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}
-              <button
+              <Button
                 onClick={() => setShowMerchantSelector(false)}
                 className="mt-3 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -533,16 +532,14 @@ export default function GoogleIntegrationsPage() {
         <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                gbpStatus?.isConnected 
-                  ? 'bg-green-100 dark:bg-green-900/30' 
-                  : 'bg-blue-100 dark:bg-blue-900/30'
-              }`}>
-                <Store className={`w-6 h-6 ${
-                  gbpStatus?.isConnected 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-blue-600 dark:text-blue-400'
-                }`} />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${gbpStatus?.isConnected
+                ? 'bg-green-100 dark:bg-green-900/30'
+                : 'bg-blue-100 dark:bg-blue-900/30'
+                }`}>
+                <Store className={`w-6 h-6 ${gbpStatus?.isConnected
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-blue-600 dark:text-blue-400'
+                  }`} />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
@@ -568,10 +565,10 @@ export default function GoogleIntegrationsPage() {
         </div>
         <div className="p-6">
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-            Connect your Google Business Profile to automatically sync your store hours, 
+            Connect your Google Business Profile to automatically sync your store hours,
             contact information, and business details to Google Maps and Search.
           </p>
-          
+
           {/* What syncs */}
           <div className="bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 mb-4">
             <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">What syncs to Google:</p>
@@ -587,13 +584,13 @@ export default function GoogleIntegrationsPage() {
           <div className="flex flex-wrap gap-3">
             {gbpStatus?.isConnected ? (
               <>
-                <button
+                <Button
                   onClick={fetchGBPStatus}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Refresh Status
-                </button>
+                </Button>
                 <Link
                   href={`/t/${tenantId}/settings/integrations/google/sync-status`}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
@@ -620,17 +617,21 @@ export default function GoogleIntegrationsPage() {
                   <Star className="w-4 h-4" />
                   Advanced →
                 </Link>
-                <button
+                <Button
                   onClick={handleDisconnectGBP}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 font-medium rounded-lg transition-colors border border-red-200 dark:border-red-800"
                 >
                   <Unlink className="w-4 h-4" />
                   Disconnect
-                </button>
+                </Button>
               </>
             ) : (
-              <button
+              <Button
                 onClick={handleConnectGBP}
+                variant="gradient"
+                style={{ color: 'white' }}
                 disabled={connectingGBP}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
               >
@@ -640,7 +641,7 @@ export default function GoogleIntegrationsPage() {
                   <LinkIcon className="w-4 h-4" />
                 )}
                 {connectingGBP ? 'Connecting...' : 'Connect Google Business Profile'}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -648,9 +649,9 @@ export default function GoogleIntegrationsPage() {
           <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-800 dark:text-blue-200">
               <strong>Tip:</strong> You can also manage your Google Business Profile directly at{' '}
-              <a 
-                href="https://business.google.com" 
-                target="_blank" 
+              <a
+                href="https://business.google.com"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:no-underline"
               >

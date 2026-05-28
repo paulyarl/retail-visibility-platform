@@ -1905,6 +1905,66 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getBarcodeScanSettings(tenantId: string): Promise<{
+    barcode_scan_enabled: boolean;
+    barcode_manual_enabled: boolean;
+    barcode_usb_enabled: boolean;
+    barcode_camera_enabled: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/barcode-scan`,
+        {},
+        `tenant-barcode-scan-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      const s = result.data?.settings;
+      return s ? {
+        barcode_scan_enabled: s.barcode_scan_enabled !== false,
+        barcode_manual_enabled: s.barcode_manual_enabled !== false,
+        barcode_usb_enabled: s.barcode_usb_enabled !== false,
+        barcode_camera_enabled: s.barcode_camera_enabled !== false,
+      } : null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get barcode scan settings:', error);
+      return null;
+    }
+  }
+
+  async getStorefrontTypeSettings(tenantId: string): Promise<{
+    storefront_type_enabled: boolean;
+    selected_storefront_type: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-type`,
+        {},
+        `tenant-storefront-type-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      const s = result.data?.settings;
+      return s ? {
+        storefront_type_enabled: s.storefront_type_enabled !== false,
+        selected_storefront_type: s.selected_storefront_type || 'online',
+      } : null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront type settings:', error);
+      return null;
+    }
+  }
+
   /**
    * Get all tiers that have a given capability type enabled.
    * Reusable for any capability — used for "upgrade to access" messaging.

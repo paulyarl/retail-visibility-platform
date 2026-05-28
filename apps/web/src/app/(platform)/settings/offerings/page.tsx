@@ -420,7 +420,7 @@ export default function OfferingsPage() {
                 </li>
               </ul>
               <div className="mt-3 pt-3 border-t border-green-300">
-                <p className="text-xs font-semibold text-green-900">Capture Intent & Drive Foot Traffic</p>
+                <p className="text-xs font-semibold text-green-900">Capture Intent and Drive Foot Traffic</p>
               </div>
             </div>
 
@@ -657,7 +657,7 @@ export default function OfferingsPage() {
                   <Badge variant="default" className="bg-green-100 text-green-800">$79/mo</Badge>
                 </div>
                 <p className="text-xs text-green-700 italic mb-1">"I am selling online"</p>
-                <p className="text-sm text-neutral-600">Capture Intent & Drive Foot Traffic</p>
+                <p className="text-sm text-neutral-600">Capture Intent and Drive Foot Traffic</p>
               </div>
               <div className="p-4 pt-0">
                 <ul className="space-y-1 text-sm">

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { integrationService } from '@/services/IntegrationService';
 import { ArrowLeft, Play, CheckCircle, XCircle, AlertTriangle, RefreshCw, Zap, Package, DollarSign, Trash2, AlertOctagon, Layers, FolderPlus, FolderEdit, FolderSync, FolderX } from 'lucide-react';
+import { Button } from '@mantine/core';
 
 // Types
 interface CloverStatus {
@@ -241,20 +242,20 @@ export default function CloverIntegrationPage() {
       '• Click OK to remove demo items\n' +
       '• Click Cancel to keep demo items in your inventory'
     );
-    
+
     // Confirm the action
     const confirmAction = confirm(
-      removeItems 
+      removeItems
         ? 'Confirm: Demo mode will be disabled and all demo items will be DELETED from your inventory.'
         : 'Confirm: Demo mode will be disabled but demo items will be KEPT in your inventory.'
     );
-    
+
     if (!confirmAction) return;
-    
+
     try {
       setActionLoading(true);
       const data = await integrationService.disableCloverDemo(tenantId, !removeItems);
-      
+
       if (removeItems) {
         alert(`Demo mode disabled. ${data.itemsDeleted || 0} demo items removed from inventory.`);
       } else {
@@ -274,7 +275,7 @@ export default function CloverIntegrationPage() {
       setActionLoading(true);
       setError(null);
       const data = await integrationService.getCloverOAuthUrl(tenantId);
-      
+
       if (data.authorizationUrl) {
         window.location.href = data.authorizationUrl;
       } else {
@@ -388,7 +389,7 @@ export default function CloverIntegrationPage() {
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link 
+        <Link
           href={`/t/${tenantId}/settings/integrations`}
           className="inline-flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 mb-4"
         >
@@ -436,24 +437,28 @@ export default function CloverIntegrationPage() {
               Try Clover Integration
             </h2>
             <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-              Experience how Clover POS sync works with 25 sample products. 
+              Experience how Clover POS sync works with 25 sample products.
               Test sync scenarios, conflict resolution, and mapping management before connecting your real account.
             </p>
             <div className="flex gap-3 justify-center">
-              <button
+              <Button
                 onClick={handleEnableDemo}
+                variant="gradient"
+                style={{ color: 'white' }}
                 disabled={actionLoading}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
               >
                 {actionLoading ? 'Enabling...' : 'Enable Demo Mode'}
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled
+                variant="gradient"
+                style={{ color: 'white' }}
                 className="px-6 py-3 bg-neutral-100 dark:bg-neutral-700 text-neutral-400 rounded-lg cursor-not-allowed font-medium"
                 title="Coming soon"
               >
                 Connect Real Account
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -465,18 +470,17 @@ export default function CloverIntegrationPage() {
           {/* Tabs - Simulate tab only in demo mode */}
           <div className="border-b border-neutral-200 dark:border-neutral-700 mb-6">
             <nav className="flex gap-6">
-              {(status.mode === 'demo' 
+              {(status.mode === 'demo'
                 ? ['overview', 'simulate', 'mappings', 'history'] as const
                 : ['overview', 'mappings', 'history'] as const
               ).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab
+                  className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
                       ? 'border-green-600 text-green-600 dark:text-green-400'
                       : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
-                  }`}
+                    }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
@@ -539,52 +543,59 @@ export default function CloverIntegrationPage() {
               <div className="flex flex-wrap gap-3">
                 {/* Production: Sync Now button */}
                 {status.mode === 'production' && (
-                  <button
+                  <Button
                     onClick={handleSync}
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     disabled={actionLoading}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
                   >
                     <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
                     Sync Now
-                  </button>
+                  </Button>
                 )}
-                
-                <Link
-                  href={`/t/${tenantId}/items`}
+
+                <Button
+                  onClick={() => router.push(`/t/${tenantId}/items`)  }
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   className="px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 font-medium"
                 >
                   View Inventory
-                </Link>
-                
+                </Button>
+
                 {/* Demo: Disable or Upgrade */}
                 {status.mode === 'demo' && (
                   <>
-                    <button
+                    <Button
                       onClick={handleConnectReal}
                       disabled={actionLoading}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                      variant="gradient"
+                      style={{ color: 'white' }}
                     >
                       Connect Real Account
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={handleDisableDemo}
                       disabled={actionLoading}
-                      className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 font-medium"
+                      variant="gradient"
+                      style={{ color: 'white' }}
                     >
                       Disable Demo
-                    </button>
+                    </Button>
                   </>
                 )}
-                
+
                 {/* Production: Disconnect */}
                 {status.mode === 'production' && (
-                  <button
+                  <Button
                     onClick={handleDisconnect}
                     disabled={actionLoading}
-                    className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 font-medium"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                   >
                     Disconnect
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -595,12 +606,11 @@ export default function CloverIntegrationPage() {
             <div className="space-y-6">
               {/* Active Simulation */}
               {activeSimulation && (
-                <div className={`p-4 rounded-lg border ${
-                  activeSimulation.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
-                  activeSimulation.status === 'failed' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
-                  activeSimulation.status === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
-                  'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                }`}>
+                <div className={`p-4 rounded-lg border ${activeSimulation.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
+                    activeSimulation.status === 'failed' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
+                      activeSimulation.status === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
+                        'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                  }`}>
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
@@ -611,12 +621,11 @@ export default function CloverIntegrationPage() {
                         <p className="text-sm text-neutral-500 dark:text-neutral-500 mt-1 italic">{activeSimulation.resolution}</p>
                       )}
                       <div className="mt-2 flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          activeSimulation.status === 'success' ? 'bg-green-200 text-green-800' :
-                          activeSimulation.status === 'failed' ? 'bg-red-200 text-red-800' :
-                          activeSimulation.status === 'conflict' ? 'bg-amber-200 text-amber-800' :
-                          'bg-blue-200 text-blue-800'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${activeSimulation.status === 'success' ? 'bg-green-200 text-green-800' :
+                            activeSimulation.status === 'failed' ? 'bg-red-200 text-red-800' :
+                              activeSimulation.status === 'conflict' ? 'bg-amber-200 text-amber-800' :
+                                'bg-blue-200 text-blue-800'
+                          }`}>
                           {activeSimulation.status}
                         </span>
                         <span className="text-xs text-neutral-500">{activeSimulation.affectedItems.length} items affected</span>
@@ -659,26 +668,24 @@ export default function CloverIntegrationPage() {
                       </h4>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {simulationResults.map((result, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`p-3 rounded-lg border ${
-                              result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
-                              result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
-                              result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
-                              result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
-                              'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                            }`}
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border ${result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
+                                result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
+                                  result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
+                                    result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                                      'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase ${
-                                    result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
-                                    result.action === 'created' ? 'bg-green-200 text-green-800' :
-                                    result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
-                                    result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
-                                    'bg-red-200 text-red-800'
-                                  }`}>
+                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase ${result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
+                                      result.action === 'created' ? 'bg-green-200 text-green-800' :
+                                        result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
+                                          result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
+                                            'bg-red-200 text-red-800'
+                                    }`}>
                                     {result.action}
                                   </span>
                                   <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
@@ -761,13 +768,15 @@ export default function CloverIntegrationPage() {
                         <div className="flex-1">
                           <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{scenario.name}</h4>
                           <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">{scenario.description}</p>
-                          <button
+                          <Button
                             onClick={() => handleTriggerSimulation(scenario.scenario)}
+                            variant="gradient"
+                            style={{ color: 'white' }}
                             disabled={actionLoading || !!activeSimulation}
                             className="mt-3 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Run Simulation
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -793,13 +802,15 @@ export default function CloverIntegrationPage() {
                         <div className="flex-1">
                           <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{scenario.name}</h4>
                           <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">{scenario.description}</p>
-                          <button
+                          <Button
                             onClick={() => handleTriggerSimulation(scenario.scenario)}
+                            variant="gradient"
+                            style={{ color: 'white' }}
                             disabled={actionLoading || !!activeSimulation}
                             className="mt-3 px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Run Simulation
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -814,12 +825,14 @@ export default function CloverIntegrationPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Item Mappings</h3>
-                <button
+                <Button
                   onClick={fetchMappings}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   className="p-2 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                 >
                   <RefreshCw className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
 
               {mappings.length === 0 ? (
@@ -853,31 +866,32 @@ export default function CloverIntegrationPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              mapping.mapping_status === 'mapped' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                              mapping.mapping_status === 'conflict' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-                              'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
-                            }`}>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${mapping.mapping_status === 'mapped' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                mapping.mapping_status === 'conflict' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                                  'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+                              }`}>
                               {mapping.mapping_status}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             {mapping.mapping_status === 'conflict' && (
                               <div className="flex gap-2">
-                                <button
+                                <Button
                                   onClick={() => handleResolveConflict(mapping.id, 'use_clover')}
                                   disabled={actionLoading}
-                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                  variant="gradient"
+                                  style={{ color: 'white' }}
                                 >
                                   Use Clover
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   onClick={() => handleResolveConflict(mapping.id, 'use_rvp')}
                                   disabled={actionLoading}
-                                  className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                                  variant="gradient"
+                                  style={{ color: 'white' }}
                                 >
                                   Use Visible Shelf
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </td>
@@ -892,12 +906,12 @@ export default function CloverIntegrationPage() {
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Category Mappings</h3>
-                  <button
+                  <Button
                     onClick={fetchCategoryMappings}
-                    className="p-2 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                    variant="ghost"
                   >
                     <RefreshCw className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
 
                 {categoryMappings.length === 0 ? (
@@ -937,26 +951,24 @@ export default function CloverIntegrationPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                catMapping.sync_direction === 'bidirectional' 
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${catMapping.sync_direction === 'bidirectional'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
                                   : catMapping.sync_direction === 'clover_to_rvp'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                  : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-                              }`}>
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                    : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                                }`}>
                                 {catMapping.sync_direction === 'bidirectional' ? '↔ Both Ways' :
-                                 catMapping.sync_direction === 'clover_to_rvp' ? '→ Clover to Visible Shelf' :
-                                 '← Visible Shelf to Clover'}
+                                  catMapping.sync_direction === 'clover_to_rvp' ? '→ Clover to Visible Shelf' :
+                                    '← Visible Shelf to Clover'}
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                catMapping.mapping_status === 'mapped' 
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${catMapping.mapping_status === 'mapped'
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                   : catMapping.mapping_status === 'conflict'
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                                  : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
-                              }`}>
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+                                }`}>
                                 {catMapping.mapping_status}
                               </span>
                             </td>
@@ -1028,7 +1040,7 @@ export default function CloverIntegrationPage() {
                           </div>
                         </div>
                       </summary>
-                      
+
                       {/* Detailed Audit Trail */}
                       {log.error_details?.auditTrail && log.error_details.auditTrail.length > 0 && (
                         <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700 pt-3">
@@ -1039,25 +1051,23 @@ export default function CloverIntegrationPage() {
                           )}
                           <div className="space-y-2">
                             {log.error_details.auditTrail.map((result, idx) => (
-                              <div 
-                                key={idx} 
-                                className={`p-2 rounded border text-sm ${
-                                  result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
-                                  result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
-                                  result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
-                                  result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
-                                  'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                                }`}
+                              <div
+                                key={idx}
+                                className={`p-2 rounded border text-sm ${result.action === 'updated' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' :
+                                    result.action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
+                                      result.action === 'archived' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800' :
+                                        result.action === 'conflict' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                                          'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                                  }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase shrink-0 ${
-                                      result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
-                                      result.action === 'created' ? 'bg-green-200 text-green-800' :
-                                      result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
-                                      result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
-                                      'bg-red-200 text-red-800'
-                                    }`}>
+                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase shrink-0 ${result.action === 'updated' ? 'bg-blue-200 text-blue-800' :
+                                        result.action === 'created' ? 'bg-green-200 text-green-800' :
+                                          result.action === 'archived' ? 'bg-orange-200 text-orange-800' :
+                                            result.action === 'conflict' ? 'bg-amber-200 text-amber-800' :
+                                              'bg-red-200 text-red-800'
+                                      }`}>
                                       {result.action}
                                     </span>
                                     <span className="font-medium truncate">{result.itemName}</span>

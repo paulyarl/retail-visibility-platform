@@ -168,6 +168,7 @@ import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
 import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
+import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
 import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
@@ -7347,6 +7348,10 @@ console.log('✅ Quickstart options settings routes mounted at /api/tenants/:ten
 /* ------------------------------ storefront options settings ------------------------------ */
 app.use('/api/tenants', storefrontOptionsSettingsRoutes);
 console.log('✅ Storefront options settings routes mounted at /api/tenants/:tenantId/storefront-options');
+
+/* ------------------------------ storefront type settings ------------------------------ */
+app.use('/api/tenants', storefrontTypeSettingsRoutes);
+console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type');
 
 /* ------------------------------ barcode scan settings ------------------------------ */
 app.use('/api/tenants', barcodeScanSettingsRoutes);

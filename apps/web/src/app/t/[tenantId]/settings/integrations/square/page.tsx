@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { ArrowLeft, Zap, ExternalLink, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Button } from '@mantine/core';
+import router from 'next/router';
 
 // Types
 interface SquareStatus {
@@ -80,7 +82,7 @@ export default function SquareIntegrationPage() {
       setActionLoading(true);
       setError(null);
       const data = await platformHomeService.getSquareOAuthAuthorize(tenantId);
-      
+
       if (data.error === 'not_implemented') {
         alert('Square OAuth integration coming soon! This feature is currently in development.');
       } else if (data.authorizationUrl) {
@@ -99,7 +101,7 @@ export default function SquareIntegrationPage() {
     try {
       setActionLoading(true);
       const data = await platformHomeService.disconnectSquare(tenantId);
-      
+
       if (data.error === 'not_implemented') {
         alert('Square integration is not yet connected.');
       } else {
@@ -117,7 +119,7 @@ export default function SquareIntegrationPage() {
     try {
       setActionLoading(true);
       const data = await platformHomeService.startSquareSync(tenantId);
-      
+
       if (data.error === 'not_implemented') {
         alert('Square sync is not yet available.');
       } else {
@@ -146,7 +148,7 @@ export default function SquareIntegrationPage() {
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link 
+        <Link
           href={`/t/${tenantId}/settings/integrations`}
           className="inline-flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 mb-4"
         >
@@ -157,7 +159,7 @@ export default function SquareIntegrationPage() {
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth="2"/>
+                <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth="2" />
               </svg>
             </div>
             <div>
@@ -196,7 +198,7 @@ export default function SquareIntegrationPage() {
             <p className="text-neutral-600 dark:text-neutral-400 mb-6">
               Sync your Square POS inventory automatically. Keep your online storefront in sync with your physical store.
             </p>
-            
+
             <div className="bg-neutral-50 dark:bg-neutral-700/50 rounded-lg p-4 mb-6 text-left">
               <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">What you'll get:</h3>
               <ul className="text-sm text-neutral-600 dark:text-neutral-400 space-y-2">
@@ -219,14 +221,17 @@ export default function SquareIntegrationPage() {
               </ul>
             </div>
 
-            <button
+            <Button
               onClick={handleConnect}
+              variant="gradient"
+              style={{ color: 'white' }}
+              size='lg'
               disabled={actionLoading || !canManageSquare}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
             >
               {actionLoading ? 'Connecting...' : 'Connect Square Account'}
-            </button>
-            
+            </Button>
+
             <p className="text-xs text-neutral-500 mt-4">
               You'll be redirected to Square to authorize access
             </p>
@@ -244,11 +249,10 @@ export default function SquareIntegrationPage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
-                  }`}
+                  className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
+                    }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
@@ -293,27 +297,33 @@ export default function SquareIntegrationPage() {
 
               {/* Actions */}
               <div className="flex gap-3">
-                <button
+                <Button
                   onClick={handleSync}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   disabled={actionLoading || !canManageSquare}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center gap-2"
                 >
                   <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
                   Sync Now
-                </button>
-                <Link
-                  href={`/t/${tenantId}/items`}
+                </Button>
+                <Button
+                  onClick={() => router.push(`/t/${tenantId}/items`)}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   className="px-4 py-2 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 font-medium"
                 >
                   View Inventory
-                </Link>
-                <button
+                </Button>
+                <Button
                   onClick={handleDisconnect}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   disabled={actionLoading || !canManageSquare}
                   className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 font-medium"
                 >
                   Disconnect
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -323,12 +333,14 @@ export default function SquareIntegrationPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Sync History</h3>
-                <button
-                  onClick={() => {/* fetch history */}}
+                <Button
+                  onClick={() => {/* fetch history */ }}
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   className="p-2 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                 >
                   <RefreshCw className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
 
               {syncLogs.length === 0 ? (

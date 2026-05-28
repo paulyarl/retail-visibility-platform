@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { Package, Loader2 } from 'lucide-react';
-import { Button } from '@mantine/core';
-import { Label } from '@/components/ui/Label';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'; 
+import { Button } from '../ui/Button';
 
 interface CloverDemoModeToggleProps {
   tenantId: string;
@@ -36,13 +35,13 @@ export function CloverDemoModeToggle({
 
   return (
     <Button
-      variant={isEnabled ? 'primary' : 'secondary'}
-      size="sm"
+      variant={isEnabled ? 'default' : 'gradient'}
+      size="md"
       onClick={() => handleToggle(!isEnabled)}
       disabled={disabled || isLoading}
       className={cn(
         'gap-2',
-        isEnabled && 'bg-amber-600 hover:bg-amber-700',
+        isEnabled && 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg',
         className
       )}
     >

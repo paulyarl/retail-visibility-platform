@@ -35,7 +35,7 @@ export default function ScanPage() {
   // Capability-based barcode scan access (supersedes Flags env var control)
   const barcodeCap = useBarcodeScanCapability(selectedTenant, { forTenant: true });
   const barcodeEnabled = barcodeCap.data?.enabled ?? null; // null = still loading
-  const barcodeModes = barcodeCap.data?.allowedModes ?? [];
+  const barcodeModes = barcodeCap.data?.effectiveModes ?? [];
   const usbAllowed = barcodeModes.includes('usb');
   const cameraAllowed = barcodeModes.includes('camera');
   const manualAllowed = barcodeModes.includes('manual');

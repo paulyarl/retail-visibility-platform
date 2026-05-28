@@ -514,7 +514,7 @@ const tiers = [
     name: 'Commitment',
     price: '$79',
     period: '/month',
-    tagline: 'Capture Intent & Drive Foot Traffic',
+    tagline: 'Capture Intent and Drive Foot Traffic',
     description: 'Deposit-based commerce to drive in-store pickup',
     trial: '14-day free trial',
     identity: 'I am selling online',

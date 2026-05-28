@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Square, ExternalLink, RefreshCw, Settings, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { SquareStatusBadge, SquareStatus } from './SquareStatusBadge';
 import { cn } from '@/lib/utils';
 
@@ -43,7 +43,7 @@ export function SquareConnectionCard({
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
     const diffHours = Math.floor(diffMins / 60);
@@ -75,7 +75,7 @@ export function SquareConnectionCard({
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <SquareStatusBadge status={status} size="md" />
             <Link
@@ -102,7 +102,8 @@ export function SquareConnectionCard({
               </p>
               {onConnect && showActions && (
                 <Button
-                  variant="primary"
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   onClick={onConnect}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
@@ -155,7 +156,8 @@ export function SquareConnectionCard({
               <div className="flex gap-2">
                 {onSync && (
                   <Button
-                    variant="primary"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     size="sm"
                     onClick={onSync}
                     disabled={status === 'syncing'}
@@ -169,16 +171,18 @@ export function SquareConnectionCard({
                   </Button>
                 )}
                 <Button
-                  variant="secondary"
+                  variant="gradient"
+                  style={{ color: 'white' }}
                   size="sm"
-                  onClick={() => {/* Navigate to settings */}}
+                  onClick={() => {/* Navigate to settings */ }}
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </Button>
                 {onDisconnect && (
                   <Button
-                    variant="danger"
+                    variant="gradient"
+                    style={{ color: 'white' }}
                     size="sm"
                     onClick={onDisconnect}
                   >
@@ -207,7 +211,8 @@ export function SquareConnectionCard({
 
             {showActions && onConnect && (
               <Button
-                variant="primary"
+                variant="gradient"
+                style={{ color: 'white' }}
                 onClick={onConnect}
                 className="bg-blue-600 hover:bg-blue-700"
               >
