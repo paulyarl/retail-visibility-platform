@@ -57,8 +57,8 @@ export default function SignupWizardPage() {
 
   // Check for existing authenticated user before showing data collection
   useEffect(() => {
-    // Only check when moving to step 7 (data collection)
-    if (step !== 7) return;
+    // Only check when moving to step 8 (data collection)
+    if (step !== 8) return;
     // Skip if still loading auth state
     if (authLoading) return;
     
@@ -115,45 +115,51 @@ export default function SignupWizardPage() {
     checkExistingUser();
   }, [step, isAuthenticated, user, authLoading, router]);
 
-  // Total steps: 6 benefit steps + 1 data collection = 7 total
-  const totalSteps = 7;
+  // Total steps: 7 benefit steps + 1 data collection = 8 total
+  const totalSteps = 8;
 
   const benefitSteps = [
     {
-      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-      title: "Your Products, Visible Everywhere",
-      description: "Get your inventory discovered by local shoppers through your own Storefront page and our Store Directory. Every product you carry becomes searchable and visible to customers nearby.",
-      highlight: "Free Storefront page + Directory listing included"
+      icon: "M13 10V3L4 14h7v7l9-11h-7z",
+      title: "Big-Box Retailers Built This for Themselves. Now It's Yours.",
+      description: "Local retailers need a way to move shoppers from discovery to purchase — because big-box retailers built end-to-end inventory visibility and commerce infrastructure internally, leaving small retailers without an affordable path to compete. Visible Shelf changes that. No IT team required. Just your Clover POS and a few minutes.",
+      highlight: "Clover-connected • Google-visible • Zero IT required"
     },
     {
       icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9",
-      title: "Tier 1 — Discovery: I Exist Online",
-      description: "People are finding your store on Google Search, Google Shopping, and Google Maps. Your business is discoverable by local shoppers through our Store Directory with featured products highlighted. Your complete inventory becomes available when you upgrade to Storefront.",
-      highlight: "Google visibility + Directory listing with featured products"
+      title: "Discovery — Get Found on Google",
+      description: "Your products are already showing up in Google Search, Google Shopping, and Google Maps — powered by real-time Clover inventory sync. No manual uploads. No spreadsheets. Just connect your POS and watch your store appear exactly where shoppers are already looking.",
+      highlight: "Real-time Google visibility + Directory listing"
     },
     {
       icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-      title: "Tier 2 — Storefront: I Have a Store Online",
-      description: "Shoppers are browsing your complete store on the platform. They can see your full inventory, contact you directly, and explore your brand. You have a professional storefront page that showcases your business and products beautifully.",
+      title: "Storefront — Own Your Platform Presence",
+      description: "Shoppers are finding you on Google — now give them a beautiful branded storefront to explore. Your full inventory, store hours, and contact details in one professional page. They can browse everything you carry and reach out directly. Your store, your brand, your way.",
       highlight: "Branded storefront + Platform search & browse"
     },
     {
       icon: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
-      title: "Tier 3 — Commitment: I Am Selling Online",
-      description: "Shoppers commit to buying and show up in-store. You can collect holding fees, manage reservations, and track conversions. Inventory availability indicators help shoppers make informed decisions. QR codes drive traffic to your store.",
-      highlight: "Add to cart + Holding fees + Shopper notifications"
+      title: "Commitment — Capture Intent & Drive Foot Traffic",
+      description: "You're a physical retailer. Shoppers browse online, but they buy in your store. Collect a small holding fee (10–15%) to guarantee their visit, then close the sale at your Clover POS. No abandoned inventory. No wasted prep time. Just guaranteed foot traffic with real financial commitment.",
+      highlight: "Deposit-based reservations • Guaranteed store visits • Clover POS synced"
     },
     {
       icon: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
-      title: "Tier 4 — Professional: I Am a Full Online Retailer",
-      description: "You're closing the full sale online with complete payment collection, delivery fulfillment, and advanced analytics. Shoppers can buy completely online and you handle everything from payment to fulfillment. Priority directory placement drives more traffic.",
-      highlight: "Full online payments + Delivery + Advanced analytics"
+      title: "E-Commerce — Sell Online, Fully & Simply",
+      description: "No physical store? No problem. Close the complete sale online with full payment collection and delivery fulfillment. Clean checkout with no deposit confusion. Built for online-only merchants who need straightforward e-commerce without the enterprise price tag or complexity.",
+      highlight: "Full online payments + Delivery + Clean checkout"
     },
     {
       icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-      title: "Tier 5 — Enterprise: I Run a Complete Business Operation",
-      description: "You have enterprise-grade tools with multi-location support, API access for custom integrations, and dedicated onboarding support. Advanced security, compliance features, and priority support help you scale your business operation efficiently.",
-      highlight: "Multi-location + API access + Enterprise support"
+      title: "Omnichannel — Physical + Online, Unified",
+      description: "You have both a physical storefront and online presence. Let shoppers choose their path: pay in full for delivery, or pay a deposit and pick up in-store. One inventory. One platform. Every way to buy. The shopper decides what works for them — you just fulfill.",
+      highlight: "Shoppers choose: full payment OR deposit & pickup"
+    },
+    {
+      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      title: "Enterprise — Complete Business Solution",
+      description: "Multi-location chains, franchises, and regional retailers need more than features — they need a platform that scales with them. Enterprise-grade analytics, dedicated onboarding, custom contracts, and unified billing across every location. White-label options for organisations that demand their own brand.",
+      highlight: "Multi-location + API access + Dedicated support"
     }
   ];
 
@@ -170,37 +176,32 @@ export default function SignupWizardPage() {
     { 
       value: 'discovery', 
       label: 'Discovery ($29/mo)',
-      description: 'Get found on Google - perfect for starting your online presence'
+      description: 'Get found on Google — real-time Clover sync, SEO pages, and directory listing'
     },
     { 
       value: 'storefront', 
       label: 'Storefront ($59/mo)',
-      description: 'Professional storefront where shoppers can browse your products'
+      description: 'Branded platform presence where shoppers browse your full inventory and contact you'
     },
     { 
       value: 'commitment', 
       label: 'Commitment ($79/mo)',
-      description: 'Sell online with deposit-based commerce to drive foot traffic'
+      description: 'Deposit-based commerce for physical retailers — drive guaranteed foot traffic to your store'
     },
     { 
       value: 'ecommerce', 
       label: 'E-commerce ($99/mo)',
-      description: 'Complete online sales with full payment processing and delivery'
+      description: 'Full online sales with payment collection and delivery — clean checkout, no deposit confusion'
     },
     { 
       value: 'omnichannel', 
       label: 'Omnichannel ($149/mo)',
-      description: 'Multi-channel retail with flexible payment options (deposit or full payment)'
-    },
-    { 
-      value: 'professional', 
-      label: 'Professional ($199/mo)',
-      description: 'Premium commerce platform with advanced features and multi-location support'
+      description: 'Unified commerce — shoppers choose full payment/delivery OR deposit/pickup'
     },
     { 
       value: 'enterprise', 
       label: 'Enterprise ($499/mo)',
-      description: 'Complete business solution with enterprise features and unlimited scaling'
+      description: 'Complete business solution with multi-location, enterprise analytics, and dedicated support'
     }
   ];
 
@@ -294,8 +295,8 @@ export default function SignupWizardPage() {
   };
 
   const renderStep = () => {
-    // Benefit steps 1-6
-    if (step >= 1 && step <= 6) {
+    // Benefit steps 1-7
+    if (step >= 1 && step <= 7) {
       const benefit = benefitSteps[step - 1];
       return (
         <div>
@@ -370,8 +371,8 @@ export default function SignupWizardPage() {
       );
     }
 
-    // Data collection step (step 7)
-    if (step === 7) {
+    // Data collection step (step 8)
+    if (step === 8) {
       // Show loading state while checking for existing user
       if (checkingExistingUser || authLoading) {
         return (
@@ -836,7 +837,7 @@ export default function SignupWizardPage() {
             {/* Progress Steps */}
             <div className="flex items-center justify-center mb-8">
               <div className="flex items-center space-x-2">
-                {[1, 2, 3, 4, 5, 6, 7].map((stepNumber) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((stepNumber) => (
                   <div key={stepNumber} className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
                       step >= stepNumber 
@@ -845,7 +846,7 @@ export default function SignupWizardPage() {
                     }`}>
                       {stepNumber}
                     </div>
-                    {stepNumber < 7 && (
+                    {stepNumber < 8 && (
                       <div className={`w-6 h-0.5 ml-2 ${
                         step > stepNumber ? 'bg-primary-600' : 'bg-neutral-200'
                       }`} />

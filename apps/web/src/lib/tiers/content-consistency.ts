@@ -18,28 +18,28 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'Clover POS integration & real-time sync',
     description: 'Automatic inventory synchronization with Clover POS for single source of truth',
     category: 'clover-inventory',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Real-Time Inventory Management',
     adminTerm: 'Real-time inventory tracking',
     description: 'Centralized inventory tracking with live updates and stock availability indicators',
     category: 'clover-inventory',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'SKU Scanning + Inventory Intelligence',
     adminTerm: 'SKU scanning + inventory intelligence',
     description: 'Complete product data capture with nutrition facts, allergens, and analytics',
     category: 'clover-inventory',
-    tier: ['professional', 'enterprise']
+    tier: ['ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Quick Start Wizard',
     adminTerm: 'Quick Start Wizard',
     description: 'Generate 50-100 realistic products in seconds with auto-categorization',
     category: 'clover-inventory',
-    tier: ['professional', 'enterprise']
+    tier: ['ecommerce', 'omnichannel', 'enterprise']
   },
 
   // GOOGLE VISIBILITY
@@ -48,21 +48,21 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'Full Google Business Profile & Shopping suite',
     description: 'Complete GMB sync with categories, hours, photos, and products',
     category: 'google-visibility',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Google Search & Shopping Optimization',
     adminTerm: 'Google Search indexing',
     description: 'SEO-optimized pages that appear in Google Search and Shopping',
     category: 'google-visibility',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Google Maps & SWIS (See What\'s In Store)',
     adminTerm: 'Google Maps / SWIS',
     description: 'Live inventory shown on Google Maps mobile',
     category: 'google-visibility',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
 
   // PLATFORM PRESENCE
@@ -71,35 +71,35 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'Branded storefront page',
     description: 'Complete branded store presence hosted on the platform',
     category: 'platform-presence',
-    tier: ['storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Smart Product Categories',
     adminTerm: 'Smart Categories + GMB Sync',
     description: 'Google Product Taxonomy with 5,595 categories and auto-categorization',
     category: 'platform-presence',
-    tier: ['storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Smart Business Hours',
     adminTerm: 'Business Hours Sync',
     description: 'Complex scheduling with multiple periods and real-time status',
     category: 'platform-presence',
-    tier: ['storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Platform Directory & Discovery',
     adminTerm: 'Directory listing',
     description: 'Enhanced directory listings with shopper inquiry system',
     category: 'platform-presence',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'QR Code Marketing & Sharing',
     adminTerm: 'QR codes (product, storefront, directory)',
     description: 'High-res QR codes for products, storefront, and directory',
     category: 'platform-presence',
-    tier: ['discovery', 'storefront', 'commitment', 'professional', 'enterprise']
+    tier: ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
 
   // COMMERCE & CONVERSION
@@ -108,28 +108,28 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'Add to cart',
     description: 'Complete shopping experience with cart management',
     category: 'commerce-conversion',
-    tier: ['commitment', 'professional', 'enterprise']
+    tier: ['commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Commitment Commerce - Holding Deposits',
     adminTerm: 'Holding / commitment fee (10–15%)',
     description: '10-15% holding deposits to capture shopper intent',
     category: 'commerce-conversion',
-    tier: ['commitment', 'professional', 'enterprise']
+    tier: ['commitment', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Click & Collect / BOPIS',
     adminTerm: 'Reserve / BOPIS / click & collect',
     description: 'Buy online, pick up in store with scheduling',
     category: 'commerce-conversion',
-    tier: ['commitment', 'professional', 'enterprise']
+    tier: ['commitment', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Full Online Payment Collection',
     adminTerm: 'Full online payment collection',
     description: 'Complete e-commerce payments with multiple methods',
     category: 'commerce-conversion',
-    tier: ['professional', 'enterprise']
+    tier: ['ecommerce', 'omnichannel', 'enterprise']
   },
 
   // MANAGEMENT & GROWTH
@@ -138,7 +138,7 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'Conversion analytics & reporting',
     description: 'Track reservations, pickups, abandonment, and revenue',
     category: 'management-growth',
-    tier: ['commitment', 'professional', 'enterprise']
+    tier: ['commitment', 'ecommerce', 'omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Multi-Location Management',
@@ -152,7 +152,7 @@ export const CONTENT_MAPPINGS: ContentMapping[] = [
     adminTerm: 'API access & custom integrations',
     description: 'Advanced API access for custom integrations',
     category: 'management-growth',
-    tier: ['professional', 'enterprise']
+    tier: ['omnichannel', 'enterprise']
   },
   {
     marketingTerm: 'Enterprise Security & Compliance',
@@ -178,19 +178,25 @@ export const TIER_PROGRESSIONS = {
     tagline: 'Own Your Platform Presence'
   },
   commitment: {
-    identity: 'I am selling online',
+    identity: 'I drive foot traffic',
     realization: 'Shoppers reserve and show up — but some want to pay fully online',
-    upgradeTrigger: 'I want to close the full sale online',
+    upgradeTrigger: 'I want to close the full sale online OR I\'m online-only',
     tagline: 'Capture Intent and Drive Foot Traffic'
   },
-  professional: {
-    identity: 'I am a full online retailer',
-    realization: 'I have everything I need for online sales',
+  ecommerce: {
+    identity: 'I sell online',
+    realization: 'I\'m selling online successfully — now I want to add physical pickup',
+    upgradeTrigger: 'I have a physical store AND online sales',
+    tagline: 'Sell Online — Fully & Simply'
+  },
+  omnichannel: {
+    identity: 'I sell everywhere',
+    realization: 'I have everything I need for all sales models',
     upgradeTrigger: 'I want advanced features and multi-location support',
-    tagline: 'Full E-Commerce Platform'
+    tagline: 'Physical + Online — Unified Commerce'
   },
   enterprise: {
-    identity: 'I am running a complete business operation',
+    identity: 'I run a business empire',
     realization: 'I have enterprise-grade tools and support',
     upgradeTrigger: 'Growth, scale, and advanced business needs',
     tagline: 'Complete Business Solution'
