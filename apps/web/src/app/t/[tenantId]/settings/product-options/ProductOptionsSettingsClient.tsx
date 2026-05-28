@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Image, Video, Copy } from 'lucide-react';
+import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Image, Video, Copy, ArrowRight, Zap, Plus, List } from 'lucide-react';
+import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { useProductOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import Link from 'next/link';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface ProductOptionsSettings {
@@ -22,6 +22,41 @@ interface ProductOptionsSettings {
 
 interface ProductOptionsSettingsClientProps {
   tenantId: string;
+}
+
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: typeof Package;
+  variant: 'general' | 'product';
+}
+
+function getQuickActions(settings: ProductOptionsSettings, tenantId: string): QuickAction[] {
+  const actions: QuickAction[] = [];
+  const anyTypeEnabled = settings.product_physical_enabled || settings.product_digital_enabled || settings.product_hybrid_enabled || settings.product_service_enabled;
+
+  if (anyTypeEnabled) {
+    actions.push({
+      id: 'items',
+      label: 'Browse Items',
+      description: 'View and manage your product catalog',
+      href: `/t/${tenantId}/items`,
+      icon: List,
+      variant: 'product',
+    });
+    actions.push({
+      id: 'create-item',
+      label: 'Create New Item',
+      description: 'Add a new product to your catalog',
+      href: `/t/${tenantId}/items/create`,
+      icon: Plus,
+      variant: 'product',
+    });
+  }
+
+  return actions;
 }
 
 export default function ProductOptionsSettingsClient({ tenantId }: ProductOptionsSettingsClientProps) {
@@ -316,6 +351,54 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
           {saving ? 'Saving...' : 'Save Product Options'}
         </Button>
       </div>
+
+      {/* Next Steps — contextual destinations based on saved preferences */}
+      {(() => {
+        const actions = getQuickActions(settings, tenantId);
+        if (actions.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                What's Next
+              </CardTitle>
+              <p className="text-sm text-neutral-600 mt-1">
+                Continue managing the product types you just enabled
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {actions.map(action => {
+                  const IconComp = action.icon;
+                  const variantStyles = {
+                    product: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
+                  };
+                  const iconStyles = {
+                    product: 'text-blue-600',
+                    general: 'text-neutral-600',
+                  };
+                  return (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${variantStyles[action.variant]}`}
+                    >
+                      <IconComp className={`h-5 w-5 shrink-0 ${iconStyles[action.variant]}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{action.label}</p>
+                        <p className="text-xs opacity-80 truncate">{action.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

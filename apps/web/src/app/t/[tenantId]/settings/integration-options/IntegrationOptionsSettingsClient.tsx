@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Link2, ShoppingCart, Search, Save, AlertCircle } from 'lucide-react';
+import { Link2, ShoppingCart, Search, Save, AlertCircle, ArrowRight, Plug, Package, CreditCard, Settings, Zap } from 'lucide-react';
+import Link from 'next/link';
 import { useIntegrationOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
@@ -64,6 +65,108 @@ const DEFAULT_SETTINGS: IntegrationOptionsSettings = {
   integration_google_enabled: true,
   integration_flexible: false,
 };
+
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: typeof Link2;
+  variant: 'pos' | 'google' | 'general' | 'commerce';
+}
+
+function getQuickActions(settings: IntegrationOptionsSettings, tenantId: string): QuickAction[] {
+  const actions: QuickAction[] = [];
+
+  if (!settings.integration_enabled) {
+    return actions;
+  }
+
+  // POS-specific actions
+  if (settings.integration_pos_enabled) {
+    if (settings.integration_clover) {
+      actions.push({
+        id: 'clover-setup',
+        label: 'Connect Clover POS',
+        description: 'Authorize and sync your Clover inventory',
+        href: `/t/${tenantId}/settings/integrations/clover`,
+        icon: Plug,
+        variant: 'pos',
+      });
+    }
+    if (settings.integration_square) {
+      actions.push({
+        id: 'square-setup',
+        label: 'Connect Square POS',
+        description: 'Authorize and sync your Square inventory',
+        href: `/t/${tenantId}/settings/integrations/square`,
+        icon: Plug,
+        variant: 'pos',
+      });
+    }
+    if (!settings.integration_clover && !settings.integration_square) {
+      actions.push({
+        id: 'pos-dashboard',
+        label: 'View POS Integrations',
+        description: 'Explore available POS connection options',
+        href: `/t/${tenantId}/settings/integrations`,
+        icon: ShoppingCart,
+        variant: 'pos',
+      });
+    }
+  }
+
+  // Google-specific actions
+  if (settings.integration_google_enabled) {
+    const hasGoogleSpecific = settings.integration_gbp ||
+      settings.integration_google_shopping ||
+      settings.integration_google_merchant_center ||
+      settings.integration_gmc_sync ||
+      settings.integration_propagation_gbp;
+
+    if (hasGoogleSpecific) {
+      actions.push({
+        id: 'google-setup',
+        label: 'Configure Google Integrations',
+        description: 'Connect Google Merchant Center, Business Profile, and Shopping',
+        href: `/t/${tenantId}/settings/integrations/google`,
+        icon: Search,
+        variant: 'google',
+      });
+    } else {
+      actions.push({
+        id: 'google-dashboard',
+        label: 'View Google Integrations',
+        description: 'Explore Google visibility and sync options',
+        href: `/t/${tenantId}/settings/integrations/google`,
+        icon: Search,
+        variant: 'google',
+      });
+    }
+  }
+
+  // General complementary actions
+  if (actions.length > 0) {
+    actions.push({
+      id: 'manage-products',
+      label: 'Manage Products',
+      description: 'Review and organize your product catalog for sync',
+      href: `/t/${tenantId}/items`,
+      icon: Package,
+      variant: 'general',
+    });
+    actions.push({
+      id: 'payment-gateways',
+      label: 'Configure Payment Gateways',
+      description: 'Set up how customers pay for orders',
+      href: `/t/${tenantId}/settings/payment-gateways`,
+      icon: CreditCard,
+      variant: 'commerce',
+    });
+  }
+
+  return actions;
+}
 
 export default function IntegrationOptionsSettingsClient({ tenantId }: IntegrationOptionsSettingsClientProps) {
   const integrationCap = useIntegrationOptionsCapability(tenantId, { forTenant: true });
@@ -334,6 +437,58 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
           {saving ? 'Saving...' : 'Save Integration Options'}
         </Button>
       </div>
+
+      {/* Next Steps — contextual destinations based on saved preferences */}
+      {(() => {
+        const actions = getQuickActions(settings, tenantId);
+        if (actions.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                What's Next
+              </CardTitle>
+              <p className="text-sm text-neutral-600 mt-1">
+                Continue setup for the integrations you just enabled
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {actions.map(action => {
+                  const IconComp = action.icon;
+                  const variantStyles = {
+                    pos: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    google: 'bg-green-50 border-green-200 hover:border-green-300 text-green-900',
+                    general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
+                    commerce: 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-900',
+                  };
+                  const iconStyles = {
+                    pos: 'text-blue-600',
+                    google: 'text-green-600',
+                    general: 'text-neutral-600',
+                    commerce: 'text-purple-600',
+                  };
+                  return (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${variantStyles[action.variant]}`}
+                    >
+                      <IconComp className={`h-5 w-5 shrink-0 ${iconStyles[action.variant]}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{action.label}</p>
+                        <p className="text-xs opacity-80 truncate">{action.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

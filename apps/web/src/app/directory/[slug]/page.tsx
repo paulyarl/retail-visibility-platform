@@ -36,6 +36,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 
 // tenant private data
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
@@ -395,9 +396,16 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
-  const showsLocation = storefrontCap.data?.showsLocation ?? true;
-  const showsMap = storefrontCap.data?.showsMap ?? true;
-  const showsHours = storefrontCap.data?.showsHours ?? true;
+  // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
+  // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
+
+  // Storefront options capability flags (fetched in parallel with other data below)
+  const [optFlags, setOptFlags] = useState<StorefrontOptionFlags | null>(null);
+
+  // Derived visibility flags from optFlags (merchant-controlled)
+  const showsHours = optFlags?.showHoursDisplay ?? true;
+  const showsMap = optFlags?.showMapDisplay ?? true;
+  const showsLocation = optFlags?.showLocationDisplay ?? true;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -427,13 +435,15 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           hours,
           related,
           categories,
-          productCount
+          productCount,
+          optionFlags
         ] = await Promise.all([
           getBusinessProfile(data.listing.tenantId),
           getBusinessHours(data.listing.tenantId),
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
-          getActualProductCount(data.listing.tenantId)
+          getActualProductCount(data.listing.tenantId),
+          publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -441,6 +451,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         setRelatedProducts(related);
         setStorefrontCategories(categories);
         setActualProductCount(productCount);
+        if (optionFlags) setOptFlags(optionFlags);
 
         // Fetch tenant info for status panel
         const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
@@ -583,8 +594,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
 
                   {/* Hours Badge - Status */}
-                  {!showStatusPanel && showsHours && isRetailStore && (
-                    <HoursStatusBadge status={hoursStatus} size='lg' />
+                  {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && isRetailStore && (
+                    <HoursStatusBadge status={hoursStatus} size='lg' animate={optFlags?.showAnimatedHours !== false} />
                   )}
 
                 </div>
@@ -694,7 +705,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                         <span className="hidden lg:inline">Hours</span>
                       </a>
                       {/* Share/Print Actions - Right side */}
-                      {!showStatusPanel && (
+                      {!showStatusPanel && optFlags?.showStorefrontActions !== false && (
                         <DirectoryActions
                           listing={{
                             business_name: listing.businessName,
@@ -826,7 +837,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             </div>
 
             {/* Right Column - Contact Info */}
-            {!showStatusPanel && showsHours && (
+            {!showStatusPanel && showsHours && optFlags?.showContact !== false && (
               <div className="space-y-6">
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -839,7 +850,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
 
                   {/* Social Links */}
-                  {(businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
+                  {optFlags?.showSocialMedia !== false && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
                     <div className="pt-3 border-t border-neutral-200 dark:border-neutral-600 mt-3">
                       <h2 className="text-lg font-semibold text-neutral-500 dark:text-neutral-400 mb-3">Follow Us</h2>
                       <div className="flex flex-wrap gap-4">
@@ -929,7 +940,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             )}
 
             {/* Business Hours - Collapsible */}
-            {!showStatusPanel && showsHours && businessHours && isRetailStore && (
+            {!showStatusPanel && showsHours && optFlags?.showHoursStatus !== false && businessHours && isRetailStore && (
               <>
                 <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={isRetailStore} />
                 <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
@@ -937,7 +948,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             )}
 
             {/* Map Location */}
-            {!showStatusPanel && showsMap && listing.address && isRetailStore && (
+            {!showStatusPanel && showsMap && optFlags?.showInteractiveMaps !== false && listing.address && isRetailStore && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -962,7 +973,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
       }
 
       {/* Recently Viewed */}
-      <LastViewed />
+      {optFlags?.showRecentlyViewed !== false && <LastViewed />}
 
       {/* Platform Branding Footer */}
       <PoweredByFooter />

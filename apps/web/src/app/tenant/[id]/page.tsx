@@ -36,6 +36,7 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 
@@ -403,7 +404,15 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug };
+    // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
+    let storefrontOptionFlags: StorefrontOptionFlags | null = null;
+    try {
+      storefrontOptionFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch storefront option flags:', e);
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -473,7 +482,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {
@@ -643,6 +652,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
           totalItems={total}
           locationStatus={tenant?.locationStatus}
           statusInfo={tenant?.statusInfo}
+          initialStorefrontOptionFlags={storefrontOptionFlags}
         />
       </TenantPaymentProvider>
     </ProductSingletonProvider>

@@ -25,8 +25,10 @@ function useResponsiveLayout() {
 }
 
 import QRCode from 'qrcode';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { useCommerceCapability, usePaymentGatewayCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';
@@ -1092,9 +1094,10 @@ interface TierBasedLandingPageProps {
   productSlug?: string;
   slugType?: string;
   disableQRCode?: boolean; // Override to disable QR code section
+  initialOptFlags?: StorefrontOptionFlags | null; // Server-side resolved flags
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl, productSlug, slugType, disableQRCode }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl, productSlug, slugType, disableQRCode, initialOptFlags }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1130,9 +1133,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
-  const showsLocation = storefrontCap.data?.showsLocation ?? true;
-  const showsMap = storefrontCap.data?.showsMap ?? true;
-  const showsHours = storefrontCap.data?.showsHours ?? true;
+  // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
+  // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
+
+  // Storefront options capability flags — initialized from server-side fetch (no waterfall)
+  const [optFlags] = useState<StorefrontOptionFlags | null>(initialOptFlags ?? null);
+
+  const showsLocation = optFlags?.showLocationDisplay ?? true;
+  const showsMap = optFlags?.showMapDisplay ?? true;
+  const showsHours = optFlags?.showHoursDisplay ?? true;
   // console.log(`[TierBasedLandingPage] Effective can purchase: ${effectiveCanPurchase}`);
   // console.log(`[TierBasedLandingPage] Effective gateway type: ${effectiveGatewayType}`);
   // console.log(`[TierBasedLandingPage] Context payment: ${JSON.stringify(contextPayment, null, 2)}`);
@@ -1847,12 +1856,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           )}
  
 
-        {/* QR Code CTA Section - Professional+ Tier */}
-        {!showStatusPanel && safeFeatures.qrCodes && !disableQRCode && (
-          <PublicQRCodeSection
-            productUrl={resolvedCurrentUrl}
-            productName={product.name}
+        {/* QR Code CTA Section - capability-aware */}
+        {!showStatusPanel && !disableQRCode && (
+          <TenantQRCode
+            url={resolvedCurrentUrl}
             tenantId={product.tenantId}
+            label="Scan to Share"
+            pageType="product"
           />
         )}
 

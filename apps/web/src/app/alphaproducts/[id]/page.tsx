@@ -32,6 +32,7 @@ import ProductCategorySidebar from '@/components/storefront/ProductCategorySideb
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 
 import { tenantPublicService,SubscriptionStatusInfo,LocationStatusInfo,PublicTenantInfo,TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -275,6 +276,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
+  const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
@@ -477,7 +479,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Directory Actions */}
-              <DirectoryActions 
+              {optFlags?.showStorefrontActions !== false && <DirectoryActions 
                 listing={{
                   business_name: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || '',
                   slug: tenantProfile?.slug || '',
@@ -487,7 +489,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 currentUrl={currentUrl}
                 entity_name={product.name}
                 variant="product"
-              />
+              />}
             </div>
           </div>
 
@@ -669,6 +671,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                   fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
                   currentUrl={currentUrl}
+                  initialOptFlags={optFlags}
                 />
               </TenantPaymentProvider>
             </div>
@@ -754,13 +757,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       {/* Recently Viewed Products */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <LastViewed 
+        {optFlags?.showRecentlyViewed !== false && <LastViewed 
           title="Recently Viewed Products"
           entityType="product"
           limit={4}
           showEmptyState={false}
           currentProductId={product.id}
-        />
+        />}
       </div>
 
       {/* Platform Branding Footer */}

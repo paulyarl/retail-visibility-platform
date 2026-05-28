@@ -11,6 +11,7 @@ import shopsRoutes from './shops';
 import tenantsRoutes from './public/tenants';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { DEFAULT_SETTINGS } from './storefront-options-settings';
 
 const router = Router();
 
@@ -3312,5 +3313,269 @@ router.use('/shops', shopsRoutes);
 
 // Mount tenants routes under /tenants
 router.use('/tenants', tenantsRoutes);
+
+// ====================
+// STOREFRONT OPTIONS - Public resolved flags
+// ====================
+
+router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Get merchant preferences
+    const settings = await prisma.tenant_storefront_options_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    const prefs = settings || DEFAULT_SETTINGS;
+
+    // Get tenant's effective tier to resolve capability features
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        organization_id: true,
+        organizations_list: {
+          select: { subscription_tier: true },
+        },
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant not found' });
+    }
+
+    const effectiveTierKey = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+
+    // Resolve tier_key -> tier_id (subscription_tier stores short keys like 'professional',
+    // but tier_features_list.tier_id stores full IDs like 'tier_professional')
+    const tierRecord = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: effectiveTierKey },
+      select: { id: true },
+    });
+    const effectiveTierId = tierRecord?.id || effectiveTierKey;
+
+    // Fetch tier features for storefront_options capability
+    const capabilityType = await prisma.capability_type_list.findUnique({
+      where: { key: 'storefront_options' },
+      select: { id: true },
+    });
+
+    const tierFeatures = capabilityType
+      ? await prisma.tier_features_list.findMany({
+          where: {
+            tier_id: effectiveTierId,
+            feature_key: { startsWith: 'storefront_opt_' },
+            is_enabled: true,
+          },
+          select: { feature_key: true },
+        })
+      : [];
+
+    // Build feature map from tier features
+    const features: Record<string, boolean> = {};
+    for (const tf of tierFeatures) {
+      features[tf.feature_key] = true;
+    }
+
+    // Resolve capability state (same logic as frontend resolveStorefrontOptionsState)
+    const enabled = !!features.storefront_opt_enabled;
+    const disabled = !!features.storefront_opt_disabled;
+    const flexible = !!features.storefront_opt_flexible;
+    const mainOn = enabled && !disabled;
+
+    // Hours group
+    const hoursGroupEnabled = !!features.storefront_opt_hours_enabled;
+    const hoursGroupDisabled = !!features.storefront_opt_hours_disabled;
+    const hoursEnabled = hoursGroupEnabled && !hoursGroupDisabled;
+    const hoursUntouched = !hoursGroupEnabled && !hoursGroupDisabled;
+    const allowedHoursTypes: string[] = [];
+    if (flexible || hoursEnabled) {
+      allowedHoursTypes.push('hours_animated', 'hours_status');
+    } else if (hoursUntouched) {
+      if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
+      if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
+    }
+
+    // Category group
+    const categoryGroupEnabled = !!features.storefront_opt_category_enabled;
+    const categoryGroupDisabled = !!features.storefront_opt_category_disabled;
+    const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
+    const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
+    const allowedCategoryTypes: string[] = [];
+    if (flexible || categoryEnabled) {
+      allowedCategoryTypes.push('category_store', 'category_product');
+    } else if (categoryUntouched) {
+      if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
+      if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
+    }
+
+    // Recommend group
+    const recommendGroupEnabled = !!features.storefront_opt_recommend_enabled;
+    const recommendGroupDisabled = !!features.storefront_opt_recommend_disabled;
+    const recommendEnabled = recommendGroupEnabled && !recommendGroupDisabled;
+    const recommendUntouched = !recommendGroupEnabled && !recommendGroupDisabled;
+    const allowedRecommendTypes: string[] = [];
+    if (flexible || recommendEnabled) {
+      allowedRecommendTypes.push('recommend_store', 'recommend_products');
+    } else if (recommendUntouched) {
+      if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
+      if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
+    }
+
+    // Section Display (standalone, no group gate)
+    const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
+    const mapDisplayTierAllowed = flexible || !!features.storefront_opt_map_display;
+    const locationDisplayTierAllowed = flexible || !!features.storefront_opt_location_display;
+
+    // Recently viewed
+    const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
+
+    // Info group
+    const infoGroupEnabled = !!features.storefront_opt_info_enabled;
+    const infoGroupDisabled = !!features.storefront_opt_info_disabled;
+    const infoEnabled = infoGroupEnabled && !infoGroupDisabled;
+    const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
+    const allowedInfoTypes: string[] = [];
+    if (flexible || infoEnabled) {
+      allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+    } else if (infoUntouched) {
+      if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
+      if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
+      if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
+    }
+
+    // QR group
+    const qrGroupEnabled = !!features.storefront_opt_qr_enabled;
+    const qrGroupDisabled = !!features.storefront_opt_qr_disabled;
+    const qrEnabled = qrGroupEnabled && !qrGroupDisabled;
+    const qrUntouched = !qrGroupEnabled && !qrGroupDisabled;
+    const allowedQRResolutions: string[] = [];
+    const allowedQRContentTypes: string[] = [];
+    if (flexible || qrEnabled) {
+      allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
+      allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
+    } else if (qrUntouched) {
+      if (features.storefront_opt_qr_codes_512) allowedQRResolutions.push('qr_codes_512');
+      if (features.storefront_opt_qr_codes_1024) allowedQRResolutions.push('qr_codes_1024');
+      if (features.storefront_opt_qr_codes_2048) allowedQRResolutions.push('qr_codes_2048');
+      if (features.storefront_opt_qr_product) allowedQRContentTypes.push('qr_product');
+      if (features.storefront_opt_qr_store) allowedQRContentTypes.push('qr_store');
+      if (features.storefront_opt_qr_logo) allowedQRContentTypes.push('qr_logo');
+      if (features.storefront_opt_qr_directory) allowedQRContentTypes.push('qr_directory');
+    }
+
+    // Gallery group
+    const galleryGroupEnabled = !!features.storefront_opt_gallery_enabled;
+    const galleryGroupDisabled = !!features.storefront_opt_gallery_disabled;
+    const galleryEnabled = galleryGroupEnabled && !galleryGroupDisabled;
+    const galleryUntouched = !galleryGroupEnabled && !galleryGroupDisabled;
+    const allowedGalleryTypes: string[] = [];
+    if (flexible || galleryEnabled) {
+      allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
+    } else if (galleryUntouched) {
+      if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
+      if (features.storefront_opt_image_gallery_10) allowedGalleryTypes.push('image_gallery_10');
+      if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
+    }
+
+    // Advanced group
+    const advancedGroupEnabled = !!features.storefront_opt_advanced_enabled;
+    const advancedGroupDisabled = !!features.storefront_opt_advanced_disabled;
+    const advancedEnabled = advancedGroupEnabled && !advancedGroupDisabled;
+    const advancedUntouched = !advancedGroupEnabled && !advancedGroupDisabled;
+    const allowedAdvancedTypes: string[] = [];
+    if (flexible || advancedEnabled) {
+      allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
+    } else if (advancedUntouched) {
+      if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
+      if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
+    }
+
+    // Compute effective flags (tier-allowed AND merchant-enabled)
+    const optEnabled = prefs.storefront_opt_enabled !== false;
+    const effectiveHoursTypes = optEnabled
+      ? allowedHoursTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveCategoryTypes = optEnabled
+      ? allowedCategoryTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveRecommendTypes = optEnabled
+      ? allowedRecommendTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && prefs.hours_display !== false;
+    const effectiveMapDisplay = optEnabled && mapDisplayTierAllowed && prefs.map_display !== false;
+    const effectiveLocationDisplay = optEnabled && locationDisplayTierAllowed && prefs.location_display !== false;
+    const effectiveRecentlyViewed = optEnabled && recentlyViewedTierAllowed && prefs.recently_viewed !== false;
+    const effectiveInfoTypes = optEnabled
+      ? allowedInfoTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveQRResolutions = optEnabled
+      ? allowedQRResolutions.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveQRContentTypes = optEnabled
+      ? allowedQRContentTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveGalleryTypes = optEnabled
+      ? allowedGalleryTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+    const effectiveAdvancedTypes = optEnabled
+      ? allowedAdvancedTypes.filter(t => (prefs as any)[t] !== false)
+      : [];
+
+    // Resolve QR resolution and gallery limit
+    let qrResolution = '';
+    if (mainOn && effectiveQRResolutions.length > 0) {
+      if (effectiveQRResolutions.includes('qr_codes_2048')) qrResolution = '2048';
+      else if (effectiveQRResolutions.includes('qr_codes_1024')) qrResolution = '1024';
+      else if (effectiveQRResolutions.includes('qr_codes_512')) qrResolution = '512';
+    }
+
+    let galleryLimit = 0;
+    if (mainOn && effectiveGalleryTypes.length > 0) {
+      if (effectiveGalleryTypes.includes('image_gallery_15')) galleryLimit = 15;
+      else if (effectiveGalleryTypes.includes('image_gallery_10')) galleryLimit = 10;
+      else if (effectiveGalleryTypes.includes('image_gallery_5')) galleryLimit = 5;
+    }
+
+    // Return resolved flags for public consumption
+    res.json({
+      success: true,
+      flags: {
+        showHoursDisplay: mainOn && effectiveHoursDisplay,
+        showAnimatedHours: mainOn && effectiveHoursTypes.includes('hours_animated'),
+        showHoursStatus: mainOn && effectiveHoursTypes.includes('hours_status'),
+        showMapDisplay: mainOn && effectiveMapDisplay,
+        showLocationDisplay: mainOn && effectiveLocationDisplay,
+        showCategoryStore: mainOn && effectiveCategoryTypes.includes('category_store'),
+        showCategoryProduct: mainOn && effectiveCategoryTypes.includes('category_product'),
+        showRecommendStore: mainOn && effectiveRecommendTypes.includes('recommend_store'),
+        showRecommendProducts: mainOn && effectiveRecommendTypes.includes('recommend_products'),
+        showRecentlyViewed: mainOn && effectiveRecentlyViewed,
+        showSocialMedia: mainOn && effectiveInfoTypes.includes('storefront_social_media'),
+        showContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
+        showInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
+        showQRCodes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
+        showQRProduct: mainOn && effectiveQRContentTypes.includes('qr_product'),
+        showQRStore: mainOn && effectiveQRContentTypes.includes('qr_store'),
+        showQRLogo: mainOn && effectiveQRContentTypes.includes('qr_logo'),
+        showQRDirectory: mainOn && effectiveQRContentTypes.includes('qr_directory'),
+        qrResolution,
+        qrResolutions: effectiveQRResolutions,
+        galleryLimit,
+        showEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
+        showStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+      },
+      tierKey: effectiveTierKey,
+    });
+  } catch (error) {
+    console.error('Error fetching public storefront options:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch storefront options',
+    });
+  }
+});
 
 export default router;

@@ -50,6 +50,7 @@ import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPa
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
 
@@ -93,6 +94,8 @@ interface StorefrontClientWrapperProps {
   // Location status fields from public API
   locationStatus?: string | null;
   statusInfo?: any;
+  // Server-side resolved storefront option flags (eliminates client-side waterfall)
+  initialStorefrontOptionFlags?: StorefrontOptionFlags | null;
 }
 
 export default function StorefrontClientWrapper({
@@ -128,6 +131,7 @@ export default function StorefrontClientWrapper({
   totalItems = 0,
   locationStatus,
   statusInfo,
+  initialStorefrontOptionFlags,
 }: StorefrontClientWrapperProps) {
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
@@ -177,9 +181,27 @@ export default function StorefrontClientWrapper({
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
-  const showsLocation = storefrontCap.data?.showsLocation ?? true; // default to true while loading
-  const showsMap = storefrontCap.data?.showsMap ?? true;
-  const showsHours = storefrontCap.data?.showsHours ?? true;
+  // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
+  // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
+
+  // Storefront options capability flags — initialized from server-side fetch (no waterfall)
+  const [storefrontOptionFlags] = useState<StorefrontOptionFlags | null>(initialStorefrontOptionFlags ?? null);
+
+  // Capability-aware visibility flags (fall back to true while loading)
+  const optFlags = storefrontOptionFlags;
+  const showsHours = optFlags?.showHoursDisplay ?? true;
+  const showsMap = optFlags?.showMapDisplay ?? true;
+  const showsLocation = optFlags?.showLocationDisplay ?? true;
+  const showsAnimatedHours = optFlags?.showAnimatedHours ?? true;
+  const showsHoursStatus = optFlags?.showHoursStatus ?? true;
+  const showsCategoryStore = optFlags?.showCategoryStore ?? true;
+  const showsCategoryProduct = optFlags?.showCategoryProduct ?? true;
+  const showsRecommendStore = optFlags?.showRecommendStore ?? true;
+  const showsRecentlyViewed = optFlags?.showRecentlyViewed ?? true;
+  const showsInteractiveMaps = optFlags?.showInteractiveMaps ?? true;
+  const showsContact = optFlags?.showContact ?? true;
+  const showsSocialMedia = optFlags?.showSocialMedia ?? true;
+  const showsStorefrontActions = optFlags?.showStorefrontActions ?? true;
 
   // Extract contact information from tenant metadata with fallbacks
   // Lazy: wait for storefrontCap to resolve before computing, so capability-driven
@@ -370,7 +392,7 @@ export default function StorefrontClientWrapper({
             </div>
           </div>
           {/* Category Badges */}
-          {primaryGBPCategory && isRetailStore && (
+          {primaryGBPCategory && isRetailStore && showsCategoryStore && (
             <div className="flex-1">
               <GBPCategoryBadges
                 categories={[primaryGBPCategory, ...secondaryGBPCategories]}
@@ -382,10 +404,10 @@ export default function StorefrontClientWrapper({
           {/* Action Buttons - Below categories for better responsive behavior */}
           {!storefrontStatus.shouldShowPanel && tenantSlug && isRetailStore && (
             <div className="hidden sm:flex justify-end mt-3">
-              {showsHours && isRetailStore && (
-                <HoursStatusBadge status={hoursStatus} size="lg" />
+              {showsHours && showsHoursStatus && isRetailStore && (
+                <HoursStatusBadge status={hoursStatus} size="lg" animate={showsAnimatedHours} />
               )}
-              <DirectoryActions
+              {showsStorefrontActions && <DirectoryActions
                 listing={{
                   business_name: tenant.name,
                   slug: tenant.slug,
@@ -393,7 +415,7 @@ export default function StorefrontClientWrapper({
                   id: tenant.id
                 }}
                 currentUrl={currentUrl}
-              />
+              />}
             </div>
           )}
           {/* Mobile Navigation */}
@@ -756,11 +778,11 @@ export default function StorefrontClientWrapper({
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Desktop Category Sidebar */}
                 <div className="hidden lg:block lg:w-64 flex-shrink-0">
-                  <ProductCategorySidebar
+                  {showsCategoryProduct && <ProductCategorySidebar
                     tenantId={tenantId}
                     categories={categories}
                     totalProducts={totalItems || 0}
-                  />
+                  />}
                   {/* QR Code - under categories */}
                   <TenantQRCode
                     url={currentUrl}
@@ -881,12 +903,12 @@ export default function StorefrontClientWrapper({
             </div>
 
             {/* Featured Buckets with Products and Section IDs for Quick Jump */}
-            <FeaturedBucketsShowcase
+            {featuredData && <FeaturedBucketsShowcase
               featuredData={featuredData}
               tenantId={tenantId}
               hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
               defaultGatewayType={tenant.metadata?.defaultGatewayType}
-            />
+            />}
           </div>
         </div>
       )}
@@ -897,7 +919,7 @@ export default function StorefrontClientWrapper({
       <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {!storefrontStatus.shouldShowPanel && showsHours && businessHours && isRetailStore && (
+            {!storefrontStatus.shouldShowPanel && showsHours && showsHoursStatus && businessHours && isRetailStore && (
               <div className="lg:col-span-2">
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
                   <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
@@ -915,7 +937,7 @@ export default function StorefrontClientWrapper({
             {/* Contact & Hours Sidebar */}
             <div className="space-y-6">
 
-              {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && (
+              {!storefrontStatus.shouldShowPanel && showsLocation && showsContact && contactInfo.address && (
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -948,25 +970,25 @@ export default function StorefrontClientWrapper({
               {/* Map & Location */}
               <div className="lg:col-span-2">
                 <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden"  >
-                  {!storefrontStatus.shouldShowPanel && showsLocation && contactInfo.address && isRetailStore && (
+                  {!storefrontStatus.shouldShowPanel && showsLocation && showsContact && contactInfo.address && isRetailStore && (
                     <div className="p-6" >
                       <><h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
                         Visit Our Store
                       </h3><p className="text-neutral-600 dark:text-neutral-400 mb-4">
                           {contactInfo.address}
                         </p><div className="flex items-center gap-2">
-                          <HoursStatusBadge status={hoursStatus} size="lg" />
+                          <HoursStatusBadge status={hoursStatus} size="lg" animate={showsAnimatedHours} />
                         </div><div className="flex items-center gap-2">
                           {hoursStatus?.label}
                         </div></>
                     </div>
                   )}
                   {/* Single Map Display */}
-                  {!storefrontStatus.shouldShowPanel && showsMap && isRetailStore && mapLocation ? (
+                  {!storefrontStatus.shouldShowPanel && showsMap && showsInteractiveMaps && isRetailStore && mapLocation ? (
                     <TenantMapSection location={mapLocation} />
-                  ) : !storefrontStatus.shouldShowPanel && showsMap && isRetailStore && contactInfo.address ? (
+                  ) : !storefrontStatus.shouldShowPanel && showsMap && showsInteractiveMaps && isRetailStore && contactInfo.address ? (
                     <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
-                  ) : tenant && (
+                  ) : tenant && showsInteractiveMaps && (
                     <StorefrontMap
                       tenant={{
                         id: tenantId,
@@ -1029,12 +1051,12 @@ export default function StorefrontClientWrapper({
       )}
 
       {/* Storefront Recommendations */}
-      {!storefrontStatus.shouldShowPanel && isRetailStore && (
+      {!storefrontStatus.shouldShowPanel && isRetailStore && showsRecommendStore && (
         <StorefrontRecommendations tenantId={tenantId} />
       )}
       {/* Recently Viewed - always last for consistency with other public pages */}
 
-      {!storefrontStatus.shouldShowPanel && (
+      {!storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
         <LastViewed />
       )}
       {/* Tier-Based Footer */}

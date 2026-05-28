@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -21,6 +22,8 @@ export interface TenantQRCodeProps {
   className?: string;
   /** Page type for filename differentiation */
   pageType?: 'storefront' | 'directory' | 'product';
+  /** Pre-resolved capability flags (skips tier fetch if provided) */
+  capabilityFlags?: StorefrontOptionFlags | null;
 }
 
 /**
@@ -36,66 +39,66 @@ export function TenantQRCode({
   showDownload = true,
   className = '',
   pageType,
+  capabilityFlags,
 }: TenantQRCodeProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
   const [tenantTier, setTenantTier] = useState<string>('discovery');
   const [isFetchingTierAndLogo, setIsFetchingTierAndLogo] = useState(true);
+  // Capability-aware flags (resolved from API or passed as prop)
+  const [resolvedFlags, setResolvedFlags] = useState<StorefrontOptionFlags | null>(capabilityFlags || null);
 
-  // Fetch tenant tier and logo
+  // Fetch tenant tier, logo, and capability flags
   useEffect(() => {
     const fetchTenantInfo = async () => {
       try {
         setIsFetchingTierAndLogo(true);
-        
-        const tierData = await storefrontService.getPublicTier(tenantId);
-        
+
+        // Fetch tier data and capability flags in parallel
+        const [tierData, flagsResult] = await Promise.all([
+          storefrontService.getPublicTier(tenantId),
+          capabilityFlags
+            ? Promise.resolve(capabilityFlags)
+            : publicStorefrontOptionsService.getStorefrontOptionFlags(tenantId),
+        ]);
+
+        // Set capability flags if not provided as prop
+        if (!capabilityFlags && flagsResult) {
+          setResolvedFlags(flagsResult);
+        }
+
         if (tierData) {
           const data = tierData.data || tierData;
-          
-          // Determine effective tier
+
+          // Determine effective tier (still needed for logo fetch and color palette)
           const individualTier = data.tenantTier?.tier_key || null;
           const organizationTier = data.organizationTier?.tier_key || null;
-          
-          const getQRCodeLevel = (tierKey: string): number => {
-            if (!tierKey) return 0;
-            if (tierKey.includes('enterprise')|| tierKey.includes('professional') || tierKey.includes('ecommerce') || tierKey.includes('omnichannel')) return 3;
-            if (tierKey === 'commitment') return 2;
-            if (tierKey === 'chain_starter' || tierKey === 'storefront') return 1;
-            if (tierKey === 'starter' || tierKey === 'discovery') return 0;
-            return 2;
-          };
-          
+
           let effectiveTier: string;
-          const individualLevel = getQRCodeLevel(individualTier || '');
-          const orgLevel = getQRCodeLevel(organizationTier || '');
-          
-          if (individualTier && (!organizationTier || individualLevel >= orgLevel)) {
+          if (individualTier && (!organizationTier || individualTier >= organizationTier)) {
             effectiveTier = individualTier;
           } else if (organizationTier) {
             effectiveTier = organizationTier;
           } else {
             effectiveTier = data.effective?.tier_key || data.tier || 'discovery';
           }
-          
+
           // Strip 'trial_' prefix if present
           let effectiveTierPart = effectiveTier;
           const tierParts = effectiveTier.split('_');
           if (tierParts.length >= 2 && tierParts[0] === 'trial') {
             effectiveTierPart = tierParts[1];
           }
-          
+
           setTenantTier(effectiveTierPart);
-          
-          // Get tenant logo for higher tiers
-          const tiersWithLogo = [
-            'professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
-            'chain_professional', 'chain_enterprise', 'chain_starter',
-            'trial_professional', 'trial_commitment', 'trial_enterprise'
-          ];
-          
-          if (tiersWithLogo.includes(effectiveTierPart)) {
+
+          // Fetch logo if QR logo capability is enabled (capability-aware)
+          const shouldFetchLogo = flagsResult?.showQRLogo
+            || ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
+                'chain_professional', 'chain_enterprise', 'chain_starter'].includes(effectiveTierPart);
+
+          if (shouldFetchLogo) {
             try {
               const profile = await tenantPublicService.getPublicTenantInfo(tenantId);
               if (profile) {
@@ -113,11 +116,11 @@ export function TenantQRCode({
         setIsFetchingTierAndLogo(false);
       }
     };
-    
+
     if (tenantId) {
       fetchTenantInfo();
     }
-  }, [tenantId]);
+  }, [tenantId, capabilityFlags]);
 
   // Overlay logo on QR code
   const overlayLogoOnQR = async (qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> => {
@@ -303,83 +306,52 @@ export function TenantQRCode({
     }
   };
 
-  // Get tier-aware QR code quality settings (aligned with TierGainsWelcome logic)
-  const getTierQRSettings = (tier: string, organizationTier?: string | undefined) => {
+  // Get capability-aware QR code quality settings
+  // Uses resolvedFlags (from storefront_options capability) when available,
+  // falls back to tier-based logic for backward compatibility
+  const getCapabilityQRSettings = (tier: string, organizationTier?: string | undefined) => {
     const baseSize = size;
     const colors = getTierColorPalette(tier, organizationTier);
-    
-    // Use organization tier logic if present
+
+    // Capability-aware: use resolved QR resolution from flags
+    if (resolvedFlags?.showQRCodes && resolvedFlags.qrResolution) {
+      const res = resolvedFlags.qrResolution;
+      const exportSize = res === '2048' ? 2048 : res === '1024' ? 1024 : res === '512' ? 512 : baseSize;
+      const needsLogo = resolvedFlags.showQRLogo && !!tenantLogo;
+      return {
+        renderSize: Math.min(baseSize * (exportSize / baseSize), exportSize),
+        exportSize,
+        errorCorrection: (needsLogo || exportSize >= 1024 ? 'H' : 'M') as 'H' | 'M',
+        margin: exportSize >= 2048 ? 4 : exportSize >= 1024 ? 3 : 2,
+        quality: exportSize >= 2048 ? 'enterprise' : exportSize >= 1024 ? 'premium' : exportSize >= 512 ? 'enhanced' : 'standard',
+        colors,
+      };
+    }
+
+    // Fallback: tier-based logic (backward compatibility)
     const effectiveTier = organizationTier || tier;
-    
     switch (effectiveTier) {
       case 'discovery':
       case 'starter':
       case 'chain_starter':
-        return {
-          renderSize: baseSize,           // 256px default
-          exportSize: baseSize,           // 256px export
-          errorCorrection: 'M' as const,
-          margin: 2,
-          quality: 'standard',
-          colors: colors
-        };
-        
+        return { renderSize: baseSize, exportSize: baseSize, errorCorrection: 'M' as const, margin: 2, quality: 'standard', colors };
       case 'storefront':
       case 'chain_storefront':
-        return {
-          renderSize: Math.min(baseSize * 1.5, 512),  // Up to 512px
-          exportSize: 512,                           // 512px export
-          errorCorrection: 'M' as const,
-          margin: 2,
-          quality: 'enhanced',
-          colors: colors
-        };
-        
+        return { renderSize: Math.min(baseSize * 1.5, 512), exportSize: 512, errorCorrection: 'M' as const, margin: 2, quality: 'enhanced', colors };
       case 'commitment':
       case 'chain_commitment':
-        return {
-          renderSize: Math.min(baseSize * 2, 1024),   // Up to 1024px
-          exportSize: 1024,                          // 1024px export
-          errorCorrection: 'H' as const,              // Higher error correction for logo
-          margin: 3,
-          quality: 'premium',
-          colors: colors
-        };
-        
+        return { renderSize: Math.min(baseSize * 2, 1024), exportSize: 1024, errorCorrection: 'H' as const, margin: 3, quality: 'premium', colors };
       case 'professional':
       case 'ecommerce':
       case 'omnichannel':
       case 'chain_professional':
-        return {
-          renderSize: Math.min(baseSize * 3, 2048),   // Up to 2048px
-          exportSize: 2048,                          // 2048px export
-          errorCorrection: 'H' as const,              // Higher error correction for logo
-          margin: 3,
-          quality: 'professional',
-          colors: colors
-        };
-        
+        return { renderSize: Math.min(baseSize * 3, 2048), exportSize: 2048, errorCorrection: 'H' as const, margin: 3, quality: 'professional', colors };
       case 'enterprise':
       case 'organization':
       case 'chain_enterprise':
-        return {
-          renderSize: Math.min(baseSize * 4, 2048),   // Up to 2048px
-          exportSize: 2048,                          // 2048px export
-          errorCorrection: 'H' as const,              // Highest error correction
-          margin: 4,
-          quality: 'enterprise',
-          colors: colors
-        };
-        
+        return { renderSize: Math.min(baseSize * 4, 2048), exportSize: 2048, errorCorrection: 'H' as const, margin: 4, quality: 'enterprise', colors };
       default:
-        return {
-          renderSize: baseSize,
-          exportSize: baseSize,
-          errorCorrection: 'M' as const,
-          margin: 2,
-          quality: 'standard',
-          colors: colors
-        };
+        return { renderSize: baseSize, exportSize: baseSize, errorCorrection: 'M' as const, margin: 2, quality: 'standard', colors };
     }
   };
 
@@ -395,9 +367,9 @@ export function TenantQRCode({
       const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
                              tenantTier === 'organization' ? 'enterprise' : undefined;
       
-      // Get tier-specific settings with organization tier support
-      const qrSettings = getTierQRSettings(tenantTier, organizationTier);
-      
+      // Get capability-aware QR settings
+      const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
+
       // Create high-resolution canvas for export
       const exportCanvas = document.createElement('canvas');
       const exportCtx = exportCanvas.getContext('2d');
@@ -418,19 +390,23 @@ export function TenantQRCode({
       });
 
       let finalCanvas = exportCanvas;
-      
-      // Logo eligibility logic (aligned with TierGainsWelcome)
-      const effectiveTier = organizationTier || tenantTier;
-      const shouldApplyLogo = (
-        effectiveTier === 'commitment' ||
-        effectiveTier === 'professional' ||
-        effectiveTier === 'ecommerce' ||
-        effectiveTier === 'omnichannel' ||
-        effectiveTier === 'enterprise' ||
-        effectiveTier === 'organization' ||
-        tenantTier === 'chain_professional' ||
-        tenantTier === 'chain_enterprise'
-      ) && tenantLogo;
+
+      // Logo eligibility: capability-aware (showQRLogo flag) with tier fallback
+      const shouldApplyLogo = resolvedFlags
+        ? resolvedFlags.showQRLogo && !!tenantLogo
+        : (() => {
+            const effectiveTier = organizationTier || tenantTier;
+            return (
+              effectiveTier === 'commitment' ||
+              effectiveTier === 'professional' ||
+              effectiveTier === 'ecommerce' ||
+              effectiveTier === 'omnichannel' ||
+              effectiveTier === 'enterprise' ||
+              effectiveTier === 'organization' ||
+              tenantTier === 'chain_professional' ||
+              tenantTier === 'chain_enterprise'
+            ) && !!tenantLogo;
+          })();
 
       if (shouldApplyLogo) {
         try {
@@ -468,8 +444,8 @@ export function TenantQRCode({
     const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
                            tenantTier === 'organization' ? 'enterprise' : undefined;
     
-    // Get tier-specific settings with organization tier support
-    const qrSettings = getTierQRSettings(tenantTier, organizationTier);
+    // Get capability-aware QR settings
+    const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
     
     // Create canvas for requested size
     const canvas = document.createElement('canvas');
@@ -492,29 +468,25 @@ export function TenantQRCode({
 
     let finalCanvas = canvas;
     
-    // Logo eligibility logic (aligned with TierGainsWelcome)
-    const effectiveTier = organizationTier || tenantTier;
-    const shouldApplyLogo = (
-      effectiveTier === 'commitment' ||
-      effectiveTier === 'professional' ||
-      effectiveTier === 'ecommerce' ||
-      effectiveTier === 'omnichannel' ||
-      effectiveTier === 'enterprise' ||
-      effectiveTier === 'organization' ||
-      tenantTier === 'chain_professional' ||
-      tenantTier === 'chain_enterprise'
-    ) && tenantLogo;
+    // Logo eligibility: capability-aware with tier fallback
+    const shouldApplyLogo = resolvedFlags
+      ? resolvedFlags.showQRLogo && !!tenantLogo
+      : (() => {
+          const effectiveTier = organizationTier || tenantTier;
+          return (
+            effectiveTier === 'commitment' ||
+            effectiveTier === 'professional' ||
+            effectiveTier === 'ecommerce' ||
+            effectiveTier === 'omnichannel' ||
+            effectiveTier === 'enterprise' ||
+            effectiveTier === 'organization' ||
+            tenantTier === 'chain_professional' ||
+            tenantTier === 'chain_enterprise'
+          ) && !!tenantLogo;
+        })();
 
-    // Apply logo if eligible (all sizes for higher tiers, 512px+ for lower tiers)
-    const logoMinSize = (
-      effectiveTier === 'professional' ||
-      effectiveTier === 'ecommerce' ||
-      effectiveTier === 'omnichannel' ||
-      effectiveTier === 'enterprise' ||
-      effectiveTier === 'organization' ||
-      tenantTier === 'chain_professional' ||
-      tenantTier === 'chain_enterprise'
-    ) ? 256 : 512;
+    // Logo minimum size: capability-aware (256px if QR logo allowed, 512px otherwise)
+    const logoMinSize = resolvedFlags?.showQRLogo ? 256 : 512;
     
     if (shouldApplyLogo && targetSize >= logoMinSize) {
       try {
@@ -555,6 +527,11 @@ export function TenantQRCode({
     }
   };
 
+  // Capability gate: if flags resolved and QR codes not allowed, render nothing
+  if (resolvedFlags && !resolvedFlags.showQRCodes) {
+    return null;
+  }
+
   return (
     <div className={`bg-white rounded-lg shadow-sm p-4 ${className}`}>
       <div className="flex items-center gap-2 mb-3">
@@ -589,20 +566,32 @@ export function TenantQRCode({
         {showDownload && qrImageUrl && (
           <div className="mt-3 space-y-2">
             {(() => {
-              // Extract organization tier for download options
-              const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
-                                     tenantTier === 'organization' ? 'enterprise' : undefined;
-              const effectiveTier = organizationTier || tenantTier;
-              
-              // Define available sizes based on tier
+              // Capability-aware download size options
               const sizeOptions = (() => {
+                // Use resolved flags when available
+                if (resolvedFlags?.showQRCodes && resolvedFlags.qrResolutions.length > 0) {
+                  const res = resolvedFlags.qrResolutions;
+                  const options = [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
+                  if (res.includes('qr_codes_512') || res.includes('qr_codes_1024') || res.includes('qr_codes_2048')) {
+                    options.push({ size: 512, label: 'Medium (512px)', description: 'Web quality' });
+                  }
+                  if (res.includes('qr_codes_1024') || res.includes('qr_codes_2048')) {
+                    options.push({ size: 1024, label: 'Large (1024px)', description: 'Print quality' });
+                  }
+                  if (res.includes('qr_codes_2048')) {
+                    options.push({ size: 2048, label: 'Extra Large (2048px)', description: 'Professional print' });
+                  }
+                  return options;
+                }
+                // Fallback: tier-based
+                const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
+                                       tenantTier === 'organization' ? 'enterprise' : undefined;
+                const effectiveTier = organizationTier || tenantTier;
                 switch (effectiveTier) {
                   case 'discovery':
                   case 'starter':
                   case 'chain_starter':
-                    return [
-                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' }
-                    ];
+                    return [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
                   case 'storefront':
                   case 'chain_storefront':
                     return [
@@ -630,9 +619,7 @@ export function TenantQRCode({
                       { size: 2048, label: 'Extra Large (2048px)', description: 'Professional print' }
                     ];
                   default:
-                    return [
-                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' }
-                    ];
+                    return [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
                 }
               })();
               
@@ -664,26 +651,29 @@ export function TenantQRCode({
             Scan to visit page
           </p>
           
-          {/* Tier-specific features */}
+          {/* Capability-aware feature indicators */}
           <div className="text-center">
             {(() => {
-              // Extract organization tier for display logic
               const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
                                      tenantTier === 'organization' ? 'enterprise' : undefined;
-              const effectiveTier = organizationTier || tenantTier;
               const colors = getTierColorPalette(tenantTier, organizationTier);
               
-              // Logo eligibility
-              const shouldShowLogo = (
-                effectiveTier === 'commitment' ||
-                effectiveTier === 'professional' ||
-                effectiveTier === 'ecommerce' ||
-                effectiveTier === 'omnichannel' ||
-                effectiveTier === 'enterprise' ||
-                effectiveTier === 'organization' ||
-                tenantTier === 'chain_professional' ||
-                tenantTier === 'chain_enterprise'
-              ) && tenantLogo;
+              // Logo eligibility: capability-aware with tier fallback
+              const shouldShowLogo = resolvedFlags
+                ? resolvedFlags.showQRLogo && !!tenantLogo
+                : (() => {
+                    const effectiveTier = organizationTier || tenantTier;
+                    return (
+                      effectiveTier === 'commitment' ||
+                      effectiveTier === 'professional' ||
+                      effectiveTier === 'ecommerce' ||
+                      effectiveTier === 'omnichannel' ||
+                      effectiveTier === 'enterprise' ||
+                      effectiveTier === 'organization' ||
+                      tenantTier === 'chain_professional' ||
+                      tenantTier === 'chain_enterprise'
+                    ) && !!tenantLogo;
+                  })();
               
               return (
                 <>
@@ -693,7 +683,7 @@ export function TenantQRCode({
                   
                   {/* Quality indicator */}
                   {(() => {
-                    const settings = getTierQRSettings(tenantTier, organizationTier);
+                    const settings = getCapabilityQRSettings(tenantTier, organizationTier);
                     const qualityLabels = {
                       'standard': 'Standard Quality',
                       'enhanced': 'Enhanced Quality',
