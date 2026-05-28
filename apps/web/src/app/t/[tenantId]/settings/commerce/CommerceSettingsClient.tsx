@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings } from 'lucide-react';
+import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings, ArrowRight, Zap, Truck, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -35,6 +36,55 @@ interface CommerceSettings {
 
 interface CommerceSettingsClientProps {
   tenantId: string;
+}
+
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: typeof CreditCard;
+  variant: 'general' | 'payment' | 'fulfillment' | 'orders';
+}
+
+function getQuickActions(settings: CommerceSettings, tenantId: string, commerceDisabled: boolean): QuickAction[] {
+  const actions: QuickAction[] = [];
+  if (commerceDisabled) return actions;
+
+  if (settings.deposit_enabled || settings.full_payment_enabled) {
+    actions.push({
+      id: 'payment-gateways',
+      label: 'Payment Gateways',
+      description: 'Connect Stripe, PayPal, Square, or Clover',
+      href: `/t/${tenantId}/settings/payment-gateways`,
+      icon: CreditCard,
+      variant: 'payment',
+    });
+  }
+
+  if (settings.auto_confirm_orders || settings.allow_payment_on_pickup) {
+    actions.push({
+      id: 'fulfillment',
+      label: 'Fulfillment Settings',
+      description: 'Configure pickup, delivery, and shipping options',
+      href: `/t/${tenantId}/settings/fulfillment`,
+      icon: Truck,
+      variant: 'fulfillment',
+    });
+  }
+
+  if (settings.notify_on_payment || settings.notify_on_deposit || settings.notify_on_fulfillment) {
+    actions.push({
+      id: 'orders',
+      label: 'View Orders',
+      description: 'Monitor and manage customer orders',
+      href: `/t/${tenantId}/orders`,
+      icon: ClipboardList,
+      variant: 'orders',
+    });
+  }
+
+  return actions;
 }
 
 export default function CommerceSettingsClient({ tenantId }: CommerceSettingsClientProps) {
@@ -569,13 +619,65 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
       {/* Message */}
       {message && (
         <div className={`p-4 rounded-lg border ${
-          message.type === 'success' 
-            ? 'bg-green-50 border-green-200 text-green-800' 
+          message.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-800'
             : 'bg-red-50 border-red-200 text-red-800'
         }`}>
           {message.text}
         </div>
       )}
+
+      {/* Next Steps — contextual destinations based on saved preferences */}
+      {(() => {
+        const actions = getQuickActions(settings, tenantId, commerceFeatures?.commerce_disabled ?? false);
+        if (actions.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                What's Next
+              </CardTitle>
+              <p className="text-sm text-neutral-600 mt-1">
+                Continue setup for the commerce features you just enabled
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {actions.map(action => {
+                  const IconComp = action.icon;
+                  const variantStyles = {
+                    payment: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    fulfillment: 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-900',
+                    orders: 'bg-green-50 border-green-200 hover:border-green-300 text-green-900',
+                    general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
+                  };
+                  const iconStyles = {
+                    payment: 'text-blue-600',
+                    fulfillment: 'text-purple-600',
+                    orders: 'text-green-600',
+                    general: 'text-neutral-600',
+                  };
+                  return (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${variantStyles[action.variant]}`}
+                    >
+                      <IconComp className={`h-5 w-5 shrink-0 ${iconStyles[action.variant]}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{action.label}</p>
+                        <p className="text-xs opacity-80 truncate">{action.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

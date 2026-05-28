@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircle2 } from 'lucide-react';
+import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircle2, ArrowRight, Zap, Plus, FolderOpen } from 'lucide-react';
+import Link from 'next/link';
 import { useQuickstartOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
@@ -39,6 +40,55 @@ const DEFAULT_SETTINGS: QuickstartOptionsSettings = {
   default_image_model: 'openai',
   default_image_quality: 'standard',
 };
+
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: typeof Rocket;
+  variant: 'general' | 'wizard' | 'category';
+}
+
+function getQuickActions(settings: QuickstartOptionsSettings, tenantId: string): QuickAction[] {
+  const actions: QuickAction[] = [];
+  if (!settings.quickstart_enabled) return actions;
+
+  if (settings.quickstart_wizard || settings.quickstart_wizard_ai) {
+    actions.push({
+      id: 'quick-start',
+      label: 'Launch Quick Start',
+      description: 'Generate products with the wizard',
+      href: `/t/${tenantId}/quick-start`,
+      icon: Rocket,
+      variant: 'wizard',
+    });
+  }
+
+  if (settings.quickstart_category_generator) {
+    actions.push({
+      id: 'categories',
+      label: 'Manage Categories',
+      description: 'Auto-generate categories for your store',
+      href: `/t/${tenantId}/categories`,
+      icon: FolderOpen,
+      variant: 'category',
+    });
+  }
+
+  if (settings.quickstart_wizard || settings.quickstart_wizard_ai || settings.quickstart_category_generator) {
+    actions.push({
+      id: 'create-item',
+      label: 'Create New Item',
+      description: 'Add a new product to your catalog',
+      href: `/t/${tenantId}/items/create`,
+      icon: Plus,
+      variant: 'general',
+    });
+  }
+
+  return actions;
+}
 
 export default function QuickstartOptionsSettingsClient({ tenantId }: QuickstartOptionsSettingsClientProps) {
   const quickstartCap = useQuickstartOptionsCapability(tenantId, { forTenant: true });
@@ -448,6 +498,56 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
           {saving ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
+
+      {/* Next Steps — contextual destinations based on saved preferences */}
+      {(() => {
+        const actions = getQuickActions(settings, tenantId);
+        if (actions.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                What's Next
+              </CardTitle>
+              <p className="text-sm text-neutral-600 mt-1">
+                Continue setup for the quickstart features you just enabled
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {actions.map(action => {
+                  const IconComp = action.icon;
+                  const variantStyles = {
+                    wizard: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    category: 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-900',
+                    general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
+                  };
+                  const iconStyles = {
+                    wizard: 'text-blue-600',
+                    category: 'text-purple-600',
+                    general: 'text-neutral-600',
+                  };
+                  return (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${variantStyles[action.variant]}`}
+                    >
+                      <IconComp className={`h-5 w-5 shrink-0 ${iconStyles[action.variant]}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{action.label}</p>
+                        <p className="text-xs opacity-80 truncate">{action.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

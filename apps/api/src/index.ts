@@ -167,6 +167,8 @@ import commerceSettingsRoutes from './routes/commerce-settings';
 import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
 import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
+import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
+import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
 import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
@@ -7341,6 +7343,14 @@ console.log('✅ Featured options settings routes mounted at /api/tenants/:tenan
 /* ------------------------------ quickstart options settings ------------------------------ */
 app.use('/api/tenants', quickstartOptionsSettingsRoutes);
 console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
+
+/* ------------------------------ storefront options settings ------------------------------ */
+app.use('/api/tenants', storefrontOptionsSettingsRoutes);
+console.log('✅ Storefront options settings routes mounted at /api/tenants/:tenantId/storefront-options');
+
+/* ------------------------------ barcode scan settings ------------------------------ */
+app.use('/api/tenants', barcodeScanSettingsRoutes);
+console.log('✅ Barcode scan settings routes mounted at /api/tenants/:tenantId/barcode-scan');
 
 /* ------------------------------ integration options settings ------------------------------ */
 app.use('/api/tenants', integrationOptionsSettingsRoutes);

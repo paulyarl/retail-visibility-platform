@@ -1858,6 +1858,53 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getStorefrontOptionsSettings(tenantId: string): Promise<{
+    storefront_opt_enabled: boolean;
+    hours_animated: boolean;
+    hours_status: boolean;
+    category_store: boolean;
+    category_product: boolean;
+    recommend_store: boolean;
+    recommend_products: boolean;
+    recently_viewed: boolean;
+    storefront_social_media: boolean;
+    storefront_contact: boolean;
+    interactive_maps: boolean;
+    qr_codes_512: boolean;
+    qr_codes_1024: boolean;
+    qr_codes_2048: boolean;
+    qr_product: boolean;
+    qr_store: boolean;
+    qr_logo: boolean;
+    qr_directory: boolean;
+    image_gallery_5: boolean;
+    image_gallery_10: boolean;
+    image_gallery_15: boolean;
+    enhanced_seo: boolean;
+    storefront_actions: boolean;
+    default_qr_resolution: string;
+    default_gallery_limit: number;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-options`,
+        {},
+        `tenant-storefront-options-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront options settings:', error);
+      return null;
+    }
+  }
+
   /**
    * Get all tiers that have a given capability type enabled.
    * Reusable for any capability — used for "upgrade to access" messaging.

@@ -86,9 +86,6 @@ export type StorefrontType = 'online' | 'retail' | 'service' | 'both' | 'none';
 export interface StorefrontState {
   enabled: boolean;
   type: StorefrontType;
-  showsLocation: boolean;
-  showsHours: boolean;
-  showsMap: boolean;
   isFlexible: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -273,6 +270,98 @@ export interface IntegrationOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- Storefront Options ---
+
+export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
+export type StorefrontOptCategoryType = 'category_store' | 'category_product';
+export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
+export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
+export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
+export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
+export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
+export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
+
+export interface StorefrontOptionsState {
+  /** Main gate (hard) — storefront_opt_enabled */
+  enabled: boolean;
+  /** Master gate — storefront_opt_flexible unlocks all feature gates */
+  isFlexible: boolean;
+  // Store Hours group
+  hoursEnabled: boolean;
+  allowedHoursTypes: StorefrontOptHoursType[];
+  // Category Display group
+  categoryEnabled: boolean;
+  allowedCategoryTypes: StorefrontOptCategoryType[];
+  // Recommendation Display group
+  recommendEnabled: boolean;
+  allowedRecommendTypes: StorefrontOptRecommendType[];
+  // User Behavior
+  recentlyViewedEnabled: boolean;
+  // Store Information group
+  infoEnabled: boolean;
+  allowedInfoTypes: StorefrontOptInfoType[];
+  // QR Code Display group
+  qrEnabled: boolean;
+  allowedQRResolutions: StorefrontOptQRResolutionType[];
+  allowedQRContentTypes: StorefrontOptQRContentType[];
+  // Gallery Display group (radio)
+  galleryEnabled: boolean;
+  allowedGalleryTypes: StorefrontOptGalleryType[];
+  // Advanced group
+  advancedEnabled: boolean;
+  allowedAdvancedTypes: StorefrontOptAdvancedType[];
+  // Convenience flags
+  canShowHoursDisplay: boolean;
+  canUseAnimatedHours: boolean;
+  canShowHoursStatus: boolean;
+  canShowMapDisplay: boolean;
+  canShowLocationDisplay: boolean;
+  canUseCategoryStore: boolean;
+  canUseCategoryProduct: boolean;
+  canUseRecommendStore: boolean;
+  canUseRecommendProducts: boolean;
+  canUseRecentlyViewed: boolean;
+  canUseSocialMedia: boolean;
+  canUseContact: boolean;
+  canUseInteractiveMaps: boolean;
+  canUseQRCodes: boolean;
+  canUseEnhancedSEO: boolean;
+  canUseStorefrontActions: boolean;
+  /** Merchant preference toggles */
+  merchantPreferences: {
+    storefront_opt_enabled: boolean;
+    hours_display: boolean;
+    hours_animated: boolean;
+    hours_status: boolean;
+    map_display: boolean;
+    location_display: boolean;
+    category_store: boolean;
+    category_product: boolean;
+    recommend_store: boolean;
+    recommend_products: boolean;
+    recently_viewed: boolean;
+    storefront_social_media: boolean;
+    storefront_contact: boolean;
+    interactive_maps: boolean;
+    qr_codes_512: boolean;
+    qr_codes_1024: boolean;
+    qr_codes_2048: boolean;
+    qr_product: boolean;
+    qr_store: boolean;
+    qr_logo: boolean;
+    qr_directory: boolean;
+    image_gallery_5: boolean;
+    image_gallery_10: boolean;
+    image_gallery_15: boolean;
+    enhanced_seo: boolean;
+    storefront_actions: boolean;
+    default_qr_resolution: string;
+    default_gallery_limit: number;
+  };
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 // --- Quickstart Options ---
 
 export type QuickstartProductType = 'wizard' | 'image_gen';
@@ -342,6 +431,7 @@ export interface AllCapabilitiesState {
   featuredOptions: FeaturedOptionsState;
   integrationOptions: IntegrationOptionsState;
   quickstartOptions: QuickstartOptionsState;
+  storefrontOptions: StorefrontOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -359,6 +449,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   featured_: 'featured_options',
   integration_: 'integration_options',
   quickstart_: 'quickstart_options',
+  storefront_opt_: 'storefront_options',
 };
 
 /**
@@ -994,6 +1085,268 @@ export function resolveQuickstartOptionsState(
 }
 
 /**
+ * Resolve storefront options state from raw capability features + merchant preferences
+ * Feature prefix: storefront_opt_ (distinct from storefront_ for storefront_types)
+ */
+export function resolveStorefrontOptionsState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    storefront_opt_enabled?: boolean;
+    hours_display?: boolean;
+    hours_animated?: boolean;
+    hours_status?: boolean;
+    map_display?: boolean;
+    location_display?: boolean;
+    category_store?: boolean;
+    category_product?: boolean;
+    recommend_store?: boolean;
+    recommend_products?: boolean;
+    recently_viewed?: boolean;
+    storefront_social_media?: boolean;
+    storefront_contact?: boolean;
+    interactive_maps?: boolean;
+    qr_codes_512?: boolean;
+    qr_codes_1024?: boolean;
+    qr_codes_2048?: boolean;
+    qr_product?: boolean;
+    qr_store?: boolean;
+    qr_logo?: boolean;
+    qr_directory?: boolean;
+    image_gallery_5?: boolean;
+    image_gallery_10?: boolean;
+    image_gallery_15?: boolean;
+    enhanced_seo?: boolean;
+    storefront_actions?: boolean;
+    default_qr_resolution?: string;
+    default_gallery_limit?: number;
+  } | null
+): StorefrontOptionsState {
+  // Main gate (hard)
+  const enabled = !!features.storefront_opt_enabled;
+  const disabled = !!features.storefront_opt_disabled;
+  // Master gate — unlocks all feature gates
+  const flexible = !!features.storefront_opt_flexible;
+
+  // Merchant preferences (soft toggle, defaults to true if not set)
+  const prefs = {
+    storefront_opt_enabled: merchantPrefs?.storefront_opt_enabled !== false,
+    hours_display: merchantPrefs?.hours_display !== false,
+    hours_animated: merchantPrefs?.hours_animated !== false,
+    hours_status: merchantPrefs?.hours_status !== false,
+    map_display: merchantPrefs?.map_display !== false,
+    location_display: merchantPrefs?.location_display !== false,
+    category_store: merchantPrefs?.category_store !== false,
+    category_product: merchantPrefs?.category_product !== false,
+    recommend_store: merchantPrefs?.recommend_store !== false,
+    recommend_products: merchantPrefs?.recommend_products !== false,
+    recently_viewed: merchantPrefs?.recently_viewed !== false,
+    storefront_social_media: merchantPrefs?.storefront_social_media !== false,
+    storefront_contact: merchantPrefs?.storefront_contact !== false,
+    interactive_maps: merchantPrefs?.interactive_maps !== false,
+    qr_codes_512: merchantPrefs?.qr_codes_512 ?? false,
+    qr_codes_1024: merchantPrefs?.qr_codes_1024 !== false,
+    qr_codes_2048: merchantPrefs?.qr_codes_2048 ?? false,
+    qr_product: merchantPrefs?.qr_product !== false,
+    qr_store: merchantPrefs?.qr_store !== false,
+    qr_logo: merchantPrefs?.qr_logo ?? false,
+    qr_directory: merchantPrefs?.qr_directory ?? false,
+    image_gallery_5: merchantPrefs?.image_gallery_5 !== false,
+    image_gallery_10: merchantPrefs?.image_gallery_10 ?? false,
+    image_gallery_15: merchantPrefs?.image_gallery_15 ?? false,
+    enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
+    storefront_actions: merchantPrefs?.storefront_actions ?? false,
+    default_qr_resolution: merchantPrefs?.default_qr_resolution || '1024',
+    default_gallery_limit: merchantPrefs?.default_gallery_limit || 5,
+  };
+
+  // --- Store Hours feature gate ---
+  const hoursGroupEnabled = !!features.storefront_opt_hours_enabled;
+  const hoursGroupDisabled = !!features.storefront_opt_hours_disabled;
+  const hoursEnabled = hoursGroupEnabled && !hoursGroupDisabled;
+  const hoursUntouched = !hoursGroupEnabled && !hoursGroupDisabled;
+
+  const allowedHoursTypes: StorefrontOptHoursType[] = [];
+  if (flexible || hoursEnabled) {
+    allowedHoursTypes.push('hours_animated', 'hours_status');
+  } else if (hoursUntouched) {
+    if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
+    if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
+  }
+
+  // --- Category Display feature gate ---
+  const categoryGroupEnabled = !!features.storefront_opt_category_enabled;
+  const categoryGroupDisabled = !!features.storefront_opt_category_disabled;
+  const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
+  const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
+
+  const allowedCategoryTypes: StorefrontOptCategoryType[] = [];
+  if (flexible || categoryEnabled) {
+    allowedCategoryTypes.push('category_store', 'category_product');
+  } else if (categoryUntouched) {
+    if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
+    if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
+  }
+
+  // --- Recommendation Display feature gate ---
+  const recommendGroupEnabled = !!features.storefront_opt_recommend_enabled;
+  const recommendGroupDisabled = !!features.storefront_opt_recommend_disabled;
+  const recommendEnabled = recommendGroupEnabled && !recommendGroupDisabled;
+  const recommendUntouched = !recommendGroupEnabled && !recommendGroupDisabled;
+
+  const allowedRecommendTypes: StorefrontOptRecommendType[] = [];
+  if (flexible || recommendEnabled) {
+    allowedRecommendTypes.push('recommend_store', 'recommend_products');
+  } else if (recommendUntouched) {
+    if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
+    if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
+  }
+
+  // --- Section Display (standalone, no group gate) ---
+  const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
+  const mapDisplayTierAllowed = flexible || !!features.storefront_opt_map_display;
+  const locationDisplayTierAllowed = flexible || !!features.storefront_opt_location_display;
+
+  // --- User Behavior (standalone, no group gate) ---
+  const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
+
+  // --- Store Information feature gate ---
+  const infoGroupEnabled = !!features.storefront_opt_info_enabled;
+  const infoGroupDisabled = !!features.storefront_opt_info_disabled;
+  const infoEnabled = infoGroupEnabled && !infoGroupDisabled;
+  const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
+
+  const allowedInfoTypes: StorefrontOptInfoType[] = [];
+  if (flexible || infoEnabled) {
+    allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+  } else if (infoUntouched) {
+    if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
+    if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
+    if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
+  }
+
+  // --- QR Code Display feature gate ---
+  const qrGroupEnabled = !!features.storefront_opt_qr_enabled;
+  const qrGroupDisabled = !!features.storefront_opt_qr_disabled;
+  const qrEnabled = qrGroupEnabled && !qrGroupDisabled;
+  const qrUntouched = !qrGroupEnabled && !qrGroupDisabled;
+
+  const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
+  const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
+  if (flexible || qrEnabled) {
+    allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
+    allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
+  } else if (qrUntouched) {
+    if (features.storefront_opt_qr_codes_512) allowedQRResolutions.push('qr_codes_512');
+    if (features.storefront_opt_qr_codes_1024) allowedQRResolutions.push('qr_codes_1024');
+    if (features.storefront_opt_qr_codes_2048) allowedQRResolutions.push('qr_codes_2048');
+    if (features.storefront_opt_qr_product) allowedQRContentTypes.push('qr_product');
+    if (features.storefront_opt_qr_store) allowedQRContentTypes.push('qr_store');
+    if (features.storefront_opt_qr_logo) allowedQRContentTypes.push('qr_logo');
+    if (features.storefront_opt_qr_directory) allowedQRContentTypes.push('qr_directory');
+  }
+
+  // --- Gallery Display feature gate (radio — only one active at a time) ---
+  const galleryGroupEnabled = !!features.storefront_opt_gallery_enabled;
+  const galleryGroupDisabled = !!features.storefront_opt_gallery_disabled;
+  const galleryEnabled = galleryGroupEnabled && !galleryGroupDisabled;
+  const galleryUntouched = !galleryGroupEnabled && !galleryGroupDisabled;
+
+  const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
+  if (flexible || galleryEnabled) {
+    allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
+  } else if (galleryUntouched) {
+    if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
+    if (features.storefront_opt_image_gallery_10) allowedGalleryTypes.push('image_gallery_10');
+    if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
+  }
+
+  // --- Advanced feature gate ---
+  const advancedGroupEnabled = !!features.storefront_opt_advanced_enabled;
+  const advancedGroupDisabled = !!features.storefront_opt_advanced_disabled;
+  const advancedEnabled = advancedGroupEnabled && !advancedGroupDisabled;
+  const advancedUntouched = !advancedGroupEnabled && !advancedGroupDisabled;
+
+  const allowedAdvancedTypes: StorefrontOptAdvancedType[] = [];
+  if (flexible || advancedEnabled) {
+    allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
+  } else if (advancedUntouched) {
+    if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
+    if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
+  }
+
+  const mainOn = enabled && !disabled;
+
+  // Effective flags = main gate AND tier allows AND merchant enabled
+  const effectiveHoursTypes = prefs.storefront_opt_enabled
+    ? allowedHoursTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveCategoryTypes = prefs.storefront_opt_enabled
+    ? allowedCategoryTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveRecommendTypes = prefs.storefront_opt_enabled
+    ? allowedRecommendTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveHoursDisplay = prefs.storefront_opt_enabled && hoursDisplayTierAllowed && prefs.hours_display;
+  const effectiveMapDisplay = prefs.storefront_opt_enabled && mapDisplayTierAllowed && prefs.map_display;
+  const effectiveLocationDisplay = prefs.storefront_opt_enabled && locationDisplayTierAllowed && prefs.location_display;
+  const effectiveRecentlyViewed = prefs.storefront_opt_enabled && recentlyViewedTierAllowed && prefs.recently_viewed;
+  const effectiveInfoTypes = prefs.storefront_opt_enabled
+    ? allowedInfoTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveQRResolutions = prefs.storefront_opt_enabled
+    ? allowedQRResolutions.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveQRContentTypes = prefs.storefront_opt_enabled
+    ? allowedQRContentTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveGalleryTypes = prefs.storefront_opt_enabled
+    ? allowedGalleryTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+  const effectiveAdvancedTypes = prefs.storefront_opt_enabled
+    ? allowedAdvancedTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
+    : [];
+
+  return {
+    enabled: mainOn,
+    isFlexible: flexible,
+    hoursEnabled: mainOn && (hoursEnabled || allowedHoursTypes.length > 0),
+    allowedHoursTypes,
+    categoryEnabled: mainOn && (categoryEnabled || allowedCategoryTypes.length > 0),
+    allowedCategoryTypes,
+    recommendEnabled: mainOn && (recommendEnabled || allowedRecommendTypes.length > 0),
+    allowedRecommendTypes,
+    recentlyViewedEnabled: mainOn && recentlyViewedTierAllowed,
+    infoEnabled: mainOn && (infoEnabled || allowedInfoTypes.length > 0),
+    allowedInfoTypes,
+    qrEnabled: mainOn && (qrEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
+    allowedQRResolutions,
+    allowedQRContentTypes,
+    galleryEnabled: mainOn && (galleryEnabled || allowedGalleryTypes.length > 0),
+    allowedGalleryTypes,
+    advancedEnabled: mainOn && (advancedEnabled || allowedAdvancedTypes.length > 0),
+    allowedAdvancedTypes,
+    canShowHoursDisplay: mainOn && effectiveHoursDisplay,
+    canUseAnimatedHours: mainOn && effectiveHoursTypes.includes('hours_animated'),
+    canShowHoursStatus: mainOn && effectiveHoursTypes.includes('hours_status'),
+    canShowMapDisplay: mainOn && effectiveMapDisplay,
+    canShowLocationDisplay: mainOn && effectiveLocationDisplay,
+    canUseCategoryStore: mainOn && effectiveCategoryTypes.includes('category_store'),
+    canUseCategoryProduct: mainOn && effectiveCategoryTypes.includes('category_product'),
+    canUseRecommendStore: mainOn && effectiveRecommendTypes.includes('recommend_store'),
+    canUseRecommendProducts: mainOn && effectiveRecommendTypes.includes('recommend_products'),
+    canUseRecentlyViewed: mainOn && effectiveRecentlyViewed,
+    canUseSocialMedia: mainOn && effectiveInfoTypes.includes('storefront_social_media'),
+    canUseContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
+    canUseInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
+    canUseQRCodes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
+    canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
+    canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+    merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
  * Resolve storefront state from raw capability features
  */
 export function resolveStorefrontState(features: Record<string, boolean>): StorefrontState {
@@ -1016,16 +1369,9 @@ export function resolveStorefrontState(features: Record<string, boolean>): Store
     type = 'service';
   }
 
-  const showsLocation = retail || bothOptions;
-  const showsHours = retail || bothOptions || online || service;
-  const showsMap = retail || bothOptions;
-
   return {
     enabled: enabled || online || retail || service,
     type,
-    showsLocation,
-    showsHours,
-    showsMap,
     isFlexible: bothOptions,
     features,
   };
@@ -1251,6 +1597,26 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   }
 
   /**
+   * Get storefront options state for a tenant, merging tier capability with merchant preferences
+   */
+  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    const tierState = all.storefrontOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveStorefrontOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[CapabilityResolutionService] Failed to fetch storefront options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -1279,6 +1645,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
+    const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -1293,6 +1660,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
+      storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -1512,6 +1880,26 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get storefront options state for a tenant, merging tier capability with merchant preferences
+   */
+  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    const tierState = all.storefrontOptions;
+
+    try {
+      const { tenantInfoService } = await import('./TenantInfoService');
+      const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
+      if (prefs) {
+        return resolveStorefrontOptionsState(tierState.features, prefs);
+      }
+    } catch (err) {
+      console.warn('[TenantCapabilityResolutionService] Failed to fetch storefront options merchant preferences, using tier-only state:', err);
+    }
+
+    return tierState;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -1537,6 +1925,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
+    const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -1551,6 +1940,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
+      storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

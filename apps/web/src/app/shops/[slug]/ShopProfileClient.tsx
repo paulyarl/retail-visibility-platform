@@ -58,6 +58,7 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { PublicTenantInfo } from '@/services/TenantPublicService';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge'; 
+import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 
 // Types
 interface DirectoryConsolidated {
@@ -162,10 +163,11 @@ interface ShopProfileClientProps {
   businessHours?: any;
   tenantInfo?: PublicTenantInfo | null;
   showStatusPanel?: boolean;
+  initialOptFlags?: StorefrontOptionFlags | null; // Server-side resolved flags
 }
 
 // Shop profile header component
-function ShopProfileHeader({ shop, shopData, businessHours }: { 
+function ShopProfileHeader({ shop, shopData, businessHours, optFlags }: { 
   shop: {
     success: boolean;
     data: {
@@ -175,6 +177,7 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
   };
   shopData: ShopData;
   businessHours?: any;
+  optFlags?: StorefrontOptionFlags | null;
 }) {
   // Create a directory listing object from shop data for the photo gallery
   const directoryListing = shopData ? {
@@ -351,7 +354,7 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
             )}
 
             {/* Business Hours */}
-            {businessHours && (
+            {businessHours && optFlags?.showHoursStatus !== false && (
               <BusinessHoursCollapsible businessHours={businessHours} />
             )}
           </div>
@@ -461,7 +464,8 @@ export default function ShopProfileClient({
   shop, 
   businessHours, 
   tenantInfo, 
-  showStatusPanel 
+  showStatusPanel,
+  initialOptFlags
 }: {
   shop: {
     success: boolean;
@@ -473,6 +477,7 @@ export default function ShopProfileClient({
   businessHours: any;
   tenantInfo?: PublicTenantInfo | null;
   showStatusPanel?: boolean;
+  initialOptFlags?: StorefrontOptionFlags | null;
 }) {
   // Extract shop data once at the top
   const shopData = (shop.data as any)?.data;
@@ -492,6 +497,9 @@ export default function ShopProfileClient({
   });
   const [featuredData, setFeaturedData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
+
+  // Storefront options capability flags — initialized from server-side fetch (no waterfall)
+  const [optFlags] = useState<StorefrontOptionFlags | null>(initialOptFlags ?? null);
   
   // Fetch categories on mount
   useEffect(() => {
@@ -637,7 +645,7 @@ export default function ShopProfileClient({
                 </Link>
                  <Divider orientation="vertical" h={24} />
                {/* Hours Badge - Status */}
-            <HoursStatusBadge status={hoursStatus} />
+            <HoursStatusBadge status={hoursStatus} animate={optFlags?.showAnimatedHours !== false} />
 			
               </div>
              
@@ -661,7 +669,7 @@ export default function ShopProfileClient({
         </div>
       </div>
 
-      <ShopProfileHeader shop={shop} shopData={shopData} businessHours={businessHours} />
+      <ShopProfileHeader shop={shop} shopData={shopData} businessHours={businessHours} optFlags={optFlags} />
 
       {/* Products Section */}
       <div className="bg-gray-50 py-8">
@@ -848,7 +856,7 @@ export default function ShopProfileClient({
 
           {/* Recently Viewed - Centered with page margins */}
           <div className="mb-12">
-            <LastViewed />
+            {optFlags?.showRecentlyViewed !== false && <LastViewed />}
           </div>
         </div>
       </div>

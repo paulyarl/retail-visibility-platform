@@ -23,6 +23,7 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
   commerce_types: 'commerce_',
   payment_gateway_options: 'payment_gateway_',
   storefront_types: 'storefront_',
+  storefront_options: 'storefront_opt_',
   featured_options: 'featured_',
   integration_options: 'integration_',
   quickstart_options: 'quickstart_',

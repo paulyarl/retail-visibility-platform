@@ -3184,6 +3184,66 @@ model tenant_featured_options_settings {
   @@index([tenant_id], map: "idx_featured_options_tenant")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_quickstart_options_settings {
+  id                            String    @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  tenant_id                     String    @unique @db.VarChar(255)
+  quickstart_enabled            Boolean?  @default(true)
+  quickstart_wizard             Boolean?  @default(true)
+  quickstart_wizard_ai          Boolean?  @default(true)
+  quickstart_category_generator Boolean?  @default(true)
+  quickstart_ai_openai          Boolean?  @default(true)
+  quickstart_ai_gemini          Boolean?  @default(true)
+  quickstart_image_gen          Boolean?  @default(true)
+  quickstart_image_hd           Boolean?  @default(true)
+  default_text_model            String?   @default("openai") @db.VarChar(20)
+  default_image_model           String?   @default("openai") @db.VarChar(20)
+  default_image_quality         String?   @default("standard") @db.VarChar(20)
+  created_at                    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime? @default(now()) @db.Timestamp(6)
+  tenants                       tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_quickstart_options_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_options_settings {
+  id                      String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id               String    @unique
+  storefront_opt_enabled  Boolean?  @default(true)
+  hours_animated          Boolean?  @default(true)
+  hours_status            Boolean?  @default(true)
+  category_store          Boolean?  @default(true)
+  category_product        Boolean?  @default(true)
+  recommend_store         Boolean?  @default(true)
+  recommend_products      Boolean?  @default(true)
+  recently_viewed         Boolean?  @default(true)
+  storefront_social_media Boolean?  @default(true)
+  storefront_contact      Boolean?  @default(true)
+  interactive_maps        Boolean?  @default(true)
+  qr_codes_512            Boolean?  @default(false)
+  qr_codes_1024           Boolean?  @default(true)
+  qr_codes_2048           Boolean?  @default(false)
+  qr_product              Boolean?  @default(true)
+  qr_store                Boolean?  @default(true)
+  qr_logo                 Boolean?  @default(false)
+  qr_directory            Boolean?  @default(false)
+  image_gallery_5         Boolean?  @default(true)
+  image_gallery_10        Boolean?  @default(false)
+  image_gallery_15        Boolean?  @default(false)
+  enhanced_seo            Boolean?  @default(false)
+  storefront_actions      Boolean?  @default(false)
+  default_qr_resolution   String?   @default("1024") @db.VarChar(10)
+  default_gallery_limit   Int?      @default(5)
+  created_at              DateTime? @default(now()) @db.Timestamp(6)
+  updated_at              DateTime? @default(now()) @db.Timestamp(6)
+  hours_display           Boolean?  @default(true)
+  map_display             Boolean?  @default(true)
+  location_display        Boolean?  @default(true)
+  tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_options_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_options_tenant")
+}
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenant_fulfillment_settings {
   id                        String    @id
@@ -3311,25 +3371,20 @@ model tenant_product_options_settings {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model tenant_quickstart_options_settings {
-  id                            String    @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
-  tenant_id                     String    @unique @db.VarChar(255)
-  quickstart_enabled            Boolean?  @default(true)
-  quickstart_wizard             Boolean?  @default(true)
-  quickstart_wizard_ai          Boolean?  @default(true)
-  quickstart_category_generator Boolean?  @default(true)
-  quickstart_ai_openai          Boolean?  @default(true)
-  quickstart_ai_gemini          Boolean?  @default(true)
-  quickstart_image_gen          Boolean?  @default(true)
-  quickstart_image_hd           Boolean?  @default(true)
-  default_text_model            String?   @default("openai") @db.VarChar(20)
-  default_image_model           String?   @default("openai") @db.VarChar(20)
-  default_image_quality         String?   @default("standard") @db.VarChar(20)
-  created_at                    DateTime? @default(now()) @db.Timestamp(6)
-  updated_at                    DateTime? @default(now()) @db.Timestamp(6)
-  tenants                       tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model tenant_barcode_scan_settings {
+  id                     String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id              String    @unique
+  barcode_enabled        Boolean?  @default(true)
+  barcode_scan_enabled   Boolean?  @default(true)
+  barcode_manual_enabled Boolean?  @default(true)
+  barcode_usb_enabled    Boolean?  @default(false)
+  barcode_camera_enabled Boolean?  @default(false)
+  default_scan_mode      String?   @default("scan") @db.VarChar(20)
+  created_at             DateTime? @default(now()) @db.Timestamp(6)
+  updated_at             DateTime? @default(now()) @db.Timestamp(6)
+  tenants                tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_barcode_scan_tenant")
 
-  @@index([tenant_id], map: "idx_quickstart_options_tenant")
+  @@index([tenant_id], map: "idx_barcode_scan_tenant")
 }
 
 model tenant_shipping_carriers {
@@ -3484,6 +3539,7 @@ model tenants {
   shopping_carts                                                                         shopping_carts[]
   subscription_invoices                                                                  subscription_invoices[]
   sync_jobs                                                                              sync_jobs[]
+  tenant_barcode_scan_settings                                                           tenant_barcode_scan_settings?
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_commerce_settings                                                               tenant_commerce_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
@@ -3495,6 +3551,7 @@ model tenants {
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
+  tenant_storefront_options_settings                                                     tenant_storefront_options_settings?
   merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?          @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organizations_list                                                                     organizations_list?                 @relation(fields: [organization_id], references: [id])
   user_tenants                                                                           user_tenants[]

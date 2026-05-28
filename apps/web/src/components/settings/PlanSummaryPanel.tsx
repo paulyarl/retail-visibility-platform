@@ -16,6 +16,14 @@ import {
   QuickstartProductType,
   QuickstartCategoryType,
   QuickstartAIType,
+  StorefrontOptHoursType,
+  StorefrontOptCategoryType,
+  StorefrontOptRecommendType,
+  StorefrontOptInfoType,
+  StorefrontOptQRResolutionType,
+  StorefrontOptQRContentType,
+  StorefrontOptGalleryType,
+  StorefrontOptAdvancedType,
 } from '@/services/CapabilityResolutionService';
 import { getFeaturedTypeMeta } from '@/utils/featuredOptions';
 
@@ -93,12 +101,6 @@ const STOREFRONT_GROUP_FEATURES: Record<string, string[]> = {
   service: ['Service'],
 };
 
-const STOREFRONT_DETAIL_LABELS: Record<string, string> = {
-  showsLocation: 'Location',
-  showsHours: 'Hours',
-  showsMap: 'Map',
-};
-
 const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
   clover: 'Clover POS',
   square: 'Square POS',
@@ -125,18 +127,64 @@ const QUICKSTART_AI_LABELS: Record<QuickstartAIType, string> = {
   image_hd: 'HD Images',
 };
 
+const STOREFRONT_OPT_HOURS_LABELS: Record<StorefrontOptHoursType, string> = {
+  hours_animated: 'Animated Hours',
+  hours_status: 'Open/Closed',
+};
+
+const STOREFRONT_OPT_CATEGORY_LABELS: Record<StorefrontOptCategoryType, string> = {
+  category_store: 'Store Categories',
+  category_product: 'Product Categories',
+};
+
+const STOREFRONT_OPT_RECOMMEND_LABELS: Record<StorefrontOptRecommendType, string> = {
+  recommend_store: 'Store Recs',
+  recommend_products: 'Product Recs',
+};
+
+const STOREFRONT_OPT_INFO_LABELS: Record<StorefrontOptInfoType, string> = {
+  storefront_social_media: 'Social Media',
+  storefront_contact: 'Contact Info',
+  interactive_maps: 'Maps',
+};
+
+const STOREFRONT_OPT_QR_RESOLUTION_LABELS: Record<StorefrontOptQRResolutionType, string> = {
+  qr_codes_512: 'QR 512px',
+  qr_codes_1024: 'QR 1024px',
+  qr_codes_2048: 'QR 2048px',
+};
+
+const STOREFRONT_OPT_QR_CONTENT_LABELS: Record<StorefrontOptQRContentType, string> = {
+  qr_product: 'Product QR',
+  qr_store: 'Store QR',
+  qr_logo: 'Logo QR',
+  qr_directory: 'Directory QR',
+};
+
+const STOREFRONT_OPT_GALLERY_LABELS: Record<StorefrontOptGalleryType, string> = {
+  image_gallery_5: '5 Images',
+  image_gallery_10: '10 Images',
+  image_gallery_15: '15 Images',
+};
+
+const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> = {
+  enhanced_seo: 'Enhanced SEO',
+  storefront_actions: 'CTA Buttons',
+};
+
 // --- Capability display config ---
 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
   commerce_types: { label: 'Commerce', icon: '💰', settingsPath: '/settings/commerce' },
   payment_gateway_options: { label: 'Payment Gateway', icon: '💳', settingsPath: '/settings/payment-gateways' },
   storefront_types: { label: 'Storefront', icon: '🏪', settingsPath: '/settings/directory' },
-  barcode_scan_options: { label: 'Barcode Scanning', icon: '📱' },
+  barcode_scan_options: { label: 'Barcode Scanning', icon: '📱', settingsPath: '/settings/barcode-scan-options' },
   fulfillment_options: { label: 'Fulfillment', icon: '📦', settingsPath: '/settings/fulfillment' },
   product_options: { label: 'Product Options', icon: '🏷️', settingsPath: '/settings/product-options' },
   featured_options: { label: 'Featured Options', icon: '⭐', settingsPath: '/settings/featured-options' },
   integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
   quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
+  storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -214,10 +262,6 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
         if (label) specifics.push(label);
       }
     }
-    // Add detail features (location, hours, map)
-    Object.entries(STOREFRONT_DETAIL_LABELS).forEach(([key, label]) => {
-      if (sf[key as keyof StorefrontState]) specifics.push(label);
-    });
     summaries.push({
       key: 'storefront_types',
       label: CAPABILITY_DISPLAY.storefront_types.label,
@@ -368,6 +412,30 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       specificFeatures: specifics,
       isHighlighted: highlight === 'quickstart_options',
       settingsPath: CAPABILITY_DISPLAY.quickstart_options.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Options — list groups and features
+  const so = caps.storefrontOptions;
+  if (Object.keys(so.features).length > 0) {
+    const specifics: string[] = [];
+    so.allowedHoursTypes.forEach(t => { const l = STOREFRONT_OPT_HOURS_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedCategoryTypes.forEach(t => { const l = STOREFRONT_OPT_CATEGORY_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedRecommendTypes.forEach(t => { const l = STOREFRONT_OPT_RECOMMEND_LABELS[t]; if (l) specifics.push(l); });
+    if (so.recentlyViewedEnabled) specifics.push('Recently Viewed');
+    so.allowedInfoTypes.forEach(t => { const l = STOREFRONT_OPT_INFO_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedQRResolutions.forEach(t => { const l = STOREFRONT_OPT_QR_RESOLUTION_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedQRContentTypes.forEach(t => { const l = STOREFRONT_OPT_QR_CONTENT_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedGalleryTypes.forEach(t => { const l = STOREFRONT_OPT_GALLERY_LABELS[t]; if (l) specifics.push(l); });
+    so.allowedAdvancedTypes.forEach(t => { const l = STOREFRONT_OPT_ADVANCED_LABELS[t]; if (l) specifics.push(l); });
+    summaries.push({
+      key: 'storefront_options',
+      label: CAPABILITY_DISPLAY.storefront_options.label,
+      icon: CAPABILITY_DISPLAY.storefront_options.icon,
+      enabled: so.enabled,
+      specificFeatures: specifics,
+      isHighlighted: highlight === 'storefront_options',
+      settingsPath: CAPABILITY_DISPLAY.storefront_options.settingsPath ?? null,
     });
   }
 

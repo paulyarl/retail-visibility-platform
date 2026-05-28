@@ -12,6 +12,7 @@ import ShopProfileClient from './ShopProfileClient';
 import { shopsService } from '@/services/ShopsService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 
 // Types
@@ -169,6 +170,16 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
     console.error('Error fetching tenant info:', error);
   }
 
+  // Fetch storefront option flags server-side (prioritized — no client waterfall)
+  let storefrontOptionFlags: StorefrontOptionFlags | null = null;
+  try {
+    if (tenantId) {
+      storefrontOptionFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(tenantId);
+    }
+  } catch (error) {
+    console.error('Error fetching storefront option flags:', error);
+  }
+
   // Check if tenant has non-active status - show status panel instead of "not found"
   const showStatusPanel = tenantInfo ? (
     tenantInfo.subscriptionTier === 'google_only' || 
@@ -217,6 +228,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
           businessHours={businessHours?.data}
           tenantInfo={tenantInfo}
           showStatusPanel={true}
+          initialOptFlags={storefrontOptionFlags}
         />
       </Suspense>
     );
@@ -251,6 +263,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
         businessHours={businessHours?.data} 
         tenantInfo={tenantInfo}
         showStatusPanel={showStatusPanel}
+        initialOptFlags={storefrontOptionFlags}
       />
     </Suspense>
   );
