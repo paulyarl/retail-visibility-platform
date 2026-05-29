@@ -10,6 +10,7 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { getEffectiveTier } from '../utils/trial-tier-transparency';
 
 // ====================
 // TYPES
@@ -115,7 +116,10 @@ class IntegrationOptionsService {
       // Collect tier keys (org + tenant, most-permissive-wins)
       const orgTierKey = tenant.organizations_list?.subscription_tier || null;
       const tenantTierKey = tenant.subscription_tier || null;
-      const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+      // Proxy trial tiers to base tiers for feature resolution
+      const resolvedOrgTierKey = orgTierKey ? getEffectiveTier(orgTierKey) : null;
+      const resolvedTenantTierKey = tenantTierKey ? getEffectiveTier(tenantTierKey) : null;
+      const tierKeys = [resolvedOrgTierKey, resolvedTenantTierKey].filter((k): k is string => !!k);
 
       if (tierKeys.length === 0) {
         return this.getDisabledState();

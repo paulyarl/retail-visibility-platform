@@ -33,6 +33,26 @@ router.get('/:tenantId/integration-options', authenticateToken, async (req, res)
   try {
     const { tenantId } = req.params;
 
+    // Resolve tier capabilities first — only block when explicitly disabled
+    const integrationService = IntegrationOptionsService.getInstance();
+    const capabilityState = await integrationService.resolveIntegrationOptionsState(tenantId);
+
+    // Only return all false when the tier explicitly sets integration_disabled
+    if (capabilityState.features?.integration_disabled) {
+      return res.json({
+        success: true,
+        settings: {
+          integration_enabled: false,
+          integration_clover: false,
+          integration_square: false,
+          integration_gbp: false,
+          integration_google_shopping: false,
+          integration_google_merchant_center: false,
+          integration_gmc_sync: false,
+        },
+      });
+    }
+
     const settings = await prisma.tenant_integration_settings.findUnique({
       where: { tenant_id: tenantId },
     });

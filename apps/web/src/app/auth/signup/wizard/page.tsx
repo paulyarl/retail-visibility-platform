@@ -120,43 +120,50 @@ export default function SignupWizardPage() {
 
   const benefitSteps = [
     {
-      icon: "M13 10V3L4 14h7v7l9-11h-7z",
+      image: '/images/wizard/step-01-mission.png',
+      iconImage: '/images/wizard/icon-01-mission.png',
       title: "Big-Box Retailers Built This for Themselves. Now It's Yours.",
       description: "Local retailers need a way to move shoppers from discovery to purchase — because big-box retailers built end-to-end inventory visibility and commerce infrastructure internally, leaving small retailers without an affordable path to compete. Visible Shelf changes that. No IT team required. Just your Clover POS and a few minutes.",
       highlight: "Clover-connected • Google-visible • Zero IT required"
     },
     {
-      icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9",
+      image: '/images/wizard/step-02-discovery.png',
+      iconImage: '/images/wizard/icon-02-discovery.png',
       title: "Discovery — Get Found on Google",
       description: "Your products are already showing up in Google Search, Google Shopping, and Google Maps — powered by real-time Clover inventory sync. No manual uploads. No spreadsheets. Just connect your POS and watch your store appear exactly where shoppers are already looking.",
       highlight: "Real-time Google visibility + Directory listing"
     },
     {
-      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      image: '/images/wizard/step-03-storefront.png',
+      iconImage: '/images/wizard/icon-03-storefront.png',
       title: "Storefront — Own Your Platform Presence",
       description: "Shoppers are finding you on Google — now give them a beautiful branded storefront to explore. Your full inventory, store hours, and contact details in one professional page. They can browse everything you carry and reach out directly. Your store, your brand, your way.",
       highlight: "Branded storefront + Platform search & browse"
     },
     {
-      icon: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
+      image: '/images/wizard/step-04-commitment.png',
+      iconImage: '/images/wizard/icon-04-commitment.png',
       title: "Commitment — Capture Intent & Drive Foot Traffic",
       description: "You're a physical retailer. Shoppers browse online, but they buy in your store. Collect a small holding fee (10–15%) to guarantee their visit, then close the sale at your Clover POS. No abandoned inventory. No wasted prep time. Just guaranteed foot traffic with real financial commitment.",
       highlight: "Deposit-based reservations • Guaranteed store visits • Clover POS synced"
     },
     {
-      icon: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
+      image: '/images/wizard/step-05-ecommerce.png',
+      iconImage: '/images/wizard/icon-05-ecommerce.png',
       title: "E-Commerce — Sell Online, Fully & Simply",
       description: "No physical store? No problem. Close the complete sale online with full payment collection and delivery fulfillment. Clean checkout with no deposit confusion. Built for online-only merchants who need straightforward e-commerce without the enterprise price tag or complexity.",
       highlight: "Full online payments + Delivery + Clean checkout"
     },
     {
-      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      image: '/images/wizard/step-06-omnichannel.png',
+      iconImage: '/images/wizard/icon-06-omnichannel.png',
       title: "Omnichannel — Physical + Online, Unified",
       description: "You have both a physical storefront and online presence. Let shoppers choose their path: pay in full for delivery, or pay a deposit and pick up in-store. One inventory. One platform. Every way to buy. The shopper decides what works for them — you just fulfill.",
       highlight: "Shoppers choose: full payment OR deposit & pickup"
     },
     {
-      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      image: '/images/wizard/step-07-enterprise.png',
+      iconImage: '/images/wizard/icon-07-enterprise.png',
       title: "Enterprise — Complete Business Solution",
       description: "Multi-location chains, franchises, and regional retailers need more than features — they need a platform that scales with them. Enterprise-grade analytics, dedicated onboarding, custom contracts, and unified billing across every location. White-label options for organisations that demand their own brand.",
       highlight: "Multi-location + API access + Dedicated support"
@@ -335,10 +342,36 @@ export default function SignupWizardPage() {
 
           <div className="text-center">
             <div className="mb-8">
-             
+              {/* Step artwork */}
+              {benefit.image && (
+                <div className="relative w-full aspect-video mb-6 rounded-xl overflow-hidden bg-neutral-100">
+                  <Image
+                    src={benefit.image}
+                    alt={benefit.title}
+                    fill
+                    sizes="(max-width: 768px) 90vw, 608px"
+                    className="object-contain"
+                    priority={step <= 2}
+                  />
+                </div>
+              )}
+
+              {/* Step icon */}
+              {benefit.iconImage && (
+                <div className="flex justify-center mb-4">
+                  <Image
+                    src={benefit.iconImage}
+                    alt=""
+                    width={64}
+                    height={64}
+                    className="w-16 h-16 object-contain"
+                  />
+                </div>
+              )}
+
               <h2 className="text-3xl font-bold text-neutral-900 mb-4">{benefit.title}</h2>
               <p className="text-xl text-neutral-600 mb-6 max-w-2xl mx-auto">{benefit.description}</p>
-              
+
               {benefit.highlight && (
                 <div className="bg-primary-50 border-l-4 border-primary-600 p-4 mb-8 inline-block">
                   <p className="text-primary-800 font-semibold">{benefit.highlight}</p>
