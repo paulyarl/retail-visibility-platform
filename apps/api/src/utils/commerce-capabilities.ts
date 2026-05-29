@@ -65,7 +65,21 @@ export async function getOrganizationCommerceCapabilities(
   });
 
   // Get unique tier keys from tenants
-  const tierKeys = [...new Set(tenants.map((t: { subscription_tier: any; }) => t.subscription_tier).filter(Boolean))];
+  const rawTierKeys = [...new Set(tenants.map((t: { subscription_tier: any; }) => t.subscription_tier).filter(Boolean))] as string[];
+
+  // Proxy trial tiers to their base tiers for feature resolution
+  const trialToBaseMap: Record<string, string> = {
+    'trial_google_only': 'google_only',
+    'trial_discovery': 'discovery',
+    'trial_starter': 'starter',
+    'trial_storefront': 'storefront',
+    'trial_commitment': 'commitment',
+    'trial_professional': 'professional',
+    'trial_chain_starter': 'chain_starter',
+    'trial_chain_professional': 'chain_professional',
+    'trial_chain_enterprise': 'chain_enterprise',
+  };
+  const tierKeys = rawTierKeys.map(k => trialToBaseMap[k] || k);
 
   // Fetch tier features for all unique tiers
   const tierFeatures = await prismaClient.subscription_tiers_list.findMany({
@@ -175,8 +189,24 @@ export async function getTenantCommerceCapabilities(
   const orgTierKey = tenant?.organizations_list?.subscription_tier || null;
   const organizationId = tenant?.organization_id;
 
+  // Proxy trial tiers to their base tiers for feature resolution
+  const trialToBaseMap: Record<string, string> = {
+    'trial_google_only': 'google_only',
+    'trial_discovery': 'discovery',
+    'trial_starter': 'starter',
+    'trial_storefront': 'storefront',
+    'trial_commitment': 'commitment',
+    'trial_professional': 'professional',
+    'trial_chain_starter': 'chain_starter',
+    'trial_chain_professional': 'chain_professional',
+    'trial_chain_enterprise': 'chain_enterprise',
+  };
+  const resolveTier = (k: string) => trialToBaseMap[k] || k;
+
   // Fetch features from both org and tenant tiers, then merge (most-permissive-wins)
-  const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+  const tierKeys = [orgTierKey, tenantTierKey]
+    .filter((k): k is string => !!k)
+    .map(resolveTier);
   const tiersData = tierKeys.length > 0
     ? await prismaClient.subscription_tiers_list.findMany({
         where: { tier_key: { in: tierKeys }, is_active: true },

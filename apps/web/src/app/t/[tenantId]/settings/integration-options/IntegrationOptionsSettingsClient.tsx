@@ -171,7 +171,7 @@ function getQuickActions(settings: IntegrationOptionsSettings, tenantId: string)
 export default function IntegrationOptionsSettingsClient({ tenantId }: IntegrationOptionsSettingsClientProps) {
   const integrationCap = useIntegrationOptionsCapability(tenantId, { forTenant: true });
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
-  const isIntegrationEnabled = integrationCap.data?.enabled ?? true;
+  const isIntegrationExplicitlyDisabled = !!integrationCap.data?.features?.integration_disabled;
   const allowedTypes = integrationCap.data?.allowedTypes ?? Object.keys(INTEGRATION_TYPE_META) as IntegrationType[];
   const isFlexible = integrationCap.data?.isFlexible ?? false;
   const isPosGroupEnabled = integrationCap.data?.posEnabled ?? true;
@@ -245,6 +245,26 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
     );
   }
 
+  // Only block the entire page when integration_disabled is explicitly true at the tier level
+  if (isIntegrationExplicitlyDisabled) {
+    return (
+      <div className="space-y-6">
+        <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="integration_options" tenantId={tenantId} />
+        <div className="p-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full mb-4">
+            <AlertCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+            Integrations Not Available
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 mb-4 max-w-2xl mx-auto">
+            Integrations are not included in your current plan. Upgrade to access POS connections, Google Merchant Center, and more.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Plan Summary */}
@@ -280,14 +300,14 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {!isIntegrationEnabled && (
+              {isIntegrationExplicitlyDisabled && (
                 <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
               )}
               <Switch
                 id="integration-enabled-toggle"
                 checked={settings.integration_enabled}
                 onCheckedChange={() => handleToggle('integration_enabled')}
-                disabled={!isIntegrationEnabled}
+                disabled={isIntegrationExplicitlyDisabled}
               />
             </div>
           </div>

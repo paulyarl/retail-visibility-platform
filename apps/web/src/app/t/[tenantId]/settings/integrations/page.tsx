@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useCloverIntegration } from '@/hooks/useCloverIntegration';
 import { useSquareIntegration } from '@/hooks/useSquareIntegration';
+import { useIntegrationOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { CloverConnectionCard } from '@/components/clover';
 import { SquareConnectionCard } from '@/components/square';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
@@ -54,6 +55,10 @@ export default function IntegrationsPage() {
   const loading = cloverLoading || squareLoading;
   const error = cloverError || squareError;
 
+  // Check integration capability (new unified system) — only block when explicitly disabled
+  const integrationCap = useIntegrationOptionsCapability(tenantId, { forTenant: true });
+  const isIntegrationExplicitlyDisabled = !!integrationCap.data?.features?.integration_disabled;
+
   // Check tier access for viewing
   const canViewClover = canAccess('clover_pos', 'canView');
   const canViewSquare = canAccess('square_pos', 'canView');
@@ -61,7 +66,7 @@ export default function IntegrationsPage() {
   const canManageSquare = canAccess('square_pos', 'canManage');
 
   // Access control check - must be Platform Admin/Support or Tenant Owner/Admin
-  if (accessLoading) {
+  if (accessLoading || integrationCap.loading) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
@@ -99,6 +104,40 @@ export default function IntegrationsPage() {
               Your current role: <span className="font-medium">{tenantRole}</span>
             </p>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Integration capability gate — only block when the entire capability is explicitly disabled at tier level
+  if (isIntegrationExplicitlyDisabled) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+            Integrations
+          </h1>
+          <p className="text-neutral-600 dark:text-neutral-400">
+            Connect your systems to automatically sync inventory and visibility
+          </p>
+        </div>
+
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full mb-4">
+            <AlertTriangle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+            Integrations Not Available
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 mb-4 max-w-2xl mx-auto">
+            Integrations are not included in your current plan. Upgrade to access POS connections, Google Merchant Center, and more.
+          </p>
+          <a
+            href={`/t/${tenantId}/settings/subscription`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+          >
+            View Plans →
+          </a>
         </div>
       </div>
     );

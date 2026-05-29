@@ -12,6 +12,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import { getEffectiveTier } from '../utils/trial-tier-transparency';
 
 const router = Router({ mergeParams: true });
 
@@ -151,8 +152,13 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
     const orgTierKey = tenant.organizations_list?.subscription_tier || null;
     const tenantTierKey = tenant.subscription_tier || null;
 
+    // Proxy trial tiers to their base tiers for feature resolution
+    // Trial tiers are pricing wrappers — real capabilities live on the base tier
+    const resolvedOrgTierKey = orgTierKey ? getEffectiveTier(orgTierKey) : null;
+    const resolvedTenantTierKey = tenantTierKey ? getEffectiveTier(tenantTierKey) : null;
+
     // Fetch features from both org tier and tenant tier, then merge (most-permissive-wins)
-    const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+    const tierKeys = [resolvedOrgTierKey, resolvedTenantTierKey].filter((k): k is string => !!k);
     const tiers = await prisma.subscription_tiers_list.findMany({
       where: { tier_key: { in: tierKeys } },
     });
@@ -225,7 +231,8 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
 
     // Report the higher tier as the effective tier_key
     // Org tier overrides tenant tier (same logic as /tenants/:id/tier endpoint)
-    const effectiveTierKey = orgTierKey || tenantTierKey || 'starter';
+    // Use resolved keys so trial tiers report their base tier for capabilities
+    const effectiveTierKey = resolvedOrgTierKey || resolvedTenantTierKey || 'starter';
 
     // Look up tier display metadata
     const effectiveTier = tierMap.get(effectiveTierKey);

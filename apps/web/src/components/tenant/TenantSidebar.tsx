@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@mantine/core'
 
 type NavItem = { label: string; href: string }
 
@@ -90,12 +91,12 @@ export default function TenantSidebar({ tenantId, tenantName, tenantLogoUrl, nav
         >
           Platform Dashboard
         </Link>
-        <button
+        <Button  variant='gradient' style={{color: 'white'}}
           onClick={async () => { await logout(); router.push('/'); }}
           className={isMobile ? "w-full text-left block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors" : "w-full text-left block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 transition-colors"}
         >
           Sign Out
-        </button>
+        </Button>
       </nav>
     </aside>
   )
