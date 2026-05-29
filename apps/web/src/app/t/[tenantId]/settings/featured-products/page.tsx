@@ -7,6 +7,7 @@ import { ArrowLeft, Star } from 'lucide-react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { AdminFeaturedApprovalService } from '@/services/AdminFeaturedApprovalService';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -64,7 +65,12 @@ export default function FeaturedProductsSettings({
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<any>(null);
   const [featuredAccessApproved, setFeaturedAccessApproved] = useState<boolean>(false);
-  console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved);
+
+  // Capability check for featured tier gating
+  const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
+  const isFeaturedEnabled = featuredCap.data?.enabled ?? true;
+  const allowedTypes = featuredCap.data?.allowedTypes ?? [];
+  console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved, 'isFeaturedEnabled', isFeaturedEnabled, 'allowedTypes', allowedTypes);
 
   useEffect(() => {
     async function fetchTenant() {
@@ -165,6 +171,48 @@ export default function FeaturedProductsSettings({
         <div className="text-center">
           <div className="text-gray-600 mb-4">📦</div>
           <p className="text-gray-600">Tenant not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tier gate: if featured capability is disabled entirely, show locked state
+  if (!isFeaturedEnabled) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <SetTenantId tenantId={tenant.id} />
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center">
+                <Link href={`/t/${tenant.id}/settings`} className="flex items-center text-gray-600 hover:text-gray-900 mr-4">
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Settings
+                </Link>
+                <div className="flex items-center">
+                  <Star className="w-6 h-6 text-amber-500 mr-3" />
+                  <h1 className="text-xl font-semibold text-gray-900">Featured Products</h1>
+                </div>
+                <SimpleTierBadge tier={tenant.subscription_tier} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
+            <Star className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-amber-800 mb-2">Featured Products Not Available</h2>
+            <p className="text-amber-700 mb-4">
+              Featured products are not included in your current plan. Upgrade to access promotional featuring for your products.
+            </p>
+            <Link
+              href={`/t/${tenant.id}/settings`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Settings
+            </Link>
+          </div>
         </div>
       </div>
     );

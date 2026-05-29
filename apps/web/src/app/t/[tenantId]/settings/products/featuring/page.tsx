@@ -15,6 +15,7 @@ import { FeaturedProduct, FeaturedType } from '@/lib/singletons/TenantFeaturedPr
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
 import { StockUpdateService } from '@/services/stockUpdateService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -290,6 +291,10 @@ export default function ProductFeaturingPage() {
   const [editingExpiration, setEditingExpiration] = useState<string | null>(null);
   const [expirationDate, setExpirationDate] = useState('');
 
+  // Capability check for featured type tier gating
+  const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
+  const isFeaturedTypeAllowed = featuredCap.data?.allowedTypes?.includes('featured') ?? true;
+
   // Use singleton for featured (pay-to-play promotional) data
   const {
     isLoading,
@@ -334,7 +339,6 @@ export default function ProductFeaturingPage() {
       if (featuredType) {
         hasInitializedFeatured.current = true;
         setSelectedType('featured');
-        // console.log('[ProductFeaturingPage] Initialized with featured type:', featuredType);
       }
     }
   }, [featuredTypes]); // Only depend on featuredTypes, not selectedType
@@ -532,6 +536,38 @@ export default function ProductFeaturingPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading featured products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tier gate: if featured type is not allowed by the tenant's plan, show locked state
+  if (!isFeaturedTypeAllowed) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center h-16">
+              <Star className="w-6 h-6 text-blue-600 mr-3" />
+              <h1 className="text-xl font-semibold text-gray-900">Premium Featuring</h1>
+              {tenant && <SimpleTierBadge tier={tenant.subscription_tier} />}
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
+            <Star className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-amber-800 mb-2">Premium Featuring Not Available</h2>
+            <p className="text-amber-700 mb-4">
+              Premium featuring is not included in your current plan. Upgrade to access pay-to-play promotional placement for your products.
+            </p>
+            <a
+              href={`/t/${tenantId}/settings/featured-options`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              View Featured Options
+            </a>
+          </div>
         </div>
       </div>
     );

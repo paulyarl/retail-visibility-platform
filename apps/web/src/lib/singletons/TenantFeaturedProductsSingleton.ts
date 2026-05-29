@@ -74,6 +74,7 @@ export interface FeaturedProductsState {
   inactiveProducts: FeaturedProduct[];
   featuredLimits: Record<string, number>;
   featuredTypes: FeaturedType[];
+  allowedTypes: string[]; // Tier-gate: which featured types are allowed by the tenant's plan
   
   // UI State
   isLoading: boolean;
@@ -253,20 +254,26 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     // Currently empty - all types are either merchant-controlled, monetization-controlled, or platform-controlled
   ];
 
-  // Get merchant-controlled types (for storefront management)
+  // Get merchant-controlled types (for storefront management), filtered by tier capability
   getMerchantControlledTypes(): FeaturedType[] {
-    return this.merchantControlledTypes.map(type => ({
-      ...type,
-      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
-    }));
+    const allowed = this.state.allowedTypes;
+    return this.merchantControlledTypes
+      .filter(type => allowed.length === 0 || allowed.includes(type.id))
+      .map(type => ({
+        ...type,
+        maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+      }));
   }
 
-  // Get platform-controlled types (algorithmic)
+  // Get platform-controlled types (algorithmic), filtered by tier capability
   getPlatformControlledTypes(): FeaturedType[] {
-    return this.platformControlledTypes.map(type => ({
-      ...type,
-      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
-    }));
+    const allowed = this.state.allowedTypes;
+    return this.platformControlledTypes
+      .filter(type => allowed.length === 0 || allowed.includes(type.id))
+      .map(type => ({
+        ...type,
+        maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+      }));
   }
 
   // Get storefront types (merchant-controlled only)
@@ -274,25 +281,33 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     return this.getMerchantControlledTypes();
   }
 
-  // Get monetization-controlled types (premium features requiring admin approval)
+  // Get monetization-controlled types (premium features requiring admin approval), filtered by tier capability
   getMonetizationControlledTypes(): FeaturedType[] {
-    return this.monetizationControlledTypes.map(type => ({
-      ...type,
-      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
-    }));
+    const allowed = this.state.allowedTypes;
+    return this.monetizationControlledTypes
+      .filter(type => allowed.length === 0 || allowed.includes(type.id))
+      .map(type => ({
+        ...type,
+        maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+      }));
   }
 
-  // Get directory-only types (not available in storefront)
+  // Get directory-only types (not available in storefront), filtered by tier capability
   getDirectoryOnlyTypes(): FeaturedType[] {
-    return this.directoryOnlyTypes.map(type => ({
-      ...type,
-      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
-    }));
+    const allowed = this.state.allowedTypes;
+    return this.directoryOnlyTypes
+      .filter(type => allowed.length === 0 || allowed.includes(type.id))
+      .map(type => ({
+        ...type,
+        maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+      }));
   }
 
-  // Get manageable featured types (for admin context - excludes platform-controlled)
+  // Get manageable featured types (for admin context - excludes platform-controlled), filtered by tier capability
   getManageableTypes(): FeaturedType[] {
-    const manageableTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.directoryOnlyTypes];
+    const allowed = this.state.allowedTypes;
+    const manageableTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.directoryOnlyTypes]
+      .filter(type => allowed.length === 0 || allowed.includes(type.id));
     
     // Apply current database limits to all types
     const typesWithLimits = manageableTypes.map((type: FeaturedType) => ({
@@ -361,6 +376,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       inactiveProducts: [], // Add this
       featuredLimits: {},
       featuredTypes: [...this.defaultFeaturedTypes],
+      allowedTypes: [], // Will be populated from capability endpoint
       isLoading: true,
       processing: false,
       searchQuery: '',
@@ -536,6 +552,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.fetchFeaturedProducts(),
         this.fetchTierLimits(),
         this.fetchFeaturedLimits(), // Add this to get database limits
+        this.fetchCapabilityState(), // Fetch tier capability allowedTypes
         this.fetchInactiveProducts(),
         this.fetchAvailableProducts(), // Load available products for featuring
         this.fetchOutOfStockProducts() // Load out-of-stock products for management
@@ -566,12 +583,15 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         
         this.setState({ featuredLimits: data.limits });
         
-        // Update featuredTypes with actual limits - include ALL types
+        // Update featuredTypes with actual limits - filter by tier capability allowedTypes
+        const allowed = this.state.allowedTypes;
         const allTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.platformControlledTypes, ...this.directoryOnlyTypes];
-        const updatedTypes = allTypes.map((type: FeaturedType) => ({
-          ...type,
-          maxProducts: (data.limits as any)[type.id] || type.maxProducts
-        }));
+        const updatedTypes = allTypes
+          .filter(type => allowed.length === 0 || allowed.includes(type.id))
+          .map((type: FeaturedType) => ({
+            ...type,
+            maxProducts: (data.limits as any)[type.id] || type.maxProducts
+          }));
         
         // console.log('[TenantFeaturedProductsSingleton] Featured limits loaded:', {
         //   limits: data.limits,
@@ -590,6 +610,44 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     } catch (error) {
       console.error('TenantFeaturedProductsSingleton: Error fetching featured limits:', error);
       // Don't throw - continue without limits
+    }
+  }
+
+  async fetchCapabilityState() {
+    try {
+      const result = await this.makeDefaultRequest(
+        `/api/tenants/${this.tenantId}/featured-options/capability`,
+        undefined,
+        `featured-capability-${this.tenantId}`,
+        300000 // 5 minutes cache
+      );
+      if (result.success) {
+        const data = result.data as any;
+        const capability = data.capability || data;
+        if (capability?.allowedTypes) {
+          this.setState({ allowedTypes: capability.allowedTypes });
+
+          // Rebuild featuredTypes now that allowedTypes is populated
+          // (fetchFeaturedLimits may have run before this, with empty allowedTypes)
+          const allTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.platformControlledTypes, ...this.directoryOnlyTypes];
+          const filteredTypes = allTypes
+            .filter(type => capability.allowedTypes.includes(type.id))
+            .map((type: FeaturedType) => ({
+              ...type,
+              maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+            }));
+          this.setState({ featuredTypes: filteredTypes });
+
+          // Update currentType if the selected type is no longer allowed
+          const currentStillAllowed = filteredTypes.find(t => t.id === this.state.selectedType);
+          if (!currentStillAllowed && filteredTypes.length > 0) {
+            this.setState({ selectedType: filteredTypes[0].id, currentType: filteredTypes[0] });
+          }
+        }
+      }
+    } catch (error) {
+      // Fail-open: if capability fetch fails, allow all types
+      console.warn('[TenantFeaturedProductsSingleton] Failed to fetch capability state, allowing all types:', error);
     }
   }
 
