@@ -90,6 +90,8 @@ export interface StorefrontState {
   /** Type effectively used after applying merchant preferences */
   effectiveType: StorefrontType;
   isFlexible: boolean;
+  /** Which individual storefront types are allowed by the tier (e.g. ['retail','service'] when type='both') */
+  allowedTypes: StorefrontType[];
   /** Whether the merchant has selected a specific type when multiple are available */
   hasMerchantSelection: boolean;
   /** Merchant preference for storefront type */
@@ -1444,6 +1446,19 @@ export function resolveStorefrontState(
     type = 'service';
   }
 
+  // Compute allowed types from actual feature gates (not just type='both' → all)
+  const allowedTypes: StorefrontType[] = [];
+  if (isEnabled) {
+    if (bothOptions) {
+      // Flexible: all individual types allowed
+      allowedTypes.push('online', 'retail', 'service');
+    } else {
+      if (online) allowedTypes.push('online');
+      if (retail) allowedTypes.push('retail');
+      if (service) allowedTypes.push('service');
+    }
+  }
+
   // Merchant preferences
   const prefs = {
     storefront_type_enabled: merchantPrefs?.storefront_type_enabled !== false,
@@ -1456,13 +1471,13 @@ export function resolveStorefrontState(
 
   if (type === 'both' && prefs.storefront_type_enabled) {
     const selected = prefs.selected_storefront_type;
-    if (selected === 'online' && online) {
+    if (selected === 'online' && allowedTypes.includes('online')) {
       effectiveType = 'online';
       hasMerchantSelection = true;
-    } else if (selected === 'retail' && retail) {
+    } else if (selected === 'retail' && allowedTypes.includes('retail')) {
       effectiveType = 'retail';
       hasMerchantSelection = true;
-    } else if (selected === 'service' && service) {
+    } else if (selected === 'service' && allowedTypes.includes('service')) {
       effectiveType = 'service';
       hasMerchantSelection = true;
     }
@@ -1473,6 +1488,7 @@ export function resolveStorefrontState(
     type,
     effectiveType,
     isFlexible: bothOptions,
+    allowedTypes,
     hasMerchantSelection,
     merchantPreferences: prefs,
     features,

@@ -252,15 +252,15 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const sf = caps.storefront;
   if (Object.keys(sf.features).length > 0) {
     const specifics: string[] = [];
-    // Expand storefront type group into constituent features
-    if (sf.type && sf.type !== 'none') {
-      const groupFeatures = STOREFRONT_GROUP_FEATURES[sf.type];
-      if (groupFeatures) {
-        groupFeatures.forEach(f => specifics.push(f));
-      } else {
-        const label = STOREFRONT_TYPE_LABELS[sf.type];
+    // Use allowedTypes for accurate feature display (e.g. retail+service, not online+retail)
+    if (sf.allowedTypes && sf.allowedTypes.length > 0) {
+      sf.allowedTypes.forEach(t => {
+        const label = STOREFRONT_TYPE_LABELS[t];
         if (label) specifics.push(label);
-      }
+      });
+    } else if (sf.type && sf.type !== 'none') {
+      const label = STOREFRONT_TYPE_LABELS[sf.type];
+      if (label) specifics.push(label);
     }
     summaries.push({
       key: 'storefront_types',

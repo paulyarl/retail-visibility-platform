@@ -180,6 +180,12 @@ export default function CapabilityManagement() {
 
   const openTierCapEditDialog = (cap: TierCapability) => {
     setEditingTierCap(cap);
+    const capType = capabilityTypes.find(ct => ct.capability_type_key === cap.capability_type_key);
+    const allowedFeatures = capType?.allowed_features || [];
+    const features = allowedFeatures.map(fk => {
+      const existing = cap.features.find(f => f.feature_key === fk);
+      return { feature_key: fk, is_enabled: existing?.is_enabled ?? false };
+    });
     setTierCapForm({
       tier_key: cap.tier_key,
       capability_type_key: cap.capability_type_key,
@@ -187,7 +193,7 @@ export default function CapabilityManagement() {
       is_highlighted: cap.is_highlighted,
       highlight_order: cap.highlight_order,
       marketing_name: cap.marketing_name || '',
-      features: cap.features.map(f => ({ feature_key: f.feature_key, is_enabled: f.is_enabled })),
+      features,
     });
     setTierCapDialogOpen(true);
   };
@@ -832,7 +838,7 @@ export default function CapabilityManagement() {
                       <div className="text-xs font-medium text-gray-600 mb-2">Feature Collection:</div>
                       {capType.allowed_features && capType.allowed_features.length > 0 ? (
                         <div className="grid grid-cols-2 gap-1.5">
-                          {capType.allowed_features.map((featKey) => {
+                          {[...capType.allowed_features].sort((a, b) => a.localeCompare(b)).map((featKey) => {
                             const feat = features.find(f => f.feature_key === featKey);
                             return (
                               <div key={featKey} className="flex items-center gap-1.5 text-xs">
@@ -1441,7 +1447,7 @@ export default function CapabilityManagement() {
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto border rounded-md p-3">
-                  {features.map((feature) => {
+                  {[...features].sort((a, b) => a.feature_key.localeCompare(b.feature_key)).map((feature) => {
                     const isSelected = capTypeForm.allowed_features.includes(feature.feature_key);
                     return (
                       <div
@@ -1774,7 +1780,7 @@ export default function CapabilityManagement() {
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto border rounded-md p-3">
-                  {tierCapForm.features.map(f => {
+                  {[...tierCapForm.features].sort((a, b) => a.feature_key.localeCompare(b.feature_key)).map(f => {
                     const feat = features.find(ft => ft.feature_key === f.feature_key);
                     return (
                       <div
