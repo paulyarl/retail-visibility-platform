@@ -12,7 +12,14 @@
 
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { tenantInfoService } from '@/services/TenantInfoService';
+import { publicPaymentGatewaySettingsService } from '@/services/PublicPaymentGatewaySettingsService';
+import { publicStorefrontTypeService } from '@/services/PublicStorefrontTypeService';
+import { publicCommerceSettingsService } from '@/services/PublicCommerceSettingsService';
+import { publicFulfillmentService } from '@/services/PublicFulfillmentService';
+import { publicFeaturedOptionsService } from '@/services/PublicFeaturedOptionsService';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+
 
 // ====================
 // TYPES
@@ -1565,8 +1572,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.commerce;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getCommerceSettings(tenantId);
+      const prefs = await publicCommerceSettingsService.getCommerceSettings(tenantId);
       if (prefs) {
         return resolveCommerceState(tierState.features, prefs);
       }
@@ -1586,8 +1592,8 @@ class CapabilityResolutionService extends CustomerApiSingleton {
 
     // Fetch merchant preferences and re-resolve with them
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getPaymentGatewaySettings(tenantId);
+
+      const prefs = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(tenantId);
       if (prefs) {
         return resolvePaymentGatewayState(tierState.features, prefs);
       }
@@ -1606,8 +1612,8 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.storefront;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getStorefrontTypeSettings(tenantId);
+
+      const prefs = await publicStorefrontTypeService.getStorefrontTypeState(tenantId);
       if (prefs) {
         return resolveStorefrontState(tierState.features, prefs);
       }
@@ -1626,7 +1632,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.barcodeScan;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
       if (prefs) {
         return resolveBarcodeScanState(tierState.features, prefs);
@@ -1646,8 +1652,8 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.fulfillment;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getFulfillmentSettings(tenantId);
+
+      const prefs = await publicFulfillmentService.getFulfillmentSettings(tenantId);
       if (prefs) {
         return resolveFulfillmentState(tierState.features, prefs);
       }
@@ -1666,7 +1672,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.productOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
       if (prefs) {
         return resolveProductOptionsState(tierState.features, prefs);
@@ -1686,8 +1692,8 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.featuredOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getFeaturedOptionsSettings(tenantId);
+
+      const prefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(tenantId);
       if (prefs) {
         return resolveFeaturedOptionsState(tierState.features, prefs);
       }
@@ -1706,7 +1712,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.integrationOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
       if (prefs) {
         return resolveIntegrationState(tierState.features, prefs);
@@ -1726,7 +1732,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.quickstartOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
       if (prefs) {
         return resolveQuickstartOptionsState(tierState.features, prefs);
@@ -1746,7 +1752,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const tierState = all.storefrontOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
       if (prefs) {
         return resolveStorefrontOptionsState(tierState.features, prefs);
@@ -1878,7 +1884,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.commerce;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getCommerceSettings(tenantId);
       if (prefs) {
         return resolveCommerceState(tierState.features, prefs);
@@ -1896,13 +1902,13 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
 
     // Fetch merchant preferences and re-resolve with them
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getPaymentGatewaySettings(tenantId);
+
+      const prefs = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(tenantId);
       if (prefs) {
         return resolvePaymentGatewayState(tierState.features, prefs);
       }
     } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch merchant preferences, using tier-only state:', err);
+      console.warn('[PublicPaymentGatewaySettingsService] Failed to fetch merchant preferences, using tier-only state:', err);
     }
 
     return tierState;
@@ -1913,8 +1919,8 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.storefront;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getStorefrontTypeSettings(tenantId);
+
+      const prefs = await publicStorefrontTypeService.getStorefrontTypeState(tenantId);
       if (prefs) {
         return resolveStorefrontState(tierState.features, prefs);
       }
@@ -1933,7 +1939,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.barcodeScan;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
       if (prefs) {
         return resolveBarcodeScanState(tierState.features, prefs);
@@ -1953,8 +1959,8 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.fulfillment;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getFulfillmentSettings(tenantId);
+
+      const prefs = await publicFulfillmentService.getFulfillmentSettings(tenantId);
       if (prefs) {
         return resolveFulfillmentState(tierState.features, prefs);
       }
@@ -1973,7 +1979,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.productOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
       if (prefs) {
         return resolveProductOptionsState(tierState.features, prefs);
@@ -1993,8 +1999,8 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.featuredOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
-      const prefs = await tenantInfoService.getFeaturedOptionsSettings(tenantId);
+
+      const prefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(tenantId);
       if (prefs) {
         return resolveFeaturedOptionsState(tierState.features, prefs);
       }
@@ -2013,7 +2019,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.integrationOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
       if (prefs) {
         return resolveIntegrationState(tierState.features, prefs);
@@ -2033,7 +2039,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.quickstartOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
       if (prefs) {
         return resolveQuickstartOptionsState(tierState.features, prefs);
@@ -2053,7 +2059,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const tierState = all.storefrontOptions;
 
     try {
-      const { tenantInfoService } = await import('./TenantInfoService');
+
       const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
       if (prefs) {
         return resolveStorefrontOptionsState(tierState.features, prefs);

@@ -109,9 +109,9 @@ import rateLimitWarningsRoutes from './routes/rate-limit-warnings';
 // import feedJobsRoutes from './routes/feed-jobs';
 // import feedbackRoutes from './routes/feedback';
 // import tenantCategoriesRoutes from './routes/tenant-categories';
-   import taxonomyAdminRoutes from './routes/taxonomy-admin';
-   import feedValidationRoutes from './routes/feed-validation';
-   import businessProfileValidationRoutes from './routes/business-profile-validation';
+import taxonomyAdminRoutes from './routes/taxonomy-admin';
+import feedValidationRoutes from './routes/feed-validation';
+import businessProfileValidationRoutes from './routes/business-profile-validation';
 import trialSetupRoutes from './routes/tenant/trial-setup';
 
 import cacheRoutes from './routes/cache';
@@ -123,11 +123,11 @@ import { memoryCache, cacheKeys, CACHE_TTL } from './utils/cache';
 // import authRoutes from './auth/auth.routes'; // Now handled by modular mounting
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
 import { isPlatformAdmin, isPlatformUser } from './utils/platform-admin';
-import { 
-  requireTenantAdmin, 
-  requireInventoryAccess, 
+import {
+  requireTenantAdmin,
+  requireInventoryAccess,
   requireTenantOwner,
-  checkTenantCreationLimit 
+  checkTenantCreationLimit
 } from './middleware/permissions';
 import { validateTierAssignment, validateTierCompatibility } from './middleware/tier-validation';
 import { validateSKULimits, validateTierSKUCompatibility } from './middleware/sku-limits';
@@ -245,7 +245,7 @@ if (sentryEnabled) {
       // Use custom environment variable to distinguish staging from production
       environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
       tracesSampleRate: 0.1,
-      
+
       // Don't send errors in development
       beforeSend(event, hint) {
         if (process.env.NODE_ENV === 'development') {
@@ -276,7 +276,7 @@ app.use(securityLogger); // Log suspicious requests
 app.use(async (req, res, next) => {
   try {
     const { rateLimitingService } = await import('./services/RateLimitingService');
-    
+
     // Check if rate limiting is globally enabled (Environment Variable > Database > Default OFF)
     const isEnabled = await rateLimitingService.isRateLimitingEnabled();
     if (!isEnabled) {
@@ -289,10 +289,10 @@ app.use(async (req, res, next) => {
 
     // Check rate limit
     const result = await rateLimitingService.checkRateLimit(ip, 'standard', path);
-    
+
     if (!result.allowed) {
       console.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
-      
+
       return res.status(429).json({
         error: 'Too Many Requests',
         message: `Rate limit exceeded. Please try again after ${result.rule?.windowMinutes || 15} minutes.`,
@@ -313,10 +313,10 @@ app.use(validateInput); // Input validation and sanitization
 app.use(ssrfProtection); // SSRF protection
 
 app.use(cors({
-  origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
+  origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
-  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info','x-admin-request','x-tenant-request','x-request-group','x-request-groups','x-require-all','x-admin-roles','x-audit-id','x-request-context','x-organization-id','x-organization-validation','x-audit-operation','x-audit-reason','x-service','x-service-key','x-auth0-email','x-auth0-id','x-session-id','x-customer-id'],
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id'],
 }));
 
 // IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
@@ -367,7 +367,7 @@ const DEV = process.env.NODE_ENV !== "production";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
 // Create upload directory in both dev and production for MVP
 if (!fs.existsSync(UPLOAD_DIR)) {
-  try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch {}
+  try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch { }
 }
 // Serve uploads statically in both dev and production for MVP
 app.use("/uploads", express.static(UPLOAD_DIR));
@@ -575,11 +575,11 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
 //   try {
 //     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
 //     const { isPlatformUser } = await import('./utils/platform-admin');
-    
+
 //     // Query parameters for filtering
 //     const includeArchived = req.query.includeArchived === 'true';
 //     const statusFilter = req.query.status as string;
-    
+
 //     // Build where clause
 //     const baseWhere = isPlatformUser(req.user) ? {} : {
 //       user_tenants: {
@@ -588,7 +588,7 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
 //         }
 //       }
 //     };
-    
+
 //     // Add status filtering - include archived by default unless specifically excluded
 //     let statusCondition: any = {};
 //     if (statusFilter) {
@@ -599,7 +599,7 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
 //       statusCondition = { location_status: { not: 'archived' } };
 //     }
 //     // Default: include all statuses including archived
-    
+
 //     const tenants = await prisma.tenants.findMany({ 
 //       where: {
 //         ...baseWhere,
@@ -615,7 +615,7 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
 //         }
 //       }
 //     });
-    
+
 //     // Transform for frontend compatibility - convert organizations_list to organization
 //     const transformedTenants = tenants.map(tenant => ({
 //       id: tenant.id,
@@ -630,7 +630,7 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
 //         name: tenant.organizations_list.name,
 //       } : null,
 //     }));
-    
+
 //     res.json(transformedTenants);
 //   } catch (_e) {
 //     res.status(500).json({ error: "failed_to_list_tenants" });
@@ -676,7 +676,7 @@ app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
         let platformDomain = 'visibleshelf.com';
         let protocol = 'https';
         let port = '';
-        
+
         if (req.headers.host) {
           const hostname = req.headers.host.split(':')[0]; // Remove port if present
           if (hostname.endsWith('.visibleshelf.com')) {
@@ -720,7 +720,7 @@ app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
 
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
-    let tenant: any = await prisma.tenants.findUnique({ 
+    let tenant: any = await prisma.tenants.findUnique({
       where: { id: req.params.id as string },
       select: {
         id: true,
@@ -766,26 +766,26 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
       }
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
-    
+
     // Fetch current slug and published status from directory_settings_list (source of truth)
     const { basePrisma } = await import('./prisma');
     // Check if tenant has published directory listing
-     const directoryResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant.id },
-            select: {
-              is_published: true,
-              slug: true
-            }
-          });
-    
+    const directoryResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant.id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
     const hasDirectory = directoryResult?.is_published === true;
     const directorySlug = directoryResult?.slug;
     const currentSlug = directorySlug || tenant.slug;
     const hasPublishedDirectory = directoryResult?.is_published === true;
     // console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
-    
+
     const now = new Date();
-    
+
     // Auto-set trial expiration date if missing for trial users
     if (
       tenant.subscription_status === "trial" &&
@@ -793,7 +793,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     ) {
       const trial_ends_at = new Date();
       trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
-      
+
       tenant = await prisma.tenants.update({
         where: { id: tenant.id },
         data: {
@@ -802,7 +802,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         },
       });
     }
-    
+
     // Check if trial has expired and mark as expired
     // If there is no active subscription attached, downgrade tier to internal google_only
     if (
@@ -822,11 +822,11 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         },
       });
     }
-    
+
     // Add location status info
     const { getLocationStatusInfo } = await import('./utils/location-status');
     const statusInfo = getLocationStatusInfo(tenant.location_status);
-    
+
     // Calculate effective expiration
     // console.log('[INDEX TENANTS] Debug: Tenant data for effective expiration:', {
     //   subscription_status: (tenant as any).subscription_status,
@@ -836,28 +836,28 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     //   manual_subscription_expires_at: (tenant as any).manual_subscription_expires_at,
     // });
 
-    const effectiveExpiration = (tenant as any).manual_subscription_control 
+    const effectiveExpiration = (tenant as any).manual_subscription_control
       ? {
-          expiresAt: (tenant as any).manual_subscription_expires_at,
-          type: 'manual' as const,
-          source: 'manual_override' as const
-        }
+        expiresAt: (tenant as any).manual_subscription_expires_at,
+        type: 'manual' as const,
+        source: 'manual_override' as const
+      }
       : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
         ? {
-            expiresAt: (tenant as any).trial_ends_at,
-            type: 'trial' as const,
-            source: 'automatic_trial' as const
-          }
+          expiresAt: (tenant as any).trial_ends_at,
+          type: 'trial' as const,
+          source: 'automatic_trial' as const
+        }
         : (tenant as any).subscription_ends_at
           ? {
-              expiresAt: (tenant as any).subscription_ends_at,
-              type: 'subscription' as const,
-              source: 'automatic_subscription' as const
-            }
+            expiresAt: (tenant as any).subscription_ends_at,
+            type: 'subscription' as const,
+            source: 'automatic_subscription' as const
+          }
           : null;
 
     // console.log('[INDEX TENANTS] Debug: Calculated effective expiration:', effectiveExpiration);
-    
+
     res.json({
       ...tenant,
       slug: currentSlug, // Use slug from directory_settings_list (source of truth)
@@ -878,7 +878,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
   }
 });
 
-const createTenantSchema = z.object({ 
+const createTenantSchema = z.object({
   name: z.string().min(1),
   slug: z.string().optional(),
   city: z.string().optional(),
@@ -890,7 +890,7 @@ const createTenantSchema = z.object({
 app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-  
+
   try {
     // Determine who will own this tenant
     // If ownerId is provided and user is PLATFORM_SUPPORT, use that owner
@@ -899,19 +899,19 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     if (!userId) {
       return res.status(401).json({ error: 'authentication_required', message: 'Invalid user ID' });
     }
-    
-    const ownerId = (req.user?.role === user_role.PLATFORM_SUPPORT || req.user?.role === user_role.PLATFORM_ADMIN) && parsed.data.ownerId 
-      ? parsed.data.ownerId 
+
+    const ownerId = (req.user?.role === user_role.PLATFORM_SUPPORT || req.user?.role === user_role.PLATFORM_ADMIN) && parsed.data.ownerId
+      ? parsed.data.ownerId
       : userId;
-    
-    
+
+
     // Validate for duplicates (check against the owner, not the creator)
     const { validateTenantCreation } = await import('./utils/tenant-validation');
     const validation = await validateTenantCreation(
       ownerId,
       parsed.data.name
     );
-    
+
     if (!validation.valid) {
       return res.status(409).json({
         error: 'duplicate_tenant',
@@ -919,11 +919,11 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
         validationErrors: validation.errors,
       });
     }
-    
+
     // Set trial to expire based on configured trial duration
     const trial_ends_at = new Date();
     trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
-    
+
     // Create tenant and link to user manually (not using $transaction to avoid issues)
 
     // Good standing check for organization membership
@@ -1036,7 +1036,7 @@ app.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
 
 // PATCH /tenants/:id - Update tenant subscription tier (admin only)
 const patchTenantSchema = z.object({
-  subscription_tier: z.enum(['google_only','discovery', 'starter','storefront', 'professional','commitment', 'enterprise', 'organization']).optional(),
+  subscription_tier: z.enum(['google_only', 'discovery', 'starter', 'storefront', 'professional', 'commitment', 'enterprise', 'organization']).optional(),
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   organization_id: z.string().optional(), // For linking to organization
 });
@@ -1044,9 +1044,9 @@ app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssig
   const parsed = patchTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
-    const tenant = await prisma.tenants.update({ 
-      where: { id: req.params.id as string }, 
-      data: parsed.data 
+    const tenant = await prisma.tenants.update({
+      where: { id: req.params.id as string },
+      data: parsed.data
     });
     res.json(tenant);
   } catch (e: any) {
@@ -1060,7 +1060,7 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
   try {
     const { id } = req.params;
     const { basePrisma } = await import('./prisma');
-    
+
     // Get tenant's address from directory_listings_list
     const listingResult = await basePrisma.$queryRaw<any[]>`
       SELECT address, city, state, zip_code, business_name
@@ -1068,17 +1068,17 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
       WHERE tenant_id = ${id}
       LIMIT 1
     `;
-    
+
     if (!listingResult || listingResult.length === 0) {
       console.log(`route: /api/tenants/:id/geocode`);
       return res.status(400).json({ error: "tenant_not_found" });
     }
-    
+
     const listing = listingResult[0];
     if (!listing.address || !listing.city || !listing.zip_code) {
       return res.status(400).json({ error: "incomplete_address", message: "Address, city, and zip code are required for geocoding" });
     }
-    
+
     // Build full address string
     const fullAddress = [
       listing.address,
@@ -1087,15 +1087,15 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
       listing.zip_code,
       'USA'
     ].filter(Boolean).join(', ');
-    
+
     console.log(`[POST /api/tenants/${id}/geocode] Geocoding address: ${fullAddress}`);
-    
+
     // Call Google Geocoding API
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "geocoding_not_configured", message: "Google Maps API key not configured" });
     }
-    
+
     const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`;
     const geocodeResponse = await fetch(geocodeUrl);
     const geocodeData = await geocodeResponse.json() as {
@@ -1110,18 +1110,18 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
       }>;
       error_message?: string;
     };
-    
+
     if (geocodeData.status !== 'OK' || !geocodeData.results || geocodeData.results.length === 0) {
       console.error(`[POST /api/tenants/${id}/geocode] Geocoding failed:`, geocodeData.status);
       return res.status(400).json({ error: "geocoding_failed", status: geocodeData.status });
     }
-    
+
     const location = geocodeData.results[0].geometry.location;
     const latitude = location.lat;
     const longitude = location.lng;
-    
+
     console.log(`[POST /api/tenants/${id}/geocode] Got coordinates: ${latitude}, ${longitude}`);
-    
+
     // Update both tables
     await basePrisma.$executeRaw`
       UPDATE "tenant_business_profiles_list" 
@@ -1130,7 +1130,7 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE tenant_id = ${id}
     `;
-    
+
     await basePrisma.$executeRaw`
       UPDATE "directory_listings_list" 
       SET latitude = ${latitude}, 
@@ -1138,9 +1138,9 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE tenant_id = ${id}
     `;
-    
+
     console.log(`[POST /api/tenants/${id}/geocode] Updated coordinates for ${listing.business_name}`);
-    
+
     res.json({
       success: true,
       coordinates: { latitude, longitude },
@@ -1163,7 +1163,7 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
   try {
     const { id } = req.params;
     const parsed = coordinatesSchema.safeParse(req.body);
-    
+
     if (!parsed.success) {
       return res.status(400).json({ error: "invalid_coordinates", details: parsed.error.flatten() });
     }
@@ -1216,19 +1216,19 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
 app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireRoleGroup('IS_TENANT_OWNER'), async (req, res) => {
   try {
     const tenant_id = req.params.id;
-    
+
     // Explicitly delete directory-related data to prevent orphaned listings
     await prisma.directory_featured_listings_list.deleteMany({
       where: { tenant_id: req.params.id as string },
     });
-    
+
     await prisma.directory_settings_list.deleteMany({
       where: { tenant_id: req.params.id as string },
     });
-    
+
     // Delete the tenant (cascade will handle other relations)
     await prisma.tenants.delete({ where: { id: req.params.id as string } });
-    
+
     console.log(`[Audit] Tenant deleted: ${tenant_id} (including directory listings)`);
     res.status(204).end();
   } catch (error: any) {
@@ -1271,7 +1271,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     switch (userRole) {
       case 'ADMIN':
         normalizedRole = user_role.PLATFORM_ADMIN;
-        break; 
+        break;
       case 'OWNER':
         normalizedRole = user_role.TENANT_OWNER;
         break;
@@ -1280,7 +1280,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
         break;
       case user_role.ADMIN:
         normalizedRole = user_role.PLATFORM_ADMIN;
-        break; 
+        break;
       case user_role.OWNER:
         normalizedRole = user_role.TENANT_OWNER;
         break;
@@ -1301,18 +1301,18 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       tenantRole,
       canChange: canChangeStatus(tenantRole)
     });
-    
+
     if (!canChangeStatus(tenantRole)) {
       console.log(`[PATCH /tenants/${id}/status] Permission denied for user ${req.user?.userId}`);
-      return res.status(403).json({ 
-        error: "insufficient_permissions", 
-        message: "You don't have permission to change location status" 
+      return res.status(403).json({
+        error: "insufficient_permissions",
+        message: "You don't have permission to change location status"
       });
     }
 
     // Get current tenant
     console.log(`[PATCH /tenants/${id}/status] Fetching tenant data`);
-    const tenant = await prisma.tenants.findUnique({ where: { id:id as string } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: id as string } });
     if (!tenant) {
       console.log(`[PATCH /tenants/${id}/status] Tenant not found`);
       return res.status(400).json({ error: "tenant_not_found" });
@@ -1341,9 +1341,9 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     const validation = validateStatusChange(tenant.location_status, status, reason);
     if (!validation.valid) {
       console.log(`[PATCH /tenants/${id}/status] Validation failed: ${validation.error}`);
-      return res.status(400).json({ 
-        error: "invalid_status_change", 
-        message: validation.error 
+      return res.status(400).json({
+        error: "invalid_status_change",
+        message: validation.error
       });
     }
 
@@ -1452,12 +1452,12 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     }
 
     const impact = getStatusChangeImpact(tenant.location_status as any, status);
-    
+
     // For preview, only check if transition is allowed (don't require reason yet)
     const allowedTransitions = getStatusTransitions(tenant.location_status as any);
     const valid = allowedTransitions.includes(status);
     const error = valid ? undefined : `Cannot transition from ${tenant.location_status} to ${status}. Allowed transitions: ${allowedTransitions.join(', ')}`;
-    
+
     res.json({
       currentStatus: tenant.location_status,
       newStatus: status,
@@ -1605,7 +1605,7 @@ const tenantProfileSchema = z.object({
     return isNaN(num) ? undefined : num;
   }),
   display_map: z.boolean().optional(),
-  map_privacy_mode: z.enum(["precise","neighborhood"]).optional(),
+  map_privacy_mode: z.enum(["precise", "neighborhood"]).optional(),
 });
 
 app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
@@ -1614,12 +1614,12 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     console.error('[POST /tenant/profile] Validation failed:', parsed.error.flatten());
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
-  
+
   try {
     const { tenant_id, ...profileData } = parsed.data;
     console.log('[POST /tenant/profile] Starting for tenant:', tenant_id);
     console.log('[POST /tenant/profile] Profile data:', profileData);
-    
+
     const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!existingTenant) {
       console.error('[POST /tenant/profile] Tenant not found:', tenant_id);
@@ -1630,7 +1630,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Import basePrisma to bypass retry wrapper
     const { basePrisma } = await import('./prisma');
-    
+
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
       SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
@@ -1728,7 +1728,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         display_map: (profileData as any).display_map,
         map_privacy_mode: (profileData as any).map_privacy_mode,
       };
-      
+
       // Add optional fields to insert
       Object.entries(optionalMappings).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -1754,11 +1754,11 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
           }
         }
       });
-      
+
       // Always add updated_at field with current timestamp
       insertFields.push('updated_at');
       // Don't push a value for updated_at, we'll use CURRENT_TIMESTAMP in SQL
-      
+
       // Build placeholders with JSON cast for jsonb columns
       const placeholders = insertFields.map((field, i) => {
         if (field === 'updated_at') {
@@ -1777,7 +1777,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         }
         return `$${paramIndex}`;
       });
-      
+
       const insertQuery = `
         INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})
@@ -1822,24 +1822,24 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
-    
+
     // Fetch slug from directory_settings_list and include in response
     const slugResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant_id },
-            select: {
-              is_published: true,
-              slug: true
-            }
-          });
-    
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
     const hasDirectory = slugResult?.is_published === true;
     const slug = slugResult?.slug || null;
-    
+
     const responseWithSlug = {
       ...(result as any)[0] || result,
       slug
     };
-    
+
     res.json(responseWithSlug);
   } catch (e: any) {
     console.error("[POST /tenant/profile] Full error details:", {
@@ -1868,19 +1868,19 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
     `;
     const bp = (bpResults as any[])[0] || null;
-    
+
     // Fetch slug from directory_settings_list
     const slugResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant_id },
-            select: {
-              is_published: true,
-              slug: true
-            }
-          });
-    
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
     // const hasDirectory = slugResult?.is_published === true;
     const slug = slugResult?.slug || tenant.slug || null;
-    
+
     // Fetch business hours from BusinessHours table (optional - tables may not exist)
     let businessHours = null;
     let specialHours = null;
@@ -1889,7 +1889,7 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
         SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenant_id}
       `;
       businessHours = (businessHoursResults as any[])[0] || null;
-      
+
       const specialHoursResults = await basePrisma.$queryRaw`
         SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenant_id}
       `;
@@ -1898,18 +1898,18 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       // Business hours tables don't exist yet - continue without them
       console.log('[GET /tenant/profile] Business hours tables not found, continuing without them');
     }
-    
-  
+
+
     // Check if tenant has published directory listing
-     const tenantResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant_id },
-            select: {
-              is_published: true
-            }
-          });
-    
-          const hasDirectory = tenantResult?.is_published === true;
-	
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    const hasDirectory = tenantResult?.is_published === true;
+
     const md = (tenant.metadata as any) || {};
     const profile = {
       tenant_id: tenant.id,
@@ -1957,23 +1957,23 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
 app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
   try {
     const { tenantId, primary, secondary } = req.body;
-    
+
     if (!tenantId) {
       return res.status(400).json({ error: "tenant_required" });
     }
-    
+
     if (!primary || !primary.id || !primary.name) {
       return res.status(400).json({ error: "primary_category_required" });
     }
-    
+
     console.log('[PUT /api/tenant/gbp-category] Updating GBP categories for tenant:', tenantId);
     console.log('[PUT /api/tenant/gbp-category] Primary:', primary);
     console.log('[PUT /api/tenant/gbp-category] Secondary:', secondary);
-    
+
     // Update business profile with GBP categories using raw SQL
     // (Prisma client needs regeneration to recognize these fields)
     const pool = getDirectPool();
-    
+
     // First, ensure the GBP category exists in gbp_categories_list
     // Insert if not exists (upsert)
     await pool.query(
@@ -1985,9 +1985,9 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
            updated_at = NOW()`,
       [primary.id, primary.name]
     );
-    
+
     console.log('[PUT /api/tenant/gbp-category] GBP category ensured in gbp_categories_list');
-    
+
     // Also ensure secondary categories exist in gbp_categories_list
     if (secondary && Array.isArray(secondary)) {
       for (const secCategory of secondary) {
@@ -2005,7 +2005,7 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
       }
       console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories ensured in gbp_categories_list`);
     }
-    
+
     // Now update the business profile
     await pool.query(
       `UPDATE tenant_business_profiles_list
@@ -2017,9 +2017,9 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
        WHERE tenant_id = $3`,
       [primary.id, primary.name, tenantId]
     );
-    
+
     console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
-    
+
     // Update tenants with new dedicated GBP columns instead of metadata
     await pool.query(
       `UPDATE tenants
@@ -2037,22 +2037,22 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
         tenantId
       ]
     );
-    
+
     console.log('[PUT /api/tenant/gbp-category] Updated tenants table with dedicated GBP columns');
-    
+
     // NEW: Update junction table with clean relational design
     // Delete existing categories for this tenant
     await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
-    
+
     // Insert primary category
     await pool.query(
       `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
        VALUES ($1, $2, 'primary')`,
       [tenantId, primary.id]
     );
-    
+
     console.log('[PUT /api/tenant/gbp-category] Primary category added to junction table');
-    
+
     // Insert secondary categories
     if (secondary && secondary.length > 0) {
       for (const secCategory of secondary) {
@@ -2064,21 +2064,21 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
       }
       console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories added to junction table`);
     }
-    
+
     // Sync GBP categories to gbp_listing_categories junction table
     // Delete existing associations
     await pool.query(
       'DELETE FROM gbp_listing_categories WHERE listing_id = $1',
       [tenantId]
     );
-    
+
     // Insert primary category
     await pool.query(
       `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
        VALUES ($1, $2, true)`,
       [tenantId, primary.id]
     );
-    
+
     // Insert secondary categories
     if (secondary && secondary.length > 0) {
       for (const cat of secondary) {
@@ -2089,12 +2089,12 @@ app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
         );
       }
     }
-    
+
     console.log('[PUT /api/tenant/gbp-category] Synced GBP categories to gbp_listing_categories');
-    
+
     // The trigger will automatically refresh the materialized view (with debounce)
-    
-    return res.json({ 
+
+    return res.json({
       success: true,
       message: 'GBP categories updated and synced to directory'
     });
@@ -2109,8 +2109,8 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
-    const tenant = await prisma.tenants.findUnique({ 
+
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenant_id }
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
@@ -2124,16 +2124,16 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
     // Check if tenant has storefront access (tier-based)
     const tier = tenant.subscription_tier as string;
     const hasStorefrontAccess = tier !== 'google_only' && tier !== 'discovery'; // google_only and discovery don't have storefront
-      // Check if tenant has published directory listing
     // Check if tenant has published directory listing
-     const tenantResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant_id },
-            select: {
-              is_published: true
-            }
-          });
-    
-          const hasDirectory = tenantResult?.is_published === true;
+    // Check if tenant has published directory listing
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    const hasDirectory = tenantResult?.is_published === true;
 
     // Storefront is accessible if: tier allows it AND location status allows it
     const finalStorefrontAccess = hasStorefrontAccess && canShowStorefront;
@@ -2169,9 +2169,9 @@ app.get("/tenant/:tenant_id/swis/preview", async (req, res) => {
     const { tenant_id } = req.params;
     const limit = parseInt(req.query.limit as string) || 12;
     const sort = (req.query.sort as string) || 'updated_desc';
-    
+
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Build sort order
     let orderBy: any = { updated_at: 'desc' };
     switch (sort) {
@@ -2194,14 +2194,14 @@ app.get("/tenant/:tenant_id/swis/preview", async (req, res) => {
         orderBy = { price: 'desc' };
         break;
     }
-    
+
     // Fetch products
     const products = await prisma.inventory_items.findMany({
       where: { tenant_id: tenant_id },
       orderBy,
       take: limit,
     });
-    
+
     return res.json({ products, total: products.length });
   } catch (e: any) {
     console.error("[GET /tenant/:tenant_id/swis/preview] Error:", e);
@@ -2214,7 +2214,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
 
@@ -2224,7 +2224,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
     `;
     const bp = (bpResults as any[])[0] || null;
-    
+
     // Fetch business hours from BusinessHours table (optional - tables may not exist)
     let businessHours = null;
     let specialHours = null;
@@ -2233,7 +2233,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
         SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenant_id}
       `;
       businessHours = (businessHoursResults as any[])[0] || null;
-      
+
       const specialHoursResults = await basePrisma.$queryRaw`
         SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenant_id}
       `;
@@ -2242,14 +2242,14 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       // Business hours tables don't exist yet - continue without them
       console.log('[GET /public/tenant/:tenant_id/profile] Business hours tables not found, continuing without them');
     }
-    
+
     let hoursData = null;
-    
+
     if (businessHours && businessHours.periods) {
       // Convert periods array to day-keyed object for storefront
       const periods = businessHours.periods as any[];
       const hoursByDay: any = { timezone: businessHours.timezone || 'America/New_York' };
-      
+
       for (const period of periods) {
         if (period.day && period.open && period.close) {
           // Convert MONDAY to Monday for storefront compatibility
@@ -2260,7 +2260,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
           };
         }
       }
-      
+
       // Add special hours overrides
       if (specialHours && specialHours.length > 0) {
         hoursByDay.special = specialHours.map((sh: any) => ({
@@ -2273,27 +2273,27 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
         // console.log('[Profile API] Special hours raw data:', specialHours.map(sh => ({ isClosed: sh.isClosed, is_closed: sh.is_closed, date: sh.date })));
         // console.log('[Profile API] Special hours processed:', hoursByDay.special);
       }
-      
+
       hoursData = hoursByDay;
       // console.log('[Profile API] Business hours for', tenant_id, ':', JSON.stringify(hoursData));
     } else {
       // console.log('[Profile API] No business hours found for', tenant_id);
     }
-    
+
     const md = (tenant.metadata as any) || {};
-       // Check if tenant has published directory listing
-     // Check if tenant has published directory listing
-     const directoryResult = await prisma.directory_settings_list.findUnique({
-            where: { tenant_id: tenant_id },
-            select: {
-              is_published: true
-            }
-          });
-    
-          // const hasDirectory = tenantResult?.is_published === true;
+    // Check if tenant has published directory listing
+    // Check if tenant has published directory listing
+    const directoryResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    // const hasDirectory = tenantResult?.is_published === true;
     const hasPublishedDirectory = directoryResult && directoryResult.is_published === true;
 
-    
+
     // Return public business information only
     const profile = {
       business_name: bp?.business_name || md.businessName || tenant.name || null,
@@ -2330,28 +2330,28 @@ app.get("/public/tenant/:tenant_id/items", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Parse pagination params
     const page = parseInt(req.query.page as string || '1', 10);
     const limit = parseInt(req.query.limit as string || '12', 10);
     const skip = (page - 1) * limit;
     const search = req.query.search as string;
     const categorySlug = req.query.category as string;
-    
+
     // Build where clause - only show active, public items
-    const where: any = { 
+    const where: any = {
       tenant_id,
       item_status: 'active',
       visibility: 'public'
     };
-    
+
     // Apply category filter
     if (categorySlug) {
       where.directoryCategory = {
         slug: categorySlug,
       };
     }
-    
+
     // Apply search filter
     if (search) {
       const searchTerm = search.toLowerCase();
@@ -2360,7 +2360,7 @@ app.get("/public/tenant/:tenant_id/items", async (req, res) => {
         { name: { contains: searchTerm, mode: 'insensitive' } },
       ];
     }
-    
+
     // Fetch items with pagination (includes category relation for better UX)
     const [items, totalCount] = await Promise.all([
       prisma.inventory_items.findMany({
@@ -2371,7 +2371,7 @@ app.get("/public/tenant/:tenant_id/items", async (req, res) => {
       }),
       prisma.inventory_items.count({ where }),
     ]);
-    
+
     // Return paginated response
     res.json({
       items,
@@ -2394,17 +2394,17 @@ app.get("/public/tenant/:tenant_id/categories", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Import category count utility
     const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
-    
+
     // Get categories with counts (only active, public products)
     const categories = await getCategoryCounts(tenant_id, false);
     const uncategorizedCount = await getUncategorizedCount(tenant_id, false);
-    
+
     // Calculate total correctly by summing numeric counts, not concatenating strings
     const totalCount = categories.reduce((sum: number, cat: any) => sum + (Number(cat.count) || 0), 0);
-    
+
     // Clean response to avoid field duplication
     const cleanResponse = {
       categories,
@@ -2476,7 +2476,7 @@ app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
 
     // Check if tenant has any active payment gateways
     const hasActivePaymentGateway = allGateways.length > 0;
-    
+
     // Get default gateway type (first one with is_default=true, or first active gateway, excluding Stripe Connect)
     const nonStripeGateways = allGateways.filter(pg => pg.gateway_type !== 'stripe');
     const defaultGateway = nonStripeGateways.find(pg => pg.is_default) || nonStripeGateways[0];
@@ -2505,7 +2505,7 @@ app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
               displayName = pg.gateway_type;
           }
         }
-        
+
         return {
           id: pg.id,
           gateway_type: pg.gateway_type,
@@ -2532,9 +2532,9 @@ app.get("/public/tenant/:tenant_id/oauth-status/:gateway_type", async (req, res)
   try {
     const { tenant_id, gateway_type } = req.params;
     if (!tenant_id || !gateway_type) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: "tenant_id and gateway_type required" 
+        error: "tenant_id and gateway_type required"
       });
     }
 
@@ -2574,10 +2574,10 @@ app.get("/public/tenant/:tenant_id/oauth-status/:gateway_type", async (req, res)
       isExpired,
       expiresAt: tokens.expires_at,
     });
-    
+
   } catch (error) {
     console.error('Public OAuth status error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'internal_error',
       connected: false
@@ -2590,11 +2590,11 @@ app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Use direct database pool to avoid Prisma issues
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     // Query ALL tenant categories, not just those with products
     const result = await pool.query(
       `SELECT
@@ -2613,7 +2613,7 @@ app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
       ORDER BY "sortOrder" ASC, name ASC`,
       [tenant_id]
     );
-    
+
     // Transform to expected format
     const categories = result.rows.map(cat => ({
       id: cat.id,
@@ -2627,7 +2627,7 @@ app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
       createdAt: cat.createdAt,
       updatedAt: cat.updatedAt
     }));
-    
+
     const cleanResponse = {
       success: true,
       data: {
@@ -2652,11 +2652,11 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Use direct database pool to avoid Prisma issues
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     // Query categories with product counts directly from inventory_items
     // Group by slug to handle duplicate categories with same slug
     const result = await pool.query(
@@ -2694,7 +2694,7 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
       ORDER BY slug`,
       [tenant_id]
     );
-    
+
     // Get total product count (ALL active/public products, including uncategorized)
     const totalProductsResult = await pool.query(
       `SELECT COUNT(*)::int as count
@@ -2705,7 +2705,7 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
       [tenant_id]
     );
     const totalProducts = totalProductsResult.rows[0]?.count || 0;
-    
+
     // Debug: Check for uncategorized products
     const uncategorizedResult = await pool.query(
       `SELECT COUNT(*)::int as count
@@ -2717,11 +2717,11 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
       [tenant_id]
     );
     const uncategorizedCount = uncategorizedResult.rows[0]?.count || 0;
-    
+
     if (uncategorizedCount > 0) {
       console.log(`[Product Categories] Tenant ${tenant_id} has ${uncategorizedCount} uncategorized products`);
     }
-    
+
     // Transform to expected format
     const categories = result.rows.map(cat => ({
       id: cat.category.id,
@@ -2731,7 +2731,7 @@ app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
       count: parseInt(cat.count),
       category_type: 'tenant'
     }));
-    
+
     const cleanResponse = {
       success: true,
       data: {
@@ -2760,10 +2760,10 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     // 1. Check raw inventory_items data
     const rawProductsResult = await pool.query(`
       SELECT 
@@ -2775,7 +2775,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
       GROUP BY directory_category_id
       ORDER BY directory_category_id
     `, [tenant_id]);
-    
+
     // 2. Check directory_category data
     const categoriesResult = await pool.query(`
       SELECT id, name, slug, "isActive", "tenantId"
@@ -2783,7 +2783,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
       WHERE "tenantId" = $1
       ORDER BY name
     `, [tenant_id]);
-    
+
     // 3. Check JOIN results (our current count query)
     const joinCountResult = await pool.query(`
       SELECT 
@@ -2801,7 +2801,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
       GROUP BY dc.id, dc.name, dc.slug
       ORDER BY dc.name
     `, [tenant_id]);
-    
+
     // 4. Check storefront filter query (what actually returns products)
     const storefrontFilterResult = await pool.query(`
       SELECT 
@@ -2819,7 +2819,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
       GROUP BY dc.id, dc.name, dc.slug
       ORDER BY dc.name
     `, [tenant_id]);
-    
+
     // 5. Check for any products with invalid category IDs
     const invalidCategoriesResult = await pool.query(`
       SELECT 
@@ -2832,7 +2832,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
           SELECT id FROM directory_category WHERE "tenantId" = $1
         )
     `, [tenant_id]);
-    
+
     // 6. Check materialized view if it exists
     let mvResult = null;
     try {
@@ -2850,7 +2850,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
     } catch (mvError) {
       console.log('Materialized view not accessible:', (mvError as Error)?.message || 'Unknown error');
     }
-    
+
     const diagnostic = {
       tenant_id,
       timestamp: new Date().toISOString(),
@@ -2868,7 +2868,7 @@ app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
         has_invalid_categories: invalidCategoriesResult.rows[0].count > 0
       }
     };
-    
+
     res.json({
       success: true,
       data: diagnostic
@@ -2885,11 +2885,11 @@ app.get("/api/categories/store-level/:tenant_id", async (req, res) => {
   try {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
-    
+
     // Query tenant_google_categories for GBP primary and secondary categories
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     const query = `
       SELECT 
         gc.id,
@@ -2908,9 +2908,9 @@ app.get("/api/categories/store-level/:tenant_id", async (req, res) => {
         CASE WHEN tgc.category_type = 'primary' THEN 0 ELSE 1 END,
         gc.display_name ASC
     `;
-    
+
     const result = await pool.query(query, [tenant_id]);
-    
+
     // Transform to expected format
     const storeCategories = result.rows.map((row: any) => ({
       id: row.id,
@@ -2921,7 +2921,7 @@ app.get("/api/categories/store-level/:tenant_id", async (req, res) => {
       gbp_category_id: row.gbp_category_id,
       count: parseInt(row.count) || 0
     }));
-    
+
     // Clean response to avoid field duplication
     const cleanResponse = {
       success: true,
@@ -2951,22 +2951,22 @@ app.post("/public/debug-query", async (req, res) => {
   try {
     const { Pool } = await import('pg');
     const { query } = req.body;
-    
+
     if (!query) {
       return res.status(400).json({ error: "query_required" });
     }
-    
+
     console.log('[POST /public/debug-query] Running analysis query...');
-    
+
     // Use shared connection pool to prevent connection exhaustion
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     const result = await pool.query(query);
     // Don't close the shared pool
-    
+
     console.log('[POST /public/debug-query] Query executed successfully');
-    
+
     res.json({
       success: true,
       data: result.rows,
@@ -2975,9 +2975,9 @@ app.post("/public/debug-query", async (req, res) => {
     });
   } catch (e: any) {
     console.error('[POST /public/debug-query] Error:', e);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_execute_query",
-      details: e.message 
+      details: e.message
     });
   }
 });
@@ -2986,17 +2986,17 @@ app.post("/public/debug-query", async (req, res) => {
 app.post("/public/refresh-materialized-views", async (req, res) => {
   try {
     // console.log('[POST /public/refresh-materialized-views] Refreshing storefront_category_counts...');
-    
+
     // Use shared connection pool to prevent connection exhaustion
     const { getDirectPool } = await import('./utils/db-pool');
     const pool = getDirectPool();
-    
+
     // Use non-concurrent refresh since concurrent is not available
     await pool.query('REFRESH MATERIALIZED VIEW storefront_category_counts');
     // Don't close the shared pool
-    
+
     console.log('[POST /public/refresh-materialized-views] Materialized view refreshed successfully');
-    
+
     res.json({
       success: true,
       message: 'Materialized views refreshed successfully',
@@ -3004,9 +3004,9 @@ app.post("/public/refresh-materialized-views", async (req, res) => {
     });
   } catch (e: any) {
     console.error('[POST /public/refresh-materialized-views] Error:', e);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_refresh_views",
-      details: e.message 
+      details: e.message
     });
   }
 });
@@ -3016,17 +3016,17 @@ app.get("/public/google-taxonomy/:categoryId", async (req, res) => {
   try {
     const { categoryId } = req.params;
     if (!categoryId) return res.status(400).json({ error: "category_id_required" });
-    
+
     // Import Google taxonomy utility
     const { getCategoryById } = await import('./lib/google/taxonomy');
-    
+
     // Get category by ID
     const category = getCategoryById(categoryId);
-    
+
     if (!category) {
       return res.status(400).json({ error: "category_not_found" });
     }
-    
+
     res.json(category);
   } catch (e: any) {
     console.error("[GET /public/google-taxonomy/:categoryId] Error:", e);
@@ -3038,15 +3038,15 @@ app.get("/public/google-taxonomy/:categoryId", async (req, res) => {
 app.get("/api/tenants/:tenant_id/categories", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenant_id } = req.params;
-    
+
     // Import category count utility
     const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
-    
+
     // Get categories with counts (ALL items, not just public)
     const categories = await getCategoryCounts(tenant_id as string, true);
     const uncategorizedCount = await getUncategorizedCount(tenant_id as string, true);
     const totalCount = await getTotalProductCount(tenant_id as string, true);
-    
+
     res.json({
       categories,
       uncategorizedCount,
@@ -3221,11 +3221,11 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
         // Fetch photos for all items in parallel
         const itemIds = items.map(item => item.id);
         const photosMap = new Map<string, any[]>();
-        
+
         if (itemIds.length > 0) {
           // Fetch all photos for these items in one query
           const allPhotos = await prisma.photo_assets.findMany({
-            where: { 
+            where: {
               inventoryItemId: { in: itemIds },
               variant_id: null // Only item-level photos, not variant photos
             },
@@ -3242,7 +3242,7 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
               createdAt: true
             }
           });
-          
+
           // Group photos by item ID
           allPhotos.forEach(photo => {
             const itemId = photo.inventoryItemId;
@@ -3260,14 +3260,14 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
             });
           });
         }
-        
+
         // Add inventory_item_id field and photo gallery for frontend compatibility
         return items.map(item => ({
           ...item,
           inventory_item_id: item.id, // CRITICAL: Frontend expects this field
           imageGallery: photosMap.get(item.id) || [], // Add actual photo gallery data
           // Sort variants by sort_order and created_at
-          variants: item.product_variants ? 
+          variants: item.product_variants ?
             [...item.product_variants].sort((a, b) => {
               const aSortOrder = a.sort_order || 0;
               const bSortOrder = b.sort_order || 0;
@@ -3328,7 +3328,7 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
         if (item.directory_category_id) {
           // Primary lookup: by directory_category_id (most reliable)
           const category = await prisma.directory_category.findFirst({
-            where: { 
+            where: {
               id: item.directory_category_id,
               tenantId: item.tenant_id // Use Prisma schema field name (camelCase)
             },
@@ -3410,10 +3410,10 @@ app.get("/api/public/features-showcase-config", async (req, res) => {
   try {
     // Return default config for now (can be extended to read from database later)
     const defaultConfig = {
-      mode: 'hybrid',
-      rotationEnabled: false,
+      mode: 'random',
+      rotationEnabled: true,
       rotationInterval: 24,
-      enabledModes: ['hybrid', 'random', 'fixed']
+      enabledModes: ['hybrid', 'random', 'tabs', 'grid', 'slider', 'fixed']
     };
     return res.json(defaultConfig);
   } catch (e: any) {
@@ -3439,7 +3439,7 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
     const { basePrisma } = await import('./prisma');
     console.log(`[PATCH /tenant/profile] Processing update for tenant ${tenant_id}`);
     console.log(`[PATCH /tenant/profile] Delta data:`, delta);
-    
+
     // Check if profile exists
     const existingProfiles = await basePrisma.$queryRaw`
       SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
@@ -3573,18 +3573,18 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     console.log(`[PATCH /tenant/profile] Final result to return:`, (result as any)[0] || result);
-    
+
     // Fetch current slug to include in response
     const slugResult = await basePrisma.$queryRaw`
       SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
     `;
     const currentSlug = (slugResult as any[])[0]?.slug || null;
-    
+
     const responseProfile = {
       ...((result as any)[0] || result),
       slug: currentSlug,
     };
-    
+
     return res.json(responseProfile);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
@@ -3636,12 +3636,12 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
       const f = req.file as any;
       const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
       const pathKey = `tenants/${tenant_id}/logo-${Date.now()}${ext}`;
-      
-      console.log(`[Logo Upload] Uploading to Supabase:`, { 
+
+      console.log(`[Logo Upload] Uploading to Supabase:`, {
         bucket: TENANT_BUCKET.name,
-        pathKey, 
-        size: f.size, 
-        mimetype: f.mimetype 
+        pathKey,
+        size: f.size,
+        mimetype: f.mimetype
       });
 
       const { error, data } = await supabaseLogo.storage
@@ -3670,9 +3670,9 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
-      
+
       const buf = Buffer.from(match[1], "base64");
-      
+
       // Enforce 5MB limit for logos
       if (buf.length > 5 * 1024 * 1024) {
         return res.status(413).json({ error: "logo_too_large", maxSizeMB: 5 });
@@ -3681,15 +3681,15 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
       const ext = parsed.data.contentType.includes("png")
         ? ".png"
         : parsed.data.contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
-      
+          ? ".webp"
+          : ".jpg";
+
       const pathKey = `tenants/${tenant_id}/logo-${Date.now()}${ext}`;
-      console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, { 
+      console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, {
         bucket: TENANT_BUCKET.name,
-        pathKey, 
-        size: buf.length, 
-        contentType: parsed.data.contentType 
+        pathKey,
+        size: buf.length,
+        contentType: parsed.data.contentType
       });
 
       const { error, data } = await supabaseLogo.storage
@@ -3741,9 +3741,9 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
       stack: e?.stack,
       tenant_id: req.params.id,
     });
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_upload_logo",
-      details: DEV ? e?.message : undefined 
+      details: DEV ? e?.message : undefined
     });
   }
 });
@@ -3783,9 +3783,9 @@ app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, 
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
-      
+
       const buf = Buffer.from(match[1], "base64");
-      
+
       // Enforce 5MB limit for banners
       if (buf.length > 5 * 1024 * 1024) {
         return res.status(413).json({ error: "banner_too_large", maxSizeMB: 5 });
@@ -3794,14 +3794,14 @@ app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, 
       const ext = parsed.data.contentType.includes("png")
         ? ".png"
         : parsed.data.contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
-      
+          ? ".webp"
+          : ".jpg";
+
       const pathKey = `tenants/${tenant_id}/banner-${Date.now()}${ext}`;
-      console.log(`[Banner Upload] Uploading dataUrl to Supabase:`, { 
+      console.log(`[Banner Upload] Uploading dataUrl to Supabase:`, {
         bucket: TENANT_BUCKET.name,
-        pathKey, 
-        size: buf.length 
+        pathKey,
+        size: buf.length
       });
 
       const { error, data } = await supabaseBanner.storage
@@ -3837,9 +3837,9 @@ app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, 
     return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
   } catch (e: any) {
     console.error("[Banner Upload Error]:", e?.message);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_upload_banner",
-      details: DEV ? e?.message : undefined 
+      details: DEV ? e?.message : undefined
     });
   }
 });
@@ -3903,7 +3903,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       bodyKeys: req.body ? Object.keys(req.body) : [],
       supabaseConfigured: !!supabase
     });
-    
+
     const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
@@ -3919,7 +3919,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(item.tenant_id,item.id),
+          id: generatePhotoId(item.tenant_id, item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url,
@@ -3944,18 +3944,18 @@ const photoUploadHandler = async (req: any, res: any) => {
       if (supabase) {
         const pathKey = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
         console.log(`[Photo Upload] Uploading to Supabase:`, { pathKey, size: f.size, mimetype: f.mimetype });
-        
+
         const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
           contentType: f.mimetype || "application/octet-stream",
         });
-        
+
         if (error) {
           console.error(`[Photo Upload] Supabase upload error:`, error);
           return res.status(500).json({ error: error.message, details: error });
         }
-        
+
         publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase upload successful:`, { publicUrl });
       } else if (DEV) {
@@ -3970,7 +3970,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(item.tenant_id,item.id),
+          id: generatePhotoId(item.tenant_id, item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl!,
@@ -4002,16 +4002,16 @@ const photoUploadHandler = async (req: any, res: any) => {
       const ext = parsed.data.contentType.includes("png")
         ? ".png"
         : parsed.data.contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
-      
+          ? ".webp"
+          : ".jpg";
+
       let publicUrl: string;
 
       // Prefer Supabase Storage if configured
       if (supabase) {
         const pathKey = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}${ext}`;
         console.log(`[Photo Upload] Uploading dataUrl to Supabase:`, { pathKey, size: buf.length, contentType: parsed.data.contentType });
-        
+
         const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
@@ -4022,7 +4022,7 @@ const photoUploadHandler = async (req: any, res: any) => {
           console.error("[Photo Upload] Supabase dataUrl upload error:", error);
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
-        
+
         publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase dataUrl upload successful:`, { publicUrl });
       } else {
@@ -4035,7 +4035,7 @@ const photoUploadHandler = async (req: any, res: any) => {
 
       const created = await prisma.photo_assets.create({
         data: {
-          id: generatePhotoId(item.tenant_id,item.id),
+          id: generatePhotoId(item.tenant_id, item.id),
           tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl,
@@ -4066,9 +4066,9 @@ const photoUploadHandler = async (req: any, res: any) => {
       bodyKeys: req.body ? Object.keys(req.body) : [],
       contentType: req.get('content-type')
     });
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_upload_photo",
-      details: DEV ? e?.message : undefined 
+      details: DEV ? e?.message : undefined
     });
   }
 };
@@ -4108,12 +4108,12 @@ app.get('/api/directory/store-types', async (req, res) => {
   try {
     const { storeTypeDirectoryService } = await import('./services/store-type-directory.service');
     const { lat, lng, radius } = req.query;
-    
+
     const location = lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string) } : undefined;
     const radiusMiles = radius ? parseFloat(radius as string) : 25;
-    
+
     const storeTypes = await storeTypeDirectoryService.getStoreTypes(location, radiusMiles);
-    
+
     res.json({
       success: true,
       data: { storeTypes, totalCount: storeTypes.length }
@@ -4182,7 +4182,7 @@ const listQuery = z.object({
  */
 app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (req, res) => {
   const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
-  
+
   if (!tenant_id) {
     return res.status(400).json({ error: "tenant_id_required" });
   }
@@ -4254,7 +4254,7 @@ app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
   const queryWithTenant = { ...req.query, tenant_id: req.params.tenantId };
   const parsed = listQuery.safeParse(queryWithTenant);
   if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
-  
+
   const tenant_id = parsed.data.tenant_id;
   if (!tenant_id) {
     return res.status(400).json({ error: "tenant_id_required" });
@@ -4283,7 +4283,7 @@ app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
   }
-  
+
   try {
     const where: any = { tenant_id };
     if (parsed.data.status !== 'trashed') {
@@ -4335,7 +4335,7 @@ app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
       is_featured_active: item.is_featured && (!item.featured_until || new Date(item.featured_until) > new Date()),
       days_until_expiration: item.featured_until ? Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null,
       is_expired: item.featured_until ? new Date(item.featured_until) <= new Date() : false,
-      is_expiring_soon: item.featured_until ? 
+      is_expiring_soon: item.featured_until ?
         Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7 : false,
       // Default product type since it's not in base table
       product_type: 'physical',
@@ -4362,11 +4362,11 @@ app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
 app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
   const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
-  
+
   // Check tenant access
   const tenant_id = parsed.data.tenant_id;
 
-  
+
   if (!tenant_id) {
     return res.status(400).json({ error: "tenant_id_required" });
   }
@@ -4395,16 +4395,16 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
   }
-  
+
   try {
     // Build where clause
     const where: any = { tenant_id };
-    
+
     // Exclude trashed items by default (unless explicitly requested)
     if (parsed.data.status !== 'trashed') {
       where.item_status = { not: 'trashed' };
     }
-    
+
     // Apply search filter
     if (parsed.data.search) {
       const searchTerm = parsed.data.search.toLowerCase();
@@ -4413,7 +4413,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         { name: { contains: searchTerm, mode: 'insensitive' } },
       ];
     }
-    
+
     // Apply status filter
     if (parsed.data.status && parsed.data.status !== 'all') {
       if (parsed.data.status === 'active') {
@@ -4429,19 +4429,19 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         ];
       }
     }
-    
+
     // Apply category filter (legacy - by directory category slug)
     if (parsed.data.category) {
       where.directoryCategory = {
         slug: parsed.data.category,
       };
     }
-    
+
     // Apply tenant category filter (by specific category ID)
     if (parsed.data.categoryId) {
       where.directory_category_id = parsed.data.categoryId;
     }
-    
+
     // Apply category assignment filter (assigned/unassigned)
     if (parsed.data.categoryFilter && parsed.data.categoryFilter !== 'all') {
       if (parsed.data.categoryFilter === 'assigned') {
@@ -4452,7 +4452,7 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         where.directory_category_id = null;
       }
     }
-    
+
     // Apply visibility filter
     if (parsed.data.visibility && parsed.data.visibility !== 'all') {
       if (parsed.data.visibility === 'public') {
@@ -4461,37 +4461,37 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         where.visibility = 'private';
       }
     }
-    
+
     // If count=true, return only the count
     if (req.query.count === 'true') {
       // Check if Prisma client is properly initialized
       if (!prisma || !prisma.inventory_items) {
         console.warn('[GET /items] Prisma client not properly initialized');
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'database_unavailable',
         });
       }
-      
+
       const count = await prisma.inventory_items.count({ where });
       return res.json({ count });
     }
-    
+
     // Parse pagination params
     const page = parseInt(parsed.data.page || '1', 10);
     const limit = parseInt(parsed.data.limit || '25', 10);
     const skip = (page - 1) * limit;
-    
+
     // Build orderBy clause
     const sortBy = parsed.data.sortBy || 'updated_at';
     const sortOrder = parsed.data.sortOrder || 'desc';
     const orderBy: any = {};
-    
+
     if (sortBy === 'price') {
       orderBy.price_cents = sortOrder;
     } else {
       orderBy[sortBy] = sortOrder;
     }
-    
+
     // Fetch items with pagination
     const [items, totalCount] = await Promise.all([
       prisma.inventory_items.findMany({
@@ -4502,11 +4502,11 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       }),
       prisma.inventory_items.count({ where }),
     ]);
-    
+
     // Fetch featured types for all items in batch
     const itemIds = items.map(item => item.id);
     const featuredTypesMap = new Map();
-    
+
     if (itemIds.length > 0) {
       // Get featured types for all items at once
       const featuredTypesForAllItems = await Promise.all(
@@ -4515,54 +4515,54 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
           return { itemId, featuredTypes };
         })
       );
-      
+
       // Create lookup map
       featuredTypesForAllItems.forEach(({ itemId, featuredTypes }) => {
         featuredTypesMap.set(itemId, featuredTypes);
       });
     }
-    
+
     // Fetch all unique category slugs from items' category_path arrays
     const categorySlugs = [...new Set(items.flatMap(item => item.category_path || []).filter(Boolean))];
-    const categories = categorySlugs.length > 0 
+    const categories = categorySlugs.length > 0
       ? await prisma.directory_category.findMany({
-          where: { 
-            slug: { in: categorySlugs },
-            tenantId: tenant_id
-          },
-          select: { id: true, name: true, slug: true, googleCategoryId: true }
-        })
+        where: {
+          slug: { in: categorySlugs },
+          tenantId: tenant_id
+        },
+        select: { id: true, name: true, slug: true, googleCategoryId: true }
+      })
       : [];
-    
+
     // Create a category lookup map
     const categoryMap = new Map(categories.map(cat => [cat.slug, cat]));
-    
+
     // Return paginated response
     // Hide price_cents from frontend since price is the authoritative field
     // Map directory_category_id to tenantCategoryId and include category object
     // Map image_url to imageUrl for frontend compatibility
-    
+
     // Also fetch categories by directory_category_id for items that have it set
     const directCategoryIds = [...new Set(items.map(item => item.directory_category_id).filter((id): id is string => !!id))];
     const directCategories = directCategoryIds.length > 0
       ? await prisma.directory_category.findMany({
-          where: { 
-            id: { in: directCategoryIds },
-            tenantId: tenant_id
-          },
-          select: { id: true, name: true, slug: true, googleCategoryId: true }
-        })
+        where: {
+          id: { in: directCategoryIds },
+          tenantId: tenant_id
+        },
+        select: { id: true, name: true, slug: true, googleCategoryId: true }
+      })
       : [];
-    
+
     // Create a category lookup map by ID
     const categoryByIdMap = new Map(directCategories.map(cat => [cat.id, cat]));
-    
+
     const itemsWithoutPriceCents = items.map((item: any) => {
       const { price_cents, directory_category_id, image_url, id, metadata, ...itemWithoutPriceCents } = item;
-      
+
       // Get featured types for this item
       const featuredTypes = featuredTypesMap.get(id) || [];
-      
+
       // Find tenant category - prefer directory_category_id, fallback to category_path
       let tenantCategory = null;
       if (directory_category_id) {
@@ -4573,14 +4573,14 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         // Fallback to category_path lookup (legacy method)
         tenantCategory = categoryMap.get(item.category_path[0]) || null;
       }
-      
+
       // Extract metadata fields if they exist (fallback for any custom fields)
       const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
-      
+
       // Extract featured types array and maintain backward compatibility
       const featuredTypesArray = featuredTypes.map((ft: any) => ft.featured_type);
       const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
-      
+
       return {
         ...itemWithoutPriceCents,
         price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
@@ -4698,7 +4698,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   if (it.directory_category_id) {
     // Primary lookup: by directory_category_id (most reliable)
     const category = await prisma.directory_category.findFirst({
-      where: { 
+      where: {
         id: it.directory_category_id,
         tenantId: it.tenant_id
       },
@@ -4720,7 +4720,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   } else if (it.category_path && it.category_path.length > 0) {
     // Fallback: try to find by slug from category_path
     const category = await prisma.directory_category.findFirst({
-      where: { 
+      where: {
         slug: it.category_path[0],
         tenantId: it.tenant_id
       },
@@ -4758,7 +4758,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   }> = [];
   try {
     const photos = await prisma.photo_assets.findMany({
-      where: { 
+      where: {
         inventoryItemId: itemId,
         variant_id: null // Only item-level photos, not variant photos
       },
@@ -4775,7 +4775,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         createdAt: true
       }
     });
-    
+
     imageGallery = photos.map(photo => ({
       id: photo.id,
       url: photo.url,
@@ -4794,10 +4794,10 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   // Hide price_cents from frontend since price is the authoritative field
   // Map image_url to imageUrl for frontend compatibility
   const { price_cents, image_url, sale_price_cents, metadata, product_variants, ...itemWithoutPriceCents } = it;
-  
+
   // Extract metadata fields if they exist (fallback for any custom fields)
   const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
-  
+
   const transformed = {
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
@@ -4810,7 +4810,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     hasActivePaymentGateway: hasActivePaymentGateway || false,
     defaultGatewayType: defaultGatewayType || null,
     // Include variants array with sorting
-    variants: product_variants ? 
+    variants: product_variants ?
       [...product_variants].sort((a, b) => {
         const aSortOrder = a.sort_order || 0;
         const bSortOrder = b.sort_order || 0;
@@ -4861,20 +4861,20 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 app.get("/api/items/:id/photos", async (req, res) => {
   try {
     const itemId = req.params.id;
-    
+
     // Verify item exists
     const item = await prisma.inventory_items.findUnique({
       where: { id: itemId },
       select: { id: true, tenant_id: true }
     });
-    
+
     if (!item) {
       return res.status(400).json({ error: "item_not_found" });
     }
-    
+
     // Fetch photos ordered by position
     const photos = await prisma.photo_assets.findMany({
-      where: { 
+      where: {
         inventoryItemId: itemId,
         variant_id: null // Only item-level photos, not variant photos
       },
@@ -4891,7 +4891,7 @@ app.get("/api/items/:id/photos", async (req, res) => {
         createdAt: true
       }
     });
-    
+
     // Transform to match frontend Photo interface
     const transformedPhotos = photos.map(photo => ({
       id: photo.id,
@@ -4903,7 +4903,7 @@ app.get("/api/items/:id/photos", async (req, res) => {
       caption: photo.caption,
       createdAt: photo.createdAt.toISOString()
     }));
-    
+
     res.json({ photos: transformedPhotos });
   } catch (error) {
     console.error('[GET /api/items/:id/photos] Error:', error);
@@ -5010,14 +5010,14 @@ const updateItemSchema = baseItemSchema.partial();
 
 app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubscriptionLimits, */ async (req, res) => {
   console.log('[POST /items] Raw request body:', JSON.stringify(req.body, null, 2));
-  
+
   const parsed = createItemSchema.safeParse(req.body ?? {});
   console.log('[POST /items] Zod validation result:', parsed.success);
   if (!parsed.success) {
     console.log('[POST /items] Validation errors:', JSON.stringify(parsed.error.flatten(), null, 2));
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
-  
+
   console.log('[POST /items] Parsed data:', parsed.data);
   try {
     // Extract variants and other special fields before creating item
@@ -5132,35 +5132,35 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
         } : {}),
       } as any,
     };
-    
+
     // Create item and variants in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create the main item
-      const created = await tx.inventory_items.create({ 
+      const created = await tx.inventory_items.create({
         data: {
           id: generateTenantItemId(itemData.tenant_id || ''),
           ...data,
           updated_at: new Date(),
         }
       });
-      
+
       // Create variants if provided
       if (has_variants && variants && variants.length > 0) {
         console.log(`[POST /items] Creating ${variants.length} variants for item ${created.id}`);
-        
+
         for (const variant of variants) {
           // Generate SKU if not provided
           let sku = variant.sku;
           if (!sku || sku.trim() === '') {
             sku = generateVariantSkuFromParent(created.sku, variants.indexOf(variant), created.product_type as any);
           }
-          
+
           // Handle both 'name' and 'variant_name' fields
           const variantName = variant.variant_name || variant.name;
-          
+
           await tx.product_variants.create({
             data: {
-              id: generateTenantVariantId(created.id,created.tenant_id),
+              id: generateTenantVariantId(created.id, created.tenant_id),
               parent_item_id: created.id,
               tenant_id: created.tenant_id,
               variant_name: variantName || `Variant ${variants.indexOf(variant) + 1}`, // Ensure string value
@@ -5176,36 +5176,36 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
             }
           });
         }
-        
+
         // Update the item to mark it as having variants
         await tx.inventory_items.update({
           where: { id: created.id },
-          data: { 
+          data: {
             has_variants: true,
           }
         });
       }
-      
+
       return created;
     });
-    
+
     // Migrate temp photos to permanent URLs
     const tenantId = itemData.tenant_id || '';
     const allPhotoUrls = [
       result.image_url,
       ...(result.image_gallery || [])
     ].filter((url): url is string => Boolean(url));
-    
+
     let finalPhotoUrls = allPhotoUrls;
-    
+
     if (allPhotoUrls.some(url => url.includes('/temp/'))) {
       console.log('[POST /items] Migrating temp photos to permanent URLs...');
-      
+
       const permanentUrls = await migrateTempPhotos(allPhotoUrls, tenantId, result.id);
-      
+
       // Update the item with permanent URLs
       const [permanentPrimaryUrl, ...permanentGalleryUrls] = permanentUrls;
-      
+
       await prisma.inventory_items.update({
         where: { id: result.id },
         data: {
@@ -5213,21 +5213,21 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
           image_gallery: permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery,
         }
       });
-      
+
       // Update result for response
       result.image_url = permanentPrimaryUrl || result.image_url;
       result.image_gallery = permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery;
       finalPhotoUrls = permanentUrls;
     }
-    
+
     // Create photo_assets records for all photos
     if (finalPhotoUrls.length > 0) {
       console.log(`[POST /items] Creating ${finalPhotoUrls.length} photo_assets records for item ${result.id}`);
-      
+
       for (let i = 0; i < finalPhotoUrls.length; i++) {
         const photoUrl = finalPhotoUrls[i];
         const isPrimary = i === 0;
-        
+
         try {
           await prisma.photo_assets.create({
             data: {
@@ -5252,9 +5252,9 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
         }
       }
     }
-    
+
     // await audit({ tenant_id: created.tenant_id, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
-    
+
     // Convert Decimal price to number and hide price_cents for frontend compatibility
     const { price_cents, ...itemWithoutPriceCents } = result;
     const transformed = {
@@ -5262,7 +5262,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
       price: result.price !== null && result.price !== undefined ? Number(result.price) : null,
       has_variants: result.has_variants,
     };
-    
+
     res.status(201).json(transformed);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
@@ -5307,31 +5307,31 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       metadata: incomingMetadata,
       ...rest
     } = parsed.data;
-    
+
     // Build update data with proper field mappings
     const updateData: any = { ...rest };
-    
+
     // Map camelCase to snake_case for item_status
     if (itemStatus !== undefined || item_status !== undefined) {
       updateData.item_status = item_status || itemStatus;
     }
-    
+
     // Map camelCase to snake_case for directory_category_id
     // CRITICAL: Must explicitly set this field as it was destructured out of rest
     if (tenantCategoryId !== undefined && tenantCategoryId !== null) {
       updateData.directory_category_id = tenantCategoryId;
       console.log('[PUT /items/:id] Setting directory_category_id from tenantCategoryId:', tenantCategoryId);
-      
+
       // When assigning a tenant category, we need to get the category slug and update category_path
       try {
         const category = await prisma.directory_category.findFirst({
-          where: { 
+          where: {
             id: tenantCategoryId,
             isActive: true
           },
           select: { slug: true }
         });
-        
+
         if (category) {
           updateData.category_path = [category.slug];
           console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
@@ -5344,17 +5344,17 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     } else if (directory_category_id !== undefined && directory_category_id !== null) {
       updateData.directory_category_id = directory_category_id;
       console.log('[PUT /items/:id] Setting directory_category_id from directory_category_id:', directory_category_id);
-      
+
       // Also update category_path for storefront compatibility
       try {
         const category = await prisma.directory_category.findFirst({
-          where: { 
+          where: {
             id: directory_category_id,
             isActive: true
           },
           select: { slug: true }
         });
-        
+
         if (category) {
           updateData.category_path = [category.slug];
           console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
@@ -5363,14 +5363,14 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         console.error('[PUT /items/:id] Error fetching category for directory_category_id:', directory_category_id, error);
       }
     }
-    
+
     // Handle variants separately - they go to the product_variants table
     let variantsData;
     if (updateData.variants) {
       variantsData = updateData.variants;
       delete updateData.variants; // Remove from main item update
     }
-    
+
     // Handle stock updates
     if (updateData.stock !== undefined) {
       const stockValue = typeof updateData.stock === 'string' ? parseInt(updateData.stock, 10) : updateData.stock;
@@ -5395,20 +5395,20 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     if (track_inventory !== undefined) updateData.track_inventory = track_inventory;
     if (allow_backorder !== undefined) updateData.allow_backorder = allow_backorder;
     if (low_stock_threshold !== undefined) updateData.low_stock_threshold = low_stock_threshold;
-    
+
     // Sync price and price_cents fields
     if (updateData.price !== undefined) {
       updateData.price_cents = Math.round(updateData.price * 100);
     } else if (updateData.price_cents !== undefined) {
       updateData.price = updateData.price_cents / 100;
     }
-    
+
     // Build metadata object with fields that are not direct columns
     const metadataFields: any = {};
     // NOTE: migrated fields are now stored as direct columns, not in metadata
     // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are stored as direct columns
     // They are NOT stored in metadata
-    
+
     // Merge with existing metadata and incoming metadata
     if (Object.keys(metadataFields).length > 0 || incomingMetadata) {
       // Get existing item to merge metadata
@@ -5417,29 +5417,29 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         where: { id: itemId },
         select: { metadata: true }
       });
-      
+
       const existingMetadata = (existingItem?.metadata as any) || {};
       const mergedMetadata = {
         ...existingMetadata,
         ...(incomingMetadata || {}),
         ...metadataFields,
       };
-      
+
       updateData.metadata = mergedMetadata;
       console.log('[PUT /items/:id] Merged metadata:', JSON.stringify(mergedMetadata));
     }
-    
+
     // Add updated_at timestamp
     updateData.updated_at = new Date();
-    
+
     console.log('[PUT /items/:id] Final update data:', JSON.stringify(updateData));
-    
+
     const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const updated = await prisma.inventory_items.update({
       where: { id: itemId },
       data: updateData,
     });
-    
+
     if (!updated) {
       return res.status(400).json({ error: 'item_not_found' });
     }
@@ -5448,35 +5448,35 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     if (updateData.item_status) {
       const newStatus = updateData.item_status;
       let variantStatus = true; // Default to active
-      
+
       // Determine variant status based on item status
       if (newStatus === 'trashed' || newStatus === 'archived' || newStatus === 'inactive') {
         variantStatus = false;
       } else if (newStatus === 'active') {
         variantStatus = true;
       }
-      
+
       // Update all variants to match parent status
       await prisma.product_variants.updateMany({
-        where: { 
+        where: {
           parent_item_id: itemId,
-          tenant_id: updated.tenant_id 
+          tenant_id: updated.tenant_id
         },
         data: { is_active: variantStatus }
       });
-      
+
       console.log(`[PUT /items/:id] Synced variants status for item ${itemId}: ${newStatus} -> variants ${variantStatus ? 'active' : 'inactive'}`);
     }
-    
+
     // Process variants if they exist
     if (variantsData && Array.isArray(variantsData)) {
-      const { generateVariantId,generateTenantVariantId ,generateVariantSkuFromParent } = await import('./lib/id-generator');
-      
+      const { generateVariantId, generateTenantVariantId, generateVariantSkuFromParent } = await import('./lib/id-generator');
+
       // Delete existing variants for this item
       await prisma.product_variants.deleteMany({
         where: { parent_item_id: itemId }
       });
-      
+
       // Create new variants with auto-generated SKUs based on parent SKU pattern
       const variantPromises = variantsData.map(async (variant: any, index: number) => {
         // Generate SKU if not provided or empty, using parent item's SKU pattern
@@ -5484,10 +5484,10 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
         if (!sku || sku.trim() === '') {
           sku = generateVariantSkuFromParent(updated.sku, index, updated.product_type as any);
         }
-        
+
         return prisma.product_variants.create({
           data: {
-            id: generateTenantVariantId(itemId,updated.tenant_id), // Unique variant ID
+            id: generateTenantVariantId(itemId, updated.tenant_id), // Unique variant ID
             parent_item_id: itemId,
             tenant_id: updated.tenant_id,
             sku: sku, // Variant SKU following parent SKU pattern
@@ -5502,15 +5502,15 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
           }
         });
       });
-      
+
       await Promise.all(variantPromises);
       console.log(`[PUT /items/:id] Created ${variantsData.length} variants for item ${itemId} with intelligent SKU generation`);
     }
-    
+
     console.log('[PUT /items/:id] Database returned directory_category_id:', updated.directory_category_id);
-    
+
     await audit({ tenantId: updated.tenant_id, actor: null, action: "inventory.update", payload: { id: updated.id } });
-    
+
     // Convert Decimal price to number and hide price_cents for frontend compatibility
     const { price_cents, ...itemWithoutPriceCents } = updated;
     const metadataObj = (updated.metadata as any) || {};
@@ -5533,9 +5533,9 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       video_url: updated.video_url || metadataObj.videoUrl || null,
       videoUrl: updated.video_url || metadataObj.videoUrl || null, // Keep videoUrl for backward compatibility
     };
-    
+
     console.log('[PUT /items/:id] Sending to frontend directory_category_id:', transformed.directory_category_id);
-    
+
     res.json(transformed);
   } catch (error) {
     console.error('[PUT /items/:id] Error updating item:', error);
@@ -5563,7 +5563,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     const trashCount = await prisma.inventory_items.count({
       where: { tenant_id: item.tenant_id, item_status: 'trashed' }
     });
-    
+
     if (isTrashFull(trashCount, tenant.subscription_tier || 'starter')) {
       const capacity = getTrashCapacity(tenant.subscription_tier || 'starter');
       return res.status(400).json({
@@ -5584,13 +5584,13 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     if (updated.item_status === 'trashed') {
       // Deactivate all variants when item is trashed
       await prisma.product_variants.updateMany({
-        where: { 
+        where: {
           parent_item_id: req.params.id,
-          tenant_id: item.tenant_id 
+          tenant_id: item.tenant_id
         },
         data: { is_active: false }
       });
-      
+
       console.log(`[Delete Item] Deactivated ${updated.item_status ? updated.item_status : 'trashed'} item variants:`, req.params.id);
     }
 
@@ -5605,7 +5605,7 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (req, res) => {
   try {
     const tenant_id = req.query.tenant_id as string;
-    
+
     console.log('2322 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
@@ -5622,7 +5622,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
     const trashCount = await prisma.inventory_items.count({
       where: { tenant_id: tenant_id, item_status: 'trashed' }
     });
-    
+
     const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscription_tier || 'starter');
     res.json(capacityInfo);
   } catch (error) {
@@ -5643,13 +5643,13 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
     if (item.item_status === 'active') {
       // Reactivate all variants when item is restored
       await prisma.product_variants.updateMany({
-        where: { 
+        where: {
           parent_item_id: req.params.id,
-          tenant_id: item.tenant_id 
+          tenant_id: item.tenant_id
         },
         data: { is_active: true }
       });
-      
+
       console.log(`[Restore Item] Reactivated ${item.item_status} item variants:`, req.params.id);
     }
 
@@ -5670,7 +5670,7 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
     if (item.item_status !== 'trashed') {
       return res.status(400).json({ error: "item_not_in_trash", message: "Item must be in trash before it can be permanently deleted" });
     }
-    
+
     // Permanently delete
     await prisma.inventory_items.delete({ where: { id: req.params.id } });
     res.status(204).end();
@@ -5699,7 +5699,7 @@ app.patch("/api/v1/tenants/:tenant_id/items/:itemId/category", authenticateToken
     if (!updated) {
       return res.status(400).json({ error: 'item_not_found' });
     }
-    
+
     const { price_cents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
@@ -5718,23 +5718,23 @@ app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) 
   try {
     const { item_status, visibility, availability } = req.body;
     const updateData: any = {};
-    
+
     if (item_status) updateData.item_status = item_status;
     if (visibility) updateData.visibility = visibility;
     if (availability) updateData.availability = availability;
-    
+
     const updated = await prisma.inventory_items.update({
       where: { id: req.params.id },
       data: updateData,
     });
-    
+
     // Convert Decimal price to number and hide price_cents for frontend compatibility
     const { price_cents, ...itemWithoutPriceCents } = updated;
     const transformed = {
       ...itemWithoutPriceCents,
       price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
     };
-    
+
     res.json(transformed);
   } catch (error) {
     console.error('[PATCH Item] Error:', error);
@@ -5794,7 +5794,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
     // Try database first, fall back to JSON file
     const dbCount = await prisma.google_taxonomy_list.count();
     const useDatabase = dbCount > 0;
-    
+
     let categories: any[] = [];
 
     if (useDatabase) {
@@ -5811,7 +5811,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       } else {
         // Get direct children of the specified parent path
         const parentDepth = parentPath.split(' > ').length;
-        
+
         categories = await prisma.google_taxonomy_list.findMany({
           where: {
             is_active: true,
@@ -5832,7 +5832,7 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       // Fallback to JSON file
       const taxonomyData = require('./lib/google/taxonomy-data.json');
       const allCategories = taxonomyData.categories || [];
-      
+
       if (!parentPath) {
         // Get top-level categories (path length = 1)
         categories = allCategories
@@ -5847,8 +5847,8 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
         const parentDepth = parentPath.split(' > ').length;
         categories = allCategories
           .filter((cat: any) => {
-            return cat.fullPath.startsWith(parentPath + ' > ') && 
-                   cat.path.length === parentDepth + 1;
+            return cat.fullPath.startsWith(parentPath + ' > ') &&
+              cat.path.length === parentDepth + 1;
           })
           .map((cat: any) => ({
             category_id: cat.id,
@@ -5856,13 +5856,13 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
             level: cat.path.length
           }));
       }
-      
+
       console.log(`[Taxonomy Browse] Using JSON fallback, found ${categories.length} categories for path: ${parentPath || 'root'}`);
     }
 
     // For each category, check if it has children
     let categoriesWithChildInfo: any[];
-    
+
     if (useDatabase) {
       categoriesWithChildInfo = await Promise.all(
         categories.map(async (cat: any) => {
@@ -5888,9 +5888,9 @@ app.get('/api/google/taxonomy/browse', async (req, res) => {
       // Use JSON data for child count
       const taxonomyData = require('./lib/google/taxonomy-data.json');
       const allCategories = taxonomyData.categories || [];
-      
+
       categoriesWithChildInfo = categories.map((cat: any) => {
-        const hasChildren = allCategories.some((c: any) => 
+        const hasChildren = allCategories.some((c: any) =>
           c.fullPath.startsWith(cat.category_path + ' > ')
         );
 
@@ -5949,9 +5949,9 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       const path = cat.category_path;
       const leafName = path.split(' > ').pop()?.toLowerCase() || '';
       const pathLower = path.toLowerCase();
-      
+
       let score = 0;
-      
+
       // Exact leaf name match (highest priority)
       if (leafName === searchQuery) {
         score += 1000;
@@ -5968,16 +5968,16 @@ app.get('/api/google/taxonomy/search', async (req, res) => {
       else if (leafName.includes(searchQuery)) {
         score += 100;
       }
-      
+
       // Bonus for shorter paths (more specific categories)
       const depth = path.split(' > ').length;
       score += Math.max(0, 50 - depth * 5);
-      
+
       // Bonus if query appears in path (for context)
       if (pathLower.includes(searchQuery) && !leafName.includes(searchQuery)) {
         score += 20;
       }
-      
+
       return {
         id: cat.category_id,
         name: path.split(' > ').pop() || path,
@@ -6017,7 +6017,7 @@ app.get("/__routes", (_req, res) => {
         const methods = layer.route.methods
           ? Array.isArray(layer.route.methods)
             ? layer.route.methods
-          : Object.keys(layer.route.methods)
+            : Object.keys(layer.route.methods)
           : [];
         const path = base + layer.route.path;
         out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
@@ -6062,17 +6062,17 @@ app.get("/google/auth", async (req, res) => {
     const businessProfileRaw = await prisma.tenant_business_profiles_list.findUnique({
       where: { tenant_id }
     });
-    
+
     // Enhance business profile to have both naming conventions
     const { enhanceDatabaseResult } = require('./middleware/universal-transform');
     const businessProfile = enhanceDatabaseResult(businessProfileRaw);
-    
-    const hasProfile = businessProfile 
+
+    const hasProfile = businessProfile
       ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
       : ((tenant.metadata as any)?.businessName && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
-    
+
     if (!hasProfile) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "incomplete_business_profile",
         message: "Please complete your business profile before connecting to Google",
       });
@@ -6172,7 +6172,7 @@ app.get("/google/callback", async (req, res) => {
 app.get("/api/google/status", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
-    
+
     console.log('2810 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
@@ -6208,7 +6208,7 @@ app.get("/api/google/status", async (req, res) => {
 app.delete("/google/disconnect", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
-    
+
     console.log('2846 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
@@ -6247,7 +6247,7 @@ app.delete("/google/disconnect", async (req, res) => {
 app.get("/google/gmc/accounts", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
-    
+
     console.log('2885 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
@@ -6276,7 +6276,7 @@ app.get("/google/gmc/accounts", async (req, res) => {
 app.post("/google/gmc/sync", async (req, res) => {
   try {
     const { tenant_id, merchantId } = req.body;
-    
+
     if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
@@ -6290,7 +6290,7 @@ app.post("/google/gmc/sync", async (req, res) => {
     }
 
     const success = await syncMerchantAccount(account.id, merchantId);
-    
+
     if (success) {
       res.json({ success: true });
     } else {
@@ -6310,7 +6310,7 @@ app.get("/google/gmc/products", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     const { merchantId } = req.query;
-    
+
     if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
@@ -6339,7 +6339,7 @@ app.get("/google/gmc/stats", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     const { merchantId } = req.query;
-    
+
     if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
@@ -6369,7 +6369,7 @@ app.get("/google/gmc/stats", async (req, res) => {
 app.get("/google/gbp/locations", async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
-    
+
     console.log('3005 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
@@ -6385,7 +6385,7 @@ app.get("/google/gbp/locations", async (req, res) => {
 
     // First get business accounts
     const businessAccounts = await listBusinessAccounts(account.id);
-    
+
     if (businessAccounts.length === 0) {
       return res.json({ locations: [] });
     }
@@ -6406,7 +6406,7 @@ app.get("/google/gbp/locations", async (req, res) => {
 app.post("/google/gbp/sync", async (req, res) => {
   try {
     const { tenant_id, locationName } = req.body;
-    
+
     if (!tenant_id || !locationName) {
       return res.status(400).json({ error: "tenant_id_and_location_name_required" });
     }
@@ -6420,13 +6420,13 @@ app.post("/google/gbp/sync", async (req, res) => {
     }
 
     const locationData = await getLocation(account.id, locationName);
-    
+
     if (!locationData) {
       return res.status(400).json({ error: "location_not_found" });
     }
 
     const success = await syncLocation(account.id, locationData);
-    
+
     if (success) {
       res.json({ success: true });
     } else {
@@ -6445,14 +6445,14 @@ app.post("/google/gbp/sync", async (req, res) => {
 app.get("/google/gbp/insights", async (req, res) => {
   try {
     const { locationId, days } = req.query;
-    
+
     if (!locationId) {
       return res.status(400).json({ error: "location_id_required" });
     }
 
     const daysNum = days ? parseInt(days as string) : 30;
     const insights = await getAggregatedInsights(locationId as string, daysNum);
-    
+
     res.json({ insights });
   } catch (error) {
     console.error("[GBP] Get insights error:", error);
@@ -6687,7 +6687,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
   try {
     const { itemId } = req.params;
     const updateData = req.body;
-    
+
     console.log('[PUT /api/items/:itemId] Received request:', { itemId, updateData: JSON.stringify(updateData) });
     console.log('[PUT /api/items/:itemId] Stock field type:', typeof updateData.stock, 'value:', updateData.stock);
 
@@ -6698,7 +6698,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
 
     // Prepare update data for Prisma
     const prismaUpdateData: any = {};
-    
+
     // Handle different field names (camelCase from frontend vs snake_case in DB)
     if (updateData.name !== undefined) prismaUpdateData.name = updateData.name;
     if (updateData.price !== undefined) prismaUpdateData.price = updateData.price;
@@ -6717,7 +6717,7 @@ app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
     // Log what we're about to send to Prisma
     console.log('[PUT /api/items/:itemId] Prisma update data:', JSON.stringify(prismaUpdateData, null, 2));
     console.log('[PUT /api/items/:itemId] Stock type check:', typeof prismaUpdateData.stock);
-    
+
     // Update the item
     const updatedItem = await prisma.inventory_items.update({
       where: { id: itemId },
@@ -6840,7 +6840,7 @@ app.post("/jobs/rates/daily", dailyRatesJob);
 app.get("/api/gbp/categories/popular", async (req, res) => {
   try {
     const pool = getDirectPool();
-    
+
     // Get popular categories from platform_categories table
     const popularQuery = `
       SELECT 
@@ -7339,7 +7339,8 @@ console.log('✅ Product options settings routes mounted at /api/tenants/:tenant
 
 /* ------------------------------ featured options settings ------------------------------ */
 app.use('/api/tenants', featuredOptionsSettingsRoutes);
-console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options');
+app.use('/api', featuredOptionsSettingsRoutes);
+console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options and /api/public/tenant/:tenantId/featured-options');
 
 /* ------------------------------ quickstart options settings ------------------------------ */
 app.use('/api/tenants', quickstartOptionsSettingsRoutes);
@@ -7351,7 +7352,8 @@ console.log('✅ Storefront options settings routes mounted at /api/tenants/:ten
 
 /* ------------------------------ storefront type settings ------------------------------ */
 app.use('/api/tenants', storefrontTypeSettingsRoutes);
-console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type');
+app.use('/api', storefrontTypeSettingsRoutes);
+console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type and /api/public/tenant/:tenantId/storefront-type');
 
 /* ------------------------------ barcode scan settings ------------------------------ */
 app.use('/api/tenants', barcodeScanSettingsRoutes);
@@ -7363,7 +7365,8 @@ console.log('✅ Integration options settings routes mounted at /api/tenants/:te
 
 /* ------------------------------ payment gateway settings ------------------------------ */
 app.use('/api/tenants', paymentGatewaySettingsRoutes);
-console.log('✅ Payment gateway settings routes mounted at /api/tenants/:tenantId/payment-gateway-settings');
+app.use('/api', paymentGatewaySettingsRoutes);
+console.log('✅ Payment gateway settings routes mounted at /api/tenants/:tenantId/payment-gateway-settings and /api/public/tenant/:tenantId/payment-gateway-settings');
 
 /* ------------------------------ organization commerce settings ------------------------------ */
 app.use('/api/organizations', organizationCommerceSettingsRoutes);
@@ -7405,16 +7408,16 @@ app.get('/api/auth/user-groups', authenticateToken, (req, res) => {
   try {
     const { getUserRoleGroups } = require('./config/role-groups');
     const userRole = req.user?.role;
-    
+
     if (!userRole) {
       return res.status(401).json({ error: 'User role not found' });
     }
-    
+
     const userGroups = getUserRoleGroups(userRole);
-    res.json({ 
+    res.json({
       userId: req.user?.id,
       userRole,
-      groups: userGroups 
+      groups: userGroups
     });
   } catch (error) {
     console.error('[API] Failed to get user groups:', error);
@@ -7440,20 +7443,20 @@ app.get('/api/auth/user-permissions', authenticateToken, (req, res) => {
   try {
     const { getUserPermissions, isValidRole } = require('./config/role-groups');
     const userRole = req.user?.role;
-    
+
     if (!userRole) {
       return res.status(401).json({ error: 'User role not found' });
     }
-    
+
     if (!isValidRole(userRole)) {
       return res.status(401).json({ error: 'Invalid user role', userRole });
     }
-    
+
     const userPermissions = getUserPermissions(userRole);
-    res.json({ 
+    res.json({
       userId: req.user?.id,
       userRole,
-      permissions: userPermissions 
+      permissions: userPermissions
     });
   } catch (error) {
     console.error('[API] Failed to get user permissions:', error);
@@ -7467,19 +7470,19 @@ app.get('/api/auth/user-access', authenticateToken, (req, res) => {
   try {
     const { getUserRoleGroups, getUserPermissions, isValidRole } = require('./config/role-groups');
     const userRole = req.user?.role;
-    
+
     if (!userRole) {
       return res.status(401).json({ error: 'User role not found' });
     }
-    
+
     if (!isValidRole(userRole)) {
       return res.status(401).json({ error: 'Invalid user role', userRole });
     }
-    
+
     const userGroups = getUserRoleGroups(userRole);
     const userPermissions = getUserPermissions(userRole);
-    
-    res.json({ 
+
+    res.json({
       userId: req.user?.id,
       userRole,
       access: {
@@ -7796,7 +7799,7 @@ if (process.env.NODE_ENV !== "test") {
     const server = app.listen(port, '0.0.0.0', async () => {
       console.log(`\n✅ API server running → http://localhost:${port}/health`);
       console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
-      
+
       // Start GMC scheduled sync (every 6 hours)
       try {
         const { startGMCScheduledSync } = await import('./jobs/gmc-scheduled-sync');
@@ -7805,7 +7808,7 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         console.error('⚠️ Failed to start GMC scheduled sync:', err);
       }
-      
+
       // Start OAuth token refresh (every hour)
       try {
         const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');

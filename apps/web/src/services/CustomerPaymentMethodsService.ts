@@ -482,5 +482,5 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
   }
 }
 
-const customerPaymentMethodsService = CustomerPaymentMethodsService.getInstance();
+export const customerPaymentMethodsService = CustomerPaymentMethodsService.getInstance();
 export default customerPaymentMethodsService;

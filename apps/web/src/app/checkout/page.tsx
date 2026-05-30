@@ -7,7 +7,8 @@ import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
 import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { CustomerInfoForm } from '@/components/checkout/CustomerInfoForm';
 import FulfillmentMethodForm, { FulfillmentMethod } from '@/components/checkout/FulfillmentMethodForm';
-import { ShippingAddressForm } from '@/components/checkout/ShippingAddressForm';
+import { ShippingAddressFormWithSaved } from '@/components/checkout/ShippingAddressFormWithSaved';
+import { GuestSavePaymentMethodPrompt } from '@/components/checkout/GuestSavePaymentMethodPrompt';
 import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import StripePaymentForm from '@/components/checkout/StripePaymentForm';
@@ -17,8 +18,10 @@ import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
-import { CustomerAuthProvider } from '@/contexts/CustomerAuthContext';
+import { CustomerAuthProvider, useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
+import { customerAuthService } from '@/services/CustomerAuthService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -56,6 +59,10 @@ function CheckoutPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
   const [isInitialized, setIsInitialized] = useState(false);
   const [availableGateways, setAvailableGateways] = useState<PaymentMethod[]>([]);
+  const [savePaymentMethod, setSavePaymentMethod] = useState(false);
+  const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
+  const [pendingPaymentMethodToken, setPendingPaymentMethodToken] = useState<string | null>(null);
+  const { isAuthenticated } = useCustomerAuth();
 
   // Capability-aware commerce and payment gateway resolution
   const commerceCap = useCommerceCapability(tenantId);
@@ -439,28 +446,15 @@ function CheckoutPageContent() {
     }
   };
 
-  const handleShippingSubmit = (address: ShippingAddress) => {
+  const handleShippingSubmit = (address: ShippingAddress, isNew?: boolean) => {
     setShippingAddress(address);
     setCurrentStep('payment');
   };
 
-  const handlePaymentSuccess = async (orderNumber: string, gatewayTransactionId?: string) => {
-    // console.log('[Checkout] Payment success:', {
-    //   orderNumber,
-    //   gatewayTransactionId,
-    //   customerInfo,
-    //   shippingAddress,
-    //   fulfillmentMethod,
-    //   fulfillmentFee,
-    //   tenantId,
-    //   gatewayType
-    // });
-
+  const handlePaymentSuccess = async (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => {
     // Clear the cart after successful payment
     if (tenantId) {
       clearCart(tenantId);
-
-      // Trigger cart update event
       window.dispatchEvent(new Event('cart-updated'));
     }
 
@@ -472,8 +466,34 @@ function CheckoutPageContent() {
       localStorage.setItem('buyer_phone', customerInfo.phone);
     }
 
+    // Handle payment method saving
+    if (savePaymentMethod && tenantId) {
+      const isLoggedIn = customerAuthService.isAuthenticated();
+      if (isLoggedIn && paymentMethodDetails?.token) {
+        try {
+          await customerPaymentMethodsService.addPaymentMethod({
+            tenantId,
+            gatewayType: paymentMethod,
+            paymentMethodToken: paymentMethodDetails.token,
+            type: paymentMethod === 'paypal' ? 'paypal' : 'card',
+            cardLast4: paymentMethodDetails.cardLast4,
+            cardBrand: paymentMethodDetails.cardBrand,
+            expiryMonth: paymentMethodDetails.expiryMonth,
+            expiryYear: paymentMethodDetails.expiryYear,
+          });
+          console.log('[Checkout] Payment method saved successfully');
+        } catch (err) {
+          console.error('[Checkout] Failed to save payment method:', err);
+        }
+      } else if (!isLoggedIn && paymentMethodDetails?.token) {
+        // Guest user: store token and show account creation prompt
+        setPendingPaymentMethodToken(paymentMethodDetails.token);
+        setShowGuestSavePrompt(true);
+        return; // Don't redirect yet
+      }
+    }
+
     // Redirect to order history (account page if logged in, my-orders for guests)
-    const { customerAuthService } = await import('@/services/CustomerAuthService');
     const isLoggedIn = customerAuthService.isAuthenticated();
     router.push(isLoggedIn ? '/account/orders' : '/my-orders');
   };
@@ -676,9 +696,11 @@ function CheckoutPageContent() {
                     <CardTitle>Shipping Address</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ShippingAddressForm
+                    <ShippingAddressFormWithSaved
                       initialData={shippingAddress}
                       onSubmit={handleShippingSubmit}
+                      selectedAddressId={selectedAddressId}
+                      onAddressSelect={setSelectedAddressId}
                     />
                   </CardContent>
                 </Card>
@@ -800,6 +822,24 @@ function CheckoutPageContent() {
                         )}
                       </div>
 
+                      {/* Save Payment Method Option */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            id="savePaymentMethod"
+                            checked={savePaymentMethod}
+                            onChange={(e) => setSavePaymentMethod(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4 mt-0.5"
+                          />
+                          <label htmlFor="savePaymentMethod" className="text-sm text-blue-700">
+                            {isAuthenticated
+                              ? 'Save this payment method for future purchases'
+                              : 'Save this payment method for faster checkout (you\'ll create an account after payment)'}
+                          </label>
+                        </div>
+                      </div>
+
                       {/* Conditional Payment Form - only show if gateways are available */}
                       {availableGateways.length > 0 && (
                         paymentMethod === 'square' ? (
@@ -823,6 +863,7 @@ function CheckoutPageContent() {
                             onSuccess={handlePaymentSuccess}
                             onBack={() => setCurrentStep('shipping')}
                             tenantId={tenantId || ''}
+                            savePaymentMethod={savePaymentMethod}
                           />
                         ) : (
                           <PayPalPaymentForm
@@ -868,6 +909,33 @@ function CheckoutPageContent() {
           </div>
         )}
       </div>
+
+      {/* Guest Save Payment Method Prompt */}
+      {showGuestSavePrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Save Your Payment Method?</h3>
+            <p className="text-sm text-gray-600">
+              Create an account to save this payment method for faster checkout next time.
+            </p>
+
+            <GuestSavePaymentMethodPrompt
+              customerInfo={customerInfo}
+              tenantId={tenantId || ''}
+              paymentMethod={paymentMethod}
+              pendingToken={pendingPaymentMethodToken}
+              onSaved={() => {
+                setShowGuestSavePrompt(false);
+                router.push('/account/orders');
+              }}
+              onSkip={() => {
+                setShowGuestSavePrompt(false);
+                router.push('/my-orders');
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

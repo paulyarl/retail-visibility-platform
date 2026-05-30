@@ -19,7 +19,7 @@ export interface PlatformStats {
 }
 
 export interface FeaturesShowcaseConfig {
-  mode: 'hybrid' | 'featured' | 'recent' | 'trending';
+  mode: 'hybrid' | 'featured' | 'recent' | 'trending' | 'grid' | 'slider' | 'featured' | 'tabs';
   enabled: boolean;
   maxItems: number;
   refreshInterval: number;
@@ -114,7 +114,7 @@ class PlatformPublicService extends PublicApiSingleton {
       if (!response.success) {
         console.error('[PlatformPublicService] Failed to get features showcase config:', response.error);
         return {
-          mode: 'hybrid',
+          mode: 'grid',
           enabled: true,
           maxItems: 10,
           refreshInterval: 300000 // 5 minutes
@@ -122,7 +122,7 @@ class PlatformPublicService extends PublicApiSingleton {
       }
 
       return response.data || {
-        mode: 'hybrid',
+        mode: 'grid',
         enabled: true,
         maxItems: 10,
         refreshInterval: 300000 // 5 minutes
@@ -130,7 +130,7 @@ class PlatformPublicService extends PublicApiSingleton {
     } catch (error) {
       console.error('[PlatformPublicService] Failed to get features showcase config:', error);
       return {
-        mode: 'hybrid',
+        mode: 'grid',
         enabled: true,
         maxItems: 10,
         refreshInterval: 300000 // 5 minutes

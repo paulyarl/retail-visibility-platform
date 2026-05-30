@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@mantine/core';
 import { useParams } from 'next/navigation';
 import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface PromotionStatus {
   isPromoted: boolean;
@@ -77,9 +77,8 @@ export default function PromotionSettingsPage() {
   const fetchPromotionStatus = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/tenants/${tenantId}/promotion/status`);
-      if (response.ok) {
-        const data = await response.json();
+      const data = await tenantInfoService.getPromotionStatus(tenantId);
+      if (data) {
         setStatus(data);
         if (data.promotionTier) {
           setSelectedTier(data.promotionTier);
@@ -95,12 +94,8 @@ export default function PromotionSettingsPage() {
   const handleEnablePromotion = async () => {
     setProcessing(true);
     try {
-      const response = await api.post(`/api/tenants/${tenantId}/promotion/enable`, {
-        tier: selectedTier,
-        durationMonths: duration,
-      });
-
-      if (response.ok) {
+      const result = await tenantInfoService.enablePromotion(tenantId, selectedTier, duration);
+      if (result) {
         await fetchPromotionStatus();
         alert('Promotion enabled successfully!');
       } else {
@@ -119,9 +114,8 @@ export default function PromotionSettingsPage() {
 
     setProcessing(true);
     try {
-      const response = await api.post(`/api/tenants/${tenantId}/promotion/disable`);
-
-      if (response.ok) {
+      const result = await tenantInfoService.disablePromotion(tenantId);
+      if (result) {
         await fetchPromotionStatus();
         alert('Promotion disabled successfully.');
       } else {

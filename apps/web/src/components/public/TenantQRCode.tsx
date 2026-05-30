@@ -527,9 +527,19 @@ export function TenantQRCode({
     }
   };
 
-  // Capability gate: if flags resolved and QR codes not allowed, render nothing
-  if (resolvedFlags && !resolvedFlags.showQRCodes) {
-    return null;
+  // Capability gate: if flags resolved and QR codes not allowed for this page type, render nothing
+  if (resolvedFlags) {
+    const pageSpecificFlag =
+      pageType === 'product'
+        ? resolvedFlags.showQRProduct
+        : pageType === 'directory'
+          ? resolvedFlags.showQRDirectory
+          : pageType === 'storefront'
+            ? resolvedFlags.showQRStore
+            : resolvedFlags.showQRCodes;
+    if (!pageSpecificFlag) {
+      return null;
+    }
   }
 
   return (

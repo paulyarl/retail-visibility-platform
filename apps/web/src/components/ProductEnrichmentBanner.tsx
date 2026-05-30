@@ -24,7 +24,7 @@ import {
   Tag
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface ProductNeedingEnrichment {
   id: string;
@@ -60,16 +60,9 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
 
   const fetchProductsNeedingEnrichment = async () => {
     try {
-      const response = await api.get('/api/products/needs-enrichment');
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data.products || []);
-      } else if (response.status === 404) {
-        // API not implemented yet, silently ignore
-        console.warn('[ProductEnrichmentBanner] Enrichment API not available');
-      } else {
-        console.error('[ProductEnrichmentBanner] Failed to fetch products:', response.status);
+      const data = await tenantInfoService.getProductsNeedingEnrichment();
+      if (data) {
+        setProducts(data);
       }
     } catch (error) {
       console.error('[ProductEnrichmentBanner] Failed to fetch products:', error);

@@ -8,6 +8,7 @@ import { Save, AlertCircle, CheckCircle2, Clock, LayoutGrid, Star, Eye, Info, Qr
 import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { STOREFRONT_OPT_GROUPS, getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface StorefrontOptionsSettings {
@@ -150,28 +151,22 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
 
   // Load settings from backend
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/storefront-options`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.settings) {
-            setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load storefront options settings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadSettings();
   }, [tenantId]);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const data = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
+      if (data) {
+        setSettings({ ...DEFAULT_SETTINGS, ...data });
+      }
+    } catch (err) {
+      console.error('Failed to load storefront options settings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggle = (key: keyof StorefrontOptionsSettings) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -188,26 +183,17 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setMessage(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/storefront-options`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify(settings),
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Storefront options saved successfully' });
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.message || 'Failed to save settings' });
+      setSaving(true);
+      setMessage(null);
+
+      const result = await tenantInfoService.updateStorefrontOptionsSettings(tenantId, settings);
+
+      if (!result) {
+        throw new Error('Failed to save storefront options settings');
       }
+
+      setMessage({ type: 'success', text: 'Storefront options saved successfully' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Failed to save settings' });
     } finally {

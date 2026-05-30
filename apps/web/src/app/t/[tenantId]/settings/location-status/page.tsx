@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 
 
@@ -49,21 +49,15 @@ export default function LocationStatusPage() {
     setLoading(true);
     try {
       // Fetch tenant info
-      const tenantRes = await api.get(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}`
-      );
-      if (tenantRes.ok) {
-        const tenantData = await tenantRes.json();
+      const tenantData = await tenantInfoService.getTenantInfo(tenantId);
+      if (tenantData) {
         setTenant(tenantData);
       }
 
       // Fetch status history
-      const historyRes = await api.get(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tenants/${tenantId}/status-history?limit=50`
-      );
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        setHistory(historyData.history || []);
+      const historyData = await tenantInfoService.getStatusHistory(tenantId, 50);
+      if (historyData) {
+        setHistory(historyData);
       }
     } catch (error) {
       console.error('Failed to fetch location status data:', error);

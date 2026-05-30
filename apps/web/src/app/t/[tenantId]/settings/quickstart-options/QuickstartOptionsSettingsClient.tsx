@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/Switch';
 import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircle2, ArrowRight, Zap, Plus, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useQuickstartOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface QuickstartOptionsSettings {
@@ -111,28 +112,22 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
 
   // Load settings from backend
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/quickstart-options`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.settings) {
-            setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load quickstart options settings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadSettings();
   }, [tenantId]);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const data = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
+      if (data) {
+        setSettings({ ...DEFAULT_SETTINGS, ...data });
+      }
+    } catch (err) {
+      console.error('Failed to load quickstart options settings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggle = (key: keyof QuickstartOptionsSettings) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -147,26 +142,17 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setMessage(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const res = await fetch(`${apiUrl}/api/tenants/${tenantId}/quickstart-options`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify(settings),
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Quickstart options saved successfully' });
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.message || 'Failed to save settings' });
+      setSaving(true);
+      setMessage(null);
+
+      const result = await tenantInfoService.updateQuickstartOptionsSettings(tenantId, settings);
+
+      if (!result) {
+        throw new Error('Failed to save quickstart options settings');
       }
+
+      setMessage({ type: 'success', text: 'Quickstart options saved successfully' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Failed to save settings' });
     } finally {

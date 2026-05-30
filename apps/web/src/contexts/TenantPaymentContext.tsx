@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+// Hooks replaced by server-fetched props to eliminate client-side waterfall
+// import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface TenantPaymentContextValue {
   canPurchase: boolean;
@@ -18,17 +19,26 @@ const TenantPaymentContext = createContext<TenantPaymentContextValue | undefined
 interface TenantPaymentProviderProps {
   tenantId: string;
   children: ReactNode;
+  // Server-fetched capability props (eliminates client-side waterfall)
+  initialCommerceSettings?: { enabled?: boolean } | null;
+  initialPaymentGatewaySettings?: { gateway_enabled?: boolean } | null;
 }
 
-export function TenantPaymentProvider({ tenantId, children }: TenantPaymentProviderProps) {
+export function TenantPaymentProvider({ tenantId, children, initialCommerceSettings, initialPaymentGatewaySettings }: TenantPaymentProviderProps) {
   const [canPurchase, setCanPurchase] = useState(false);
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
 
-  // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(tenantId);
-  const paymentCap = usePaymentGatewayCapability(tenantId);
+  // Capability-aware commerce and payment gateway resolution — from server-fetched props
+  const commerceCap = {
+    data: initialCommerceSettings ? { enabled: initialCommerceSettings.enabled ?? true } : undefined,
+    loading: false,
+  };
+  const paymentCap = {
+    data: initialPaymentGatewaySettings ? { enabled: initialPaymentGatewaySettings.gateway_enabled ?? true } : undefined,
+    loading: false,
+  };
 
   const checkPurchaseAbility = async () => {
     try {

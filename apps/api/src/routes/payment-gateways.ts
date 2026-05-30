@@ -42,7 +42,7 @@ router.get('/:tenantId/payment-gateway', async (req: Request, res: Response) => 
     const { tenantId } = req.params;
 
     const activeGateway = await prisma.tenant_payment_gateways.findFirst({
-      where: { 
+      where: {
         tenant_id: tenantId,
         is_active: true,
       },
@@ -83,7 +83,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
     // Get gateways, tenant tier, Stripe Connect status, and commerce features in parallel
     const [gateways, tenant, stripeConnect] = await Promise.all([
       prisma.tenant_payment_gateways.findMany({
-        where: { 
+        where: {
           tenant_id: tenantId,
           is_active: true, // Only return active gateways
         },
@@ -118,20 +118,25 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
     // Fetch commerce features from tier_features_list based on tenant's tier
     let commerceFeatures: string[] = [];
     if (tenant?.subscription_tier) {
-      const tierKey = tenant.subscription_tier.startsWith('trial_') 
-        ? tenant.subscription_tier.replace('trial_', '') 
+      const tierKey = tenant.subscription_tier.startsWith('trial_')
+        ? tenant.subscription_tier.replace('trial_', '')
         : tenant.subscription_tier;
-      
-      const tierRecord = await prisma.$queryRaw<Array<{id: string}>>`
-        SELECT id FROM subscription_tiers_list WHERE tier_key = ${tierKey} AND is_active = true LIMIT 1
-      `;
-      
-      if (tierRecord.length > 0) {
-        const tierId = tierRecord[0].id;
-        const features = await prisma.$queryRaw<Array<{feature_key: string}>>`
-          SELECT feature_key FROM tier_features_list 
-          WHERE tier_id = ${tierId} AND feature_key LIKE 'commerce_%' AND is_enabled = true
-        `;
+
+      const tierRecord = await prisma.subscription_tiers_list.findFirst({
+        where: { tier_key: tierKey, is_active: true },
+        select: { id: true },
+      });
+
+      if (tierRecord) {
+        const tierId = tierRecord.id;
+        const features = await prisma.tier_features_list.findMany({
+          where: {
+            tier_id: tierId,
+            feature_key: { startsWith: 'commerce_' },
+            is_enabled: true,
+          },
+          select: { feature_key: true },
+        });
         commerceFeatures = features.map(f => f.feature_key);
       }
     }
@@ -285,7 +290,7 @@ router.post('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async
 
     if (gateway_type === 'paypal') {
       const { mode, client_id, client_secret } = req.body;
-      
+
       if (!client_id || !client_secret) {
         return res.status(400).json({
           success: false,
@@ -303,7 +308,7 @@ router.post('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async
       };
     } else if (gateway_type === 'square') {
       const { environment, application_id, access_token, location_id } = req.body;
-      
+
       if (!application_id || !access_token || !location_id) {
         return res.status(400).json({
           success: false,

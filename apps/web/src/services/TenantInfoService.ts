@@ -1905,6 +1905,121 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async updateStorefrontOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-options`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-options-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-options-settings-${tenantId}*`);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront options settings:', error);
+      return null;
+    }
+  }
+
+  async updateQuickstartOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/quickstart-options`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-quickstart-options-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-quickstart-options-settings-${tenantId}*`);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update quickstart options settings:', error);
+      return null;
+    }
+  }
+
+  async getQuickStartEligibility(tenantId: string): Promise<{
+    eligible: boolean;
+    capabilityEnabled: boolean;
+    capabilityTiers: { tier_key: string; tier_name: string }[];
+    productCount: number;
+    productLimit: number;
+    isPlatformAdmin: boolean;
+    rateLimitReached: boolean;
+    resetAt?: number;
+    recommendation: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        eligible: boolean;
+        capabilityEnabled: boolean;
+        capabilityTiers: { tier_key: string; tier_name: string }[];
+        productCount: number;
+        productLimit: number;
+        isPlatformAdmin: boolean;
+        rateLimitReached: boolean;
+        resetAt?: number;
+        recommendation: string;
+      }>(
+        `/api/v1/tenants/${tenantId}/quick-start/eligibility`,
+        {},
+        `tenant-quickstart-eligibility-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get quickstart eligibility:', error);
+      return null;
+    }
+  }
+
+  async generateQuickStartProducts(
+    tenantId: string,
+    payload: {
+      scenario: string;
+      productCount: number;
+      assignCategories: boolean;
+      createAsDrafts: boolean;
+      generateImages: boolean;
+      imageQuality: string;
+      textModel: string;
+      imageModel: string;
+    }
+  ): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/v1/tenants/${tenantId}/quick-start`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+        `tenant-quickstart-generate-${tenantId}`
+      );
+      if (!result.success) return null;
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to generate quickstart products:', error);
+      return null;
+    }
+  }
+
   async getBarcodeScanSettings(tenantId: string): Promise<{
     barcode_scan_enabled: boolean;
     barcode_manual_enabled: boolean;
@@ -1934,6 +2049,123 @@ class TenantInfoService extends TenantApiSingleton {
     } catch (error) {
       console.error('[TenantInfoService] Failed to get barcode scan settings:', error);
       return null;
+    }
+  }
+
+  // ─── Feed Validation ───────────────────────────────────────────────
+
+  async getFeedValidation(tenantId: string): Promise<{
+    total: number;
+    errors: Array<{ id: string; field: string; message: string; sku?: string; name?: string }>;
+    warnings: Array<{ id: string; field: string; message: string; sku?: string; name?: string }>;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenant/${tenantId}/feed/validate`,
+        {},
+        `tenant-feed-validation-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get feed validation:', error);
+      return null;
+    }
+  }
+
+  async getCategoryCoverage(tenantId: string): Promise<{
+    total: number;
+    mapped: number;
+    unmapped: number;
+    coverage: number;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenant/${tenantId}/categories/coverage`,
+        {},
+        `tenant-category-coverage-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get category coverage:', error);
+      return null;
+    }
+  }
+
+  async getFeedSetupStatus(tenantId: string): Promise<{
+    isReady: boolean;
+    hasGoogleAccount: boolean;
+    hasMerchantLink: boolean;
+    hasOAuthTokens: boolean;
+    message: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/feed-jobs/setup-status/${tenantId}`,
+        {},
+        `tenant-feed-setup-status-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get feed setup status:', error);
+      return null;
+    }
+  }
+
+  async runFeedPrecheck(tenantId: string): Promise<{
+    total: number;
+    missingCategory: Array<{ id: string; sku?: string }>;
+    unmapped: Array<{ id: string; sku?: string; categoryPath?: string[] }>;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenant/${tenantId}/feed/precheck`,
+        { method: 'POST' },
+        `tenant-feed-precheck-${tenantId}`
+      );
+      if (!result.success) return null;
+      return result.data?.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to run feed precheck:', error);
+      return null;
+    }
+  }
+
+  async createFeedJob(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/feed-jobs`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ tenantId }),
+        },
+        `tenant-feed-job-create-${tenantId}`
+      );
+      if (!result.success) {
+        // Surface 422 details for alignment modal
+        if (result.status === 422) {
+          const details = result.data?.details || {};
+          throw Object.assign(new Error('Feed alignment required'), { status: 422, details });
+        }
+        throw new Error(result.data?.message || result.data?.error || 'Failed to create feed job');
+      }
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to create feed job:', error);
+      throw error;
     }
   }
 
@@ -2038,6 +2270,154 @@ class TenantInfoService extends TenantApiSingleton {
       return s ? { pickup_enabled: !!s.pickup_enabled, delivery_enabled: !!s.delivery_enabled, shipping_enabled: !!s.shipping_enabled } : null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to get fulfillment settings:', error);
+      return null;
+    }
+  }
+
+  async getStatusHistory(tenantId: string, limit: number = 50): Promise<any[] | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/status-history?limit=${limit}`,
+        {},
+        `tenant-status-history-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.history ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get status history:', error);
+      return null;
+    }
+  }
+
+  async getPopularGBPCategories(tenantId: string): Promise<any[] | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`,
+        {},
+        `tenant-gbp-popular-categories-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.items ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get popular GBP categories:', error);
+      return null;
+    }
+  }
+
+  async searchGBPCategories(tenantId: string, query: string, limit: number = 10): Promise<any[] | null> {
+    try {
+      if (!tenantId || !query) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/gbp/categories?query=${encodeURIComponent(query)}&limit=${limit}&tenantId=${encodeURIComponent(tenantId)}`,
+        {},
+        `tenant-gbp-categories-search-${tenantId}-${query}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.items ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to search GBP categories:', error);
+      return null;
+    }
+  }
+
+  async getProductsNeedingEnrichment(): Promise<any[] | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/products/needs-enrichment',
+        {},
+        'products-needing-enrichment',
+        this.cacheTTL,
+        { context: AppContext.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) {
+        if (result.status === 404) {
+          console.warn('[TenantInfoService] Enrichment API not available');
+          return null;
+        }
+        return null;
+      }
+      return result.data?.products ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get products needing enrichment:', error);
+      return null;
+    }
+  }
+
+  async getPromotionStatus(tenantId: string): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/promotion/status`,
+        {},
+        `tenant-promotion-status-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get promotion status:', error);
+      return null;
+    }
+  }
+
+  async enablePromotion(tenantId: string, tier: string, durationMonths: number): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/promotion/enable`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ tier, durationMonths }),
+        },
+        `tenant-promotion-enable-${tenantId}`
+      );
+      if (!result.success) return null;
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to enable promotion:', error);
+      return null;
+    }
+  }
+
+  async disablePromotion(tenantId: string): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/promotion/disable`,
+        { method: 'POST' },
+        `tenant-promotion-disable-${tenantId}`
+      );
+      if (!result.success) return null;
+      return result.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to disable promotion:', error);
+      return null;
+    }
+  }
+
+  async getItems(tenantId: string, limit: number = 10): Promise<any[] | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<any>(
+        `/api/items?tenantId=${tenantId}&limit=${limit}`,
+        {},
+        `tenant-items-${tenantId}-${limit}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.items ?? result.data?.data ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get items:', error);
       return null;
     }
   }

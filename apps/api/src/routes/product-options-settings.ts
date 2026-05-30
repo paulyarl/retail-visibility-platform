@@ -141,7 +141,8 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
       if (type) {
         if (tierState.allowedTypes.includes(type)) {
           filteredData[key] = value;
-        } else {
+        } else if (value === true) {
+          // Only reject if user is trying to enable a disallowed type
           return res.status(403).json({
             success: false,
             error: 'tier_restricted',
@@ -149,6 +150,7 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
             feature_key: key,
           });
         }
+        // If value is false, silently skip (disabled UI control may send false)
         continue;
       }
       // Check toggle gates (variant, gallery, video)
@@ -156,7 +158,8 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
       if (tierFlag) {
         if (tierState[tierFlag]) {
           filteredData[key] = value;
-        } else {
+        } else if (value === true) {
+          // Only reject if user is trying to enable a disallowed toggle
           return res.status(403).json({
             success: false,
             error: 'tier_restricted',
@@ -164,6 +167,7 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
             feature_key: key,
           });
         }
+        // If value is false, silently skip
         continue;
       }
       // Other keys pass through

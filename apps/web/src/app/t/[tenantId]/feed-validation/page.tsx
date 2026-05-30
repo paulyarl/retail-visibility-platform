@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { api, API_BASE_URL } from '@/lib/api'
+import { tenantInfoService } from '@/services/TenantInfoService'
 import { ContextBadges } from '@/components/ContextBadges'
 import { 
   AlertCircle, 
@@ -161,10 +161,9 @@ export default function FeedValidationPage() {
   async function fetchValidation() {
     try {
       setLoading(true)
-      const res = await api.get(`${API_BASE_URL}/api/tenant/${tenantId}/feed/validate`)
-      if (!res.ok) throw new Error('Failed to fetch validation data')
-      const data = await res.json()
-      setValidationData(data.data)
+      const data = await tenantInfoService.getFeedValidation(tenantId)
+      if (!data) throw new Error('Failed to fetch validation data')
+      setValidationData(data)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -175,19 +174,15 @@ export default function FeedValidationPage() {
 
   async function fetchCoverage() {
     try {
-      const r = await api.get(`${API_BASE_URL}/api/tenant/${tenantId}/categories/coverage`)
-      if (!r.ok) return
-      const d = await r.json()
-      setCoverage(d?.data || null)
+      const data = await tenantInfoService.getCategoryCoverage(tenantId)
+      setCoverage(data)
     } catch {}
   }
 
   async function fetchSetupStatus() {
     try {
-      const r = await api.get(`${API_BASE_URL}/api/feed-jobs/setup-status/${tenantId}`)
-      if (!r.ok) return
-      const d = await r.json()
-      setSetupStatus(d?.data || null)
+      const data = await tenantInfoService.getFeedSetupStatus(tenantId)
+      setSetupStatus(data)
     } catch {}
   }
 
@@ -281,20 +276,19 @@ export default function FeedValidationPage() {
             onClick={async () => {
               try {
                 setLoading(true)
-                const res = await api.post(`${API_BASE_URL}/api/tenant/${tenantId}/feed/precheck`)
-                const data = await res.json()
+                const data = await tenantInfoService.runFeedPrecheck(tenantId)
                 // Convert precheck result to validation-like display
                 const errors: ValidationError[] = []
-                for (const m of (data?.data?.missingCategory || [])) {
+                for (const m of (data?.missingCategory || [])) {
                   errors.push({ id: m.id, field: 'categoryPath', message: 'category_required' })
                 }
-                for (const u of (data?.data?.unmapped || [])) {
+                for (const u of (data?.unmapped || [])) {
                   errors.push({ id: u.id, field: 'googleCategoryId', message: 'category_unmapped' })
                 }
-                setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
+                setValidationData({ total: data?.total || 0, errors, warnings: [] })
                 setError(null)
                 // refresh coverage
-                try { const r = await api.get(`${API_BASE_URL}/api/tenant/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                try { const cov = await tenantInfoService.getCategoryCoverage(tenantId); setCoverage(cov) } catch {}
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to run precheck')
               } finally {
@@ -312,10 +306,16 @@ export default function FeedValidationPage() {
               if (!tenantId) return
               setPushing(true)
               try {
-                const res = await api.post(`${API_BASE_URL}/api/feed-jobs`, { tenantId })
-                if (res.status === 422) {
-                  const data = await res.json()
-                  const det = data?.details || {}
+                await tenantInfoService.createFeedJob(tenantId)
+                setToast({ open: true, message: 'Feed job queued successfully' })
+                // Auto-dismiss after 3s
+                setTimeout(() => setToast({ open: false, message: '' }), 3000)
+                // also refresh coverage
+                // TEMP: Disabled due to Prisma JsonBody error
+                // try { const cov = await tenantInfoService.getCategoryCoverage(tenantId); setCoverage(cov) } catch {}
+              } catch (e: any) {
+                if (e.status === 422) {
+                  const det = e.details || {}
                   setAlignmentModal({
                     open: true,
                     missingCategoryCount: det?.missingCategoryCount || 0,
@@ -325,25 +325,6 @@ export default function FeedValidationPage() {
                   })
                   return
                 }
-                if (!res.ok) {
-                  const errorData = await res.json().catch(() => ({}))
-                  const errorMsg = errorData?.message || errorData?.error || 'Failed to create feed job'
-                  const details = errorData?.details
-                  if (details && Array.isArray(details)) {
-                    // Zod validation errors
-                    const messages = details.map((d: any) => d.message || d.path?.join('.') || 'Unknown error').join(', ')
-                    throw new Error(`Validation error: ${messages}`)
-                  }
-                  throw new Error(errorMsg)
-                }
-                await res.json()
-                setToast({ open: true, message: 'Feed job queued successfully' })
-                // Auto-dismiss after 3s
-                setTimeout(() => setToast({ open: false, message: '' }), 3000)
-                // also refresh coverage
-                // TEMP: Disabled due to Prisma JsonBody error
-                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
-              } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed to push feed')
               } finally {
                 setPushing(false)
@@ -639,16 +620,15 @@ export default function FeedValidationPage() {
                 onClick={async () => {
                   try {
                     setLoading(true)
-                    const res = await api.post(`${API_BASE_URL}/api/tenant/${tenantId}/feed/precheck`)
-                    const data = await res.json()
+                    const data = await tenantInfoService.runFeedPrecheck(tenantId)
                     const errors: ValidationError[] = []
-                    for (const m of (data?.data?.missingCategory || [])) errors.push({ id: m.id, field: 'categoryPath', message: 'category_required' })
-                    for (const u of (data?.data?.unmapped || [])) errors.push({ id: u.id, field: 'googleCategoryId', message: 'category_unmapped' })
-                    setValidationData({ total: data?.data?.total || 0, errors, warnings: [] })
+                    for (const m of (data?.missingCategory || [])) errors.push({ id: m.id, field: 'categoryPath', message: 'category_required' })
+                    for (const u of (data?.unmapped || [])) errors.push({ id: u.id, field: 'googleCategoryId', message: 'category_unmapped' })
+                    setValidationData({ total: data?.total || 0, errors, warnings: [] })
                     setAlignmentModal({ ...alignmentModal, open: false })
                     // refresh coverage
                     // TEMP: Disabled due to Prisma JsonBody error
-                // try { const r = await api.get(`${API_BASE_URL}/api/${tenantId}/categories/coverage`); const d = await r.json(); setCoverage(d?.data || null) } catch {}
+                    // try { const cov = await tenantInfoService.getCategoryCoverage(tenantId); setCoverage(cov) } catch {}
                   } catch (e) {
                     // keep modal open but surface error inline
                     alert('Failed to run precheck')

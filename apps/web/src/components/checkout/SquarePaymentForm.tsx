@@ -43,7 +43,7 @@ interface SquarePaymentFormProps {
     inventoryItemId?: string;
     tenantId: string;
   }>;
-  onSuccess: (orderNumber: string, gatewayTransactionId?: string) => void;
+  onSuccess: (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
   onBack: () => void;
   squareConfig?: { applicationId: string; locationId: string } | null;
 }
@@ -329,8 +329,14 @@ function SquarePaymentFormContent({
             throw new Error('Invalid payment response from server');
           }
           
-          // Success - call onSuccess with order number and transaction ID
-          onSuccess(orderNumber, payment.id);
+          // Success - call onSuccess with order number, transaction ID, and card details
+          onSuccess(orderNumber, payment.id, {
+            token: result.token,
+            cardLast4: payment.cardDetails?.last4,
+            cardBrand: payment.cardDetails?.cardBrand,
+            expiryMonth: payment.cardDetails?.expMonth,
+            expiryYear: payment.cardDetails?.expYear,
+          });
         } catch (paymentError) {
           console.error('Backend payment error:', paymentError);
           setError(paymentError instanceof Error ? paymentError.message : 'Payment processing failed');

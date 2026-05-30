@@ -1138,6 +1138,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
   // Storefront options capability flags — initialized from server-side fetch (no waterfall)
   const [optFlags] = useState<StorefrontOptionFlags | null>(initialOptFlags ?? null);
+  // console.log(`product storefront_options optFlags: ${JSON.stringify(optFlags, null, 2)}`);
 
   const showsLocation = optFlags?.showLocationDisplay ?? true;
   const showsMap = optFlags?.showMapDisplay ?? true;
@@ -1863,6 +1864,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             tenantId={product.tenantId}
             label="Scan to Share"
             pageType="product"
+            capabilityFlags={optFlags}
           />
         )}
 
