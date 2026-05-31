@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { X, Plus, GripVertical, Star } from 'lucide-react';
 
 interface GBPCategory {
@@ -54,10 +54,9 @@ export default function GBPCategorySelectorMulti({
     async function loadPopularCategories() {
       try {
         setLoadingPopular(true);
-        const response = await api.get(`/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPopularCategories(data.items || []);
+        const data = await tenantInfoService.getPopularGBPCategories(tenantId);
+        if (data) {
+          setPopularCategories(data);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Failed to load popular categories:', error);
@@ -79,10 +78,9 @@ export default function GBPCategorySelectorMulti({
     const timer = setTimeout(async () => {
       try {
         setPrimaryLoading(true);
-        const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(primaryQuery)}&limit=10&tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok && active) {
-          const data = await response.json();
-          setPrimaryResults(data.items || []);
+        const data = await tenantInfoService.searchGBPCategories(tenantId, primaryQuery, 10);
+        if (data && active) {
+          setPrimaryResults(data);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Primary search error:', error);
@@ -108,10 +106,9 @@ export default function GBPCategorySelectorMulti({
     const timer = setTimeout(async () => {
       try {
         setSecondaryLoading(true);
-        const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(secondaryQuery)}&limit=10&tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok && active) {
-          const data = await response.json();
-          setSecondaryResults(data.items || []);
+        const data = await tenantInfoService.searchGBPCategories(tenantId, secondaryQuery, 10);
+        if (data && active) {
+          setSecondaryResults(data);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Secondary search error:', error);

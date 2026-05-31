@@ -12,7 +12,7 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+// Capability data now passed as server-fetched props — eliminates client-side waterfall 
 import { Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
@@ -96,6 +96,12 @@ interface StorefrontClientWrapperProps {
   statusInfo?: any;
   // Server-side resolved storefront option flags (eliminates client-side waterfall)
   initialStorefrontOptionFlags?: StorefrontOptionFlags | null;
+  // Server-side resolved commerce settings (merchant gate)
+  initialCommerceSettings?: { enabled?: boolean; show_payment_options?: boolean; require_payment_upfront?: boolean; allow_payment_on_pickup?: boolean } | null;
+  // Server-side resolved payment gateway settings (merchant gate)
+  initialPaymentGatewaySettings?: { gateway_enabled?: boolean; stripe_enabled?: boolean; paypal_enabled?: boolean; square_enabled?: boolean; clover_enabled?: boolean } | null;
+  // Server-side resolved storefront type settings (merchant gate)
+  initialStorefrontTypeSettings?: { settings?: { storefront_type_enabled?: boolean; selected_storefront_type?: string | null }; tierState?: { enabled?: boolean; type?: string; effectiveType?: string } } | null;
 }
 
 export default function StorefrontClientWrapper({
@@ -132,6 +138,9 @@ export default function StorefrontClientWrapper({
   locationStatus,
   statusInfo,
   initialStorefrontOptionFlags,
+  initialCommerceSettings,
+  initialPaymentGatewaySettings,
+  initialStorefrontTypeSettings,
 }: StorefrontClientWrapperProps) {
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
@@ -139,6 +148,7 @@ export default function StorefrontClientWrapper({
   // console.log(`primaryGBPCategory    : ${JSON.stringify(primaryGBPCategory)}`);
   // console.log(`secondaryGBPCategories: ${JSON.stringify(secondaryGBPCategories)}`);
   // console.log(`locationStatus        : ${locationStatus}`);
+  // console.log(`initialStorefrontOptionFlags: ${JSON.stringify(initialStorefrontOptionFlags)}`);
 
   const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({});
 
@@ -175,9 +185,15 @@ export default function StorefrontClientWrapper({
   // Check if storefront status panel should be shown
   const storefrontStatus = useStorefrontStatus(tenantId, tenantInfoForStatus as any);
 
-  // Storefront capability-driven content control
-  const storefrontCap = useStorefrontCapability(tenantId);
-  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true; // default to true while loading
+  // Storefront capability-driven content control — now from server-fetched props
+  const storefrontCap = {
+    data: {
+      enabled: initialStorefrontTypeSettings?.settings?.storefront_type_enabled ?? true,
+      type: initialStorefrontTypeSettings?.tierState?.effectiveType ?? initialStorefrontTypeSettings?.tierState?.type ?? 'both',
+    },
+    loading: false,
+  };
+  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
@@ -202,6 +218,15 @@ export default function StorefrontClientWrapper({
   const showsContact = optFlags?.showContact ?? true;
   const showsSocialMedia = optFlags?.showSocialMedia ?? true;
   const showsStorefrontActions = optFlags?.showStorefrontActions ?? true;
+
+  // console.log(`----------------------------isRetailStore---------------------------------------: ${isRetailStore}`)
+  // console.log(`optFlags: ${optFlags}`)
+  // console.log(`showsHours: ${showsHours}`)
+  // console.log(`showsMap: ${showsMap}`)
+  // console.log(`showsLocation: ${showsLocation}`)
+  // console.log(`showsHoursStatus: ${showsHoursStatus}`)
+  // console.log(`showsInteractiveMaps: ${showsInteractiveMaps}`)
+  // console.log(`showsStorefrontActions: ${showsStorefrontActions}`)
 
   // Extract contact information from tenant metadata with fallbacks
   // Lazy: wait for storefrontCap to resolve before computing, so capability-driven
@@ -402,7 +427,7 @@ export default function StorefrontClientWrapper({
             </div>
           )}
           {/* Action Buttons - Below categories for better responsive behavior */}
-          {!storefrontStatus.shouldShowPanel && tenantSlug && isRetailStore && (
+          {!storefrontStatus.shouldShowPanel && tenantSlug && (
             <div className="hidden sm:flex justify-end mt-3">
               {showsHours && showsHoursStatus && isRetailStore && (
                 <HoursStatusBadge status={hoursStatus} size="lg" animate={showsAnimatedHours} />
@@ -793,6 +818,7 @@ export default function StorefrontClientWrapper({
                     showDownload={true}
                     className="mt-4"
                     pageType="storefront"
+                    capabilityFlags={storefrontOptionFlags}
                   />
                 </div>
 
@@ -813,6 +839,7 @@ export default function StorefrontClientWrapper({
                     showDownload={true}
                     className="mt-4"
                     pageType="storefront"
+                    capabilityFlags={storefrontOptionFlags}
                   />
                 </div>
 

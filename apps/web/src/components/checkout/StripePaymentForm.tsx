@@ -27,10 +27,11 @@ interface StripePaymentFormProps {
   };
   fulfillmentMethod?: string;
   cartItems: any[];
-  onSuccess: (orderId: string) => void;
+  onSuccess: (orderId: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
   onBack: () => void;
   tenantId: string;
   orderId?: string; // Optional - passed when payment intent is created on mount
+  savePaymentMethod?: boolean;
 }
 
 function StripeCheckoutForm({ 
@@ -42,7 +43,8 @@ function StripeCheckoutForm({
   onSuccess, 
   onBack,
   tenantId,
-  orderId 
+  orderId,
+  savePaymentMethod
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -63,6 +65,13 @@ function StripeCheckoutForm({
     setError(null);
 
     try {
+      // Store save payment method intent for retrieval after redirect
+      if (savePaymentMethod) {
+        sessionStorage.setItem('checkout_savePaymentMethod', 'true');
+        sessionStorage.setItem('checkout_tenantId', tenantId);
+        sessionStorage.setItem('checkout_gatewayType', 'stripe');
+      }
+
       // Payment intent already created on mount - just confirm the payment
       const { error: submitError } = await stripe.confirmPayment({
         elements,

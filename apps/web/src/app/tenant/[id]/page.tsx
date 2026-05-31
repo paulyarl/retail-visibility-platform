@@ -37,6 +37,9 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
+import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
+import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 
@@ -412,7 +415,31 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch storefront option flags:', e);
     }
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags };
+    // Fetch commerce settings (merchant gate) — server-side to eliminate client waterfall
+    let commerceSettings: CommerceSettings | null = null;
+    try {
+      commerceSettings = await publicCommerceSettingsService.getCommerceSettings(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch commerce settings:', e);
+    }
+
+    // Fetch payment gateway settings (merchant gate) — server-side to eliminate client waterfall
+    let paymentGatewaySettings: PaymentGatewaySettings | null = null;
+    try {
+      paymentGatewaySettings = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch payment gateway settings:', e);
+    }
+
+    // Fetch storefront type settings (merchant gate) — server-side to eliminate client waterfall
+    let storefrontTypeSettings: StorefrontTypeResponse | null = null;
+    try {
+      storefrontTypeSettings = await publicStorefrontTypeService.getStorefrontTypeSettings(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch storefront type settings:', e);
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -482,7 +509,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {
@@ -619,7 +646,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
 
   return (
     <ProductSingletonProvider>
-      <TenantPaymentProvider tenantId={resolvedTenantId || tenant.id || id}>
+      <TenantPaymentProvider
+        tenantId={resolvedTenantId || tenant.id || id}
+        initialCommerceSettings={commerceSettings}
+        initialPaymentGatewaySettings={paymentGatewaySettings}
+      >
         <StorefrontClientWrapper
           tenantId={resolvedTenantId || tenant.id || id}
           tenant={tenant}
@@ -653,6 +684,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
           locationStatus={tenant?.locationStatus}
           statusInfo={tenant?.statusInfo}
           initialStorefrontOptionFlags={storefrontOptionFlags}
+          initialCommerceSettings={commerceSettings}
+          initialPaymentGatewaySettings={paymentGatewaySettings}
+          initialStorefrontTypeSettings={storefrontTypeSettings}
         />
       </TenantPaymentProvider>
     </ProductSingletonProvider>

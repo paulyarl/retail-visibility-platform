@@ -107,9 +107,11 @@ interface FeaturesShowcaseProps {
   className?: string;
 }
 
-export default function FeaturesShowcase({ mode = 'hybrid', className = '' }: FeaturesShowcaseProps) {
+export default function FeaturesShowcase({ mode = 'grid', className = '' }: FeaturesShowcaseProps) {
   const [activeMode, setActiveMode] = useState<ShowcaseMode>(mode);
   const prefersReducedMotion = useReducedMotion();
+
+  // console.log(`activeMode:  ${activeMode}`);
 
   useEffect(() => {
     // Handle random mode - pick a random showcase on mount

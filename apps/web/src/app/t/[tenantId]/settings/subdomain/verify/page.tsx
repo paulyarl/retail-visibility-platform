@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, API_BASE_URL } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import {
   CheckCircle,
@@ -67,10 +67,9 @@ export default function SubdomainVerificationPage() {
       setError(null);
 
       // Get tenant subdomain status
-      const tenantRes = await api.get(`/api/tenants/${tenantId}`);
-      if (!tenantRes.ok) throw new Error('Failed to load tenant data');
+      const tenant = await tenantInfoService.getTenantInfo(tenantId);
+      if (!tenant) throw new Error('Failed to load tenant data');
 
-      const tenant = await tenantRes.json();
       const subdomain = tenant.subdomain || null;
       const hasSubdomain = !!(subdomain && subdomain.trim().length > 0);
 
@@ -86,12 +85,8 @@ export default function SubdomainVerificationPage() {
       }
 
       // Get sample products for testing
-      const productsRes = await api.get(`/api/items?tenantId=${tenantId}&limit=3`);
-      let sampleProducts: Product[] = [];
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        sampleProducts = (productsData.items || productsData.data || []).slice(0, 3);
-      }
+      const itemsData = await tenantInfoService.getItems(tenantId, 3);
+      let sampleProducts: Product[] = (itemsData || []).slice(0, 3);
 
       // Check if subdomain is live (this is a basic check - in production you might want more sophisticated verification)
       const isLive = hasSubdomain && platformDomain !== 'localhost'; // For localhost, we'd need special handling

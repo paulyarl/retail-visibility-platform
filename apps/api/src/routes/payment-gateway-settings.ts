@@ -183,4 +183,40 @@ router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
   }
 });
 
+// Public endpoint - Get payment gateway settings for storefront/checkout
+router.get('/public/tenant/:tenantId/payment-gateway-settings', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const settings = await prisma.tenant_payment_gateway_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    if (!settings) {
+      return res.json({
+        success: true,
+        settings: DEFAULT_SETTINGS,
+      });
+    }
+
+    res.json({
+      success: true,
+      settings: {
+        gateway_enabled: settings.gateway_enabled,
+        stripe_enabled: settings.stripe_enabled,
+        paypal_enabled: settings.paypal_enabled,
+        square_enabled: settings.square_enabled,
+        clover_enabled: settings.clover_enabled,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching public payment gateway settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch payment gateway settings',
+    });
+  }
+});
+
 export default router;

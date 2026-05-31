@@ -189,4 +189,80 @@ router.get('/:tenantId/storefront-type/capability', authenticateToken, async (re
   }
 });
 
+// Public endpoint - Get storefront type settings for storefront display
+router.get('/public/tenant/:tenantId/storefront-type', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Resolve tier capabilities for tier-gate-aware merchant gate
+    const storefrontService = StorefrontTypeService.getInstance();
+    const tierState = await storefrontService.resolveStorefrontTypeState(tenantId);
+
+    // Hard gate: if storefront is disabled at tier level, return disabled settings
+    if (!tierState.enabled) {
+      return res.json({
+        success: true,
+        settings: {
+          storefront_type_enabled: false,
+          selected_storefront_type: null,
+        },
+        tierState,
+      });
+    }
+
+    // Fetch merchant preferences from DB
+    const merchantPrefs = await prisma.tenant_storefront_type_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    const rawSettings = merchantPrefs || DEFAULT_SETTINGS;
+
+    // Enforce tier gates on merchant preferences
+    const storefrontTypeEnabled = tierState.enabled && rawSettings.storefront_type_enabled;
+    let selectedStorefrontType = rawSettings.selected_storefront_type;
+
+    // Validate selected_storefront_type against tier allowed types
+    if (selectedStorefrontType && !tierState.allowedTypes.includes(selectedStorefrontType as StorefrontType)) {
+      selectedStorefrontType = tierState.type === 'both' ? null : (tierState.type !== 'none' ? tierState.type : null);
+    }
+
+    res.json({
+      success: true,
+      settings: {
+        storefront_type_enabled: storefrontTypeEnabled,
+        selected_storefront_type: selectedStorefrontType,
+      },
+      tierState,
+    });
+  } catch (error) {
+    console.error('Error fetching public storefront type settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch storefront type settings',
+    });
+  }
+});
+
+// Public endpoint - Get storefront type capability state for storefront display
+router.get('/public/tenant/:tenantId/storefront-type/capability', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const storefrontService = StorefrontTypeService.getInstance();
+    const state = await storefrontService.resolveStorefrontTypeState(tenantId);
+
+    res.json({
+      success: true,
+      capability: state,
+    });
+  } catch (error) {
+    console.error('Error resolving public storefront type capability:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve storefront type capability',
+    });
+  }
+});
+
 export default router;

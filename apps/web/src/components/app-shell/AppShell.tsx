@@ -9,10 +9,10 @@ import { useSessionRestore } from "./hooks/useSessionRestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import Link from "next/link";
-import { Button } from "@/components/ui";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 import { GlobalAlertBar } from "@/components/ui/GlobalAlertProvider";
-import ShellWithTicker from "@/components/layout/ShellWithTicker"; 
+import ShellWithTicker from "@/components/layout/ShellWithTicker";
+import { Button } from "@mantine/core";
 
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -20,7 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [tenantName, setTenantName] = useState<string | null>(null);
-  
+
   // Get current tenant ID from localStorage
   const [tenantId, setTenantId] = useState<string | null>(null);
   useEffect(() => {
@@ -28,9 +28,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       setTenantId(localStorage.getItem('tenantId'));
     }
   }, [user]);
-  
+
   // Use extracted hooks for navigation and session restore
-  const { links, tenantScopedLinksOn, hydrated } = useAppNavigation({ 
+  const { links, tenantScopedLinksOn, hydrated } = useAppNavigation({
     tenantId
   });
   const restoreToast = useSessionRestore(tenantName);
@@ -45,7 +45,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 
   // Don't render children if not authenticated
- 
+
 
   return (
     <ShellWithTicker shellHeader={
@@ -58,9 +58,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {/* Logo */}
               {settings?.logoUrl && (
                 <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
-                  <img 
-                    src={settings.logoUrl} 
-                    alt={settings.platformName || 'Platform Logo'} 
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.platformName || 'Platform Logo'}
                     className="h-8 w-auto object-contain"
                     loading="lazy"
                     decoding="async"
@@ -90,14 +90,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 />
               )}
             </div>
-          
+
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-2 lg:gap-3">
               {hydrated && user ? (
                 <>
                   <Link href="/settings/account">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant='gradient' style={{ color: 'yellow' }}
                       size="sm"
                       className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                     >
@@ -108,11 +108,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </Link>
                   <Button
-                    variant='gradient' style={{color: 'white'}}
+                    variant='gradient' style={{ color: 'white' }}
                     size="sm"
                     className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
                     onClick={async () => {
-                      try { await logout(); } catch {}
+                      try { await logout(); } catch { }
                       if (typeof window !== 'undefined') window.location.href = '/';
                     }}
                   >
@@ -124,8 +124,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </>
               ) : (
                 <Link href="/auth/login">
-                  <Button 
-                    variant='gradient' style={{color: 'white'}}
+                  <Button
+                    variant='gradient' style={{ color: 'white' }}
                     size="sm"
                     className="bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
                   >
@@ -170,7 +170,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
                 {/* Mobile Navigation */}
                 {hydrated && (
-                  <NavLinks 
+                  <NavLinks
                     links={links}
                     tenantScopedLinksOn={tenantScopedLinksOn}
                     className="space-y-1"
@@ -184,9 +184,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {hydrated && user ? (
                     <>
                       <Link href="/settings/account" className="block" onClick={() => setMobileMenuOpen(false)}>
-                        <Button 
-                          variant='gradient' style={{color: 'white'}}
-                          className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" 
+                        <Button
+                          variant='gradient' style={{ color: 'yellow' }}
+                          className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                           size="md"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -196,12 +196,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         </Button>
                       </Link>
                       <Button
-                        variant='gradient' style={{color: 'white'}}
+                        variant='gradient' style={{ color: 'white' }}
                         className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                         size="md"
                         onClick={async () => {
                           setMobileMenuOpen(false);
-                          try { await logout(); } catch {}
+                          try { await logout(); } catch { }
                           if (typeof window !== 'undefined') window.location.href = '/';
                         }}
                       >
@@ -213,9 +213,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </>
                   ) : (
                     <Link href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                      <Button 
-                        variant='gradient' style={{color: 'white'}}
-                        className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2" 
+                      <Button
+                        variant='gradient' style={{ color: 'white' }}
+                        className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                         size="md"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

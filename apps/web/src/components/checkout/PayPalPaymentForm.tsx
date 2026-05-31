@@ -34,7 +34,7 @@ interface PayPalPaymentFormProps {
     unitPrice: number;
     tenantId: string;
   }>;
-  onSuccess: (orderNumber: string, gatewayTransactionId?: string) => void;
+  onSuccess: (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
   onBack: () => void;
 }
 
@@ -112,8 +112,11 @@ function PayPalPaymentFormContent({
         throw new Error('Payment capture failed');
       }
 
-      // Pass both order number and PayPal transaction ID
-      onSuccess(orderNumber, response.capture?.id || data.orderID);
+      // Pass order number, PayPal transaction ID, and token for saving
+      const transactionId = response.capture?.id || data.orderID;
+      onSuccess(orderNumber, transactionId, {
+        token: transactionId,
+      });
     } catch (error) {
       console.error('PayPal capture error:', error);
       setError('Payment processing failed. Please try again.');

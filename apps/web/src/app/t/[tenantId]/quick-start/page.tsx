@@ -8,7 +8,7 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Button } from '@mantine/core';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // Add slider thumb styling
 const sliderStyles = `
@@ -132,27 +132,11 @@ export default function QuickStartPage() {
 
   const checkEligibility = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      //const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
-      const res = await api.get(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start/eligibility`, {
-        headers,
-        credentials: 'include',
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.message || 'Unable to check eligibility');
+      const data = await tenantInfoService.getQuickStartEligibility(tenantId);
+      if (!data) {
+        setError('Unable to check eligibility');
         return;
       }
-      
-      const data = await res.json();
       setEligibility(data);
     } catch (err: any) {
       console.error('Failed to check eligibility:', err);
@@ -165,44 +149,25 @@ export default function QuickStartPage() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      //const res = await fetch(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
-      const res = await api.post(`${apiUrl}/api/v1/tenants/${tenantId}/quick-start`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          scenario: selectedScenario,
-          productCount,
-          assignCategories: true,
-          createAsDrafts: true,
-          generateImages,
-          imageQuality,
-          textModel,
-          imageModel,
-        }),
+      const data = await tenantInfoService.generateQuickStartProducts(tenantId, {
+        scenario: selectedScenario,
+        productCount,
+        assignCategories: true,
+        createAsDrafts: true,
+        generateImages,
+        imageQuality,
+        textModel,
+        imageModel,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to generate products');
+      if (!data) {
+        throw new Error('Failed to generate products');
       }
 
       setResult(data);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to generate products');
     } finally {
       setLoading(false);
     }

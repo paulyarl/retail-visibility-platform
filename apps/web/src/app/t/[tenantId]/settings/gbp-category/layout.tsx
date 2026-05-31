@@ -10,7 +10,7 @@
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 
 
@@ -25,10 +25,8 @@ export default function GBPCategoryLayout({ children }: { children: React.ReactN
     // Fetch tenant tier
     const fetchTier = async () => {
       try {
-        const res = await api.get(`/api/tenants/${tenantId}`);
-        
-        if (res.ok) {
-          const data = await res.json();
+        const data = await tenantInfoService.getTenantInfo(tenantId);
+        if (data) {
           // API may return snake_case or camelCase depending on endpoint
           setTier(data.subscriptionTier || data.subscription_tier || 'trial');
         }

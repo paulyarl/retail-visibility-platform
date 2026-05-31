@@ -156,7 +156,8 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
       const type = FEATURE_KEY_TO_TYPE[key];
       if (type && tierState.allowedTypes.includes(type)) {
         filteredData[key] = value;
-      } else if (type && !tierState.allowedTypes.includes(type)) {
+      } else if (type && !tierState.allowedTypes.includes(type) && value === true) {
+        // Only reject if user is trying to enable a disallowed type
         return res.status(403).json({
           success: false,
           error: 'tier_restricted',
@@ -164,6 +165,7 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
           feature_key: key,
         });
       }
+      // If value is false, silently skip (disabled UI control may send false)
     }
 
     // Check if settings exist
@@ -215,6 +217,68 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
       success: false,
       error: 'internal_error',
       message: 'Failed to update featured options settings',
+    });
+  }
+});
+
+// Public endpoint - Get featured options settings for storefront
+router.get('/public/tenant/:tenantId/featured-options', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Resolve tier capabilities for tier-gate-aware merchant gate
+    const featuredService = FeaturedOptionsService.getInstance();
+    const tierState = await featuredService.resolveFeaturedOptionsState(tenantId);
+
+    // Hard gate: if featured is disabled at tier level, return all-false
+    if (!tierState.enabled) {
+      return res.json({
+        success: true,
+        settings: {
+          featured_enabled: false,
+          featured_store_selection: false,
+          featured_new_arrival: false,
+          featured_seasonal: false,
+          featured_sale: false,
+          featured_staff_pick: false,
+          featured_clearance: false,
+          featured_featured: false,
+          featured_bestseller: false,
+          featured_trending: false,
+          featured_recommended: false,
+          featured_random_featured: false,
+        },
+        tierState,
+      });
+    }
+
+    // Fetch merchant preferences from DB
+    const merchantPrefs = await prisma.tenant_featured_options_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    const rawSettings = merchantPrefs || DEFAULT_SETTINGS;
+
+    // Enforce tier gates: force off any feature not in tier's allowedTypes
+    const tierFilteredSettings: Record<string, boolean> = {
+      featured_enabled: !!rawSettings.featured_enabled && tierState.enabled,
+    };
+    for (const [key, type] of Object.entries(FEATURE_KEY_TO_TYPE)) {
+      const isAllowed = tierState.allowedTypes.includes(type);
+      tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
+    }
+
+    res.json({
+      success: true,
+      settings: tierFilteredSettings,
+      tierState,
+    });
+  } catch (error) {
+    console.error('Error fetching public featured options settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch featured options settings',
     });
   }
 });

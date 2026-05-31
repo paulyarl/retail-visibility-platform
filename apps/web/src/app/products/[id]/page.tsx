@@ -557,6 +557,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 url={currentUrl}
                 tenantId={product.tenantId}
                 label="Scan to Share"
+                capabilityFlags={optFlags}
+                pageType="product"
               />
             </div>
 
@@ -577,6 +579,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 url={currentUrl}
                 tenantId={product.tenantId}
                 label="Scan to Share"
+                capabilityFlags={optFlags}
+                pageType="product"
               />
             </div>
 

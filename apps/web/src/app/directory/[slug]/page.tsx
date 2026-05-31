@@ -823,6 +823,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     showDownload={true}
                     className="mt-4"
                     pageType="directory"
+                    capabilityFlags={optFlags}
                   />
                 </div>
               )}
