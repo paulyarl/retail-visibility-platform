@@ -383,10 +383,8 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                   <Settings className="w-5 h-5 text-purple-600" />
                   <h3 className="font-semibold text-gray-900">Capabilities for You</h3>
                 </div>
-                {tier && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                    <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
-                  </div>
+                {tier && (                
+                  <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />            
                 )}
               </div>
             </motion.div>
