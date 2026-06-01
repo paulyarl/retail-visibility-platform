@@ -29,6 +29,23 @@ import {
 const router = Router();
 
 /**
+ * Fetch current platform fee percentage from admin settings
+ */
+async function getPlatformFeePercentage(): Promise<number> {
+  try {
+    const { basePrisma } = await import('../prisma');
+    const config = await basePrisma.platform_payment_config.findUnique({
+      where: { id: 'platform_main' },
+      select: { default_platform_fee_percent: true },
+    });
+    return config?.default_platform_fee_percent ?? 3.0;
+  } catch (error) {
+    console.warn('[Checkout] Failed to fetch platform fee, using default:', error);
+    return 3.0;
+  }
+}
+
+/**
  * POST /api/checkout/orders
  * Create a new order without authentication (guest checkout)
  */
@@ -430,14 +447,21 @@ router.post('/orders', async (req: Request, res: Response) => {
     });
     const totals = calculateOrderTotals(line_items);
 
-    // Calculate deposit based on commerce capabilities
+    // Fetch dynamic platform fee and include in order total (only if non-zero)
+    const platformFeePercentage = await getPlatformFeePercentage();
+    const platformFeeCents = platformFeePercentage > 0
+      ? Math.round(totals.subtotal_cents * (platformFeePercentage / 100))
+      : 0;
+    const orderTotalCents = totals.total_cents + platformFeeCents;
+
+    // Calculate deposit based on commerce capabilities (using total including platform fee)
     let depositCalculation = null;
-    let paymentAmount = totals.total_cents; // Default to full payment
+    let paymentAmount = orderTotalCents; // Default to full payment
     
     if (checkoutCapabilities.mode === 'deposit_only' || 
         (checkoutCapabilities.mode === 'flexible' && checkout_mode === 'deposit')) {
-      const depositPercentage = getDepositPercentageForOrder(commerceCapabilities, totals.total_cents);
-      depositCalculation = calculateDeposit(totals.total_cents, depositPercentage);
+      const depositPercentage = getDepositPercentageForOrder(commerceCapabilities, orderTotalCents);
+      depositCalculation = calculateDeposit(orderTotalCents, depositPercentage);
       paymentAmount = depositCalculation.depositCents;
       
       // console.log('[Checkout] Tier 3 deposit calculation:', {
@@ -483,15 +507,16 @@ router.post('/orders', async (req: Request, res: Response) => {
           ...(fulfillment_method ? { fulfillment_method } : {}),
           ...(pickup_tenant_id ? { pickup_tenant_id, is_multi_location_order: true } : {}),
           ...(paymentTenantId !== tenant_id ? { payment_tenant_id: paymentTenantId, is_hero_payment: true } : {}),
+          ...(platformFeeCents > 0 ? { platform_fee_cents: platformFeeCents, platform_fee_percentage: platformFeePercentage } : {}),
         },
         updated_at: new Date(),
         // Order totals
         subtotal_cents: totals.subtotal_cents,
         tax_cents: totals.tax_cents,
         shipping_cents: totals.shipping_cents,
-        total_cents: totals.total_cents,
+        total_cents: orderTotalCents,
         // Tier 3 deposit fields
-        checkout_mode: checkoutCapabilities.mode,
+        checkout_mode: checkout_mode || checkoutCapabilities.mode,
         deposit_percentage: depositCalculation?.depositPercentage || null,
         deposit_cents: depositCalculation?.depositCents || 0,
         remaining_balance_cents: depositCalculation?.remainingBalanceCents || 0,
@@ -575,7 +600,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         created_at: order.created_at,
         order_items: (order as any).order_items,
         // Include deposit info for frontend
-        checkout_mode: checkoutCapabilities.mode,
+        checkout_mode: order.checkout_mode,
         deposit_cents: order.deposit_cents,
         remaining_balance_cents: order.remaining_balance_cents,
         pickup_deadline: order.pickup_deadline,

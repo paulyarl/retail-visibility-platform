@@ -50,18 +50,20 @@ interface OrderReceiptProps {
     remainingBalanceCents?: number;
     pickupDeadline?: string | null;
     depositForfeitedAt?: string | null;
+    depositPercentage?: number | null;
     // Cancellation fields
     cancellationReason?: string;
     cancelledAt?: string | null;
     // Payment gateway
     gatewayType?: string;
   };
+  platformFeePercentage?: number;
   onPrint?: () => void;
   className?: string;
   actions?: React.ReactNode;
 }
 
-export default function OrderReceipt({ cart, onPrint, className = "", actions }: OrderReceiptProps) {
+export default function OrderReceipt({ cart, platformFeePercentage = 3.0, onPrint, className = "", actions }: OrderReceiptProps) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -98,7 +100,7 @@ export default function OrderReceipt({ cart, onPrint, className = "", actions }:
   };
 
   // Calculate fees (same as checkout)
-  const platformFee = Math.round(cart.subtotal * 0.03); // 3% platform fee
+  const platformFee = Math.round(cart.subtotal * (platformFeePercentage / 100));
   const fulfillmentFee = cart.fulfillmentFee || 0;
   const total = cart.subtotal + platformFee + fulfillmentFee;
   
@@ -107,6 +109,7 @@ export default function OrderReceipt({ cart, onPrint, className = "", actions }:
   const isDepositForfeited = isDepositOrder && cart.depositForfeitedAt;
   const depositAmount = cart.depositCents || 0;
   const remainingBalance = cart.remainingBalanceCents || (total - depositAmount);
+  const depositPercentageDisplay = cart.depositPercentage ?? (depositAmount > 0 && cart.subtotal > 0 ? Math.round((depositAmount / cart.subtotal) * 100) : null);
   
   const getFulfillmentLabel = () => {
     if (!cart.fulfillmentMethod) return 'Fulfillment';
@@ -307,8 +310,7 @@ ${cart.items.map(item => {
 ORDER SUMMARY
 ───────────────────────────────────────────────────────────
 Subtotal: ${formatCurrency(cart.subtotal)}
-Platform Fee (3%): ${formatCurrency(platformFee)}
-${getFulfillmentLabel()}: ${formatCurrency(fulfillmentFee)}
+${platformFee > 0 ? `Platform Fee (${platformFeePercentage}%): ${formatCurrency(platformFee)}\n` : ''}${getFulfillmentLabel()}: ${formatCurrency(fulfillmentFee)}
 ───────────────────────────────────────────────────────────
 TOTAL: ${formatCurrency(total)}
 
@@ -822,10 +824,12 @@ Generated on ${new Date().toLocaleString()}
                 <span className="text-gray-600">Subtotal</span>
                 <span>{formatCurrency(cart.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Platform Fee (3%)</span>
-                <span>{formatCurrency(platformFee)}</span>
-              </div>
+              {platformFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Platform Fee ({platformFeePercentage}%)</span>
+                  <span>{formatCurrency(platformFee)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{getFulfillmentLabel()}</span>
                 <span className={fulfillmentFee === 0 ? 'text-green-600 font-semibold' : ''}>
@@ -850,7 +854,7 @@ Generated on ${new Date().toLocaleString()}
                     // Picked up - show what was paid
                     <>
                       <div className="flex justify-between text-sm pt-3 mt-3 border-t border-gray-200 bg-green-50 -mx-4 px-4 py-2 rounded">
-                        <span className="text-green-800 font-medium">Deposit Paid (10%)</span>
+                        <span className="text-green-800 font-medium">Deposit Paid {depositPercentageDisplay !== null ? `(${depositPercentageDisplay}%)` : ''}</span>
                         <span className="text-green-800 font-semibold">{formatCurrency(depositAmount)}</span>
                       </div>
                       <div className="flex justify-between text-sm bg-green-50 -mx-4 px-4 py-2 rounded-b">
@@ -862,7 +866,7 @@ Generated on ${new Date().toLocaleString()}
                     // Pending pickup
                     <>
                       <div className="flex justify-between text-sm pt-3 mt-3 border-t border-gray-200 bg-amber-50 -mx-4 px-4 py-2 rounded">
-                        <span className="text-amber-800 font-medium">Deposit Paid (10%)</span>
+                        <span className="text-amber-800 font-medium">Deposit Paid {depositPercentageDisplay !== null ? `(${depositPercentageDisplay}%)` : ''}</span>
                         <span className="text-amber-800 font-semibold">{formatCurrency(depositAmount)}</span>
                       </div>
                       <div className="flex justify-between text-sm bg-amber-50 -mx-4 px-4 py-2">

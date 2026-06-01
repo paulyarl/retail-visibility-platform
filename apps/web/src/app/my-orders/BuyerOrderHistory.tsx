@@ -68,6 +68,7 @@ interface BuyerOrder {
   remainingBalanceCents?: number;
   pickupDeadline?: string | null;
   depositForfeitedAt?: string | null;
+  depositPercentage?: number | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -849,6 +850,7 @@ export default function BuyerOrderHistory() {
               remainingBalanceCents: (selectedOrder as any).remainingBalanceCents || undefined,
               pickupDeadline: (selectedOrder as any).pickupDeadline || undefined,
               depositForfeitedAt: (selectedOrder as any).depositForfeitedAt || undefined,
+              depositPercentage: (selectedOrder as any).depositPercentage || undefined,
               // Cancellation fields
               cancellationReason: (selectedOrder as any).cancellationReason || undefined,
               cancelledAt: (selectedOrder as any).cancelledAt || undefined,

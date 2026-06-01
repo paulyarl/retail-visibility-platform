@@ -19,6 +19,7 @@ interface PlatformPaymentSettings {
     currency: string;
     displayAmount: string; // formatted for display
   };
+  platformFeePercentage: number;
 }
 
 export default function PaymentSettingsPage() {
@@ -41,13 +42,15 @@ export default function PaymentSettingsPage() {
       amount: 200, // $2.00 in cents
       currency: 'USD',
       displayAmount: '$2.00',
-    }
+    },
+    platformFeePercentage: 3.0,
   });
 
   useEffect(() => {
     if (platformSettings?.minimumPaymentAmount) {
       setPaymentSettings({
-        minimumPaymentAmount: platformSettings.minimumPaymentAmount
+        minimumPaymentAmount: platformSettings.minimumPaymentAmount,
+        platformFeePercentage: platformSettings.platformFeePercentage ?? 3.0,
       });
     }
   }, [platformSettings]);
@@ -56,6 +59,7 @@ export default function PaymentSettingsPage() {
     const amountInCents = Math.round(parseFloat(value) * 100);
     if (!isNaN(amountInCents) && amountInCents >= 0) {
       setPaymentSettings(prev => ({
+        ...prev,
         minimumPaymentAmount: {
           ...prev.minimumPaymentAmount,
           amount: amountInCents,
@@ -68,6 +72,16 @@ export default function PaymentSettingsPage() {
     }
   };
 
+  const handleFeePercentageChange = (value: string) => {
+    const percentage = parseFloat(value);
+    if (!isNaN(percentage) && percentage >= 0 && percentage <= 100) {
+      setPaymentSettings(prev => ({
+        ...prev,
+        platformFeePercentage: percentage,
+      }));
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
@@ -75,7 +89,8 @@ export default function PaymentSettingsPage() {
 
     try {
       const result = await adminSettingsService.updatePaymentSettings({
-        minimumPaymentAmount: paymentSettings.minimumPaymentAmount
+        minimumPaymentAmount: paymentSettings.minimumPaymentAmount,
+        platformFeePercentage: paymentSettings.platformFeePercentage,
       });
 
       if (!result) {
@@ -153,6 +168,30 @@ export default function PaymentSettingsPage() {
               <p className="mt-1 text-sm text-gray-600">
                 This is the minimum amount required for all credit card payments across the platform.
                 Current setting: {paymentSettings.minimumPaymentAmount.displayAmount}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="platformFeePercentage" className="text-sm font-medium text-gray-700">
+                Platform Fee Percentage
+              </Label>
+              <div className="mt-1 flex items-center gap-2">
+                <Input
+                  id="platformFeePercentage"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={paymentSettings.platformFeePercentage}
+                  onChange={(e) => handleFeePercentageChange(e.target.value)}
+                  className="w-32"
+                  placeholder="3.0"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+              <p className="mt-1 text-sm text-gray-600">
+                Percentage charged as a platform fee on every transaction.
+                Current setting: {paymentSettings.platformFeePercentage}%
               </p>
             </div>
 

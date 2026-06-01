@@ -67,6 +67,13 @@ export interface CustomerOrder {
     lastName: string;
   };
   cancellationReason?: string;
+  // Deposit order fields
+  checkoutMode?: 'deposit' | 'full_payment';
+  depositCents?: number;
+  remainingBalanceCents?: number;
+  pickupDeadline?: string | null;
+  depositForfeitedAt?: string | null;
+  depositPercentage?: number | null;
 }
 
 export interface CustomerOrderItem {
@@ -494,6 +501,7 @@ class CustomerOrderService extends CustomerApiSingleton {
     fulfillmentMethod: string;
     shippingAddress?: any;
     paymentMethod: string;
+    checkoutMode?: 'deposit' | 'full_payment';
   }): Promise<any> {
     try {
       // Map frontend format to API expected format
@@ -518,6 +526,7 @@ class CustomerOrderService extends CustomerApiSingleton {
         fulfillment_method: orderData.fulfillmentMethod,
         shipping_address: orderData.shippingAddress,
         payment_method: orderData.paymentMethod,
+        checkout_mode: orderData.checkoutMode,
         customer_id: customer?.id || undefined,
       };
 

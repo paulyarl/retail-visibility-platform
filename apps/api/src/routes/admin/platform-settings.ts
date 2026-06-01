@@ -29,6 +29,7 @@ const paymentSettingsSchema = z.object({
     currency: z.string(),
     displayAmount: z.string(),
   }),
+  platformFeePercentage: z.number().min(0).max(100).optional(),
 });
 
 // GET / - Get admin platform settings (router mounted at /api/admin/platform-settings)
@@ -170,6 +171,12 @@ router.get('/payment', async (req: Request, res: Response) => {
 
     const settings = paymentSettings[0];
 
+    // Get platform fee percentage from platform_payment_config
+    const platformConfig = await basePrisma.platform_payment_config.findUnique({
+      where: { id: 'platform_main' },
+      select: { default_platform_fee_percent: true },
+    });
+
     if (!settings || !settings.minimum_payment_amount) {
       // Return default settings if none exist
       return res.json({
@@ -177,7 +184,8 @@ router.get('/payment', async (req: Request, res: Response) => {
           amount: 200, // $2.00 in cents
           currency: 'USD',
           displayAmount: '$2.00',
-        }
+        },
+        platformFeePercentage: platformConfig?.default_platform_fee_percent ?? 3.0,
       });
     }
 
@@ -186,7 +194,8 @@ router.get('/payment', async (req: Request, res: Response) => {
         amount: settings.minimum_payment_amount,
         currency: settings.minimum_payment_currency,
         displayAmount: settings.minimum_payment_display,
-      }
+      },
+      platformFeePercentage: platformConfig?.default_platform_fee_percent ?? 3.0,
     });
   } catch (error) {
     console.error('[GET /api/admin/platform-settings/payment] Error:', error);
@@ -205,7 +214,7 @@ router.put('/payment', async (req: Request, res: Response) => {
       });
     }
 
-    const { minimumPaymentAmount } = parsed.data;
+    const { minimumPaymentAmount, platformFeePercentage } = parsed.data;
 
     // Update payment settings in platform_settings table
     await basePrisma.$executeRaw`
@@ -218,9 +227,23 @@ router.put('/payment', async (req: Request, res: Response) => {
       WHERE id = 1
     `;
 
+    // Update platform fee percentage in platform_payment_config
+    if (platformFeePercentage !== undefined) {
+      await basePrisma.platform_payment_config.upsert({
+        where: { id: 'platform_main' },
+        update: { default_platform_fee_percent: platformFeePercentage },
+        create: {
+          id: 'platform_main',
+          default_platform_fee_percent: platformFeePercentage,
+          is_active: false,
+        },
+      });
+    }
+
     // Return updated settings
     res.json({
       minimumPaymentAmount,
+      platformFeePercentage,
       updatedAt: new Date().toISOString(),
       updatedBy: req.user?.email || 'admin',
     });

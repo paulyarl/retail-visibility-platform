@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
@@ -18,10 +18,12 @@ import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
-import { CustomerAuthProvider, useCustomerAuth } from '@/contexts/CustomerAuthContext';
+import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { customerAuthService } from '@/services/CustomerAuthService';
+import { publicCommerceSettingsService } from '@/services/PublicCommerceSettingsService';
+import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -78,6 +80,12 @@ function CheckoutPageContent() {
     remainingBalanceCents: number;
     pickupDeadline: Date;
   } | null>(null);
+  // Actual deposit config from backend commerce settings (tenant → org → platform default)
+  const [commerceSettings, setCommerceSettings] = useState<{
+    deposit_percentage: number;
+    deposit_min_cents: number;
+    deposit_max_cents: number;
+  } | null>(null);
   // Tenant contact info for disabled checkout
   const [tenantContact, setTenantContact] = useState<{
     business_name: string;
@@ -97,6 +105,8 @@ function CheckoutPageContent() {
   const [tenantDisplayLogo, setTenantDisplayLogo] = useState<string | null>(null);
   // Square config for tenant-specific credentials
   const [squareConfig, setSquareConfig] = useState<{ applicationId: string; locationId: string } | null>(null);
+  // Dynamic platform fee percentage from admin settings
+  const [platformFeePercentage, setPlatformFeePercentage] = useState<number>(3.0);
 
   // Get the cart for this tenant (gateway selected at checkout)
   const cart = tenantId ? getCart(tenantId) : null;
@@ -373,14 +383,67 @@ function CheckoutPageContent() {
     }
   }, [tenantId, gatewayType, cart, router, isInitialized]);
 
-  const platformFee = Math.round(subtotal * 0.03); // 3% platform fee
+  const platformFee = platformFeePercentage > 0
+    ? Math.round(subtotal * (platformFeePercentage / 100))
+    : 0;
   const total = subtotal + platformFee + fulfillmentFee;
 
-  // Calculate deposit for Tier 3 commitment
+  // Fetch dynamic platform fee percentage
+  useEffect(() => {
+    const fetchPlatformFee = async () => {
+      try {
+        const percentage = await publicPlatformFeeService.getPlatformFeePercentage();
+        setPlatformFeePercentage(percentage);
+      } catch (error) {
+        console.warn('[Checkout] Failed to fetch platform fee, using default:', error);
+      }
+    };
+
+    fetchPlatformFee();
+  }, []);
+
+  // Fetch actual deposit configuration from backend commerce settings
+  useEffect(() => {
+    const fetchCommerceSettings = async () => {
+      if (!tenantId) return;
+      try {
+        const settings = await publicCommerceSettingsService.getCommerceSettings(tenantId);
+        if (settings) {
+          setCommerceSettings({
+            deposit_percentage: settings.deposit_percentage ?? 15,
+            deposit_min_cents: settings.deposit_min_cents ?? 500,
+            deposit_max_cents: settings.deposit_max_cents ?? 5000,
+          });
+        }
+      } catch (error) {
+        console.warn('[Checkout] Failed to fetch commerce settings, using defaults:', error);
+      }
+    };
+
+    fetchCommerceSettings();
+  }, [tenantId]);
+
+  // Calculate deposit for Tier 3 commitment — matches backend logic exactly
   useEffect(() => {
     if (checkoutMode === 'deposit' && total > 0) {
-      const depositPercentage = 10; // Default 10% deposit
-      const depositCents = Math.round(total * (depositPercentage / 100));
+      // Backend calculates deposit on total (including fees), using tenant's configured percentage
+      const percentage = commerceSettings?.deposit_percentage ?? 15;
+      const minDeposit = commerceSettings?.deposit_min_cents ?? 500;
+      const maxDeposit = commerceSettings?.deposit_max_cents ?? 5000;
+
+      // Calculate deposit amount (same formula as backend)
+      let depositCents = Math.round(total * (percentage / 100));
+      let depositPercentage = percentage;
+
+      // Apply min/max constraints (same as backend getDepositPercentageForOrder)
+      if (depositCents < minDeposit) {
+        depositPercentage = Math.round((minDeposit / total) * 100);
+        depositCents = Math.round(total * (depositPercentage / 100));
+      } else if (depositCents > maxDeposit) {
+        depositPercentage = Math.round((maxDeposit / total) * 100);
+        depositCents = Math.round(total * (depositPercentage / 100));
+      }
+
       const remainingBalanceCents = total - depositCents;
       const pickupDeadline = new Date();
       pickupDeadline.setHours(pickupDeadline.getHours() + 48); // 48 hours
@@ -397,14 +460,16 @@ function CheckoutPageContent() {
       //   depositPercentage,
       //   depositCents,
       //   remainingBalanceCents,
+      //   minDeposit,
+      //   maxDeposit,
       // });
     } else {
       setDepositInfo(null);
     }
-  }, [checkoutMode, total]);
+  }, [checkoutMode, total, commerceSettings]);
 
   // Map cart items to payment form format
-  const mappedCartItems = cartItems.map(item => ({
+  const mappedCartItems = useMemo(() => cartItems.map(item => ({
     id: item.product_id,
     name: item.product_name,
     sku: item.product_sku || '',
@@ -414,7 +479,7 @@ function CheckoutPageContent() {
     imageUrl: item.product_image,
     inventoryItemId: item.product_id,
     tenantId: tenantId || ''
-  }));
+  })), [cartItems, tenantId]);
 
   if (!tenantId || !cart) {
     return (
@@ -852,6 +917,7 @@ function CheckoutPageContent() {
                             onSuccess={handlePaymentSuccess}
                             onBack={() => setCurrentStep('shipping')}
                             squareConfig={squareConfig}
+                            checkoutMode={checkoutMode}
                           />
                         ) : paymentMethod === 'stripe' ? (
                           <StripePaymentForm
@@ -864,6 +930,7 @@ function CheckoutPageContent() {
                             onBack={() => setCurrentStep('shipping')}
                             tenantId={tenantId || ''}
                             savePaymentMethod={savePaymentMethod}
+                            checkoutMode={checkoutMode}
                           />
                         ) : (
                           <PayPalPaymentForm
@@ -874,6 +941,7 @@ function CheckoutPageContent() {
                             cartItems={mappedCartItems}
                             onSuccess={handlePaymentSuccess}
                             onBack={() => setCurrentStep('shipping')}
+                            checkoutMode={checkoutMode}
                           />
                         )
                       )}
@@ -889,6 +957,7 @@ function CheckoutPageContent() {
                   items={mappedCartItems}
                   subtotal={subtotal}
                   platformFee={platformFee}
+                  platformFeePercentage={platformFeePercentage}
                   shipping={fulfillmentFee}
                   total={total}
                   fulfillmentMethod={fulfillmentMethod || undefined}
@@ -942,17 +1011,15 @@ function CheckoutPageContent() {
 
 export default function CheckoutPage() {
   return (
-    <CustomerAuthProvider>
-      <Suspense fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading checkout...</p>
-          </div>
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading checkout...</p>
         </div>
-      }>
-        <CheckoutPageContent />
-      </Suspense>
-    </CustomerAuthProvider>
+      </div>
+    }>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

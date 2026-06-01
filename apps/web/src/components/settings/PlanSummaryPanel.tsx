@@ -489,46 +489,46 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
           {summaries.map(cap => {
             const href = cap.settingsPath && tenantId ? `/t/${tenantId}${cap.settingsPath}` : null;
             return (
-            <div
-              key={cap.key}
-              className={`rounded-lg p-3 border ${
-                cap.isHighlighted
-                  ? 'bg-white border-blue-300 ring-1 ring-blue-200'
-                  : 'bg-white/60 border-transparent'
-              } ${href ? 'cursor-pointer hover:bg-white/80 hover:border-blue-200 transition-colors' : ''}`}
-              onClick={() => href && router.push(href)}
-            >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-sm">{cap.icon}</span>
-                <span className={`text-xs font-semibold ${cap.isHighlighted ? 'text-blue-800' : 'text-neutral-700'}`}>
-                  {cap.label}
-                </span>
-                {href && (
-                  <ExternalLink className="h-3 w-3 text-blue-500 ml-0.5" />
-                )}
-                {!cap.enabled && (
-                  <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">Off</Badge>
+              <div
+                key={cap.key}
+                className={`rounded-lg p-3 border ${cap.isHighlighted
+                    ? 'bg-white border-blue-300 ring-1 ring-blue-200'
+                    : 'bg-white/60 border-transparent'
+                  } ${href ? 'cursor-pointer hover:bg-white/80 hover:border-blue-200 transition-colors' : ''}`}
+                onClick={() => href && router.push(href)}
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-sm">{cap.icon}</span>
+                  <span className={`text-xs font-semibold ${cap.isHighlighted ? 'text-blue-800' : 'text-neutral-700'}`}>
+                    {cap.label}
+                  </span>
+                  {href && (
+                    <ExternalLink className="h-3 w-3 text-blue-500 ml-0.5" />
+                  )}
+                  {!cap.enabled && (
+                    <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">Off</Badge>
+                  )}
+                </div>
+                {cap.specificFeatures.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {cap.specificFeatures.map(f => (
+                      <span
+                        key={f}
+                        className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-800 border border-green-200"
+                      >
+                        <Check className="h-2.5 w-2.5" />
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-neutral-400 flex items-center gap-0.5">
+                    <X className="h-3 w-3" /> None available
+                  </span>
                 )}
               </div>
-              {cap.specificFeatures.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {cap.specificFeatures.map(f => (
-                    <span
-                      key={f}
-                      className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-800 border border-green-200"
-                    >
-                      <Check className="h-2.5 w-2.5" />
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-xs text-neutral-400 flex items-center gap-0.5">
-                  <X className="h-3 w-3" /> None available
-                </span>
-              )}
-            </div>
-          );})}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

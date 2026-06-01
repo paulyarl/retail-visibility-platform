@@ -18,6 +18,10 @@ function SuccessPageContent() {
   const [guestTenantId, setGuestTenantId] = useState<string>('');
   const [guestGatewayType, setGuestGatewayType] = useState<string>('');
   const [guestPaymentToken, setGuestPaymentToken] = useState<string>('');
+  const [guestCardLast4, setGuestCardLast4] = useState<string | undefined>();
+  const [guestCardBrand, setGuestCardBrand] = useState<string | undefined>();
+  const [guestExpiryMonth, setGuestExpiryMonth] = useState<number | undefined>();
+  const [guestExpiryYear, setGuestExpiryYear] = useState<number | undefined>();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -77,13 +81,19 @@ function SuccessPageContent() {
           sessionStorage.removeItem('checkout_gatewayType');
 
           const isLoggedIn = customerAuthService.isAuthenticated();
+          // Use PaymentMethod ID from backend if available, fallback to paymentIntentId
+          const paymentMethodToken = confirmResult.paymentMethodId || paymentIntentId;
           if (isLoggedIn) {
             try {
               await customerPaymentMethodsService.addPaymentMethod({
                 tenantId: saveTenantId,
                 gatewayType: saveGatewayType as 'stripe' | 'square' | 'paypal',
-                paymentMethodToken: paymentIntentId,
+                paymentMethodToken,
                 type: 'card',
+                cardLast4: confirmResult.cardLast4,
+                cardBrand: confirmResult.cardBrand,
+                expiryMonth: confirmResult.expiryMonth,
+                expiryYear: confirmResult.expiryYear ? String(confirmResult.expiryYear) : undefined,
               });
               console.log('[Checkout Success] Payment method saved successfully');
             } catch (err) {
@@ -96,7 +106,11 @@ function SuccessPageContent() {
             setGuestEmail(order?.customer_email || '');
             setGuestTenantId(saveTenantId);
             setGuestGatewayType(saveGatewayType);
-            setGuestPaymentToken(paymentIntentId);
+            setGuestPaymentToken(paymentMethodToken);
+            setGuestCardLast4(confirmResult.cardLast4);
+            setGuestCardBrand(confirmResult.cardBrand);
+            setGuestExpiryMonth(confirmResult.expiryMonth);
+            setGuestExpiryYear(confirmResult.expiryYear);
             setShowGuestPrompt(true);
           }
         } else {
@@ -150,6 +164,10 @@ function SuccessPageContent() {
             gatewayType: guestGatewayType as 'stripe' | 'square' | 'paypal',
             paymentMethodToken: guestPaymentToken,
             type: 'card',
+            cardLast4: guestCardLast4,
+            cardBrand: guestCardBrand,
+            expiryMonth: guestExpiryMonth,
+            expiryYear: guestExpiryYear ? String(guestExpiryYear) : undefined,
           });
         } catch (err) {
           console.error('[Checkout Success] Failed to save guest payment method:', err);

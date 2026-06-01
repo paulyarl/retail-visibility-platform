@@ -460,11 +460,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   return {
-    title: `${businessName} - Product Catalog`,
+    title: `${businessName} - Store Catalog`,
     description: `Browse products from ${businessName}. ${tenant.metadata?.address || ''}`,
     openGraph: {
       title: businessName,
-      description: `Shop products from ${businessName}`,
+      description: `Shop products from ${businessName} catalog`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',
     },

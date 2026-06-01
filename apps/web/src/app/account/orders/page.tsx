@@ -304,6 +304,7 @@ export default function OrdersPage() {
               depositCents: (selectedOrder as any).depositCents || undefined,
               remainingBalanceCents: (selectedOrder as any).remainingBalanceCents || undefined,
               pickupDeadline: (selectedOrder as any).pickupDeadline || undefined,
+              depositPercentage: (selectedOrder as any).depositPercentage || undefined,
               gatewayType: (selectedOrder as any).gatewayType || undefined,
             }}
             actions={

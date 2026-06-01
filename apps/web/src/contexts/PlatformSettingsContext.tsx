@@ -16,6 +16,7 @@ interface PlatformSettings {
     currency: string;
     displayAmount: string; // formatted for display
   };
+  platformFeePercentage?: number;
 }
 
 interface PlatformSettingsContextType {
@@ -50,9 +51,10 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
         
         // Try to fetch payment settings from admin service
         let paymentSettings = null;
+        let paymentData = null;
         try {
           if (isAuthenticated){
-            const paymentData = await adminSettingsService.getPaymentSettings();
+            paymentData = await adminSettingsService.getPaymentSettings();
             if (paymentData) {
               paymentSettings = paymentData.minimumPaymentAmount;
             }
@@ -72,6 +74,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
             currency: 'USD',
             displayAmount: '$2.00',
           },
+          platformFeePercentage: paymentData?.platformFeePercentage ?? 3.0,
         };
         // console.log('[PlatformSettingsProvider] Mapped settings:', mappedSettings);
         setSettings(mappedSettings);

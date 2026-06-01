@@ -142,6 +142,24 @@ export function ShippingAddressFormWithSaved({
     }
   };
 
+  const handleContinueWithSaved = () => {
+    const address = addresses.find(a => a.id === selectedAddressId);
+    if (address) {
+      onSubmit({
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2 || '',
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        country: address.country,
+        recipientName: address.recipientName || '',
+        phone: address.phone || '',
+        saveAddress: false,
+        label: address.label || 'Home',
+      }, false);
+    }
+  };
+
   const handleNewAddress = () => {
     setEditingAddress(null);
     form.reset({
@@ -311,7 +329,7 @@ export function ShippingAddressFormWithSaved({
                       }}
                       className="h-8 w-8 p-0"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4" style={{ color: 'white' }} />
                     </Button>
                     <Button
                       variant="ghost"
@@ -322,13 +340,25 @@ export function ShippingAddressFormWithSaved({
                       }}
                       className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" style={{ color: 'red' }}   />
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Continue button when a saved address is selected */}
+          {selectedAddressId && (
+            <Button
+              style={{ color: 'white' }}
+              variant="gradient"
+              className="w-full"
+              onClick={handleContinueWithSaved}
+            >
+              Continue to Payment
+            </Button>
+          )}
         </div>
       )}
 

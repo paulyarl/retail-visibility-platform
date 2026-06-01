@@ -272,6 +272,7 @@ router.get('/customer/:email', async (req, res) => {
         orderDate: order.created_at,
         paidAt: order.paid_at || order.created_at,
         total: order.total_cents,
+        paymentAmount: payment?.amount_cents || undefined,
         subtotal: order.subtotal_cents,
         platformFee: 0,
         fulfillmentFee: order.shipping_cents || 0,
@@ -322,6 +323,7 @@ router.get('/customer/:email', async (req, res) => {
         depositCents: order.deposit_cents || undefined,
         remainingBalanceCents: order.remaining_balance_cents || undefined,
         pickupDeadline: order.pickup_deadline || undefined,
+        depositPercentage: order.deposit_percentage || undefined,
       };
     });
 
@@ -449,6 +451,7 @@ router.get('/:orderId', async (req, res) => {
       remainingBalanceCents: order.remaining_balance_cents || 0,
       pickupDeadline: order.pickup_deadline || null,
       depositForfeitedAt: order.deposit_forfeited_at || null,
+      depositPercentage: order.deposit_percentage || null,
       customerInfo: {
         email: order.customer_email,
         phone: order.customer_phone || '',

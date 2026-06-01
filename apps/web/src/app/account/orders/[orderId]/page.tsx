@@ -333,6 +333,7 @@ export default function OrderDetailPage() {
               depositCents: (order as any).depositCents || undefined,
               remainingBalanceCents: (order as any).remainingBalanceCents || undefined,
               pickupDeadline: (order as any).pickupDeadline || undefined,
+              depositPercentage: (order as any).depositPercentage || undefined,
               gatewayType: (order as any).gatewayType || undefined,
             }}
           />

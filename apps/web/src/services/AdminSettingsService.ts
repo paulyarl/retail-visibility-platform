@@ -8,10 +8,12 @@ interface MinimumPaymentAmount {
 
 interface PaymentSettings {
   minimumPaymentAmount: MinimumPaymentAmount;
+  platformFeePercentage?: number;
 }
 
 interface PaymentSettingsResponse {
   minimumPaymentAmount: MinimumPaymentAmount;
+  platformFeePercentage?: number;
   updatedAt?: string;
   updatedBy?: string;
 }

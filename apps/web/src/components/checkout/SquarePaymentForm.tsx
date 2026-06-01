@@ -46,12 +46,14 @@ interface SquarePaymentFormProps {
   onSuccess: (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
   onBack: () => void;
   squareConfig?: { applicationId: string; locationId: string } | null;
+  checkoutMode?: 'deposit' | 'full_payment';
 }
 
 interface SquarePaymentFormContentProps extends SquarePaymentFormProps {
   orderId: string;
   orderNumber: string;
   paymentId: string;
+  backendPaymentAmount?: number;
 }
 
 function SquarePaymentFormContent({
@@ -65,6 +67,8 @@ function SquarePaymentFormContent({
   orderNumber,
   paymentId,
   squareConfig,
+  checkoutMode,
+  backendPaymentAmount,
 }: SquarePaymentFormContentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -310,7 +314,7 @@ function SquarePaymentFormContent({
             orderId,
             paymentId,
             sourceId: token,
-            amount,
+            amount: backendPaymentAmount ?? amount,
             customerInfo,
             shippingAddress,
             cartItems,
@@ -427,13 +431,14 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
   const [orderId, setOrderId] = useState<string>('');
   const [orderNumber, setOrderNumber] = useState<string>('');
   const [paymentId, setPaymentId] = useState<string>('');
+  const [backendPaymentAmount, setBackendPaymentAmount] = useState<number | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { settings: platformSettings } = usePlatformSettings();
   const orderCreatedRef = useRef(false);
 
   // Destructure props for useEffect dependencies
-  const { customerInfo, shippingAddress, cartItems, amount } = props;
+  const { customerInfo, shippingAddress, cartItems, amount, checkoutMode } = props;
 
   // Validate minimum payment amount using platform-wide settings
   const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
@@ -483,6 +488,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
           fulfillmentMethod: 'pickup',
           shippingAddress: shippingAddress,
           paymentMethod: 'square',
+          checkoutMode,
         });
 
         if (!orderResponse) {
@@ -512,6 +518,9 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
         if (payment?.id) {
           setPaymentId(payment.id);
         }
+        if (typeof payment?.amount_cents === 'number') {
+          setBackendPaymentAmount(payment.amount_cents);
+        }
         setIsLoading(false);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
@@ -521,7 +530,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
     };
 
     initializePayment();
-  }, [customerInfo, shippingAddress, cartItems, amount]);
+  }, [customerInfo, shippingAddress, cartItems, amount, checkoutMode]);
 
   // Load Square.js script
   useEffect(() => {
@@ -586,6 +595,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
       orderNumber={orderNumber}
       paymentId={paymentId}
       squareConfig={props.squareConfig}
+      backendPaymentAmount={backendPaymentAmount}
     />
   );
 }

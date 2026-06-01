@@ -227,9 +227,40 @@ router.post('/confirm-payment', async (req, res) => {
       // Don't fail the payment if digital fulfillment fails - can retry later
     }
 
+    // Retrieve PaymentIntent from Stripe to get PaymentMethod details for saved payment methods
+    let paymentMethodId: string | undefined;
+    let cardLast4: string | undefined;
+    let cardBrand: string | undefined;
+    let expiryMonth: number | undefined;
+    let expiryYear: number | undefined;
+    try {
+      const stripe = await stripeConnectService['getStripeClient']();
+      if (stripe) {
+        const retrievedPI = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (retrievedPI.payment_method && typeof retrievedPI.payment_method === 'string') {
+          paymentMethodId = retrievedPI.payment_method;
+          const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+          if (pm.card) {
+            cardLast4 = pm.card.last4 ?? undefined;
+            cardBrand = pm.card.brand ?? undefined;
+            expiryMonth = pm.card.exp_month ?? undefined;
+            expiryYear = pm.card.exp_year ?? undefined;
+          }
+        }
+      }
+    } catch (stripeError) {
+      console.error('[Stripe] Failed to retrieve PaymentIntent for saved payment method:', stripeError);
+      // Don't fail the confirmation if we can't retrieve card details
+    }
+
     res.json({
       success: true,
       orderId: payment.orders.id,
+      paymentMethodId,
+      cardLast4,
+      cardBrand,
+      expiryMonth,
+      expiryYear,
     });
   } catch (error) {
     console.error('[Stripe] Confirm payment error:', error);

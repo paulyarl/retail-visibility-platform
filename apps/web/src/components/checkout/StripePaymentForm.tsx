@@ -32,6 +32,11 @@ interface StripePaymentFormProps {
   tenantId: string;
   orderId?: string; // Optional - passed when payment intent is created on mount
   savePaymentMethod?: boolean;
+  checkoutMode?: 'deposit' | 'full_payment';
+}
+
+interface StripeCheckoutFormProps extends StripePaymentFormProps {
+  backendPaymentAmount?: number;
 }
 
 function StripeCheckoutForm({ 
@@ -44,8 +49,9 @@ function StripeCheckoutForm({
   onBack,
   tenantId,
   orderId,
-  savePaymentMethod
-}: StripePaymentFormProps) {
+  savePaymentMethod,
+  backendPaymentAmount,
+}: StripeCheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -133,7 +139,7 @@ function StripeCheckoutForm({
               Processing...
             </>
           ) : (
-            `Pay $${(amount / 100).toFixed(2)}`
+            `Pay $${((backendPaymentAmount ?? amount) / 100).toFixed(2)}`
           )}
         </Button>
       </div>
@@ -144,6 +150,7 @@ function StripeCheckoutForm({
 export default function StripePaymentFormWrapper(props: StripePaymentFormProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [backendPaymentAmount, setBackendPaymentAmount] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { settings: platformSettings } = usePlatformSettings();
@@ -178,6 +185,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
           {
             shippingAddress: props.shippingAddress,
             fulfillmentMethod: props.fulfillmentMethod,
+            checkoutMode: props.checkoutMode,
           }
         );
 
@@ -192,6 +200,9 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
 
         setOrderId(checkoutResult.orderId);
         setClientSecret(checkoutResult.clientSecret);
+        if (typeof checkoutResult.paymentAmount === 'number') {
+          setBackendPaymentAmount(checkoutResult.paymentAmount);
+        }
       } catch (err: any) {
         console.error('[Stripe] Failed to initialize checkout:', err);
         setError(err.message || 'Failed to initialize payment. Please try again.');
@@ -319,7 +330,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
         stripe={loadStripe(publishableKey!)} 
         options={options}
       >
-        <StripeCheckoutForm {...props} orderId={orderId!} />
+        <StripeCheckoutForm {...props} orderId={orderId!} backendPaymentAmount={backendPaymentAmount} />
       </Elements>
     </StripeWrapper>
   );

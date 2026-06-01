@@ -3,7 +3,7 @@
  * 
  * Handles multi-location checkout for organizations with multiple stores.
  * Finds nearest available locations for cart items, supporting both:
- * - Deposit checkout (Tier 3): 10-15% deposit, pickup at nearest location
+ * - Deposit checkout (Tier 3): deposit based on commerce settings, pickup at nearest location
  * - Full checkout (Tier 4): Full payment, pickup at nearest location
  */
 

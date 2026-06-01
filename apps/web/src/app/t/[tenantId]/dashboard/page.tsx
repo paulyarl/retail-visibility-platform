@@ -1,17 +1,16 @@
-import TenantDashboard from "@/components/dashboard/TenantDashboard";
-import { Button } from '@mantine/core';
+import TenantDashboardV2 from "@/components/dashboard/TenantDashboardV2";
 import SetTenantId from "@/components/client/SetTenantId";
 
 export default async function TenantScopedDashboard({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  
+
   return (
     <>
       {/* Set tenantId in localStorage for context */}
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      
-      {/* Dedicated tenant dashboard - knows its context */}
-      <TenantDashboard tenantId={tenantId} />
+
+      {/* New redesigned tenant dashboard */}
+      <TenantDashboardV2 tenantId={tenantId} />
     </>
   );
 }

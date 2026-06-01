@@ -24,6 +24,7 @@ interface OrderSummaryProps {
   items: CartItem[];
   subtotal: number;
   platformFee: number;
+  platformFeePercentage?: number;
   shipping: number;
   total: number;
   fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping';
@@ -48,6 +49,7 @@ export function OrderSummary({
   items,
   subtotal,
   platformFee,
+  platformFeePercentage = 3.0,
   shipping,
   total,
   fulfillmentMethod,
@@ -124,25 +126,27 @@ export function OrderSummary({
             <span>{formatCurrency(subtotal)}</span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <div className="flex items-center gap-1">
-              <span className="text-gray-600">Platform Fee</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-3 w-3 text-gray-400" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-xs">
-                      Platform fee helps us maintain and improve our services.
-                      This fee goes towards payment processing, security, and platform operations.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+          {platformFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <div className="flex items-center gap-1">
+                <span className="text-gray-600">Platform Fee ({platformFeePercentage}%)</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-xs">
+                        Platform fee helps us maintain and improve our services.
+                        This fee goes towards payment processing, security, and platform operations.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <span>{formatCurrency(platformFee)}</span>
             </div>
-            <span>{formatCurrency(platformFee)}</span>
-          </div>
+          )}
 
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">{getFulfillmentLabel()}</span>

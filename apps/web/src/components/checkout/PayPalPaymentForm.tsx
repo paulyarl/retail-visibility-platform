@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
@@ -36,12 +36,14 @@ interface PayPalPaymentFormProps {
   }>;
   onSuccess: (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
   onBack: () => void;
+  checkoutMode?: 'deposit' | 'full_payment';
 }
 
 interface PayPalPaymentFormContentProps extends PayPalPaymentFormProps {
   orderId: string;
   orderNumber: string;
   paymentId: string;
+  backendPaymentAmount?: number;
 }
 
 function PayPalPaymentFormContent({
@@ -54,13 +56,26 @@ function PayPalPaymentFormContent({
   orderId,
   orderNumber,
   paymentId,
+  checkoutMode,
+  backendPaymentAmount,
 }: PayPalPaymentFormContentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // PayPal configuration
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  if (!paypalClientId) {
+    return (
+      <Alert variant="error">
+        <AlertDescription>
+          PayPal is not configured. Please contact the site administrator or select a different payment method.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   const paypalOptions = {
-    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '',
+    clientId: paypalClientId,
     currency: 'USD',
     intent: 'capture' as const,
     // Force sandbox mode to match backend API
@@ -72,7 +87,7 @@ function PayPalPaymentFormContent({
       const response = await customerOrderService.createPayPalOrder({
         orderId,
         paymentId,
-        amount,
+        amount: backendPaymentAmount ?? amount,
         customerInfo,
         shippingAddress,
         cartItems,
@@ -153,7 +168,7 @@ function PayPalPaymentFormContent({
           <div className="border-t pt-2 mt-2">
             <div className="flex justify-between font-medium">
               <span>Total</span>
-              <span>${(amount / 100).toFixed(2)}</span>
+              <span>${((backendPaymentAmount ?? amount) / 100).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -203,6 +218,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
   const [orderId, setOrderId] = useState<string>('');
   const [orderNumber, setOrderNumber] = useState<string>('');
   const [paymentId, setPaymentId] = useState<string>('');
+  const [backendPaymentAmount, setBackendPaymentAmount] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { settings: platformSettings } = usePlatformSettings();
@@ -220,9 +236,13 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
     );
   }
 
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
     createOrderAndPayment();
-  }, [props.customerInfo, props.shippingAddress, props.fulfillmentMethod, props.cartItems]);
+  }, []);
 
   const createOrderAndPayment = async () => {
     try {
@@ -233,6 +253,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
         fulfillmentMethod: props.fulfillmentMethod || 'pickup',
         shippingAddress: props.shippingAddress,
         paymentMethod: 'paypal',
+        checkoutMode: props.checkoutMode,
       });
 
       if (!orderResponse) {
@@ -260,6 +281,9 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       
       if (payment?.id) {
         setPaymentId(payment.id);
+      }
+      if (typeof payment?.amount_cents === 'number') {
+        setBackendPaymentAmount(payment.amount_cents);
       }
 
       setLoading(false);
@@ -293,6 +317,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       orderId={orderId}
       orderNumber={orderNumber}
       paymentId={paymentId}
+      backendPaymentAmount={backendPaymentAmount}
     />
   );
 }

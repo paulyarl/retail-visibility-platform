@@ -3578,4 +3578,32 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/platform-fee
+ * Get current platform fee percentage (public, no auth required)
+ */
+router.get('/platform-fee', async (_req, res) => {
+  try {
+    const { basePrisma } = await import('../prisma');
+    const platformConfig = await basePrisma.platform_payment_config.findUnique({
+      where: { id: 'platform_main' },
+      select: { default_platform_fee_percent: true },
+    });
+
+    const percentage = platformConfig?.default_platform_fee_percent ?? 3.0;
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.json({
+      success: true,
+      platformFeePercentage: percentage,
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching platform fee:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch platform fee',
+    });
+  }
+});
+
 export default router;

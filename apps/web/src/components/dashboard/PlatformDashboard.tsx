@@ -39,7 +39,7 @@ export default function PlatformDashboard() {
     growthMetrics: null as any
   });
   
-  const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('hybrid');
+  const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('grid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Fetch platform stats
@@ -89,9 +89,9 @@ export default function PlatformDashboard() {
           'recent': 'slider',
           'trending': 'tabs'
         };
-        setShowcaseMode(modeMap[config.mode] || 'hybrid');
+        setShowcaseMode(modeMap[config.mode] || 'grid');
       } catch {
-        setShowcaseMode('hybrid');
+        setShowcaseMode('grid');
       }
     };
     fetchShowcaseConfig();

@@ -241,41 +241,65 @@ export class CustomerPaymentMethodsService {
     let cardCountry: string | null = null;
     let methodType: PaymentMethodType = input.type || 'card';
 
+    let paymentMethodToken = input.paymentMethodToken;
+
     // For Stripe: get or create a Stripe customer on the tenant's Stripe account,
     // then attach the PaymentMethod
     if (input.gatewayType === 'stripe' && this.stripe) {
       try {
+        // If token is a PaymentIntent ID (pi_xxx), retrieve it to get the actual PaymentMethod
+        if (paymentMethodToken.startsWith('pi_')) {
+          const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentMethodToken);
+          if (paymentIntent.payment_method) {
+            paymentMethodToken = paymentIntent.payment_method as string;
+          }
+        }
+
         // Get or create Stripe customer for this customer+tenant combination
         const stripeCustomer = await this.getOrCreateStripeCustomer(customerId, input.tenantId, customer.email);
 
         // Attach payment method to Stripe customer
-        await this.stripe.paymentMethods.attach(input.paymentMethodToken, {
-          customer: stripeCustomer.id,
-        });
+        try {
+          await this.stripe.paymentMethods.attach(paymentMethodToken, {
+            customer: stripeCustomer.id,
+          });
+        } catch (attachError: any) {
+          // If PaymentMethod was previously used without a Customer, it can't be re-attached.
+          // We still try to retrieve details and save it in our DB for reference.
+          if (attachError.message?.includes('previously used without being attached to a Customer') ||
+              attachError.message?.includes('was detached from a Customer')) {
+            console.warn('[CustomerPaymentMethods] PaymentMethod cannot be re-attached, saving reference only:', attachError.message);
+          } else if (attachError.message?.includes('No such PaymentMethod')) {
+            throw new Error(
+              'Stripe configuration mismatch: Frontend and backend are using different Stripe accounts. ' +
+              'Ensure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY are from the same Stripe account.'
+            );
+          } else {
+            throw attachError;
+          }
+        }
 
         // Retrieve payment method details from Stripe
-        const pm = await this.stripe.paymentMethods.retrieve(input.paymentMethodToken);
+        try {
+          const pm = await this.stripe.paymentMethods.retrieve(paymentMethodToken);
 
-        if (pm.card) {
-          cardLast4 = pm.card.last4;
-          cardBrand = pm.card.brand;
-          expiryMonth = pm.card.exp_month;
-          expiryYear = pm.card.exp_year;
-          cardFunding = pm.card.funding;
-          cardCountry = pm.card.country;
-          methodType = 'card';
-        } else if (pm.type === 'link') {
-          methodType = 'wallet';
+          if (pm.card) {
+            cardLast4 = pm.card.last4;
+            cardBrand = pm.card.brand;
+            expiryMonth = pm.card.exp_month;
+            expiryYear = pm.card.exp_year;
+            cardFunding = pm.card.funding;
+            cardCountry = pm.card.country;
+            methodType = 'card';
+          } else if (pm.type === 'link') {
+            methodType = 'wallet';
+          }
+        } catch (retrieveError: any) {
+          console.warn('[CustomerPaymentMethods] Could not retrieve PaymentMethod from Stripe:', retrieveError.message);
+          // Fall back to input values if retrieve fails
         }
       } catch (stripeError: any) {
         console.error('[CustomerPaymentMethods] Stripe error:', stripeError.message);
-
-        if (stripeError.message?.includes('No such PaymentMethod')) {
-          throw new Error(
-            'Stripe configuration mismatch: Frontend and backend are using different Stripe accounts. ' +
-            'Ensure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY are from the same Stripe account.'
-          );
-        }
         throw stripeError;
       }
     }
@@ -303,7 +327,7 @@ export class CustomerPaymentMethodsService {
         customer_id: customerId,
         tenant_id: input.tenantId,
         gateway_type: input.gatewayType,
-        payment_method_token: input.paymentMethodToken,
+        payment_method_token: paymentMethodToken,
         type: methodType,
         card_last4: cardLast4 || null,
         card_brand: cardBrand || null,

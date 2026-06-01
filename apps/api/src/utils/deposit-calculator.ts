@@ -119,7 +119,7 @@ export function supportsDepositCheckout(tierKey: string): boolean {
  * Calculate deposit amount for commitment checkout
  * 
  * @param totalCents - Total order amount in cents
- * @param depositPercentage - Optional custom deposit percentage (default: 10%)
+ * @param depositPercentage - Optional custom deposit percentage (default: 15%)
  * @returns Deposit calculation with amounts and deadline
  */
 export function calculateDeposit(

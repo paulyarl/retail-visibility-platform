@@ -156,6 +156,12 @@ router.post('/process-payment', async (req, res) => {
         status: payment.status,
         amount: payment.amountMoney?.amount?.toString(),
         orderId,
+        cardDetails: payment.cardDetails ? {
+          last4: payment.cardDetails.last4,
+          cardBrand: payment.cardDetails.cardBrand,
+          expMonth: payment.cardDetails.expMonth,
+          expYear: payment.cardDetails.expYear,
+        } : undefined,
       },
     });
   } catch (error) {

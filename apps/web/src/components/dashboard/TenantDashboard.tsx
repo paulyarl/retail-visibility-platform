@@ -50,22 +50,22 @@ interface TenantDashboardProps {
 
 export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { user } = useAuth();
-  
+
   // Consolidated data fetching - replaces 3 separate API calls with 1
-  const { 
-    tenant: tenantData, 
-    tier, 
-    usage, 
+  const {
+    tenant: tenantData,
+    tier,
+    usage,
     organizationTenants,
-    loading: completeLoading, 
-    error: completeError, 
-    refresh: refreshTenantData 
+    loading: completeLoading,
+    error: completeError,
+    refresh: refreshTenantData
   } = useTenantComplete(tenantId, true);
 
-  
+
   // User profile (still separate since it's user-specific, not tenant-specific)
   const { profile, loading: profileLoading } = useUserProfile();
-  
+
   // Business profile for logo
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [businessProfileLoading, setBusinessProfileLoading] = useState(true);
@@ -77,18 +77,18 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
   // Capability-aware plan summary
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
-  
+
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
-  
+
   //const slugs = tenantSlugService.getTenantSlug({ businessName: tenantData?.name || '', tenantId });
- // console.log(`${TenantDashboard.name} tenant data`, tenantData);
+  // console.log(`${TenantDashboard.name} tenant data`, tenantData);
 
   const slugs = tenantData?.slug || tenantData?.id || tenantId;
-  const { status: hoursStatus } = useStoreStatus(tenantId||tenantData?.id || '', false); // Public scope
+  const { status: hoursStatus } = useStoreStatus(tenantId || tenantData?.id || '', false); // Public scope
 
- // console.log(`${TenantDashboard.name} tenant slugs`, slugs);
-  
+  // console.log(`${TenantDashboard.name} tenant slugs`, slugs);
+
   // Track tenant dashboard view
   useEffect(() => {
     if (tenantId) {
@@ -103,7 +103,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
       });
     }
   }, [tenantId]);
-  
+
   // Fetch business profile for logo, banner, and social links
   useEffect(() => {
     const fetchBusinessProfile = async () => {
@@ -147,7 +147,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   }
 
   //const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
-  
+
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
@@ -171,13 +171,13 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 </h1>
               </Link>
             )}
-            
+
             {/* Desktop Navigation */}
             <div className="hidden sm:flex items-center gap-2 md:gap-3">
               <Tooltip label="Store profile and branding">
                 <Link href={`/t/${tenantId}/settings/tenant`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -190,8 +190,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="Manage products and inventory">
                 <Link href={`/t/${tenantId}/items`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -204,8 +204,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="View and manage orders">
                 <Link href={`/t/${tenantId}/orders`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -218,8 +218,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="Google Business Profile integration">
                 <Link href={`/t/${tenantId}/settings/integrations/google`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -232,8 +232,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="Data sync and feed status">
                 <Link href={`/t/${tenantId}/settings/integrations/google/sync-status`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -246,8 +246,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="Inventory transfer management">
                 <Link href={`/t/${tenantId}/inventory-transfers`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -260,8 +260,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               </Tooltip>
               <Tooltip label="Store settings and configuration">
                 <Link href={`/t/${tenantId}/settings`}>
-                  <Button 
-                    variant="subtle" 
+                  <Button
+                    variant="subtle"
                     size="sm"
                     className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                   >
@@ -304,7 +304,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                     className="flex items-center justify-center w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md transition-all duration-200 hover:scale-110"
                   >
                     <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.973H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.973H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                     </svg>
                   </a>
                 )}
@@ -316,7 +316,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                     className="flex items-center justify-center w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md transition-all duration-200 hover:scale-110"
                   >
                     <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
                     </svg>
                   </a>
                 )}
@@ -333,7 +333,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               <UserProfileBadge profile={profile} />
             </div>
           )}
-          
+
           {/* Right Side: Chain Badge + Tier Badge + Tenant Limits */}
           <div className="shrink-0 flex items-center gap-3">
             {/* Chain Badge - Show organization name if part of a chain */}
@@ -345,10 +345,10 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 <span className="font-medium text-sm">{tier.organization.name}</span>
               </div>
             )}
-            
+
             {/* Tenant Limits Badge (Compact) */}
             <TenantLimitBadge variant="compact" showUpgrade={true} />
-            
+
             {/* Tier Badge */}
             {tier && (
               <TierBadge tier={tier} showDetails={true} />
@@ -358,8 +358,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Subscription State Banner (Maintenance/Freeze) */}
         <SubscriptionStateBanner tenantId={tenantId} />
-        <HoursStatusBadge status={hoursStatus} size="lg"/>
-         <span>{hoursStatus?.label}</span>
+        <HoursStatusBadge status={hoursStatus} size="lg" />
+        <span>{hoursStatus?.label}</span>
 
         {/* Location Status Banner (Inactive/Closed/Pending/Archived) */}
         {tenantData?.locationStatus && (
@@ -371,11 +371,11 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             variant="full"
           />
         )}
-         {/* Hours Badge - Status */}
-         
+        {/* Hours Badge - Status */}
+
 
         {/* Header */}
-        <DashboardHeader 
+        <DashboardHeader
           title={`${tenantData?.name || 'Tenant'} Dashboard`}
           subtitle="Manage your retail inventory and visibility across platforms"
           storeLogo={businessProfile?.logo_url}
@@ -401,9 +401,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             <code className="text-xs font-mono text-neutral-700 bg-white px-2 py-0.5 rounded border select-all">
               {tenantId}
             </code>
-             
+
           </div>
-          
+
           {/* Debug Refresh Button */}
           <button
             onClick={() => refreshTenantData()}
@@ -472,7 +472,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             {console.log('[TenantDashboard] tier.organization:', (tier as any).organization)}
             {console.log('[TenantDashboard] tier.tenant:', tier.tenant)} */}
             <Suspense fallback={<ComponentLoader />}>
-              <TierGainsWelcome 
+              <TierGainsWelcome
                 currentTier={tier.tenant?.id || tier.effective.id}
                 tierDisplayName={tier.tenant?.name || tier.effective.name}
                 organizationTier={(tier as any).organization?.id}
@@ -484,7 +484,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Quick Actions */}
         <Suspense fallback={<ComponentLoader />}>
-          <QuickActions 
+          <QuickActions
             tenantId={tenantId}
             canManageSettings={canManageSettings}
           />
@@ -522,28 +522,28 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                   {hoursStatus ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Hours Badge - Status */}
-          <HoursStatusBadge status={hoursStatus} /> 
-                  </div>
-                ) : (
-                  <p className="text-sm sm:text-base text-neutral-500">
-                    Set your store hours to display them here.
-                  </p>
-                )}
+                      <HoursStatusBadge status={hoursStatus} />
+                    </div>
+                  ) : (
+                    <p className="text-sm sm:text-base text-neutral-500">
+                      Set your store hours to display them here.
+                    </p>
+                  )}
+                </div>
+                {(() => {
+                  // Use centralized permission helper
+                  if (!user || !canManageSettings) return null;
+                  return (
+                    <Link href={`/t/${tenantId}/settings/hours`} className="w-full sm:w-auto">
+                      <Button variant='gradient' style={{ color: 'white' }} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap">
+                        {hoursStatus ? '⚙️ Manage Hours' : '➕ Set Hours'}
+                      </Button>
+                    </Link>
+                  );
+                })()}
               </div>
-              {(() => {
-                // Use centralized permission helper
-                if (!user || !canManageSettings) return null;
-                return (
-                  <Link href={`/t/${tenantId}/settings/hours`} className="w-full sm:w-auto">
-                    <Button variant='gradient' style={{ color: 'white' }} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap">
-                      {hoursStatus ? '⚙️ Manage Hours' : '➕ Set Hours'}
-                    </Button>
-                  </Link>
-                );
-              })()}
-            </div>
-          </MantineCard>
-            </motion.div>
+            </MantineCard>
+          </motion.div>
         </div>
 
         {/* Value Showcase - Only show when user has products */}

@@ -30,12 +30,14 @@ export interface CreateOrderRequest {
   fulfillmentMethod?: string;
   cartItems: any[];
   paymentMethod: string;
+  checkoutMode?: 'deposit' | 'full_payment';
 }
 
 export interface CreateOrderResponse {
   orderId: string;
   paymentId: string;
   orderNumber?: string;
+  paymentAmount?: number;
 }
 
 export interface CreatePaymentIntentRequest {
@@ -111,6 +113,7 @@ class CheckoutService extends PublicApiSingleton {
         shipping_address: request.shippingAddress,
         fulfillment_method: request.fulfillmentMethod,
         payment_method: request.paymentMethod,
+        checkout_mode: request.checkoutMode,
       };
 
       const result = await this.makeDefaultRequest<{
@@ -121,6 +124,7 @@ class CheckoutService extends PublicApiSingleton {
         };
         payment: {
           id: string;
+          amount_cents?: number;
         };
       }>(
         '/api/checkout/orders',
@@ -147,6 +151,7 @@ class CheckoutService extends PublicApiSingleton {
         orderId: data.order.id,
         paymentId: data.payment.id,
         orderNumber: data.order.order_number,
+        paymentAmount: data.payment.amount_cents,
       };
     } catch (error) {
       console.error('[CheckoutService] Create order error:', error);
@@ -206,8 +211,9 @@ class CheckoutService extends PublicApiSingleton {
     options: {
       shippingAddress?: ShippingAddress;
       fulfillmentMethod?: string;
+      checkoutMode?: 'deposit' | 'full_payment';
     } = {}
-  ): Promise<{ orderId: string; paymentId: string; clientSecret: string } | null> {
+  ): Promise<{ orderId: string; paymentId: string; clientSecret: string; paymentAmount?: number } | null> {
     // Step 1: Create order
     // console.log('[CheckoutService] initiateCheckout - creating order with data:', {
     //   tenantId,
@@ -224,17 +230,18 @@ class CheckoutService extends PublicApiSingleton {
       fulfillmentMethod: options.fulfillmentMethod,
       cartItems,
       paymentMethod: 'stripe',
+      checkoutMode: options.checkoutMode,
     });
 
     if (!orderResponse) {
       return null;
     }
 
-    // Step 2: Create payment intent
+    // Step 2: Create payment intent using backend-calculated amount
     const intentResponse = await this.createPaymentIntent({
       orderId: orderResponse.orderId,
       paymentId: orderResponse.paymentId,
-      amount,
+      amount: orderResponse.paymentAmount ?? amount,
       customerInfo,
       cartItems,
     });
@@ -247,6 +254,7 @@ class CheckoutService extends PublicApiSingleton {
       orderId: orderResponse.orderId,
       paymentId: orderResponse.paymentId,
       clientSecret: intentResponse.clientSecret,
+      paymentAmount: orderResponse.paymentAmount,
     };
   }
 
@@ -254,11 +262,23 @@ class CheckoutService extends PublicApiSingleton {
    * Confirm a successful Stripe payment
    * Uses the /api/checkout/stripe/confirm-payment endpoint
    */
-  async confirmStripePayment(paymentIntentId: string, clientSecret?: string): Promise<{ orderId: string } | null> {
+  async confirmStripePayment(paymentIntentId: string, clientSecret?: string): Promise<{
+    orderId: string;
+    paymentMethodId?: string;
+    cardLast4?: string;
+    cardBrand?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
+  } | null> {
     try {
       const result = await this.makeDefaultRequest<{
         success: boolean;
         orderId: string;
+        paymentMethodId?: string;
+        cardLast4?: string;
+        cardBrand?: string;
+        expiryMonth?: number;
+        expiryYear?: number;
       }>(
         '/api/checkout/stripe/confirm-payment',
         {
@@ -278,6 +298,11 @@ class CheckoutService extends PublicApiSingleton {
 
       return {
         orderId: result.data?.orderId || '',
+        paymentMethodId: result.data?.paymentMethodId,
+        cardLast4: result.data?.cardLast4,
+        cardBrand: result.data?.cardBrand,
+        expiryMonth: result.data?.expiryMonth,
+        expiryYear: result.data?.expiryYear,
       };
     } catch (error) {
       console.error('[CheckoutService] Confirm payment error:', error);
