@@ -365,6 +365,10 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       // console.log(`[useTenantComplete] Organization tier:`, orgTier);
       // console.log(`[useTenantComplete] Effective tier:`, effectiveTier);
 
+      // Only allow upgrades for discovery and storefront tiers
+      // Higher tiers (commitment, professional, enterprise) are comprehensive
+      const canUpgrade = effectiveTier.level === 'discovery' || effectiveTier.level === 'storefront';
+
       return {
         effective: effectiveTier,
         tenant: tenantTier,
@@ -372,7 +376,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
         organizationName: rawTierData.organizationName,
         organizationId: rawTierData.organizationId,
         isChain,
-        canUpgrade: true,
+        canUpgrade,
         upgradeOptions: getUpgradeOptions(effectiveTier.level)
       };
     } catch (err) {
@@ -469,6 +473,7 @@ function mapTierLevel(tierId: string): TierInfo['level'] {
     case 'discovery': return 'discovery';
     case 'storefront': return 'storefront';
     case 'commitment': return 'commitment';
+    case 'omnichannel': return 'omnichannel';
     case 'starter': return 'discovery';
     case 'professional': return 'professional';
     case 'enterprise': return 'enterprise';
@@ -498,9 +503,12 @@ function getTierLimit(tierId: string, type: 'products' | 'locations' | 'users'):
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
   // Simplified upgrade options
   switch (currentLevel) {
-    case 'discovery': return ['storefront', 'commitment', 'professional', 'enterprise'];
-    case 'storefront': return ['commitment', 'professional', 'enterprise'];
-    case 'commitment': return ['professional', 'enterprise'];
+    case 'google_only': return ['storefront', 'commitment', 'omnichannel', 'professional', 'enterprise'];
+    case 'starter': return ['storefront', 'commitment', 'omnichannel', 'professional', 'enterprise'];
+    case 'discovery': return ['storefront', 'commitment', 'omnichannel', 'professional', 'enterprise'];
+    case 'storefront': return ['commitment', 'omnichannel', 'professional', 'enterprise'];
+    case 'commitment': return [ 'omnichannel','professional', 'enterprise'];
+    case 'omnichannel': return ['professional', 'enterprise'];
     case 'professional': return ['enterprise'];
     default: return ['discovery', 'storefront', 'commitment', 'professional', 'enterprise'];
   }

@@ -178,7 +178,7 @@ export const TenantSidebarTemplate = () => {
     },
     {
       label: 'Storefront',
-      href: '/t/[tenantId]/storefront',
+      href: '/t/[tenantId]/settings/directory',
       icon: NavigationHelpers.getStandardIcon('STORE'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },

@@ -27,7 +27,7 @@ export interface TierLimits {
 export interface TierInfo {
   id: string;
   name: string;
-  level: 'discovery' | 'storefront' | 'commitment'| 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+  level: 'google_only' |'starter' |'discovery' | 'storefront' | 'commitment' | 'omnichannel' | 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
@@ -67,6 +67,7 @@ export function resolveTier(
       case 'discovery': return 'discovery';
       case 'storefront': return 'storefront';
       case 'commitment': return 'commitment';
+      case 'omnichannel': return 'omnichannel';
       case 'professional': return 'professional';
       case 'enterprise': return 'enterprise';
       case 'organization': return 'enterprise'; // Map organization to enterprise level
@@ -81,7 +82,7 @@ export function resolveTier(
   if (isChain && organizationTier) {
     const effectiveTier = mergeTiers(organizationTier, tenantTier);
     effectiveTier.level = mapTierLevel(effectiveTier.id);
-    
+
     return {
       effective: effectiveTier,
       organization: organizationTier,
@@ -135,12 +136,12 @@ function mergeTiers(orgTier: TierInfo, tenantTier: TierInfo | null): TierInfo {
 
   // Start with org tier as base (with safety check)
   const mergedFeatures = orgTier.features ? [...orgTier.features] : [];
-  
+
   // Add or override with tenant-specific features
   if (tenantTier.features) {
     tenantTier.features.forEach(tenantFeature => {
       const existingIndex = mergedFeatures.findIndex(f => f.id === tenantFeature.id);
-      
+
       if (existingIndex >= 0) {
         // Override existing feature
         mergedFeatures[existingIndex] = {
@@ -160,7 +161,7 @@ function mergeTiers(orgTier: TierInfo, tenantTier: TierInfo | null): TierInfo {
   // Merge limits (take the higher limit) with safety checks
   const orgLimits = orgTier.limits || {};
   const tenantLimits = tenantTier.limits || {};
-  
+
   const mergedLimits: TierLimits = {
     maxProducts: Math.max(
       orgLimits.maxProducts || 0,
@@ -201,7 +202,7 @@ function getHigherTierLevel(
   level1: TierInfo['level'],
   level2: TierInfo['level']
 ): TierInfo['level'] {
-  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'professional', 'enterprise', 'custom'];
+  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'omnichannel', 'professional', 'enterprise', 'custom'];
   const index1 = hierarchy.indexOf(level1);
   const index2 = hierarchy.indexOf(level2);
   return index1 > index2 ? level1 : level2;
@@ -211,7 +212,7 @@ function getHigherTierLevel(
  * Gets available upgrade options for a tier level
  */
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
-  const allTiers: TierInfo['level'][] = ['discovery', 'commitment', 'storefront', 'professional', 'enterprise'];
+  const allTiers: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'omnichannel', 'professional', 'enterprise'];
   const currentIndex = allTiers.indexOf(currentLevel);
   return allTiers.slice(currentIndex + 1);
 }

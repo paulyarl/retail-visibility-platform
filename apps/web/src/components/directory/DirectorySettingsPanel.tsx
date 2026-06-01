@@ -316,6 +316,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
           <div className="flex gap-3">
             <Button
               onClick={handleSave}
+              variant="gradient"
+              style={{color:'white'}}
               disabled={isSaving}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -325,7 +327,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               <Button
                 onClick={handleUnpublish}
                 disabled={isSaving}
-                variant="outlined"
+                variant="gradient"
+                style={{color:'white'}}
               >
                 Unpublish
               </Button>
@@ -333,8 +336,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               <Button
                 onClick={handlePublish}
                 disabled={isSaving || !canPublish}
-                variant="filled" 
-                style={{ color: 'white' }}
+                variant="gradient"
+                style={{color:'white'}}
                 title={
                   !canPublish 
                     ? missingBusinessName && missingPrimaryCategory
