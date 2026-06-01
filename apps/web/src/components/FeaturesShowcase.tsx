@@ -2,101 +2,82 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
-// Feature data
-const features = [
+// Business journey stages aligned with tier progression
+const businessJourney = [
   {
-    id: 'quick-start',
-    icon: '⚡',
-    title: 'Quick Start Wizard',
-    description: 'Generate 50-100 products in 1 SECOND',
-    subtext: 'Save $2,400/month vs manual entry',
-    gradient: 'from-blue-500 to-purple-600',
-    badge: 'GAME CHANGER',
-    priority: 1, // Top 3 feature
-    videoUrl: '/videos/quick-start-demo.mp4', // Placeholder
-  },
-  {
-    id: 'sku-scanning',
-    icon: '🎯',
-    title: 'SKU Scanning Intelligence',
-    description: 'Complete nutrition facts, allergens & specifications',
-    subtext: 'Compete with CVS, Walmart & Target',
-    gradient: 'from-green-500 to-emerald-600',
-    badge: 'BREAKTHROUGH',
-    priority: 1, // Top 3 feature
-  },
-  {
-    id: 'chain-management',
-    icon: '🔗',
-    title: 'Chain Management & Sync',
-    description: 'Distribute & UPDATE products across 50+ locations in ONE CLICK',
-    subtext: 'Save 400+ hours per rollout - Enterprise retailers pay $50K+/year for this',
-    gradient: 'from-emerald-500 to-teal-600',
-    badge: 'ENTERPRISE',
-    priority: 1, // Top 3 feature
-  },
-  {
-    id: 'google-integration',
-    icon: '🔍',
-    title: 'Google Integration Suite',
-    description: 'Full GMB sync, Shopping feeds & SWIS',
-    subtext: 'Instant local visibility',
-    gradient: 'from-blue-500 to-green-600',
-    badge: 'COMPLETE',
-    priority: 1, // Top 3 feature
-  },
-  {
-    id: 'qr-marketing',
-    icon: '📱',
-    title: 'QR Code Marketing',
-    description: 'High-res QR codes up to 2048px',
-    subtext: 'Print-ready for flyers & signage',
-    gradient: 'from-purple-500 to-pink-600',
-    badge: 'PRINT-READY',
-    priority: 2,
+    id: 'discovery',
+    icon: '🔎',
+    title: 'Get Found on Google',
+    description: 'Shoppers discover your products on Search, Shopping & Maps — instantly.',
+    subtext: 'Visibility-only tier for retailers who want Google presence without commerce complexity.',
+    gradient: 'from-blue-500 to-indigo-600',
+    badge: 'DISCOVERY',
+    priority: 1,
+    price: '$29/mo',
+    upgradeTrigger: 'People are finding my products — now I want them to find my whole store.',
   },
   {
     id: 'storefront',
-    icon: '🏪',
-    title: 'Complete Storefront',
-    description: 'Beautiful, SEO-optimized product pages',
-    subtext: 'No coding required',
-    gradient: 'from-orange-500 to-red-600',
-    badge: 'NO CODE',
-    priority: 2,
-  },
-  {
-    id: 'analytics',
-    icon: '📊',
-    title: 'Real-Time Analytics',
-    description: 'Track performance, ROI & data quality',
-    subtext: 'Data-driven decisions',
-    gradient: 'from-cyan-500 to-blue-600',
-    badge: 'INSIGHTS',
-    priority: 2,
-  },
-  {
-    id: 'categories',
-    icon: '🏷️',
-    title: 'Smart Categories',
-    description: '5,595 Google taxonomy categories',
-    subtext: 'Auto-categorization & sync',
+    icon: '�',
+    title: 'Own Your Platform Presence',
+    description: 'A branded storefront inside the marketplace — browse, inquire, and connect.',
+    subtext: 'Platform presence for retailers ready to be discovered beyond Google.',
     gradient: 'from-indigo-500 to-purple-600',
-    badge: 'AUTO-SYNC',
-    priority: 3,
+    badge: 'STOREFRONT',
+    priority: 1,
+    price: '$59/mo',
+    upgradeTrigger: 'Shoppers are browsing — now I want them to commit to buying.',
   },
   {
-    id: 'business-hours',
-    icon: '🕐',
-    title: 'Smart Business Hours',
-    description: 'Real-time status that goes beyond Google',
-    subtext: 'Multiple periods, split shifts, emergency updates - your storefront shows it all',
-    gradient: 'from-teal-500 to-cyan-600',
-    badge: 'REAL-TIME',
-    priority: 3,
+    id: 'commitment',
+    icon: '🤝',
+    title: 'Capture Intent & Drive Foot Traffic',
+    description: 'Deposit-based reservations guarantee serious buyers walk through your door.',
+    subtext: 'Commitment commerce for physical retailers. Transaction closes in-store via Clover POS.',
+    gradient: 'from-purple-500 to-pink-600',
+    badge: 'COMMITMENT',
+    priority: 1,
+    price: '$79/mo',
+    upgradeTrigger: 'Shoppers reserve and show up — now I want to close the full sale online.',
+  },
+  {
+    id: 'ecommerce',
+    icon: '�',
+    title: 'Sell Online — Fully & Simply',
+    description: 'Complete checkout, payment collection & delivery — pure e-commerce.',
+    subtext: 'Full online sales for digital-first retailers. No deposit confusion.',
+    gradient: 'from-pink-500 to-rose-600',
+    badge: 'E-COMMERCE',
+    priority: 1,
+    price: '$99/mo',
+    upgradeTrigger: 'I\'m selling online successfully — now I want to add physical pickup options.',
+  },
+  {
+    id: 'omnichannel',
+    icon: '🌐',
+    title: 'Physical + Online — Unified Commerce',
+    description: 'Shoppers choose: pay in full for delivery OR deposit & pick up in store.',
+    subtext: 'Unified commerce for retailers with both physical and online presence.',
+    gradient: 'from-rose-500 to-orange-600',
+    badge: 'OMNICHANNEL',
+    priority: 2,
+    price: '$149/mo',
+    upgradeTrigger: 'I have a physical store AND online sales — I want to offer every way to buy.',
+  },
+  {
+    id: 'enterprise',
+    icon: '🏢',
+    title: 'Complete Business Solution',
+    description: 'Multi-location, enterprise-grade tools, custom contracts & white-label options.',
+    subtext: 'For chains, franchises, and regional retailers with advanced needs.',
+    gradient: 'from-orange-500 to-amber-600',
+    badge: 'ENTERPRISE',
+    priority: 2,
+    price: '$499/mo',
+    upgradeTrigger: 'Growth, scale, and advanced business needs.',
   },
 ];
 
@@ -128,17 +109,17 @@ export default function FeaturesShowcase({ mode = 'grid', className = '' }: Feat
   const showcaseContent = (() => {
     switch (activeMode) {
       case 'slider':
-        return <SliderMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+        return <SliderMode stages={businessJourney} prefersReducedMotion={prefersReducedMotion} className={className} />;
       case 'hybrid':
-        return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+        return <HybridMode stages={businessJourney} prefersReducedMotion={prefersReducedMotion} className={className} />;
       case 'tabs':
-        return <TabsMode features={features} className={className} />;
+        return <TabsMode stages={businessJourney} className={className} />;
       case 'grid':
-        return <GridMode features={features} className={className} />;
+        return <GridMode stages={businessJourney} className={className} />;
       case 'video-hero':
-        return <VideoHeroMode features={features} className={className} />;
+        return <VideoHeroMode stages={businessJourney} className={className} />;
       default:
-        return <HybridMode features={features} prefersReducedMotion={prefersReducedMotion} className={className} />;
+        return <HybridMode stages={businessJourney} prefersReducedMotion={prefersReducedMotion} className={className} />;
     }
   })();
 
@@ -150,9 +131,9 @@ export default function FeaturesShowcase({ mode = 'grid', className = '' }: Feat
 }
 
 // ==================== MODE 1: SLIDER ====================
-function SliderMode({ features, prefersReducedMotion, className }: any) {
+function SliderMode({ stages, prefersReducedMotion, className }: any) {
   const [isPaused, setIsPaused] = useState(false);
-  const duplicatedFeatures = [...features, ...features, ...features];
+  const duplicatedStages = [...stages, ...stages, ...stages];
 
   return (
     <div className={`relative overflow-hidden py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -162,10 +143,10 @@ function SliderMode({ features, prefersReducedMotion, className }: any) {
       <div className="text-center mb-4 sm:mb-6 px-3 sm:px-4">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
-            Powerful Features at Your Fingertips
+            Grow Your Business, One Tier at a Time
           </h3>
           <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
-            Everything you need to dominate local search and drive customers to your store
+            Every tier matches your business reality — move up as your ambition grows
           </p>
         </motion.div>
       </div>
@@ -180,20 +161,20 @@ function SliderMode({ features, prefersReducedMotion, className }: any) {
         <motion.div
           className="flex gap-3 sm:gap-4 md:gap-6 px-2 sm:px-4"
           animate={{
-            x: prefersReducedMotion || isPaused ? undefined : [0, -((features.length * 320) + (features.length * 24))],
+            x: prefersReducedMotion || isPaused ? undefined : [0, -((stages.length * 320) + (stages.length * 24))],
           }}
           transition={{
             x: {
               repeat: Infinity,
               repeatType: "loop",
-              duration: features.length * 4,
+              duration: stages.length * 4,
               ease: "linear",
             },
           }}
           style={{ width: 'fit-content' }}
         >
-          {duplicatedFeatures.map((feature: any, index: number) => (
-            <FeatureCard key={`${feature.id}-${index}`} feature={feature} />
+          {duplicatedStages.map((stage: any, index: number) => (
+            <FeatureCard key={`${stage.id}-${index}`} feature={stage} />
           ))}
         </motion.div>
       </div>
@@ -212,11 +193,11 @@ function SliderMode({ features, prefersReducedMotion, className }: any) {
 }
 
 // ==================== MODE 2: HYBRID (RECOMMENDED) ====================
-function HybridMode({ features, prefersReducedMotion, className }: any) {
-  const topFeatures = features.filter((f: any) => f.priority === 1);
-  const secondaryFeatures = features.filter((f: any) => f.priority === 2);
+function HybridMode({ stages, prefersReducedMotion, className }: any) {
+  const topStages = stages.filter((s: any) => s.priority === 1);
+  const secondaryStages = stages.filter((s: any) => s.priority === 2);
   const [isPaused, setIsPaused] = useState(false);
-  const duplicatedSecondary = [...secondaryFeatures, ...secondaryFeatures];
+  const duplicatedSecondary = [...secondaryStages, ...secondaryStages];
 
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -225,10 +206,10 @@ function HybridMode({ features, prefersReducedMotion, className }: any) {
         <div className="text-center mb-6 sm:mb-8">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
-              Game-Changing Features
+              A Tier for Every Business Model
             </h3>
             <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
-              The complete toolkit to compete with major retailers and dominate local search
+              Tiers aligned with how you actually operate — not just feature accumulation
             </p>
           </motion.div>
         </div>
@@ -240,19 +221,19 @@ function HybridMode({ features, prefersReducedMotion, className }: any) {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mb-6 sm:mb-8"
         >
-          <HeroFeatureCard feature={topFeatures[0]} />
+          <HeroFeatureCard feature={topStages[0]} />
         </motion.div>
 
         {/* Top 2 Features - Side by side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {topFeatures.slice(1, 3).map((feature: any, index: number) => (
+          {topStages.slice(1, 3).map((stage: any, index: number) => (
             <motion.div
-              key={feature.id}
+              key={stage.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
             >
-              <LargeFeatureCard feature={feature} />
+              <LargeFeatureCard feature={stage} />
             </motion.div>
           ))}
         </div>
@@ -260,7 +241,7 @@ function HybridMode({ features, prefersReducedMotion, className }: any) {
         {/* Secondary Features - Slider */}
         <div className="mb-6 sm:mb-8">
           <h4 className="text-lg sm:text-xl font-bold text-neutral-900 mb-3 sm:mb-4 text-center">
-            Plus More Powerful Tools
+            Advanced Tiers for Growing Businesses
           </h4>
           <div className="relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-neutral-50 to-transparent z-10 pointer-events-none" />
@@ -275,20 +256,20 @@ function HybridMode({ features, prefersReducedMotion, className }: any) {
               <motion.div
                 className="flex gap-3 sm:gap-4"
                 animate={{
-                  x: prefersReducedMotion || isPaused ? undefined : [0, -((secondaryFeatures.length * 280) + (secondaryFeatures.length * 16))],
+                  x: prefersReducedMotion || isPaused ? undefined : [0, -((secondaryStages.length * 280) + (secondaryStages.length * 16))],
                 }}
                 transition={{
                   x: {
                     repeat: Infinity,
                     repeatType: "loop",
-                    duration: secondaryFeatures.length * 3,
+                    duration: secondaryStages.length * 3,
                     ease: "linear",
                   },
                 }}
                 style={{ width: 'fit-content' }}
               >
-                {duplicatedSecondary.map((feature: any, index: number) => (
-                  <SmallFeatureCard key={`${feature.id}-${index}`} feature={feature} />
+                {duplicatedSecondary.map((stage: any, index: number) => (
+                  <SmallFeatureCard key={`${stage.id}-${index}`} feature={stage} />
                 ))}
               </motion.div>
             </div>
@@ -302,7 +283,7 @@ function HybridMode({ features, prefersReducedMotion, className }: any) {
 }
 
 // ==================== MODE 3: TABS ====================
-function TabsMode({ features, className }: any) {
+function TabsMode({ stages, className }: any) {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -310,16 +291,16 @@ function TabsMode({ features, className }: any) {
       <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="text-center mb-6 sm:mb-8">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
-            Explore Our Features
+            Explore Your Growth Path
           </h3>
-          <p className="text-sm sm:text-base text-neutral-600">Click to learn more about each capability</p>
+          <p className="text-sm sm:text-base text-neutral-600">Click each tier to see the business model it unlocks</p>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap justify-center gap-2 mb-6 sm:mb-8">
-          {features.map((feature: any, index: number) => (
+          {stages.map((stage: any, index: number) => (
             <button
-              key={feature.id}
+              key={stage.id}
               onClick={() => setActiveTab(index)}
               className={`px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all ${
                 activeTab === index
@@ -327,7 +308,7 @@ function TabsMode({ features, className }: any) {
                   : 'bg-white text-neutral-700 hover:bg-neutral-100'
               }`}
             >
-              {feature.icon} {feature.title}
+              {stage.icon} {stage.badge}
             </button>
           ))}
         </div>
@@ -339,7 +320,7 @@ function TabsMode({ features, className }: any) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <DetailedFeatureCard feature={features[activeTab]} />
+          <DetailedFeatureCard feature={stages[activeTab]} />
         </motion.div>
 
         <CTAButton />
@@ -349,26 +330,26 @@ function TabsMode({ features, className }: any) {
 }
 
 // ==================== MODE 4: GRID ====================
-function GridMode({ features, className }: any) {
+function GridMode({ stages, className }: any) {
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="text-center mb-6 sm:mb-8">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
-            Complete Feature Suite
+            A Tier for Every Business Reality
           </h3>
-          <p className="text-sm sm:text-base text-neutral-600">Everything you need in one powerful platform</p>
+          <p className="text-sm sm:text-base text-neutral-600">Align your tier with your business model — not the other way around</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {features.map((feature: any, index: number) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {stages.map((stage: any, index: number) => (
             <motion.div
-              key={feature.id}
+              key={stage.id}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: index * 0.05 }}
             >
-              <GridFeatureCard feature={feature} />
+              <GridFeatureCard feature={stage} />
             </motion.div>
           ))}
         </div>
@@ -380,17 +361,17 @@ function GridMode({ features, className }: any) {
 }
 
 // ==================== MODE 5: VIDEO HERO ====================
-function VideoHeroMode({ features, className }: any) {
-  const heroFeature = features.find((f: any) => f.priority === 1);
+function VideoHeroMode({ stages, className }: any) {
+  const heroStage = stages.find((s: any) => s.priority === 1);
 
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="text-center mb-6 sm:mb-8">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
-            See It In Action
+            See the Platform in Action
           </h3>
-          <p className="text-sm sm:text-base text-neutral-600">Watch how easy it is to get started</p>
+          <p className="text-sm sm:text-base text-neutral-600">How local retailers move from discovery to conversion</p>
         </div>
 
         {/* Video Section */}
@@ -399,17 +380,17 @@ function VideoHeroMode({ features, className }: any) {
             <div className="text-center">
               <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">🎬</div>
               <p className="text-lg sm:text-xl font-semibold">Video Demo Coming Soon</p>
-              <p className="text-xs sm:text-sm text-neutral-400 mt-2">{heroFeature?.title}</p>
+              <p className="text-xs sm:text-sm text-neutral-400 mt-2">{heroStage?.title}</p>
             </div>
           </div>
         </div>
 
         {/* Feature Grid Below */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {features.slice(0, 4).map((feature: any) => (
-            <div key={feature.id} className="text-center p-3 sm:p-4 bg-white rounded-lg">
-              <div className="text-2xl sm:text-3xl mb-2">{feature.icon}</div>
-              <p className="text-xs sm:text-sm font-semibold text-neutral-900">{feature.title}</p>
+          {stages.slice(0, 4).map((stage: any) => (
+            <div key={stage.id} className="text-center p-3 sm:p-4 bg-white rounded-lg">
+              <div className="text-2xl sm:text-3xl mb-2">{stage.icon}</div>
+              <p className="text-xs sm:text-sm font-semibold text-neutral-900">{stage.badge}</p>
             </div>
           ))}
         </div>
@@ -446,8 +427,8 @@ function FeatureCard({ feature }: any) {
         <div>
           <h4 className="text-base sm:text-lg md:text-xl font-bold mb-1 sm:mb-2">{feature.title}</h4>
           <p className="text-xs sm:text-sm text-white/90">{feature.description}</p>
-          {feature.subtext && (
-            <p className="text-xs text-white/70 mt-1">💰 {feature.subtext}</p>
+          {feature.price && (
+            <p className="text-xs text-white/90 mt-1 font-semibold">{feature.price}</p>
           )}
         </div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
@@ -469,10 +450,13 @@ function HeroFeatureCard({ feature }: any) {
         </div>
         <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">{feature.title}</h3>
         <p className="text-base sm:text-lg md:text-xl mb-2">{feature.description}</p>
-        <p className="text-sm sm:text-base md:text-lg text-white/80 mb-4 sm:mb-6">💰 {feature.subtext}</p>
-        <Link href={`/auth/signup?feature=${feature.id}`}>
+        <p className="text-sm sm:text-base md:text-lg text-white/80 mb-2 sm:mb-3">{feature.price}</p>
+        {feature.upgradeTrigger && (
+          <p className="text-xs sm:text-sm text-white/70 mb-4 sm:mb-6 italic">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+        )}
+        <Link href={`/auth/signup?tier=${feature.id}`}>
           <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100">
-            Try This Feature Now →
+            Start with {feature.badge} →
           </Button>
         </Link>
       </div>
@@ -495,7 +479,7 @@ function LargeFeatureCard({ feature }: any) {
         <div>
           <h4 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">{feature.title}</h4>
           <p className="text-xs sm:text-sm mb-1 sm:mb-2">{feature.description}</p>
-          <p className="text-xs text-white/70">💰 {feature.subtext}</p>
+          <p className="text-xs text-white/90 font-semibold">{feature.price}</p>
         </div>
       </div>
       <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20" />
@@ -536,16 +520,19 @@ function DetailedFeatureCard({ feature }: any) {
           </div>
         </div>
         <p className="text-base sm:text-lg md:text-xl mb-2 sm:mb-3">{feature.description}</p>
-        <p className="text-sm sm:text-base md:text-lg text-white/80 mb-4 sm:mb-6">💰 {feature.subtext}</p>
+        <p className="text-sm sm:text-base md:text-lg text-white/80 mb-2 sm:mb-3">{feature.price}</p>
+        {feature.upgradeTrigger && (
+          <p className="text-xs sm:text-sm text-white/70 mb-4 sm:mb-6 italic">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+        )}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <Link href={`/auth/signup?feature=${feature.id}`} className="w-full sm:w-auto">
+          <Link href={`/auth/signup?tier=${feature.id}`} className="w-full sm:w-auto">
             <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100 w-full sm:w-auto">
-              Try This Feature →
+              Start with {feature.badge} →
             </Button>
           </Link>
-          <Link href="/features" className="w-full sm:w-auto">
+          <Link href="/pricing" className="w-full sm:w-auto">
             <Button size="lg" variant="ghost" className="text-white border-white hover:bg-white/10 w-full sm:w-auto">
-              Learn More
+              Compare Tiers
             </Button>
           </Link>
         </div>
@@ -565,7 +552,10 @@ function GridFeatureCard({ feature }: any) {
       </span>
       <h4 className="text-base sm:text-lg font-bold text-neutral-900 mb-1 sm:mb-2">{feature.title}</h4>
       <p className="text-xs sm:text-sm text-neutral-600 mb-1 sm:mb-2">{feature.description}</p>
-      <p className="text-xs text-neutral-500">💰 {feature.subtext}</p>
+      <p className="text-xs text-neutral-500">{feature.price}</p>
+      {feature.upgradeTrigger && (
+        <p className="text-xs text-neutral-400 mt-1 italic line-clamp-2">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+      )}
     </div>
   );
 }
@@ -580,7 +570,7 @@ function CTAButton() {
     >
       <Link href="/features">
         <Button size="lg" className="shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-          <span>Explore All Features</span>
+          <span>Explore All Tiers</span>
           <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
