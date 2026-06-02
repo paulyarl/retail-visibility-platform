@@ -90,7 +90,7 @@ export class ProductCacheService {
       // Update usage stats
       await this.incrementUsageCount(cachedProducts.map(p => p.id));
       
-      // Convert to GeneratedProduct format (include image data)
+      // Convert to GeneratedProduct format (include image data and enhanced content)
       return cachedProducts.slice(0, count).map(p => ({
         name: p.productName,
         price: p.priceCents,
@@ -103,6 +103,10 @@ export class ProductCacheService {
         imageWidth: p.imageWidth || undefined,
         imageHeight: p.imageHeight || undefined,
         imageBytes: p.imageBytes || undefined,
+        // Include enhanced content if available
+        enhancedDescription: p.enhancedDescription || undefined,
+        features: p.features ? JSON.parse(JSON.stringify(p.features)) : undefined,
+        specifications: p.specifications ? JSON.parse(JSON.stringify(p.specifications)) : undefined,
       }));
     }
     

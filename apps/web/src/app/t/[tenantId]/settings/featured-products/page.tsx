@@ -6,7 +6,7 @@ import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager
 import { ArrowLeft, Star } from 'lucide-react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import { AdminFeaturedApprovalService } from '@/services/AdminFeaturedApprovalService';
+import TenantFeaturedAccessService from '@/services/TenantFeaturedAccessService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Force dynamic rendering to prevent caching
@@ -98,16 +98,9 @@ export default function FeaturedProductsSettings({
           // console.log('FeaturedProductsSettings: Tenant data received', tenantData);
           setTenant(tenantData);
           
-          // Fetch featured access approval status
+          // Fetch featured access approval status (tenant-scoped, no admin required)
           try {
-            const approvalService = AdminFeaturedApprovalService.getInstance();
-            const allTenantsWithStatus = await approvalService.getAllTenantsWithFeaturedAccessStatus();
-            console.log(`FeaturedProductsSettings: All tenants with status`, allTenantsWithStatus);
-            const currentTenantStatus = allTenantsWithStatus.find(t => t.id === id);
-            console.log(`FeaturedProductsSettings: Current tenant status`, currentTenantStatus);
-            
-            const hasApprovedAccess = currentTenantStatus?.featured_access_approved === true && 
-                                    currentTenantStatus?.subscription_status === 'active';
+            const hasApprovedAccess = await TenantFeaturedAccessService.hasFeaturedAccess(id);
             console.log(`FeaturedProductsSettings: Has approved access`, hasApprovedAccess);
             
             setFeaturedAccessApproved(hasApprovedAccess);

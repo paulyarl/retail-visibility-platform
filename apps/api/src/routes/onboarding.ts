@@ -2,7 +2,9 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { optionalAuth } from '../middleware/auth';
+import { USER_ROLES } from '../config/role-groups';
 import { generateTenantId, generateUserTenantId } from '../lib/id-generator';
+import slugSingletonService from '../services/SlugSingletonService';
 
 const router = Router();
 
@@ -59,6 +61,7 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
         business_name: businessName,
         business_type: businessType,
         phone: phone,
+        role: USER_ROLES.OWNER,
         onboarding_completed: true,
         onboarding_step: 'complete',
         onboarding_data: {
@@ -93,12 +96,13 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
     if (!existingTenant && businessName) {
       // Create tenant with the business name
       const tenantId = generateTenantId();
+      const tenantSlug = await slugSingletonService.generateSlug(businessName, {}, tenantId);
       tenant = await prisma.tenants.create({
         data: {
           id: tenantId,
           name: businessName,
-          slug: businessName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 50),
-          subscription_tier: 'starter',
+          slug: tenantSlug,
+          subscription_tier: 'discovery',
           subscription_status: 'trial',
         },
       });

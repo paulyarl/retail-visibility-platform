@@ -16,20 +16,14 @@ export default function PublicFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand Column */}
           <div className="col-span-1 md:col-span-2">
-            {settings?.logoUrl ? (
-              <Image
-                src={settings.logoUrl}
-                alt={settings.platformName || 'Platform Logo'}
-                width={150}
-                height={40}
-                className="object-contain mb-4"
-                style={{ width: 'auto', height: 'auto' }}
-              />
-            ) : (
-              <h3 className="text-lg font-bold text-neutral-900 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center text-white font-black text-sm select-none">
+                VS
+              </div>
+              <span className="text-xl font-extrabold tracking-wider text-neutral-900 uppercase font-sans">
                 {settings?.platformName || 'Visible Shelf'}
-              </h3>
-            )}
+              </span>
+            </div>
             <p className="text-neutral-600 text-sm mb-4 max-w-md">
               {settings?.platformDescription || 'Manage your retail operations with ease'}
             </p>

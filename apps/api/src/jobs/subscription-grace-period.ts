@@ -9,7 +9,7 @@
  * Run schedule: Daily at midnight (00:00 UTC)
  */
 
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { getTrialManagementService, GRACE_DURATION_DAYS } from '../services/subscription/TrialManagementService';
 import { expireManualSubscriptionControl } from './expireManualSubscriptionControl';
@@ -158,7 +158,7 @@ export async function getTenantsApproachingExpiry(): Promise<{
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return prisma.$queryRaw<Array<{ id: string; name: string; email: string }>>`
+    return basePrisma.$queryRaw<Array<{ id: string; name: string; email: string }>>`
       SELECT t.id, t.name, u.email
       FROM tenants t
       JOIN users u ON u.tenant_id = t.id AND u.role = 'owner'

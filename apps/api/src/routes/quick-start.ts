@@ -11,6 +11,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { user_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
+import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
@@ -117,7 +118,7 @@ const quickStartSchema = z.object({
   imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quick_start_wizard_full'), validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quickstart_enabled'), validateSKULimits, async (req, res) => {
   try {
     console.log('[Quick Start] POST request received');
     const { tenantId } = req.params;
@@ -366,7 +367,10 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
     if (tenant) {
       const orgTierKey = tenant.organizations_list?.subscription_tier || null;
       const tenantTierKey = tenant.subscription_tier || null;
-      const tierKeys = [orgTierKey, tenantTierKey].filter((k): k is string => !!k);
+      // Resolve trial tiers to base tiers (same logic as capabilities endpoint)
+      const resolvedOrgTierKey = orgTierKey ? getEffectiveTier(orgTierKey) : null;
+      const resolvedTenantTierKey = tenantTierKey ? getEffectiveTier(tenantTierKey) : null;
+      const tierKeys = [resolvedOrgTierKey, resolvedTenantTierKey].filter((k): k is string => !!k);
 
       if (tierKeys.length > 0) {
         const tiers = await prisma.subscription_tiers_list.findMany({

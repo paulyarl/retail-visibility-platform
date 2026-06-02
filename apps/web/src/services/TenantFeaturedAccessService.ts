@@ -84,7 +84,7 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
   async hasFeaturedAccess(tenantId: string): Promise<boolean> {
     try {
       const result = await this.makeDefaultRequest<FeaturedAccessStatus>(
-        `/api/tenants/${tenantId}/featured-access-status`,
+        `/api/featured-products/tenants/${tenantId}/featured-access-status`,
         {},
         `tenant-featured-access-${tenantId}`
       );
@@ -92,7 +92,7 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
         console.log(`Failed to check featured access: ${result.error}`);
         return false;
       }
-      return result.data.hasAccess || false;
+      return result.data?.hasAccess || false;
     } catch (error) {
       console.error('Error checking featured access:', error);
       return false; // Default to false on error
@@ -104,11 +104,11 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
    */
   async getAccessStatus(tenantId: string): Promise<FeaturedAccessStatus> {
     const result = await this.makeDefaultRequest<FeaturedAccessStatus>(
-      `/api/tenants/${tenantId}/featured-access-status`,
+      `/api/featured-products/tenants/${tenantId}/featured-access-status`,
       {},
       `tenant-featured-access-status-${tenantId}`
     );
-    if (!result.success) {
+    if (!result.success || !result.data) {
       console.log(`Failed to get featured access status: ${result.error}`);
       return { 
         hasAccess: false, 
@@ -129,11 +129,11 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
     if (options?.offset) params.append('offset', options.offset.toString());
     
     const result = await this.makeDefaultRequest<{ featuredProducts: FeaturedProductWithApproval[] }>(
-      `/api/tenants/${tenantId}/featured-products/with-approval${params.toString() ? `?${params.toString()}` : ''}`,
+      `/api/featured-products/tenants/${tenantId}/featured-products/with-approval${params.toString() ? `?${params.toString()}` : ''}`,
       {},
       `tenant-featured-products-${tenantId}`
     );
-    if (!result.success) {
+    if (!result.success || !result.data) {
       console.log(`Failed to get featured products with approval: ${result.error}`);
       return [];
     }
@@ -145,7 +145,7 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
    */
   async requestFeaturedAccess(tenantId: string, reason?: string): Promise<FeaturedAccessRequest> {
     const result = await this.makeDefaultRequest<FeaturedAccessRequest>(
-      `/api/tenants/${tenantId}/request-featured-access`,
+      `/api/featured-products/tenants/${tenantId}/request-featured-access`,
       {
         method: 'POST',
         headers: {
@@ -155,7 +155,7 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
       },
       `tenant-featured-access-request-${tenantId}`
     );
-    if (!result.success) {
+    if (!result.success || !result.data) {
       console.log(`Failed to request featured access: ${result.error}`);
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to request featured access');
     }

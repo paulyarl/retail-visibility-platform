@@ -8,7 +8,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
-import { BusinessProfile } from '../lib/validation/businessProfile';
+import { BusinessProfile, normalizePhoneInput } from '../lib/validation/businessProfile';
 import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 
@@ -2722,7 +2722,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       ...tenant,
       ...tenant?.metadata,
       business_name: profile?.business_name || tenant?.name || '',
-      phone_number: profile?.phone_number || tenant?.metadata?.phone_number || '',
+      phone_number: normalizePhoneInput(profile?.phone_number || tenant?.metadata?.phone_number || ''),
       email: profile?.email || tenant?.metadata?.email || '',
       website: profile?.website || tenant?.metadata?.website || '',
       contact_person: profile?.contact_person || tenant?.metadata?.contact_person || '',

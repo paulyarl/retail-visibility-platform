@@ -42,6 +42,17 @@ export default function SignupWizardPage() {
   useEffect(() => {
     const existingState = onboardingStateService.getPhase1();
     // console.log('[SignupWizard] Restoring from onboardingStateService:', existingState);
+    
+    // Check if there's a tier parameter in the URL
+    let urlTier = '';
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tierParam = params.get('tier');
+      if (tierParam) {
+        urlTier = tierParam;
+      }
+    }
+
     if (existingState) {
       setFormData(prev => ({
         ...prev,
@@ -51,6 +62,12 @@ export default function SignupWizardPage() {
         businessType: existingState.businessType || prev.businessType,
         phone: existingState.phone || prev.phone,
         email: existingState.email || prev.email,
+        preferredTier: urlTier || existingState.preferredTier || prev.preferredTier,
+      }));
+    } else if (urlTier) {
+      setFormData(prev => ({
+        ...prev,
+        preferredTier: urlTier,
       }));
     }
   }, []);

@@ -544,8 +544,13 @@ export default function StorefrontClientWrapper({
                 {/* Social Links */}
                 {!storefrontStatus.shouldShowPanel && tenant.profileData?.social_links && (
                   <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
                     <div className="flex flex-wrap gap-3">
+                      {(tenant.profileData.social_links.facebook
+                        || tenant.profileData.social_links?.instagram
+                        || tenant.profileData.social_links?.twitter
+                        || tenant.profileData.social_links?.linkedin) && (
+                          <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
+                        )}
                       {tenant.profileData.social_links.facebook && (
                         <a
                           href={tenant.profileData.social_links.facebook}

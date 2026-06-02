@@ -116,6 +116,8 @@ export default function OnboardingWizard({
     forced 
   });
   
+  const currentStepId = steps[currentStep]?.id;
+  
   // Handle saving
   const { 
     save, 
@@ -171,7 +173,7 @@ export default function OnboardingWizard({
   
   // Handlers
   const handleNext = async () => {
-    if (currentStep >= 1 && currentStep <= 4) {
+    if (currentStepId && currentStepId !== 'complete') {
       // Save data at each step, capture response for next step
       const savedData = await save(businessData);
       
@@ -183,7 +185,7 @@ export default function OnboardingWizard({
       }
       // If save failed, the error state will be set and the Alert will show
       // User can try again or fix the issue
-    } else if (currentStep === 5) {
+    } else if (currentStepId === 'complete') {
       handleComplete();
     }
   };
@@ -291,7 +293,7 @@ export default function OnboardingWizard({
           )}
 
           <AnimatePresence mode="wait">
-            {currentStep === 1 && (
+            {currentStepId === 'store' && (
               <motion.div
                 key="store-identity"
                 initial={{ opacity: 0, x: 20 }}
@@ -308,7 +310,7 @@ export default function OnboardingWizard({
               </motion.div>
             )}
 
-            {currentStep === 2 && (
+            {currentStepId === 'hours' && (
               <motion.div
                 key="business-hours"
                 initial={{ opacity: 0, x: 20 }}
@@ -325,7 +327,7 @@ export default function OnboardingWizard({
               </motion.div>
             )}
 
-            {currentStep === 3 && (
+            {currentStepId === 'branding' && (
               <motion.div
                 key="branding-social"
                 initial={{ opacity: 0, x: 20 }}
@@ -342,7 +344,7 @@ export default function OnboardingWizard({
               </motion.div>
             )}
 
-            {currentStep === 4 && (
+            {currentStepId === 'settings' && (
               <motion.div
                 key="additional-settings"
                 initial={{ opacity: 0, x: 20 }}
@@ -359,7 +361,7 @@ export default function OnboardingWizard({
               </motion.div>
             )}
 
-            {currentStep === 5 && (
+            {currentStepId === 'complete' && (
               <motion.div
                 key="complete"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -596,7 +598,7 @@ export default function OnboardingWizard({
           {/* Navigation Buttons */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
             <div>
-              {currentStep >= 1 && currentStep < 5 && (
+              {currentStepId !== 'complete' && (
                 <Button variant="ghost" onClick={handleSkip}>
                   Skip for now
                 </Button>
@@ -604,7 +606,7 @@ export default function OnboardingWizard({
             </div>
             
             <div className="flex items-center gap-3">
-              {currentStep > 1 && currentStep <= 5 && (
+              {currentStepId !== 'store' && currentStepId !== 'complete' && (
                 <Button variant="secondary" onClick={handleBack} disabled={saving}>
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -613,20 +615,20 @@ export default function OnboardingWizard({
                 </Button>
               )}
               
-              {currentStep >= 1 && currentStep < 5 && (
+              {currentStepId !== 'complete' && (
                 <Button 
                   onClick={handleNext} 
                   disabled={!isValid || saving}
                   loading={saving} style={{color: 'white'}}
                 >
-                  {saving ? 'Saving...' : currentStep === 4 ? 'Complete Setup' : 'Continue'}
+                  {saving ? 'Saving...' : currentStepId === 'settings' ? 'Complete Setup' : 'Continue'}
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </Button>
               )}
 
-              {currentStep === 5 && (
+              {currentStepId === 'complete' && (
                 <Button onClick={handleNext}>
                   Go to Dashboard
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -645,7 +647,7 @@ export default function OnboardingWizard({
             </div>
           </div>
           
-          {currentStep === 5 && (
+          {currentStepId === 'complete' && (
             <div className="mt-8">
               {/* Primary Actions */}
               <div className={`grid gap-3 mb-4 ${canStartTrial ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>

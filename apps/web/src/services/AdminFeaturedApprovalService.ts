@@ -82,7 +82,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
       'admin-all-tenants-featured-access'
     );
     
-    const tenants = result.data.tenants || [];
+    const tenants = result.data?.tenants || [];
     // console.log('[DEBUG] AdminFeaturedApprovalService: API returned tenants:', tenants.length);
     // console.log('[DEBUG] AdminFeaturedApprovalService: Raw tenant data:', tenants);
     

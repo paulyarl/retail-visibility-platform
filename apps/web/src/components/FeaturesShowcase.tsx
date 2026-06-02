@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -18,10 +18,11 @@ const businessJourney = [
     priority: 1,
     price: '$29/mo',
     upgradeTrigger: 'People are finding my products — now I want them to find my whole store.',
+    nextEvolution: 'Storefront Tier →',
   },
   {
     id: 'storefront',
-    icon: '�',
+    icon: '🏪',
     title: 'Own Your Platform Presence',
     description: 'A branded storefront inside the marketplace — browse, inquire, and connect.',
     subtext: 'Platform presence for retailers ready to be discovered beyond Google.',
@@ -30,6 +31,7 @@ const businessJourney = [
     priority: 1,
     price: '$59/mo',
     upgradeTrigger: 'Shoppers are browsing — now I want them to commit to buying.',
+    nextEvolution: 'Commitment Tier →',
   },
   {
     id: 'commitment',
@@ -42,10 +44,11 @@ const businessJourney = [
     priority: 1,
     price: '$79/mo',
     upgradeTrigger: 'Shoppers reserve and show up — now I want to close the full sale online.',
+    nextEvolution: 'E-commerce Tier →',
   },
   {
     id: 'ecommerce',
-    icon: '�',
+    icon: '🛒',
     title: 'Sell Online — Fully & Simply',
     description: 'Complete checkout, payment collection & delivery — pure e-commerce.',
     subtext: 'Full online sales for digital-first retailers. No deposit confusion.',
@@ -54,6 +57,7 @@ const businessJourney = [
     priority: 1,
     price: '$99/mo',
     upgradeTrigger: 'I\'m selling online successfully — now I want to add physical pickup options.',
+    nextEvolution: 'Omnichannel Tier →',
   },
   {
     id: 'omnichannel',
@@ -66,6 +70,7 @@ const businessJourney = [
     priority: 2,
     price: '$149/mo',
     upgradeTrigger: 'I have a physical store AND online sales — I want to offer every way to buy.',
+    nextEvolution: 'Enterprise Tier →',
   },
   {
     id: 'enterprise',
@@ -78,6 +83,7 @@ const businessJourney = [
     priority: 2,
     price: '$499/mo',
     upgradeTrigger: 'Growth, scale, and advanced business needs.',
+    nextEvolution: 'Ultimate Scale',
   },
 ];
 
@@ -124,7 +130,7 @@ export default function FeaturesShowcase({ mode = 'grid', className = '' }: Feat
   })();
 
   return (
-    <div className="hidden md:block">
+    <div className="w-full">
       {showcaseContent}
     </div>
   );
@@ -214,6 +220,34 @@ function HybridMode({ stages, prefersReducedMotion, className }: any) {
           </motion.div>
         </div>
 
+        {/* Baseline / Pre-Discovery Mindset Shift */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
+        >
+          <div className="bg-neutral-900/5 border border-dashed border-neutral-300 rounded-2xl p-5 md:p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="absolute top-0 right-0 p-3 text-neutral-200/50 text-7xl font-serif pointer-events-none select-none z-0">
+              &ldquo;
+            </div>
+            <div className="relative z-10 max-w-2xl">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-300 mb-2">
+                🔒 Baseline (The Retailer's Dilemma)
+              </span>
+              <p className="text-sm md:text-base text-neutral-600 font-medium italic leading-relaxed">
+                &ldquo;My products are sitting on the physical shelves right now, but unless someone walks through my door, nobody in my neighborhood even knows what I have in stock.&rdquo;
+              </p>
+            </div>
+            <div className="relative z-10 shrink-0 self-start md:self-center">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 block mb-1">Next Evolution</span>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1">
+                🔎 Discovery Tier →
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Hero Feature - Largest, with video option */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -295,6 +329,34 @@ function TabsMode({ stages, className }: any) {
           </h3>
           <p className="text-sm sm:text-base text-neutral-600">Click each tier to see the business model it unlocks</p>
         </div>
+
+        {/* Baseline / Pre-Discovery Mindset Shift */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
+        >
+          <div className="bg-neutral-900/5 border border-dashed border-neutral-300 rounded-2xl p-5 md:p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="absolute top-0 right-0 p-3 text-neutral-200/50 text-7xl font-serif pointer-events-none select-none z-0">
+              &ldquo;
+            </div>
+            <div className="relative z-10 max-w-2xl">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-300 mb-2">
+                🔒 Baseline (The Retailer's Dilemma)
+              </span>
+              <p className="text-sm md:text-base text-neutral-600 font-medium italic leading-relaxed">
+                &ldquo;My products are sitting on the physical shelves right now, but unless someone walks through my door, nobody in my neighborhood even knows what I have in stock.&rdquo;
+              </p>
+            </div>
+            <div className="relative z-10 shrink-0 self-start md:self-center">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 block mb-1">Next Evolution</span>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1">
+                🔎 Discovery Tier →
+              </span>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap justify-center gap-2 mb-6 sm:mb-8">
@@ -444,15 +506,31 @@ function HeroFeatureCard({ feature }: any) {
       <div className="relative z-10 text-white">
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div className="text-5xl sm:text-6xl md:text-7xl">{feature.icon}</div>
-          <span className="bg-white/20 backdrop-blur-sm px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold">
-            {feature.badge}
-          </span>
+          <div className="flex flex-col items-end gap-2">
+            <span className="bg-white/20 backdrop-blur-sm px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold">
+              {feature.badge}
+            </span>
+            {feature.nextEvolution && (
+              <span className="bg-white/10 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-white/90 border border-white/15">
+                Next Evolution: {feature.nextEvolution}
+              </span>
+            )}
+          </div>
         </div>
         <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">{feature.title}</h3>
         <p className="text-base sm:text-lg md:text-xl mb-2">{feature.description}</p>
         <p className="text-sm sm:text-base md:text-lg text-white/80 mb-2 sm:mb-3">{feature.price}</p>
         {feature.upgradeTrigger && (
-          <p className="text-xs sm:text-sm text-white/70 mb-4 sm:mb-6 italic">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+          <div className="mt-4 mb-6 p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-white/60" />
+            <p className="text-xs font-semibold tracking-wider text-white/50 uppercase mb-1">Retailer Growth Mindset</p>
+            <p className="text-sm md:text-base text-white font-medium italic relative z-10 leading-relaxed">
+              &ldquo;{feature.upgradeTrigger}&rdquo;
+            </p>
+            <div className="absolute -right-4 -bottom-4 text-white/5 text-6xl font-serif pointer-events-none select-none">
+              &rdquo;
+            </div>
+          </div>
         )}
         <Link href={`/auth/signup?tier=${feature.id}`}>
           <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100">
@@ -510,19 +588,35 @@ function DetailedFeatureCard({ feature }: any) {
   return (
     <div className={`relative rounded-xl sm:rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br ${feature.gradient} p-6 sm:p-8`}>
       <div className="relative z-10 text-white">
-        <div className="flex items-center gap-4 sm:gap-6 mb-4 sm:mb-6">
-          <div className="text-4xl sm:text-5xl md:text-6xl">{feature.icon}</div>
-          <div>
-            <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold mb-2 inline-block">
-              {feature.badge}
-            </span>
-            <h4 className="text-2xl sm:text-3xl font-bold">{feature.title}</h4>
+        <div className="flex items-center justify-between gap-4 sm:gap-6 mb-4 sm:mb-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="text-4xl sm:text-5xl md:text-6xl">{feature.icon}</div>
+            <div>
+              <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold mb-2 inline-block">
+                {feature.badge}
+              </span>
+              <h4 className="text-2xl sm:text-3xl font-bold">{feature.title}</h4>
+            </div>
           </div>
+          {feature.nextEvolution && (
+            <span className="bg-white/10 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-white/90 border border-white/15">
+              Next Evolution: {feature.nextEvolution}
+            </span>
+          )}
         </div>
         <p className="text-base sm:text-lg md:text-xl mb-2 sm:mb-3">{feature.description}</p>
         <p className="text-sm sm:text-base md:text-lg text-white/80 mb-2 sm:mb-3">{feature.price}</p>
         {feature.upgradeTrigger && (
-          <p className="text-xs sm:text-sm text-white/70 mb-4 sm:mb-6 italic">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+          <div className="mt-4 mb-6 p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-white/60" />
+            <p className="text-xs font-semibold tracking-wider text-white/50 uppercase mb-1">Retailer Growth Mindset</p>
+            <p className="text-sm md:text-base text-white font-medium italic relative z-10 leading-relaxed">
+              &ldquo;{feature.upgradeTrigger}&rdquo;
+            </p>
+            <div className="absolute -right-4 -bottom-4 text-white/5 text-6xl font-serif pointer-events-none select-none">
+              &rdquo;
+            </div>
+          </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <Link href={`/auth/signup?tier=${feature.id}`} className="w-full sm:w-auto">
@@ -530,7 +624,7 @@ function DetailedFeatureCard({ feature }: any) {
               Start with {feature.badge} →
             </Button>
           </Link>
-          <Link href="/pricing" className="w-full sm:w-auto">
+          <Link href="/features#pricing" className="w-full sm:w-auto">
             <Button size="lg" variant="ghost" className="text-white border-white hover:bg-white/10 w-full sm:w-auto">
               Compare Tiers
             </Button>
@@ -554,7 +648,12 @@ function GridFeatureCard({ feature }: any) {
       <p className="text-xs sm:text-sm text-neutral-600 mb-1 sm:mb-2">{feature.description}</p>
       <p className="text-xs text-neutral-500">{feature.price}</p>
       {feature.upgradeTrigger && (
-        <p className="text-xs text-neutral-400 mt-1 italic line-clamp-2">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+        <div className="mt-4 p-3 rounded-lg bg-gray-50 border-l-2 border-primary-500 relative overflow-hidden">
+          <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-0.5">Mindset Shift</p>
+          <p className="text-xs text-gray-600 font-medium italic leading-normal select-none">
+            &ldquo;{feature.upgradeTrigger}&rdquo;
+          </p>
+        </div>
       )}
     </div>
   );

@@ -8,6 +8,9 @@ import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 
+// E.164 phone number validation
+const phoneRegex = /^\+[1-9]\d{1,14}$/;
+
 // Create a schema that only validates onboarding form fields and ignores extra fields
 const onboardingFormSchema = z.object({
   business_name: z.string()
@@ -50,6 +53,7 @@ const onboardingFormSchema = z.object({
   
   phone_number: z.string({ message: 'Phone number is required' })
     .min(1, 'Phone number is required')
+    .regex(phoneRegex, 'Phone must be in E.164 format (e.g., +1 202 555 1234)')
     .trim(),
   
   email: z.string()
@@ -121,6 +125,10 @@ export default function StoreIdentityStep({
   
   // Sanitize initial data to prevent hydration mismatches
   const sanitizedInitialData = sanitizeData(initialData);
+  // Normalize phone number so loaded data always has E.164 +1 prefix
+  if (sanitizedInitialData.phone_number) {
+    sanitizedInitialData.phone_number = normalizePhoneInput(sanitizedInitialData.phone_number);
+  }
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(sanitizedInitialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -135,6 +143,9 @@ export default function StoreIdentityStep({
       if (dataKey !== lastInitialDataRef.current) {
         lastInitialDataRef.current = dataKey;
         const sanitized = sanitizeData(initialData);
+        if (sanitized.phone_number) {
+          sanitized.phone_number = normalizePhoneInput(sanitized.phone_number);
+        }
         setFormData(sanitized);
       }
     }

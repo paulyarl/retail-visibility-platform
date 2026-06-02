@@ -46,13 +46,15 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
   // Initialize on mount
   useEffect(() => {
     const initAuth = async () => {
+      // console.log('[CustomerAuthContext] Initializing auth...');
       setIsLoading(true);
       try {
+        // console.log('[CustomerAuthContext] Calling initialize...');
         const existingCustomer = await customerAuthService.initialize();
-        setCustomer(existingCustomer);
+        // console.log('[CustomerAuthContext] Initialize result:', existingCustomer);
+        existingCustomer ? setCustomer(existingCustomer) : setIsLoading(false);
       } catch (err) {
         console.error('[CustomerAuthContext] Init error:', err);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -69,6 +71,11 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
 
     try {
       const result = await customerAuthService.login(email, password);
+
+      if (!result.success){
+        setError(result.error || 'Login failed');
+        return result;
+      }
 
       if (result.success && result.customer) {
         setCustomer(result.customer);

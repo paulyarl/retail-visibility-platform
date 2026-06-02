@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { BusinessProfile, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { onboardingDataService } from '@/services/onboardingDataService';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
 
@@ -51,6 +51,11 @@ export function useOnboardingData({
 
         // Merge: API data as base, localStorage overrides, then phase1Data
         const merged = { ...apiData, ...localData, ...phase1Data };
+
+        // Ensure phone number is always E.164 after merge (localStorage may have stale un-normalized value)
+        if (merged.phone_number) {
+          merged.phone_number = normalizePhoneInput(merged.phone_number);
+        }
 
         // Sanitize and normalize
         const sanitized = onboardingDataService.sanitizeData(merged);

@@ -80,6 +80,7 @@ class CustomerAuthService extends CustomerApiSingleton {
    */
   private clearToken(): void {
     if (typeof window === 'undefined') return;
+    console.log('[CustomerAuthService] Clearing token');
     localStorage.removeItem('customer_auth_token');
   }
 
@@ -101,11 +102,15 @@ class CustomerAuthService extends CustomerApiSingleton {
    * Initialize - check for existing session via token or cookie
    */
   async initialize(): Promise<Customer | null> {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === 'undefined') {
+      console.log('[CustomerAuthService] Window is undefined, skipping initialization');
+      return null;
+    }
 
     // Skip API call if no token exists - avoids unnecessary 401s on public pages
     const token = this.getToken();
     if (!token) {
+      // console.log('[CustomerAuthService] No token found, skipping API call');
       this.customer = null;
       return null;
     }
@@ -124,13 +129,23 @@ class CustomerAuthService extends CustomerApiSingleton {
         'customer-auth-me'
       );
 
-      if (result.success && result.data?.customer) {
+      if (!result.success) {
+        console.log('[CustomerAuthService] Initialize failed:', result.error);
+        const status = (result.error as any)?.status;
+        if (status === 401) {
+          this.clearToken();
+        }
+        return null;
+      }
+
+      if (result.data?.customer) {
         this.customer = result.data.customer;
         this.setCurrentCustomer(this.customer.id, this.customer);
+        console.log('[CustomerAuthService] Customer initialized:', this.customer);
         return this.customer;
       }
-    } catch (error) {
-      console.warn('[CustomerAuth] Session validation failed:', error);
+    } catch (error: any) {
+      console.log(`[CustomerAuthService] Initialize error: ${error}`);
     }
 
     return null;

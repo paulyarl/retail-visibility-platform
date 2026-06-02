@@ -121,6 +121,8 @@ export default function PlatformDashboard() {
                   alt={settings.platformName || 'Platform Logo'}
                   width={150}
                   height={40}
+                  style={{ height: 'auto', width: 'auto' }}
+                  priority
                   className="object-contain cursor-pointer"
                 />
               </Link>
@@ -498,7 +500,7 @@ export default function PlatformDashboard() {
 
         {/* Features Showcase */}
         <div className="mb-6 sm:mb-8">
-          <FeaturesShowcase mode={showcaseMode} />
+          <FeaturesShowcase mode="hybrid" />
         </div>
       </main>
 

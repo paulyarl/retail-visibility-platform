@@ -99,6 +99,10 @@ export class OnboardingDataService {
     try {
       // Sanitize data to convert null values to empty strings
       const sanitizedData = this.sanitizeData(data);
+      // Ensure phone is in E.164 format before sending to API
+      if (sanitizedData.phone_number) {
+        sanitizedData.phone_number = normalizePhoneInput(sanitizedData.phone_number);
+      }
       const result = await platformHomeService.saveOnboardingProfile(tenantId, sanitizedData);
       return result as Partial<BusinessProfile>;
     } catch (error) {

@@ -35,6 +35,7 @@ import { propagateVariants } from './utils/variant-propagation';
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
 import { requireRoleGroup } from "./middleware/role-validation";
 import { requirePermission } from "./middleware/role-validation";
+import { USER_ROLES } from "./config/role-groups";
 
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
@@ -1226,8 +1227,31 @@ app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireRole
       where: { tenant_id: req.params.id as string },
     });
 
+    // Find owners before deleting the tenant so we can check their remaining tenants afterward
+    const ownersBeforeDelete = await prisma.user_tenants.findMany({
+      where: {
+        tenant_id: req.params.id as string,
+        role: 'OWNER',
+      },
+      select: { user_id: true },
+    });
+
     // Delete the tenant (cascade will handle other relations)
     await prisma.tenants.delete({ where: { id: req.params.id as string } });
+
+    // Downgrade global role for any owner whose last tenant was just deleted
+    for (const { user_id } of ownersBeforeDelete) {
+      const remainingTenants = await prisma.user_tenants.count({
+        where: { user_id },
+      });
+      if (remainingTenants === 0) {
+        await prisma.users.update({
+          where: { id: user_id },
+          data: { role: USER_ROLES.USER },
+        });
+        console.log(`[Audit] Downgraded user ${user_id} from OWNER to USER (last tenant deleted)`);
+      }
+    }
 
     console.log(`[Audit] Tenant deleted: ${tenant_id} (including directory listings)`);
     res.status(204).end();
@@ -1626,6 +1650,43 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "tenant_not_found" });
     }
     console.log('[POST /tenant/profile] Found tenant:', existingTenant.name);
+
+    // Ensure the current user has OWNER role for this tenant (defensive check)
+    // Skip for platform admins who may legitimately update any tenant profile
+    const currentUserId = req.user?.id;
+    const isPlatformAdmin = req.user?.role === USER_ROLES.PLATFORM_ADMIN || req.user?.role === USER_ROLES.ADMIN;
+    if (currentUserId && !isPlatformAdmin) {
+      const existingUserTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: currentUserId,
+            tenant_id: tenant_id,
+          },
+        },
+      });
+      if (!existingUserTenant) {
+        await prisma.user_tenants.create({
+          data: {
+            id: generateUserTenantId(currentUserId, tenant_id),
+            user_id: currentUserId,
+            tenant_id: tenant_id,
+            role: USER_ROLES.OWNER,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        });
+        console.log('[POST /tenant/profile] Created user_tenants OWNER link for user:', currentUserId);
+      } else if (existingUserTenant.role !== USER_ROLES.OWNER) {
+        await prisma.user_tenants.update({
+          where: { id: existingUserTenant.id },
+          data: {
+            role: USER_ROLES.OWNER,
+            updated_at: new Date(),
+          },
+        });
+        console.log('[POST /tenant/profile] Updated user_tenants role to OWNER for user:', currentUserId);
+      }
+    }
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Import basePrisma to bypass retry wrapper
