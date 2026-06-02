@@ -570,8 +570,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   publishedAt: product.publishedAt,
 
                   // Featured system
-                  featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes,
+                  featuredType: product.featuredType || type || undefined,
+                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
@@ -583,7 +583,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Legacy metadata
                   metadata: {
-                    featuredTypes: product.featuredTypes
+                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : []))
                   }
                 }}
                 variant="featured"
@@ -738,8 +738,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   publishedAt: product.publishedAt,
 
                   // Featured system
-                  featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes,
+                  featuredType: product.featuredType || type || undefined,
+                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
@@ -751,7 +751,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Legacy metadata
                   metadata: {
-                    featuredTypes: product.featuredTypes
+                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : []))
                   }
                 }}
                 variant="list"

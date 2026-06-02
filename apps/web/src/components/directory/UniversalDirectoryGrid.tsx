@@ -108,7 +108,7 @@ export default function UniversalDirectoryGrid({
               {productIds.slice(0, 8).map((productId) => (
                 <SmartProductCard
                   key={productId}
-                  product={{ id: productId, name: '', priceCents: 0 } as any}
+                  product={{ id: productId, name: '', priceCents: 0, featuredTypes: [] } as any}
                   tenantId={productId}
                   variant="compact"
                 />

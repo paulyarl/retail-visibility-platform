@@ -33,6 +33,7 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -159,20 +160,61 @@ async function getTenantProfile(tenantId: string) {
   }
 }
 
-async function getBucketCounts(tenantId: string): Promise<Record<string, number> | undefined> {
+async function getFeaturedProductsByType(tenantId: string): Promise<{ counts: Record<string, number>; groupedProducts: Record<string, any[]> }> {
   try {
-    const featuredData = await storefrontSingletonService.getFeaturedProductsByType(tenantId, undefined, 1);
-    // Extract bucket counts from the response
-    // The API returns products grouped by type, we just need counts
+    const featuredData = await storefrontSingletonService.getFeaturedProductsByType(tenantId, undefined, 6);
     const counts: Record<string, number> = {};
     for (const [type, products] of Object.entries(featuredData || {})) {
       counts[type] = Array.isArray(products) ? products.length : 0;
     }
-    return counts;
+    return { counts, groupedProducts: featuredData || {} };
   } catch (error) {
-    console.error('Error fetching bucket counts:', error);
-    return undefined;
+    console.error('Error fetching featured products by type:', error);
+    return { counts: {}, groupedProducts: {} };
   }
+}
+
+// Merchant gate helpers: filter by merchant preferences before passing to components
+function filterTypesByMerchantPreferences(
+  types: string[],
+  prefs: FeaturedOptionsSettings | null
+): string[] {
+  if (!prefs || !prefs.featured_enabled) return [];
+  return types.filter(type => {
+    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    return prefs[key] === true;
+  });
+}
+
+function filterBucketCountsByMerchantPreferences(
+  counts: Record<string, number> | undefined,
+  prefs: FeaturedOptionsSettings | null
+): Record<string, number> | undefined {
+  if (!counts) return undefined;
+  if (!prefs || !prefs.featured_enabled) return {};
+  const filtered: Record<string, number> = {};
+  for (const [type, count] of Object.entries(counts)) {
+    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    if (prefs[key] === true) {
+      filtered[type] = count;
+    }
+  }
+  return filtered;
+}
+
+function filterGroupedProductsByMerchantPreferences(
+  grouped: Record<string, any[]>,
+  prefs: FeaturedOptionsSettings | null
+): Record<string, any[]> {
+  if (!prefs || !prefs.featured_enabled) return {};
+  const filtered: Record<string, any[]> = {};
+  for (const [type, products] of Object.entries(grouped)) {
+    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    if (prefs[key] === true) {
+      filtered[type] = products;
+    }
+  }
+  return filtered;
 }
 
 async function getStorefrontCategories(tenantId: string) {
@@ -270,7 +312,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   }
 
   const shopData = await getShopData(product.tenantId);
-  const bucketCounts = await getBucketCounts(product.tenantId);
+  const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
+
+  // Fetch merchant preferences and apply merchant gate filtering at page root
+  const featuredPrefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(product.tenantId);
+  const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredPrefs);
+  const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredPrefs);
+  const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredPrefs);
   // const tenantProfile2 = await getTenantProfile(product.tenantId);
   const tenantProfile = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
@@ -615,7 +663,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       name: product.category.name,
                       slug: product.category.slug,
                     } : undefined,
-                    featuredTypes: product.featuredTypes,
+                    featuredTypes: merchantFilteredFeaturedTypes,
                     bucketCounts,
                     gtin: undefined, // Not available in new API
                     mpn: undefined, // Not available in new API
@@ -673,7 +721,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
         {/* Business Description - Merchant Branding - Full Width */}
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
-                  
+
           {/* Business Information - Contact Us - Full Width */}
 
           {product.productType != 'digital' ? (
@@ -715,7 +763,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <FeaturedTypeProducts
               currentProductId={product.id}
               tenantId={product.tenantId}
-              featuredTypes={product.featuredTypes || []}
+              featuredTypes={merchantFilteredFeaturedTypes}
+              groupedProducts={merchantFilteredGroupedProducts}
             />
           </div>
 

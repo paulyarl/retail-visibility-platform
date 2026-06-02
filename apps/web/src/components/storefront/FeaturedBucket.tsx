@@ -111,7 +111,9 @@ export default function FeaturedBucket({
               availability: product.availability || 'in_stock',
               has_variants: product.hasVariants || false,
               has_active_payment_gateway: hasActivePaymentGateway,
-              payment_gateway_type: defaultGatewayType
+              payment_gateway_type: defaultGatewayType,
+              featuredType: product.featuredType || bucketType || undefined,
+              featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])),
             }}
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}

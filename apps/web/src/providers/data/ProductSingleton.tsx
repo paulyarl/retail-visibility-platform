@@ -29,6 +29,7 @@ export interface PublicProduct {
   };
   isFeatured?: boolean;
   featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredTypes?: string[];
   featuredPriority?: number;
   featuredAt?: string;
   featuredExpiresAt?: string;

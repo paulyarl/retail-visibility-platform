@@ -146,7 +146,9 @@ export default function FeaturedProductsSection({
               imageUrl: product.imageUrl,
               tenantId: product.tenantId,
               availability: product.availability || 'in_stock',
-              has_variants: product.hasVariants || false
+              has_variants: product.hasVariants || false,
+              featuredType: product.featuredType || showType || undefined,
+              featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (showType ? [showType] : [])),
             }}
             variant="compact"
           />

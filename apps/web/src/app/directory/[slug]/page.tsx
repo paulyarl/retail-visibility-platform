@@ -33,7 +33,7 @@ import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 // recommendation data
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
-import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
+// import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
@@ -728,7 +728,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
+                      <h2 className="text-2xl font-bold text-gray-900">Store Selections</h2>
                       <Link
                         href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
                         className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -767,14 +767,15 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                               has_variants: product.has_variants,
                               // Use fresh payment gateway status from consolidated data instead of inconsistent context
                               payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
+                              featuredType: product.featuredType,
+                              featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
                             }}
                             tenantName={listing.businessName}
                             tenantLogo={tenantLogo?.toString() || listing.logoUrl}
                             defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
                             variant="featured"
                             showCategory={true}
-                            showDescription={true}
-
+                            showDescription={true}                            
                           />
                         ))
                       })()}

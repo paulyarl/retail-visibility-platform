@@ -23,6 +23,8 @@ interface RecommendedProduct {
   tenantSlug?: string;
   productCategory?: string;
   productCategorySlug?: string;
+  featuredType?: string;
+  featuredTypes?: string[];
 }
 
 interface ProductRecommendationsProps {
@@ -101,6 +103,8 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
                 payment_gateway_type: product.payment_gateway_type,
                 productCategory: product.productCategory,
                 productCategorySlug: product.productCategorySlug,
+                featuredType: product.featuredType,
+                featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
               }}
               tenantName=""
               hasActivePaymentGateway={product.has_active_payment_gateway}

@@ -72,6 +72,7 @@ interface LastViewedProduct {
   productCategory?: string;
   productCategorySlug?: string;
   featuredType?: string;
+  featuredTypes?: string[];
   featuredPriority?: number;
   featuredAt?: string;
   isFeaturedActive?: boolean;
@@ -413,6 +414,7 @@ export default function LastViewed({
                             
                             // Featured data
                             featuredType: productData.featuredType,
+                            featuredTypes: productData.featuredTypes || (productData.featuredType ? [productData.featuredType] : []),
                             featuredPriority: productData.featuredPriority,
                             featuredAt: productData.featuredAt,
                             isFeaturedActive: productData.isFeaturedActive,

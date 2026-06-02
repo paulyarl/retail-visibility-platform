@@ -30,12 +30,12 @@ import { useDirectoryStores } from '@/hooks/useDirectoryStores';
 
 // Cache configuration for directory data
 const CACHE_CONFIG = {
-  categories: { 
-    key: 'directory-categories', 
+  categories: {
+    key: 'directory-categories',
     ttl: 24 * 60 * 60 * 1000 // 24 hours
   },
-  storeTypes: { 
-    key: 'directory-store-types', 
+  storeTypes: {
+    key: 'directory-store-types',
     ttl: 24 * 60 * 60 * 1000 // 24 hours
   }
 };
@@ -45,17 +45,17 @@ function getCachedData(key: string): any | null {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
-    
+
     const { data, timestamp } = JSON.parse(cached);
     const config = Object.values(CACHE_CONFIG).find(c => c.key === key);
-    
+
     if (!config || Date.now() - timestamp > config.ttl) {
       localStorage.removeItem(key);
       return null;
     }
     // console.log('[DirectoryClient] Cache hit for:', key);
     // console.log('[DirectoryClient] Cache data:', data);
-    
+
     return data;
   } catch (error) {
     console.warn('Error reading cache:', error);
@@ -90,40 +90,40 @@ async function getUserLocation(): Promise<{
           enableHighAccuracy: true
         });
       });
-      
+
       const { latitude, longitude } = position.coords;
-      
+
       // Reverse geocoding via service
       const data = await externalApiService.reverseGeocode(latitude, longitude);
-      
+
       if (!data) {
         return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
       }
-      
+
       const address = data.address || {};
       const city = address.city || address.town || address.village || 'Unknown';
       const state = address.state || 'Unknown';
-      
+
       return { latitude, longitude, city, state };
     }
   } catch (error) {
     console.warn('Geolocation failed, falling back to IP-based location');
   }
-  
+
   // Fallback to IP-based location
   try {
     // Get user context for unique cache key to prevent cross-contamination
     const getUserIdFromContext = () => {
       const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
       if (userId) return userId;
-      
+
       const cookies = document.cookie.split(';');
       const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
       if (userIdCookie) return userIdCookie.split('=')[1]?.trim();
-      
+
       return null;
     };
-    
+
     const getSessionIdFromContext = () => {
       let sessionId = sessionStorage.getItem('sessionId');
       if (!sessionId) {
@@ -132,19 +132,19 @@ async function getUserLocation(): Promise<{
       }
       return sessionId;
     };
-    
+
     const userId = getUserIdFromContext();
     const sessionId = getSessionIdFromContext();
     const userContext = userId || sessionId || 'anonymous';
     const cacheKey = `ip-geolocation-${userContext}`;
-    
+
     const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
-    
+
     if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
       console.warn('Invalid location data received from external API');
       return null;
     }
-    
+
     return {
       latitude: ipLocation.latitude,
       longitude: ipLocation.longitude,
@@ -203,7 +203,7 @@ export default function DirectoryClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { totalItems: cartTotalItems } = useMultiCart();
-  
+
   // Use the new directory stores hook with StoreSingleton caching
   const {
     stores: data,
@@ -273,7 +273,7 @@ export default function DirectoryClient() {
     if (savedPageSize && [12, 24, 48, 96].includes(Number(savedPageSize))) {
       setPageSize(Number(savedPageSize));
     }
-    
+
     // Track directory page view
     trackBehaviorClient({
       entityType: 'category',
@@ -289,17 +289,17 @@ export default function DirectoryClient() {
     const hasLat = searchParams.get('lat');
     const hasLng = searchParams.get('lng');
     const hasSort = searchParams.get('sort');
-    
+
     if (hasLat && hasLng) {
       return; // Already has location
     }
-    
+
     // Check if user has opted out of auto-location
     const autoLocationDisabled = localStorage.getItem('directory-auto-location-disabled');
     if (autoLocationDisabled === 'true') {
       return;
     }
-    
+
     // Detect location and update URL
     getUserLocation()
       .then((location) => {
@@ -339,7 +339,7 @@ export default function DirectoryClient() {
   useEffect(() => {
     const fetchFilters = async () => {
       // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
+
       try {
         // Start location detection asynchronously (non-blocking)
         getUserLocation().then((location) => {
@@ -348,7 +348,7 @@ export default function DirectoryClient() {
           console.warn('Location detection failed:', error);
           setUserLocation(null);
         });
-        
+
         // Try cache first for categories
         // TEMP: Clear cache to force fresh API call
         if (typeof window !== 'undefined') {
@@ -376,14 +376,14 @@ export default function DirectoryClient() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(CACHE_CONFIG.storeTypes.key);
         }
-        
+
         let storeTypes = getCachedData(CACHE_CONFIG.storeTypes.key);
         // console.log('[DirectoryClient] Store types cache check:', storeTypes ? 'HIT' : 'MISS');
-        
+
         if (!storeTypes) {
           // Fetch store types
           const typesData = await directoryService.getDirectoryStoreTypes();
-          
+
           if (typesData) {
             storeTypes = typesData;
           } else {
@@ -393,9 +393,9 @@ export default function DirectoryClient() {
         } else {
           console.log('[DirectoryClient] Using cached store types:', storeTypes);
         }
-        
+
         setStoreTypes(storeTypes || []);
-        
+
         // Locations endpoint is disabled (old directory system)
         // TODO: Re-enable when directory_listings table is available
         // const locationsRes = await fetch(`${apiBaseUrl}/api/directory/locations`);
@@ -413,13 +413,13 @@ export default function DirectoryClient() {
 
   // Track search behavior once per unique search
   const trackedSearchesRef = useRef<Set<string>>(new Set());
-  
+
   // Track directory browse behavior (Near Me search) - once per unique search
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
   const sort = searchParams.get('sort');
   const search = searchParams.get('q') || searchParams.get('search');
-  
+
   useEffect(() => {
     if (lat && lng && sort === 'distance') {
       const searchKey = `near-me-${lat}-${lng}`;
@@ -480,7 +480,7 @@ export default function DirectoryClient() {
             <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-6">
               Find products and services from merchants near you
             </p>
-            
+
             {/* Search Bar */}
             <div className="max-w-2xl mx-auto mb-4">
               <DirectorySearch />
@@ -488,8 +488,8 @@ export default function DirectoryClient() {
 
             {/* Popular Tags */}
             {!loading && data && (
-              <DirectoryPopularTags 
-                listings={data || []} 
+              <DirectoryPopularTags
+                listings={data || []}
                 className="max-w-4xl mx-auto"
               />
             )}
@@ -524,7 +524,7 @@ export default function DirectoryClient() {
                   )}
                 </div>
               )}
-              
+
               {/* How It Works CTA */}
               <Link
                 href="/directory/about"
@@ -539,13 +539,13 @@ export default function DirectoryClient() {
       </div>
 
       {/* Filters */}
-      <DirectoryFilters 
+      <DirectoryFilters
         categories={Array.isArray(categories) ? categories.map(cat => ({ name: cat.name, slug: cat.slug, count: cat.storeCount })) : []}
         storeTypes={storeTypes}
-        locations={Array.isArray(locations) ? locations.map(loc => ({ city: loc.city, state: loc.state, count: loc.count })) : []} 
+        locations={Array.isArray(locations) ? locations.map(loc => ({ city: loc.city, state: loc.state, count: loc.count })) : []}
       />
 
-   
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Error State */}
@@ -573,7 +573,7 @@ export default function DirectoryClient() {
                 <p className="text-neutral-600 dark:text-neutral-400">
                   Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} of {totalItems.toLocaleString()} stores
                 </p>
-                
+
                 {/* Page Size Dropdown */}
                 <div className="flex items-center gap-2">
                   <label htmlFor="pageSize" className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -592,165 +592,162 @@ export default function DirectoryClient() {
                   </select>
                 </div>
               </div>
-              
+
               {/* View Toggle */}
               <div className="flex items-center gap-2 bg-white dark:bg-neutral-800 rounded-lg p-1 border border-neutral-200 dark:border-neutral-700">
-              <button
-                onClick={() => handleViewModeChange('grid')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                }`}
-              >
-                <Grid3x3 className="w-4 h-4" />
-                <span className="hidden sm:inline">Grid</span>
-              </button>
-              <button
-                onClick={() => handleViewModeChange('list')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                <span className="hidden sm:inline">List</span>
-              </button>
-              <button
-                onClick={() => handleViewModeChange('map')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  viewMode === 'map'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                }`}
-              >
-                <Map className="w-4 h-4" />
-                <span className="hidden sm:inline">Map</span>
-              </button>
+                <button
+                  onClick={() => handleViewModeChange('grid')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'grid'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+                <button
+                  onClick={() => handleViewModeChange('list')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'list'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  <List className="w-4 h-4" />
+                  <span className="hidden sm:inline">List</span>
+                </button>
+                <button
+                  onClick={() => handleViewModeChange('map')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'map'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                >
+                  <Map className="w-4 h-4" />
+                  <span className="hidden sm:inline">Map</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Grid View */}
-        {viewMode === 'grid' && (
-          <DirectoryGrid 
-            listings={data || []} 
-            loading={loading}
-            viewMode="grid"
-          />
-        )}
-
-        {/* List View */}
-        {viewMode === 'list' && (
-          <DirectoryList 
-            listings={data || []} 
-            loading={loading}
-            showLogo={true}
-            viewMode="list"
-          />
-        )}
-
-        {/* Map View */}
-        {viewMode === 'map' && (
-          <DirectoryMapGoogle 
-            listings={data || []}
-            useMapEndpoint={true}
-            filters={{
-              category: searchParams.get('category') || undefined,
-              city: searchParams.get('city') || undefined,
-              state: searchParams.get('state') || undefined,
-              q: searchParams.get('q') || undefined, // Search query
-            }}
-          />
-        )}
-
-        {/* Pagination */}
-        {!loading && data && totalPages > 1 && (
-          <div className="mt-12 flex justify-center">
-            <Pagination
-              currentPage={currentPage}
-              totalItems={totalItems}
-              pageSize={pageSize}
-              onPageChange={(page: number) => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.set('page', page.toString());
-                window.location.href = `/directory?${params.toString()}`;
-              }}
-              onPageSizeChange={handlePageSizeChange}
+          {/* Grid View */}
+          {viewMode === 'grid' && (
+            <DirectoryGrid
+              listings={data || []}
+              loading={loading}
+              viewMode="grid"
             />
-          </div>
-        )}
+          )}
+
+          {/* List View */}
+          {viewMode === 'list' && (
+            <DirectoryList
+              listings={data || []}
+              loading={loading}
+              showLogo={true}
+              viewMode="list"
+            />
+          )}
+
+          {/* Map View */}
+          {viewMode === 'map' && (
+            <DirectoryMapGoogle
+              listings={data || []}
+              useMapEndpoint={true}
+              filters={{
+                category: searchParams.get('category') || undefined,
+                city: searchParams.get('city') || undefined,
+                state: searchParams.get('state') || undefined,
+                q: searchParams.get('q') || undefined, // Search query
+              }}
+            />
+          )}
+
+          {/* Pagination */}
+          {!loading && data && totalPages > 1 && (
+            <div className="mt-12 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={(page: number) => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set('page', page.toString());
+                  window.location.href = `/directory?${params.toString()}`;
+                }}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </div>
+          )}
         </div> {/* Close Store Listings Section */}
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+        {/* Gradient border line */}
+        <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
         {/* Browse Sections - Show immediately when collapsed (no search active) */}
         {!searchParams.get('q') && !searchParams.get('search') && !searchParams.get('category') && (
           <>
             {/* Product Category Browser - Show immediately, data loads in background */}
-            <DirectoryCategoryBrowser 
+            <DirectoryCategoryBrowser
               categories={categories}
               className="mt-12"
             />
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+            {/* Gradient border line */}
+            <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
             {/* Store Type Browser - Show immediately, data loads in background */}
-            <DirectoryStoreTypeBrowser 
+            <DirectoryStoreTypeBrowser
               storeTypes={storeTypes}
               className="mt-8"
             />
-            
+
             {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+            <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
           </>
         )}
-           {/* Random Featured Products */}
-      <ProductSingletonProvider>
-        <RandomFeaturedProducts />
-      </ProductSingletonProvider>
+        {/* Random Featured Products */}
+        <ProductSingletonProvider>
+          <RandomFeaturedProducts />
+        </ProductSingletonProvider>
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-      {/* Featured Stores */}
-      <StoreSingletonProvider>
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Featured Stores</h2>
-            <Link
-              href="/directory/stores"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              View all stores →
-            </Link>
+        {/* Gradient border line */}
+        <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+        {/* Featured Stores */}
+        <StoreSingletonProvider>
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Featured Stores</h2>
+              <Link
+                href="/directory/stores"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                View all stores →
+              </Link>
+            </div>
+
+            {/* Gradient border line */}
+            <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+            <FeaturedStoresList
+              limit={8}
+              showLocation={true}
+              showRating={true}
+              showProductCount={true}
+              userLocation={userLocation ? {
+                lat: userLocation.latitude,
+                lng: userLocation.longitude
+              } : undefined}
+            />
           </div>
-          
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-          <FeaturedStoresList 
-            limit={8} 
-            showLocation={true}
-            showRating={true}
-            showProductCount={true}
-            userLocation={userLocation ? {
-              lat: userLocation.latitude,
-              lng: userLocation.longitude
-            } : undefined}
-          />
-        </div>
-      </StoreSingletonProvider>
+        </StoreSingletonProvider>
 
 
         {/* Directory Home Recommendations */}
         <DirectoryHomeRecommendations />
 
-        
+
         {/* Last Viewed Items */}
         <LastViewed />
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+        {/* Gradient border line */}
+        <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
         {/* Help Section - Two Column */}
         {!loading && (
           <div className="mt-16 grid md:grid-cols-2 gap-6">
@@ -761,7 +758,7 @@ export default function DirectoryClient() {
                   Are you a merchant?
                 </h2>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  Get your store listed in our directory and reach more customers. 
+                  Get your store listed in our directory and reach more customers.
                   It's free and takes just a few minutes to set up.
                 </p>
                 <a
@@ -783,7 +780,7 @@ export default function DirectoryClient() {
                   </h2>
                 </div>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  Discover the zero-effort magic behind this directory. 
+                  Discover the zero-effort magic behind this directory.
                   No manual curation, just pure automation.
                 </p>
                 <Link
@@ -796,8 +793,8 @@ export default function DirectoryClient() {
             </div>
           </div>
         )}
-        
-      
+
+
       </div>
       {/* Platform Branding Footer */}
       <PoweredByFooter />

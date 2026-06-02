@@ -1,11 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useMemo } from 'react';
 import SmartProductCard from './SmartProductCard';
-import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
-import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
-import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Package, Calendar, DollarSign, Star, TrendingUp, Award, Zap, Flame, Crown, ThumbsUp, Sparkles } from 'lucide-react';
 
 interface FeaturedTypeProduct {
@@ -38,6 +34,7 @@ interface FeaturedTypeProductsProps {
   tenantId: string;
   featuredTypes: string[];
   showAllBuckets?: boolean; // If true, show all buckets with products, not just current product's types
+  groupedProducts: Record<string, any[]>; // Pre-fetched and merchant-gate filtered from page root
 }
 
 // Featured type configuration - supports all featured types in the system
@@ -121,125 +118,55 @@ const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: strin
   },
 };
 
-export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes, showAllBuckets = true }: FeaturedTypeProductsProps) {
-  const [productsByType, setProductsByType] = useState<Record<string, FeaturedTypeProduct[]>>({});
-  const [loading, setLoading] = useState(true);
+export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes, showAllBuckets = true, groupedProducts = {} }: FeaturedTypeProductsProps) {
+  const productsByType = useMemo(() => {
+    if (!featuredTypes || featuredTypes.length === 0) return {};
 
-  // Capability-aware featured options filtering
-  const featuredCap = useFeaturedOptionsCapability(tenantId);
-  const featuredOptionsState = featuredCap.data;
+    const grouped: Record<string, FeaturedTypeProduct[]> = {};
 
-  // Filter input featuredTypes by effective capability state (tier allows AND merchant enabled)
-  const allowedFeaturedTypes = featuredOptionsState && featuredOptionsState.enabled
-    ? featuredTypes.filter(type => featuredOptionsState.effectiveTypes.includes(type as any))
-    : featuredTypes;
+    const typesToProcess = showAllBuckets
+      ? Object.keys(groupedProducts || {}).filter(type => featuredTypes.includes(type))
+      : featuredTypes;
 
-  useEffect(() => {
-    if (!allowedFeaturedTypes || allowedFeaturedTypes.length === 0) {
-      setLoading(false);
-      return;
-    }
+    for (const type of typesToProcess) {
+      if (groupedProducts[type] && groupedProducts[type].length > 0) {
+        const filteredProducts = groupedProducts[type]
+          .filter((p: any) => p.id !== currentProductId)
+          .slice(0, 4);
 
-    let isMounted = true;
-
-    const fetchFeaturedProducts = async () => {
-      /* console.log('[FeaturedTypeProducts] Fetching featured products:', {
-        tenantId,
-        currentProductId,
-        featuredTypes,
-        hasTenantId: !!tenantId,
-        hasFeaturedTypes: featuredTypes.length > 0
-      }) */;
-
-      try {
-        // Use singleton service to fetch featured products grouped by type
-        const groupedProducts = await storefrontSingletonService.getFeaturedProductsByType(
-          tenantId,
-          undefined, // Get all types
-          6 // Limit per type
-        );
-        // console.log('[FeaturedTypeProducts] API response:', groupedProducts);
-
-        // console.log('[FeaturedTypeProducts] API response:', {
-        //   groupedProductsKeys: Object.keys(groupedProducts || {}),
-        //   groupedProductsCounts: Object.fromEntries(
-        //     Object.entries(groupedProducts || {}).map(([k, v]) => [k, v?.length || 0])
-        //   )
-        // });
-
-        if (isMounted) {
-          const grouped: Record<string, FeaturedTypeProduct[]> = {};
-
-          // Determine which types to process
-          // When showAllBuckets is true, show all buckets with products (filtered by capability)
-          // Otherwise, only show types the current product belongs to (filtered by capability)
-          const typesToProcess = showAllBuckets
-            ? Object.keys(groupedProducts || {}).filter(type => allowedFeaturedTypes.includes(type))
-            : allowedFeaturedTypes;
-
-          // Process each featured type
-          for (const type of typesToProcess) {
-            if (groupedProducts[type] && groupedProducts[type].length > 0) {
-              // Filter out current product and limit to 4
-              const filteredProducts = groupedProducts[type]
-                .filter((p: any) => p.id !== currentProductId)
-                .slice(0, 4);
-
-              if (filteredProducts.length > 0) {
-                grouped[type] = filteredProducts.map((p: any) => ({
-                  id: p.id,
-                  name: p.name,
-                  title: p.title || p.name,
-                  price: p.price || 0,
-                  priceCents: p.priceCents,
-                  listPriceCents: p.listPriceCents,
-                  salePriceCents: p.salePriceCents,
-                  isOnSale: p.isOnSale,
-                  discountPercentage: p.discountPercentage,
-                  stock: p.stock || 0,
-                  sku: p.sku,
-                  currency: p.currency || 'USD',
-                  imageUrl: p.imageUrl,
-                  brand: p.brand,
-                  tenantId: p.tenantId || tenantId,
-                  featuredType: type,
-                  featuredTypes: p.featuredTypes || [type],
-                  hasActivePaymentGateway: p.hasActivePaymentGateway,
-                  defaultGatewayType: p.defaultGatewayType,
-                  availability: p.availability,
-                  categoryName: p.categoryName,
-                  categorySlug: p.categorySlug,
-                }));
-              }
-            }
-          }
-
-          // console.log('[FeaturedTypeProducts] Final grouped products:', {
-          //   types: Object.keys(grouped),
-          //   counts: Object.fromEntries(
-          //     Object.entries(grouped).map(([k, v]) => [k, v.length])
-          //   )
-          // });
-
-          setProductsByType(grouped);
-        }
-      } catch (error) {
-        console.error('[FeaturedTypeProducts] Error fetching featured type products:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
+        if (filteredProducts.length > 0) {
+          grouped[type] = filteredProducts.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            title: p.title || p.name,
+            price: p.price || 0,
+            priceCents: p.priceCents,
+            listPriceCents: p.listPriceCents,
+            salePriceCents: p.salePriceCents,
+            isOnSale: p.isOnSale,
+            discountPercentage: p.discountPercentage,
+            stock: p.stock || 0,
+            sku: p.sku,
+            currency: p.currency || 'USD',
+            imageUrl: p.imageUrl,
+            brand: p.brand,
+            tenantId: p.tenantId || tenantId,
+            featuredType: type,
+            featuredTypes: p.featuredTypes || [type],
+            hasActivePaymentGateway: p.hasActivePaymentGateway,
+            defaultGatewayType: p.defaultGatewayType,
+            availability: p.availability,
+            categoryName: p.categoryName,
+            categorySlug: p.categorySlug,
+          }));
         }
       }
-    };
+    }
 
-    fetchFeaturedProducts();
+    return grouped;
+  }, [currentProductId, tenantId, featuredTypes, showAllBuckets, groupedProducts]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [currentProductId, tenantId, featuredTypes, showAllBuckets]);
-
-  if (loading || Object.keys(productsByType).length === 0) {
+  if (Object.keys(productsByType).length === 0) {
     return null;
   }
 
@@ -297,7 +224,8 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                     availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
                     has_active_payment_gateway: product.hasActivePaymentGateway,
                     payment_gateway_type: product.defaultGatewayType,
-                    featuredTypes: product.featuredTypes as string[],
+                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
+                    featuredType: product.featuredType || type || undefined,
                     categoryName: product.categoryName,
                     categorySlug: product.categorySlug,
                   }}

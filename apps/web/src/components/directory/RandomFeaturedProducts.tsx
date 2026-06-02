@@ -70,7 +70,7 @@ export default function RandomFeaturedProducts() {
     }))); */
   }, [products]);
 
-  let randomListPrice =null;
+  let randomListPrice = null;
   let randomSalesPrice = null;
   // console.log(`RandomFeaturedProducts: randomListPrice: ${randomListPrice}, randomSalesPrice: ${randomSalesPrice}`);
 
@@ -79,7 +79,7 @@ export default function RandomFeaturedProducts() {
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products Near You</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Store Selections Near You</h2>
             <p className="text-gray-600">Discover amazing products from stores in your area</p>
             <div className="flex items-center justify-center gap-2 mt-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -110,15 +110,15 @@ export default function RandomFeaturedProducts() {
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products Near You</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Store Selections Near You</h2>
             <p className="text-gray-600">Discover amazing products from stores in your area</p>
             <p className="text-sm text-gray-500 mt-1">
-              📍 {error || 'No featured products available in your area'}
+              📍 {error || 'No Store Selections available in your area'}
             </p>
           </div>
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <p className="text-gray-500">
-              {error || 'No featured products available at the moment.'}
+              {error || 'No Store Selections available at the moment.'}
             </p>
             <p className="text-sm text-gray-400 mt-2">
               {error ? 'Please try again later.' : 'Check back soon for new discoveries!'}
@@ -142,7 +142,7 @@ export default function RandomFeaturedProducts() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Store Selections</h2>
           <p className="text-gray-600">Discover amazing products from stores near you</p>
           <div className="flex items-center justify-center gap-4 mt-2 text-sm text-gray-500">
             {userLocation && (
@@ -167,8 +167,8 @@ export default function RandomFeaturedProducts() {
               <button
                 onClick={() => handleViewModeChange('grid')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 <Grid3x3 className="w-4 h-4" />
@@ -177,8 +177,8 @@ export default function RandomFeaturedProducts() {
               <button
                 onClick={() => handleViewModeChange('list')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 <List className="w-4 h-4" />
@@ -218,6 +218,7 @@ export default function RandomFeaturedProducts() {
                   has_variants: product.hasVariants || false,
                   // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
+                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
@@ -277,6 +278,7 @@ export default function RandomFeaturedProducts() {
 
                   // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
+                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,

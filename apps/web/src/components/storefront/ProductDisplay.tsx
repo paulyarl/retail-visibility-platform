@@ -29,6 +29,8 @@ interface Product {
     name: string;
     slug: string;
   };
+  featuredType?: string;
+  featuredTypes?: string[];
 }
 
 interface ProductDisplayProps {
@@ -241,6 +243,8 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 has_active_payment_gateway: product.has_active_payment_gateway,
                 availability: product.availability,
                 tenantCategory: product.tenantCategory,
+                featuredType: product.featuredType,
+                featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
               }}
               tenantName={tenantName}
               tenantLogo={tenantLogo}
@@ -499,6 +503,8 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                     has_variants: productsWithPhotos[currentProductIndex].has_variants,
                     availability: productsWithPhotos[currentProductIndex].availability,
                     tenantCategory: productsWithPhotos[currentProductIndex].tenantCategory,
+                    featuredType: productsWithPhotos[currentProductIndex].featuredType,
+                    featuredTypes: productsWithPhotos[currentProductIndex].featuredTypes || (productsWithPhotos[currentProductIndex].featuredType ? [productsWithPhotos[currentProductIndex].featuredType] : []),
                   }}
                   tenantName={tenantName}
                   tenantLogo={tenantLogo}
@@ -537,6 +543,8 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 has_active_payment_gateway: product.has_active_payment_gateway,
                 availability: product.availability,
                 tenantCategory: product.tenantCategory,
+                featuredType: product.featuredType,
+                featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
               }}
               tenantName={tenantName}
               tenantLogo={tenantLogo}
