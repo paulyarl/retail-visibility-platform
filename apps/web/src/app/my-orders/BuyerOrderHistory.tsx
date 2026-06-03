@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar ,User} from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
-import { tenantOrderService } from '@/services/TenantOrderService';
+import { customerOrderService } from '@/services/CustomerOrderService';
 
 interface BuyerOrder {
   orderId: string;
@@ -62,6 +62,7 @@ interface BuyerOrder {
   cancellationReason?: string;
   trackingNumber?: string;
   shippingProvider?: string;
+  statusHistory?: any[];
   // Deposit order fields
   checkoutMode?: 'deposit' | 'full_payment';
   depositCents?: number;
@@ -124,7 +125,7 @@ export default function BuyerOrderHistory() {
       if (emailToSearch) params.append('email', emailToSearch);
       if (phoneToSearch) params.append('phone', phoneToSearch);
 
-      const data = await tenantOrderService.getBuyerOrders({
+      const data = await customerOrderService.getBuyerOrders({
         email: emailToSearch,
         phone: phoneToSearch,
         page: 1,
@@ -158,7 +159,7 @@ export default function BuyerOrderHistory() {
     try {
       setConfirmingPickup(true);
       
-      const result = await tenantOrderService.confirmPickup(orderId, email, phone);
+      const result = await customerOrderService.confirmPickup(orderId, email, phone);
       
       if (result.success) {
         // Update local state with fulfilledAt timestamp
@@ -176,13 +177,13 @@ export default function BuyerOrderHistory() {
             : order
         ));
 
-        alert('Order marked as picked up!');
+        alert('Order marked as fulfilled!');
       } else {
-        throw new Error('Failed to confirm pickup');
+        throw new Error('Failed to confirm fulfillment');
       }
     } catch (error) {
-      console.error('Error confirming pickup:', error);
-      alert('Failed to confirm pickup. Please try again.');
+      console.error('Error confirming fulfillment:', error);
+      alert('Failed to confirm fulfillment. Please try again.');
     } finally {
       setConfirmingPickup(false);
     }
@@ -194,7 +195,7 @@ export default function BuyerOrderHistory() {
       
       const finalReason = cancellationReason === 'custom' ? customReason.trim() : cancellationReason;
       
-      const success = await tenantOrderService.cancelOrder(selectedOrder?.orderId || '', finalReason || 'Customer request', email, phone);
+      const success = await customerOrderService.cancelOrder(selectedOrder?.orderId || '', finalReason || 'Customer request', email, phone);
       
       if (success) {
         // Update local state
@@ -243,7 +244,7 @@ export default function BuyerOrderHistory() {
     try {
       setLoadingDownloads(true);
       
-      const data = await tenantOrderService.getOrderDownloads(orderId);
+      const data = await customerOrderService.getOrderDownloads(orderId);
       
       setDigitalDownloads(data?.downloads || []);
     } catch (error) {
@@ -301,8 +302,8 @@ export default function BuyerOrderHistory() {
     //   canConfirmPickup: selectedOrder.fulfillmentMethod === 'pickup' && selectedOrder.fulfillmentStatus !== 'fulfilled'
     // });
 
-    const canConfirmPickup = 
-      selectedOrder.fulfillmentMethod === 'pickup' && 
+    const canConfirmFulfillment = 
+      ['pickup', 'delivery', 'shipping'].includes(selectedOrder.fulfillmentMethod || '') && 
       selectedOrder.fulfillmentStatus !== 'fulfilled' &&
       selectedOrder.fulfillmentStatus !== 'cancelled';
     
@@ -342,7 +343,7 @@ export default function BuyerOrderHistory() {
             </Button>
             
             <div className="flex items-center gap-3">
-              {canConfirmPickup && (
+              {canConfirmFulfillment && (
                 <Button
                   onClick={() => handleConfirmPickup(selectedOrder.orderId)}
                   disabled={confirmingPickup}
@@ -356,7 +357,9 @@ export default function BuyerOrderHistory() {
                   ) : (
                     <>
                       <Package className="h-4 w-4 mr-2" />
-                      Confirm Pickup
+                      {selectedOrder.fulfillmentMethod === 'pickup' && 'Confirm Pickup'}
+                      {selectedOrder.fulfillmentMethod === 'delivery' && 'Confirm Delivery'}
+                      {selectedOrder.fulfillmentMethod === 'shipping' && 'Confirm Received'}
                     </>
                   )}
                 </Button>
@@ -827,6 +830,7 @@ export default function BuyerOrderHistory() {
           )}
           
           <OrderReceipt
+            statusHistory={selectedOrder.statusHistory}
             cart={{
               tenantId: selectedOrder.tenantId,
               tenantName: selectedOrder.tenantName,
@@ -836,7 +840,7 @@ export default function BuyerOrderHistory() {
               status: selectedOrder.status,
               fulfillmentStatus: selectedOrder.fulfillmentStatus,
               fulfilledAt: selectedOrder.fulfilledAt || undefined,
-              orderId: selectedOrder.orderNumber,
+              orderId: selectedOrder.orderId,
               paymentId: (selectedOrder as any).paymentId || undefined,
               gatewayTransactionId: (selectedOrder as any).gatewayTransactionId || undefined,
               paidAt: new Date(selectedOrder.paidAt),

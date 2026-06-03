@@ -115,11 +115,9 @@ export default function OrdersPage() {
     try {
       setConfirmingPickup(true);
       
-      // Use tenantOrderService for pickup confirmation
-      const { tenantOrderService } = await import('@/services/TenantOrderService');
-      const result = await tenantOrderService.confirmPickup(
-        orderId, 
-        customer.email, 
+      const result = await customerOrderService.confirmPickup(
+        orderId,
+        customer.email,
         customer.phone || ''
       );
       
@@ -139,13 +137,13 @@ export default function OrdersPage() {
             : order
         ));
 
-        alert('Order marked as picked up!');
+        alert('Order marked as fulfilled!');
       } else {
-        throw new Error('Failed to confirm pickup');
+        throw new Error('Failed to confirm fulfillment');
       }
     } catch (error) {
-      console.error('Error confirming pickup:', error);
-      alert('Failed to confirm pickup. Please try again.');
+      console.error('Error confirming fulfillment:', error);
+      alert('Failed to confirm fulfillment. Please try again.');
     } finally {
       setConfirmingPickup(false);
     }
@@ -157,12 +155,10 @@ export default function OrdersPage() {
       
       const finalReason = cancellationReason === 'custom' ? customReason.trim() : cancellationReason;
       
-      // Use tenantOrderService for order cancellation
-      const { tenantOrderService } = await import('@/services/TenantOrderService');
-      const success = await tenantOrderService.cancelOrder(
-        orderId, 
-        finalReason || 'Customer request', 
-        customer?.email || '', 
+      const success = await customerOrderService.cancelOrder(
+        orderId,
+        finalReason || 'Customer request',
+        customer?.email || '',
         customer?.phone || ''
       );
       
@@ -272,6 +268,7 @@ export default function OrdersPage() {
           )}
           
           <OrderReceipt
+            statusHistory={selectedOrder.statusHistory}
             cart={{
               tenantId: selectedOrder.tenantId,
               tenantName: selectedOrder.tenantName,
@@ -287,7 +284,7 @@ export default function OrdersPage() {
               status: selectedOrder.orderStatus,
               fulfillmentStatus: selectedOrder.fulfillmentStatus,
               fulfilledAt: selectedOrder.fulfilledAt || undefined,
-              orderId: selectedOrder.orderNumber,
+              orderId: selectedOrder.orderId,
               paymentId: selectedOrder.paymentId || undefined,
               gatewayTransactionId: selectedOrder.gatewayTransactionId || undefined,
               paidAt: selectedOrder.paidAt ? new Date(selectedOrder.paidAt) : undefined,
@@ -309,7 +306,7 @@ export default function OrdersPage() {
             }}
             actions={
               <div className="flex gap-2 mt-4">
-                {selectedOrder.fulfillmentMethod === 'pickup' && 
+                {['pickup', 'delivery', 'shipping'].includes(selectedOrder.fulfillmentMethod || '') && 
                  selectedOrder.orderStatus === 'paid' && 
                  !selectedOrder.fulfilledAt && (
                   <Button
@@ -325,7 +322,9 @@ export default function OrdersPage() {
                     ) : (
                       <>
                         <CheckCircle className="w-4 h-4" />
-                        Confirm Pickup
+                        {selectedOrder.fulfillmentMethod === 'pickup' && 'Confirm Pickup'}
+                        {selectedOrder.fulfillmentMethod === 'delivery' && 'Confirm Delivery'}
+                        {selectedOrder.fulfillmentMethod === 'shipping' && 'Confirm Received'}
                       </>
                     )}
                   </Button>
@@ -503,7 +502,7 @@ export default function OrdersPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-2">
-                          {order.fulfillmentMethod === 'pickup' && 
+                          {['pickup', 'delivery', 'shipping'].includes(order.fulfillmentMethod || '') && 
                            order.orderStatus === 'paid' && 
                            !order.fulfilledAt && (
                             <Button
@@ -516,7 +515,9 @@ export default function OrdersPage() {
                               className="flex items-center gap-1"
                             >
                               <CheckCircle className="w-3 h-3" />
-                              Confirm Pickup
+                              {order.fulfillmentMethod === 'pickup' && 'Confirm Pickup'}
+                              {order.fulfillmentMethod === 'delivery' && 'Confirm Delivery'}
+                              {order.fulfillmentMethod === 'shipping' && 'Confirm Received'}
                             </Button>
                           )}
                           

@@ -74,6 +74,7 @@ export interface CustomerOrder {
   pickupDeadline?: string | null;
   depositForfeitedAt?: string | null;
   depositPercentage?: number | null;
+  statusHistory?: any[];
 }
 
 export interface CustomerOrderItem {
@@ -615,6 +616,91 @@ class CustomerOrderService extends CustomerApiSingleton {
     } catch (error) {
       console.error('[CustomerOrderService] Failed to create Square charge:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get buyer orders
+   * Public endpoint for order history lookup by email or phone
+   */
+  async getBuyerOrders(params: {
+    email?: string;
+    phone?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params.email) searchParams.append('email', params.email);
+      if (params.phone) searchParams.append('phone', params.phone);
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+
+      const response = await this.makeDefaultRequest<any>(
+        `/api/orders/buyer?${searchParams.toString()}`,
+        {},
+        `buyer-orders-${params.email || 'anonymous'}-${params.phone || 'anonymous'}-${params.page || 1}`
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to get buyer orders:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Confirm order fulfillment (pickup, delivery, or shipping)
+   * Public endpoint for buyers to confirm they received the order
+   */
+  async confirmPickup(orderId: string, email?: string, phone?: string): Promise<{ success: boolean; fulfilledAt?: string }> {
+    try {
+      if (!orderId) {
+        throw new Error('Order ID is required');
+      }
+
+      const response = await this.makeDefaultRequest<{ success: boolean; order: { fulfilledAt: string } }>(
+        `/api/orders/${orderId}/pickup`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ email, phone })
+        },
+        `pickup-confirm-${orderId}`
+      );
+
+      return {
+        success: response.success,
+        fulfilledAt: response.data?.order?.fulfilledAt
+      };
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to confirm fulfillment:', error);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Cancel order
+   * Public endpoint for buyers to cancel an order before fulfillment
+   */
+  async cancelOrder(orderId: string, cancellationReason: string, email?: string, phone?: string): Promise<boolean> {
+    try {
+      if (!orderId) {
+        throw new Error('Order ID is required');
+      }
+
+      await this.makeDefaultRequest<void>(
+        `/api/orders/${orderId}/cancel`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ cancellationReason, email, phone })
+        },
+        `order-cancel-${orderId}`
+      );
+
+      return true;
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to cancel order:', error);
+      return false;
     }
   }
 }

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package, AlertTriangle, XCircle } from 'lucide-react';
-import QRCode from 'qrcode';
+import TenantQRCode from '@/components/public/TenantQRCode';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
-import { tenantOrderService } from '@/services/TenantOrderService';
+import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
 
 interface OrderReceiptProps {
@@ -62,17 +62,17 @@ interface OrderReceiptProps {
   onPrint?: () => void;
   className?: string;
   actions?: React.ReactNode;
+  statusHistory?: any[];
 }
 
-export default function OrderReceipt({ cart, platformFeePercentage: propPlatformFeePercentage = 3.0, onPrint, className = "", actions }: OrderReceiptProps) {
+export default function OrderReceipt({ cart, platformFeePercentage: propPlatformFeePercentage = 3.0, onPrint, className = "", actions, statusHistory: propStatusHistory }: OrderReceiptProps) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [fulfillmentSettings, setFulfillmentSettings] = useState<any>(null);
   const [effectivePlatformFeePercentage, setEffectivePlatformFeePercentage] = useState<number>(propPlatformFeePercentage);
-  const [statusHistory, setStatusHistory] = useState<any[]>([]);
-  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [statusHistory, setStatusHistory] = useState<any[]>(propStatusHistory || []);
 
   // Fetch actual platform fee percentage if not explicitly provided
   useEffect(() => {
@@ -96,13 +96,15 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
     fetchPlatformFee();
   }, [propPlatformFeePercentage]);
 
-  // Fetch order status history
+  // Fetch order status history only when not provided as prop
   useEffect(() => {
+    if (propStatusHistory) return;
+
     const fetchStatusHistory = async () => {
       if (!cart.orderId) return;
       
       try {
-        const orderData = await tenantOrderService.getOrder(cart.tenantId, cart.orderId);
+        const orderData = await customerOrderService.getOrder(cart.orderId, cart.customerInfo?.email);
         if (orderData && orderData.statusHistory) {
           setStatusHistory(orderData.statusHistory);
         }
@@ -112,7 +114,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
     };
 
     fetchStatusHistory();
-  }, [cart.orderId, cart.tenantId]);
+  }, [cart.orderId, cart.tenantId, propStatusHistory]);
 
   // Debug: Log cart data to see what's available
   // console.log('[OrderReceipt] Cart data:', {
@@ -229,34 +231,10 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
     fetchTenantData();
   }, [cart.tenantId]);
 
-  // Generate QR code for directions when profile data is available
-  useEffect(() => {
-    const generateDirectionsQR = async () => {
-      if (!tenantProfile || !qrCanvasRef.current) return;
-
-      // Build Google Maps directions URL from store address
-      if (tenantProfile.address_line1 && tenantProfile.city && tenantProfile.state) {
-        const address = `${tenantProfile.address_line1}, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}`;
-        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
-
-        try {
-          await QRCode.toCanvas(qrCanvasRef.current, mapsUrl, {
-            width: 150,
-            margin: 2,
-            color: {
-              dark: '#7c3aed', // Purple to match fulfillment theme
-              light: '#ffffff',
-            },
-          });
-          console.log('[OrderReceipt] Generated directions QR code');
-        } catch (error) {
-          console.error('[OrderReceipt] Error generating QR code:', error);
-        }
-      }
-    };
-
-    generateDirectionsQR();
-  }, [cart.fulfillmentMethod, tenantProfile]);
+  // Compute directions URL from tenant profile
+  const directionsUrl = tenantProfile?.address_line1 && tenantProfile?.city && tenantProfile?.state
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${tenantProfile.address_line1}, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}`)}`
+    : '';
 
   const handlePrint = () => {
     setIsPrinting(true);
@@ -631,14 +609,18 @@ Generated on ${new Date().toLocaleString()}
                   )}
 
                   {/* QR Code for Directions */}
-                  {tenantProfile?.address_line1 && (
+                  {directionsUrl && cart.tenantId && (
                     <div className="mt-3 pt-3 border-t border-purple-200">
                       <p className="text-purple-800 font-medium mb-2">Get Directions:</p>
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0">
-                          <canvas 
-                            ref={qrCanvasRef} 
-                            className="border-2 border-purple-300 rounded-lg"
+                          <TenantQRCode
+                            url={directionsUrl}
+                            tenantId={cart.tenantId}
+                            size={150}
+                            showDownload={false}
+                            label=""
+                            className="bg-transparent shadow-none p-0"
                           />
                         </div>
                         <div className="flex-1 text-xs text-purple-700">
@@ -840,14 +822,18 @@ Generated on ${new Date().toLocaleString()}
               )}
 
               {/* QR Code for Directions - Always show */}
-              {tenantProfile?.address_line1 && (
+              {directionsUrl && cart.tenantId && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <p className="text-gray-800 font-medium mb-2">Get Directions:</p>
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0">
-                      <canvas 
-                        ref={qrCanvasRef} 
-                        className="border-2 border-gray-300 rounded-lg"
+                      <TenantQRCode
+                        url={directionsUrl}
+                        tenantId={cart.tenantId}
+                        size={150}
+                        showDownload={false}
+                        label=""
+                        className="bg-transparent shadow-none p-0"
                       />
                     </div>
                     <div className="flex-1 text-xs text-gray-700">

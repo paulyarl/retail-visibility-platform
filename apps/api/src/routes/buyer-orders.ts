@@ -5,6 +5,7 @@ import { RefundService } from '../services/refunds/RefundService';
 const router = Router();
 
 // Get orders for a buyer by email or phone
+// api/orders/buyer?email=
 router.get('/buyer', async (req, res) => {
   try {
     const { email, phone } = req.query;
@@ -184,6 +185,7 @@ router.get('/buyer', async (req, res) => {
 });
 
 // Get orders for a customer by email (with pagination)
+// api/orders/customer/:email
 router.get('/customer/:email', async (req, res) => {
   try {
     const { email } = req.params;
@@ -348,6 +350,7 @@ router.get('/customer/:email', async (req, res) => {
 });
 
 // Get single order details by order ID
+// api/orders/:orderId
 router.get('/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -374,6 +377,11 @@ router.get('/:orderId', async (req, res) => {
           take: 1,
         },
         refunds: {
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
+        order_status_history: {
           orderBy: {
             created_at: 'desc',
           },
@@ -496,6 +504,15 @@ router.get('/:orderId', async (req, res) => {
         createdAt: refund.created_at,
         completedAt: refund.completed_at,
       })) || [],
+      statusHistory: order.order_status_history?.map(entry => ({
+        id: entry.id,
+        from_status: entry.from_status,
+        to_status: entry.to_status,
+        changed_by_name: entry.changed_by_name,
+        reason: entry.reason,
+        notes: entry.notes,
+        created_at: entry.created_at,
+      })) || [],
       internalNotes: order.internal_notes,
       // Extract cancellation reason from internal_notes
       cancellationReason: order.internal_notes?.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || undefined,
@@ -572,13 +589,14 @@ router.patch('/:orderId/pickup', async (req, res) => {
       });
     }
 
-    // Check if order is pickup
+    // Check if order is a fulfillable method (pickup, delivery, or shipping)
     const metadata = order.metadata as any;
-    if (metadata?.fulfillment_method !== 'pickup') {
+    const allowedMethods = ['pickup', 'delivery', 'shipping'];
+    if (!allowedMethods.includes(metadata?.fulfillment_method)) {
       return res.status(400).json({
         success: false,
-        error: 'not_pickup_order',
-        message: 'This order is not a pickup order',
+        error: 'not_fulfillable_order',
+        message: 'This order cannot be confirmed as fulfilled',
       });
     }
 
