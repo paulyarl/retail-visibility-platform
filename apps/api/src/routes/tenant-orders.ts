@@ -2,8 +2,27 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { RefundService } from '../services/refunds/RefundService';
+import { generateOrderItemHistoryId } from '../lib/id-generator';
 
 const router = Router();
+
+// Helper function to generate status change reason
+function getStatusChangeReason(status: string, shippingProvider?: string, cancellationReason?: string): string {
+  switch (status) {
+    case 'processing':
+      return 'Order marked as processing';
+    case 'shipped':
+      return shippingProvider 
+        ? `Order shipped via ${shippingProvider}`
+        : 'Order shipped';
+    case 'fulfilled':
+      return 'Order fulfilled and completed';
+    case 'cancelled':
+      return cancellationReason || 'Order cancelled';
+    default:
+      return 'Status updated';
+  }
+}
 
 // GET /api/tenants/:tenantId/orders - Get all orders for a tenant
 router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
@@ -290,6 +309,11 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
             created_at: 'desc'
           }
         },
+        order_status_history: {
+          orderBy: {
+            created_at: 'desc'
+          }
+        },
         tenants: {
           select: {
             name: true,
@@ -386,6 +410,15 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
         gatewayRefundId: refund.gateway_refund_id,
         createdAt: refund.created_at,
         completedAt: refund.completed_at
+      })) || [],
+      statusHistory: order.order_status_history?.map(entry => ({
+        id: entry.id,
+        from_status: entry.from_status,
+        to_status: entry.to_status,
+        changed_by_name: entry.changed_by_name,
+        reason: entry.reason,
+        notes: entry.notes,
+        created_at: entry.created_at
       })) || []
     };
 
@@ -410,7 +443,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
     const { fulfillmentStatus, trackingNumber, cancellationReason, shippingProvider } = req.body;
 
     // Validate fulfillment status
-    const validStatuses = ['pending', 'processing', 'fulfilled', 'cancelled'];
+    const validStatuses = ['pending', 'processing', 'shipped', 'fulfilled', 'cancelled'];
     if (fulfillmentStatus && !validStatuses.includes(fulfillmentStatus)) {
       return res.status(400).json({
         success: false,
@@ -542,6 +575,29 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       where: { id: orderId },
       data: updateData
     });
+
+    // Create status history entry if fulfillment status changed
+    if (fulfillmentStatus && fulfillmentStatus !== existingOrder.fulfillment_status) {
+      const user = (req as any).user;
+      await prisma.order_status_history.create({
+        data: {
+          id: generateOrderItemHistoryId(updatedOrder.id, tenantId),
+          order_id: updatedOrder.id,
+          from_status: existingOrder.fulfillment_status as any,
+          to_status: fulfillmentStatus as any,
+          changed_by_user_id: user?.userId || null,
+          changed_by_name: user?.name || user?.email || 'Tenant User',
+          reason: getStatusChangeReason(fulfillmentStatus, shippingProvider, cancellationReason),
+          notes: trackingNumber ? `Tracking: ${trackingNumber}` : null,
+          metadata: {
+            fulfillmentMethod: (existingOrder.metadata as any)?.fulfillment_method || null,
+            shippingProvider: shippingProvider || null,
+            trackingNumber: trackingNumber || null,
+          },
+          created_at: new Date(),
+        },
+      });
+    }
 
     // Restore stock for cancelled orders
     if (fulfillmentStatus === 'cancelled') {

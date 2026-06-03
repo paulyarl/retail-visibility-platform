@@ -7,6 +7,7 @@ import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package, A
 import QRCode from 'qrcode';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { tenantOrderService } from '@/services/TenantOrderService';
+import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
 
 interface OrderReceiptProps {
   cart: {
@@ -63,13 +64,55 @@ interface OrderReceiptProps {
   actions?: React.ReactNode;
 }
 
-export default function OrderReceipt({ cart, platformFeePercentage = 3.0, onPrint, className = "", actions }: OrderReceiptProps) {
+export default function OrderReceipt({ cart, platformFeePercentage: propPlatformFeePercentage = 3.0, onPrint, className = "", actions }: OrderReceiptProps) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [fulfillmentSettings, setFulfillmentSettings] = useState<any>(null);
+  const [effectivePlatformFeePercentage, setEffectivePlatformFeePercentage] = useState<number>(propPlatformFeePercentage);
+  const [statusHistory, setStatusHistory] = useState<any[]>([]);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Fetch actual platform fee percentage if not explicitly provided
+  useEffect(() => {
+    // If the prop is explicitly different from the default, trust it
+    if (propPlatformFeePercentage !== 3.0) {
+      setEffectivePlatformFeePercentage(propPlatformFeePercentage);
+      return;
+    }
+
+    // Otherwise fetch from the single source of truth
+    const fetchPlatformFee = async () => {
+      try {
+        const percentage = await publicPlatformFeeService.getPlatformFeePercentage();
+        setEffectivePlatformFeePercentage(percentage);
+      } catch (error) {
+        console.warn('[OrderReceipt] Failed to fetch platform fee, using default:', error);
+        setEffectivePlatformFeePercentage(3.0);
+      }
+    };
+
+    fetchPlatformFee();
+  }, [propPlatformFeePercentage]);
+
+  // Fetch order status history
+  useEffect(() => {
+    const fetchStatusHistory = async () => {
+      if (!cart.orderId) return;
+      
+      try {
+        const orderData = await tenantOrderService.getOrder(cart.tenantId, cart.orderId);
+        if (orderData && orderData.statusHistory) {
+          setStatusHistory(orderData.statusHistory);
+        }
+      } catch (error) {
+        console.warn('[OrderReceipt] Failed to fetch status history:', error);
+      }
+    };
+
+    fetchStatusHistory();
+  }, [cart.orderId, cart.tenantId]);
 
   // Debug: Log cart data to see what's available
   // console.log('[OrderReceipt] Cart data:', {
@@ -78,7 +121,7 @@ export default function OrderReceipt({ cart, platformFeePercentage = 3.0, onPrin
   //   tenantId: cart.tenantId,
   //   orderId: cart.orderId
   // });
-  
+
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -100,7 +143,7 @@ export default function OrderReceipt({ cart, platformFeePercentage = 3.0, onPrin
   };
 
   // Calculate fees (same as checkout)
-  const platformFee = Math.round(cart.subtotal * (platformFeePercentage / 100));
+  const platformFee = Math.round(cart.subtotal * (effectivePlatformFeePercentage / 100));
   const fulfillmentFee = cart.fulfillmentFee || 0;
   const total = cart.subtotal + platformFee + fulfillmentFee;
   
@@ -116,6 +159,35 @@ export default function OrderReceipt({ cart, platformFeePercentage = 3.0, onPrin
     if (cart.fulfillmentMethod === 'pickup') return 'In-Store Pickup';
     if (cart.fulfillmentMethod === 'delivery') return 'Local Delivery';
     return 'Shipping';
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: '⏳', label: 'Pending' },
+      processing: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: '🔄', label: 'Processing' },
+      shipped: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: '📦', label: 'Shipped' },
+      fulfilled: { color: 'bg-green-100 text-green-800 border-green-200', icon: '✅', label: 'Fulfilled' },
+      cancelled: { color: 'bg-red-100 text-red-800 border-red-200', icon: '❌', label: 'Cancelled' },
+    };
+    
+    const badge = badges[status as keyof typeof badges] || badges.pending;
+    
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
+        <span className="text-xs">{badge.icon}</span>
+        {badge.label}
+      </span>
+    );
+  };
+
+  const formatStatusDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   // Fetch tenant profile and business hours
@@ -310,7 +382,7 @@ ${cart.items.map(item => {
 ORDER SUMMARY
 ───────────────────────────────────────────────────────────
 Subtotal: ${formatCurrency(cart.subtotal)}
-${platformFee > 0 ? `Platform Fee (${platformFeePercentage}%): ${formatCurrency(platformFee)}\n` : ''}${getFulfillmentLabel()}: ${formatCurrency(fulfillmentFee)}
+${platformFee > 0 ? `Platform Fee (${effectivePlatformFeePercentage}%): ${formatCurrency(platformFee)}\n` : ''}${getFulfillmentLabel()}: ${formatCurrency(fulfillmentFee)}
 ───────────────────────────────────────────────────────────
 TOTAL: ${formatCurrency(total)}
 
@@ -826,7 +898,7 @@ Generated on ${new Date().toLocaleString()}
               </div>
               {platformFee > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Platform Fee ({platformFeePercentage}%)</span>
+                  <span className="text-gray-600">Platform Fee ({effectivePlatformFeePercentage}%)</span>
                   <span>{formatCurrency(platformFee)}</span>
                 </div>
               )}
@@ -949,6 +1021,47 @@ Generated on ${new Date().toLocaleString()}
               )}
             </div>
           </div>
+
+          {/* Status History Timeline */}
+          {statusHistory.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-gray-900 mb-3">Order Timeline</h4>
+              <div className="space-y-3">
+                {statusHistory.map((entry, index) => (
+                  <div key={entry.id || index} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-1">
+                      {getStatusBadge(entry.to_status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {entry.reason || `Status changed to ${entry.to_status}`}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatStatusDateTime(entry.created_at)}
+                        </p>
+                      </div>
+                      {entry.changed_by_name && (
+                        <p className="text-xs text-gray-600">
+                          by {entry.changed_by_name}
+                        </p>
+                      )}
+                      {entry.notes && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          {entry.notes}
+                        </p>
+                      )}
+                      {entry.from_status && entry.from_status !== entry.to_status && (
+                        <p className="text-xs text-gray-500">
+                          Changed from {entry.from_status} to {entry.to_status}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           {actions && (

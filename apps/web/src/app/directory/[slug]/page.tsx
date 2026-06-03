@@ -37,6 +37,20 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
+
+// Merchant gate helper for client-side filtering
+function filterFeaturedProductsByMerchantPreferences(
+  products: any[],
+  prefs: FeaturedOptionsSettings | null
+): any[] {
+  if (!prefs || !prefs.featured_enabled) return [];
+  return products.filter(product => {
+    const type = product.featuredType || 'store_selection';
+    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    return prefs[key] === true;
+  });
+}
 
 // tenant private data
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
@@ -385,6 +399,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   // console.log(`[Directory] tenantInfo:`, tenantInfo);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
+  const [featuredOptionsSettings, setFeaturedOptionsSettings] = useState<FeaturedOptionsSettings | null>(null);
 
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
@@ -436,14 +451,16 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           related,
           categories,
           productCount,
-          optionFlags
+          optionFlags,
+          featuredPrefs
         ] = await Promise.all([
           getBusinessProfile(data.listing.tenantId),
           getBusinessHours(data.listing.tenantId),
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId)
+          publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId),
+          publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -452,6 +469,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         setStorefrontCategories(categories);
         setActualProductCount(productCount);
         if (optionFlags) setOptFlags(optionFlags);
+        if (featuredPrefs) setFeaturedOptionsSettings(featuredPrefs);
 
         // Fetch tenant info for status panel
         const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
@@ -494,10 +512,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const paymentGatewayStatus = consolidatedData.paymentGatewayStatus || { hasActiveGateway: false, defaultGatewayType: null };
 
   // Deduplicate featured products by ID to prevent React key conflicts
-  const featuredProducts = featuredProductsRaw.filter((product: any, index: number, arr: any[]) => {
+  const dedupedFeaturedProducts = featuredProductsRaw.filter((product: any, index: number, arr: any[]) => {
     const productId = product.id || product.inventory_item_id;
     return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
   });
+
+  // Apply merchant gate filtering to featured products
+  const featuredProducts = filterFeaturedProductsByMerchantPreferences(dedupedFeaturedProducts, featuredOptionsSettings);
 
   // Compute store status from business hours data
   const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;

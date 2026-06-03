@@ -534,15 +534,51 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                         Mark as Processing
                       </Button>
                     )}
-                    <Button
-                      onClick={handleMarkFulfilled}
-                      disabled={updating}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      size="sm"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Mark as Fulfilled
-                    </Button>
+                    {/* Context-aware fulfill button */}
+                    {order.fulfillmentMethod === 'shipping' && (
+                      <Button
+                        onClick={() => setShowFulfillDialog(true)}
+                        disabled={updating}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Mark as Shipped
+                      </Button>
+                    )}
+                    {order.fulfillmentMethod === 'delivery' && (
+                      <Button
+                        onClick={() => updateFulfillmentStatus('fulfilled')}
+                        disabled={updating}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark as Delivered
+                      </Button>
+                    )}
+                    {order.fulfillmentMethod === 'pickup' && (
+                      <Button
+                        onClick={() => updateFulfillmentStatus('fulfilled')}
+                        disabled={updating}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        {order.checkoutMode === 'deposit' ? 'Confirm Pickup' : 'Mark as Fulfilled'}
+                      </Button>
+                    )}
+                    {order.fulfillmentMethod !== 'shipping' && order.fulfillmentMethod !== 'delivery' && order.fulfillmentMethod !== 'pickup' && (
+                      <Button
+                        onClick={handleMarkFulfilled}
+                        disabled={updating}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark as Fulfilled
+                      </Button>
+                    )}
                     <Button
                       onClick={() => setShowCancelDialog(true)}
                       disabled={updating}

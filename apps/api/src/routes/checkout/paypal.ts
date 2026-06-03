@@ -51,7 +51,22 @@ router.post('/create-order', async (req, res) => {
 
     // Calculate totals from cart items
     const itemTotal = cartItems.reduce((sum: number, item: any) => sum + (item.unitPrice * item.quantity), 0);
-    const totalAmount = itemTotal; // For now, just use item total (add shipping/tax later if needed)
+    
+    // Retrieve the order's actual shipping_cents from database to enforce correct payment breakdowns
+    let shippingCents = 0;
+    try {
+      const orderRecord = await prisma.orders.findUnique({
+        where: { id: orderId },
+        select: { shipping_cents: true },
+      });
+      if (orderRecord) {
+        shippingCents = orderRecord.shipping_cents || 0;
+      }
+    } catch (orderErr) {
+      console.warn('[PayPal Checkout] Failed to fetch order record for shipping fee:', orderErr);
+    }
+
+    const totalAmount = itemTotal + shippingCents;
 
     // Build purchase unit with optional shipping
     const purchaseUnit: any = {
@@ -63,6 +78,10 @@ router.post('/create-order', async (req, res) => {
           item_total: {
             currency_code: 'USD',
             value: (itemTotal / 100).toFixed(2),
+          },
+          shipping: {
+            currency_code: 'USD',
+            value: (shippingCents / 100).toFixed(2),
           },
         },
       },

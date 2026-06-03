@@ -52,7 +52,10 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
         // console.log('[CustomerAuthContext] Calling initialize...');
         const existingCustomer = await customerAuthService.initialize();
         // console.log('[CustomerAuthContext] Initialize result:', existingCustomer);
-        existingCustomer ? setCustomer(existingCustomer) : setIsLoading(false);
+        if (existingCustomer) {
+          setCustomer(existingCustomer);
+        }
+        setIsLoading(false);
       } catch (err) {
         console.error('[CustomerAuthContext] Init error:', err);
         setIsLoading(false);

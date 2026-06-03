@@ -52,6 +52,16 @@ export interface TenantOrder {
   remainingBalanceCents?: number;
   pickupDeadline?: string | null;
   depositForfeitedAt?: string | null;
+  // Status history
+  statusHistory?: Array<{
+    id: string;
+    from_status: string | null;
+    to_status: string;
+    changed_by_name: string | null;
+    reason: string | null;
+    notes: string | null;
+    created_at: Date | string;
+  }>;
   // Tenant/Merchant fields
   tenantName?: string;
   tenantLogo?: string | null;

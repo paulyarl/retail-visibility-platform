@@ -433,6 +433,29 @@ router.post('/orders', async (req: Request, res: Response) => {
     // Generate order number
     const order_number = await generateOrderNumber(tenant_id);
 
+    // Fetch fulfillment settings to check for delivery or shipping fees dynamically
+    let shipping_cents = 0;
+    try {
+      const fulfillmentSettings = await prisma.tenant_fulfillment_settings.findUnique({
+        where: { tenant_id },
+      });
+      if (fulfillmentSettings) {
+        if (fulfillment_method === 'delivery' && fulfillmentSettings.delivery_enabled) {
+          const deliveryFee = fulfillmentSettings.delivery_fee_cents ?? 0;
+          const minFree = fulfillmentSettings.delivery_min_free_cents;
+          const itemsSubtotal = validatedItems.reduce((sum, item) => sum + item.total_price_cents, 0);
+          
+          if (minFree === null || minFree === undefined || itemsSubtotal < minFree) {
+            shipping_cents = deliveryFee;
+          }
+        } else if (fulfillment_method === 'shipping' && fulfillmentSettings.shipping_enabled) {
+          shipping_cents = fulfillmentSettings.shipping_flat_rate_cents ?? 0;
+        }
+      }
+    } catch (fsError) {
+      console.warn('[Checkout] Failed to fetch tenant fulfillment settings for fee calculation:', fsError);
+    }
+
     // Calculate totals using validated items from database
     const line_items = validatedItems.map((item) => {
       const calculation = calculateLineItem(item.quantity, item.unit_price_cents);
@@ -445,7 +468,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         list_price_cents: item.list_price_cents,
       };
     });
-    const totals = calculateOrderTotals(line_items);
+    const totals = calculateOrderTotals(line_items, shipping_cents);
 
     // Fetch dynamic platform fee and include in order total (only if non-zero)
     const platformFeePercentage = await getPlatformFeePercentage();
@@ -596,6 +619,9 @@ router.post('/orders', async (req: Request, res: Response) => {
       order: {
         id: order.id,
         order_number: order.order_number,
+        subtotal_cents: order.subtotal_cents,
+        shipping_cents: order.shipping_cents,
+        tax_cents: order.tax_cents,
         total_cents: order.total_cents,
         created_at: order.created_at,
         order_items: (order as any).order_items,
