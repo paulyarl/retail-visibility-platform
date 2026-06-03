@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { optionalAuth } from '../middleware/auth';
 import { USER_ROLES } from '../config/role-groups';
+import { TRIAL_CONFIG } from '../config/tenant-limits';
 import { generateTenantId, generateUserTenantId } from '../lib/id-generator';
 import slugSingletonService from '../services/SlugSingletonService';
 
@@ -94,6 +95,38 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
 
     let tenant = null;
     if (!existingTenant && businessName) {
+      // Check trial tenant limit for non-platform-admin users
+      const onboardingUser = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true }
+      });
+      const isPlatformAdmin = onboardingUser?.role === USER_ROLES.PLATFORM_ADMIN || onboardingUser?.role === USER_ROLES.ADMIN;
+      if (!isPlatformAdmin) {
+        const now = new Date();
+        const activeTrialCount = await prisma.tenants.count({
+          where: {
+            user_tenants: {
+              some: { user_id: userId }
+            },
+            subscription_status: 'trial',
+            OR: [
+              { trial_ends_at: { gt: now } },
+              { trial_ends_at: null }
+            ]
+          }
+        });
+        if (activeTrialCount >= 1) {
+          return res.status(409).json({
+            success: false,
+            error: 'trial_limit_reached',
+            message: 'You already have an active trial tenant. Please upgrade your existing tenant or wait for your trial to expire before creating a new one.'
+          });
+        }
+      }
+      // Calculate trial end date
+      const trial_ends_at = new Date();
+      trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
+
       // Create tenant with the business name
       const tenantId = generateTenantId();
       const tenantSlug = await slugSingletonService.generateSlug(businessName, {}, tenantId);
@@ -102,8 +135,11 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
           id: tenantId,
           name: businessName,
           slug: tenantSlug,
+          created_by: userId,
           subscription_tier: 'discovery',
           subscription_status: 'trial',
+          trial_ends_at: trial_ends_at,
+          location_status: 'active',
         },
       });
 

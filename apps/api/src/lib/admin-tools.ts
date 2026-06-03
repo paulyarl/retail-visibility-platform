@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../prisma';
+import { TRIAL_CONFIG } from '../config/tenant-limits';
 import { generateQuickStartProducts, QuickStartScenario } from './quick-start';
 import { generateQuickStart, generateUserTenantId } from './id-generator';
 
@@ -196,6 +197,11 @@ export async function createTestTenant(options: {
 
   const tenantId = `tenant_test_${Date.now()}`;
 
+  // Calculate trial end date if creating a trial tenant
+  const trialEndsAt = subscriptionStatus === 'trial'
+    ? new Date(Date.now() + TRIAL_CONFIG.durationDays * 24 * 60 * 60 * 1000)
+    : null;
+
   // Create tenant
   const tenant = await prisma.tenants.create({
     data: {
@@ -203,6 +209,7 @@ export async function createTestTenant(options: {
       name,
       subscription_tier: subscriptionTier,
       subscription_status: subscriptionStatus,
+      trial_ends_at: trialEndsAt,
       organization_id: organizationId || null,
     },
   });

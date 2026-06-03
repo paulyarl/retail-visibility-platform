@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
+import { TRIAL_CONFIG } from '../../config/tenant-limits';
 import { TenantService } from '../../services/TenantService';
 import { checkTierFeatureAccess, isValidTier } from '../../services/TierService';
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate trial end date (14 days from now)
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
 
     // Update tenant with trial tier
     const updatedTenant = await prisma.tenants.update({
@@ -278,7 +279,7 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
 
     // Calculate trial end date (14 days from now)
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_CONFIG.durationDays);
 
     // Update tenant with trial tier
     const updatedTenant = await prisma.tenants.update({

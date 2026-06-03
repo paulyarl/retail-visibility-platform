@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { audit } from '../../audit';
+import { TRIAL_CONFIG } from '../../config/tenant-limits';
 
 const router = Router();
 
@@ -422,8 +423,8 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       } else {
         // Only set trial expiration if manual control is NOT active
         const now = new Date();
-        const trialEndsAt = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
-        const graceEndsAt = new Date(now.getTime() + (28 * 24 * 60 * 60 * 1000)); // 28 days from now (14 + 14 grace)
+        const trialEndsAt = new Date(now.getTime() + (TRIAL_CONFIG.durationDays * 24 * 60 * 60 * 1000));
+        const graceEndsAt = new Date(now.getTime() + ((TRIAL_CONFIG.durationDays * 2) * 24 * 60 * 60 * 1000));
         
         updatePayload.trial_ends_at = trialEndsAt;
         updatePayload.subscription_status = updateData.subscriptionStatus || 'trial';

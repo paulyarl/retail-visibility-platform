@@ -905,6 +905,33 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       ? parsed.data.ownerId
       : userId;
 
+    // Check trial tenant limit for non-platform-admin owners
+    const ownerUser = await prisma.users.findUnique({
+      where: { id: ownerId },
+      select: { id: true, role: true }
+    });
+    const isOwnerPlatformAdmin = ownerUser?.role === USER_ROLES.PLATFORM_ADMIN || ownerUser?.role === USER_ROLES.ADMIN;
+    if (!isOwnerPlatformAdmin) {
+      const now = new Date();
+      const activeTrialCount = await prisma.tenants.count({
+        where: {
+          user_tenants: {
+            some: { user_id: ownerId }
+          },
+          subscription_status: 'trial',
+          OR: [
+            { trial_ends_at: { gt: now } },
+            { trial_ends_at: null }
+          ]
+        }
+      });
+      if (activeTrialCount >= 1) {
+        return res.status(409).json({
+          error: 'trial_limit_reached',
+          message: 'You already have an active trial tenant. Please upgrade your existing tenant or wait for your trial to expire before creating a new one.'
+        });
+      }
+    }
 
     // Validate for duplicates (check against the owner, not the creator)
     const { validateTenantCreation } = await import('./utils/tenant-validation');
@@ -943,7 +970,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
         name: parsed.data.name,
         slug: parsed.data.slug,
         created_by: req.user?.userId || null, // Optional field - null if user not authenticated
-        subscription_tier: 'starter',
+        subscription_tier: 'discovery',
         subscription_status: 'trial',
         trial_ends_at: trial_ends_at,
         location_status: 'active',
@@ -1005,7 +1032,25 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       // Don't fail the entire operation if logging fails
     }
 
-    await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
+    // Update the owner's platform role to OWNER if they don't already have a higher-level role
+    try {
+      const ownerUser = await prisma.users.findUnique({
+        where: { id: ownerId },
+        select: { id: true, role: true }
+      });
+      if (ownerUser && !ownerUser.role) {
+        await prisma.users.update({
+          where: { id: ownerId },
+          data: { role: USER_ROLES.OWNER }
+        });
+        console.log(`[POST /tenants] Updated owner ${ownerId} platform role to OWNER`);
+      }
+    } catch (roleError) {
+      console.warn('[POST /tenants] Could not update owner platform role:', roleError);
+      // Don't fail tenant creation if role update fails
+    }
+
+    await audit({ tenantId: tenant.id, actor: ownerId, action: "tenant.create", payload: { name: parsed.data.name, ownerId } });
     res.status(201).json(tenant);
   } catch (error) {
     console.error('[POST /tenants] Error creating tenant:', error);
