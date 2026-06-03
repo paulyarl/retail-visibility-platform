@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package, AlertTriangle, XCircle } from 'lucide-react';
@@ -66,6 +66,7 @@ interface OrderReceiptProps {
 }
 
 export default function OrderReceipt({ cart, platformFeePercentage: propPlatformFeePercentage = 3.0, onPrint, className = "", actions, statusHistory: propStatusHistory }: OrderReceiptProps) {
+  const receiptRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -236,166 +237,74 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${tenantProfile.address_line1}, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}`)}`
     : '';
 
-  const handlePrint = () => {
+  const printReceipt = (mode: 'print' | 'download' = 'print') => {
+    const container = receiptRef.current;
+    if (!container) return;
+
     setIsPrinting(true);
-    window.print();
-    setTimeout(() => setIsPrinting(false), 100);
-    onPrint?.();
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setIsPrinting(false);
+      alert('Please allow popups to print or download the receipt.');
+      return;
+    }
+
+    const title = mode === 'download'
+      ? `Receipt-${cart.orderId || 'order'}.pdf`
+      : `Receipt-${cart.orderId || 'order'}`;
+
+    // Gather all stylesheets and inline styles from the parent document
+    const parentStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((el) => el.outerHTML)
+      .join('\n');
+
+    // Clone the receipt node so we can manipulate it without affecting the live DOM
+    const clone = container.cloneNode(true) as HTMLElement;
+
+    // Remove action buttons from the clone
+    clone.querySelectorAll('.print\\:hidden').forEach((el) => el.remove());
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  ${parentStyles}
+  <style>
+    @media print {
+      @page { margin: 0.5in; size: letter; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: #fff; }
+  </style>
+</head>
+<body>
+  ${clone.outerHTML}
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    // Wait for images/fonts then trigger print
+    const trigger = () => {
+      printWindow.focus();
+      printWindow.print();
+      if (mode === 'print') {
+        onPrint?.();
+      }
+      setTimeout(() => setIsPrinting(false), 500);
+    };
+
+    // Give the browser a tick to render styles
+    setTimeout(trigger, 350);
   };
 
-  const handleDownload = () => {
-    // Create a text receipt
-    const receipt = generateTextReceipt();
-    const blob = new Blob([receipt], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipt-${cart.orderId || 'order'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  };
-
-  const generateTextReceipt = () => {
-    const storeAddress = tenantProfile?.address_line1 ? `
-${tenantProfile.address_line1}
-${tenantProfile.address_line2 ? tenantProfile.address_line2 : ''}
-${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}
-${tenantProfile.country_code}` : 'Store Location';
-    
-    const storePhone = tenantProfile?.phone_number || '(555) 123-4567';
-    const storeEmail = tenantProfile?.email || `support@${cart.tenantName.toLowerCase().replace(/\s+/g, '-')}.com`;
-    // console.log(`Cart gateway 1: ${cart.gatewayType}`);
-
-    return `
-╔══════════════════════════════════════════════════════════════╗
-║                      ORDER RECEIPT                           ║
-╚══════════════════════════════════════════════════════════════╝
-
-Order Number: ${cart.orderId || 'N/A'}
-Order Status: ${cart.status.toUpperCase()}
-Date: ${cart.paidAt ? formatDate(cart.paidAt) : new Date().toLocaleString()}
-
-═══════════════════════════════════════════════════════════════
-
-CUSTOMER INFORMATION
-───────────────────────────────────────────────────────────
-${cart.customerInfo ? `
-Name: ${cart.customerInfo.firstName} ${cart.customerInfo.lastName}
-Email: ${cart.customerInfo.email}
-Phone: ${cart.customerInfo.phone}` : 'Guest Checkout'}
-
-═══════════════════════════════════════════════════════════════
-
-FULFILLMENT METHOD
-───────────────────────────────────────────────────────────
-${cart.fulfillmentMethod === 'pickup' ? `
-*** IN-STORE PICKUP ***
-Pick up your order at our store location.
-We'll notify you when your order is ready for pickup.
-${fulfillmentFee === 0 ? 'FREE' : formatCurrency(fulfillmentFee)}
-${fulfillmentSettings?.pickup_ready_time_minutes ? `
-⏱️ Estimated Ready Time: ${Math.floor(fulfillmentSettings.pickup_ready_time_minutes / 60)}h ${fulfillmentSettings.pickup_ready_time_minutes % 60}m
-Your order will typically be ready within ${fulfillmentSettings.pickup_ready_time_minutes} minutes.` : ''}
-${fulfillmentSettings?.pickup_instructions ? `
-
-📋 Pickup Instructions:
-${fulfillmentSettings.pickup_instructions}` : ''}
-
-${businessHours ? `Store Hours:
-${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
-  const dayHours = businessHours[day];
-  const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
-  const dayLabel = isToday ? `${day} (Today)` : day;
-  const hours = dayHours ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}` : 'Closed';
-  return `  ${dayLabel.padEnd(18)} ${hours}`;
-}).join('\n')}` : ''}` : ''}${cart.fulfillmentMethod === 'delivery' && cart.shippingAddress ? `
-*** LOCAL DELIVERY ***
-Delivery Address:
-${cart.customerInfo?.firstName} ${cart.customerInfo?.lastName}
-${cart.shippingAddress.addressLine1}
-${cart.shippingAddress.addressLine2 ? cart.shippingAddress.addressLine2 : ''}
-${cart.shippingAddress.city}, ${cart.shippingAddress.state} ${cart.shippingAddress.postalCode}
-${cart.customerInfo?.phone ? `Contact: ${cart.customerInfo.phone}` : ''}` : ''}${cart.fulfillmentMethod === 'shipping' && cart.shippingAddress ? `
-*** SHIPPING ***
-Shipping Address:
-${cart.customerInfo?.firstName} ${cart.customerInfo?.lastName}
-${cart.shippingAddress.addressLine1}
-${cart.shippingAddress.addressLine2 ? cart.shippingAddress.addressLine2 : ''}
-${cart.shippingAddress.city}, ${cart.shippingAddress.state} ${cart.shippingAddress.postalCode}
-${cart.shippingAddress.country}
-${cart.customerInfo?.phone ? `Contact: ${cart.customerInfo.phone}` : ''}` : ''}${!cart.fulfillmentMethod && cart.shippingAddress ? `
-Shipping Address:
-${cart.customerInfo?.firstName} ${cart.customerInfo?.lastName}
-${cart.shippingAddress.addressLine1}
-${cart.shippingAddress.addressLine2 ? cart.shippingAddress.addressLine2 : ''}
-${cart.shippingAddress.city}, ${cart.shippingAddress.state} ${cart.shippingAddress.postalCode}
-${cart.shippingAddress.country}` : ''}
-
-═══════════════════════════════════════════════════════════════
-
-MERCHANT INFORMATION
-───────────────────────────────────────────────────────────
-Store: ${cart.tenantName}
-Store ID: ${cart.tenantId}
-Address: ${storeAddress}
-Phone: ${storePhone}
-Email: ${storeEmail}
-
-═══════════════════════════════════════════════════════════════
-
-ORDER ITEMS
-───────────────────────────────────────────────────────────
-${cart.items.map(item => {
-  const itemTotal = item.unitPrice * item.quantity;
-  return `${item.quantity}x ${item.name}
-    SKU: ${item.sku}
-    Unit Price: ${formatCurrency(item.unitPrice)}
-    Item Total: ${formatCurrency(itemTotal)}`;
-}).join('\n\n')}
-
-═══════════════════════════════════════════════════════════════
-
-ORDER SUMMARY
-───────────────────────────────────────────────────────────
-Subtotal: ${formatCurrency(cart.subtotal)}
-${platformFee > 0 ? `Platform Fee (${effectivePlatformFeePercentage}%): ${formatCurrency(platformFee)}\n` : ''}${getFulfillmentLabel()}: ${formatCurrency(fulfillmentFee)}
-───────────────────────────────────────────────────────────
-TOTAL: ${formatCurrency(total)}
-
-═══════════════════════════════════════════════════════════════
-
-PAYMENT INFORMATION
-───────────────────────────────────────────────────────────
-Payment Method: ${cart.gatewayType ? cart.gatewayType.charAt(0).toUpperCase() + cart.gatewayType.slice(1) : 'PayPal'}
-Payment Status: ${cart.status.toUpperCase()}
-Transaction ID: ${cart.gatewayTransactionId || cart.paymentId || cart.orderId || 'N/A'}
-
-═══════════════════════════════════════════════════════════════
-
-FULFILLMENT INFORMATION
-───────────────────────────────────────────────────────────
-Fulfillment Method: ${getFulfillmentLabel()}
-Fulfillment Status: ${cart.fulfillmentStatus === 'fulfilled' ? 'PICKED UP' : cart.fulfillmentStatus?.toUpperCase() || 'PROCESSING'}${cart.fulfilledAt ? `
-Picked Up On: ${new Date(cart.fulfilledAt).toLocaleDateString('en-US', {
-  weekday: 'long',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})}` : ''}${cart.fulfillmentMethod === 'pickup' && tenantProfile?.address_line1 ? `
-Pickup Location: ${tenantProfile.address_line1}${tenantProfile.address_line2 ? `, ${tenantProfile.address_line2}` : ''}, ${tenantProfile.city}, ${tenantProfile.state} ${tenantProfile.postal_code}` : ''}
-
-═══════════════════════════════════════════════════════════════
-
-Thank you for your order!
-Questions? Contact us at support@visibleshelf.store
-
-Generated on ${new Date().toLocaleString()}
-`.trim();
-  };
+  const handlePrint = () => printReceipt('print');
+  const handleDownload = () => printReceipt('download');
 
   // Allow cancelled orders and forfeited deposit orders to show receipt
   const isCancelled = cart.status === 'cancelled';
@@ -404,7 +313,7 @@ Generated on ${new Date().toLocaleString()}
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div ref={receiptRef} className={`space-y-4 ${className}`}>
       {/* Header - show appropriate status */}
       {isCancelled ? (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
