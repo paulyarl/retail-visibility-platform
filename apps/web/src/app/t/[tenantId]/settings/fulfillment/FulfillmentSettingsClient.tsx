@@ -21,6 +21,7 @@ interface FulfillmentSettings {
   delivery_instructions: string | null;
   shipping_enabled: boolean;
   shipping_flat_rate_cents: number | null;
+  shipping_min_free_cents: number | null;
   shipping_zones: any[];
   shipping_handling_days: number;
   shipping_provider: string | null;
@@ -51,6 +52,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
     delivery_instructions: null,
     shipping_enabled: false,
     shipping_flat_rate_cents: null,
+    shipping_min_free_cents: null,
     shipping_zones: [],
     shipping_handling_days: 2,
     shipping_provider: null,
@@ -479,6 +481,24 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="8"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Free Shipping Threshold ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={settings.shipping_min_free_cents != null ? settings.shipping_min_free_cents / 100 : ''}
+                      onChange={(e) => setSettings({ ...settings, shipping_min_free_cents: e.target.value ? parseCurrency(e.target.value) : null })}
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="50"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Orders over this amount qualify for free shipping
+                    </p>
                   </div>
 
                   <div>

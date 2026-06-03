@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Save, AlertCircle, CheckCircle2, Clock, LayoutGrid, Star, Eye, Info, QrCode, Image, Zap, ArrowRight, Building, Paintbrush, MapPin, CalendarDays, Tag, FolderOpen } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Clock, LayoutGrid, Star, Eye, Info, QrCode, Image, Zap, ArrowRight, Building, Paintbrush, MapPin, CalendarDays, Tag, FolderOpen, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { STOREFRONT_OPT_GROUPS, getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
@@ -123,6 +123,24 @@ function getQuickActions(settings: StorefrontOptionsSettings, tenantId: string):
     description: 'Configure how your store appears in the directory',
     href: `/t/${tenantId}/settings/directory`,
     icon: FolderOpen,
+    variant: 'directory',
+  });
+
+  actions.push({
+    id: 'public-storefront',
+    label: 'Public Storefront',
+    description: "View your store as customers see it",
+    href: `/tenant/${tenantId}`,
+    icon: Globe,
+    variant: 'general',
+  });
+
+  actions.push({
+    id: 'directory-entry',
+    label: 'Directory Entry',
+    description: "View your store's public directory listing",
+    href: `/directory/${tenantId}`,
+    icon: MapPin,
     variant: 'directory',
   });
 

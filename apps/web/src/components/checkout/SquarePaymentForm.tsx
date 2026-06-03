@@ -438,7 +438,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
   const orderCreatedRef = useRef(false);
 
   // Destructure props for useEffect dependencies
-  const { customerInfo, shippingAddress, cartItems, amount, checkoutMode } = props;
+  const { customerInfo, shippingAddress, cartItems, amount, checkoutMode, fulfillmentMethod } = props;
 
   // Validate minimum payment amount using platform-wide settings
   const paymentValidation = validateMinimumPaymentAmount(props.amount, platformSettings?.minimumPaymentAmount);
@@ -485,7 +485,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
             image_url: item.imageUrl,
             tenant_id: item.tenantId,
           })),
-          fulfillmentMethod: 'pickup',
+          fulfillmentMethod: fulfillmentMethod || 'pickup',
           shippingAddress: shippingAddress,
           paymentMethod: 'square',
           checkoutMode,
@@ -530,7 +530,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
     };
 
     initializePayment();
-  }, [customerInfo, shippingAddress, cartItems, amount, checkoutMode]);
+  }, [customerInfo, shippingAddress, cartItems, amount, checkoutMode, fulfillmentMethod]);
 
   // Load Square.js script
   useEffect(() => {

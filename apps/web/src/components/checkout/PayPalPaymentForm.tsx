@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
@@ -236,13 +236,9 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
     );
   }
 
-  const hasInitialized = useRef(false);
-
   useEffect(() => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
     createOrderAndPayment();
-  }, []);
+  }, [props.fulfillmentMethod, props.amount]);
 
   const createOrderAndPayment = async () => {
     try {

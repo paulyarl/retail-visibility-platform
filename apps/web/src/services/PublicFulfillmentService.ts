@@ -19,7 +19,44 @@ export interface FulfillmentSettings {
   delivery_time_hours: number;
   shipping_enabled: boolean;
   shipping_flat_rate_cents: number | null;
+  shipping_min_free_cents: number | null;
   shipping_handling_days: number;
+}
+
+/**
+ * Standalone utility: calculate the fulfillment fee for a given method.
+ * Used by payment forms to ensure a single source of truth for fee calculation.
+ *
+ * @param settings - FulfillmentSettings from the public endpoint
+ * @param method   - Selected fulfillment method
+ * @param subtotalCents - Cart subtotal in cents (needed for free-delivery threshold)
+ * @returns fee in cents
+ */
+export function calculateFulfillmentFee(
+  settings: FulfillmentSettings,
+  method: 'pickup' | 'delivery' | 'shipping',
+  subtotalCents: number
+): number {
+  switch (method) {
+    case 'pickup':
+      return 0;
+    case 'delivery': {
+      if (!settings.delivery_enabled) return 0;
+      if (settings.delivery_min_free_cents && subtotalCents >= settings.delivery_min_free_cents) {
+        return 0;
+      }
+      return settings.delivery_fee_cents;
+    }
+    case 'shipping': {
+      if (!settings.shipping_enabled) return 0;
+      if (settings.shipping_min_free_cents && subtotalCents >= settings.shipping_min_free_cents) {
+        return 0;
+      }
+      return settings.shipping_flat_rate_cents || 0;
+    }
+    default:
+      return 0;
+  }
 }
 
 class PublicFulfillmentService extends PublicApiSingleton {
@@ -149,10 +186,13 @@ class PublicFulfillmentService extends PublicApiSingleton {
   }
 
   /**
-   * Calculate shipping fee based on settings
+   * Calculate shipping fee based on settings and subtotal
    */
-  calculateShippingFee(settings: FulfillmentSettings): number {
+  calculateShippingFee(settings: FulfillmentSettings, subtotalCents: number): number {
     if (!settings.shipping_enabled) return 0;
+    if (settings.shipping_min_free_cents && subtotalCents >= settings.shipping_min_free_cents) {
+      return 0;
+    }
     return settings.shipping_flat_rate_cents || 0;
   }
 
@@ -188,7 +228,7 @@ class PublicFulfillmentService extends PublicApiSingleton {
         return {
           ...baseDetails,
           enabled: settings.shipping_enabled,
-          fee: this.calculateShippingFee(settings),
+          fee: subtotalCents ? this.calculateShippingFee(settings, subtotalCents) : (settings.shipping_flat_rate_cents || 0),
           time: this.formatDays(settings.shipping_handling_days),
         };
       

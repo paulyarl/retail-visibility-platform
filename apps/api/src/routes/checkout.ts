@@ -449,7 +449,13 @@ router.post('/orders', async (req: Request, res: Response) => {
             shipping_cents = deliveryFee;
           }
         } else if (fulfillment_method === 'shipping' && fulfillmentSettings.shipping_enabled) {
-          shipping_cents = fulfillmentSettings.shipping_flat_rate_cents ?? 0;
+          const shippingFee = fulfillmentSettings.shipping_flat_rate_cents ?? 0;
+          const minFree = fulfillmentSettings.shipping_min_free_cents;
+          const itemsSubtotal = validatedItems.reduce((sum, item) => sum + item.total_price_cents, 0);
+
+          if (minFree === null || minFree === undefined || itemsSubtotal < minFree) {
+            shipping_cents = shippingFee;
+          }
         }
       }
     } catch (fsError) {

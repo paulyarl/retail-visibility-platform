@@ -352,6 +352,7 @@ export interface FulfillmentSettings {
   delivery_instructions: string | null;
   shipping_enabled: boolean;
   shipping_flat_rate_cents: number | null;
+  shipping_min_free_cents: number | null;
   shipping_zones: any[];
   shipping_handling_days: number;
   shipping_provider: string | null;

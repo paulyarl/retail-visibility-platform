@@ -65,7 +65,12 @@ export default function FulfillmentMethodForm({
 
   const getDeliveryFee = (): number => {
     if (!settings) return 0;
-    return publicFulfillmentService.calculateDeliveryFee(settings, subtotal * 100); // Convert dollars to cents
+    return publicFulfillmentService.calculateDeliveryFee(settings, subtotal); // subtotal is already in cents
+  };
+
+  const getShippingFee = (): number => {
+    if (!settings) return 0;
+    return publicFulfillmentService.calculateShippingFee(settings, subtotal); // subtotal is already in cents
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -76,8 +81,8 @@ export default function FulfillmentMethodForm({
     let fee = 0;
     if (selectedMethod === 'delivery') {
       fee = getDeliveryFee();
-    } else if (selectedMethod === 'shipping' && settings?.shipping_flat_rate_cents) {
-      fee = settings.shipping_flat_rate_cents;
+    } else if (selectedMethod === 'shipping') {
+      fee = getShippingFee();
     }
 
     onSubmit(selectedMethod, fee);
@@ -106,7 +111,9 @@ export default function FulfillmentMethodForm({
   }
 
   const deliveryFee = getDeliveryFee();
+  const shippingFee = getShippingFee();
   const qualifiesForFreeDelivery = settings.delivery_min_free_cents && subtotal >= settings.delivery_min_free_cents;
+  const qualifiesForFreeShipping = settings.shipping_min_free_cents && subtotal >= settings.shipping_min_free_cents;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -195,7 +202,7 @@ export default function FulfillmentMethodForm({
                 )}
                 {qualifiesForFreeDelivery && (
                   <p className="text-green-600 text-xs mt-1">
-                    🎉 You qualify for free delivery!
+                    🎉 Congratulations! Your order is over {formatCurrency(settings.delivery_min_free_cents!)}! You qualify for free delivery!
                   </p>
                 )}
                 {!qualifiesForFreeDelivery && settings.delivery_min_free_cents && (
@@ -210,7 +217,7 @@ export default function FulfillmentMethodForm({
       )}
 
       {/* Shipping Option */}
-      {settings.shipping_enabled && settings.shipping_flat_rate_cents && showsShipping && (
+      {settings.shipping_enabled && showsShipping && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'shipping'
             ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
@@ -233,7 +240,7 @@ export default function FulfillmentMethodForm({
                   <span className="font-semibold text-neutral-900">Shipping</span>
                 </div>
                 <span className="font-semibold text-neutral-900">
-                  {formatCurrency(settings.shipping_flat_rate_cents)}
+                  {formatCurrency(getShippingFee())}
                 </span>
               </div>
               <div className="text-sm text-neutral-600 space-y-1">
@@ -244,6 +251,16 @@ export default function FulfillmentMethodForm({
                 <p className="text-xs">
                   Ships in {settings.shipping_handling_days} business {settings.shipping_handling_days === 1 ? 'day' : 'days'}
                 </p>
+                {qualifiesForFreeShipping && (
+                  <p className="text-green-600 text-xs mt-1">
+                    🎉 Congratulations! Your order is over {formatCurrency(settings.shipping_min_free_cents!)}! You qualify for free shipping!
+                  </p>
+                )}
+                {!qualifiesForFreeShipping && settings.shipping_min_free_cents && (
+                  <p className="text-xs mt-1">
+                    Free shipping on orders over {formatCurrency(settings.shipping_min_free_cents)}
+                  </p>
+                )}
               </div>
             </div>
           </div>

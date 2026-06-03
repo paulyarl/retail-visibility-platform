@@ -212,7 +212,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
     };
 
     initializeCheckout();
-  }, [props.amount, props.tenantId]);
+  }, [props.amount, props.tenantId, props.fulfillmentMethod]);
 
   if (loading) {
     return (
