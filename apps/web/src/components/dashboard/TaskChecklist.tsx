@@ -10,6 +10,8 @@ interface TaskChecklistProps {
   hasProducts: boolean;
   hasStorefront: boolean;
   hasPublishedDirectory: boolean;
+  locationStatus?: string;
+  subscriptionStatus?: string;
 }
 
 interface TaskItem {
@@ -24,6 +26,8 @@ export default function TaskChecklist({
   hasProducts,
   hasStorefront,
   hasPublishedDirectory,
+  locationStatus,
+  subscriptionStatus,
 }: TaskChecklistProps) {
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
 
@@ -36,6 +40,18 @@ export default function TaskChecklist({
     const canManageDiscounts = caps?.commerce?.enabled ?? true;
 
     return [
+      {
+        id: "location",
+        label: "Verify your business location",
+        done: locationStatus === "active",
+        link: `/t/${tenantId}/settings/location`,
+      },
+      {
+        id: "subscription",
+        label: "Activate your subscription",
+        done: subscriptionStatus === "active",
+        link: `/t/${tenantId}/settings/subscription`,
+      },
       {
         id: "payments",
         label: "Connect payment providers",
@@ -63,11 +79,17 @@ export default function TaskChecklist({
       {
         id: "storefront",
         label: "Publish your storefront",
-        done: hasStorefront && hasPublishedDirectory,
+        done: hasStorefront,
+        link: `/t/${tenantId}/settings/tenant`,
+      },
+      {
+        id: "directory",
+        label: "Publish your directory listing",
+        done: hasPublishedDirectory,
         link: `/t/${tenantId}/settings/tenant`,
       },
     ];
-  }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, tenantId]);
+  }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, locationStatus, subscriptionStatus, tenantId]);
 
   const completed = tasks.filter((t) => t.done).length;
   const percent = Math.round((completed / tasks.length) * 100);
