@@ -103,7 +103,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
 
     const fetchStatusHistory = async () => {
       if (!cart.orderId) return;
-      
+
       try {
         const orderData = await customerOrderService.getOrder(cart.orderId, cart.customerInfo?.email);
         if (orderData && orderData.statusHistory) {
@@ -149,14 +149,14 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
   const platformFee = Math.round(cart.subtotal * (effectivePlatformFeePercentage / 100));
   const fulfillmentFee = cart.fulfillmentFee || 0;
   const total = cart.subtotal + platformFee + fulfillmentFee;
-  
+
   // Deposit order handling
   const isDepositOrder = cart.checkoutMode === 'deposit';
   const isDepositForfeited = isDepositOrder && cart.depositForfeitedAt;
   const depositAmount = cart.depositCents || 0;
   const remainingBalance = cart.remainingBalanceCents || (total - depositAmount);
   const depositPercentageDisplay = cart.depositPercentage ?? (depositAmount > 0 && cart.subtotal > 0 ? Math.round((depositAmount / cart.subtotal) * 100) : null);
-  
+
   const getFulfillmentLabel = () => {
     if (!cart.fulfillmentMethod) return 'Fulfillment';
     if (cart.fulfillmentMethod === 'pickup') return 'In-Store Pickup';
@@ -172,9 +172,9 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
       fulfilled: { color: 'bg-green-100 text-green-800 border-green-200', icon: '✅', label: 'Fulfilled' },
       cancelled: { color: 'bg-red-100 text-red-800 border-red-200', icon: '❌', label: 'Cancelled' },
     };
-    
+
     const badge = badges[status as keyof typeof badges] || badges.pending;
-    
+
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
         <span className="text-xs">{badge.icon}</span>
@@ -197,7 +197,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
   useEffect(() => {
     const fetchTenantData = async () => {
       if (!cart.tenantId) return;
-      
+
       setIsLoadingProfile(true);
       try {
         // Fetch tenant profile
@@ -384,7 +384,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="p-6">
           {/* Order Details */}
           <div className="mb-6">
@@ -399,11 +399,10 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                 </p>
               </div>
               <div className="text-right">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  isCancelled ? 'bg-red-100 text-red-800' :
-                  isDepositForfeited ? 'bg-red-100 text-red-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${isCancelled ? 'bg-red-100 text-red-800' :
+                    isDepositForfeited ? 'bg-red-100 text-red-800' :
+                      'bg-green-100 text-green-800'
+                  }`}>
                   {isCancelled && <XCircle className="h-4 w-4 mr-1" />}
                   {!isCancelled && !isDepositForfeited && <CheckCircle2 className="h-4 w-4 mr-1" />}
                   {isDepositForfeited && <AlertTriangle className="h-4 w-4 mr-1" />}
@@ -411,7 +410,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                 </span>
               </div>
             </div>
-            
+
             {/* Cancellation Reason */}
             {isCancelled && cart.cancellationReason && (
               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -470,7 +469,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   <p className="text-purple-700">
                     We'll notify you when your order is ready for pickup.
                   </p>
-                  
+
                   {/* Pickup Ready Time */}
                   {fulfillmentSettings?.pickup_ready_time_minutes && (
                     <div className="mt-2 p-2 bg-purple-100 rounded border border-purple-300">
@@ -482,7 +481,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                       </p>
                     </div>
                   )}
-                  
+
                   {/* Pickup Instructions */}
                   {fulfillmentSettings?.pickup_instructions && (
                     <div className="mt-2 p-2 bg-purple-100 rounded border border-purple-300">
@@ -494,7 +493,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                       </p>
                     </div>
                   )}
-                  
+
                   {/* Store Hours */}
                   {businessHours && (
                     <div className="mt-3 pt-3 border-t border-purple-200">
@@ -503,7 +502,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
                           const dayHours = businessHours[day];
                           const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
-                          
+
                           return (
                             <div key={day} className={`flex justify-between ${isToday ? 'font-semibold text-purple-900' : 'text-purple-700'}`}>
                               <span>{isToday ? `${day} (Today)` : day}</span>
@@ -546,7 +545,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   )}
                 </>
               )}
-              
+
               {cart.fulfillmentMethod === 'delivery' && cart.shippingAddress && (
                 <>
                   <div className="flex items-center gap-2">
@@ -574,7 +573,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   </div>
                 </>
               )}
-              
+
               {cart.fulfillmentMethod === 'shipping' && cart.shippingAddress && (
                 <>
                   <div className="flex items-center gap-2">
@@ -603,7 +602,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   </div>
                 </>
               )}
-              
+
               {!cart.fulfillmentMethod && cart.shippingAddress && (
                 <>
                   <p className="text-purple-800 font-medium">Shipping Address:</p>
@@ -648,8 +647,8 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   <p className="text-gray-600 text-xs">Store ID: {cart.tenantId}</p>
                 </div>
               </div>
-              
-                            
+
+
               {/* Store Address */}
               {tenantProfile?.address_line1 && (
                 <div className="flex items-start gap-2 text-gray-600">
@@ -666,7 +665,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   </div>
                 </div>
               )}
-              
+
               {/* Store Phone */}
               {tenantProfile?.phone_number && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -674,7 +673,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   <span>{tenantProfile.phone_number}</span>
                 </div>
               )}
-              
+
               {/* Store Email */}
               {tenantProfile?.email && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -682,7 +681,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                   <span>{tenantProfile.email}</span>
                 </div>
               )}
-              
+
               {/* Fallback placeholders if no profile data */}
               {!tenantProfile && (
                 <>
@@ -709,14 +708,14 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
                       const dayHours = businessHours[day];
                       const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
-                      
+
                       // Debug logging
                       // if (day === 'Monday') {
-                        // console.log('[OrderReceipt] Business hours state:', businessHours);
-                        // console.log('[OrderReceipt] Monday hours:', dayHours);
+                      // console.log('[OrderReceipt] Business hours state:', businessHours);
+                      // console.log('[OrderReceipt] Monday hours:', dayHours);
                       // }
                       //  console.log(`Cart gateway 2: ${cart.gatewayType}`);
-                      
+
                       return (
                         <div key={day} className={`flex justify-between ${isToday ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
                           <span>{isToday ? `${day} (Today)` : day}</span>
@@ -807,7 +806,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
                 <span>Order Total</span>
                 <span>{formatCurrency(total)}</span>
               </div>
-              
+
               {/* Deposit Order Info - context aware based on status */}
               {isDepositOrder && depositAmount > 0 && (
                 <>
@@ -964,7 +963,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
               {actions}
             </div>
           )}
-          
+
           <div className="mt-6 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
             <p>Thank you for your order!</p>
             <p>Questions? Contact us at support@visibleshelf.store</p>

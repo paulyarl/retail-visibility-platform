@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { RefundService } from '../services/refunds/RefundService';
+import { getStockService } from '../services/StockService';
+import { CustomerTokenService } from '../services/CustomerTokenService';
+import { stripeConnectService } from '../services/payments/StripeConnectService';
+import { getOrderNotificationService } from '../services/OrderNotificationService';
 
 const router = Router();
 
@@ -22,13 +26,24 @@ router.get('/buyer', async (req, res) => {
 
     // Find orders by customer email or phone
     // Include both paid and draft orders so customers can see/cancel incomplete orders
+    // Exclude draft orders older than 24 hours to prevent list clutter from abandoned checkouts
+    const DRAFT_ORDER_WINDOW_HOURS = 24;
+    const draftCutoff = new Date(Date.now() - DRAFT_ORDER_WINDOW_HOURS * 60 * 60 * 1000);
+
     const orders = await prisma.orders.findMany({
       where: {
         OR: [
           email ? { customer_email: email as string } : {},
           phone ? { customer_phone: phone as string } : {},
         ],
-        order_status: { in: ['paid', 'draft'] },
+        AND: [
+          {
+            OR: [
+              { order_status: { not: 'draft' } },
+              { order_status: 'draft', created_at: { gte: draftCutoff } },
+            ],
+          },
+        ],
       },
       include: {
         order_items: {
@@ -64,14 +79,14 @@ router.get('/buyer', async (req, res) => {
     });
 
     // Fetch variants for all orders by tenant and parent_item_id
-    const parentItemIds = [...new Set(orders.flatMap(order => 
+    const parentItemIds = [...new Set(orders.flatMap(order =>
       order.order_items.map(item => item.inventory_item_id)
     ))];
-    
+
     const variants = parentItemIds.length > 0 ? await prisma.product_variants.findMany({
-      where: { 
+      where: {
         parent_item_id: { in: parentItemIds.filter(id => id !== null) as string[] },
-        tenant_id: orders[0]?.tenant_id 
+        tenant_id: orders[0]?.tenant_id
       },
       select: {
         id: true,
@@ -80,92 +95,92 @@ router.get('/buyer', async (req, res) => {
         image_url: true,
       },
     }) : [];
-    
+
     // Create maps for both variant_id and sku lookup
     const variantMapById = new Map(variants.map(v => [v.id, v]));
     const variantMapBySku = new Map(variants.map(v => [v.sku, v]));
 
     // Transform to buyer-friendly format
     const ordersList = orders.map((order) => {
-        const tenant = order.tenants;
-        const payment = order.payments[0];
-        const shipment = order.shipments?.[0];
+      const tenant = order.tenants;
+      const payment = order.payments[0];
+      const shipment = order.shipments?.[0];
 
-        return {
-          orderId: order.id,
-          orderNumber: order.order_number,
-          paymentId: payment?.id || null,
-          gatewayTransactionId: payment?.gateway_transaction_id || null,
-          gatewayType: payment?.gateway_type || null,
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          tenantLogo: (tenant.metadata as any)?.logo_url || null,
-          status: order.order_status,
-          fulfillmentStatus: order.fulfillment_status,
-          fulfilledAt: order.fulfilled_at,
-          orderDate: order.created_at,
-          paidAt: order.paid_at || order.created_at,
-          total: order.total_cents,
-          subtotal: order.subtotal_cents,
-          platformFee: 0, // Platform fee not stored in orders table
-          fulfillmentFee: order.shipping_cents || 0,
-          fulfillmentMethod: (order.metadata as any)?.fulfillment_method || null,
-          trackingNumber: shipment?.tracking_number || order.shipping_provider || undefined,
-          shippingProvider: order.shipping_provider || undefined,
-          customerInfo: {
-            email: order.customer_email,
-            phone: order.customer_phone || '',
-            firstName: order.customer_name?.split(' ')[0] || '',
-            lastName: order.customer_name?.split(' ').slice(1).join(' ') || '',
-          },
-          shippingAddress: order.shipping_address_line1 ? {
-            addressLine1: order.shipping_address_line1,
-            addressLine2: order.shipping_address_line2 || undefined,
-            city: order.shipping_city || '',
-            state: order.shipping_state || '',
-            postalCode: order.shipping_postal_code || '',
-            country: order.shipping_country || 'US',
-          } : null,
-          items: order.order_items.map((item) => {
-            // Try to find variant by variant_id first, then by sku
-            let variant = null;
-            if (item.variant_id) {
-              variant = variantMapById.get(item.variant_id);
-            } else if (item.sku) {
-              variant = variantMapBySku.get(item.sku);
-            }
-            
-            return {
-              id: item.id,
-              name: variant ? 
-                `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` : 
-                (item.inventory_items?.name || item.name || ''),
-              sku: variant?.sku || item.inventory_items?.sku || item.sku || '',
-              quantity: item.quantity,
-              unitPrice: item.unit_price_cents,
-              imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
-            };
-          }),
-          itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
-          refunds: order.refunds?.map(refund => ({
-            id: refund.id,
-            amount: refund.amount_cents,
-            status: refund.refund_status,
-            reason: refund.refund_reason,
-            gatewayRefundId: refund.gateway_refund_id,
-            createdAt: refund.created_at,
-            completedAt: refund.completed_at,
-          })) || [],
-          internalNotes: order.internal_notes || undefined,
-          // Extract cancellation reason from internal_notes
-          cancellationReason: order.internal_notes?.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || undefined,
-          // Deposit order fields
-          checkoutMode: order.checkout_mode || undefined,
-          depositCents: order.deposit_cents || undefined,
-          remainingBalanceCents: order.remaining_balance_cents || undefined,
-          pickupDeadline: order.pickup_deadline || undefined,
-        };
-      });
+      return {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        paymentId: payment?.id || null,
+        gatewayTransactionId: payment?.gateway_transaction_id || null,
+        gatewayType: payment?.gateway_type || null,
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        tenantLogo: (tenant.metadata as any)?.logo_url || null,
+        status: order.order_status,
+        fulfillmentStatus: order.fulfillment_status,
+        fulfilledAt: order.fulfilled_at,
+        orderDate: order.created_at,
+        paidAt: order.paid_at || order.created_at,
+        total: order.total_cents,
+        subtotal: order.subtotal_cents,
+        platformFee: 0, // Platform fee not stored in orders table
+        fulfillmentFee: order.shipping_cents || 0,
+        fulfillmentMethod: (order.metadata as any)?.fulfillment_method || null,
+        trackingNumber: shipment?.tracking_number || order.shipping_provider || undefined,
+        shippingProvider: order.shipping_provider || undefined,
+        customerInfo: {
+          email: order.customer_email,
+          phone: order.customer_phone || '',
+          firstName: order.customer_name?.split(' ')[0] || '',
+          lastName: order.customer_name?.split(' ').slice(1).join(' ') || '',
+        },
+        shippingAddress: order.shipping_address_line1 ? {
+          addressLine1: order.shipping_address_line1,
+          addressLine2: order.shipping_address_line2 || undefined,
+          city: order.shipping_city || '',
+          state: order.shipping_state || '',
+          postalCode: order.shipping_postal_code || '',
+          country: order.shipping_country || 'US',
+        } : null,
+        items: order.order_items.map((item) => {
+          // Try to find variant by variant_id first, then by sku
+          let variant = null;
+          if (item.variant_id) {
+            variant = variantMapById.get(item.variant_id);
+          } else if (item.sku) {
+            variant = variantMapBySku.get(item.sku);
+          }
+
+          return {
+            id: item.id,
+            name: variant ?
+              `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` :
+              (item.inventory_items?.name || item.name || ''),
+            sku: variant?.sku || item.inventory_items?.sku || item.sku || '',
+            quantity: item.quantity,
+            unitPrice: item.unit_price_cents,
+            imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+          };
+        }),
+        itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
+        refunds: order.refunds?.map(refund => ({
+          id: refund.id,
+          amount: refund.amount_cents,
+          status: refund.refund_status,
+          reason: refund.refund_reason,
+          gatewayRefundId: refund.gateway_refund_id,
+          createdAt: refund.created_at,
+          completedAt: refund.completed_at,
+        })) || [],
+        internalNotes: order.internal_notes || undefined,
+        // Extract cancellation reason from internal_notes
+        cancellationReason: order.internal_notes?.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || undefined,
+        // Deposit order fields
+        checkoutMode: order.checkout_mode || undefined,
+        depositCents: order.deposit_cents || undefined,
+        remainingBalanceCents: order.remaining_balance_cents || undefined,
+        pickupDeadline: order.pickup_deadline || undefined,
+      };
+    });
 
     // console.log(`[Buyer Orders] Found ${ordersList.length} orders`);
 
@@ -200,21 +215,30 @@ router.get('/customer/:email', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       try {
-        const { CustomerTokenService } = await import('../services/CustomerTokenService');
         const tokenService = CustomerTokenService.getInstance();
         const payload = tokenService.verifyAccessToken(authHeader.substring(7));
         if (payload) {
           customerId = payload.customerId;
         }
-      } catch {}
+      } catch { }
     }
+
+    const DRAFT_ORDER_WINDOW_HOURS = 24;
+    const draftCutoff = new Date(Date.now() - DRAFT_ORDER_WINDOW_HOURS * 60 * 60 * 1000);
 
     const where: any = {
       OR: [
         { customer_email: email.toLowerCase() },
         ...(customerId ? [{ customer_id: customerId }] : []),
       ],
-      order_status: { in: ['paid', 'draft', 'confirmed', 'processing', 'shipped', 'delivered'] },
+      AND: [
+        {
+          OR: [
+            { order_status: { not: 'draft' } },
+            { order_status: 'draft', created_at: { gte: draftCutoff } },
+          ],
+        },
+      ],
     };
 
     const [orders, total] = await Promise.all([
@@ -399,7 +423,7 @@ router.get('/:orderId', async (req, res) => {
 
     // Verify order belongs to the buyer (if email/phone provided)
     if (email || phone) {
-      const isOwner = 
+      const isOwner =
         (email && order.customer_email === email) ||
         (phone && order.customer_phone === phone);
 
@@ -414,11 +438,11 @@ router.get('/:orderId', async (req, res) => {
 
     // Fetch variants for order by tenant and parent_item_id
     const parentItemIds = [...new Set(order.order_items.map(item => item.inventory_item_id))];
-    
+
     const variants = parentItemIds.length > 0 ? await prisma.product_variants.findMany({
-      where: { 
+      where: {
         parent_item_id: { in: parentItemIds.filter(id => id !== null) as string[] },
-        tenant_id: order.tenant_id 
+        tenant_id: order.tenant_id
       },
       select: {
         id: true,
@@ -427,7 +451,7 @@ router.get('/:orderId', async (req, res) => {
         image_url: true,
       },
     }) : [];
-    
+
     // Create maps for both variant_id and sku lookup
     const variantMapById = new Map(variants.map(v => [v.id, v]));
     const variantMapBySku = new Map(variants.map(v => [v.sku, v]));
@@ -482,11 +506,11 @@ router.get('/:orderId', async (req, res) => {
         } else if (item.sku) {
           variant = variantMapBySku.get(item.sku);
         }
-        
+
         return {
           id: item.id,
-          name: variant ? 
-            `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` : 
+          name: variant ?
+            `${item.inventory_items?.name || item.name || ''} - ${variant.variant_name}` :
             (item.inventory_items?.name || item.name || ''),
           sku: variant?.sku || item.inventory_items?.sku || item.sku || '',
           quantity: item.quantity,
@@ -575,10 +599,10 @@ router.patch('/:orderId/pickup', async (req, res) => {
     }
 
     // Verify authorization (buyer or store owner)
-    const isBuyer = 
+    const isBuyer =
       (email && order.customer_email === email) ||
       (phone && order.customer_phone === phone);
-    
+
     const isStoreOwner = tenantId && order.tenant_id === tenantId;
 
     if (!isBuyer && !isStoreOwner) {
@@ -617,7 +641,6 @@ router.patch('/:orderId/pickup', async (req, res) => {
     const depositPayment = order?.payments?.[0];
     if (depositPayment && depositPayment.platform_fee_cents && depositPayment.platform_fee_cents > 0) {
       try {
-        const { stripeConnectService } = await import('../services/payments/StripeConnectService');
         const isActive = await stripeConnectService.isRevenueCollectionActive();
         if (isActive) {
           await stripeConnectService.recordRevenueTransaction({
@@ -638,15 +661,14 @@ router.patch('/:orderId/pickup', async (req, res) => {
       }
     }
 
-    // Send order fulfilled notification (async, don't wait)
-    const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+    // Send order fulfilled notification (async, don't wait) 
     getOrderNotificationService().notifyOrderFulfilled({
       tenantId: order.tenant_id,
       orderId: orderId,
       customerEmail: order.customer_email,
       customerName: order.customer_name || undefined,
       amount: order.total_cents,
-    }).catch(err => console.error('[Buyer Orders] Failed to send fulfillment notification:', err));
+    }).catch((err: any) => console.error('[Buyer Orders] Failed to send fulfillment notification:', err));
 
     res.json({
       success: true,
@@ -700,7 +722,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
     }
 
     // Verify buyer authorization
-    const isBuyer = 
+    const isBuyer =
       (email && order.customer_email === email) ||
       (phone && order.customer_phone === phone);
 
@@ -731,12 +753,12 @@ router.patch('/:orderId/cancel', async (req, res) => {
 
     // Prepare cancellation note
     const timestamp = new Date().toISOString();
-    const cancellationNote = cancellationReason 
+    const cancellationNote = cancellationReason
       ? `[${timestamp}] BUYER CANCELLATION: ${cancellationReason}`
       : `[${timestamp}] BUYER CANCELLATION: No reason provided`;
-    
+
     const existingNotes = order.internal_notes || '';
-    const updatedNotes = existingNotes 
+    const updatedNotes = existingNotes
       ? `${existingNotes}\n\n${cancellationNote}`
       : cancellationNote;
 
@@ -755,7 +777,6 @@ router.patch('/:orderId/cancel', async (req, res) => {
 
     // Restore stock for cancelled orders (both paid and draft)
     try {
-      const { getStockService } = await import('../services/StockService');
       const stockService = getStockService(prisma);
       await stockService.restoreStockForOrder(orderId);
       // console.log(`[Buyer Orders] Stock restored for cancelled order: ${orderId}`);
@@ -764,8 +785,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
       // Don't fail the cancellation if stock restoration fails
     }
 
-    // Send order cancelled notification (async, don't wait)
-    const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+    // Send order cancelled notification (async, don't wait) 
     getOrderNotificationService().notifyOrderCancelled({
       tenantId: order.tenant_id,
       orderId: orderId,
@@ -774,12 +794,12 @@ router.patch('/:orderId/cancel', async (req, res) => {
       amount: order.total_cents,
       reason: cancellationReason,
       cancelledBy: 'buyer',
-    }).catch(err => console.error('[Buyer Orders] Failed to send cancellation notification:', err));
+    }).catch((err: any) => console.error('[Buyer Orders] Failed to send cancellation notification:', err));
 
     // Process refund if order was paid
     if (order.order_status === 'paid') {
       // console.log('[Buyer Orders] Order is paid, initiating refund for order:', orderId);
-      
+
       // Get payment record
       const payment = await prisma.payments.findFirst({
         where: { order_id: orderId },

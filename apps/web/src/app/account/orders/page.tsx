@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
-import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Receipt, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Receipt, CheckCircle, XCircle, AlertTriangle, CreditCard } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 
 export default function OrdersPage() {
@@ -42,9 +42,22 @@ export default function OrdersPage() {
 
       // Apply status filter
       if (statusFilter !== 'all') {
-        filteredOrders = filteredOrders.filter(
-          order => order.orderStatus.toLowerCase() === statusFilter
-        );
+        filteredOrders = filteredOrders.filter(order => {
+          const status = order.orderStatus.toLowerCase();
+          const fulfillment = (order.fulfillmentStatus || '').toLowerCase();
+
+          if (statusFilter === 'fulfilled') {
+            return fulfillment === 'fulfilled';
+          }
+
+          // Active statuses hide already-fulfilled orders
+          if (['confirmed', 'paid', 'processing', 'shipped'].includes(statusFilter)) {
+            if (fulfillment === 'fulfilled') return false;
+            return status === statusFilter;
+          }
+
+          return status === statusFilter;
+        });
       }
 
       // Apply search filter
@@ -76,8 +89,10 @@ export default function OrdersPage() {
 
   const getStatusColor = (status: string) => {
     switch ((status || 'unknown').toLowerCase()) {
-      case 'pending':
+      case 'confirmed':
         return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'paid':
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
       case 'processing':
         return 'text-blue-600 bg-blue-50 border-blue-200';
       case 'shipped':
@@ -86,8 +101,29 @@ export default function OrdersPage() {
         return 'text-green-600 bg-green-50 border-green-200';
       case 'cancelled':
         return 'text-red-600 bg-red-50 border-red-200';
+      case 'refunded':
+        return 'text-orange-600 bg-orange-50 border-orange-200';
+      case 'fulfilled':
+        return 'text-teal-600 bg-teal-50 border-teal-200';
+      case 'draft':
+        return 'text-amber-600 bg-amber-50 border-amber-200';
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch ((status || 'unknown').toLowerCase()) {
+      case 'confirmed': return 'Confirmed';
+      case 'paid': return 'Paid';
+      case 'processing': return 'Processing';
+      case 'shipped': return 'Shipped';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      case 'refunded': return 'Refunded';
+      case 'fulfilled': return 'Fulfilled';
+      case 'draft': return 'Draft - Needs Payment';
+      default: return status;
     }
   };
 
@@ -306,8 +342,20 @@ export default function OrdersPage() {
             }}
             actions={
               <div className="flex gap-2 mt-4">
-                {['pickup', 'delivery', 'shipping'].includes(selectedOrder.fulfillmentMethod || '') && 
-                 selectedOrder.orderStatus === 'paid' && 
+                {selectedOrder.orderStatus === 'draft' && (
+                  <Button
+                    onClick={() => {
+                      window.location.href = `/checkout?tenantId=${selectedOrder.tenantId}`;
+                    }}
+                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Continue Checkout
+                  </Button>
+                )}
+
+                {['pickup', 'delivery', 'shipping'].includes(selectedOrder.fulfillmentMethod || '') &&
+                 selectedOrder.orderStatus === 'paid' &&
                  !selectedOrder.fulfilledAt && (
                   <Button
                     onClick={() => handleConfirmPickup(selectedOrder.orderId)}
@@ -329,8 +377,8 @@ export default function OrdersPage() {
                     )}
                   </Button>
                 )}
-                
-                {['paid', 'processing'].includes(selectedOrder.orderStatus) && !selectedOrder.fulfilledAt && (
+
+                {['paid', 'processing', 'draft'].includes(selectedOrder.orderStatus) && !selectedOrder.fulfilledAt && (
                   <Button
                     variant="outline"
                     onClick={() => setShowCancelConfirm(true)}
@@ -396,11 +444,15 @@ export default function OrdersPage() {
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
+                <option value="draft">Draft</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="paid">Paid</option>
                 <option value="processing">Processing</option>
                 <option value="shipped">Shipped</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="refunded">Refunded</option>
+                <option value="fulfilled">Fulfilled</option>
               </select>
             </div>
           </div>
@@ -445,7 +497,11 @@ export default function OrdersPage() {
                   <Link
                     key={order.orderId}
                     href={`/account/orders/${order.orderId}`}
-                    className="block border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all"
+                    className={`block border rounded-lg p-4 hover:shadow-md transition-all ${
+                      order.orderStatus === 'draft'
+                        ? 'border-amber-300 bg-amber-50/30 hover:border-amber-400'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
                   >
                     {/* Order Header */}
                     <div className="flex items-start justify-between mb-3">
@@ -454,7 +510,7 @@ export default function OrdersPage() {
                         <p className="text-sm text-gray-500">{formatDate(order.createdAt)}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.orderStatus)}`}>
-                        {order.orderStatus}
+                        {getStatusLabel(order.orderStatus)}
                       </span>
                     </div>
 
@@ -502,8 +558,39 @@ export default function OrdersPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-2">
-                          {['pickup', 'delivery', 'shipping'].includes(order.fulfillmentMethod || '') && 
-                           order.orderStatus === 'paid' && 
+                          {order.orderStatus === 'draft' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  window.location.href = `/checkout?tenantId=${order.tenantId}`;
+                                }}
+                                className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white"
+                              >
+                                <CreditCard className="w-3 h-3" />
+                                Continue Checkout
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleCancelOrder(order.orderId);
+                                }}
+                                disabled={cancellingOrder}
+                                className="flex items-center gap-1 text-red-600 border-red-300 hover:bg-red-50"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Cancel Draft
+                              </Button>
+                            </>
+                          )}
+
+                          {['pickup', 'delivery', 'shipping'].includes(order.fulfillmentMethod || '') &&
+                           order.orderStatus === 'paid' &&
                            !order.fulfilledAt && (
                             <Button
                               size="sm"
@@ -520,7 +607,7 @@ export default function OrdersPage() {
                               {order.fulfillmentMethod === 'shipping' && 'Confirm Received'}
                             </Button>
                           )}
-                          
+
                           {['paid', 'processing'].includes(order.orderStatus) && !order.fulfilledAt && (
                             <Button
                               variant="outline"
@@ -536,19 +623,21 @@ export default function OrdersPage() {
                               Cancel
                             </Button>
                           )}
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSelectedOrder(order);
-                            }}
-                          >
-                            <Receipt className="w-4 h-4 mr-1" />
-                            View Receipt
-                          </Button>
+
+                          {order.orderStatus !== 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedOrder(order);
+                              }}
+                            >
+                              <Receipt className="w-4 h-4 mr-1" />
+                              View Receipt
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
