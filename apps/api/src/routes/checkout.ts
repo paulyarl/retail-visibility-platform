@@ -502,11 +502,174 @@ router.post('/orders', async (req: Request, res: Response) => {
       // });
     }
 
+    // ── RESUME EXISTING DRAFT ORDER ────────────────────────────────
+    // If the customer already has a recent draft order for this tenant
+    // with the same items, reuse it instead of creating another draft.
+    const DRAFT_ORDER_WINDOW_HOURS = 24;
+    const draftCutoff = new Date(Date.now() - DRAFT_ORDER_WINDOW_HOURS * 60 * 60 * 1000);
+
+    const existingDrafts = await prisma.orders.findMany({
+      where: {
+        tenant_id,
+        order_status: 'draft',
+        created_at: { gte: draftCutoff },
+        OR: [
+          customer.email ? { customer_email: customer.email } : {},
+          effectiveCustomerId ? { customer_id: effectiveCustomerId } : {},
+        ],
+      },
+      include: { order_items: true, payments: true },
+      orderBy: { created_at: 'desc' },
+      take: 5,
+    });
+
+    // Helper: build a comparable signature from item list
+    const itemSignature = (orderItems: any[]) =>
+      orderItems
+        .map((i) => `${i.sku}:${i.quantity}`)
+        .sort()
+        .join(',');
+
+    const requestedSignature = itemSignature(
+      validatedItems.map((item) => ({ sku: item.sku, quantity: item.quantity }))
+    );
+
+    const matchingDraft = existingDrafts.find((draft) => {
+      const draftSignature = itemSignature(draft.order_items);
+      return draftSignature === requestedSignature;
+    });
+
+    if (matchingDraft) {
+      console.log(
+        `[Checkout] Resuming existing draft order ${matchingDraft.id} for customer ${customer.email || effectiveCustomerId}`
+      );
+
+      // Update shipping / customer details in case they changed
+      const updatedOrder = await prisma.orders.update({
+        where: { id: matchingDraft.id },
+        data: {
+          customer_name:
+            customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || null,
+          customer_phone: customer.phone || null,
+          shipping_address_line1: shipping_address?.addressLine1,
+          shipping_address_line2: shipping_address?.addressLine2,
+          shipping_city: shipping_address?.city,
+          shipping_state: shipping_address?.state,
+          shipping_postal_code: shipping_address?.postalCode,
+          shipping_country: shipping_address?.country,
+          billing_address_line1: billing_address?.addressLine1 || shipping_address?.addressLine1,
+          billing_address_line2: billing_address?.addressLine2 || shipping_address?.addressLine2,
+          billing_city: billing_address?.city || shipping_address?.city,
+          billing_state: billing_address?.state || shipping_address?.state,
+          billing_postal_code: billing_address?.postalCode || shipping_address?.postalCode,
+          billing_country: billing_address?.country || shipping_address?.country,
+          metadata: {
+            ...(matchingDraft.metadata as object || {}),
+            ...(fulfillment_method ? { fulfillment_method } : {}),
+            ...(pickup_tenant_id ? { pickup_tenant_id, is_multi_location_order: true } : {}),
+            ...(paymentTenantId !== tenant_id ? { payment_tenant_id: paymentTenantId, is_hero_payment: true } : {}),
+            ...(platformFeeCents > 0 ? { platform_fee_cents: platformFeeCents, platform_fee_percentage: platformFeePercentage } : {}),
+          },
+          subtotal_cents: totals.subtotal_cents,
+          tax_cents: totals.tax_cents,
+          shipping_cents: totals.shipping_cents,
+          total_cents: orderTotalCents,
+          checkout_mode: checkout_mode || checkoutCapabilities.mode,
+          deposit_percentage: depositCalculation?.depositPercentage || null,
+          deposit_cents: depositCalculation?.depositCents || 0,
+          remaining_balance_cents: depositCalculation?.remainingBalanceCents || 0,
+          pickup_deadline: depositCalculation?.pickupDeadline || null,
+          updated_at: new Date(),
+        },
+        include: { order_items: true },
+      });
+
+      // Re-calculate fees for the existing order
+      const { PlatformFeeCalculator } = await import('../services/payments/PlatformFeeCalculator');
+      const fees = await PlatformFeeCalculator.calculateFees(
+        updatedOrder.tenant_id,
+        paymentAmount,
+        0
+      );
+
+      // Find or update the payment record
+      let existingPayment = matchingDraft.payments?.[0];
+      if (existingPayment) {
+        existingPayment = await prisma.payments.update({
+          where: { id: existingPayment.id },
+          data: {
+            gateway_type: payment_method || 'paypal',
+            payment_method: payment_method || 'paypal',
+            amount_cents: paymentAmount,
+            platform_fee_cents: fees.platformFeeCents,
+            platform_fee_percentage: fees.platformFeePercentage,
+            gateway_fee_cents: fees.gatewayFeeCents,
+            net_amount_cents: fees.netAmountCents,
+            total_fees_cents: fees.totalFeesCents,
+            fee_waived: fees.feeWaived,
+            fee_waived_reason: fees.feeWaivedReason,
+            payment_status: 'pending',
+            is_deposit_payment: checkoutCapabilities.mode === 'deposit_only' || checkoutCapabilities.mode === 'flexible',
+            deposit_percentage: depositCalculation?.depositPercentage || null,
+            updated_at: new Date(),
+          },
+        });
+      } else {
+        existingPayment = await prisma.payments.create({
+          data: {
+            id: generatePaymentId(updatedOrder.tenant_id),
+            tenant_id: updatedOrder.tenant_id,
+            order_id: updatedOrder.id,
+            gateway_type: payment_method || 'paypal',
+            payment_method: payment_method || 'paypal',
+            amount_cents: paymentAmount,
+            platform_fee_cents: fees.platformFeeCents,
+            platform_fee_percentage: fees.platformFeePercentage,
+            gateway_fee_cents: fees.gatewayFeeCents,
+            net_amount_cents: fees.netAmountCents,
+            total_fees_cents: fees.totalFeesCents,
+            fee_waived: fees.feeWaived,
+            fee_waived_reason: fees.feeWaivedReason,
+            payment_status: 'pending',
+            is_deposit_payment: checkoutCapabilities.mode === 'deposit_only' || checkoutCapabilities.mode === 'flexible',
+            deposit_percentage: depositCalculation?.depositPercentage || null,
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        order: {
+          id: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          subtotal_cents: updatedOrder.subtotal_cents,
+          shipping_cents: updatedOrder.shipping_cents,
+          tax_cents: updatedOrder.tax_cents,
+          total_cents: updatedOrder.total_cents,
+          created_at: updatedOrder.created_at,
+          order_items: (updatedOrder as any).order_items,
+          checkout_mode: updatedOrder.checkout_mode,
+          deposit_cents: updatedOrder.deposit_cents,
+          remaining_balance_cents: updatedOrder.remaining_balance_cents,
+          pickup_deadline: updatedOrder.pickup_deadline,
+        },
+        payment: {
+          id: existingPayment.id,
+          status: existingPayment.payment_status,
+          amount_cents: existingPayment.amount_cents,
+          is_deposit_payment: existingPayment.is_deposit_payment,
+        },
+        resumed: true,
+      });
+    }
+    // ── END RESUME LOGIC ───────────────────────────────────────────
+
     // Generate order ID with customer correlation if available
     // Format: order-{tenantKey}-{customerKey}-{nanoid} for logged-in customers
     // Format: order-{tenantKey}-GUEST-{nanoid} for guest checkout
     const orderId = generateOrderId(tenant_id, effectiveCustomerId);
-    
+
     // Create order
     const order = await prisma.orders.create({
       data: {

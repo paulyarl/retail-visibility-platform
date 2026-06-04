@@ -21,7 +21,7 @@ export interface TenantQRCodeProps {
   /** Additional container classes */
   className?: string;
   /** Page type for filename differentiation */
-  pageType?: 'storefront' | 'directory' | 'product';
+  pageType?: 'storefront' | 'directory' | 'product' | 'map';
   /** Pre-resolved capability flags (skips tier fetch if provided) */
   capabilityFlags?: StorefrontOptionFlags | null;
 }
@@ -96,7 +96,7 @@ export function TenantQRCode({
           // Fetch logo if QR logo capability is enabled (capability-aware)
           const shouldFetchLogo = flagsResult?.showQRLogo
             || ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
-                'chain_professional', 'chain_enterprise', 'chain_starter'].includes(effectiveTierPart);
+              'chain_professional', 'chain_enterprise', 'chain_starter'].includes(effectiveTierPart);
 
           if (shouldFetchLogo) {
             try {
@@ -147,13 +147,13 @@ export function TenantQRCode({
         // White circular background
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 6, 0, Math.PI * 2);
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
         ctx.fill();
 
         // Circular mask for logo
         ctx.save();
         ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 0, Math.PI * 2);
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
 
@@ -165,7 +165,7 @@ export function TenantQRCode({
         ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 3, 0, Math.PI * 2);
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
         ctx.stroke();
 
         resolve(canvas);
@@ -362,11 +362,11 @@ export function TenantQRCode({
     setIsGenerating(true);
     try {
       const QRCode = (await import('qrcode')).default;
-      
+
       // Extract organization tier from effective tier logic (same as TierGainsWelcome)
-      const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
-                             tenantTier === 'organization' ? 'enterprise' : undefined;
-      
+      const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
+        tenantTier === 'organization' ? 'enterprise' : undefined;
+
       // Get capability-aware QR settings
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
@@ -395,18 +395,18 @@ export function TenantQRCode({
       const shouldApplyLogo = resolvedFlags
         ? resolvedFlags.showQRLogo && !!tenantLogo
         : (() => {
-            const effectiveTier = organizationTier || tenantTier;
-            return (
-              effectiveTier === 'commitment' ||
-              effectiveTier === 'professional' ||
-              effectiveTier === 'ecommerce' ||
-              effectiveTier === 'omnichannel' ||
-              effectiveTier === 'enterprise' ||
-              effectiveTier === 'organization' ||
-              tenantTier === 'chain_professional' ||
-              tenantTier === 'chain_enterprise'
-            ) && !!tenantLogo;
-          })();
+          const effectiveTier = organizationTier || tenantTier;
+          return (
+            effectiveTier === 'commitment' ||
+            effectiveTier === 'professional' ||
+            effectiveTier === 'ecommerce' ||
+            effectiveTier === 'omnichannel' ||
+            effectiveTier === 'enterprise' ||
+            effectiveTier === 'organization' ||
+            tenantTier === 'chain_professional' ||
+            tenantTier === 'chain_enterprise'
+          ) && !!tenantLogo;
+        })();
 
       if (shouldApplyLogo) {
         try {
@@ -419,7 +419,7 @@ export function TenantQRCode({
       // Generate high-quality PNG with maximum quality
       const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
-      
+
       // Log quality level for debugging
       // console.log(`[TenantQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
@@ -439,14 +439,14 @@ export function TenantQRCode({
   // Generate QR code at specific size for download
   const generateQRCodeAtSize = async (targetSize: number): Promise<string> => {
     const QRCode = (await import('qrcode')).default;
-    
+
     // Extract organization tier from effective tier logic (same as TierGainsWelcome)
-    const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
-                           tenantTier === 'organization' ? 'enterprise' : undefined;
-    
+    const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
+      tenantTier === 'organization' ? 'enterprise' : undefined;
+
     // Get capability-aware QR settings
     const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
-    
+
     // Create canvas for requested size
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -467,27 +467,27 @@ export function TenantQRCode({
     });
 
     let finalCanvas = canvas;
-    
+
     // Logo eligibility: capability-aware with tier fallback
     const shouldApplyLogo = resolvedFlags
       ? resolvedFlags.showQRLogo && !!tenantLogo
       : (() => {
-          const effectiveTier = organizationTier || tenantTier;
-          return (
-            effectiveTier === 'commitment' ||
-            effectiveTier === 'professional' ||
-            effectiveTier === 'ecommerce' ||
-            effectiveTier === 'omnichannel' ||
-            effectiveTier === 'enterprise' ||
-            effectiveTier === 'organization' ||
-            tenantTier === 'chain_professional' ||
-            tenantTier === 'chain_enterprise'
-          ) && !!tenantLogo;
-        })();
+        const effectiveTier = organizationTier || tenantTier;
+        return (
+          effectiveTier === 'commitment' ||
+          effectiveTier === 'professional' ||
+          effectiveTier === 'ecommerce' ||
+          effectiveTier === 'omnichannel' ||
+          effectiveTier === 'enterprise' ||
+          effectiveTier === 'organization' ||
+          tenantTier === 'chain_professional' ||
+          tenantTier === 'chain_enterprise'
+        ) && !!tenantLogo;
+      })();
 
     // Logo minimum size: capability-aware (256px if QR logo allowed, 512px otherwise)
     const logoMinSize = resolvedFlags?.showQRLogo ? 256 : 512;
-    
+
     if (shouldApplyLogo && targetSize >= logoMinSize) {
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
@@ -504,18 +504,18 @@ export function TenantQRCode({
     try {
       setIsGenerating(true);
       const dataUrl = await generateQRCodeAtSize(targetSize);
-      
+
       const link = document.createElement('a');
       link.href = dataUrl;
-      
+
       // Create filename with page type prefix for better organization
       let baseName = downloadName || url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      
+
       // Add page type prefix if specified
       if (pageType) {
         baseName = `${pageType}-${baseName}`;
       }
-      
+
       link.download = `qr-${baseName}-${targetSize}px.png`;
       document.body.appendChild(link);
       link.click();
@@ -545,34 +545,31 @@ export function TenantQRCode({
   return (
     <div className={`bg-white rounded-lg shadow-sm p-4 ${className}`}>
       <div className="flex items-center gap-2 mb-3">
-        <svg className="w-5 h-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12l4-4m4 4l-4-4m0 0h4.01M12 12v4" />
-        </svg>
         <h3 className="text-lg font-semibold text-neutral-900">{label}</h3>
       </div>
-      
+
       <div className="flex flex-col items-center">
         {isGenerating || isFetchingTierAndLogo ? (
-          <div 
+          <div
             className="bg-neutral-100 rounded-lg animate-pulse"
             style={{ width: size, height: size }}
           />
         ) : qrImageUrl ? (
-          <img 
-            src={qrImageUrl} 
-            alt="QR Code" 
+          <img
+            src={qrImageUrl}
+            alt="QR Code"
             className="rounded-lg border border-neutral-200 shadow-sm"
             style={{ width: size, height: 'auto' }}
           />
         ) : (
-          <div 
+          <div
             className="bg-neutral-100 rounded-lg flex items-center justify-center text-neutral-400"
             style={{ width: size, height: size }}
           >
             No QR Code
           </div>
         )}
-        
+
         {showDownload && qrImageUrl && (
           <div className="mt-3 space-y-2">
             {(() => {
@@ -594,8 +591,8 @@ export function TenantQRCode({
                   return options;
                 }
                 // Fallback: tier-based
-                const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
-                                       tenantTier === 'organization' ? 'enterprise' : undefined;
+                const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
+                  tenantTier === 'organization' ? 'enterprise' : undefined;
                 const effectiveTier = organizationTier || tenantTier;
                 switch (effectiveTier) {
                   case 'discovery':
@@ -632,7 +629,7 @@ export function TenantQRCode({
                     return [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
                 }
               })();
-              
+
               return (
                 <>
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -654,43 +651,43 @@ export function TenantQRCode({
           </div>
         )}
       </div>
-      
+
       {tenantTier && (
         <div className="mt-3 space-y-1">
           <p className="text-xs text-neutral-500 text-center">
-            Scan to visit page
+            Scan to visit
           </p>
-          
+
           {/* Capability-aware feature indicators */}
           <div className="text-center">
             {(() => {
-              const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
-                                     tenantTier === 'organization' ? 'enterprise' : undefined;
+              const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
+                tenantTier === 'organization' ? 'enterprise' : undefined;
               const colors = getTierColorPalette(tenantTier, organizationTier);
-              
+
               // Logo eligibility: capability-aware with tier fallback
               const shouldShowLogo = resolvedFlags
                 ? resolvedFlags.showQRLogo && !!tenantLogo
                 : (() => {
-                    const effectiveTier = organizationTier || tenantTier;
-                    return (
-                      effectiveTier === 'commitment' ||
-                      effectiveTier === 'professional' ||
-                      effectiveTier === 'ecommerce' ||
-                      effectiveTier === 'omnichannel' ||
-                      effectiveTier === 'enterprise' ||
-                      effectiveTier === 'organization' ||
-                      tenantTier === 'chain_professional' ||
-                      tenantTier === 'chain_enterprise'
-                    ) && !!tenantLogo;
-                  })();
-              
+                  const effectiveTier = organizationTier || tenantTier;
+                  return (
+                    effectiveTier === 'commitment' ||
+                    effectiveTier === 'professional' ||
+                    effectiveTier === 'ecommerce' ||
+                    effectiveTier === 'omnichannel' ||
+                    effectiveTier === 'enterprise' ||
+                    effectiveTier === 'organization' ||
+                    tenantTier === 'chain_professional' ||
+                    tenantTier === 'chain_enterprise'
+                  ) && !!tenantLogo;
+                })();
+
               return (
                 <>
                   {shouldShowLogo && (
                     <span className={`block text-xs ${colors.primaryIcon} font-medium`}>✨ Branded with store logo</span>
                   )}
-                  
+
                   {/* Quality indicator */}
                   {(() => {
                     const settings = getCapabilityQRSettings(tenantTier, organizationTier);
@@ -701,14 +698,14 @@ export function TenantQRCode({
                       'professional': 'Professional Quality',
                       'enterprise': 'Enterprise Quality'
                     };
-                    
+
                     return settings.exportSize > size ? (
                       <span className={`block text-xs mt-1 ${colors.secondaryIcon}`}>
                         📏 {settings.exportSize}px export • {qualityLabels[settings.quality as keyof typeof qualityLabels] || settings.quality}
                       </span>
                     ) : null;
                   })()}
-                  
+
                   {/* Organization tier indicator */}
                   {organizationTier && (
                     <span className={`block text-xs mt-1 ${colors.primaryIcon}`}>

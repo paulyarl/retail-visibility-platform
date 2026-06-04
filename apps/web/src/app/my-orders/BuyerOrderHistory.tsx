@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar ,User} from 'lucide-react';
+import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar, User, X, CreditCard, Filter } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { customerOrderService } from '@/services/CustomerOrderService';
+
+type OrderStatusFilter = 'all' | 'draft' | 'active' | 'completed' | 'cancelled';
 
 interface BuyerOrder {
   orderId: string;
@@ -77,6 +79,16 @@ const statusColors: Record<string, string> = {
   fulfilled: 'bg-blue-100 text-blue-800',
   completed: 'bg-purple-100 text-purple-800',
   cancelled: 'bg-red-100 text-red-800',
+  draft: 'bg-amber-100 text-amber-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+};
+
+const filterLabels: Record<OrderStatusFilter, string> = {
+  all: 'All',
+  draft: 'Draft',
+  active: 'Active',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
 };
 
 export default function BuyerOrderHistory() {
@@ -95,6 +107,7 @@ export default function BuyerOrderHistory() {
   const [customReason, setCustomReason] = useState('');
   const [digitalDownloads, setDigitalDownloads] = useState<any[]>([]);
   const [loadingDownloads, setLoadingDownloads] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>('all');
 
   // Check localStorage for saved email/phone
   useEffect(() => {
@@ -225,6 +238,45 @@ export default function BuyerOrderHistory() {
       setShowCancelConfirm(false);
     }
   };
+
+  const handleQuickCancelDraft = async (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Cancel this draft order? It will be removed from your order list.')) return;
+    try {
+      setCancellingOrder(true);
+      const success = await customerOrderService.cancelOrder(orderId, 'Customer cleared draft', email, phone);
+      if (success) {
+        setOrders(orders.filter(o => o.orderId !== orderId));
+        if (selectedOrder?.orderId === orderId) setSelectedOrder(null);
+      } else {
+        alert('Failed to cancel draft order.');
+      }
+    } catch (error) {
+      console.error('Error cancelling draft:', error);
+      alert('Failed to cancel draft order.');
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
+
+  const handleContinueCheckout = (order: BuyerOrder, e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/checkout?tenantId=${order.tenantId}`);
+  };
+
+  const getOrderCategory = (order: BuyerOrder): OrderStatusFilter => {
+    if (order.fulfillmentStatus === 'cancelled') return 'cancelled';
+    if (order.status === 'draft') return 'draft';
+    if (order.status === 'paid' || order.status === 'confirmed') return 'active';
+    if (order.fulfillmentStatus === 'fulfilled') return 'completed';
+    return 'all';
+  };
+
+  const filteredOrders = statusFilter === 'all'
+    ? orders
+    : orders.filter(order => getOrderCategory(order) === statusFilter ||
+        (statusFilter === 'active' && (order.status === 'paid' || order.status === 'confirmed')) ||
+        (statusFilter === 'completed' && order.fulfillmentStatus === 'fulfilled'));
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -362,6 +414,16 @@ export default function BuyerOrderHistory() {
                       {selectedOrder.fulfillmentMethod === 'shipping' && 'Confirm Received'}
                     </>
                   )}
+                </Button>
+              )}
+              
+              {selectedOrder.status === 'draft' && (
+                <Button
+                  onClick={(e) => handleContinueCheckout(selectedOrder, e as unknown as React.MouseEvent)}
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Continue Checkout
                 </Button>
               )}
               
@@ -986,18 +1048,38 @@ export default function BuyerOrderHistory() {
               </Card>
             ) : (
               <>
-                <div className="mb-4 text-sm text-gray-600">
-                  Found {orders.length} order{orders.length !== 1 ? 's' : ''}
+                {/* Status Filter Tabs */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {(['all', 'draft', 'active', 'completed', 'cancelled'] as OrderStatusFilter[]).map((filter) => {
+                    const count = filter === 'all' ? orders.length : orders.filter(o => getOrderCategory(o) === filter).length;
+                    return (
+                      <button
+                        key={filter}
+                        onClick={() => setStatusFilter(filter)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                          statusFilter === filter
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {filterLabels[filter]} ({count})
+                      </button>
+                    );
+                  })}
                 </div>
-                
+
+                <div className="mb-4 text-sm text-gray-600">
+                  Showing {filteredOrders.length} of {orders.length} order{orders.length !== 1 ? 's' : ''}
+                </div>
+
                 <div className="space-y-4">
-                  {orders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <div
                       key={order.orderId}
                       className="cursor-pointer"
                       onClick={() => setSelectedOrder(order)}
                     >
-                      <Card className="hover:shadow-lg transition-shadow">
+                      <Card className={`hover:shadow-lg transition-shadow ${order.status === 'draft' ? 'border-amber-300 bg-amber-50/30' : ''}`}>
                         <CardContent className="p-6">
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                           {/* Left: Order Info */}
@@ -1006,19 +1088,26 @@ export default function BuyerOrderHistory() {
                               <h3 className="text-lg font-semibold text-gray-900">
                                 Order #{order.orderNumber}
                               </h3>
-                              
+
+                              {/* Draft badge */}
+                              {order.status === 'draft' && (
+                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                                  DRAFT
+                                </span>
+                              )}
+
                               {/* Payment Status Badge */}
                               {order.status === 'paid' && (
                                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                                   PAID
                                 </span>
                               )}
-                              {order.status === 'pending' && (
+                              {order.status === 'confirmed' && (
                                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                                  PENDING
+                                  CONFIRMED
                                 </span>
                               )}
-                              
+
                               {/* Fulfillment Status Badge */}
                               {order.fulfillmentStatus && (
                                 <span
@@ -1029,7 +1118,7 @@ export default function BuyerOrderHistory() {
                                   {order.fulfillmentStatus.toUpperCase()}
                                 </span>
                               )}
-                              
+
                               {/* Refund Status Badge */}
                               {order.refunds && order.refunds.length > 0 && (
                                 <>
@@ -1072,14 +1161,40 @@ export default function BuyerOrderHistory() {
                             </div>
                           </div>
 
-                          {/* Right: Total & Action */}
+                          {/* Right: Total & Actions */}
                           <div className="text-left lg:text-right">
                             <div className="text-2xl font-bold text-gray-900 mb-2">
                               {formatCurrency(order.total)}
                             </div>
-                            <Button variant="outline" size="sm">
-                              View Receipt
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              {order.status === 'draft' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="bg-primary-600 hover:bg-primary-700 text-white"
+                                    onClick={(e) => handleContinueCheckout(order, e as unknown as React.MouseEvent)}
+                                  >
+                                    <CreditCard className="h-4 w-4 mr-1" />
+                                    Continue Checkout
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={cancellingOrder}
+                                    className="text-red-600 border-red-300 hover:bg-red-50"
+                                    onClick={(e) => handleQuickCancelDraft(order.orderId, e as unknown as React.MouseEvent)}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel Draft
+                                  </Button>
+                                </>
+                              )}
+                              {order.status !== 'draft' && (
+                                <Button variant="outline" size="sm">
+                                  View Receipt
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                         </CardContent>
