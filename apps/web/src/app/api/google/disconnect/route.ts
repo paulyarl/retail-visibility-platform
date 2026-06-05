@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -17,18 +18,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const apiUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-    const response = await fetch(`${apiUrl}/google/disconnect?tenantId=${tenantId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return NextResponse.json(error, { status: response.status });
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
+    await googleIntegrationService.disconnect(tenantId);
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API Proxy] Google disconnect error:', error);
     return NextResponse.json(

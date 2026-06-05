@@ -2,6 +2,21 @@ packages:
   - apps/*
   - packages/*
 
+allowBuilds:
+  '@newrelic/fn-inspect': false
+  '@newrelic/native-metrics': false
+  '@prisma/client': false
+  '@prisma/engines': false
+  '@railway/cli': false
+  '@sentry/cli': false
+  core-js: false
+  es5-ext: false
+  esbuild: false
+  prisma: false
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false
+
 ignoredBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
@@ -9,6 +24,11 @@ ignoredBuiltDependencies:
   - prisma
 
 onlyBuiltDependencies:
+  - '@newrelic/fn-inspect'
+  - '@newrelic/native-metrics'
+  - '@sentry/cli'
   - '@tailwindcss/oxide'
+  - aws-sdk
+  - protobufjs
   - sharp
   - unrs-resolver

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/categories/${id}`, {
+    
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(req);
+    const accessToken = auth?.accessToken || null;
+    
+    const res = await authenticatedFetch(`/api/categories/${id}`, accessToken, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -21,8 +25,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/categories/${id}`, {
+    
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(req);
+    const accessToken = auth?.accessToken || null;
+    
+    const res = await authenticatedFetch(`/api/categories/${id}`, accessToken, {
       method: 'DELETE',
     });
     if (res.status === 204) {

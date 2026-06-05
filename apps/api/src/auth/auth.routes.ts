@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { authService } from './auth.service';
 import { authenticateToken } from '../middleware/auth';
+import { threatDetectionService } from '../services/threat-detection';
+import { prisma } from '../prisma';
 import { z } from 'zod';
+import { trackSession, trackFailedLogin } from '../middleware/session-tracker';
 
 const router = Router();
 
@@ -65,12 +68,46 @@ router.post('/register', async (req: Request, res: Response) => {
  * Login user
  */
 router.post('/login', async (req: Request, res: Response) => {
+  const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  
   try {
     const validatedData = loginSchema.parse(req.body);
+    
+    // Check if IP is blocked before attempting login
+    const isBlocked = await threatDetectionService.isIPBlocked(ipAddress);
+    if (isBlocked) {
+      return res.status(403).json({
+        error: 'ip_blocked',
+        message: 'Your IP address has been temporarily blocked due to suspicious activity. Please try again later.',
+      });
+    }
+    
     const result = await authService.login(validatedData);
     
+    // Log successful login attempt
+    await prisma.login_attempts.create({
+      data: {
+        user_id: result.user.id,
+        email: validatedData.email,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        success: true
+      }
+    }).catch(err => console.error('Failed to log successful login:', err));
+    
+    // Track session for security monitoring
+    if (result.accessToken) {
+      trackSession({
+        userId: result.user.id,
+        token: result.accessToken,
+        ipAddress,
+        userAgent,
+        req, // Pass the request object for enhanced security context
+      }).catch(err => console.error('Failed to track session:', err));
+    }
+    
     res.json({
-      message: 'Login successful',
       ...result,
     });
   } catch (error) {
@@ -83,24 +120,62 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     
     if (error instanceof Error) {
+      // Database connection errors - critical for login
+      if (
+        error.name === 'PrismaClientInitializationError' ||
+        error.message?.includes("Can't reach database server") ||
+        error.message?.includes('Connection refused')
+      ) {
+        console.error('[Login Critical] Database connection failed:', error.message);
+        return res.status(503).json({
+          error: 'service_unavailable',
+          message: 'Authentication service is temporarily unavailable. Please try again in a moment.',
+        });
+      }
+      
       if (error.message.includes('Invalid email or password') || error.message.includes('deactivated')) {
+        // Log failed login attempt
+        const email = req.body.email || 'unknown';
+        await prisma.login_attempts.create({
+          data: {
+            email,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            success: false,
+            failure_reason: error.message.includes('deactivated') ? 'account_deactivated' : 'invalid_credentials'
+          }
+        }).catch(err => console.error('Failed to log failed login:', err));
+        
+        // Record threat event for failed login
+        await threatDetectionService.recordFailedLogin(ipAddress, userAgent, email);
+        
+        // Track failed login for security alerts
+        const reason = error.message.includes('deactivated') ? 'account_deactivated' : 'invalid_password';
+        trackFailedLogin(email, ipAddress, userAgent, reason)
+          .catch(err => console.error('Failed to track failed login:', err));
+        
         return res.status(401).json({
           error: 'authentication_failed',
           message: error.message,
         });
       }
+      
+      console.error('[Login Error]', error.message);
       return res.status(400).json({
         error: 'login_failed',
         message: error.message,
       });
     }
     
+    console.error('[Login Critical] Unexpected error:', error);
     res.status(500).json({
       error: 'internal_error',
       message: 'An unexpected error occurred',
     });
   }
 });
+
+// Note: /sessions endpoint moved to auth-sessions.ts for full implementation
 
 /**
  * POST /api/auth/refresh
@@ -151,7 +226,17 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       });
     }
     
-    const user = await authService.getUserById(req.user.userId);
+    // Universal transform middleware converts userId to userId
+    const userId = (req.user as any).userId || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Invalid authentication data',
+      });
+    }
+    
+    const user = await authService.getUserById(userId);
     
     res.json({ user });
   } catch (error) {
@@ -182,7 +267,15 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
       });
     }
     
-    const result = await authService.logout(req.user.userId);
+    const userId = (req.user as any).userId || req.user.userId;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Invalid authentication data',
+      });
+    }
+    
+    const result = await authService.logout(userId);
     
     res.json(result);
   } catch (error) {

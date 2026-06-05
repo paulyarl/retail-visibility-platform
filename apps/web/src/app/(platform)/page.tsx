@@ -1,0 +1,1328 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import { Card, Button } from '@mantine/core';
+import { Badge, AnimatedCard } from "@/components/ui";
+import { useCountUp } from "@/hooks/useCountUp";
+import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
+import { motion } from "framer-motion";
+import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
+import { hoursStatusService } from '@/services/HoursStatusService';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { tenantPublicService } from '@/services/TenantPublicService';
+import { platformPublicService } from '@/services/PlatformPublicService';
+import Image from "next/image";
+import { canManageTenantSettings } from "@/lib/auth/access-control";
+import PublicFooter from "@/components/PublicFooter";
+import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
+import { computeStoreStatus } from "@/lib/hours-utils";
+import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
+import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
+import { Badge as MantineBadge } from '@mantine/core';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+
+
+export default function PlatformHomePage() {
+  // Prevent SSR rendering of Mantine components
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+
+    // Track landing page view
+    trackBehaviorClient({
+      entityType: 'platform',
+      entityId: 'platform_home',
+      entityName: 'Platform Home',
+      pageType: 'platform_home'
+    });
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Home embedded />;
+}
+
+function Home({ embedded = false }: { embedded?: boolean } = {}) {
+  const { settings } = usePlatformSettings();
+  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
+  const router = useRouter();
+
+  // Use consolidated platform dashboard hook
+  const { data: platformData, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
+
+  const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
+    items: "/items",
+    createItem: "/items?create=true",
+    tenants: "/tenants",
+    settingsTenant: "/settings",
+  });
+  const [hoursInfo, setHoursInfo] = useState<{ hasHours: boolean; today?: string } | null>(null);
+  const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string; bannerUrl?: string } | null>(null);
+  const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('tabs');
+  // console.log(`showcaseMode: ${showcaseMode}`);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [platformStats, setPlatformStats] = useState({
+    activeRetailers: 0,
+    activeRetailersFormatted: '0',
+    productsListed: 0,
+    productsListedFormatted: '0',
+    storefrontsLive: 0,
+    storefrontsLiveFormatted: '0',
+    platformUptime: 99.9,
+    platformUptimeFormatted: '99.9%',
+    // Additional fields for authenticated users
+    totalUsers: 0,
+    activeUsers: 0,
+    systemHealth: null,
+    growthMetrics: null
+  });
+
+  // Extract stats from platform stats state (after it's loaded)
+  const stats = useMemo(() => ({
+    total: platformStats.productsListed || 0,
+    active: Math.floor(platformStats.productsListed * 0.9) || 0, // Estimate active items
+    syncIssues: 0, // Platform doesn't have sync issues
+    locations: platformStats.activeRetailers || 0,
+    isChain: false, // Platform view shows all tenants
+    organizationName: null, // Platform view
+  }), [platformStats.productsListed, platformStats.activeRetailers]);
+  //console.log('Platform stats:', stats);
+  const selectedTenantId = null; // Platform view doesn't have selected tenant
+
+  // Fetch platform stats for all users (public and authenticated)
+  useEffect(() => {
+    if (!authLoading) {
+      const fetchPlatformStats = async () => {
+        try {
+          let statsData;
+
+          if (isAuthenticated) {
+            // Authenticated users get full data from platform dashboard
+            const { platformDashboardService } = await import('@/services/PlatformDashboardSingletonService');
+            const dashboardData = await platformDashboardService.getPlatformDashboard();
+            //  console.log('Platform dashboardData:', dashboardData);
+            statsData = dashboardData?.stats;
+            //  console.log('About to setPlatformStats with data:', statsData);
+          } else {
+            // Public users get limited data from public service
+            statsData = await platformPublicService.getPlatformStats();
+            //   console.log('Platform statsData:', statsData);
+          }
+
+          // Transform to match expected state format
+          setPlatformStats({
+            activeRetailers: (statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0,
+            activeRetailersFormatted: ((statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0).toLocaleString(),
+            productsListed: (statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0,
+            productsListedFormatted: ((statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0).toLocaleString(),
+            storefrontsLive: (statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5),
+            storefrontsLiveFormatted: ((statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5)).toLocaleString(),
+            platformUptime: (statsData as any).platformUptime || 99.9,
+            platformUptimeFormatted: (statsData as any).platformUptimeFormatted || '99.9%',
+            // Add additional data for authenticated users
+            totalUsers: (statsData as any).totalUsers || 0,
+            activeUsers: (statsData as any).activeUsers || 0,
+            systemHealth: (statsData as any).systemHealth || null,
+            growthMetrics: (statsData as any).growthMetrics || null
+          });
+        } catch (error) {
+          // Silently fail - platform stats are non-critical for user experience
+          console.warn('[Platform Stats] Failed to load public stats, using defaults');
+        }
+      };
+      fetchPlatformStats();
+    }
+  }, [isAuthenticated, authLoading]);
+
+  // Fetch showcase mode configuration
+  useEffect(() => {
+    const fetchShowcaseConfig = async () => {
+      try {
+        // Check for preview mode in URL
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const preview = params.get('preview_showcase') as ShowcaseMode;
+          if (preview) {
+            setShowcaseMode(preview);
+            return;
+          }
+        }
+
+        // Use platformPublicService for consistent caching and metrics
+        const config = await platformPublicService.getFeaturesShowcaseConfig();
+        // console.log(`config: ${config}`);
+        // Map config mode to expected ShowcaseMode type
+        const modeMap: Record<string, ShowcaseMode> = {
+          'hybrid': 'hybrid',
+          'featured': 'grid',
+          'recent': 'slider',
+          'trending': 'tabs'
+        };
+        setShowcaseMode(modeMap[config.mode] || 'tabs');
+      } catch (error) {
+        // Silently fail - showcase config is non-critical, defaults to 'hybrid'
+        console.warn('[Showcase Config] Failed to load config, using hybrid mode');
+        setShowcaseMode('tabs');
+      }
+    };
+    fetchShowcaseConfig();
+  }, []);
+
+  // Fetch tenant business hours when a tenant is selected
+  useEffect(() => {
+    const fetchHours = async () => {
+      try {
+        if (!selectedTenantId) { setHoursInfo(null); return; }
+
+        // Use TenantPublicService for tenant profile data
+        const profile = await tenantPublicService.getPublicTenantProfile(selectedTenantId);
+
+        if (!profile) {
+          setHoursInfo(null);
+          return;
+        }
+
+
+        const hours = profile?.hours;
+        let hasHours = false;
+        if (Array.isArray(hours)) hasHours = hours.length > 0;
+        else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).filter(k => k !== 'timezone' && k !== 'special').length > 0;
+
+        // Use shared utility to compute store status (handles special hours too!)
+        const status = computeStoreStatus(hours);
+        const today = status?.label;
+
+        setHoursInfo({ hasHours, today });
+      } catch {
+        setHoursInfo(null);
+      }
+    };
+    fetchHours();
+  }, [selectedTenantId]);
+
+  // Fetch tenant details (logo/banner) when tenant ID is available
+  useEffect(() => {
+    const fetchTenantDetails = async () => {
+      if (!selectedTenantId) return;
+
+      try {
+        // Use appropriate service based on authentication state
+        const tenantInfo = isAuthenticated
+          ? await platformHomeService.getTenant(selectedTenantId)
+          : await tenantPublicService.getPublicTenantInfo(selectedTenantId);
+
+        if (tenantInfo) {
+          setTenantData({
+            name: tenantInfo.name,
+            logoUrl: tenantInfo.logoUrl,
+            bannerUrl: tenantInfo.bannerUrl,
+          });
+        }
+      } catch (error) {
+        // Silently fail - tenant details are non-critical for dashboard
+        console.warn('[Tenant Details] Failed to load logo/banner, continuing without them');
+      }
+    };
+
+    fetchTenantDetails();
+  }, [selectedTenantId]);
+
+  // Compute tenant-scoped quick action links independently for faster UI readiness
+  useLayoutEffect(() => {
+    const override = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
+    // Try to get tenantId from multiple sources
+    const tenantId = selectedTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+    const on = override || isFeatureEnabled('FF_TENANT_URLS', tenantId || undefined);
+
+    if (on && tenantId) {
+      setScopedLinks({
+        items: `/t/${tenantId}/items`,
+        createItem: `/t/${tenantId}/items?create=true`,
+        tenants: `/tenants`,
+        settingsTenant: `/t/${tenantId}/settings`,
+      });
+    } else {
+      setScopedLinks({ items: "/items", createItem: "/items?create=true", tenants: "/tenants", settingsTenant: "/settings" });
+    }
+  }, [selectedTenantId, loading]);
+
+  // Animated counts for metrics
+  const inventoryCount = useCountUp(stats.total);
+  const listingsCount = useCountUp(stats.active);
+  const syncIssuesCount = useCountUp(stats.syncIssues);
+  const locationsCount = useCountUp(stats.locations);
+  // console.log(`Selected TenantId: ${selectedTenantId}`);
+  const { status: hoursStatus } = useStoreStatus(selectedTenantId || undefined, false); // Public scope
+
+  return (
+    <div className="min-h-screen bg-neutral-50 flex flex-col">
+      {!embedded && (
+        <header className="bg-white border-b border-neutral-200">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              {settings?.logoUrl ? (
+                <Link href="/">
+                  <Image
+                    src={settings.logoUrl}
+                    alt={settings.platformName || 'Platform Logo'}
+                    width={150}
+                    height={40}
+                    className="object-contain cursor-pointer"
+                    loading="eager"
+                    priority
+                  />
+                </Link>
+              ) : (
+                <Link href="/">
+                  <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
+                    {settings?.platformName || 'Visible Shelf'}
+                  </h1>
+                </Link>
+              )}
+
+              {/* Desktop Navigation */}
+              <div className="hidden sm:flex items-center gap-2 md:gap-3">
+                {isAuthenticated && selectedTenantId && (
+                  <SubscriptionUsageBadge variant="compact" tenantId={selectedTenantId} />
+                )}
+                <Link href="/settings">
+                  <Button variant="ghost" size="sm">Settings</Button>
+                </Link>
+                {isAuthenticated ? (
+                  <Button
+                    variant='gradient' style={{ color: 'white' }}
+                    size="sm"
+                    onClick={async () => {
+                      await logout();
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                ) : (
+                  <a href="/auth/login">
+                    <Button variant='gradient' style={{ color: 'white' }} size="md">Sign In</Button>
+                  </a>
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                className="sm:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {mobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+
+            {/* Mobile Menu Dropdown */}
+            {mobileMenuOpen && (
+              <div className="sm:hidden mt-4 pb-2 space-y-2 border-t border-neutral-200 pt-4">
+                <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start" size="md">Settings</Button>
+                </Link>
+                {isAuthenticated ? (
+                  <Button
+                    variant='gradient' style={{ color: 'white' }}
+                    className="w-full"
+                    size="md"
+                    onClick={async () => {
+                      setMobileMenuOpen(false);
+                      await logout();
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                ) : (
+                  <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant='gradient' style={{ color: 'white' }} className="w-full" size="md">Sign In</Button>
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </header>
+      )}
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
+        {isAuthenticated && <SubscriptionStatusGuide />}
+
+        {/* Banner Hero Section (if authenticated and banner exists) */}
+        {isAuthenticated && tenantData?.bannerUrl && (
+          <div className="mb-6 sm:mb-8">
+            <div className="relative w-full h-40 sm:h-48 md:h-64 rounded-lg overflow-hidden shadow-lg">
+              <Image
+                src={tenantData.bannerUrl}
+                alt={`${tenantData.name} banner`}
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+
+          </div>
+        )}
+
+        {/* Welcome Section */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
+            {isAuthenticated && tenantData?.logoUrl && (
+              <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0">
+                <Image
+                  src={tenantData.logoUrl}
+                  alt={tenantData.name}
+                  fill
+                  className="object-contain rounded-lg"
+                />
+                {/* Hours Badge - Status */}
+                <HoursStatusBadge status={hoursStatus} />
+
+              </div>
+            )}
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
+                {isAuthenticated
+                  ? (user?.firstName
+                    ? `Welcome, ${user.firstName}!`
+                    : (user?.businessName
+                      ? `${user.businessName} Dashboard`
+                      : 'Welcome to Your Dashboard'))
+                  : 'Platform Overview'}
+              </h2>
+              <p className="text-sm sm:text-base text-neutral-600 mt-1">
+                {isAuthenticated
+                  ? (stats.isChain
+                    ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
+                    : 'Manage your retail inventory and visibility across platforms'
+                  )
+                  : 'Making your shelves visible online so you can compete with the giants'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Public Platform Health - For visitors/non-authenticated users */}
+        {!isAuthenticated && !authLoading && (
+          <div className="mb-6 sm:mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
+              <AnimatedCard delay={0} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Retailers</p>
+                    <motion.p
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring" }}
+                    >
+                      {platformStats.activeRetailersFormatted}
+                    </motion.p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">using the platform</p>
+                  </div>
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.1} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Products Listed</p>
+                    <motion.p
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.3, type: "spring" }}
+                    >
+                      {platformStats.productsListedFormatted}
+                    </motion.p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">on Google Shopping</p>
+                  </div>
+                  <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.2} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Storefronts Live</p>
+                    <motion.p
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring" }}
+                    >
+                      {platformStats.storefrontsLiveFormatted}
+                    </motion.p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">total products</p>
+                  </div>
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.3} className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Platform Uptime</p>
+                    <motion.p
+                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5, type: "spring" }}
+                    >
+                      {platformStats.platformUptimeFormatted}
+                    </motion.p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">last 30 days</p>
+                  </div>
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </AnimatedCard>
+            </div>
+
+            {/* Additional badges for authenticated users */}
+            {isAuthenticated && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6">
+                <AnimatedCard delay={0.4} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Total Users</p>
+                      <motion.p
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.6, type: "spring" }}
+                      >
+                        {platformStats.totalUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">registered users</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.5} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Users</p>
+                      <motion.p
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.7, type: "spring" }}
+                      >
+                        {platformStats.activeUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">currently active</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.6} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">System Health</p>
+                      <motion.p
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.8, type: "spring" }}
+                      >
+                        {(platformStats.systemHealth as any)?.database === 'healthy' &&
+                          (platformStats.systemHealth as any)?.cache === 'healthy' &&
+                          (platformStats.systemHealth as any)?.api === 'healthy' ? 'Healthy' : 'Issues'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">system status</p>
+                    </div>
+                    <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${(platformStats.systemHealth as any)?.database === 'healthy' &&
+                      (platformStats.systemHealth as any)?.cache === 'healthy' &&
+                      (platformStats.systemHealth as any)?.api === 'healthy'
+                      ? 'bg-success'
+                      : 'bg-warning'
+                      }`}>
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+              </div>
+            )}
+
+            {/* Mission Statement - For visitors */}
+            <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
+                  Empowering Local Retailers to Compete Online
+                </h2>
+                <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
+                  We built this platform as the missing connector between your physical shelves and the internet. Think of it as the Amazon of local retail on your terms and the Shopify of offline retail: it plugs into the tools you already use, uses AI and automation to keep everything in sync, and makes your inventory discoverable on Google, your storefront, and our directory—the same way social media connected people to the world.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
+                  <motion.div
+                    className="p-4 sm:p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                  >
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      Make every local shelf visible online and give small retailers big-brand style visibility.
+                    </p>
+                  </motion.div>
+                  <motion.div
+                    className="p-4 sm:p-6 bg-green-50 rounded-xl border-2 border-green-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                  >
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      A world where local businesses are connected to the world as easily as people are on social media.
+                    </p>
+                  </motion.div>
+                  <motion.div
+                    className="p-4 sm:p-6 bg-blue-50 rounded-xl border-2 border-blue-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.5 }}
+                  >
+                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">⚡</div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      Enterprise features with an "it just works" experience, small business pricing, and setup in minutes—not months.
+                    </p>
+                  </motion.div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Features Showcase - WOW Factor for visitors */}
+            <div className="my-8 sm:my-12">
+              <FeaturesShowcase mode={showcaseMode} />
+            </div>
+
+            {/* CTA for visitors */}
+            <Card className="p-6 sm:p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
+              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">
+                Join Thousands of Retailers
+              </h3>
+              <p className="text-sm sm:text-base text-neutral-600 mb-6 max-w-2xl mx-auto">
+                Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <a href="/auth/signup" className="w-full sm:w-auto">
+                  <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
+                    Start Free Trial →
+                  </Button>
+                </a>
+                <Link href="/features" className="w-full sm:w-auto">
+                  <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
+                    Learn More
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Platform Overview - Only for chains with multiple locations */}
+        {!loading && stats.isChain && stats.locations > 1 && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-neutral-900 flex-1 min-w-0">
+                {stats.organizationName} - Platform Overview
+              </h3>
+              <Badge variant="default" className="bg-primary-600 text-white flex-shrink-0">
+                {stats.locations} Locations
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Total Locations</p>
+                <p className="text-xl sm:text-2xl font-bold text-neutral-900">{stats.locations}</p>
+                <p className="text-xs text-neutral-500 mt-1">Across organization</p>
+              </Card>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Organization Type</p>
+                <p className="text-xl sm:text-2xl font-bold text-neutral-900">Chain</p>
+                <p className="text-xs text-neutral-500 mt-1">Multi-location</p>
+              </Card>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Current View</p>
+                <p className="text-base sm:text-lg font-bold text-neutral-900 truncate" title={selectedTenantId || ''}>
+                  {selectedTenantId ? 'Single Location' : 'All'}
+                </p>
+                <Link href="/tenants" className="text-xs text-primary-600 hover:underline mt-1 block">
+                  Switch location →
+                </Link>
+              </Card>
+              <Card className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-neutral-600 mb-1">Quick Access</p>
+                <Link href="/tenants">
+                  <Button variant="gradient" style={{ color: 'white' }} size="sm" className="w-full mt-1">
+                    View All Locations
+                  </Button>
+                </Link>
+              </Card>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> Metrics below show data for the currently selected location.
+                <Link href="/tenants" className="text-blue-600 hover:underline ml-1">
+                  Switch locations
+                </Link> to view different store data.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State - Only show for authenticated users */}
+        {!loading && isAuthenticated && stats.total === 0 && (
+          <Card className="col-span-full text-center p-6 sm:p-8 md:p-12 mb-6 sm:mb-8">
+            <div className="max-w-md mx-auto">
+              <div className="text-5xl sm:text-6xl mb-4">🏪</div>
+              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">Welcome to Your Dashboard!</h3>
+              <p className="text-sm sm:text-base text-neutral-600 mb-6">
+                Let's get your storefront up and running. Start by adding your first product.
+              </p>
+              <Link href={scopedLinks.createItem}>
+                <Button variant="gradient" style={{ color: 'white' }} size="lg" className="w-full sm:w-auto">
+                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Your First Product
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
+        {/* Hero Metrics */}
+        {!loading && stats.total > 0 && stats.isChain && stats.locations > 1 && (
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+            Current Location Metrics
+          </h3>
+        )}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-6">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-neutral-200 rounded w-24 mb-3"></div>
+                  <div className="h-10 bg-neutral-200 rounded w-16 mb-2"></div>
+                  <div className="h-3 bg-neutral-200 rounded w-20"></div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : stats.total > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Link href={scopedLinks.items}>
+              <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">Catalog Size</p>
+                    <motion.p
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring" }}
+                    >
+                      {inventoryCount}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">total products</p>
+                  </div>
+                  <motion.div
+                    className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 400 }}
+                  >
+                    <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </motion.div>
+                </div>
+              </AnimatedCard>
+            </Link>
+
+            <AnimatedCard delay={0.1} className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600">Live Products</p>
+                  <motion.p
+                    className="text-3xl font-bold text-neutral-900 mt-2"
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3, type: "spring" }}
+                  >
+                    {listingsCount}
+                  </motion.p>
+                  <p className="text-sm text-neutral-500 mt-1">synced to Google</p>
+                </div>
+                <motion.div
+                  className="h-12 w-12 bg-success rounded-lg flex items-center justify-center"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  transition={{ type: "spring", stiffness: 400 }}
+                >
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </motion.div>
+              </div>
+            </AnimatedCard>
+
+            {/* Google Sync Status - Actionable metric */}
+            <AnimatedCard delay={0.2} className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-600">Sync Health</p>
+                  <motion.p
+                    className="text-3xl font-bold text-neutral-900 mt-2"
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring" }}
+                  >
+                    {syncIssuesCount}
+                  </motion.p>
+                  <p className="text-sm text-neutral-500 mt-1">{syncIssuesCount > 0 ? 'items need sync' : 'everything synced'}</p>
+                </div>
+                <motion.div
+                  className={`h-12 w-12 ${syncIssuesCount > 0 ? 'bg-warning' : 'bg-success'} rounded-lg flex items-center justify-center`}
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  transition={{ type: "spring", stiffness: 400 }}
+                >
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </motion.div>
+              </div>
+            </AnimatedCard>
+
+            {/* Locations Count - Context-aware */}
+            <Link href={scopedLinks.tenants}>
+              <AnimatedCard delay={0.3} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-600">
+                      {stats.isChain ? 'Chain Locations' : 'Your Locations'}
+                    </p>
+                    <motion.p
+                      className="text-3xl font-bold text-neutral-900 mt-2"
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5, type: "spring" }}
+                    >
+                      {locationsCount}
+                    </motion.p>
+                    <p className="text-sm text-neutral-500 mt-1">
+                      {stats.isChain && stats.organizationName ? stats.organizationName : 'manage stores'}
+                    </p>
+                  </div>
+                  <motion.div
+                    className="h-12 w-12 bg-info rounded-lg flex items-center justify-center"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 400 }}
+                  >
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </motion.div>
+                </div>
+              </AnimatedCard>
+            </Link>
+          </div>
+        )}
+
+        {/* Business Hours Card (tenant-scoped) */}
+        {isAuthenticated && selectedTenantId && (
+          <div className="mb-6">
+            <AnimatedCard delay={0.35} className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="h-5 w-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-base sm:text-lg font-bold text-neutral-900">Business Hours</h3>
+                  </div>
+                  {hoursInfo?.hasHours ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hoursInfo.today ? (() => {
+                        // Parse status from label (e.g., "Open now • Closes at 5:00 PM" or "Closed • Opens today at 9:00 AM")
+                        const isOpen = hoursInfo.today.startsWith('Open');
+                        const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
+                        const statusText = isOpen ? 'Open' : 'Closed';
+                        const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
+
+                        return (
+                          <>
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+                            <span className={`font-semibold ${statusColor}`}>{statusText}</span>
+                            <span className="text-neutral-400">•</span>
+                            <span className="text-sm sm:text-base text-neutral-900">{hoursInfo.today}</span>
+                          </>
+                        );
+                      })() : <span className="text-sm sm:text-base text-neutral-900">Hours configured</span>}
+
+
+                      {/* Hours Badge - Status */}
+                      <HoursStatusBadge status={hoursStatus} />
+                    </div>
+                  ) : (
+                    <p className="text-sm sm:text-base text-neutral-500">
+                      Set your store hours to display them here.
+                    </p>
+                  )}
+                </div>
+                {(() => {
+                  // Use centralized permission helper
+                  if (!user || !canManageTenantSettings(user, selectedTenantId)) return null;
+                  return (
+                    <Link href={`/t/${selectedTenantId}/settings/hours`} className="w-full sm:w-auto">
+                      <Button variant='gradient' style={{ color: 'white' }} size="md" className="w-full sm:w-auto whitespace-nowrap font-semibold">
+                        {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
+                      </Button>
+                    </Link>
+                  );
+                })()}
+              </div>
+            </AnimatedCard>
+          </div>
+        )}
+
+        {/* Quick Actions - Different for authenticated vs visitors */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {isAuthenticated ? (
+            <>
+              <AnimatedCard delay={0.4} hover={false}>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Get started with common tasks</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 sm:space-y-3">
+                    {selectedTenantId && (
+                      <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
+                        <Button variant="primary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                          <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                          </svg>
+                          View Your Storefront
+                        </Button>
+                      </Link>
+                    )}
+                    <Link href={scopedLinks.tenants} className="block">
+                      <Button variant='gradient' style={{ color: 'white' }} className="w-full justify-start" size="md">
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Manage Locations
+                      </Button>
+                    </Link>
+                    <Link href={scopedLinks.items} className="block">
+                      <Button variant='gradient' style={{ color: 'white' }} className="w-full justify-start" size="md">
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        View Inventory
+                      </Button>
+                    </Link>
+                    <Link href={scopedLinks.createItem} className="block">
+                      <Button variant='gradient' style={{ color: 'white' }} className="w-full justify-start" size="md">
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add New Product
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.5} hover={false}>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Getting Started</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Set up your Visible Shelf</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 sm:space-y-4">
+                    <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                      <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
+                        1
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
+                      </div>
+                    </Link>
+                    <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                      <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                        2
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
+                      </div>
+                    </Link>
+                    <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                      <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                        3
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
+                      </div>
+                    </Link>
+                  </div>
+                </div>
+              </AnimatedCard>
+            </>
+          ) : (
+            // Visitor Quick Actions
+            <>
+              <AnimatedCard delay={0.4} hover={false}>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-orange-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why Choose Us?</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Everything you need to succeed online</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </AnimatedCard>
+
+              <AnimatedCard delay={0.5} hover={false}>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Get Started Today</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Join retailers already using our platform</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 sm:space-y-4">
+                    <a href="/auth/signup" className="block">
+                      <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Create Free Account
+                      </Button>
+                    </a>
+                    <a href="/auth/login" className="block">
+                      <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                        Sign In
+                      </Button>
+                    </a>
+                    <div className="pt-3 sm:pt-4 border-t border-neutral-200">
+                      <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
+                      <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
+                        Contact our team →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </AnimatedCard>
+            </>
+          )}
+        </div>
+
+        {/* Browse Directory - Prominent Platform Pillar */}
+        <AnimatedCard delay={0.6} hover={true} className="mt-8 overflow-hidden">
+          <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-600 p-8 md:p-12">
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute inset-0" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+              }} />
+            </div>
+
+            <div className="relative z-10">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                {/* Icon & Branding */}
+                <div className="flex-shrink-0">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-white/20 rounded-3xl blur-2xl"></div>
+                    <div className="relative bg-white/10 backdrop-blur-sm border-2 border-white/30 rounded-3xl p-6 md:p-8">
+                      <svg className="w-16 h-16 md:w-20 md:h-20 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 text-center md:text-left">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold mb-4">
+                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                    Platform Pillar
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
+                    Discover Online Presence
+                  </h2>
+                  <p className="text-lg md:text-xl text-white/90 mb-6 max-w-2xl">
+                    Browse our curated directory of {platformStats.activeRetailersFormatted}+ retailers with {platformStats.productsListedFormatted}+ products.
+                    Find exactly what you need, right in your neighborhood.
+                  </p>
+
+                  {/* Features Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="flex items-center gap-3 text-white/90">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium">Search by Location</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium">Filter by Category</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium">View Ratings</span>
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <Link href="/directory">
+                    <Button
+                      variant='gradient' style={{ color: 'white' }}
+                      size="lg"
+                      className="bg-white text-indigo-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 font-bold text-lg px-8 py-6"
+                    >
+                      <svg className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Browse Directory
+                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </AnimatedCard>
+
+        {/* Value Showcase - Only show to authenticated users with products */}
+        {isAuthenticated && !loading && stats.total > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
+            {/* Storefront Status */}
+            <AnimatedCard delay={0.6} hover={false}>
+              <div className="p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0">Your Storefront</h3>
+                  <Badge variant="success" className="flex-shrink-0">Live</Badge>
+                </div>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">{stats.active} Products Live</p>
+                      <p className="text-xs sm:text-sm text-neutral-600">Visible to customers</p>
+                    </div>
+                  </div>
+                  {selectedTenantId && (
+                    <Link href={`/tenant/${selectedTenantId}`} target="_blank">
+                      <Button variant='gradient' style={{ color: 'white' }} className="w-full" size="md">
+                        View Storefront →
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </AnimatedCard>
+
+            {/* Google Integration Status */}
+            <AnimatedCard delay={0.7} hover={false}>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Google Integration</h3>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">Google Shopping</p>
+                      <p className="text-xs sm:text-sm text-neutral-600">{stats.active} products synced</p>
+                    </div>
+                  </div>
+                  <Link href={scopedLinks.settingsTenant}>
+                    <Button variant="gradient" className="w-full" size="md" style={{ color: 'white' }}>
+                      Manage Integration →
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </AnimatedCard>
+
+            {/* Actionable Insights */}
+            <AnimatedCard delay={0.8} hover={false}>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Action Items</h3>
+                <div className="space-y-2 sm:space-y-3">
+                  {stats.syncIssues > 0 && (
+                    <div className="flex items-start gap-2 p-3 bg-warning-50 rounded-lg">
+                      <svg className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need sync</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
+                          Review sync status →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {stats.total - stats.active > 0 && (
+                    <div className="flex items-start gap-2 p-3 bg-info-50 rounded-lg">
+                      <svg className="h-5 w-5 text-info mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.total - stats.active} inactive products</p>
+                        <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
+                          Activate products →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {stats.syncIssues === 0 && stats.total === stats.active && (
+                    <div className="flex items-start gap-2 p-3 bg-success-50 rounded-lg">
+                      <svg className="h-5 w-5 text-success mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs sm:text-sm font-medium text-neutral-900">Everything looks great! 🎉</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AnimatedCard>
+          </div>
+        )}
+      </main>
+
+      <PublicFooter />
+    </div>
+  );
+}

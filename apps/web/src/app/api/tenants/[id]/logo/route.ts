@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function POST(
   req: NextRequest,
@@ -8,10 +9,17 @@ export async function POST(
     const { id: tenantId } = await context.params;
     const body = await req.json();
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/tenant/${encodeURIComponent(tenantId)}/logo`, {
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch(`/tenant/${encodeURIComponent(tenantId)}/logo`, accessToken, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     

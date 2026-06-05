@@ -1,0 +1,263 @@
+// Digital Products Schema Additions
+// Add these models to the main schema.prisma file
+// After running the SQL migration, run: npx prisma db pull && npx prisma generate
+
+// ============================================================================
+// 1. Digital Download Pages
+// ============================================================================
+
+model digital_download_pages {
+  id                          String                    @id @default(uuid()) @db.Uuid
+  tenant_id                   String                    @db.Uuid
+  item_id                     String                    @db.Uuid
+  slug                        String                    @db.VarChar(255)
+  title                       String                    @db.VarChar(255)
+  description                 String?
+  
+  // Page Configuration
+  page_type                   String                    @default("standard") @db.VarChar(50)
+  custom_css                  String?
+  custom_js                   String?
+  logo_url                    String?
+  banner_url                  String?
+  brand_color                 String?                   @db.VarChar(50)
+  
+  // Content
+  instructions                String?
+  thank_you_message           String?
+  support_email               String?                   @db.VarChar(255)
+  support_url                 String?
+  
+  // Access Control
+  require_authentication      Boolean                   @default(true)
+  require_purchase_verification Boolean                 @default(true)
+  access_expires              Boolean                   @default(false)
+  access_duration_days        Int?
+  
+  // Download Settings
+  allow_multiple_downloads    Boolean                   @default(true)
+  download_limit              Int?
+  download_tracking           Boolean                   @default(true)
+  
+  // Custom Access Control Overrides
+  custom_download_limit       Int?
+  custom_access_duration_days Int?
+  
+  // SEO & Metadata
+  seo_title                   String?                   @db.VarChar(255)
+  seo_description             String?
+  
+  // Status
+  status                      String                    @default("draft") @db.VarChar(50)
+  published_at                DateTime?                 @db.Timestamptz(6)
+  
+  // Timestamps
+  created_at                  DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                  @default(now()) @db.Timestamptz(6)
+  created_by                  String?                   @db.Uuid
+  
+  // Relations
+  tenants                     tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  inventory_items             inventory_items           @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  users                       users?                    @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  digital_downloads           digital_downloads[]
+  digital_access_grants       digital_access_grants[]
+  
+  @@unique([tenant_id, item_id])
+  @@unique([tenant_id, slug])
+  @@index([tenant_id])
+  @@index([item_id])
+  @@index([slug])
+  @@index([status])
+  @@map("digital_download_pages")
+}
+
+// ============================================================================
+// 2. Digital Downloads (Assets)
+// ============================================================================
+
+model digital_downloads {
+  id                          String                    @id @default(uuid()) @db.Uuid
+  tenant_id                   String                    @db.Uuid
+  download_page_id            String                    @db.Uuid
+  item_id                     String                    @db.Uuid
+  
+  // Asset Information
+  asset_name                  String                    @db.VarChar(255)
+  asset_type                  String                    @db.VarChar(50) // file, link, license_key, access_grant
+  file_path                   String?
+  file_size                   BigInt?
+  file_mime_type              String?                   @db.VarChar(255)
+  external_url                String?
+  license_key_template        String?
+  
+  // Download Configuration
+  download_method             String                    @default("direct") @db.VarChar(50) // direct, email, license_key, external
+  requires_license_key        Boolean                   @default(false)
+  license_key_generator       String?                   @db.VarChar(50)
+  
+  // Access Control
+  access_type                 String                    @default("standard") @db.VarChar(50) // standard, time_limited, limited_downloads
+  max_downloads               Int?
+  expiry_days                 Int?
+  
+  // Display
+  display_order               Int                       @default(0)
+  is_primary                  Boolean                   @default(false)
+  
+  // Timestamps
+  created_at                  DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                  @default(now()) @db.Timestamptz(6)
+  
+  // Relations
+  tenants                     tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  digital_download_pages      digital_download_pages    @relation(fields: [download_page_id], references: [id], onDelete: Cascade)
+  inventory_items             inventory_items           @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  download_access_logs        download_access_logs[]
+  
+  @@index([download_page_id])
+  @@index([item_id])
+  @@index([tenant_id])
+  @@index([asset_type])
+  @@index([display_order])
+  @@map("digital_downloads")
+}
+
+// ============================================================================
+// 3. Download Access Logs
+// ============================================================================
+
+model download_access_logs {
+  id                          String                    @id @default(uuid()) @db.Uuid
+  tenant_id                   String                    @db.Uuid
+  access_grant_id             String                    @db.VarChar(255)
+  download_id                 String?                   @db.Uuid
+  
+  // Access Details
+  accessed_at                 DateTime                  @default(now()) @db.Timestamptz(6)
+  ip_address                  String?                   @db.VarChar(50)
+  user_agent                  String?
+  referrer                    String?
+  
+  // Download Details
+  download_successful         Boolean?
+  download_size               BigInt?
+  download_duration_ms        Int?
+  
+  // Error Tracking
+  error_code                  String?                   @db.VarChar(50)
+  error_message               String?
+  
+  // Relations
+  tenants                     tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  digital_access_grants       digital_access_grants     @relation(fields: [access_grant_id], references: [id], onDelete: Cascade)
+  digital_downloads           digital_downloads?        @relation(fields: [download_id], references: [id], onDelete: SetNull)
+  
+  @@index([access_grant_id])
+  @@index([tenant_id])
+  @@index([accessed_at])
+  @@index([download_successful])
+  @@map("download_access_logs")
+}
+
+// ============================================================================
+// 4. Updates to Existing Models
+// ============================================================================
+
+// Add to inventory_items model:
+// download_page_id            String?                   @db.Uuid
+// digital_download_pages      digital_download_pages?   @relation(fields: [download_page_id], references: [id], onDelete: SetNull)
+
+// Add to digital_access_grants model (if not already present):
+// tenant_id                   String?                   @db.Uuid
+// download_page_id            String?                   @db.Uuid
+// customer_id                 String?                   @db.Uuid
+// access_granted_at           DateTime                  @default(now()) @db.Timestamptz(6)
+// access_expires_at           DateTime?                 @db.Timestamptz(6) // renamed from expires_at
+// max_downloads               Int? // renamed from download_limit
+// license_key                 String?                   @unique @db.VarChar(255)
+// license_key_activated_at    DateTime?                 @db.Timestamptz(6)
+// license_key_activated_by    String?                   @db.VarChar(255)
+// status                      String                    @default("active") @db.VarChar(50)
+// access_ip_addresses         String[]
+// tenants                     tenants?                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+// digital_download_pages      digital_download_pages?   @relation(fields: [download_page_id], references: [id], onDelete: SetNull)
+// customers                   customers?               @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+// download_access_logs        download_access_logs[]
+
+// Add to tenants model:
+// digital_download_pages      digital_download_pages[]
+// digital_downloads           digital_downloads[]
+// download_access_logs        download_access_logs[]
+
+// Add to customers model:
+// digital_access_grants       digital_access_grants[]
+
+// Add to users model:
+// digital_download_pages      digital_download_pages[]
+
+// ============================================================================
+// 5. Enums (if not already defined)
+// ============================================================================
+
+// enum asset_type {
+//   file
+//   link
+//   license_key
+//   access_grant
+// }
+
+// enum download_method {
+//   direct
+//   email
+//   license_key
+//   external
+// }
+
+// enum access_type {
+//   standard
+//   time_limited
+//   limited_downloads
+// }
+
+// enum download_page_status {
+//   draft
+//   active
+//   archived
+// }
+
+// enum access_grant_status {
+//   active
+//   expired
+//   revoked
+//   exhausted
+//   activated
+// }
+
+// ============================================================================
+// Integration Instructions
+// ============================================================================
+
+// 1. Run the SQL migration file:
+//    psql -d your_database -f apps/api/prisma/migrations/20260510_digital_products_system.sql
+//
+// 2. Add the models above to schema.prisma in the appropriate locations
+//
+// 3. Update existing models with the new relations
+//
+// 4. Run Prisma introspection and generation:
+//    cd apps/api
+//    npx prisma db pull
+//    npx prisma generate
+//
+// 5. Verify the schema was correctly introspected by checking:
+//    - All new tables exist
+//    - All relations are correct
+//    - All indexes are present
+//    - All enums are defined
+//
+// 6. Test the migration by:
+//    - Creating a test download page
+//    - Adding test assets
+//    - Creating a test access grant
+//    - Logging a test download access

@@ -7,10 +7,12 @@ export type ChainTier = 'chain_starter' | 'chain_professional' | 'chain_enterpri
 
 export interface ChainTierLimits {
   name: string;
+  description?: string;
   price: string;
   pricePerMonth: number;
   maxLocations: number;
   maxTotalSKUs: number;
+  maxSkus?: number; // Alias for maxTotalSKUs for compatibility
   features: string[];
   color: string;
 }
@@ -18,10 +20,12 @@ export interface ChainTierLimits {
 export const CHAIN_TIERS: Record<ChainTier, ChainTierLimits> = {
   chain_starter: {
     name: 'Chain Starter',
+    description: 'Perfect for small chains and franchises',
     price: '$199/month',
     pricePerMonth: 199,
     maxLocations: 5,
     maxTotalSKUs: 2500,
+    maxSkus: 2500,
     features: [
       '5 locations included',
       '2,500 SKUs shared across all locations',
@@ -34,10 +38,12 @@ export const CHAIN_TIERS: Record<ChainTier, ChainTierLimits> = {
   },
   chain_professional: {
     name: 'Chain Professional',
+    description: 'For growing chains and multi-location businesses',
     price: '$499/month',
     pricePerMonth: 499,
     maxLocations: 15,
     maxTotalSKUs: 25000,
+    maxSkus: 25000,
     features: [
       '15 locations included',
       '25,000 SKUs shared across all locations',
@@ -52,10 +58,12 @@ export const CHAIN_TIERS: Record<ChainTier, ChainTierLimits> = {
   },
   chain_enterprise: {
     name: 'Chain Enterprise',
-    price: '$999/month',
-    pricePerMonth: 999,
+    description: 'For large chains and enterprise organizations',
+    price: '$899/month',
+    pricePerMonth: 899,
     maxLocations: Infinity,
     maxTotalSKUs: Infinity,
+    maxSkus: Infinity,
     features: [
       'Unlimited locations',
       'Unlimited SKUs',
@@ -125,7 +133,7 @@ export function calculateSavings(numLocations: number, individualTier: 'starter'
   const individualPrices = {
     starter: 49,
     professional: 149,
-    enterprise: 499,
+    enterprise: 299, // updated price
   };
 
   const individualCost = numLocations * individualPrices[individualTier];

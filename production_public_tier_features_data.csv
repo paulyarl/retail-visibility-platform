@@ -1,0 +1,69 @@
+id,tier_id,feature_key,feature_name,is_enabled,is_inherited,metadata,created_at,updated_at
+ea7ae5b7-614e-4109-9c5e-b5883c49aa25,tier_google_only,google_shopping,Google Shopping,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c457e7e0-1387-4b8f-a8b3-2a7c71a7a8c1,tier_google_only,google_merchant_center,Google Merchant Center,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+e3e73b15-8e18-43e8-b22c-73465b6722f3,tier_google_only,basic_product_pages,Basic Product Pages,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+caff7134-e958-4b23-a423-c69c0874b0d1,tier_google_only,qr_codes_512,QR Codes (512px),true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+f767521c-57ba-409d-b1e4-1b4b76f33e17,tier_google_only,performance_analytics,Performance Analytics,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+5098a957-e909-4f31-a278-293536227769,tier_google_only,quick_start_wizard,Quick Start Wizard (Limited),true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+d0c94cbc-9d1c-4f58-aa62-553d58cf7041,tier_starter,google_shopping,Google Shopping,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+a9081e8f-9cba-416d-aa3c-5d9757b44b38,tier_starter,google_merchant_center,Google Merchant Center,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c74406ee-7409-4f96-9993-e739dc8e67b6,tier_starter,basic_product_pages,Basic Product Pages,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+fd4d9ec1-44ca-4352-9120-a05b262822fa,tier_starter,qr_codes_512,QR Codes (512px),true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+b58b4445-f162-4fb6-a753-e2a267b09523,tier_starter,performance_analytics,Performance Analytics,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+255f2076-850f-4a1a-ad8a-f65283a1156d,tier_starter,storefront,Public Storefront,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+b8334134-c2c7-4d5f-9cd6-8eec8f0c71c4,tier_starter,product_search,Product Search,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+840409ff-6f55-44d0-8133-4001c62d1b97,tier_starter,mobile_responsive,Mobile-Responsive Design,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+6015680e-bbe8-4ba0-a26b-b569db5942aa,tier_starter,enhanced_seo,Enhanced SEO,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+30b5a43d-a0ce-4433-ad7e-e38568144308,tier_starter,basic_categories,Basic Categories,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+f7fec499-724a-496e-8498-fdb5a9e7c4ba,tier_professional,google_shopping,Google Shopping,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+2221fb06-29e9-4095-a325-ec2b5f6e7708,tier_professional,google_merchant_center,Google Merchant Center,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+b8e79f8a-e4b0-43c4-a030-f054c5fd7032,tier_professional,basic_product_pages,Basic Product Pages,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+e70c5989-6516-49fc-a553-fefe15962c9b,tier_professional,qr_codes_512,QR Codes (512px),true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+261dd200-9718-4cf3-bf72-affdcfbcf619,tier_professional,performance_analytics,Performance Analytics,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+939c0fbc-4f58-43d1-ae17-8c7698fe612a,tier_professional,storefront,Public Storefront,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+fbeb950a-eab3-495d-b815-9d8c120dc8e6,tier_professional,product_search,Product Search,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+1b1b698a-ac3f-4899-b523-09476d2d48db,tier_professional,mobile_responsive,Mobile-Responsive Design,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+4864e62c-288c-4b53-92f0-4457902ecea0,tier_professional,enhanced_seo,Enhanced SEO,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+54c0e7e0-186d-40cc-a305-fd74ea135844,tier_professional,basic_categories,Basic Categories,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+df97dfb6-0905-4373-a8b1-fd5de06b9cfd,tier_professional,quick_start_wizard_full,Quick Start Wizard (Full),true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+6f6e30dc-7a01-4efa-a6fe-716b5bb955d9,tier_professional,product_scanning,Product Scanning,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+63267dcb-c45b-417e-b895-b652e3b9ae18,tier_professional,gbp_integration,Google Business Profile Integration,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c416d2d5-c5b1-4e9d-a93e-e274ec5ea54b,tier_professional,custom_branding,Custom Branding,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+3169ec98-6360-4fea-8345-217a9bcda3e0,tier_professional,business_logo,Business Logo,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c0598f8e-99f6-4125-a9a9-7dc9af1fd618,tier_professional,qr_codes_1024,QR Codes (1024px),true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+162c0b21-365d-4e2d-b603-8f3a81ae6d74,tier_professional,image_gallery_5,5-Image Gallery,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+9074272e-8ca5-48ce-ba01-cf61f3114f32,tier_professional,interactive_maps,Interactive Maps,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+21f48f0b-d5e9-497f-814a-b8f0cf66f76b,tier_professional,privacy_mode,Privacy Mode,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+d71dc779-5af6-4956-8842-50ed68df6ea6,tier_professional,custom_marketing_copy,Custom Marketing Copy,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+4bba319f-80a4-4f09-ab2c-c9e1391eeaa9,tier_professional,priority_support,Priority Support,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+b855dbc0-5c10-473f-b8b8-bf9500ec0340,tier_enterprise,google_shopping,Google Shopping,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+47a90d88-1630-4a6d-b613-2d6548ecca68,tier_enterprise,google_merchant_center,Google Merchant Center,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+90fe65d5-2281-4f05-8670-55b3cc8b2a8d,tier_enterprise,basic_product_pages,Basic Product Pages,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+53c02db6-08b4-4e12-bed1-dc741f3a99bb,tier_enterprise,qr_codes_512,QR Codes (512px),true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c5d79a56-c20a-49e5-a0e6-b8b074295fca,tier_enterprise,performance_analytics,Performance Analytics,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+5b006f4c-7659-47f8-8a16-e67fe82a7135,tier_enterprise,storefront,Public Storefront,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+ec292238-18d2-4c54-8d5b-839909fec990,tier_enterprise,product_search,Product Search,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+bacf8a00-a6a2-4649-8590-57a3d65e9b2e,tier_enterprise,mobile_responsive,Mobile-Responsive Design,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+12e202e5-b3ed-4510-947c-a01cc71244c0,tier_enterprise,enhanced_seo,Enhanced SEO,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+c655c27c-9f3a-47b4-9ca0-7e0b9c07cc70,tier_enterprise,basic_categories,Basic Categories,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+55e1e8f4-f368-4d85-943a-e69fd766dca7,tier_enterprise,quick_start_wizard_full,Quick Start Wizard (Full),true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+651e7dd1-9349-4547-9d0a-8b0af59daffc,tier_enterprise,product_scanning,Product Scanning,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+2ae0d574-1a79-4a97-8ef3-896b234f8e20,tier_enterprise,gbp_integration,Google Business Profile Integration,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+1c023af6-3562-4a6d-be1a-2d40423c2106,tier_enterprise,custom_branding,Custom Branding,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+a1e4f765-46a6-4277-9831-f28737cdb661,tier_enterprise,business_logo,Business Logo,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+145b87f7-4d40-489c-a1fb-2edde1f412b9,tier_enterprise,qr_codes_1024,QR Codes (1024px),true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+e17995b1-afe7-470e-8ee8-29fd331d1009,tier_enterprise,image_gallery_5,5-Image Gallery,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+946bc8bc-bfd0-41a7-b984-0322306a5ebd,tier_enterprise,interactive_maps,Interactive Maps,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+aeea7910-f755-40d6-a0b1-66e8eb0c3705,tier_enterprise,privacy_mode,Privacy Mode,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+8a6f4ea5-fc81-40ec-bed0-8490cefa990c,tier_enterprise,custom_marketing_copy,Custom Marketing Copy,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+eceae6f6-bc43-4e11-812b-7ac3beeef191,tier_enterprise,priority_support,Priority Support,true,true,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+5f4582f9-a25e-4424-a0e9-b727b17bc62e,tier_enterprise,unlimited_skus,Unlimited SKUs,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+13701e58-1037-4d38-b1b8-d7115f4e883a,tier_enterprise,white_label,White Label Branding,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+2d3d1714-b264-49de-a606-b7bf2a72d9c8,tier_enterprise,custom_domain,Custom Domain,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+d9d043df-c4e9-435a-b1aa-186950f34044,tier_enterprise,qr_codes_2048,QR Codes (2048px),true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+14cca90c-6f34-44f2-9efa-db2de5f4a5cb,tier_enterprise,image_gallery_10,10-Image Gallery,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+f7f9cd3d-6264-47d9-8c64-fbb3f958de89,tier_enterprise,api_access,API Access,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+91159f3b-30ba-4d97-a5f8-7752f0da67d3,tier_enterprise,advanced_analytics,Advanced Analytics,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+ad885c2d-3354-4212-a376-1cf607393b14,tier_enterprise,dedicated_account_manager,Dedicated Account Manager,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+7b45698d-ee2e-4da6-8b6d-0164c2eb782e,tier_enterprise,sla_guarantee,SLA Guarantee,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064
+15545b84-bc26-4e21-bde0-bc28645eeb0d,tier_enterprise,custom_integrations,Custom Integrations,true,false,null,2025-11-10 22:03:48.064,2025-11-10 22:03:48.064

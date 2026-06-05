@@ -1,0 +1,115 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import { tenantManagementService } from "@/services/TenantManagementService";
+
+
+
+export default function TimezonePicker({ tenantId, onTimezoneChange }: { tenantId: string; onTimezoneChange?: (timezone: string) => void }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState<string>("");
+  const [existingHours, setExistingHours] = useState<any>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const profile = await tenantManagementService.getCurrentTenantProfile(tenantId);
+        if (!mountedRef.current) return;
+        const tz = profile?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        setTimezone(tz);
+        // Store existing hours without timezone (timezone is managed separately)
+        const { timezone: _, ...hoursWithoutTimezone } = profile?.hours || {};
+        setExistingHours(hoursWithoutTimezone);
+      } catch (e) {
+        if (mountedRef.current) {
+          setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+          setExistingHours({});
+        }
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+    load();
+  }, [tenantId]);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      await tenantManagementService.updateTimezone(tenantId, timezone, existingHours);
+      // Notify parent of timezone change
+      onTimezoneChange?.(timezone);
+    } catch (e) {
+      setError("Failed to save timezone");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tzOptions: string[] = [
+    "UTC",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "America/Phoenix",
+    "America/Anchorage",
+    "Pacific/Honolulu",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Europe/Madrid",
+    "Asia/Tokyo",
+    "Asia/Hong_Kong",
+    "Asia/Singapore",
+    "Australia/Sydney",
+  ];
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Timezone</h2>
+        {loading ? (
+          <span className="text-sm text-gray-500">Loading…</span>
+        ) : error ? (
+          <span className="text-sm text-red-600">{error}</span>
+        ) : null}
+      </div>
+      <div className="p-6 flex flex-col sm:flex-row gap-3 sm:items-center">
+        <label className="text-sm text-gray-700">Store Timezone</label>
+        <select
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="border border-gray-300 rounded-md px-3 py-2 w-full sm:max-w-xs"
+        >
+          {tzOptions.map((tz) => (
+            <option key={tz} value={tz}>{tz}</option>
+          ))}
+        </select>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+      <div className="px-6 pb-4 text-xs text-gray-500">
+        Used to calculate open/closed status on your storefront.
+      </div>
+    </div>
+  );
+}

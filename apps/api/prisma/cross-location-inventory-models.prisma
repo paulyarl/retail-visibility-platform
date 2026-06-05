@@ -1,0 +1,161 @@
+// ========================================
+// Cross-Location Inventory System Models
+// ========================================
+
+/// Inventory transfer tracking between locations
+model inventory_transfers {
+  id                String          @id
+  tenant_id         String
+  source_location_id String
+  target_location_id String
+  sku               String
+  quantity          Int
+  status            transfer_status @default(pending)
+  initiated_by      String
+  initiated_at      DateTime        @default(now())
+  approved_by       String?
+  approved_at       DateTime?
+  shipped_by        String?
+  shipped_at        DateTime?
+  received_by       String?
+  received_at       DateTime?
+  cancelled_by      String?
+  cancelled_at      DateTime?
+  notes             String?
+  metadata          Json            @default("{}")
+  tracking_number   String?
+  estimated_arrival DateTime?
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+
+  // Relations
+  tenant                  tenants                  @relation(fields: [tenant_id], references: [id])
+  source_location         tenants                  @relation("SourceLocation", fields: [source_location_id], references: [id])
+  target_location         tenants                  @relation("TargetLocation", fields: [target_location_id], references: [id])
+  initiated_by_user       users                    @relation("TransferInitiator", fields: [initiated_by], references: [id])
+  approved_by_user        users?                   @relation("TransferApprover", fields: [approved_by], references: [id])
+  shipped_by_user         users?                   @relation("TransferShipper", fields: [shipped_by], references: [id])
+  received_by_user        users?                   @relation("TransferReceiver", fields: [received_by], references: [id])
+  cancelled_by_user       users?                   @relation("TransferCanceller", fields: [cancelled_by], references: [id])
+  inventory_transfer_logs inventory_transfer_logs[]
+
+  @@index([tenant_id])
+  @@index([status])
+  @@index([source_location_id, target_location_id])
+  @@index([sku])
+  @@index([initiated_at])
+}
+
+/// Location-specific inventory pools
+model location_inventory_pools {
+  id                  String  @id
+  tenant_id           String
+  location_id         String
+  sku                 String
+  total_quantity      Int     @default(0)
+  available_quantity  Int     @default(0)
+  reserved_quantity   Int     @default(0)
+  in_transit_quantity Int     @default(0)
+  low_stock_threshold Int     @default(5)
+  reorder_point       Int     @default(10)
+  reorder_quantity    Int     @default(20)
+  last_updated        DateTime @default(now())
+  metadata            Json    @default("{}")
+
+  // Relations
+  tenant    tenants @relation(fields: [tenant_id], references: [id])
+  location  tenants @relation("InventoryLocation", fields: [location_id], references: [id])
+
+  @@unique([tenant_id, location_id, sku])
+  @@index([tenant_id])
+  @@index([location_id])
+  @@index([sku])
+  @@index([tenant_id, location_id], map: "idx_low_stock_locations") 
+    WHERE available_quantity <= low_stock_threshold
+}
+
+/// Detailed audit trail for transfer operations
+model inventory_transfer_logs {
+  id            String              @id
+  transfer_id   String
+  tenant_id     String
+  action        transfer_log_action
+  performed_by  String
+  performed_at  DateTime            @default(now())
+  old_status    transfer_status?
+  new_status    transfer_status?
+  quantity_change Int?
+  notes         String?
+  metadata      Json                @default("{}")
+
+  // Relations
+  transfer      inventory_transfers @relation(fields: [transfer_id], references: [id])
+  tenant        tenants             @relation(fields: [tenant_id], references: [id])
+  performed_by_user users           @relation("TransferLogPerformer", fields: [performed_by], references: [id])
+
+  @@index([transfer_id])
+  @@index([tenant_id])
+  @@index([performed_at])
+}
+
+/// Real-time inventory synchronization events
+model inventory_sync_events {
+  id              String        @id
+  tenant_id       String
+  location_id     String
+  sku             String
+  event_type      sync_event_type
+  quantity_before Int?
+  quantity_after  Int?
+  source_event_id String?
+  triggered_by    String?
+  triggered_at    DateTime      @default(now())
+  processed_at    DateTime?
+  status          sync_status   @default(pending)
+  error_message   String?
+  metadata        Json          @default("{}")
+
+  // Relations
+  tenant        tenants @relation(fields: [tenant_id], references: [id])
+  location      tenants @relation("SyncLocation", fields: [location_id], references: [id])
+  triggered_by_user users? @relation("SyncTriggerUser", fields: [triggered_by], references: [id])
+
+  @@index([tenant_id])
+  @@index([location_id])
+  @@index([status])
+  @@index([triggered_at])
+}
+
+// Enums
+enum transfer_status {
+  pending
+  approved
+  shipped
+  in_transit
+  delivered
+  received
+  cancelled
+  rejected
+}
+
+enum transfer_log_action {
+  initiated
+  approved
+  shipped
+  received
+  cancelled
+  rejected
+  modified
+}
+
+enum sync_event_type {
+  sale
+  transfer_out
+  transfer_in
+  adjustment
+  restock
+  return
+  damage
+  loss
+}
+

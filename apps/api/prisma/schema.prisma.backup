@@ -1,0 +1,1446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model InventoryItem {
+  id                    String
+  tenantId              String
+  sku                   String
+  name                  String
+  priceCents            Int
+  stock                 Int                      @default(0)
+  imageUrl              String?
+  metadata              Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime
+  marketingDescription  String?
+  imageGallery          String[]                 @default([])
+  customCta             Json?
+  socialLinks           Json?
+  customBranding        Json?
+  customSections        Json[]                   @default([])
+  landingPageTheme      String?                  @default("default")
+  auditLogId            String?
+  availability          availability_status      @default(in_stock)
+  brand                 String
+  categoryPath          String[]                 @default([])
+  condition             product_condition?       @default(brand_new)
+  currency              String                   @default("USD") @db.Char(3)
+  description           String?
+  eligibilityReason     String?
+  gtin                  String?
+  itemStatus            item_status?             @default(active)
+  locationId            String?
+  manufacturer          String?
+  merchantName          String?
+  mpn                   String?
+  price                 Decimal                  @db.Decimal(12, 2)
+  quantity              Int?
+  searchTsv             Unsupported("tsvector")?
+  syncStatus            sync_status?             @default(pending)
+  syncedAt              DateTime?
+  title                 String
+  visibility            item_visibility?         @default(public)
+  tenant_category_id    String?
+  enriched_at           DateTime?
+  enriched_by           String?
+  enriched_from_barcode String?
+  missing_images        Boolean                  @default(false)
+  missing_description   Boolean                  @default(false)
+  missing_specs         Boolean                  @default(false)
+  missing_brand         Boolean                  @default(false)
+  source                product_source           @default(MANUAL)
+  enrichmentStatus      enrichment_status        @default(COMPLETE)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model LocationStatusLog {
+  id            String
+  tenantId      String
+  oldStatus     LocationStatus
+  newStatus     LocationStatus
+  changedBy     String
+  reason        String?
+  reopeningDate DateTime?
+  metadata      Json?
+  createdAt     DateTime       @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PhotoAsset {
+  id              String
+  tenantId        String
+  inventoryItemId String
+  url             String
+  width           Int?
+  height          Int?
+  contentType     String?
+  bytes           Int?
+  exifRemoved     Boolean   @default(false)
+  capturedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  publicUrl       String?
+  signedUrl       String?
+  position        Int       @default(0)
+  alt             String?
+  caption         String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model ProductPerformance {
+  id              String
+  itemId          String
+  tenantId        String
+  date            DateTime @db.Date
+  approvalStatus  String?
+  rejectionReason String?
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  ctr             Decimal  @default(0) @db.Decimal(5, 2)
+  conversions     Int      @default(0)
+  revenue         Decimal  @default(0) @db.Decimal(12, 2)
+  visibilityScore Int      @default(0)
+  searchRank      Int?
+  lastUpdated     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model SyncJob {
+  id        String
+  tenantId  String
+  target    String
+  status    String   @default("queued")
+  attempt   Int      @default(0)
+  payload   Json
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  source    String   @default("manual")
+
+  @@ignore
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model Tenant {
+  id                          String                        @id
+  name                        String
+  createdAt                   DateTime                      @default(now())
+  region                      String                        @default("us-east-1")
+  language                    String                        @default("en-US")
+  currency                    String                        @default("USD")
+  data_policy_accepted        Boolean                       @default(false)
+  metadata                    Json?
+  subscriptionStatus          String?                       @default("trial")
+  subscriptionTier            String?                       @default("starter")
+  trialEndsAt                 DateTime?
+  subscriptionEndsAt          DateTime?
+  stripeCustomerId            String?                       @unique
+  stripeSubscriptionId        String?                       @unique
+  organizationId              String?
+  serviceLevel                String?                       @default("self_service")
+  managedServicesActive       Boolean                       @default(false)
+  dedicatedManager            String?
+  monthlySkuQuota             Int?
+  skusAddedThisMonth          Int                           @default(0)
+  googleBusinessAccessToken   String?
+  googleBusinessRefreshToken  String?
+  googleBusinessTokenExpiry   DateTime?
+  created_by                  String?
+  location_status             location_status               @default(active)
+  status_changed_at           DateTime?
+  status_changed_by           String?
+  reopening_date              DateTime?
+  closure_reason              String?
+  locationStatus              LocationStatus?               @default(active)
+  statusChangedAt             DateTime?
+  statusChangedBy             String?
+  reopeningDate               DateTime?
+  closureReason               String?
+  slug                        String?                       @unique
+  google_sync_enabled         Boolean?                      @default(false)
+  google_last_sync            DateTime?                     @db.Timestamp(6)
+  google_product_count        Int?                          @default(0)
+  directory_visible           Boolean?                      @default(true)
+  organization                organization?                 @relation(fields: [organizationId], references: [id])
+  directory_featured_listings directory_featured_listings[]
+
+  @@index([directory_visible], map: "idx_tenant_directory_visible")
+  @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
+  @@index([slug], map: "idx_tenant_slug")
+  @@index([created_by], map: "tenant_created_by_idx")
+  @@index([directory_visible], map: "tenant_directory_visible_idx")
+  @@index([google_sync_enabled, google_last_sync], map: "tenant_google_sync_enabled_google_last_sync_idx")
+  @@index([location_status], map: "tenant_location_status_idx")
+  @@index([locationStatus], map: "tenant_locationstatus_idx")
+  @@index([name], map: "tenant_name_idx")
+  @@index([organizationId], map: "tenant_organizationid_idx")
+  @@index([serviceLevel], map: "tenant_servicelevel_idx")
+  @@index([slug], map: "tenant_slug_idx")
+  @@index([subscriptionStatus], map: "tenant_subscriptionstatus_idx")
+}
+
+model audit_log {
+  id           String      @id
+  tenant_id    String
+  actor_id     String
+  actor_type   actor_type
+  diff         Json
+  entity_id    String
+  entity_type  entity_type
+  ip           String?
+  metadata     Json        @default("{}")
+  occurred_at  DateTime    @default(now())
+  pii_scrubbed Boolean     @default(true)
+  request_id   String?
+  user_agent   String?
+  action       action
+
+  @@index([tenant_id, occurred_at(sort: Desc)], map: "audit_log_tenant_id_occurred_at_sort_desc_idx")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model barcode_enrichment {
+  id                  String
+  barcode             String
+  name                String?
+  brand               String?
+  description         String?
+  category_path       String[]
+  price_cents         Int?
+  image_url           String?
+  image_thumbnail_url String?
+  metadata            Json?
+  source              String
+  last_fetched_at     DateTime @default(now())
+  fetch_count         Int      @default(1)
+  created_at          DateTime @default(now())
+  updated_at          DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model barcode_lookup_log {
+  id         String
+  tenant_id  String
+  barcode    String
+  provider   String?
+  status     String   @default("success")
+  response   Json?
+  latency_ms Int?
+  error      String?
+  created_at DateTime @default(now())
+
+  @@ignore
+}
+
+model business_hours {
+  id             String    @id
+  tenant_id      String    @unique
+  timezone       String    @default("America/New_York")
+  periods        Json      @default("[]")
+  source_hash    String?
+  last_synced_at DateTime?
+  sync_attempts  Int       @default(0)
+  last_error     String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+  tenant         tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model business_hours_special {
+  id             String    @id
+  tenant_id      String
+  date           DateTime  @db.Date
+  is_closed      Boolean   @default(false)
+  open           String?
+  close          String?
+  note           String?
+  source_hash    String?
+  last_synced_at DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+  tenant         tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, date])
+  @@index([tenant_id, date])
+}
+
+model category_mirror_runs {
+  id           String    @id
+  tenant_id    String?
+  strategy     String
+  dry_run      Boolean   @default(true)
+  created      Int       @default(0)
+  updated      Int       @default(0)
+  deleted      Int       @default(0)
+  skipped      Boolean   @default(false)
+  reason       String?
+  error        String?
+  job_id       String?
+  started_at   DateTime  @default(now())
+  completed_at DateTime?
+  tenant       tenant?   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_id")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model clover_demo_snapshots {
+  id             String
+  integration_id String
+  snapshot_data  Json
+  item_count     Int
+  created_at     DateTime @default(now())
+  expires_at     DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model clover_integrations {
+  id                    String
+  tenant_id             String
+  mode                  String    @default("demo")
+  status                String    @default("active")
+  access_token          String?
+  refresh_token         String?
+  token_expires_at      DateTime?
+  merchant_id           String?
+  demo_enabled_at       DateTime?
+  demo_last_active_at   DateTime?
+  production_enabled_at DateTime?
+  last_sync_at          DateTime?
+  last_sync_status      String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model clover_item_mappings {
+  id               String
+  integration_id   String
+  clover_item_id   String
+  clover_item_name String
+  clover_sku       String?
+  rvp_item_id      String?
+  rvp_sku          String?
+  mapping_status   String    @default("pending")
+  conflict_reason  String?
+  last_synced_at   DateTime?
+  last_sync_status String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model clover_sync_logs {
+  id              String
+  integration_id  String
+  trace_id        String
+  operation       String
+  status          String
+  items_processed Int       @default(0)
+  items_succeeded Int       @default(0)
+  items_failed    Int       @default(0)
+  error_message   String?
+  error_details   Json?
+  duration_ms     Int?
+  started_at      DateTime  @default(now())
+  completed_at    DateTime?
+
+  @@ignore
+}
+
+model directory_featured_listings {
+  id                 String   @id
+  tenant_id          String
+  featured_from      DateTime
+  featured_until     DateTime
+  placement_priority Int      @default(5)
+  created_by         String?
+  created_at         DateTime @default(now())
+  users              users?   @relation(fields: [created_by], references: [id])
+  Tenant             Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([placement_priority, featured_from(sort: Desc)])
+  @@index([tenant_id, featured_until])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model directory_listings {
+  id                   String
+  tenant_id            String
+  business_name        String?
+  slug                 String?
+  address              String?
+  city                 String?
+  state                String?
+  zip_code             String?
+  phone                String?
+  email                String?
+  website              String?
+  latitude             Float?
+  longitude            Float?
+  primary_category     String?
+  secondary_categories String[]
+  logo_url             String?
+  description          String?
+  rating_avg           Float?    @default(0)
+  rating_count         Int?      @default(0)
+  product_count        Int?      @default(0)
+  is_featured          Boolean?  @default(false)
+  subscription_tier    String?   @default("trial")
+  use_custom_website   Boolean?  @default(false)
+  is_published         Boolean?  @default(true)
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model directory_settings {
+  id                   String
+  tenant_id            String
+  is_published         Boolean   @default(false)
+  seo_description      String?
+  seo_keywords         String[]
+  primary_category     String?
+  secondary_categories String[]
+  is_featured          Boolean   @default(false)
+  featured_until       DateTime?
+  slug                 String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model directory_support_notes {
+  id         String
+  tenant_id  String
+  note       String
+  created_by String
+  created_at DateTime @default(now())
+
+  @@ignore
+}
+
+model email_configuration {
+  id         String   @id
+  category   String   @unique
+  email      String
+  updated_at DateTime
+  updated_by String?
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model feed_push_jobs {
+  id            String
+  tenant_id     String
+  sku           String?
+  job_status    job_status @default(queued)
+  retry_count   Int        @default(0)
+  max_retries   Int        @default(5)
+  last_attempt  DateTime?
+  next_retry    DateTime?
+  error_message String?
+  error_code    String?
+  payload       Json?
+  result        Json?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime
+  completed_at  DateTime?
+
+  @@ignore
+}
+
+model gbp_categories {
+  id                      String                    @id
+  name                    String                    @unique
+  display_name            String
+  is_active               Boolean                   @default(true)
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime
+  tenant_business_profile tenant_business_profile[]
+}
+
+model gbp_insights_daily {
+  id                 String        @id
+  location_id        String
+  date               DateTime      @db.Date
+  views_search       Int           @default(0)
+  views_maps         Int           @default(0)
+  actions_website    Int           @default(0)
+  actions_phone      Int           @default(0)
+  actions_directions Int           @default(0)
+  photos_count       Int           @default(0)
+  created_at         DateTime      @default(now())
+  gbp_locations      gbp_locations @relation(fields: [location_id], references: [id], onDelete: Cascade)
+
+  @@unique([location_id, date])
+}
+
+model gbp_locations {
+  id                    String                @id
+  account_id            String
+  location_id           String
+  location_name         String
+  store_code            String?
+  address               String?
+  phone_number          String?
+  website_url           String?
+  category              String?
+  is_verified           Boolean?              @default(false)
+  is_published          Boolean?              @default(false)
+  last_fetched_at       DateTime?
+  created_at            DateTime              @default(now())
+  updated_at            DateTime
+  gbp_insights_daily    gbp_insights_daily[]
+  google_oauth_accounts google_oauth_accounts @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@unique([account_id, location_id])
+}
+
+model google_merchant_links {
+  id                    String                @id
+  account_id            String
+  merchant_id           String
+  merchant_name         String?
+  website_url           String?
+  is_active             Boolean               @default(true)
+  last_sync_at          DateTime?
+  sync_status           String?               @default("pending")
+  sync_error            String?
+  created_at            DateTime              @default(now())
+  updated_at            DateTime
+  google_oauth_accounts google_oauth_accounts @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+}
+
+model google_oauth_accounts {
+  id                    String                  @id
+  tenant_id             String
+  google_account_id     String
+  email                 String
+  display_name          String?
+  profile_picture_url   String?
+  scopes                String[]
+  created_at            DateTime                @default(now())
+  updated_at            DateTime
+  gbp_locations         gbp_locations[]
+  google_merchant_links google_merchant_links[]
+  tenant                tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  google_oauth_tokens   google_oauth_tokens?
+
+  @@unique([tenant_id, google_account_id])
+}
+
+model google_oauth_tokens {
+  id                      String                @id
+  account_id              String                @unique
+  access_token_encrypted  String
+  refresh_token_encrypted String
+  token_type              String                @default("Bearer")
+  expires_at              DateTime
+  scopes                  String[]
+  created_at              DateTime              @default(now())
+  updated_at              DateTime
+  google_oauth_accounts   google_oauth_accounts @relation(fields: [account_id], references: [id], onDelete: Cascade)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model google_taxonomy {
+  id            String
+  category_id   String
+  category_path String
+  parent_id     String?
+  level         Int
+  is_active     Boolean  @default(true)
+  version       String   @default("2024-09")
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@ignore
+}
+
+model inventory_item {
+  id                    String                   @id
+  tenant_id             String
+  sku                   String
+  name                  String
+  price_cents           Int
+  stock                 Int                      @default(0)
+  image_url             String?
+  metadata              Json?
+  created_at            DateTime                 @default(now())
+  updated_at            DateTime
+  marketing_description String?
+  image_gallery         String[]                 @default([])
+  custom_cta            Json?
+  social_links          Json?
+  custom_branding       Json?
+  custom_sections       Json[]                   @default([])
+  landing_page_theme    String?                  @default("default")
+  audit_log_id          String?
+  availability          availability_status      @default(in_stock)
+  brand                 String
+  category_path         String[]                 @default([])
+  tenant_category_id    String?
+  condition             product_condition?       @default(brand_new)
+  currency              String                   @default("USD") @db.Char(3)
+  description           String?
+  eligibility_reason    String?
+  gtin                  String?
+  item_status           item_status?             @default(active)
+  location_id           String?
+  merchant_name         String?
+  mpn                   String?
+  price                 Decimal                  @db.Decimal(12, 2)
+  quantity              Int?
+  search_tsv            Unsupported("tsvector")?
+  sync_status           sync_status?             @default(pending)
+  synced_at             DateTime?
+  title                 String
+  visibility            item_visibility?         @default(public)
+  manufacturer          String?
+  source                product_source           @default(MANUAL)
+  enrichment_status     enrichment_status        @default(COMPLETE)
+  enriched_at           DateTime?
+  enriched_by           String?
+  enriched_from_barcode String?
+  missing_images        Boolean                  @default(false)
+  missing_description   Boolean                  @default(false)
+  missing_specs         Boolean                  @default(false)
+  missing_brand         Boolean                  @default(false)
+  tenant                tenant                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  photo_asset           photo_asset[]
+  product_performance   product_performance[]
+
+  @@unique([tenant_id, sku])
+  @@index([source])
+  @@index([tenant_id, enrichment_status])
+  @@index([tenant_id, updated_at])
+}
+
+model invitations {
+  id          String           @id @default(dbgenerated("gen_random_uuid()"))
+  email       String
+  token       String           @unique @default(dbgenerated("encode(gen_random_bytes(32), 'hex'::text)"))
+  tenant_id   String
+  role        user_tenant_role @default(MEMBER)
+  invited_by  String
+  expires_at  DateTime         @default(dbgenerated("(now() + '7 days'::interval)"))
+  accepted_at DateTime?
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @default(now())
+  users       users            @relation(fields: [invited_by], references: [id], onDelete: Cascade)
+  tenant      tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([expires_at])
+  @@index([tenant_id])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model location_status_logs {
+  id             String
+  tenant_id      String
+  old_status     location_status
+  new_status     location_status
+  changed_by     String
+  reason         String?
+  reopening_date DateTime?
+  metadata       Json?
+  created_at     DateTime        @default(now())
+
+  @@index([changed_by])
+  @@index([tenant_id, created_at])
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_integrations {
+  id            String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String?
+  provider      String
+  access_token  String
+  refresh_token String?
+  scopes        String[]  @default([])
+  expires_at    DateTime? @db.Timestamptz(6)
+  is_active     Boolean?  @default(true)
+  metadata      Json?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@ignore
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model organization {
+  id                     String    @id
+  name                   String
+  owner_id               String
+  created_at             DateTime  @default(now())
+  updated_at             DateTime
+  subscription_tier      String?   @default("chain_starter")
+  subscription_status    String?   @default("trial")
+  trial_ends_at          DateTime?
+  subscription_ends_at   DateTime?
+  stripe_customer_id     String?
+  stripe_subscription_id String?
+  max_locations          Int       @default(5)
+  max_total_skus         Int       @default(2500)
+  metadata               Json?
+  ownerId                String
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime
+  subscriptionTier       String?   @default("chain_starter")
+  subscriptionStatus     String?   @default("trial")
+  trialEndsAt            DateTime?
+  subscriptionEndsAt     DateTime?
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  maxLocations           Int       @default(5)
+  maxTotalSKUs           Int       @default(2500)
+  Tenant                 Tenant[]
+  tenant                 tenant[]
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model organization_requests {
+  id              String
+  tenant_id       String
+  organization_id String
+  requested_by    String
+  status          String    @default("pending")
+  request_type    String    @default("join")
+  estimated_cost  Float?
+  cost_currency   String?   @default("USD")
+  notes           String?
+  admin_notes     String?
+  cost_agreed     Boolean   @default(false)
+  cost_agreed_at  DateTime?
+  processed_by    String?
+  processed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model outreach_feedback {
+  id         String
+  tenant_id  String?
+  user_id    String?
+  feedback   Json
+  score      Int
+  category   String?
+  context    String?
+  created_at DateTime @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model permission_audit_log {
+  id         String
+  role       String
+  action     String
+  old_value  Boolean?
+  new_value  Boolean
+  changed_by String
+  changed_at DateTime @default(now())
+  reason     String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model permission_matrix {
+  id          String
+  role        String
+  action      permission_action
+  allowed     Boolean           @default(false)
+  description String?
+  created_at  DateTime          @default(now())
+  updated_at  DateTime
+
+  @@ignore
+}
+
+model photo_asset {
+  id                String         @id
+  tenant_id         String
+  inventory_item_id String
+  url               String
+  width             Int?
+  height            Int?
+  content_type      String?
+  bytes             Int?
+  exif_removed      Boolean        @default(false)
+  captured_at       DateTime?
+  created_at        DateTime       @default(now())
+  public_url        String?
+  signed_url        String?
+  position          Int            @default(0)
+  alt               String?
+  caption           String?
+  inventory_item    inventory_item @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
+  tenant            tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([inventory_item_id, position])
+  @@index([inventory_item_id])
+  @@index([tenant_id])
+}
+
+model platform_feature_flags {
+  id                    String   @id
+  flag                  String   @unique
+  enabled               Boolean  @default(false)
+  description           String?
+  rollout               String?
+  allow_tenant_override Boolean  @default(false)
+  updated_at            DateTime
+}
+
+model platform_settings {
+  id                   Int      @id @default(1)
+  platform_name        String?
+  platform_description String?
+  logo_url             String?
+  favicon_url          String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime
+}
+
+model product_performance {
+  id               String         @id
+  item_id          String
+  tenant_id        String
+  date             DateTime       @db.Date
+  approval_status  String?
+  rejection_reason String?
+  impressions      Int            @default(0)
+  clicks           Int            @default(0)
+  ctr              Decimal        @default(0) @db.Decimal(5, 2)
+  conversions      Int            @default(0)
+  revenue          Decimal        @default(0) @db.Decimal(12, 2)
+  visibility_score Int            @default(0)
+  search_rank      Int?
+  last_updated     DateTime       @default(now())
+  created_at       DateTime       @default(now())
+  inventory_item   inventory_item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  tenant           tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([item_id, date])
+  @@index([tenant_id, date(sort: Desc)], map: "product_performance_tenant_id_date_sort_desc_idx")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model scan_results {
+  id           String
+  tenant_id    String
+  session_id   String
+  barcode      String
+  sku          String?
+  raw_payload  Json?
+  status       String   @default("new")
+  enrichment   Json?
+  validation   Json?
+  duplicate_of String?
+  error        String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model scan_sessions {
+  id              String
+  tenant_id       String
+  user_id         String?
+  template_id     String?
+  status          String    @default("active")
+  device_type     String?
+  scanned_count   Int       @default(0)
+  committed_count Int       @default(0)
+  duplicate_count Int       @default(0)
+  metadata        Json?
+  started_at      DateTime  @default(now())
+  completed_at    DateTime?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model scan_templates {
+  id                String
+  tenant_id         String
+  name              String
+  defaultCategory   String?
+  defaultPriceCents Int?
+  defaultCurrency   String   @default("USD") @db.Char(3)
+  defaultVisibility String   @default("private")
+  enrichmentRules   Json?
+  created_at        DateTime @default(now())
+  updated_at        DateTime
+
+  @@ignore
+}
+
+model sku_billing_policy {
+  id                   String    @id
+  scope                String    @default("global")
+  count_active_private Boolean?
+  count_preorder       Boolean?
+  count_zero_price     Boolean?
+  require_image        Boolean?
+  require_currency     Boolean?
+  note                 String?
+  updated_by           String?
+  effective_from       DateTime?
+  effective_to         DateTime?
+  updated_at           DateTime
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sku_billing_policy_history {
+  id                   String
+  scope                String    @default("global")
+  effective_from       DateTime
+  effective_to         DateTime?
+  count_active_private Boolean
+  count_preorder       Boolean
+  count_zero_price     Boolean
+  require_image        Boolean
+  require_currency     Boolean
+  notes                String?
+  updated_by           String
+  created_at           DateTime  @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sku_billing_policy_overrides {
+  id                   String   @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id            String
+  count_active_private Boolean?
+  count_preorder       Boolean?
+  count_zero_price     Boolean?
+  require_image        Boolean?
+  require_currency     Boolean?
+  note                 String?
+  updated_by           String?
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model square_integrations {
+  id               String
+  tenant_id        String
+  access_token     String
+  refresh_token    String?
+  merchant_id      String
+  location_id      String?
+  token_expires_at DateTime?
+  scopes           String[]
+  mode             String
+  enabled          Boolean   @default(true)
+  last_sync_at     DateTime?
+  last_error       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model square_product_mappings {
+  id                       String
+  tenant_id                String
+  integration_id           String
+  inventory_item_id        String
+  square_catalog_object_id String
+  square_item_variation_id String?
+  sync_status              String    @default("pending")
+  last_synced_at           DateTime?
+  sync_error               String?
+  conflict_resolution      String?
+  created_at               DateTime  @default(now())
+  updated_at               DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model square_sync_logs {
+  id               String
+  tenant_id        String
+  integration_id   String
+  mapping_id       String?
+  sync_type        String
+  direction        String
+  operation        String
+  status           String
+  error_message    String?
+  error_code       String?
+  request_payload  Json?
+  response_payload Json?
+  items_affected   Int      @default(0)
+  duration_ms      Int?
+  created_at       DateTime @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model stripe_webhook_events {
+  id           String
+  event_id     String
+  event_type   String
+  processed_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model subscription_tiers {
+  id            String
+  tier_key      String
+  name          String
+  display_name  String
+  description   String?
+  price_monthly Int
+  max_skus      Int?
+  max_locations Int?
+  tier_type     String   @default("individual")
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  metadata      Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+  created_by    String?
+  updated_by    String?
+
+  @@ignore
+}
+
+model sync_job {
+  id         String   @id
+  tenant_id  String
+  target     String
+  status     String   @default("queued")
+  attempt    Int      @default(0)
+  payload    Json
+  last_error String?
+  created_at DateTime @default(now())
+  updated_at DateTime
+  tenant     tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, status, updated_at])
+}
+
+model tenant {
+  id                            String                   @id
+  name                          String
+  created_at                    DateTime                 @default(now())
+  created_by                    String?
+  region                        String                   @default("us-east-1")
+  language                      String                   @default("en-US")
+  currency                      String                   @default("USD")
+  data_policy_accepted          Boolean                  @default(false)
+  metadata                      Json?
+  subscription_status           String?                  @default("trial")
+  subscription_tier             String?                  @default("starter")
+  trial_ends_at                 DateTime?
+  subscription_ends_at          DateTime?
+  stripe_customer_id            String?
+  stripe_subscription_id        String?
+  organization_id               String?
+  service_level                 String?                  @default("self_service")
+  managed_services_active       Boolean                  @default(false)
+  dedicated_manager             String?
+  monthly_sku_quota             Int?
+  skus_added_this_month         Int                      @default(0)
+  google_business_access_token  String?
+  google_business_refresh_token String?
+  google_business_token_expiry  DateTime?
+  business_hours                business_hours?
+  business_hours_special        business_hours_special[]
+  category_mirror_runs          category_mirror_runs[]
+  google_oauth_accounts         google_oauth_accounts[]
+  inventory_item                inventory_item[]
+  invitations                   invitations[]
+  photo_asset                   photo_asset[]
+  product_performance           product_performance[]
+  sync_job                      sync_job[]
+  organization                  organization?            @relation(fields: [organization_id], references: [id])
+  tenant_business_profile       tenant_business_profile?
+
+  @@index([organization_id])
+}
+
+model tenant_business_profile {
+  tenant_id                  String          @id @unique
+  business_name              String
+  address_line1              String
+  address_line2              String?
+  city                       String
+  state                      String?
+  postal_code                String
+  country_code               String          @db.Char(2)
+  phone_number               String?
+  email                      String?
+  website                    String?
+  contact_person             String?
+  logo_url                   String?
+  banner_url                 String?
+  business_description       String?
+  hours                      Json?
+  social_links               Json?
+  seo_tags                   Json?
+  latitude                   Decimal?
+  longitude                  Decimal?
+  display_map                Boolean         @default(false)
+  map_privacy_mode           String          @default("precise")
+  gbp_category_id            String?
+  gbp_category_name          String?
+  gbp_category_last_mirrored DateTime?
+  gbp_category_sync_status   String?
+  updated_at                 DateTime
+  gbp_categories             gbp_categories? @relation(fields: [gbp_category_id], references: [id])
+  tenant                     tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([gbp_category_id])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tenant_category {
+  id                 String
+  tenant_id          String
+  name               String
+  slug               String
+  parent_id          String?
+  google_category_id String?
+  is_active          Boolean  @default(true)
+  sort_order         Int      @default(0)
+  created_at         DateTime @default(now())
+  updated_at         DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tenant_feature_flags {
+  id          String
+  tenant_id   String
+  flag        String
+  enabled     Boolean  @default(false)
+  rollout     String?
+  updated_at  DateTime
+  description String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tenant_feature_overrides {
+  id         String
+  tenant_id  String
+  feature    String
+  granted    Boolean   @default(true)
+  reason     String?
+  expires_at DateTime?
+  granted_by String
+  created_at DateTime  @default(now())
+  updated_at DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tier_change_logs {
+  id               String
+  entity_type      String
+  entity_id        String
+  action           String
+  change_type      String
+  before_state     Json?
+  after_state      Json?
+  changed_by       String
+  changed_by_email String?
+  reason           String?
+  ip_address       String?
+  user_agent       String?
+  created_at       DateTime @default(now())
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tier_features {
+  id           String
+  tier_id      String
+  feature_key  String
+  feature_name String
+  is_enabled   Boolean  @default(true)
+  is_inherited Boolean  @default(false)
+  metadata     Json?
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model upgrade_requests {
+  id             String
+  tenant_id      String
+  business_name  String
+  current_tier   String
+  requested_tier String
+  status         String    @default("new")
+  notes          String?
+  admin_notes    String?
+  processed_by   String?
+  processed_at   DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@ignore
+}
+
+model user_sessions {
+  id          String   @id
+  user_id     String
+  device_info String?
+  ip_address  String?
+  user_agent  String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  expires_at  DateTime
+  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([expires_at])
+  @@index([user_id])
+}
+
+model user_tenants {
+  id         String           @id
+  user_id    String
+  tenant_id  String
+  role       user_tenant_role @default(MEMBER)
+  created_at DateTime         @default(now())
+  updated_at DateTime
+  users      users            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, tenant_id])
+  @@index([tenant_id])
+  @@index([user_id])
+}
+
+model users {
+  id                          String                        @id
+  email                       String                        @unique
+  password_hash               String
+  first_name                  String?
+  last_name                   String?
+  role                        user_role                     @default(USER)
+  email_verified              Boolean                       @default(false)
+  email_verification_token    String?
+  password_reset_token        String?
+  password_reset_expires      DateTime?
+  last_login                  DateTime?
+  is_active                   Boolean                       @default(true)
+  created_at                  DateTime                      @default(now())
+  updated_at                  DateTime
+  directory_featured_listings directory_featured_listings[]
+  invitations                 invitations[]
+  user_sessions               user_sessions[]
+  user_tenants                user_tenants[]
+}
+
+enum LocationStatus {
+  pending
+  active
+  inactive
+  closed
+  archived
+}
+
+enum action {
+  create
+  update
+  delete
+  sync
+  policy_apply
+  oauth_connect
+  oauth_refresh
+}
+
+enum actor_type {
+  user
+  system
+  integration
+}
+
+enum availability_status {
+  in_stock
+  out_of_stock
+  preorder
+}
+
+enum enrichment_status {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum entity_type {
+  inventory_item
+  tenant
+  policy
+  oauth
+  other
+}
+
+enum item_status {
+  active
+  inactive
+  archived
+  trashed
+}
+
+enum item_visibility {
+  public
+  private
+}
+
+enum job_status {
+  queued
+  processing
+  success
+  failed
+}
+
+enum location_status {
+  pending
+  active
+  inactive
+  closed
+  archived
+}
+
+enum permission_action {
+  tenant_create          @map("tenant.create")
+  tenant_read            @map("tenant.read")
+  tenant_update          @map("tenant.update")
+  tenant_delete          @map("tenant.delete")
+  tenant_manage_users    @map("tenant.manage_users")
+  inventory_create       @map("inventory.create")
+  inventory_read         @map("inventory.read")
+  inventory_update       @map("inventory.update")
+  inventory_delete       @map("inventory.delete")
+  analytics_view         @map("analytics.view")
+  admin_access_dashboard @map("admin.access_dashboard")
+  admin_manage_settings  @map("admin.manage_settings")
+}
+
+enum product_condition {
+  brand_new
+  refurbished
+  used
+}
+
+enum product_source {
+  MANUAL
+  BARCODE_SCAN
+  BULK_UPLOAD
+  API_IMPORT
+}
+
+enum sync_status {
+  pending
+  success
+  error
+}
+
+enum user_role {
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  PLATFORM_VIEWER
+  ADMIN
+  OWNER
+  USER
+  TENANT_OWNER
+  TENANT_ADMIN
+  TENANT_MANAGER
+  TENANT_MEMBER
+  TENANT_VIEWER
+}
+
+enum user_tenant_role {
+  OWNER
+  ADMIN
+  SUPPORT
+  MEMBER
+  VIEWER
+}
+
+enum email_delivery_status {
+  pending
+  sent
+  delivered
+  bounced
+  failed
+}
+
+model email_delivery_tracking {
+  id            String                 @id
+  message_id    String                 @unique
+  provider      String
+  status        email_delivery_status  @default(sent)
+  recipient     String
+  subject       String
+  sent_at       DateTime               @default(now())
+  delivered_at  DateTime?
+  error_message String?
+  webhook_data  Json?
+  created_at    DateTime               @default(now())
+  updated_at    DateTime               @updatedAt
+
+  @@map("email_delivery_tracking")
+}

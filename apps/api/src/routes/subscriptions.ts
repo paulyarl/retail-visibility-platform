@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../prisma";
 import { z } from "zod";
+import { TRIAL_CONFIG } from "../config/tenant-limits";
 
 const router = Router();
 
@@ -13,83 +14,72 @@ router.get("/status", async (req, res) => {
       return res.status(400).json({ error: "tenant_required" });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-        stripeCustomerId: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
+        stripe_customer_id: true,
         _count: {
           select: {
-            items: true,
-            users: true,
+            inventory_items: true,
+            user_tenants: true,
           },
         },
       },
     });
 
     if (!tenant) {
+      
+        console.log(`${req.method} ${req.path} - route: getSubscriptionStatus`);
       return res.status(404).json({ error: "tenant_not_found" });
     }
 
     const now = new Date();
-    
-    // Check if trial has expired and auto-convert to starter
-    if (
-      tenant.subscriptionStatus === "trial" &&
-      tenant.trialEndsAt &&
-      tenant.trialEndsAt < now
-    ) {
-      console.log(`[GET /subscriptions/status] Trial expired for tenant ${tenant.id}. Auto-converting to starter plan.`);
-      const updatedTenant = await prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          subscriptionTier: "starter",
-          subscriptionStatus: "active",
-          subscriptionEndsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        },
-        select: {
-          id: true,
-          name: true,
-          subscriptionStatus: true,
-          subscriptionTier: true,
-          trialEndsAt: true,
-          subscriptionEndsAt: true,
-          stripeCustomerId: true,
-          _count: {
-            select: {
-              items: true,
-              users: true,
-            },
-          },
-        },
-      });
-      console.log(`[GET /subscriptions/status] Tenant ${tenant.id} successfully converted to starter plan.`);
-      // Use updated tenant data
-      Object.assign(tenant, updatedTenant);
-    }
 
-    // Calculate days remaining
+    // Calculate effective expiration with manual priority
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
+    // Calculate days remaining using effective expiration
     let daysRemaining = null;
     
-    if (tenant.subscriptionStatus === "trial" && tenant.trialEndsAt) {
-      daysRemaining = Math.ceil((tenant.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    } else if (tenant.subscriptionEndsAt) {
-      daysRemaining = Math.ceil((tenant.subscriptionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (effectiveExpiration?.expiresAt) {
+      daysRemaining = Math.ceil((effectiveExpiration.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Get tier limits
-    const limits: Record<string, { items: number; users: number }> = {
-      starter: { items: 500, users: 3 },
-      pro: { items: 5000, users: 10 },
-      enterprise: { items: Infinity, users: Infinity },
+    const limits: Record<string, { _count: number; user_tenants: number }> = {
+      starter: { _count: 500, user_tenants: 3 },
+      pro: { _count: 5000, user_tenants: 10 },
+      enterprise: { _count: Infinity, user_tenants: Infinity },
     };
 
-    const tier = tenant.subscriptionTier || "starter";
+    const tier = tenant.subscription_tier || "starter";
     const tierLimits = limits[tier] || limits.starter;
 
     res.json({
@@ -98,23 +88,31 @@ router.get("/status", async (req, res) => {
         name: tenant.name,
       },
       subscription: {
-        status: tenant.subscriptionStatus,
-        tier: tenant.subscriptionTier,
-        trialEndsAt: tenant.trialEndsAt,
-        subscriptionEndsAt: tenant.subscriptionEndsAt,
+        status: tenant.subscription_status,
+        tier: tenant.subscription_tier,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
         daysRemaining,
-        hasStripeAccount: !!tenant.stripeCustomerId,
+        hasStripeAccount: !!tenant.stripe_customer_id,
+        // Manual subscription control fields
+        manualSubscriptionControl: tenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+        manualSubscriptionReason: tenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       usage: {
-        items: {
-          current: tenant._count.items,
-          limit: tierLimits.items,
-          percentage: tierLimits.items === Infinity ? 0 : Math.round((tenant._count.items / tierLimits.items) * 100),
+        _count: {
+          current: tenant._count.inventory_items,
+          limit: tierLimits._count,
+          percentage: tierLimits._count === Infinity ? 0 : Math.round((tenant._count.inventory_items / tierLimits._count) * 100),
         },
-        users: {
-          current: tenant._count.users,
-          limit: tierLimits.users,
-          percentage: tierLimits.users === Infinity ? 0 : Math.round((tenant._count.users / tierLimits.users) * 100),
+        user_tenants: {
+          current: tenant._count.user_tenants,
+          limit: tierLimits.user_tenants,
+          percentage: tierLimits.user_tenants === Infinity ? 0 : Math.round((tenant._count.user_tenants / tierLimits.user_tenants) * 100),
         },
       },
     });
@@ -131,8 +129,8 @@ const updateSchema = z.object({
   subscriptionTier: z.enum(["starter", "pro", "enterprise"]).optional(),
   trialEndsAt: z.string().datetime().optional(),
   subscriptionEndsAt: z.string().datetime().optional(),
-  stripeCustomerId: z.string().optional(),
-  stripeSubscriptionId: z.string().optional(),
+  stripe_customer_id: z.string().optional(),
+  stripe_subscription_id: z.string().optional(),
 });
 
 router.patch("/update", async (req, res) => {
@@ -153,20 +151,20 @@ router.patch("/update", async (req, res) => {
     if (updates.trialEndsAt) {
       data.trialEndsAt = new Date(updates.trialEndsAt);
     }
-    if (updates.subscriptionEndsAt) {
+    if (updates.subscriptionEndsAt) { 
       data.subscriptionEndsAt = new Date(updates.subscriptionEndsAt);
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await prisma.tenants.update({
       where: { id: tenantId },
       data,
       select: {
         id: true,
         name: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
       },
     });
 
@@ -195,11 +193,11 @@ router.get("/pricing", async (req, res) => {
           "500 items",
           "Basic sync",
           "Email support",
-          "30-day trial",
+          `${TRIAL_CONFIG.durationDays}-day trial`,
         ],
         limits: {
-          items: 500,
-          users: 3,
+          _count: 500,
+          user_tenants: 3,
           locations: 1,
         },
       },
@@ -217,8 +215,8 @@ router.get("/pricing", async (req, res) => {
           "Custom reports",
         ],
         limits: {
-          items: 5000,
-          users: 10,
+          _count: 5000,
+          user_tenants: 10,
           locations: 5,
         },
         popular: true,
@@ -237,8 +235,8 @@ router.get("/pricing", async (req, res) => {
           "SLA guarantee",
         ],
         limits: {
-          items: Infinity,
-          users: Infinity,
+          _count: Infinity,
+          user_tenants: Infinity,
           locations: Infinity,
         },
       },

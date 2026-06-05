@@ -1,0 +1,854 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { ContextBadges } from '@/components/ContextBadges';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { Button } from '@mantine/core';
+import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
+import { tenantInfoService } from '@/services/TenantInfoService';
+
+// Add slider thumb styling
+const sliderStyles = `
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+  }
+`;
+
+type Scenario = {
+  id: string;
+  name: string;
+  categoryCount: number;
+  sampleProductCount: number;
+};
+
+type EligibilityResponse = {
+  eligible: boolean;
+  capabilityEnabled: boolean;
+  capabilityTiers: { tier_key: string; tier_name: string }[];
+  productCount: number;
+  productLimit: number;
+  isPlatformAdmin: boolean;
+  rateLimitReached: boolean;
+  resetAt?: number;
+  recommendation: string;
+};
+
+
+
+
+export default function QuickStartPage() {
+  const params = useParams();
+  const router = useRouter();
+  const tenantId = params.tenantId as string;
+
+  // Check tier AND role access for full Quick Start wizard (Professional+ tier, MANAGER+ role)
+  const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
+  const hasBarcodeScanning = canAccess('barcode_scan', 'canEdit');
+  const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
+
+  // Capability-based quickstart state
+  const { data: quickstartState } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const hasFullQuickStart = quickstartState?.canUseAIWizard ?? false;
+  const hasStaticQuickStart = quickstartState?.canUseWizard ?? false;
+  const canUseAI = (quickstartState?.canUseOpenAI || quickstartState?.canUseGemini) ?? false;
+  const canUseOpenAI = quickstartState?.canUseOpenAI ?? false;
+  const canUseGemini = quickstartState?.canUseGemini ?? false;
+  const canGenerateImages = quickstartState?.canGenerateImages ?? false;
+  const canUseHDImages = quickstartState?.canUseHDImages ?? false;
+
+  // All 19 business type scenarios (aligned with backend)
+  // Max 25 products - Quick Start is for sample products to get tenants started, not a product factory
+  const allScenarios: Scenario[] = [
+    { id: 'grocery', name: 'Grocery Store', categoryCount: 8, sampleProductCount: 25 },
+    { id: 'pharmacy', name: 'Pharmacy', categoryCount: 6, sampleProductCount: 20 },
+    { id: 'fashion', name: 'Fashion Boutique', categoryCount: 7, sampleProductCount: 20 },
+    { id: 'electronics', name: 'Electronics Store', categoryCount: 6, sampleProductCount: 18 },
+    { id: 'home_garden', name: 'Home & Garden', categoryCount: 6, sampleProductCount: 20 },
+    { id: 'health_beauty', name: 'Health & Beauty', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'sports_outdoors', name: 'Sports & Outdoors', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'toys_games', name: 'Toys & Games', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'automotive', name: 'Automotive', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'books_media', name: 'Books & Media', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'pet_supplies', name: 'Pet Supplies', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'office_supplies', name: 'Office Supplies', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'jewelry', name: 'Jewelry', categoryCount: 4, sampleProductCount: 12 },
+    { id: 'baby_kids', name: 'Baby & Kids', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'arts_crafts', name: 'Arts & Crafts', categoryCount: 4, sampleProductCount: 15 },
+    { id: 'hardware_tools', name: 'Hardware & Tools', categoryCount: 5, sampleProductCount: 18 },
+    { id: 'furniture', name: 'Furniture', categoryCount: 5, sampleProductCount: 15 },
+    { id: 'restaurant', name: 'Restaurant', categoryCount: 4, sampleProductCount: 20 },
+    { id: 'general', name: 'General Store', categoryCount: 6, sampleProductCount: 20 },
+  ];
+
+  const [scenarios, setScenarios] = useState<Scenario[]>(allScenarios);
+  const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<string>('grocery');
+  const [productCount, setProductCount] = useState<number>(25);
+  const [generateImages, setGenerateImages] = useState<boolean>(false);
+  const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
+  // Default to first available AI model based on capability
+  const [textModel, setTextModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
+  const [imageModel, setImageModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
+  
+  // Check if any Google model is selected (for warning display)
+  const usesGoogle = textModel === 'google' || (generateImages && imageModel === 'google');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+
+  // Update product count when scenario changes
+  const handleScenarioChange = (scenarioId: string) => {
+    setSelectedScenario(scenarioId);
+    const scenario = scenarios.find(s => s.id === scenarioId);
+    if (scenario) {
+      setProductCount(scenario.sampleProductCount);
+    }
+  };
+
+  // Fetch eligibility on mount
+  useEffect(() => {
+    checkEligibility();
+  }, []);
+
+  const checkEligibility = async () => {
+    try {
+      const data = await tenantInfoService.getQuickStartEligibility(tenantId);
+      if (!data) {
+        setError('Unable to check eligibility');
+        return;
+      }
+      setEligibility(data);
+    } catch (err: any) {
+      console.error('Failed to check eligibility:', err);
+      setError('Unable to connect to server');
+    }
+  };
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await tenantInfoService.generateQuickStartProducts(tenantId, {
+        scenario: selectedScenario,
+        productCount,
+        assignCategories: true,
+        createAsDrafts: true,
+        generateImages,
+        imageQuality,
+        textModel,
+        imageModel,
+      });
+
+      if (!data) {
+        throw new Error('Failed to generate products');
+      }
+
+      setResult(data);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewProducts = () => {
+    router.push(`/t/${tenantId}/items?filter=inactive`);
+  };
+
+  // Show blocked state if there's an error from eligibility check
+  if (error && !loading && !success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 border-red-200 dark:border-red-800">
+            {/* Blocked Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+
+            {/* Blocked Message */}
+            <h1 className="text-3xl font-bold text-center mb-4 text-red-600 dark:text-red-400">
+              Quick Start Unavailable
+            </h1>
+
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 mb-6">
+              <p className="text-center text-gray-700 dark:text-gray-300 mb-2">
+                <strong>Reason:</strong>
+              </p>
+              <p className="text-center text-gray-600 dark:text-gray-400">
+                {error}
+              </p>
+            </div>
+
+            {/* Common Reasons */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Common reasons:
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Plan Limit:</strong> {eligibility && !eligibility.capabilityEnabled
+                    ? (() => {
+                        const tierNames = eligibility.capabilityTiers.map(t => t.tier_name);
+                        const tierList = tierNames.length === 1
+                          ? `the ${tierNames[0]} plan`
+                          : tierNames.length === 2
+                            ? `the ${tierNames[0]} or ${tierNames[1]} plans`
+                            : tierNames.length > 2
+                              ? `the ${tierNames.slice(0, -1).join(', ')}, or ${tierNames[tierNames.length - 1]} plans`
+                              : 'a higher plan';
+                        return `Your plan does not include Quick Start. Upgrade to ${tierList}.`;
+                      })()
+                    : 'Your current plan does not include Quick Start'}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Authentication:</strong> You must be logged in to use Quick Start</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Permissions:</strong> Only the organization owner or platform admins can use Quick Start</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Rate Limit:</strong> Quick Start can only be used once per 24 hours</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span><strong>Product Limit:</strong> You already have {eligibility?.productLimit || 500}+ products</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => router.push(`/t/${tenantId}/items`)}
+                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Go to Products
+              </button>
+              <button
+                onClick={() => router.push(`/t/${tenantId}/dashboard`)}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success state
+  if (success && result) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+
+            {/* Success Message */}
+            <h1 className="text-3xl font-bold text-center mb-4 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              🎉 {result.productsCreated} Products Created!
+            </h1>
+
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
+              Your products are ready to customize and activate!
+            </p>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {result.productsCreated}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Products</div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {result.categoriesCreated}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Categories</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {result.categorizedProducts}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Categorized</div>
+              </div>
+              <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {result.inStockProducts}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">In Stock</div>
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6 mb-6">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Next Steps
+              </h3>
+              <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">1.</span>
+                  <span>Review each product and customize (name, price, description)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">2.</span>
+                  <span>Add your own product photos</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">3.</span>
+                  <span>Activate products when ready to publish</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">4.</span>
+                  <span>Products will appear in feeds only when activated</span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={handleViewProducts}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              <Package className="w-5 h-5" />
+              View Products
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show main wizard
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: sliderStyles }} />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <ContextBadges tenant={{ id: tenantId, name: '' }} contextLabel="Quick Start" />
+        {/* Page Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Quick Start: Add Products Fast
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">
+            Choose the best method to populate your inventory
+          </p>
+          {eligibility?.isPlatformAdmin && (
+            <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-300 dark:border-purple-700 rounded-full">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                Platform Admin: All limits bypassed
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Two Options: Generate or Scan */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Option 1: Generate Products */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Rocket className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-white">
+              Generate Products
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+              Create 5-200 realistic products with AI (optional photos)
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Perfect for testing and demos</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Auto-categorized with prices</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <span>Optional AI-generated photos</span>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Best for: New stores, testing, demos
+            </div>
+          </div>
+
+          {/* Option 2: SKU Scanning */}
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border-2 ${hasBarcodeScanning ? 'border-green-500 dark:border-green-600' : 'border-gray-300 dark:border-gray-600'} relative ${!hasBarcodeScanning ? 'opacity-60' : ''}`}>
+            <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              RECOMMENDED
+            </div>
+            {!hasBarcodeScanning && (
+              <div className="absolute -top-3 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                PRO+
+              </div>
+            )}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-white">
+              Scan Products
+              {!hasBarcodeScanning && (
+                <span className="ml-2 text-sm text-purple-600 dark:text-purple-400">(Pro+)</span>
+              )}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+              Scan barcodes to add real products with images
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Automatic product info & images</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>USB scanner or manual entry</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>Real products, real data</span>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Best for: Real inventory, existing products
+            </div>
+
+            <button
+              onClick={() => router.push(`/t/${tenantId}/scan`)}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+              Start Scanning
+            </button>
+          </div>
+        </div>
+
+        {/* Generate Products Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+              Generate Products Configuration
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Customize your generated product set
+            </p>
+          </div>
+
+          {/* Capacity Warning */}
+          <div className="mb-6">
+            <CreationCapacityWarning 
+              type="sku" 
+              tenantId={tenantId}
+            />
+          </div>
+
+          {/* Eligibility Warning */}
+          {eligibility && !eligibility.eligible && (
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                  {!eligibility.capabilityEnabled
+                    ? (() => {
+                        const tierNames = eligibility.capabilityTiers.map(t => t.tier_name);
+                        const tierList = tierNames.length === 1
+                          ? `the ${tierNames[0]} plan`
+                          : tierNames.length === 2
+                            ? `the ${tierNames[0]} or ${tierNames[1]} plans`
+                            : tierNames.length > 2
+                              ? `the ${tierNames.slice(0, -1).join(', ')}, or ${tierNames[tierNames.length - 1]} plans`
+                              : 'a higher plan';
+                        return `Your current plan does not include Quick Start. Upgrade to ${tierList} to access this feature.`;
+                      })()
+                    : eligibility.rateLimitReached
+                      ? 'Rate limit reached. You can use Quick Start once per 24 hours.'
+                      : eligibility.recommendation}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Scenario Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              What type of business do you have?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {scenarios.map((scenario) => (
+                <button
+                  key={scenario.id}
+                  onClick={() => handleScenarioChange(scenario.id)}
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                    selectedScenario === scenario.id
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className="font-semibold text-gray-900 dark:text-white mb-1">
+                    {scenario.name}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {scenario.categoryCount} categories
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Count Slider */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                How many products to start with?
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                  {productCount}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">products</span>
+              </div>
+            </div>
+            
+            {/* Slider */}
+            <div className="relative">
+              <input
+                type="range"
+                min="5"
+                max="25"
+                step="1"
+                value={productCount}
+                onChange={(e) => setProductCount(parseInt(e.target.value))}
+                className="w-full h-3 bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 dark:from-blue-900 dark:via-purple-900 dark:to-pink-900 rounded-lg appearance-none cursor-pointer slider-thumb"
+                style={{
+                  background: `linear-gradient(to right, 
+                    rgb(59, 130, 246) 0%, 
+                    rgb(147, 51, 234) ${((productCount - 5) / 20) * 100}%, 
+                    rgb(229, 231, 235) ${((productCount - 5) / 20) * 100}%, 
+                    rgb(229, 231, 235) 100%)`
+                }}
+              />
+              
+              {/* Slider Labels */}
+              <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>5</span>
+                <span>10</span>
+                <span>15</span>
+                <span>20</span>
+                <span>25</span>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex gap-2 mt-4">
+              {[
+                { value: 5, label: 'Test' },
+                { value: 10, label: 'Small' },
+                { value: 15, label: 'Medium' },
+                { value: 20, label: 'Large' },
+                { value: 25, label: 'Max' },
+              ].map((preset) => (
+                <button
+                  key={preset.value}
+                  onClick={() => setProductCount(preset.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    productCount === preset.value
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Provider Selection */}
+          {canUseAI && (
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              AI Provider for Product Generation
+            </label>
+            <div className="flex gap-2 mb-2">
+              {canUseOpenAI && (
+              <button
+                onClick={() => setTextModel('openai')}
+                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  textModel === 'openai'
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  🤖 OpenAI GPT-4
+                </span>
+                <span className="text-xs opacity-75 mt-1 block">Fast & reliable</span>
+              </button>
+              )}
+              {canUseGemini && (
+              <button
+                onClick={() => setTextModel('google')}
+                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  textModel === 'google'
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  ✨ Google Gemini
+                </span>
+                <span className="text-xs opacity-75 mt-1 block">Free tier available</span>
+              </button>
+              )}
+            </div>
+            
+            {/* Google Warning */}
+            {textModel === 'google' && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                  <span className="text-amber-500">⏳</span>
+                  <span>
+                    <strong>Slower generation:</strong> Google Gemini has rate limits. 
+                    If limits are hit, the system will wait ~40 seconds before retrying. 
+                    This may significantly increase total generation time.
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* Photo Generation Toggle */}
+          {canGenerateImages && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Generate AI Product Photos
+              </label>
+              <button
+                onClick={() => setGenerateImages(!generateImages)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  generateImages ? 'bg-gradient-to-r from-blue-600 to-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    generateImages ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {generateImages && (
+              <div className="space-y-3 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  ⚠️ Enabling photos will increase generation time to 2-3 minutes
+                </p>
+                
+                {/* AI Model Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    AI Model
+                  </label>
+                  <div className="flex gap-2">
+                    {canUseOpenAI && (
+                    <button
+                      onClick={() => setImageModel('openai')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageModel === 'openai'
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        🤖 DALL-E 3
+                      </span>
+                    </button>
+                    )}
+                    {canUseGemini && (
+                    <button
+                      onClick={() => setImageModel('google')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageModel === 'google'
+                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        🎨 Imagen 3
+                      </span>
+                    </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    {imageModel === 'openai' 
+                      ? 'OpenAI DALL-E 3 - High quality, reliable' 
+                      : 'Google Imagen 3 - Cost-effective (preview)'}
+                  </p>
+                  
+                  {/* Google Image Warning */}
+                  {imageModel === 'google' && (
+                    <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                        <span className="text-amber-500">⏳</span>
+                        <span>Rate limits may cause ~40s waits between images.</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Image Quality Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    Image Quality
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setImageQuality('standard')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageQuality === 'standard'
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    {canUseHDImages && (
+                    <button
+                      onClick={() => setImageQuality('hd')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        imageQuality === 'hd'
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      HD (Slower)
+                    </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* Features */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span>Auto-assign to categories</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span>Create as drafts (review before activating)</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span>Realistic prices and product names</span>
+              </div>
+              {generateImages && (
+                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>AI-generated product photos ({imageQuality === 'hd' ? 'HD quality' : 'Standard quality'})</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.back()}
+              className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={loading || (eligibility ? !eligibility.eligible : false)}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {generateImages ? 'Generating with Photos (2-3 min)...' : 'Generating...'}
+                </>
+              ) : (
+                <>
+                  {generateImages ? <Sparkles className="w-5 h-5" /> : <Rocket className="w-5 h-5" />}
+                  {generateImages ? 'Generate with AI Photos' : 'Generate Products'}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}

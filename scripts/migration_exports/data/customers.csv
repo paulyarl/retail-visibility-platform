@@ -1,0 +1,2 @@
+id,customer_number,email,first_name,last_name,phone,date_of_birth,gender,preferred_language,timezone,marketing_consent,sms_consent,email_consent,platform_orders,platform_value_cents,first_platform_order_at,last_platform_order_at,tags,preferences,metadata,created_at,updated_at
+customer_1777677754915_yw3qkcyn7,CUST1777677754914A4VEWD,test.customer@example.com,Test,Customer,+1234567890,,,en,UTC,f,f,t,0,0,,,[],{},{},2026-05-01 23:22:34.937,2026-05-01 23:22:34.937

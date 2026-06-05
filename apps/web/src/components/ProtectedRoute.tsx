@@ -9,6 +9,8 @@ interface ProtectedRouteProps {
   requiredRole?: 'ADMIN' | 'OWNER' | 'USER';
 }
 
+
+
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -16,14 +18,14 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       // Redirect to login if not authenticated
-      router.push('/login');
+      router.push('/auth/login');
     }
   }, [isLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && requiredRole) {
       // Check if user has required role
-      const roleHierarchy = { ADMIN: 3, OWNER: 2, USER: 1 };
+      const roleHierarchy = { PLATFORM_ADMIN: 5, PLATFORM_SUPPORT: 4, PLATFORM_VIEWER: 3, ADMIN: 3, OWNER: 2, USER: 1 };
       const userRoleLevel = roleHierarchy[user?.role || 'USER'];
       const requiredRoleLevel = roleHierarchy[requiredRole];
 
@@ -53,7 +55,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // Don't render if role check fails
   if (requiredRole) {
-    const roleHierarchy = { ADMIN: 3, OWNER: 2, USER: 1 };
+    const roleHierarchy = { PLATFORM_ADMIN: 5, PLATFORM_SUPPORT: 4, PLATFORM_VIEWER: 3, ADMIN: 3, OWNER: 2, USER: 1 };
     const userRoleLevel = roleHierarchy[user?.role || 'USER'];
     const requiredRoleLevel = roleHierarchy[requiredRole];
 

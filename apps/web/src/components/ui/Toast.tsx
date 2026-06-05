@@ -3,6 +3,8 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+
+
 export interface ToastProps {
   id: string;
   message: string;
@@ -10,6 +12,7 @@ export interface ToastProps {
   duration?: number;
   onClose: (id: string) => void;
 }
+
 
 export function Toast({
   id,
@@ -63,7 +66,7 @@ export function Toast({
       className={`flex items-center gap-3 p-4 rounded-lg border shadow-lg ${variantStyles[variant]} min-w-[300px] max-w-md`}
     >
       <div className="flex-shrink-0">{icons[variant]}</div>
-      <p className="text-sm font-medium flex-1">{message}</p>
+      <p className="text-sm font-medium flex-1 whitespace-normal break-words">{message}</p>
       <button
         onClick={() => onClose(id)}
         className="flex-shrink-0 text-current opacity-70 hover:opacity-100 transition-opacity"
@@ -77,6 +80,7 @@ export function Toast({
 }
 
 // Toast Container Component
+
 export function ToastContainer({ toasts, onClose }: { toasts: ToastProps[]; onClose: (id: string) => void }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">

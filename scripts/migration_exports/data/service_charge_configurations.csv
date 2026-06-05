@@ -1,0 +1,4 @@
+id,charge_type,name,description,default_amount_cents,is_active,requires_approval,created_at
+setup_fee,setup_fee,Setup Fee,One-time setup charge for new tenants,5000,t,f,2026-04-09 00:26:09.141945
+service_fee,service_fee,Service Fee,Monthly service charge,1000,t,f,2026-04-09 00:26:09.141945
+custom_invoice,custom_invoice,Custom Invoice,Custom invoice for special services,0,t,f,2026-04-09 00:26:09.141945

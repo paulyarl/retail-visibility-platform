@@ -3,13 +3,14 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, 
 export { Input, type InputProps } from './Input';
 export { Badge, type BadgeProps } from './Badge';
 export { Skeleton, SkeletonCard, type SkeletonProps } from './Skeleton';
-export { Alert, type AlertProps } from './Alert';
+export { Alert, AlertDescription, type AlertProps } from './Alert';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Spinner, type SpinnerProps } from './Spinner';
 export { Select, type SelectProps } from './Select';
 export { Modal, ModalFooter, type ModalProps } from './Modal';
+export { default as ConfirmDialog } from './ConfirmDialog';
 export { Tooltip, type TooltipProps } from './Tooltip';
-export { Tabs, type TabsProps, type Tab } from './Tabs';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
 export { Toast, ToastContainer, type ToastProps } from './Toast';
 export { AnimatedCard, type AnimatedCardProps } from './AnimatedCard';
 export { Pagination } from './Pagination';
@@ -18,4 +19,5 @@ export { AdvancedSearchableSelect, type SelectOption } from './AdvancedSearchabl
 export { ThemeToggle } from './ThemeToggle';
 export { Label } from './Label';
 export { Textarea } from './Textarea';
+export { Progress } from './Progress';
 export { useToast } from './use-toast';

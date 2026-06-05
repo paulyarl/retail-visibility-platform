@@ -1,0 +1,21 @@
+id,tenant_id,user_id,rating,review_text,helpful_count,verified_purchase,location_lat,location_lng,created_at,updated_at,session_id,approval_status,approved_by,approved_at,rejection_reason,product_id
+dc27ca58-96d8-475f-98a6-831460bc21aa,tid-m8ijkrnk,uid-zqe5ns5k,5,Tell them about it,0,f,,,2026-01-06 22:13:26.978692,2026-01-06 22:13:26.978692,,approved,,,,
+cfe66204-b524-4c45-9190-345479604e1a,tid-m8ijkrnk,,5,The experience,0,f,,,2026-01-06 22:41:35.899145,2026-01-06 22:52:17.487543,anon_1767739295461_dpi9l308h,approved,uid-zqe5ns5k,2026-01-06 22:52:17.487543+00,,
+2a4c3522-6d68-475b-98de-020d2fea90b4,tid-m8ijkrnk,,4,Testing rich product data - second anonymous review,0,t,,,2026-02-24 16:47:07.899294,2026-02-24 16:53:02.142043,anon_1771951626937_1hzkaeq3f,approved,uid-zqe5ns5k,2026-02-24 16:53:02.142043+00,,csid-5osctbcd
+e1b736a2-46c6-4e27-bfa9-41a9546a767b,tid-mrsyk3w6,uid-zqe5ns5k,4,This store rocks,1,f,,,2026-01-07 13:49:54.160716,2026-01-07 13:49:54.160716,,approved,,,,
+ebbfdade-1eb9-48e7-a811-20f14558ea65,tid-mrsyk3w6,uid-zqe5ns5k,5,I love this product,0,f,,,2026-01-07 14:01:44.228186,2026-01-07 14:01:44.228186,,approved,,,,sid-e39jxsbf
+b1542f53-902d-489c-ade0-868cef30ff33,tid-m8ijkrnk,uid-zqe5ns5k,5,Better,1,f,,,2026-01-07 18:18:10.610414,2026-01-07 18:18:10.610414,,approved,,,,sid-5ka4o8v0
+9f8d39a5-f423-4210-9511-e8fcba0af543,tid-m8ijkrnk,uid-zqe5ns5k,5,I love this product too,1,f,,,2026-01-07 13:24:16.885682,2026-01-07 13:47:46.988297,,approved,,,,sid-xbjcqzwj
+51ea281d-7bc9-4c09-976b-1bbdda633ce5,tid-m8ijkrnk,uid-zqe5ns5k,5,,1,f,,,2026-01-07 00:01:55.467079,2026-01-07 00:01:55.467079,,approved,,,,sid-5xpfo6fd
+e5eeb955-412f-4530-b063-9485afffd24a,tid-m8ijkrnk,uid-x7fhbagq,5,This store gave me an excellent experience,1,f,,,2026-01-08 02:20:28.330997,2026-01-08 02:20:28.330997,,approved,,,,
+18d090b3-20a7-4c97-9ea8-519432057f3f,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:04:22.64,2026-02-23 18:38:38.066,,approved,uid-zqe5ns5k,2026-02-23 18:38:38.066+00,,
+bdf5d56a-e131-4d99-ad90-4522e8d6eacd,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:07:01.332,2026-02-23 18:38:46.235,,approved,uid-zqe5ns5k,2026-02-23 18:38:46.235+00,,
+4133d17c-0de7-4289-bc0b-621b0aef2c2b,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:09:12.469,2026-02-23 18:38:52.876,,approved,uid-zqe5ns5k,2026-02-23 18:38:52.876+00,,
+8b951132-eb55-4aa8-b847-051a68bfcc05,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:10:04.096,2026-02-23 18:38:56.018,,approved,uid-zqe5ns5k,2026-02-23 18:38:56.018+00,,
+cad2ad46-cda5-4c92-9a43-e07dff793db4,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:11:57.387,2026-02-23 18:38:58.972,,approved,uid-zqe5ns5k,2026-02-23 18:38:58.972+00,,
+4109b9bb-b03a-4c35-b87e-eac98d9e0921,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:12:54.081,2026-02-23 18:39:02.133,,approved,uid-zqe5ns5k,2026-02-23 18:39:02.133+00,,
+1ef76d16-472a-4884-9bfc-85d57e30e558,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:15:32.109,2026-02-23 18:39:05.624,,approved,uid-zqe5ns5k,2026-02-23 18:39:05.624+00,,
+bb16feae-6db4-41f7-b3c9-c07ba2966eea,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:16:49.088,2026-02-23 18:39:16.418,,approved,uid-zqe5ns5k,2026-02-23 18:39:16.418+00,,
+fa0fbe0c-5db8-4a04-9410-4a61143c2655,tid-m8ijkrnk,uid-zqe5ns5k,5,Excellent Product,0,t,,,2026-01-23 15:22:28.419,2026-02-23 18:39:19.969,,approved,uid-zqe5ns5k,2026-02-23 18:39:19.969+00,,
+509b08c2-f110-4a25-9896-80c46082a41b,tid-m8ijkrnk,,5,Testing rich product data - anonymous review,0,t,,,2026-02-24 16:43:25.874794,2026-02-24 16:43:25.874794,anon_1771951404915_5ptjkhofj,pending,,,,
+a089bae6-eb93-4382-b4db-c2cfeea9f321,tid-m8ijkrnk,,3,Testing approval process - second test,0,f,,,2026-02-24 17:08:02.618289,2026-02-24 17:08:44.257758,anon_1771952881633_5jtz9xfg1,approved,uid-zqe5ns5k,2026-02-24 17:08:44.257758+00,,csid-5osctbcd

@@ -1,0 +1,16 @@
+
+Test Summary for unit
+===============================
+Total Tests: 7
+Passed: 1
+Failed: 6
+Duration: 152ms
+Success Rate: 14.29%
+
+Failed Tests:
+- testSingletonPattern: Singleton instance creation failed
+- testCacheOperations: Cache set operation failed
+- testTTLBehavior: TTL expiration not working
+- testMetricsTracking: Metrics not tracked correctly
+- testAuthentication: Authentication validation failed
+- testEncryption: Encryption/decryption failed

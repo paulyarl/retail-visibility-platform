@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SwisPreviewItem } from '@/components/tenant/SwisPreviewWidget';
+import { swisPreviewService } from '@/services/SwisPreviewSingletonService';
 
 interface UseSwisPreviewOptions {
   tenantId: string;
@@ -35,16 +36,10 @@ export function useSwisPreview({
         sort: sortOrder,
       });
 
-      const response = await fetch(`/api/tenant/${tenantId}/swis/preview?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products (${response.status})`);
-      }
-
-      const data = await response.json();
+      const data = await swisPreviewService.getSwisPreview(tenantId, limit, sortOrder);
       
-      setItems(data.items || []);
-      setLastUpdated(data.items?.[0]?.updated_at || new Date().toISOString());
+      setItems(data?.items || []);
+      setLastUpdated(data?.items?.[0]?.updated_at || new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load products');
       setItems([]);

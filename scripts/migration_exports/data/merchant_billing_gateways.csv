@@ -1,0 +1,13 @@
+id,tenant_id,gateway_type,payment_method_token,card_last4,card_brand,expiry_month,expiry_year,is_default,is_active,created_at,manual_reference,admin_notes,verified_by,verified_at,updated_at
+mbg-tid-fjwr30ib-8is9b9,tid-fjwr30ib,stripe,pm_1TQqV4QnZRZo6S8oysozNmKd,4242,visa,12,2028,f,t,2026-04-27 14:51:06.299+00,,,,,2026-04-27 14:51:06.299
+mbg-tid-fjwr30ib-ezoqf1,tid-fjwr30ib,paypal,6AB90372RF7976743,,,,,t,t,2026-04-27 15:02:52.79+00,,,,,2026-04-27 15:02:52.79
+mbg-tid-042hi7ju-uh9x2z,tid-042hi7ju,paypal,4PB691133N518125U,,,,,f,t,2026-04-27 22:34:34.907+00,,"{""paypalEmail"":""niftytek-buyer@gmail.com"",""paypalAccountId"":""UEEQHZ95KZ8GY""}",,,2026-04-27 22:34:34.907
+mbg-tid-042hi7ju-6d86q4,tid-042hi7ju,stripe,pm_1TQBE0QnZRZo6S8o2i79couk,4242,visa,4,2027,t,t,2026-04-25 18:46:46.973+00,,,,,2026-04-25 18:46:46.973
+mbg-tid-jcvzufq2-doxis7,tid-jcvzufq2,paypal,2LP444312E464672L,,,,,t,t,2026-04-28 12:01:44.945+00,,"{""paypalEmail"":""niftytek-buyer@gmail.com"",""paypalAccountId"":""UEEQHZ95KZ8GY""}",,,2026-04-28 12:01:44.945
+mbg-tid-jcvzufq2-cyfys1,tid-jcvzufq2,stripe,pm_1TRAgKQnZRZo6S8o0jKHBgUb,4242,visa,12,2029,f,t,2026-04-28 12:24:07.476+00,,,,,2026-04-28 12:24:07.476
+mbg-tid-8622qs2t-z9x3uj,tid-8622qs2t,stripe,pm_1TRB6hQnZRZo6S8ojGMzWtKo,4242,visa,12,2028,t,t,2026-04-28 12:51:21.689+00,,,,,2026-04-28 12:51:21.689
+mbg-tid-8622qs2t-yjp8yx,tid-8622qs2t,paypal,82697717EU8319142,,,,,f,t,2026-04-28 12:52:33.693+00,,"{""paypalEmail"":""niftytek-buyer@gmail.com"",""paypalAccountId"":""UEEQHZ95KZ8GY""}",,,2026-04-28 12:52:33.693
+mbg-tid-m8ijkrnk-ang8ch,tid-m8ijkrnk,stripe,pm_1TRCKgQnZRZo6S8o3rNe49QC,4242,visa,4,2028,t,t,2026-04-28 14:09:54.58+00,,,,,2026-04-28 14:09:54.58
+mbg-tid-m8ijkrnk-zfrnui,tid-m8ijkrnk,paypal,9HW83455BS549614X,,,,,f,t,2026-04-28 14:12:09.343+00,,"{""paypalEmail"":""niftytek-buyer@gmail.com"",""paypalAccountId"":""UEEQHZ95KZ8GY""}",,,2026-04-28 14:12:09.343
+mbg-tid-r6cccpag-b05dcn,tid-r6cccpag,stripe,pm_1TRWGMQnZRZo6S8op4Od03v2,4242,visa,4,2028,t,t,2026-04-29 11:26:45.76+00,,,,,2026-04-29 11:26:45.76
+mbg-tid-mrsyk3w6-kayrdq,tid-mrsyk3w6,stripe,pm_1TSFMoQnZRZo6S8o2QaS7LL1,4242,visa,4,2028,t,t,2026-05-01 11:36:26.654+00,,,,,2026-05-01 11:36:26.654

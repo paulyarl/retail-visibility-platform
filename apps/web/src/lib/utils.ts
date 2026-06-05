@@ -1,23 +1,59 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
- 
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(input: string | number | Date): string {
-  const date = new Date(input)
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  })
-}
-
-export function absoluteUrl(path: string) {
-  return `${process.env.NEXT_PUBLIC_APP_URL || ''}${path}`
-}
-
-export function truncate(str: string, length: number) {
-  return str.length > length ? `${str.substring(0, length)}...` : str
-}
+/**
+ * Distance conversion utilities
+ */
+export const distanceUtils = {
+  /**
+   * Convert kilometers to miles
+   */
+  kmToMiles: (km: number): number => {
+    return km * 0.62137119223733;
+  },
+  
+  /**
+   * Detect if user is in US based on browser locale
+   */
+  isUSUser: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    
+    const locale = navigator.language || navigator.languages?.[0] || 'en-US';
+    return locale.startsWith('en-US') || locale.startsWith('en-US');
+  },
+  
+  /**
+   * Format distance display based on user locale
+   * Returns formatted distance with appropriate unit
+   */
+  formatDistance: (km: number): string => {
+    if (km === null || km === undefined) return '';
+    
+    const isUS = distanceUtils.isUSUser();
+    
+    if (isUS) {
+      const miles = distanceUtils.kmToMiles(km);
+      if (miles < 1) {
+        return `${Math.round(miles * 5280)}ft away`;
+      }
+      return `${Math.round(miles)}mi away`;
+    } else {
+      if (km < 1) {
+        return `${Math.round(km * 1000)}m away`;
+      }
+      return `${Math.round(km)}km away`;
+    }
+  },
+  
+  /**
+   * Get distance in preferred unit for calculations
+   */
+  getDistanceInPreferredUnit: (km: number): number => {
+    const isUS = distanceUtils.isUSUser();
+    return isUS ? distanceUtils.kmToMiles(km) : km;
+  }
+};

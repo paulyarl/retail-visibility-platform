@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
-import { downloadCSVTemplate, parseCSV, validateCSVItems, type CSVItem } from '@/lib/csv-utils';
+import { downloadCSVTemplate, parseCSV, validateCSVItems, autoGenerateSKUs, type CSVItem } from '@/lib/csv-utils';
+import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 
 interface BulkUploadModalProps {
   tenantId: string;
@@ -35,14 +36,17 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
       const text = await selectedFile.text();
       const parsedItems = parseCSV(text);
       
+      // Auto-generate SKUs for items that don't have them
+      const itemsWithSKUs = autoGenerateSKUs(parsedItems, tenantId);
+      
       // Validate
-      const validation = validateCSVItems(parsedItems);
+      const validation = validateCSVItems(itemsWithSKUs);
       if (!validation.valid) {
         setErrors(validation.errors);
         return;
       }
 
-      setItems(parsedItems);
+      setItems(itemsWithSKUs);
     } catch (error) {
       setErrors([error instanceof Error ? error.message : 'Failed to parse CSV']);
     }
@@ -61,19 +65,16 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
         
-        // Upload batch
+        // Upload batch using service
+        const { itemsService } = await import('@/services/ItemsService');
         const promises = batch.map(async (item) => {
           try {
-            const res = await fetch(`/api/items?tenantId=${tenantId}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
-            });
-
-            if (!res.ok) {
-              const error = await res.json();
-              throw new Error(error.message || 'Upload failed');
-            }
+            // Filter out incompatible status values
+            const cleanItem = {
+              ...item,
+              status: item.status === 'archived' ? 'draft' : item.status
+            };
+            await itemsService.createItemLegacy(tenantId, cleanItem);
           } catch (error) {
             uploadErrors.push(`${item.sku}: ${error instanceof Error ? error.message : 'Failed'}`);
           }
@@ -115,6 +116,12 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {/* Capacity Warning */}
+            <CreationCapacityWarning 
+              type="sku" 
+              tenantId={tenantId}
+            />
+            
             {/* Instructions */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2">How to use bulk upload:</h3>

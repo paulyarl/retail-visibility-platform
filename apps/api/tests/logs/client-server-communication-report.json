@@ -1,0 +1,374 @@
+{
+  "timestamp": "2026-01-23T10:24:50.198Z",
+  "testType": "Client-Server Singleton Communication Test",
+  "testData": {
+    "tenant": "tid-m8ijkrnk",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc2ODkxODMwOCwiZXhwIjoxODAwNDU0MzA4fQ.-Swkbx8_UOF_4rpBKhs5XvJauNgu0ef6IR_buNbYz64",
+    "userId": "uid-zqe5ns5k",
+    "email": "platform@rvp.com",
+    "role": "PLATFORMFORM_ADMIN"
+  },
+  "results": {
+    "totalTests": 23,
+    "passedTests": 9,
+    "failedTests": 14,
+    "testResults": [
+      {
+        "name": "Security Event Recording",
+        "category": "Security Monitoring",
+        "status": "passed",
+        "duration": 117,
+        "startTime": 1769163888030,
+        "endTime": 1769163888147,
+        "clientMethod": "SecurityMonitoringSingleton.recordEvent",
+        "serverEndpoint": "/api/security/events",
+        "communicationValid": true,
+        "error": null
+      },
+      {
+        "name": "Security Metrics Retrieval",
+        "category": "Security Monitoring",
+        "status": "failed",
+        "duration": 129,
+        "startTime": 1769163888149,
+        "endTime": 1769163888278,
+        "clientMethod": "SecurityMonitoringSingleton.getMetrics",
+        "serverEndpoint": "/api/security/metrics",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Blocked IPs Management",
+        "category": "Security Monitoring",
+        "status": "failed",
+        "duration": 115,
+        "startTime": 1769163888279,
+        "endTime": 1769163888394,
+        "clientMethod": "SecurityMonitoringSingleton.getBlockedIPs",
+        "serverEndpoint": "/api/security/blocked-ips",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Security Health Check",
+        "category": "Security Monitoring",
+        "status": "failed",
+        "duration": 116,
+        "startTime": 1769163888394,
+        "endTime": 1769163888510,
+        "clientMethod": "SecurityMonitoringSingleton.getHealthStatus",
+        "serverEndpoint": "/api/security/health",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Rate Limit Status Check",
+        "category": "Rate Limiting",
+        "status": "failed",
+        "duration": 118,
+        "startTime": 1769163888512,
+        "endTime": 1769163888630,
+        "clientMethod": "RateLimitingControllerSingleton.getStatus",
+        "serverEndpoint": "/api/rate-limit/status/192.168.1.1",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Rate Limit Rule Creation",
+        "category": "Rate Limiting",
+        "status": "failed",
+        "duration": 97,
+        "startTime": 1769163888631,
+        "endTime": 1769163888728,
+        "clientMethod": "RateLimitingControllerSingleton.createRule",
+        "serverEndpoint": "/api/rate-limit/rules",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Rate Limit Check",
+        "category": "Rate Limiting",
+        "status": "failed",
+        "duration": 119,
+        "startTime": 1769163888729,
+        "endTime": 1769163888848,
+        "clientMethod": "RateLimitingControllerSingleton.checkLimit",
+        "serverEndpoint": "/api/rate-limit/check",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Rate Limit Rules List",
+        "category": "Rate Limiting",
+        "status": "failed",
+        "duration": 113,
+        "startTime": 1769163888849,
+        "endTime": 1769163888962,
+        "clientMethod": "RateLimitingControllerSingleton.getRules",
+        "serverEndpoint": "/api/rate-limit/rules",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Behavior Event Tracking",
+        "category": "Behavior Tracking",
+        "status": "passed",
+        "duration": 99,
+        "startTime": 1769163888964,
+        "endTime": 1769163889063,
+        "clientMethod": "BehaviorTrackingSingleton.trackEvent",
+        "serverEndpoint": "/api/behavior/events",
+        "communicationValid": true,
+        "error": null
+      },
+      {
+        "name": "Behavior Analytics Retrieval",
+        "category": "Behavior Tracking",
+        "status": "failed",
+        "duration": 115,
+        "startTime": 1769163889064,
+        "endTime": 1769163889179,
+        "clientMethod": "BehaviorTrackingSingleton.getAnalytics",
+        "serverEndpoint": "/api/behavior/analytics",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "User Behavior Patterns",
+        "category": "Behavior Tracking",
+        "status": "failed",
+        "duration": 114,
+        "startTime": 1769163889180,
+        "endTime": 1769163889294,
+        "clientMethod": "BehaviorTrackingSingleton.getUserPatterns",
+        "serverEndpoint": "/api/behavior/patterns/uid-zqe5ns5k",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Behavior Configuration",
+        "category": "Behavior Tracking",
+        "status": "failed",
+        "duration": 118,
+        "startTime": 1769163889294,
+        "endTime": 1769163889412,
+        "clientMethod": "BehaviorTrackingSingleton.getConfig",
+        "serverEndpoint": "/api/behavior/config",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Tenant Profile Retrieval",
+        "category": "Tenant Profile",
+        "status": "failed",
+        "duration": 87,
+        "startTime": 1769163889412,
+        "endTime": 1769163889499,
+        "clientMethod": "TenantProfileSingleton.getProfile",
+        "serverEndpoint": "/api/tenant/tid-m8ijkrnk/profile",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Tenant Analytics",
+        "category": "Tenant Profile",
+        "status": "failed",
+        "duration": 97,
+        "startTime": 1769163889499,
+        "endTime": 1769163889596,
+        "clientMethod": "TenantProfileSingleton.getAnalytics",
+        "serverEndpoint": "/api/tenant/tid-m8ijkrnk/analytics",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Tenant Activity Recording",
+        "category": "Tenant Profile",
+        "status": "failed",
+        "duration": 115,
+        "startTime": 1769163889597,
+        "endTime": 1769163889712,
+        "clientMethod": "TenantProfileSingleton.recordActivity",
+        "serverEndpoint": "/api/tenant/tid-m8ijkrnk/activity",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "Tenant Profile Statistics",
+        "category": "Tenant Profile",
+        "status": "failed",
+        "duration": 83,
+        "startTime": 1769163889713,
+        "endTime": 1769163889796,
+        "clientMethod": "TenantProfileSingleton.getStats",
+        "serverEndpoint": "/api/tenant/tid-m8ijkrnk/stats",
+        "communicationValid": false,
+        "error": null
+      },
+      {
+        "name": "SecurityDashboardSingleton Data Aggregation",
+        "category": "Consumer Singletons",
+        "status": "passed",
+        "duration": 49,
+        "startTime": 1769163889798,
+        "endTime": 1769163889847,
+        "clientMethod": "SecurityDashboardSingleton.getDashboardData",
+        "serverEndpoints": [
+          "/api/security/metrics",
+          "/api/security/blocked-ips",
+          "/api/security/threats"
+        ],
+        "consumerValid": true,
+        "error": null
+      },
+      {
+        "name": "RateLimitingMonitoringSingleton Status Display",
+        "category": "Consumer Singletons",
+        "status": "passed",
+        "duration": 34,
+        "startTime": 1769163889847,
+        "endTime": 1769163889881,
+        "clientMethod": "RateLimitingMonitoringSingleton.getStatus",
+        "serverEndpoints": [
+          "/api/rate-limit/status/192.168.1.1"
+        ],
+        "consumerValid": true,
+        "error": null
+      },
+      {
+        "name": "RecentlyViewedSingleton Local Storage",
+        "category": "Consumer Singletons",
+        "status": "passed",
+        "duration": 34,
+        "startTime": 1769163889881,
+        "endTime": 1769163889915,
+        "clientMethod": "RecentlyViewedSingleton.getRecentlyViewed",
+        "serverEndpoints": [],
+        "consumerValid": true,
+        "error": null
+      },
+      {
+        "name": "RecommendationsSingleton Data Processing",
+        "category": "Consumer Singletons",
+        "status": "passed",
+        "duration": 31,
+        "startTime": 1769163889916,
+        "endTime": 1769163889947,
+        "clientMethod": "RecommendationsSingleton.getRecommendations",
+        "serverEndpoints": [
+          "/api/tenant/tid-m8ijkrnk/profile"
+        ],
+        "consumerValid": true,
+        "error": null
+      },
+      {
+        "name": "Security Event → Rate Limiting Integration",
+        "category": "Cross-Singleton",
+        "status": "passed",
+        "duration": 65,
+        "startTime": 1769163889948,
+        "endTime": 1769163890013,
+        "flow": [
+          "SecurityMonitoringSingleton.recordEvent",
+          "RateLimitingControllerSingleton.checkLimit"
+        ],
+        "flowValid": true,
+        "error": null
+      },
+      {
+        "name": "Behavior Event → Tenant Profile Integration",
+        "category": "Cross-Singleton",
+        "status": "passed",
+        "duration": 82,
+        "startTime": 1769163890014,
+        "endTime": 1769163890096,
+        "flow": [
+          "BehaviorTrackingSingleton.trackEvent",
+          "TenantProfileSingleton.recordActivity"
+        ],
+        "flowValid": true,
+        "error": null
+      },
+      {
+        "name": "Security Dashboard → Multiple Services",
+        "category": "Cross-Singleton",
+        "status": "passed",
+        "duration": 100,
+        "startTime": 1769163890097,
+        "endTime": 1769163890197,
+        "flow": [
+          "SecurityDashboardSingleton.getDashboardData",
+          "SecurityMonitoringSingleton.getMetrics",
+          "RateLimitingControllerSingleton.getStatus"
+        ],
+        "flowValid": true,
+        "error": null
+      }
+    ],
+    "startTime": 1769163888029,
+    "endTime": 1769163890197,
+    "successRate": 39.130434782608695,
+    "totalDuration": 2168,
+    "averageTestDuration": 94.26086956521739
+  },
+  "assessment": {
+    "status": "POOR",
+    "message": "❌ COMMUNICATION FAILED! Client-server singleton system not working.",
+    "communicationStatus": "NOT_INTEGRATED",
+    "recommendations": [
+      "❌ Major communication issues",
+      "🔧 Complete review needed",
+      "📋 Check API endpoint mappings"
+    ]
+  },
+  "categories": {
+    "Security Monitoring": {
+      "total": 4,
+      "passed": 1,
+      "failed": 3
+    },
+    "Rate Limiting": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4
+    },
+    "Behavior Tracking": {
+      "total": 4,
+      "passed": 1,
+      "failed": 3
+    },
+    "Tenant Profile": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4
+    },
+    "Consumer Singletons": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "Cross-Singleton": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "communicationMatrix": {
+    "SecurityMonitoringSingleton.recordEvent ↔ /api/security/events": "✅",
+    "SecurityMonitoringSingleton.getMetrics ↔ /api/security/metrics": "❌",
+    "SecurityMonitoringSingleton.getBlockedIPs ↔ /api/security/blocked-ips": "❌",
+    "SecurityMonitoringSingleton.getHealthStatus ↔ /api/security/health": "❌",
+    "RateLimitingControllerSingleton.getStatus ↔ /api/rate-limit/status/192.168.1.1": "❌",
+    "RateLimitingControllerSingleton.createRule ↔ /api/rate-limit/rules": "❌",
+    "RateLimitingControllerSingleton.checkLimit ↔ /api/rate-limit/check": "❌",
+    "RateLimitingControllerSingleton.getRules ↔ /api/rate-limit/rules": "❌",
+    "BehaviorTrackingSingleton.trackEvent ↔ /api/behavior/events": "✅",
+    "BehaviorTrackingSingleton.getAnalytics ↔ /api/behavior/analytics": "❌",
+    "BehaviorTrackingSingleton.getUserPatterns ↔ /api/behavior/patterns/uid-zqe5ns5k": "❌",
+    "BehaviorTrackingSingleton.getConfig ↔ /api/behavior/config": "❌",
+    "TenantProfileSingleton.getProfile ↔ /api/tenant/tid-m8ijkrnk/profile": "❌",
+    "TenantProfileSingleton.getAnalytics ↔ /api/tenant/tid-m8ijkrnk/analytics": "❌",
+    "TenantProfileSingleton.recordActivity ↔ /api/tenant/tid-m8ijkrnk/activity": "❌",
+    "TenantProfileSingleton.getStats ↔ /api/tenant/tid-m8ijkrnk/stats": "❌"
+  }
+}

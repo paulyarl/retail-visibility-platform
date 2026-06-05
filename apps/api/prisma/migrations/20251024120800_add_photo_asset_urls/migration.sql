@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "PhotoAsset" ADD COLUMN IF NOT EXISTS "publicUrl" TEXT;
-ALTER TABLE "PhotoAsset" ADD COLUMN IF NOT EXISTS "signedUrl" TEXT;

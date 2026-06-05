@@ -1,0 +1,158 @@
+import { tenants } from "@prisma/client";
+
+/**
+ * Internal subscription status enum (derived from Tenant fields)
+ * 
+ * This represents the actual operational state of a subscription,
+ * derived from subscriptionStatus, subscriptionTier, and date fields.
+ */
+export type InternalStatus = 
+  | 'trialing'      // Active trial period (14 days)
+  | 'active'        // Paid subscription in good standing
+  | 'past_due'      // Payment failed, within grace period
+  | 'maintenance'   // google_only tier, can maintain but not grow
+  | 'frozen'        // Read-only visibility mode (expired_trial)
+  | 'canceled'      // Explicitly canceled
+  | 'expired';      // Trial or subscription expired
+
+/**
+ * Internal maintenance state for google_only and inactive subscriptions.
+ *
+ * - `maintenance`: limited maintenance window (google_only + within boundary)
+ * - `freeze`: full read-only visibility mode (inactive or outside boundary)
+ * - `null`: no special maintenance/freeze semantics
+ */
+export type MaintenanceState = 'maintenance' | 'freeze' | null;
+
+interface MaintenanceContext {
+  tier: string | null | undefined;
+  status: string | null | undefined;
+  trialEndsAt?: Date | null;
+}
+
+/**
+ * Derive maintenance/freeze state for a tenant based on tier, status, and trial end.
+ *
+ * This mirrors the frontend logic in SubscriptionStatusGuide:
+ * - google_only + active + trialEndsAt in the future (or missing) => maintenance
+ * - canceled/expired => freeze
+ * - google_only outside maintenance window => freeze
+ */
+export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
+  const tier = ctx.tier || 'discovery';
+  const status = ctx.status || 'active';
+  const now = new Date();
+
+  const isInactive = status === 'canceled' || status === 'expired';
+
+  let inMaintenanceWindow = false;
+
+  // Only google_only tier enters maintenance when status is not inactive.
+  // 'discovery' is a paid tier — active subscription means full access.
+  if (tier === 'google_only' && !isInactive) {
+    if (!ctx.trialEndsAt) {
+      inMaintenanceWindow = true;
+    } else {
+      const boundary = new Date(ctx.trialEndsAt);
+      if (!Number.isNaN(boundary.getTime()) && now < boundary) {
+        inMaintenanceWindow = true;
+      }
+    }
+  }
+
+  // For google_only or discovery with expired status, check maintenance window
+  // Both tiers can enter a maintenance grace period before full freeze
+  if ((tier === 'google_only' || tier === 'discovery') && status === 'expired') {
+    if (!ctx.trialEndsAt) {
+      inMaintenanceWindow = true;
+    } else {
+      const boundary = new Date(ctx.trialEndsAt);
+      if (!Number.isNaN(boundary.getTime()) && now < boundary) {
+        inMaintenanceWindow = true;
+      }
+    }
+  }
+
+  const isFullyFrozen = (isInactive && (tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow) || 
+                        (tier === 'google_only' && !inMaintenanceWindow);
+
+  if (inMaintenanceWindow) return 'maintenance';
+  if (isFullyFrozen) return 'freeze';
+  return null;
+}
+
+/**
+ * Derive the internal operational status from tenant subscription fields.
+ * 
+ * This is the single source of truth for determining what a tenant can do.
+ * 
+ * Lifecycle:
+ * 1. Trial (14 days) -> Full access within tier limits
+ * 2. Trial ends -> Auto-charge payment method
+ * 3. Grace period (14 days) -> Retry payment every 3 days
+ * 4. Grace expires -> Auto-downgrade to expired_trial (invisible on public pages)
+ * 
+ * @param tenant - Tenant object with subscription fields
+ * @returns InternalStatus enum value
+ */
+export function deriveInternalStatus(tenant: {
+  subscription_status: string | null;
+  subscription_tier: string | null;
+  trialEndsAt: Date | null;
+  subscription_ends_at: Date | null;
+}): InternalStatus {
+  const now = new Date();
+  const status = tenant.subscription_status || 'active';
+  const tier = tenant.subscription_tier || 'discovery';
+
+  // 1. Check for expired_trial tier (invisible on public pages)
+  if (tier === 'expired_trial') {
+    return 'frozen';
+  }
+
+  // 2. Check for explicit canceled status
+  if (status === 'canceled') {
+    return 'canceled';
+  }
+
+  // 3. Check for explicit expired status
+  if (status === 'expired') {
+    return 'expired';
+  }
+
+  // 4. Check for past_due status (payment failed, grace period)
+  if (status === 'past_due') {
+    return 'past_due';
+  }
+
+  // 5. Check for active trial
+  if (status === 'trial') {
+    // If trial hasn't expired yet, it's trialing
+    if (!tenant.trialEndsAt || tenant.trialEndsAt > now) {
+      return 'trialing';
+    }
+    // Trial expired but status not updated yet - treat as expired
+    // (This shouldn't happen after GET /tenants/:id auto-downgrade, but handle it)
+    return 'expired';
+  }
+
+  // 6. Check for active paid subscription
+  if (status === 'active') {
+    // Check if subscription has expired
+    if (tenant.subscription_ends_at && tenant.subscription_ends_at < now) {
+      return 'expired';
+    }
+
+    // Check if this is google_only tier (paid tier, not maintenance)
+    if (tier === 'google_only' || tier === 'discovery') {
+      // google_only is now a paid tier ($29/mo), not a downgrade target
+      return 'active';
+    }
+
+    // Regular paid tier with active subscription
+    return 'active';
+  }
+
+  // Default fallback: treat as active
+  return 'active';
+}

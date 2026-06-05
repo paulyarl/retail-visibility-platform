@@ -3,6 +3,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+
+
 export interface AnimatedCardProps {
   children: React.ReactNode;
   className?: string;
@@ -10,6 +12,7 @@ export interface AnimatedCardProps {
   hover?: boolean;
   onClick?: () => void;
 }
+
 
 export function AnimatedCard({
   children,

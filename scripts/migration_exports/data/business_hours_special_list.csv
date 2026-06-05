@@ -1,0 +1,5 @@
+id,tenant_id,date,isClosed,open,close,note,source_hash,last_synced_at,created_at,updated_at
+tid-mrsyk3w6_2025-12-31,tid-mrsyk3w6,2025-12-31,f,11:00,19:00,"New Year's Eve, Hours might differ",,,2025-12-27 10:54:53.662,2025-12-27 10:54:53.661
+tid-mrsyk3w6_2026-01-01,tid-mrsyk3w6,2026-01-01,t,10:00,14:00,New Year's Day,,,2025-12-27 10:54:53.857,2025-12-27 10:54:53.855
+tid-042hi7ju_2026-03-21,tid-042hi7ju,2026-03-21,t,10:00,14:00,closed today,,,2026-03-21 16:53:39.01,2026-03-21 16:53:39.007
+tid-m8ijkrnk_2026-03-22,tid-m8ijkrnk,2026-03-22,t,10:00,14:00,Personal time,,,2026-03-22 02:08:49.787,2026-03-22 02:08:49.78

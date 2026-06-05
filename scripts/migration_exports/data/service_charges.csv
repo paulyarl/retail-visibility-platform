@@ -1,0 +1,2 @@
+id,tenant_id,organization_id,charge_type,amount_cents,description,invoice_id,applied_at,created_by,created_at,updated_at
+svc-tid-zcp9a56y-pthfsz,tid-zcp9a56y,,service_fee,2299,service charge test,inv-tid-zcp9a56y-28unip,2026-04-09 04:31:25.563,uid-li9gr,2026-04-09 04:31:25.562,2026-04-09 09:30:13.69

@@ -10,7 +10,7 @@ router.get('/dashboard', async (req, res) => {
     const { tenantId, days = '30' } = req.query;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     const daysNum = parseInt(days as string);
@@ -100,9 +100,9 @@ router.get('/product/:itemId', async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
-    const performance = await prisma.productPerformance.findMany({
+    const performance = await prisma.product_performances.findMany({
       where: {
-        itemId,
+        item_id:itemId,
         date: {
           gte: startDate,
         },
@@ -157,7 +157,7 @@ router.get('/product/:itemId', async (req, res) => {
 router.post('/update', async (req, res) => {
   try {
     const schema = z.object({
-      itemId: z.string(),
+      item_id: z.string(),
       tenantId: z.string(),
       date: z.string().datetime(),
       approvalStatus: z.string().optional(),
@@ -180,27 +180,27 @@ router.post('/update', async (req, res) => {
         ? (data.clicks / data.impressions) * 100
         : undefined;
 
-    const performance = await prisma.productPerformance.upsert({
+    const performance = await prisma.product_performances.upsert({
       where: {
-        itemId_date: {
-          itemId: data.itemId,
+        item_id_date: {
+          item_id: data.item_id,
           date,
         },
       },
       update: {
-        approvalStatus: data.approvalStatus,
-        rejectionReason: data.rejectionReason,
+        approval_status: data.approvalStatus,
+        rejection_reason: data.rejectionReason,
         impressions: data.impressions,
         clicks: data.clicks,
         ctr: ctr !== undefined ? ctr : undefined,
         conversions: data.conversions,
         revenue: data.revenue,
-        visibilityScore: data.visibilityScore,
-        searchRank: data.searchRank,
-        lastUpdated: new Date(),
+        visibility_score: data.visibilityScore,
+        search_rank: data.searchRank,
+        last_updated: new Date(),
       },
       create: {
-        itemId: data.itemId,
+        itemId: data.item_id,
         tenantId: data.tenantId,
         date,
         approvalStatus: data.approvalStatus || 'not_synced',
@@ -212,7 +212,7 @@ router.post('/update', async (req, res) => {
         revenue: data.revenue || 0,
         visibilityScore: data.visibilityScore || 0,
         searchRank: data.searchRank,
-      },
+      } as any,
     });
 
     res.json(performance);
@@ -231,7 +231,7 @@ router.get('/approval-status', async (req, res) => {
     const { tenantId } = req.query;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Get latest approval status for each product

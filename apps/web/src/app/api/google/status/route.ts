@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,18 +18,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const apiUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-    const response = await fetch(`${apiUrl}/google/status?tenantId=${tenantId}`, {
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return NextResponse.json(error, { status: response.status });
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
+    const status = await googleIntegrationService.getStatus(tenantId);
+    return NextResponse.json(status);
   } catch (error) {
     console.error('[API Proxy] Google status error:', error);
     return NextResponse.json(

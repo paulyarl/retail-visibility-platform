@@ -1,0 +1,306 @@
+import { Client, Environment, OrdersController, PaymentsController } from '@paypal/paypal-server-sdk';
+import {
+  PaymentGatewayInterface,
+  PaymentMethod,
+  PaymentResult,
+  RefundResult,
+  GatewayCredentials,
+} from '../PaymentGatewayInterface';
+
+export class PayPalGateway extends PaymentGatewayInterface {
+  private client: Client;
+  private ordersController: OrdersController;
+  private paymentsController: PaymentsController;
+
+  constructor(credentials: GatewayCredentials, isTestMode: boolean = false) {
+    super(credentials, isTestMode);
+    
+    this.client = new Client({
+      clientCredentialsAuthCredentials: {
+        oAuthClientId: credentials.apiKey,
+        oAuthClientSecret: credentials.apiSecret || '',
+      },
+      environment: isTestMode ? Environment.Sandbox : Environment.Production,
+    });
+
+    this.ordersController = new OrdersController(this.client);
+    this.paymentsController = new PaymentsController(this.client);
+  }
+
+  getGatewayName(): string {
+    return 'paypal';
+  }
+
+  async authorize(
+    amount: number,
+    currency: string,
+    paymentMethod: PaymentMethod,
+    metadata?: Record<string, any>
+  ): Promise<PaymentResult> {
+    try {
+      // Convert cents to dollars for PayPal
+      const amountInDollars = (amount / 100).toFixed(2);
+
+      const orderRequest = {
+        body: {
+          intent: 'AUTHORIZE',
+          purchase_units: [
+            {
+              amount: {
+                currency_code: currency,
+                value: amountInDollars,
+              },
+              custom_id: metadata?.orderId,
+            },
+          ],
+          payment_source: {
+            paypal: {
+              experience_context: {
+                return_url: metadata?.returnUrl || 'https://example.com/return',
+                cancel_url: metadata?.cancelUrl || 'https://example.com/cancel',
+              },
+            },
+          },
+        },
+      };
+
+      const { result } = await this.ordersController.create(orderRequest);
+
+      // PayPal fee is approximately 2.9% + $0.30
+      const feeCents = Math.round(amount * 0.029 + 30);
+      const netAmountCents = amount - feeCents;
+
+      return {
+        success: result.status === 'CREATED' || result.status === 'APPROVED',
+        transactionId: result.id || '',
+        authorizationId: result.id || '',
+        amount,
+        currency,
+        status: result.status === 'APPROVED' ? 'authorized' : 'pending',
+        gatewayResponse: result,
+        gatewayFeeCents: feeCents,
+        netAmountCents,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        amount,
+        currency,
+        status: 'failed',
+        gatewayResponse: error,
+        error: error.message || 'Authorization failed',
+      };
+    }
+  }
+
+  async capture(
+    authorizationId: string,
+    amount?: number
+  ): Promise<PaymentResult> {
+    try {
+      const captureRequest = {
+        id: authorizationId,
+        body: amount
+          ? {
+              amount: {
+                currency_code: 'USD',
+                value: (amount / 100).toFixed(2),
+              },
+            }
+          : {},
+      };
+
+      const { result } = await this.ordersController.capture(captureRequest);
+
+      const capturedAmount = amount || 0;
+      const feeCents = Math.round(capturedAmount * 0.029 + 30);
+      const netAmountCents = capturedAmount - feeCents;
+
+      return {
+        success: result.status === 'COMPLETED',
+        transactionId: result.id || '',
+        authorizationId: result.id || '',
+        amount: capturedAmount,
+        currency: 'USD',
+        status: result.status === 'COMPLETED' ? 'captured' : 'pending',
+        gatewayResponse: result,
+        gatewayFeeCents: feeCents,
+        netAmountCents,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        amount: amount || 0,
+        currency: 'USD',
+        status: 'failed',
+        gatewayResponse: error,
+        error: error.message || 'Capture failed',
+      };
+    }
+  }
+
+  async charge(
+    amount: number,
+    currency: string,
+    paymentMethod: PaymentMethod,
+    metadata?: Record<string, any>
+  ): Promise<PaymentResult> {
+    try {
+      const amountInDollars = (amount / 100).toFixed(2);
+
+      const orderRequest = {
+        body: {
+          intent: 'CAPTURE',
+          purchase_units: [
+            {
+              amount: {
+                currency_code: currency,
+                value: amountInDollars,
+              },
+              custom_id: metadata?.orderId,
+            },
+          ],
+          payment_source: {
+            paypal: {
+              experience_context: {
+                return_url: metadata?.returnUrl || 'https://example.com/return',
+                cancel_url: metadata?.cancelUrl || 'https://example.com/cancel',
+              },
+            },
+          },
+        },
+      };
+
+      const { result } = await this.ordersController.ordersCreate(orderRequest);
+
+      // Auto-capture the order
+      if (result.id) {
+        const captureResult = await this.ordersController.capture({ id: result.id, body: {} });
+        
+        const feeCents = Math.round(amount * 0.029 + 30);
+        const netAmountCents = amount - feeCents;
+
+        return {
+          success: captureResult.result.status === 'COMPLETED',
+          transactionId: captureResult.result.id || '',
+          amount,
+          currency,
+          status: captureResult.result.status === 'COMPLETED' ? 'captured' : 'pending',
+          gatewayResponse: captureResult.result,
+          feeCents,
+          netAmountCents,
+        };
+      }
+
+      return {
+        success: false,
+        amount,
+        currency,
+        status: 'failed',
+        gatewayResponse: result,
+        error: 'Failed to create order',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        amount,
+        currency,
+        status: 'failed',
+        gatewayResponse: error,
+        error: error.message || 'Charge failed',
+      };
+    }
+  }
+
+  async refund(
+    transactionId: string,
+    amount?: number,
+    reason?: string
+  ): Promise<RefundResult> {
+    try {
+      const refundRequest = {
+        captureId: transactionId,
+        body: {
+          amount: amount
+            ? {
+                currency_code: 'USD',
+                value: (amount / 100).toFixed(2),
+              }
+            : undefined,
+          note_to_payer: reason,
+        },
+      };
+
+      const { result } = await this.paymentsController.refund(refundRequest);
+
+      return {
+        success: result.status === 'COMPLETED' || result.status === 'PENDING',
+        refundId: result.id || '',
+        amount: amount || 0,
+        currency: 'USD',
+        status: result.status === 'COMPLETED' ? 'completed' : 'pending',
+        gatewayResponse: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        refundId: '',
+        amount: amount || 0,
+        currency: 'USD',
+        status: 'failed',
+        gatewayResponse: error,
+        error: error.message || 'Refund failed',
+      };
+    }
+  }
+
+  async getStatus(transactionId: string): Promise<PaymentResult> {
+    try {
+      const { result } = await this.ordersController.get({ id: transactionId });
+
+      let status: PaymentResult['status'] = 'pending';
+      if (result.status === 'COMPLETED') {
+        status = 'captured';
+      } else if (result.status === 'APPROVED') {
+        status = 'authorized';
+      } else if (result.status === 'VOIDED' || result.status === 'CANCELLED') {
+        status = 'failed';
+      }
+
+      const amount = result.purchase_units?.[0]?.amount?.value
+        ? Math.round(parseFloat(result.purchase_units[0].amount.value) * 100)
+        : 0;
+
+      const feeCents = Math.round(amount * 0.029 + 30);
+      const netAmountCents = amount - feeCents;
+
+      return {
+        success: true,
+        transactionId: result.id || '',
+        authorizationId: result.id || '',
+        amount,
+        currency: result.purchase_units?.[0]?.amount?.currency_code || 'USD',
+        status,
+        gatewayResponse: result,
+        gatewayFeeCents: feeCents,
+        netAmountCents,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        amount: 0,
+        currency: 'USD',
+        status: 'failed',
+        gatewayResponse: error,
+        error: error.message || 'Failed to get status',
+      };
+    }
+  }
+
+  validateWebhook(payload: string | Buffer, signature: string): boolean {
+    // PayPal webhook validation requires additional setup
+    // For now, return true and implement proper validation later
+    console.warn('[PayPal] Webhook validation not yet implemented');
+    return true;
+  }
+}

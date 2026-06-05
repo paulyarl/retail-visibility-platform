@@ -11,7 +11,7 @@ router.get('/tenant/billing/counters', requireAuth, async (req, res) => {
     const tenantId = getTenantId(req);
     
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Query the tenant_sku_counters view
@@ -40,7 +40,7 @@ router.get('/tenant/billing/counters', requireAuth, async (req, res) => {
     const counters = result[0];
     
     // Get tenant's plan limit from metadata
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { metadata: true },
     });
@@ -76,7 +76,7 @@ router.get('/tenant/billing/status', requireAuth, async (req, res) => {
     const tenantId = getTenantId(req);
     
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Query the tenant_tier_status view
@@ -116,11 +116,11 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
     const { tenantId, skuLimit } = req.body;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'tenant_id_required' });
+      return res.status(400).json({ error: 'tenantId_required' });
     }
 
     // Get existing metadata
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: { metadata: true },
     });
@@ -128,7 +128,7 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
     const metadata = (tenant?.metadata as any) || {};
 
     // Update with new limit
-    await prisma.tenant.update({
+    await prisma.tenants.update({
       where: { id: tenantId },
       data: {
         metadata: {
@@ -145,7 +145,7 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /organization/billing/counters - Get SKU counters for entire organization
+// GET /api/organization/billing/counters - Get SKU counters for entire organization
 router.get('/organization/billing/counters', requireAuth, async (req, res) => {
   try {
     const organizationId = req.query.organizationId as string;
@@ -155,22 +155,23 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
     }
 
     // Get organization with all tenants
-    const org = await prisma.organization.findUnique({
+    const org = await prisma.organizations_list.findUnique({
       where: { id: organizationId },
       select: {
         id: true,
         name: true,
-        maxLocations: true,
-        maxTotalSKUs: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
+        max_locations: true,
+        max_total_skus: true, 
+        subscription_tier: true,
+        subscription_status: true,
         tenants: {
           select: {
             id: true,
             name: true,
+            metadata: true,
             _count: {
               select: {
-                items: true,
+                inventory_items: true,
               },
             },
           },
@@ -184,28 +185,29 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
 
     // Calculate totals
     const totalLocations = org.tenants.length;
-    const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.items, 0);
+    const totalSKUs = org.tenants.reduce((sum, t) => sum + t._count.inventory_items, 0);
     const locationBreakdown = org.tenants.map(t => ({
       tenantId: t.id,
       tenantName: t.name,
-      skuCount: t._count.items,
+      skuCount: t._count.inventory_items,
+      metadata: t.metadata,
     }));
 
     // Calculate status
-    const locationStatus = totalLocations >= org.maxLocations ? 'at_limit' :
-                          totalLocations >= org.maxLocations * 0.9 ? 'warning' : 'ok';
+    const locationStatus = totalLocations >= org.max_locations ? 'at_limit' :
+                          totalLocations >= org.max_locations * 0.9 ? 'warning' : 'ok';
     
-    const skuStatus = totalSKUs >= org.maxTotalSKUs ? 'at_limit' :
-                     totalSKUs >= org.maxTotalSKUs * 0.9 ? 'warning' : 'ok';
+    const skuStatus = totalSKUs >= org.max_total_skus ? 'at_limit' :
+                     totalSKUs >= org.max_total_skus * 0.9 ? 'warning' : 'ok';
 
     res.json({
       organizationId: org.id,
       organizationName: org.name,
-      subscriptionTier: org.subscriptionTier,
-      subscriptionStatus: org.subscriptionStatus,
+      subscription_tier: org.subscription_tier,
+      subscription_status: org.subscription_status,
       limits: {
-        maxLocations: org.maxLocations,
-        maxTotalSKUs: org.maxTotalSKUs,
+        maxLocations: org.max_locations,
+        maxTotalSKUs: org.max_total_skus,
       },
       current: {
         totalLocations,
@@ -238,7 +240,7 @@ router.post('/admin/organization/override', requireAdmin, async (req, res) => {
     if (maxLocations !== undefined) updateData.maxLocations = maxLocations;
     if (maxTotalSKUs !== undefined) updateData.maxTotalSKUs = maxTotalSKUs;
 
-    await prisma.organization.update({
+    await prisma.organizations_list.update({
       where: { id: organizationId },
       data: updateData,
     });

@@ -1,0 +1,6 @@
+id,tier,monthly_price_cents,annual_price_cents,features,created_at
+tpr-097d78f6-1c9d-4668-854c-d351bb3aa6c5,google_only,0,0,"{""maxSkus"": 250, ""support"": ""community"", ""features"": [""google_listing""]}",2026-04-07 20:47:22.611775+00
+tpr-fb252d17-5cf2-4596-b3dc-0e2242ace515,starter,2900,29000,"{""maxSkus"": 500, ""support"": ""email"", ""features"": [""storefront"", ""directory"", ""products""]}",2026-04-07 20:47:22.611775+00
+tpr-ac729794-3f1d-4400-8485-477d41e57285,professional,7900,79000,"{""maxSkus"": 5000, ""support"": ""priority"", ""features"": [""storefront"", ""directory"", ""products"", ""analytics"", ""integrations""]}",2026-04-07 20:47:22.611775+00
+tpr-5a9c4a21-95de-4add-933b-6a3cfcdb5efb,enterprise,19900,199000,"{""maxSkus"": -1, ""support"": ""dedicated"", ""features"": [""storefront"", ""directory"", ""products"", ""analytics"", ""integrations"", ""api"", ""white_label""]}",2026-04-07 20:47:22.611775+00
+tpr-d31a2f59-c35b-4930-9d83-ae307882a87a,organization,49900,499000,"{""maxSkus"": 10000, ""support"": ""dedicated"", ""features"": [""multi_location"", ""shared_billing"", ""centralized_management""]}",2026-04-07 20:47:22.611775+00

@@ -1,0 +1,1 @@
+id,customer_id,tenant_id,customer_segment,loyalty_points,tenant_orders,tenant_value_cents,first_tenant_order_at,last_tenant_order_at,tenant_tags,tenant_preferences,internal_notes,is_active,created_at,updated_at

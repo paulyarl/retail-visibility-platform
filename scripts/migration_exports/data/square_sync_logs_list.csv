@@ -1,0 +1,1 @@
+id,tenant_id,integration_id,mapping_id,sync_type,direction,operation,status,error_message,error_code,request_payload,response_payload,items_affected,duration_ms,created_at,updated_at

@@ -1,11 +1,19 @@
-import React from 'react';
+﻿import React from 'react';
 
 export interface AlertProps {
-  variant?: 'info' | 'success' | 'warning' | 'error';
+  variant?: 'info' | 'success' | 'warning' | 'error' | 'destructive';
   title?: string;
   children: React.ReactNode;
   className?: string;
   onClose?: () => void;
+}
+
+export function AlertDescription({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={'text-sm ' + className}>
+      {children}
+    </div>
+  );
 }
 
 export function Alert({
@@ -20,6 +28,7 @@ export function Alert({
     success: 'bg-green-50 border-green-200 text-green-800',
     warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     error: 'bg-red-50 border-red-200 text-red-800',
+    destructive: 'bg-red-50 border-red-200 text-red-800',
   };
 
   const iconColors = {
@@ -27,6 +36,7 @@ export function Alert({
     success: 'text-green-400',
     warning: 'text-yellow-400',
     error: 'text-red-400',
+    destructive: 'text-red-400',
   };
 
   const icons = {
@@ -50,12 +60,17 @@ export function Alert({
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
+    destructive: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
   };
 
   return (
-    <div className={`rounded-lg border p-4 ${variantStyles[variant]} ${className}`}>
+    <div className={'rounded-lg border p-4 ' + variantStyles[variant] + ' ' + className}>
       <div className="flex">
-        <div className={`flex-shrink-0 ${iconColors[variant]}`}>
+        <div className={'shrink-0 ' + iconColors[variant]}>
           {icons[variant]}
         </div>
         <div className="ml-3 flex-1">
@@ -67,7 +82,7 @@ export function Alert({
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto flex-shrink-0 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
+            className="ml-auto shrink-0 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

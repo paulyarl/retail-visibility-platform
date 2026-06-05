@@ -1,32 +1,41 @@
 import { NextResponse } from 'next/server';
-import { proxyGet } from '@/lib/api-proxy';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id: tenantId } = await params;
     
-    // Fetch items for this tenant from backend with auth
-    const res = await proxyGet(request, `/tenants/${id}/items`);
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
+    }
+
+    // Get items for this tenant using service with automatic caching
+    const itemsData = await itemsService.getItemsComplete({
+      tenant_id: tenantId,
+      page: 1,
+      limit: 100, // Default limit for tenant items
+      status: 'all',
+      visibility: 'all'
+    });
     
-    if (!res.ok) {
-      if (res.status === 404) {
-        return NextResponse.json([]);
-      }
-      return NextResponse.json(
-        { error: 'Failed to fetch items' },
-        { status: res.status }
-      );
+    if (!itemsData) {
+      return NextResponse.json([]);
     }
     
-    const items = await res.json();
-    return NextResponse.json(items);
+    return NextResponse.json(itemsData.items);
   } catch (error) {
-    console.error('Error fetching tenant items:', error);
+    console.error('[Tenant Items API] Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch tenant items' 
+      },
       { status: 500 }
     );
   }

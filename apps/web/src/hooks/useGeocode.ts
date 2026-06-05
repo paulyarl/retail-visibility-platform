@@ -31,19 +31,10 @@ export function useGeocode({ address, enabled = true }: UseGeocodeOptions): UseG
     setError(null);
 
     try {
-      const response = await fetch('/api/tenant/profile/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to geocode address');
-      }
-
-      const data = await response.json();
+      const { tenantProfileService } = await import('@/services/TenantProfileService');
+      const data = await tenantProfileService.geocodeAddress(address);
       
-      if (data.latitude && data.longitude) {
+      if (data?.latitude && data?.longitude) {
         setCoordinates({
           latitude: data.latitude,
           longitude: data.longitude,

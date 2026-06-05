@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton, Aler
 import SwisProductCard from './SwisProductCard';
 import { useSwisPreview } from '@/hooks/useSwisPreview';
 
+
+
 export interface SwisPreviewItem {
   sku: string;
   title: string;
@@ -15,7 +17,7 @@ export interface SwisPreviewItem {
   image_url?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
   updated_at: string;
-  category_path?: string[];
+  categoryPath?: string[];
   badges?: Array<'new' | 'sale' | 'low_stock'>;
 }
 
@@ -27,6 +29,7 @@ interface SwisPreviewWidgetProps {
   onViewAll?: () => void;
   editable?: boolean;
 }
+
 
 export default function SwisPreviewWidget({
   tenantId,
@@ -139,8 +142,8 @@ export default function SwisPreviewWidget({
 
             {/* Last Updated */}
             {lastUpdated && (
-              <div className="mt-4 pt-4 border-t border-neutral-200">
-                <p className="text-xs text-neutral-500 text-center">
+              <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
                   Updated {formatLastUpdated(lastUpdated)}
                 </p>
               </div>

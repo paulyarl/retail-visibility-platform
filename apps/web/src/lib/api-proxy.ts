@@ -6,10 +6,11 @@
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 
 /**
- * Get headers with Authorization forwarded from the request
+ * Get headers with Authorization and Cookie forwarded from the request
  */
 export function getProxyHeaders(req: Request, additionalHeaders?: Record<string, string>): HeadersInit {
   const authHeader = req.headers.get('authorization');
+  const cookieHeader = req.headers.get('cookie');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...additionalHeaders,
@@ -17,6 +18,10 @@ export function getProxyHeaders(req: Request, additionalHeaders?: Record<string,
   
   if (authHeader) {
     headers['Authorization'] = authHeader;
+  }
+  
+  if (cookieHeader) {
+    headers['Cookie'] = cookieHeader;
   }
   
   return headers;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 /**
  * GET /api/tenant
@@ -7,54 +7,38 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
     
-    console.log('[GET /api/tenant] Auth check:', { user: user?.id, authError });
+    const { accessToken, session } = authResult;
+
+    // Get user's tenant from Auth0 user metadata or app metadata
+    const user = session?.user;
+    const tenantId = user?.tenant_id || user?.['https://visible.shelf/tenant_id'];
     
-    if (authError || !user) {
-      console.error('[GET /api/tenant] Unauthorized:', authError);
-      return NextResponse.json({ error: 'unauthorized', details: 'Not logged in' }, { status: 401 });
+    console.log('[GET /api/tenant] User tenant:', { userId: user?.sub, tenantId });
+
+    if (!tenantId) {
+      console.error('[GET /api/tenant] Tenant not found for user');
+      return NextResponse.json({ error: 'tenant_not_found', details: 'User has no tenant' }, { status: 400 });
     }
 
-    // Get user's tenant from database
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('tenantId')
-      .eq('id', user.id)
-      .single();
-
-    console.log('[GET /api/tenant] User data:', { userData, userError });
-
-    if (userError || !userData?.tenantId) {
-      console.error('[GET /api/tenant] Tenant not found:', userError);
-      return NextResponse.json({ error: 'tenant_not_found', details: 'User has no tenant' }, { status: 404 });
-    }
-
-    // Fetch tenant from backend API
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/tenants/${userData.tenantId}`);
+    // Fetch tenant from backend API with auth token
+    const res = await authenticatedFetch(`/api/tenants/${tenantId}`, accessToken, {
+      method: 'GET',
+    });
     
     if (!res.ok) {
-      return NextResponse.json({ error: 'tenant_not_found' }, { status: 404 });
+      return NextResponse.json({ error: 'tenant_not_found' }, { status: 400 });
     }
 
     const tenant = await res.json();
-    
-    // Get SKU count
-    const { count } = await supabase
-      .from('items')
-      .select('*', { count: 'exact', head: true })
-      .eq('tenantId', userData.tenantId);
 
-    return NextResponse.json({
-      ...tenant,
-      _count: {
-        items: count || 0
-      }
-    });
+    return NextResponse.json(tenant);
   } catch (error) {
     console.error('[GET /api/tenant] Error:', error);
     return NextResponse.json({ error: 'internal_error' }, { status: 500 });

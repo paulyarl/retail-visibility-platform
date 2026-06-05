@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export function useCountUp(end: number, duration: number = 2000, start: number = 0) {
+export function useCountUp(end: number, duration: number = 2500, start: number = 0) {
   const [count, setCount] = useState(start);
 
   useEffect(() => {

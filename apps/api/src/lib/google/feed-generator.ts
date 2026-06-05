@@ -16,19 +16,21 @@ export interface FeedItem {
   currency: string;
   availability: string;
   imageUrl?: string;
-  categoryPath?: string[];
+  additionalImageLinks?: string[];
+  googleProductCategory?: string; // Google category ID from tenant category
+  productType?: string; // Tenant category name for product_type field
 }
 
 /**
  * Generate product feed for Google Merchant Center
  * Only includes items with itemStatus='active' AND visibility='public'
  */
-export async function generateProductFeed(tenantId: string): Promise<FeedItem[]> {
+export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]> {
   try {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await prisma.inventory_items.findMany({
       where: {
-        tenantId,
-        itemStatus: 'active',  // Only active items
+        tenant_id: tenant_id, 
+        item_status: 'active',  // Only active items
         visibility: 'public',   // Only public items
       },
       select: {
@@ -41,17 +43,39 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
         price: true,
         currency: true,
         availability: true,
-        imageUrl: true,
-        categoryPath: true,
+        image_url: true,
+        // TODO: Add directoryCategory relationship back when schema supports it
+        // directoryCategory: {
+        //   select: {
+        //     name: true,
+        //     googleCategoryId: true,
+        //   },
+        // },
       },
     });
 
-    return items.map(item => ({
-      ...item,
-      price: Number(item.price),
-      description: item.description || undefined,
-      imageUrl: item.imageUrl || undefined,
-    }));
+    return items.map(item => {
+      // Use tenant category's Google ID if available
+      // TODO: Add directoryCategory relationship back when schema supports it
+      const googleProductCategory = undefined;
+      const productType = undefined;
+
+      return {
+        id: item.id,
+        sku: item.sku,
+        name: item.name,
+        title: item.title,
+        brand: item.brand,
+        description: item.description || undefined,
+        price: Number(item.price),
+        currency: item.currency,
+        availability: item.availability,
+        image_url: item.image_url || undefined,
+        additionalImageLinks: undefined,
+        googleProductCategory, // Google category ID from tenant category
+        productType, // Tenant category name
+      } as FeedItem;
+    });
   } catch (error) {
     console.error('[Feed Generator] Error:', error);
     throw error;
@@ -61,19 +85,19 @@ export async function generateProductFeed(tenantId: string): Promise<FeedItem[]>
 /**
  * Get feed statistics
  */
-export async function getFeedStats(tenantId: string) {
+export async function getFeedStats(tenant_id: string) {
   const [total, active, inactive, syncing, notSyncing] = await Promise.all([
-    prisma.inventoryItem.count({ where: { tenantId } }),
-    prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'active' } }),
-    prisma.inventoryItem.count({ where: { tenantId, itemStatus: 'inactive' } }),
-    prisma.inventoryItem.count({ 
-      where: { tenantId, itemStatus: 'active', visibility: 'public' } 
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id } }),
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id, item_status: 'active' } }),
+    prisma.inventory_items.count({ where: { tenant_id: tenant_id, item_status: 'inactive' } }),
+    prisma.inventory_items.count({ 
+      where: { tenant_id: tenant_id, item_status: 'active', visibility: 'public' } 
     }),
-    prisma.inventoryItem.count({ 
+    prisma.inventory_items.count({ 
       where: { 
-        tenantId,
+        tenant_id: tenant_id,
         OR: [
-          { itemStatus: { not: 'active' } },
+          { item_status: { not: 'active' } },
           { visibility: { not: 'public' } },
         ]
       } 

@@ -1,0 +1,7 @@
+id,tenant_id,feature,granted,reason,expires_at,granted_by,created_at,updated_at
+override_tid-m8ijkrnk_advanced_analytics_1773424990282,tid-m8ijkrnk,advanced_analytics,t,Test override creation,,uid-zqe5ns5k,2026-03-13 18:03:10.282,2026-03-13 18:03:10.282
+pricing_tid-m8ijkrnk_starter_1773425232178,tid-m8ijkrnk,pricing_starter,t,Special promotional pricing,,uid-zqe5ns5k,2026-03-13 18:07:12.178,2026-03-13 18:07:12.178
+limits_tid-m8ijkrnk_products_1773425296609,tid-m8ijkrnk,limits_products,t,Expanded product catalog for growing business,,uid-zqe5ns5k,2026-03-13 18:08:16.609,2026-03-13 18:08:16.609
+featured_tid-m8ijkrnk_homepage_1773425357587,tid-m8ijkrnk,featured_homepage,t,Featured homepage placement for promotional campaign,,uid-zqe5ns5k,2026-03-13 18:09:17.587,2026-03-13 18:09:17.587
+override_tid-m8ijkrnk_import_test_feature_1_1773425694115_egu359rpw,tid-m8ijkrnk,import_test_feature_1,t,Import validation test,,uid-zqe5ns5k,2026-03-13 18:14:54.115,2026-03-13 18:14:54.115
+override_tid-m8ijkrnk_import_test_feature_2_1773425694722_egwfi8umb,tid-m8ijkrnk,import_test_feature_2,t,Second import test,,uid-zqe5ns5k,2026-03-13 18:14:54.722,2026-03-13 18:14:54.722

@@ -1,0 +1,7 @@
+id,order_id,tenant_id,customer_id,notification_type,channel,status,content,scheduled_at,sent_at,error,metadata,created_at,updated_at
+notification_1777697288811_ah3xmuyg5,oid-tid-042hi7ju-xu2wodk9,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 04:48:08.813,2026-05-02 04:48:08.813
+notification_1777697559435_4k0a35wp7,oid-tid-042hi7ju-4u5g1zev,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 04:52:39.44,2026-05-02 04:52:39.44
+notification_1777697808887_3ynhluhql,oid-tid-042hi7ju-t2k3fg0l,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 04:56:48.888,2026-05-02 04:56:48.888
+notif-tid-042hi7ju-9zsibzqwj,oid-tid-042hi7ju-xmzkr167,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 05:27:53.181,2026-05-02 05:27:53.181
+notif-R4KG-pim91b1vy,oid-R4KG-i1c87k2q,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 05:57:37.369,2026-05-02 05:57:37.369
+notif-R4KG-myszbg5fs,oid-R4KG-nyegr8iz,tid-042hi7ju,customer_1777677754915_yw3qkcyn7,ready_for_pickup,email,pending,Your order is ready for pickup!,2026-05-02 08:00:00,,,{},2026-05-02 06:15:29.6,2026-05-02 06:15:29.6

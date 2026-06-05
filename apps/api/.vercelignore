@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage
+.nyc_output
+uploads
+prisma/migrations
+scripts
+tests
+*.test.ts
+*.test.js
+*.md
+!README.md

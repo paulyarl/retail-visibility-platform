@@ -1,0 +1,6 @@
+id,organization_id,tenant_id,override_type,status,reason,expires_at,granted_by,approved_by,approved_at,created_at,updated_at,subscription_tier,original_limit,custom_limit,custom_price,currency
+sample-feature-1,sample-org-1,sample-tenant-1,feature,active,Grant advanced analytics for trial,,admin-1,,,2026-03-13 17:24:11.186015+00,2026-03-13 17:24:11.186015+00,,,,,USD
+sample-pricing-1,sample-org-1,sample-tenant-1,pricing,active,Custom pricing for enterprise client,,admin-1,,,2026-03-13 17:24:11.186015+00,2026-03-13 17:24:11.186015+00,enterprise,,,299.99,USD
+sample-limits-1,sample-org-1,sample-tenant-1,limits,active,Increase SKU limit for growth,,admin-1,,,2026-03-13 17:24:11.186015+00,2026-03-13 17:24:11.186015+00,business,100,500,,USD
+sample-featured-1,sample-org-1,sample-tenant-1,featured_products,active,Holiday promotion increase,,admin-1,,,2026-03-13 17:24:11.186015+00,2026-03-13 17:24:11.186015+00,basic,3,10,,USD
+sample-tenant-limits-1,sample-org-1,sample-tenant-1,tenant_limits,active,Expansion allowance,,admin-1,,,2026-03-13 17:24:11.186015+00,2026-03-13 17:24:11.186015+00,basic,1,5,,USD

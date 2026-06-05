@@ -1,0 +1,4 @@
+id,tenant_id,strategy,dry_run,created,updated,deleted,skipped,reason,error,job_id,started_at,completed_at
+7b50edfa-2c85-4f7e-8dd2-95febee6b420,,platform_to_gbp,f,0,0,0,f,,,gbp-mirror-1765030751358-6naizw,2025-12-06 14:19:11.36,2025-12-06 14:19:11.59
+cmid-all-pending-mq05b,,platform_to_gbp,f,0,0,0,f,,,gbp-mirror-1774519948586-3ha3nm,2026-03-26 10:12:28.588,2026-03-26 10:12:29.165
+cmid-all-pending-w7pzb,,platform_to_gbp,f,0,0,0,f,,,gbp-mirror-1774663085478-r67sxk,2026-03-28 01:58:05.478,2026-03-28 01:58:05.719

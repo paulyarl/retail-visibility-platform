@@ -5,6 +5,8 @@ export interface CardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   className?: string;
+  withBorder?: boolean;
+  radius?: 'none' | 'sm' | 'md' | 'lg';
 }
 
 export function Card({
@@ -12,11 +14,20 @@ export function Card({
   padding = 'md',
   children,
   className = '',
+  withBorder = false,
+  radius = 'lg',
 }: CardProps) {
-  const baseStyles = 'rounded-lg';
+  const radiusStyles = {
+    none: '',
+    sm: 'rounded-sm',
+    md: 'rounded-md',
+    lg: 'rounded-lg',
+  };
+  
+  const baseStyles = radiusStyles[radius];
   
   const variantStyles = {
-    default: 'bg-white border border-neutral-200',
+    default: withBorder ? 'bg-white border-2 border-neutral-200' : 'bg-white border border-neutral-200',
     elevated: 'bg-white shadow-md',
     outlined: 'bg-transparent border-2 border-neutral-300',
   };

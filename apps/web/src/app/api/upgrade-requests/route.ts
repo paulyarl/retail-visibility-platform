@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
     const searchParams = req.nextUrl.searchParams;
     const queryString = searchParams.toString();
-    const url = `${API_BASE_URL}/upgrade-requests${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/upgrade-requests${queryString ? `?${queryString}` : ''}`;
     
-    const res = await fetch(url);
+    const res = await authenticatedFetch(endpoint, accessToken, {
+      method: 'GET',
+    });
+    
     const data = await res.json();
-    
     return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error('Error fetching upgrade requests:', error);
@@ -20,11 +32,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
     const body = await req.json();
     
-    const res = await fetch(`${API_BASE_URL}/upgrade-requests`, {
+    const res = await authenticatedFetch('/upgrade-requests', accessToken, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     

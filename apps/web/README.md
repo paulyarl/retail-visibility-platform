@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Feature Flags
+
+- FF_APP_SHELL_NAV: Enables the new header with Tenant Switcher. Dev/test override is available by setting `localStorage.ff_app_shell_nav = 'on'`.
+- FF_TENANT_URLS: Enables URL-driven tenant context under `/t/{tenantId}/...`.
+
+## Tenant URL Patterns
+
+- `/t/{tenantId}/dashboard` → Renders legacy dashboard with the route tenant applied.
+- `/t/{tenantId}/items` → Renders legacy Items page. SSR receives `tenantId` via `searchParams`.
+- `/t/{tenantId}/users` → Renders legacy Users page.
+- `/t/{tenantId}/settings/tenant` → Renders Tenant Settings page.
+- `/onboarding?tenantId={id}` → Onboarding-first flow when profile is incomplete. Business Name is prefilled from tenant name.
+
+Client sets and reads `localStorage.tenantId` and `localStorage.current_tenant_id`. SSR guards read `access_token` cookie set by the app on login/refresh.

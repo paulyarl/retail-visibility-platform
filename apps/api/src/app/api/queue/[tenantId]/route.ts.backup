@@ -1,0 +1,237 @@
+/**
+ * Product Queue API Routes
+ * RESTful endpoints for queue management with Universal Singleton integration
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { productQueueService } from '../../../../lib/services/ProductQueueService';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { tenantId: string } }
+) {
+  try {
+    const { tenantId } = params;
+    const { searchParams } = new URL(request.url);
+    
+    const includeCompleted = searchParams.get('includeCompleted') === 'true';
+    const status = searchParams.get('status');
+    const stats = searchParams.get('stats') === 'true';
+    const limit = searchParams.get('limit');
+    const priority = searchParams.get('priority');
+
+    // Set tenant context for RLS
+    // process.env.POSTGRES_OPTIONS = `-c app.current_tenant_id=${tenantId}`;
+
+    if (stats) {
+      // Return queue statistics
+      const queueStats = await productQueueService.getQueueStats(tenantId);
+      return NextResponse.json({ success: true, data: queueStats });
+    }
+
+    if (status) {
+      // Return items by status
+      const items = await productQueueService.getItemsByStatus(tenantId, status as any);
+      return NextResponse.json({ success: true, data: items });
+    }
+
+    if (priority) {
+      // Return items by priority
+      const queue = await productQueueService.getTenantQueue(tenantId, includeCompleted);
+      const items = queue.filter((item: any) => item.priority === priority);
+      return NextResponse.json({ success: true, data: items });
+    }
+
+    // Return full queue
+    const queue = await productQueueService.getTenantQueue(tenantId, includeCompleted);
+    
+    let items = queue;
+    if (limit) {
+      items = queue.slice(0, parseInt(limit));
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      data: items,
+      total: queue.length,
+      hasMore: limit ? queue.length > parseInt(limit) : false
+    });
+
+  } catch (error) {
+    console.error('Queue GET error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch queue data' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { tenantId: string } }
+) {
+  try {
+    const { tenantId } = params;
+    const body = await request.json() as {
+      productData: any;
+      priority?: 'normal' | 'high' | 'urgent';
+      sessionId?: string;
+      userAgent?: string;
+      source?: 'wizard' | 'import' | 'bulk';
+    };
+
+    const { 
+      productData, 
+      priority = 'normal' as 'normal' | 'high' | 'urgent',
+      sessionId,
+      userAgent,
+      source = 'wizard' as 'wizard' | 'import' | 'bulk'
+    } = body;
+
+    if (!productData) {
+      return NextResponse.json(
+        { success: false, error: 'Product data is required' },
+        { status: 400 }
+      );
+    }
+
+    // Set tenant context for RLS
+    // process.env.POSTGRES_OPTIONS = `-c app.current_tenant_id=${tenantId}`;
+
+    // Add item to queue
+    const queueItem = await productQueueService.addToQueue(
+      tenantId,
+      productData,
+      priority,
+      { sessionId, userAgent, source }
+    );
+
+    return NextResponse.json({ 
+      success: true, 
+      data: queueItem,
+      message: 'Item added to queue successfully'
+    });
+
+  } catch (error) {
+    console.error('Queue POST error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to add item to queue' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { tenantId: string } }
+) {
+  try {
+    const { tenantId } = params;
+    const body = await request.json() as {
+      action: string;
+      itemId?: string;
+      priority?: 'normal' | 'high' | 'urgent';
+      itemIds?: string[];
+      maxConcurrent?: number;
+      timeout?: number;
+      retryFailed?: boolean;
+    };
+
+    const { action, itemId, priority } = body;
+
+    // Set tenant context for RLS
+    // process.env.POSTGRES_OPTIONS = `-c app.current_tenant_id=${tenantId}`;
+
+    switch (action) {
+      case 'update_priority':
+        if (!itemId || !priority) {
+          return NextResponse.json(
+            { success: false, error: 'Item ID and priority are required' },
+            { status: 400 }
+          );
+        }
+
+        const updated = await productQueueService.updateItemPriority(itemId, priority);
+        return NextResponse.json({ 
+          success: updated, 
+          message: updated ? 'Priority updated successfully' : 'Failed to update priority'
+        });
+
+      case 'process':
+        const { itemIds, maxConcurrent, timeout, retryFailed } = body;
+        
+        const results = await productQueueService.processQueue(tenantId, itemIds, {
+          maxConcurrent,
+          timeout,
+          retryFailed
+        });
+
+        return NextResponse.json({ 
+          success: true, 
+          data: results,
+          message: `Processed ${results.processed} items, ${results.failed} failed`
+        });
+
+      default:
+        return NextResponse.json(
+          { success: false, error: 'Invalid action' },
+          { status: 400 }
+        );
+    }
+
+  } catch (error) {
+    console.error('Queue PUT error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update queue' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { tenantId: string } }
+) {
+  try {
+    const { tenantId } = params;
+    const { searchParams } = new URL(request.url);
+    
+    const itemId = searchParams.get('itemId');
+    const cleanup = searchParams.get('cleanup') === 'true';
+    const olderThanDays = parseInt(searchParams.get('olderThanDays') || '7');
+
+    // Set tenant context for RLS
+    // process.env.POSTGRES_OPTIONS = `-c app.current_tenant_id=${tenantId}`;
+
+    if (itemId) {
+      // Remove specific item
+      const removed = await productQueueService.removeFromQueue(itemId, tenantId);
+      return NextResponse.json({ 
+        success: removed, 
+        message: removed ? 'Item removed from queue' : 'Failed to remove item'
+      });
+    }
+
+    if (cleanup) {
+      // Cleanup old items
+      const deletedCount = await productQueueService.cleanupOldItems(tenantId, olderThanDays);
+      return NextResponse.json({ 
+        success: true, 
+        data: { deletedCount },
+        message: `Cleaned up ${deletedCount} old items`
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Item ID or cleanup action is required' },
+      { status: 400 }
+    );
+
+  } catch (error) {
+    console.error('Queue DELETE error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete queue item' },
+      { status: 500 }
+    );
+  }
+}

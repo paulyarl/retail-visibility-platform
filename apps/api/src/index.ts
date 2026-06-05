@@ -1,19 +1,73 @@
-import express from "express";
-import cors from "cors";
-import morgan from "morgan";
-import { prisma } from "./prisma";
-import { z } from "zod";
+// Sentry - Must be imported first for error tracking
+import * as Sentry from '@sentry/node';
 
-// Debug: Log DATABASE_URL to verify it's correct
-// Migration fix applied: 20251024093000_add_photo_asset_fields marked as rolled back
-console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...');
+// New Relic APM - Must be imported first
+import './newrelic';
+
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import { user_role } from '@prisma/client';
+
+// Fix for Supabase SSL certificate issues in production
+// This allows Node.js to accept Supabase's SSL certificates
+if (process.env.NODE_ENV === 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
+}
+import { Pool } from 'pg';
+import { prisma, basePrisma } from "./prisma";
+import { z } from "zod";
+import { setRequestContext } from "./context";
+import { getDirectPool } from "./utils/db-pool";
+import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
+import { applyRateLimit } from "./middleware/rate-limit";
+import { securityHeaders, additionalSecurityHeaders } from "./middleware/security-headers";
+import { inputValidationMiddleware } from "./middleware/input-validation";
+import { createRateLimitingMiddleware } from "./services/RateLimitingService";
+
+// Security middleware imports
+import { validateInput, securityLogger } from "./middleware/security";
+import { generateItemId, generatePhotoId, generateTenantItemId, generateTenantId, generateUserTenantId, generateVariantId, generateTenantVariantId, generateVariantSkuFromParent, generateSKU, generateTenantKey } from './lib/id-generator';
+import { propagateVariants } from './utils/variant-propagation';
+
+import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
+import { requireRoleGroup } from "./middleware/role-validation";
+import { requirePermission } from "./middleware/role-validation";
+import { USER_ROLES } from "./config/role-groups";
+
+// Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
+// Force rebuild v3: Railway build cache bypass
 import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import { setRequestContext } from "./context";
-import { audit } from "./audit";
+import { Flags } from "./config";
+import { TRIAL_CONFIG } from "./config/tenant-limits";
+import { getAlertStatus, performanceMonitoring } from "./services/alerting";
+import { StorageBuckets } from "./storage-config";
+import { audit, ensureAuditTable } from "./audit";
 import { dailyRatesJob } from "./jobs/rates";
+import { ensureFeedCategoryView } from "./views";
+import { triggerRevalidate } from "./utils/revalidate";
+import { categoryService } from "./services/CategoryService";
+import { FeaturedProductsService } from "./services/FeaturedProductsService";
+
+// Utility function to safely extract string parameters from Express req.params
+function getParam(params: any, key: string): string {
+  const value = params[key];
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  return value || '';
+}
+
+// Temporarily disable ALL route imports to isolate startup issue
+// import businessHoursRoutes from './routes/business-hours';
+// import tenantFlagsRoutes from './routes/tenant-flags';
+// import platformFlagsRoutes from './routes/platform-flags';
+// import effectiveFlagsRoutes from './routes/effective-flags';
 import {
   getAuthorizationUrl,
   decodeState,
@@ -42,205 +96,1003 @@ import {
   getAggregatedInsights,
 } from "./lib/google/gbp";
 
-// v3.5 imports
-import auditRoutes from './routes/audit';
-import policyRoutes from './routes/policy';
+// v3.5 imports - temporarily disabled
+// import auditRoutes from './routes/audit';
+// import policyRoutes from './routes/policy';
 import billingRoutes from './routes/billing';
-import subscriptionRoutes from './routes/subscriptions';
-import categoryRoutes from './routes/categories';
+// import subscriptionRoutes from './routes/subscriptions';
+// import categoryRoutes from './routes/categories';
+import photosRouter, { migrateTempPhotos } from './photos';
+import directoryPhotosRouter from './routes/directory-photos';
+import rateLimitWarningsRoutes from './routes/rate-limit-warnings';
 
-// Authentication
-import authRoutes from './auth/auth.routes';
+// v3.6.2-prep imports - temporarily disabled
+// import feedJobsRoutes from './routes/feed-jobs';
+// import feedbackRoutes from './routes/feedback';
+// import tenantCategoriesRoutes from './routes/tenant-categories';
+import taxonomyAdminRoutes from './routes/taxonomy-admin';
+import feedValidationRoutes from './routes/feed-validation';
+import businessProfileValidationRoutes from './routes/business-profile-validation';
+import trialSetupRoutes from './routes/tenant/trial-setup';
+
+import cacheRoutes from './routes/cache';
+
+// Import cache utilities for inline usage
+import { memoryCache, cacheKeys, CACHE_TTL } from './utils/cache';
+
+// Authentication middleware and utilities
+// import authRoutes from './auth/auth.routes'; // Now handled by modular mounting
 import { authenticateToken, checkTenantAccess, requireAdmin } from './middleware/auth';
-import { 
-  requireTenantAdmin, 
-  requireInventoryAccess, 
+import { isPlatformAdmin, isPlatformUser } from './utils/platform-admin';
+import {
+  requireTenantAdmin,
+  requireInventoryAccess,
   requireTenantOwner,
-  checkTenantCreationLimit 
+  checkTenantCreationLimit
 } from './middleware/permissions';
-import performanceRoutes from './routes/performance';
+import { validateTierAssignment, validateTierCompatibility } from './middleware/tier-validation';
+import { validateSKULimits, validateTierSKUCompatibility } from './middleware/sku-limits';
+import { auditLogger } from './middleware/audit-logger';
+import { requireActiveSubscription, checkSubscriptionLimits, requireWritableSubscription } from './middleware/subscription';
+import { enforcePolicyCompliance } from './middleware/policy-enforcement';
+// All route imports temporarily disabled for isolation
+// import performanceRoutes from './routes/performance';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
-import userRoutes from './routes/users';
-import tenantUserRoutes from './routes/tenant-users';
-import { auditLogger } from './middleware/audit-logger';
-import { requireActiveSubscription, checkSubscriptionLimits } from './middleware/subscription';
-import { enforcePolicyCompliance } from './middleware/policy-enforcement';
+// import userRoutes from './routes/users';
+// import tenantUserRoutes from './routes/tenant-users';
+// import categoriesPlatformRoutes from './routes/categories.platform';
+// import categoriesTenantRoutes from './routes/categories.tenant';
+// import categoriesMirrorRoutes from './routes/categories.mirror';
+// import mirrorAdminRoutes from './routes/mirror.admin';
+// import syncLogsRoutes from './routes/sync-logs';
+// import directoryRoutes from './routes/directory-v2';
+// import directoryTenantRoutes from './routes/directory-tenant';
+// import directoryAdminRoutes from './routes/directory-admin';
+// import directorySupportRoutes from './routes/directory-support';
+// import directoryCategoriesRoutes from './routes/directory-categories';
+// import directoryStoreTypesRoutes from './routes/directory-store-types';
+// Directory routes imported later in file (line ~5120) before mounting
+import storefrontRoutes from './routes/storefront';
+import gbpRoutes from './routes/gbp';
+import scanRoutes from './routes/scan';
+import scanMetricsRoutes from './routes/scan-metrics';
+import quickStartRoutes from './routes/quick-start';
+import tenantsRoutes from './routes/tenants';
+import paymentGatewaysRoutes from './routes/payment-gateways';
+import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
+import commerceSettingsRoutes from './routes/commerce-settings';
+import productOptionsSettingsRoutes from './routes/product-options-settings';
+import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
+import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
+import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
+import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
+import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
+import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
+import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
+import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
+import buyerOrdersRoutes from './routes/buyer-orders';
+import tenantOrdersRoutes from './routes/tenant-orders';
+import productLikesRoutes from './routes/product-likes';
+import adminToolsRoutes from './routes/admin-tools';
+import adminUsersRoutes from './routes/admin-users';
+import cachedProductsRoutes from './routes/cached-products';
+import featureOverridesRoutes from './routes/admin/feature-overrides';
+import capabilityRoutes from './routes/admin/capability-routes';
+import tierSystemRoutes from './routes/admin/tier-system';
+// import testGbpRoutes from './routes/test-gbp';
+import googleBusinessOAuthRoutes from './routes/google-business-oauth';
+import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
+// import cloverRoutes from './routes/integrations/clover';
+// import emailTestRoutes from './routes/email-test';
+// Legacy Square routes (lazy import) - replaced by /api/integrations routes
+// let squareRoutes: any = null;
+// const getSquareRoutes = async () => {
+//   if (!squareRoutes) {
+//     const { default: routes } = await import('./square/square.routes');
+//     squareRoutes = routes;
+//   }
+//   return squareRoutes;
+// };
+// Temporarily disable all route imports except essential ones
+// import dashboardRoutes from './routes/dashboard'; // FIXED VERSION
+// import dashboardConsolidatedRoutes from './routes/dashboard-consolidated';
+// import tenantTierRoutes from './routes/tenant-tier';
+// import promotionRoutes from './routes/promotion';
+// import tenantLimitsRoutes from './routes/tenant-limits';
+
+// Temporarily disable all route imports to isolate startup issue
+// import testGbpSyncRoutes from './routes/test-gbp-sync';
+// import emailManagementRoutes from './routes/email-management';
+
+// Essential routes only - disable all others
+// import feedJobsRoutes from './routes/feed-jobs';
+// import feedbackRoutes from './routes/feedback';
+// import tenantCategoriesRoutes from './routes/tenant-categories';
+// import quickStartRoutes from './routes/quick-start';
+// import tenantFlagsRoutes from './routes/tenant-flags';
+// import adminToolsRoutes from './routes/admin-tools';
+// import featureOverridesRoutes from './routes/admin/feature-overrides';
+// import tierManagementRoutes from './routes/admin/tier-management';
+// import tierSystemRoutes from './routes/admin/tier-system';
+// import cloverRoutes from './routes/integrations/clover';
+// import emailTestRoutes from './routes/email-test';
+// import categoriesPlatformRoutes from './routes/categories.platform';
+// import categoriesTenantRoutes from './routes/categories.tenant';
+// import categoriesMirrorRoutes from './routes/categories.mirror';
+// import mirrorAdminRoutes from './routes/mirror.admin';
+// import syncLogsRoutes from './routes/sync-logs';
+// import scanMetricsRoutes from './routes/scan-metrics';
+// import testGbpSyncRoutes from './routes/test-gbp-sync';
 
 const app = express();
 
+// Trust proxy - only enable in production where there's an actual proxy (Railway, Vercel)
+// In development, there's no proxy so this should be false to avoid security warnings
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true);
+}
+
+// Initialize Sentry for error tracking (only if DSN is provided)
+const sentryEnabled = process.env.SENTRY_DSN && process.env.SENTRY_DSN.trim() !== '';
+
+if (sentryEnabled) {
+  try {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      // Use custom environment variable to distinguish staging from production
+      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.1,
+
+      // Don't send errors in development
+      beforeSend(event, hint) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Sentry error (not sent in dev):', hint.originalException || event);
+          return null;
+        }
+        return event;
+      },
+    });
+
+    console.log('✅ Sentry error tracking initialized');
+  } catch (error) {
+    console.error('⚠️  Failed to initialize Sentry:', error);
+  }
+} else {
+  console.log('⚠️  Sentry DSN not found - error tracking disabled');
+}
+
 /* ------------------------- middleware ------------------------- */
-app.use(cors({ origin: [/localhost:\d+$/, /\.vercel\.app$/], credentials: false }));
+// Security headers - applied first for maximum protection
+app.use(securityHeaders);
+app.use(additionalSecurityHeaders);
+
+// Security middleware - applied early for protection
+app.use(securityLogger); // Log suspicious requests
+
+// Rate limiting middleware using RateLimitingService (database-driven with priority logic)
+app.use(async (req, res, next) => {
+  try {
+    const { rateLimitingService } = await import('./services/RateLimitingService');
+
+    // Check if rate limiting is globally enabled (Environment Variable > Database > Default OFF)
+    const isEnabled = await rateLimitingService.isRateLimitingEnabled();
+    if (!isEnabled) {
+      return next(); // Rate limiting disabled globally
+    }
+
+    // Get client IP and path
+    const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    const path = req.path || req.url || '/';
+
+    // Check rate limit
+    const result = await rateLimitingService.checkRateLimit(ip, 'standard', path);
+
+    if (!result.allowed) {
+      console.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
+
+      return res.status(429).json({
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded. Please try again after ${result.rule?.windowMinutes || 15} minutes.`,
+        retryAfter: (result.rule?.windowMinutes || 15) * 60,
+        priority: 'Environment Variable > Database > Default OFF'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[RateLimitingService] Middleware error:', error);
+    next(); // Allow request on error
+  }
+});
+
+app.use(blockIotRequests); // Block ONVIF/IoT attacks
+app.use(validateInput); // Input validation and sanitization
+app.use(ssrfProtection); // SSRF protection
+
+app.use(cors({
+  origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id'],
+}));
+
+// IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
+// Stripe signature verification requires raw body access
+import webhooksRoutes from './routes/webhooks';
+app.use('/api/webhooks', webhooksRoutes);
+console.log('Webhooks routes mounted at /api/webhooks (Phase 3B: Payment Event Processing)');
+
+// Stripe Connect webhooks - requires raw body for signature verification
+import stripeConnectWebhooks from './routes/stripe-connect-webhooks';
+app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }), stripeConnectWebhooks);
+console.log('Stripe Connect webhooks mounted at /api/webhooks/stripe-connect');
+
+app.use(cookieParser()); // Parse cookies for customer session auth
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Rate limiting middleware - applied early for security
+app.use(applyRateLimit);
+
+// Input validation and sanitization middleware
+app.use(inputValidationMiddleware);
+
+// Performance monitoring middleware
+app.use(performanceMonitoring);
+
+// 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
+// Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
+// import { universalTransformMiddleware } from './middleware/universal-transform';
+// app.use(universalTransformMiddleware);
+
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
+// CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
+app.use(setCsrfCookie);
+app.use(csrfProtect);
 
-console.log("✓ Express configured with 50mb body limit");
+// Ensure audit table exists if auditing is enabled
+// TEMP: Commented out due to Prisma JsonBody error in Railway
+// ensureAuditTable().catch(() => {});
+// Ensure helper view exists for feed category resolution
+// TEMP: Commented out due to Prisma JsonBody error in Railway
+// ensureFeedCategoryView().catch(() => {});
+
 
 /* -------------------- static uploads (filesystem for MVP) -------------------- */
 const DEV = process.env.NODE_ENV !== "production";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
 // Create upload directory in both dev and production for MVP
 if (!fs.existsSync(UPLOAD_DIR)) {
-  try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch {}
+  try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch { }
 }
 // Serve uploads statically in both dev and production for MVP
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-/* ----------------------------- health ----------------------------- */
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+/* ------------------------------ tenants ------------------------------ */
+import tenantCategoriesRoutes from './routes/tenant-categories';
 
-/* ------------------------------ TENANTS ------------------------------ */
-app.get("/tenants", authenticateToken, async (req, res) => {
+// Mount admin service charges routes BEFORE universal tenants to prevent interception
+import serviceChargesRoutes from './routes/admin/service-charges';
+app.use('/api/admin/service-charges', serviceChargesRoutes);
+console.log('✅ Admin service charges routes mounted at /api/admin/service-charges');
+
+// Mount universal tenant routes (NEW - Phase 3)
+import universalTenantsRoutes from './routes/universal-tenants';
+app.use('/api', universalTenantsRoutes);
+console.log('✅ Universal tenant routes mounted at /api (Phase 3: Universal Identifier System)');
+
+// Mount cache monitoring routes (NEW - Phase 1)
+import cacheMonitoringRoutes from './routes/cache-monitoring';
+app.use('/api/cache', cacheMonitoringRoutes);
+console.log('✅ Cache monitoring routes mounted at /api/cache (Phase 1: Encrypted Cache System)');
+
+// Mount cache invalidation routes (NEW - Cache Management)
+import cacheInvalidationRoutes from './routes/cache-invalidation';
+app.use('/api/cache', cacheInvalidationRoutes);
+console.log('✅ Cache invalidation routes mounted at /api/cache (Cache Management)');
+
+// Health check route
+const healthRoutes = (req: any, res: any) => {
+  const alertStatus = getAlertStatus();
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || 'unknown',
+    alerts: alertStatus,
+    memory: process.memoryUsage(),
+    // Add more health metrics as needed
+  });
+};
+
+app.use('/health', healthRoutes);
+app.use('/api/health', healthRoutes);
+
+// Request logging middleware for debugging
+/* app.use((req, res, next) => {
+  if (req.path.startsWith('/api/public')) {
+    console.log(`[API REQUEST] ${req.method} ${req.path}`, {
+      query: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer'),
+      timestamp: new Date().toISOString()
+    });
+  }
+  next();
+}); */
+
+// PUBLIC API ROUTES - Singleton System
+import publicApiRoutes from './routes/public-api';
+app.use('/api/public', publicApiRoutes);
+console.log('✅ Public API routes mounted at /api/public (Singleton System)');
+
+// PUBLIC STATUS ENDPOINT - No authentication required for status display
+app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) => {
+  const { tenantId } = req.params;
+
   try {
-    // Admin users see all tenants, regular users see only their tenants
-    const isAdmin = req.user?.role === 'ADMIN';
-    const tenants = await prisma.tenant.findMany({ 
-      where: isAdmin ? {} : {
-        users: {
-          some: {
-            userId: req.user?.userId
-          }
+    // Check cache first
+    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
+    const cachedResult = memoryCache.get(cacheKey)
+
+    if (cachedResult) {
+      return res.json(cachedResult)
+    }
+
+    // Get tenant location status first to override hours-based status
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { location_status: true, closure_reason: true, reopening_date: true }
+    });
+
+    // If tenant has non-active location status, return that status instead of hours-based status
+    if (tenant?.location_status && tenant.location_status !== 'active') {
+      const { getLocationStatusInfo } = await import('./utils/location-status');
+      const statusInfo = getLocationStatusInfo(tenant.location_status as any);
+
+      let label = statusInfo.label;
+      if (tenant.closure_reason) {
+        label = `${statusInfo.label} - ${tenant.closure_reason}`;
+      }
+      if (tenant.reopening_date) {
+        const reopenDate = new Date(tenant.reopening_date);
+        label += ` (Reopens ${reopenDate.toLocaleDateString()})`;
+      }
+
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed', // Frontend expects 'closed' for non-active status
+          label,
+          locationStatus: tenant.location_status, // Actual location status for reference
+          statusInfo: {
+            showStorefront: statusInfo.showStorefront,
+            showInDirectory: statusInfo.showInDirectory,
+            description: statusInfo.description,
+            icon: statusInfo.icon,
+            color: statusInfo.color
+          },
+          reopeningDate: tenant.reopening_date?.toISOString() || null,
+          closureReason: tenant.closure_reason || null
         }
-      },
-      orderBy: { createdAt: "desc" },
+      };
+
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS);
+      return res.json(result);
+    }
+
+    // Get business hours data
+    const hoursRow = await prisma.business_hours_list.findUnique({
+      where: { tenant_id: tenantId }
+    });
+
+    if (!hoursRow) {
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed',
+          label: 'Closed'
+        }
+      }
+      // Cache the result
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      return res.json(result)
+    }
+
+    // Get special hours
+    const specialHours = await prisma.business_hours_special_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { date: 'asc' }
+    });
+
+    // Build hours object
+    const periods = hoursRow.periods as any[] || [];
+    const hours: any = { timezone: hoursRow.timezone };
+
+    // Convert periods to day-based format for computeStoreStatus
+    periods.forEach((period: any) => {
+      const dayName = period.day?.toLowerCase();
+      if (dayName && !hours[dayName]) {
+        hours[dayName] = {
+          open: period.open,
+          close: period.close
+        };
+      }
+    });
+
+    // Include periods array for updated computeStoreStatus
+    if (periods.length > 0) {
+      hours.periods = periods;
+    }
+
+    // Add special hours
+    if (specialHours.length > 0) {
+      hours.special = specialHours.map((sh: any) => ({
+        date: sh.date.toISOString().slice(0, 10),
+        open: sh.open,
+        close: sh.close,
+        isClosed: sh.isClosed,
+        note: sh.note
+      }));
+    }
+
+    // Import and use computeStoreStatus
+    const { computeStoreStatus } = await import('./lib/hours-utils');
+    const status = computeStoreStatus(hours);
+
+    const result = {
+      success: true,
+      data: status || {
+        isOpen: false,
+        status: 'closed',
+        label: 'Closed'
+      }
+    }
+
+    // Cache the result
+    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error computing store status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute store status'
+    });
+  }
+});
+
+// TENANTS - Now handled by tenantsRoutes below
+// app.get("/api/tenants", authenticateToken, async (req, res) => {
+//   try {
+//     // Platform users (admin, support, viewer) see all tenants, regular users see only their tenants
+//     const { isPlatformUser } = await import('./utils/platform-admin');
+
+//     // Query parameters for filtering
+//     const includeArchived = req.query.includeArchived === 'true';
+//     const statusFilter = req.query.status as string;
+
+//     // Build where clause
+//     const baseWhere = isPlatformUser(req.user) ? {} : {
+//       user_tenants: {
+//         some: {
+//           user_id: req.user?.userId
+//         }
+//       }
+//     };
+
+//     // Add status filtering - include archived by default unless specifically excluded
+//     let statusCondition: any = {};
+//     if (statusFilter) {
+//       // Specific status requested
+//       statusCondition = { location_status: statusFilter };
+//     } else if (includeArchived === false) {
+//       // Explicitly exclude archived
+//       statusCondition = { location_status: { not: 'archived' } };
+//     }
+//     // Default: include all statuses including archived
+
+//     const tenants = await prisma.tenants.findMany({ 
+//       where: {
+//         ...baseWhere,
+//         ...statusCondition,
+//       },
+//       orderBy: { created_at: "desc" },
+//       include: {
+//         organizations_list: {
+//           select: {
+//             id: true,
+//             name: true,
+//           }
+//         }
+//       }
+//     });
+
+//     // Transform for frontend compatibility - convert organizations_list to organization
+//     const transformedTenants = tenants.map(tenant => ({
+//       id: tenant.id,
+//       name: tenant.name,
+//       organizationId: tenant.organization_id,
+//       subscriptionTier: tenant.subscription_tier,
+//       subscriptionStatus: tenant.subscription_status,
+//       locationStatus: tenant.location_status || 'active',
+//       createdAt: tenant.created_at,
+//       organization: tenant.organizations_list ? {
+//         id: tenant.organizations_list.id,
+//         name: tenant.organizations_list.name,
+//       } : null,
+//     }));
+
+//     res.json(transformedTenants);
+//   } catch (_e) {
+//     res.status(500).json({ error: "failed_to_list_tenants" });
+//   }
+// });
+
+
+// GET /api/tenants/my-subdomains - Get all subdomains for the current user's tenants
+// Query param: tenantId (optional) - scope to specific tenant
+app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userId = user?.userId || user?.user_id || user?.id;
+    const requestedTenantId = req.query.tenantId as string;
+
+    // Get all tenants for this user
+    const userTenants = await prisma.user_tenants.findMany({
+      where: { user_id: userId },
       include: {
-        organization: {
+        tenants: {
           select: {
             id: true,
             name: true,
+            subdomain: true,
+            created_at: true
           }
         }
       }
     });
-    res.json(tenants);
-  } catch (_e) {
-    res.status(500).json({ error: "failed_to_list_tenants" });
+
+    let filteredUserTenants = userTenants;
+
+    // If tenantId is specified, filter to just that tenant
+    if (requestedTenantId) {
+      filteredUserTenants = userTenants.filter(ut => ut.tenants.id === requestedTenantId);
+    }
+
+    // Filter tenants that have subdomains and format the response
+    const subdomains = filteredUserTenants
+      .filter(ut => ut.tenants.subdomain)
+      .map(ut => {
+        // Detect platform domain (similar to frontend logic)
+        let platformDomain = 'visibleshelf.com';
+        let protocol = 'https';
+        let port = '';
+
+        if (req.headers.host) {
+          const hostname = req.headers.host.split(':')[0]; // Remove port if present
+          if (hostname.endsWith('.visibleshelf.com')) {
+            platformDomain = 'visibleshelf.com';
+          } else if (hostname.endsWith('.visibleshelf.store')) {
+            platformDomain = 'visibleshelf.store';
+          } else if (hostname.endsWith('.localhost') || hostname === 'localhost') {
+            platformDomain = 'localhost';
+            protocol = 'http'; // Use HTTP for localhost
+            port = ':3000'; // Include port for localhost
+          }
+        }
+
+        return {
+          tenantId: ut.tenants.id,
+          tenantName: ut.tenants.name,
+          subdomain: ut.tenants.subdomain,
+          createdAt: ut.tenants.created_at,
+          url: `${protocol}://${ut.tenants.subdomain}.${platformDomain}${port}`,
+          platformDomain,
+          isCurrentTenant: requestedTenantId ? ut.tenants.id === requestedTenantId : false
+        };
+      });
+
+    res.json({
+      success: true,
+      subdomains,
+      total: subdomains.length,
+      scopedToTenant: !!requestedTenantId
+    });
+  } catch (error: any) {
+    console.error('[TENANTS] Error fetching user subdomains:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch subdomains'
+    });
   }
 });
 
-app.get("/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    let tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
-    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
-    
-    const now = new Date();
-    
-    // Auto-set trial expiration date if missing for trial users
-    if (
-      (tenant.subscriptionStatus === "trial" || tenant.subscriptionTier === "trial") &&
-      !tenant.trialEndsAt
-    ) {
-      console.log(`[GET /tenants/:id] Trial date missing for tenant ${tenant.id}. Setting trial to expire in 30 days.`);
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-      
-      tenant = await prisma.tenant.update({
-        where: { id: tenant.id },
-        data: {
-          trialEndsAt: trialEndsAt,
-          subscriptionStatus: "trial",
-        },
-      });
-      console.log(`[GET /tenants/:id] Trial date set for tenant ${tenant.id}: ${trialEndsAt.toISOString()}`);
-    }
-    
-    // Check if trial has expired and mark as expired (do NOT auto-convert)
-    // Admin must manually convert after payment/contract confirmation
-    if (
-      tenant.subscriptionStatus === "trial" &&
-      tenant.trialEndsAt &&
-      tenant.trialEndsAt < now
-    ) {
-      console.log(`[GET /tenants/:id] Trial expired for tenant ${tenant.id}. Marking as expired.`);
-      tenant = await prisma.tenant.update({
-        where: { id: tenant.id },
-        data: {
-          subscriptionStatus: "expired",
-        },
-      });
-      console.log(`[GET /tenants/:id] Tenant ${tenant.id} marked as expired. Admin action required.`);
-    }
-    
-    res.json(tenant);
-  } catch (_e) {
-    res.status(500).json({ error: "failed_to_get_tenant" });
-  }
-});
 
-const createTenantSchema = z.object({ name: z.string().min(1) });
-app.post("/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
-  const parsed = createTenantSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-  
+app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
-    console.log('[POST /tenants] Creating tenant for user:', req.user?.userId);
-    
-    // Set trial to expire 30 days from now
-    const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-    
-    const tenant = await prisma.tenant.create({
-      data: {
-        name: parsed.data.name,
-        subscriptionTier: 'starter',
-        subscriptionStatus: 'trial',
-        trialEndsAt: trialEndsAt,
+    let tenant: any = await prisma.tenants.findUnique({
+      where: { id: req.params.id as string },
+      select: {
+        id: true,
+        name: true,
+        created_at: true,
+        region: true,
+        language: true,
+        currency: true,
+        subscription_status: true,
+        subscription_tier: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        grace_ends_at: true,
+        stripe_customer_id: true,
+        stripe_subscription_id: true,
+        organization_id: true,
+        service_level: true,
+        managed_services_active: true,
+        dedicated_manager: true,
+        monthly_sku_quota: true,
+        skus_added_this_month: true,
+        google_business_access_token: true,
+        google_business_refresh_token: true,
+        google_business_token_expiry: true,
+        created_by: true,
+        location_status: true,
+        status_changed_at: true,
+        status_changed_by: true,
+        reopening_date: true,
+        closure_reason: true,
+        slug: true,
+        google_sync_enabled: true,
+        google_last_sync: true,
+        google_product_count: true,
+        directory_visible: true,
+        metadata: true,
+        data_policy_accepted: true,
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
       }
     });
-    console.log('[POST /tenants] Tenant created:', tenant.id);
-    
-    // Link tenant to the authenticated user as owner
-    if (req.user?.userId) {
-      console.log('[POST /tenants] Linking tenant to user...');
-      await prisma.userTenant.create({
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
+
+    // Fetch current slug and published status from directory_settings_list (source of truth)
+    const { basePrisma } = await import('./prisma');
+    // Check if tenant has published directory listing
+    const directoryResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant.id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
+    const hasDirectory = directoryResult?.is_published === true;
+    const directorySlug = directoryResult?.slug;
+    const currentSlug = directorySlug || tenant.slug;
+    const hasPublishedDirectory = directoryResult?.is_published === true;
+    // console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
+
+    const now = new Date();
+
+    // Auto-set trial expiration date if missing for trial users
+    if (
+      tenant.subscription_status === "trial" &&
+      !tenant.trial_ends_at
+    ) {
+      const trial_ends_at = new Date();
+      trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
+
+      tenant = await prisma.tenants.update({
+        where: { id: tenant.id },
         data: {
-          userId: req.user.userId,
-          tenantId: tenant.id,
-          role: 'OWNER',
+          trial_ends_at: trial_ends_at,
+          subscription_status: "trial",
         },
       });
-      console.log('[POST /tenants] UserTenant link created successfully');
-    } else {
-      console.error('[POST /tenants] No userId in request.user!', req.user);
     }
-    
-    await audit({ tenantId: tenant.id, actor: null, action: "tenant.create", payload: { name: parsed.data.name } });
+
+    // Check if trial has expired and mark as expired
+    // If there is no active subscription attached, downgrade tier to internal google_only
+    if (
+      tenant.subscription_status === "trial" &&
+      tenant.trial_ends_at &&
+      tenant.trial_ends_at < now
+    ) {
+      const hasStripeSubscription = !!tenant.stripe_subscription_id;
+
+
+      tenant = await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: {
+          subscription_status: "expired",
+          // For maintenance-only accounts without a paid subscription, force internal discovery tier
+          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : "discovery",
+        },
+      });
+    }
+
+    // Add location status info
+    const { getLocationStatusInfo } = await import('./utils/location-status');
+    const statusInfo = getLocationStatusInfo(tenant.location_status);
+
+    // Calculate effective expiration
+    // console.log('[INDEX TENANTS] Debug: Tenant data for effective expiration:', {
+    //   subscription_status: (tenant as any).subscription_status,
+    //   trial_ends_at: (tenant as any).trial_ends_at,
+    //   subscription_ends_at: (tenant as any).subscription_ends_at,
+    //   manual_subscription_control: (tenant as any).manual_subscription_control,
+    //   manual_subscription_expires_at: (tenant as any).manual_subscription_expires_at,
+    // });
+
+    const effectiveExpiration = (tenant as any).manual_subscription_control
+      ? {
+        expiresAt: (tenant as any).manual_subscription_expires_at,
+        type: 'manual' as const,
+        source: 'manual_override' as const
+      }
+      : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
+        ? {
+          expiresAt: (tenant as any).trial_ends_at,
+          type: 'trial' as const,
+          source: 'automatic_trial' as const
+        }
+        : (tenant as any).subscription_ends_at
+          ? {
+            expiresAt: (tenant as any).subscription_ends_at,
+            type: 'subscription' as const,
+            source: 'automatic_subscription' as const
+          }
+          : null;
+
+    // console.log('[INDEX TENANTS] Debug: Calculated effective expiration:', effectiveExpiration);
+
+    res.json({
+      ...tenant,
+      slug: currentSlug, // Use slug from directory_settings_list (source of truth)
+      hasPublishedDirectory,
+      statusInfo,
+      // Manual subscription control fields
+      manualSubscriptionControl: (tenant as any).manual_subscription_control,
+      manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
+      manualSubscriptionReason: (tenant as any).manual_subscription_reason,
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source
+    });
+  } catch (e: any) {
+    console.error('[GET /tenants/:id] Error:', e);
+    res.status(500).json({ error: "failed_to_get_tenant", details: e?.message });
+  }
+});
+
+const createTenantSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country_code: z.string().optional(),
+  ownerId: z.string().optional(), // Optional: specify a different owner (for PLATFORM_SUPPORT)
+  organizationId: z.string().optional(), // Optional: assign to organization during creation
+});
+app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
+  const parsed = createTenantSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+
+  try {
+    // Determine who will own this tenant
+    // If ownerId is provided and user is PLATFORM_SUPPORT, use that owner
+    // Otherwise, the authenticated user becomes the owner
+    const userId = req.user!.userId || req.user!.user_id;
+    if (!userId) {
+      return res.status(401).json({ error: 'authentication_required', message: 'Invalid user ID' });
+    }
+
+    const ownerId = (req.user?.role === user_role.PLATFORM_SUPPORT || req.user?.role === user_role.PLATFORM_ADMIN) && parsed.data.ownerId
+      ? parsed.data.ownerId
+      : userId;
+
+    // Check trial tenant limit for non-platform-admin owners
+    const ownerUser = await prisma.users.findUnique({
+      where: { id: ownerId },
+      select: { id: true, role: true }
+    });
+    const isOwnerPlatformAdmin = ownerUser?.role === USER_ROLES.PLATFORM_ADMIN || ownerUser?.role === USER_ROLES.ADMIN;
+    if (!isOwnerPlatformAdmin) {
+      const now = new Date();
+      const activeTrialCount = await prisma.tenants.count({
+        where: {
+          user_tenants: {
+            some: { user_id: ownerId }
+          },
+          subscription_status: 'trial',
+          OR: [
+            { trial_ends_at: { gt: now } },
+            { trial_ends_at: null }
+          ]
+        }
+      });
+      if (activeTrialCount >= 1) {
+        return res.status(409).json({
+          error: 'trial_limit_reached',
+          message: 'You already have an active trial tenant. Please upgrade your existing tenant or wait for your trial to expire before creating a new one.'
+        });
+      }
+    }
+
+    // Validate for duplicates (check against the owner, not the creator)
+    const { validateTenantCreation } = await import('./utils/tenant-validation');
+    const validation = await validateTenantCreation(
+      ownerId,
+      parsed.data.name
+    );
+
+    if (!validation.valid) {
+      return res.status(409).json({
+        error: 'duplicate_tenant',
+        message: 'A location with this information already exists',
+        validationErrors: validation.errors,
+      });
+    }
+
+    // Set trial to expire based on configured trial duration
+    const trial_ends_at = new Date();
+    trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
+
+    // Create tenant and link to user manually (not using $transaction to avoid issues)
+
+    // Good standing check for organization membership
+    if (parsed.data.organizationId) {
+      // Since new tenants start with 'starter' tier and 'trial' status,
+      // they are automatically in good standing for organization membership
+      // This validation is mainly for future-proofing and consistency
+      console.log('[POST /tenants] Assigning tenant to organization:', parsed.data.organizationId);
+    }
+
+    // Create the tenant first
+
+    const tenant = await prisma.tenants.create({
+      data: {
+        id: generateTenantId(),
+        name: parsed.data.name,
+        slug: parsed.data.slug,
+        created_by: req.user?.userId || null, // Optional field - null if user not authenticated
+        subscription_tier: 'discovery',
+        subscription_status: 'trial',
+        trial_ends_at: trial_ends_at,
+        location_status: 'active',
+        organization_id: parsed.data.organizationId || null,
+        metadata: {
+          city: parsed.data.city,
+          state: parsed.data.state,
+          country_code: parsed.data.country_code,
+        }
+      }
+    });
+
+
+    // Now create the UserTenant link (tenant should be committed now)
+
+    // Add debugging to check if tenant still exists before UserTenant creation
+    const tenantCheck = await prisma.tenants.findUnique({
+      where: { id: tenant.id }
+    });
+
+    if (!tenantCheck) {
+      console.error('[POST /tenants] CRITICAL: Tenant disappeared before UserTenant creation!');
+      return res.status(500).json({ error: "tenant_creation_failed", message: "Tenant was created but is no longer accessible" });
+    }
+
+    const userTenant = await prisma.user_tenants.create({
+      data: {
+        id: generateUserTenantId(ownerId, tenant.id),
+        user_id: ownerId,
+        tenant_id: tenant.id,
+        role: 'OWNER' as const,
+        updated_at: new Date(),
+      },
+    });
+
+
+    // Try to create initial status log (optional - don't fail if table doesn't exist)
+    try {
+      // Note: location_status_logs model is ignored in Prisma schema
+      // Skip creating status log for now
+      // await prisma.location_status_logs.create({
+      //   data: {
+      //     tenant_id: tenant.id,
+      //     oldStatus: 'pending', // New tenants start as pending
+      //     newStatus: 'active', // But get activated immediately
+      //     changedBy: req.user?.userId || 'system',
+      //     reason: 'Initial tenant creation',
+      //     reopening_date: null,
+      //     metadata: {
+      //       userAgent: req.headers['user-agent'] || null,
+      //       ip: req.ip || (Array.isArray(req.headers['x-forwarded-for']) 
+      //         ? req.headers['x-forwarded-for'][0] 
+      //         : req.headers['x-forwarded-for']) || null,
+      //     },
+      //   },
+      // });
+    } catch (logError: any) {
+      console.warn('[POST /tenants] Could not create initial status log (table may not exist):', logError.message);
+      // Don't fail the entire operation if logging fails
+    }
+
+    // Update the owner's platform role to OWNER if they don't already have a higher-level role
+    try {
+      const ownerUser = await prisma.users.findUnique({
+        where: { id: ownerId },
+        select: { id: true, role: true }
+      });
+      if (ownerUser && !ownerUser.role) {
+        await prisma.users.update({
+          where: { id: ownerId },
+          data: { role: USER_ROLES.OWNER }
+        });
+        console.log(`[POST /tenants] Updated owner ${ownerId} platform role to OWNER`);
+      }
+    } catch (roleError) {
+      console.warn('[POST /tenants] Could not update owner platform role:', roleError);
+      // Don't fail tenant creation if role update fails
+    }
+
+    await audit({ tenantId: tenant.id, actor: ownerId, action: "tenant.create", payload: { name: parsed.data.name, ownerId } });
     res.status(201).json(tenant);
   } catch (error) {
     console.error('[POST /tenants] Error creating tenant:', error);
     res.status(500).json({ error: "failed_to_create_tenant", message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
-
-const updateTenantSchema = z.object({ name: z.string().min(1) });
-app.put("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantAdmin, async (req, res) => {
+const updateTenantSchema = z.object({
+  name: z.string().min(1).optional(),
+  region: z.string().min(1).optional(),
+  language: z.string().min(1).optional(),
+  currency: z.string().min(1).optional(),
+});
+app.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   const parsed = updateTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
-    const tenant = await prisma.tenant.update({ where: { id: req.params.id }, data: { name: parsed.data.name } });
+    const data: any = {};
+    if (parsed.data.name !== undefined) data.name = parsed.data.name;
+    if (parsed.data.region !== undefined) data.region = parsed.data.region;
+    if (parsed.data.language !== undefined) data.language = parsed.data.language;
+    if (parsed.data.currency !== undefined) data.currency = parsed.data.currency;
+    const tenant = await prisma.tenants.update({ where: { id: req.params.id as string }, data });
     res.json(tenant);
-  } catch {
+  } catch (e) {
+    console.error('[PUT /tenants/:id] Error updating tenant:', e);
     res.status(500).json({ error: "failed_to_update_tenant" });
   }
 });
 
 // PATCH /tenants/:id - Update tenant subscription tier (admin only)
 const patchTenantSchema = z.object({
-  subscriptionTier: z.enum(['trial', 'starter', 'professional', 'enterprise']).optional(),
-  subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled']).optional(),
+  subscription_tier: z.enum(['google_only', 'discovery', 'starter', 'storefront', 'professional', 'commitment', 'enterprise', 'organization']).optional(),
+  subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
+  organization_id: z.string().optional(), // For linking to organization
 });
-app.patch("/tenants/:id", authenticateToken, requireAdmin, async (req, res) => {
+app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, async (req, res) => {
   const parsed = patchTenantSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
-    const tenant = await prisma.tenant.update({ 
-      where: { id: req.params.id }, 
-      data: parsed.data 
+    const tenant = await prisma.tenants.update({
+      where: { id: req.params.id as string },
+      data: parsed.data
     });
     res.json(tenant);
   } catch (e: any) {
@@ -249,52 +1101,2600 @@ app.patch("/tenants/:id", authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
+// POST /api/tenants/:id/geocode - Geocode tenant address and update coordinates
+app.post("/api/tenants/:id/geocode", async (req, res) => {
   try {
-    await prisma.tenant.delete({ where: { id: req.params.id } });
+    const { id } = req.params;
+    const { basePrisma } = await import('./prisma');
+
+    // Get tenant's address from directory_listings_list
+    const listingResult = await basePrisma.$queryRaw<any[]>`
+      SELECT address, city, state, zip_code, business_name
+      FROM directory_listings_list
+      WHERE tenant_id = ${id}
+      LIMIT 1
+    `;
+
+    if (!listingResult || listingResult.length === 0) {
+      console.log(`route: /api/tenants/:id/geocode`);
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    const listing = listingResult[0];
+    if (!listing.address || !listing.city || !listing.zip_code) {
+      return res.status(400).json({ error: "incomplete_address", message: "Address, city, and zip code are required for geocoding" });
+    }
+
+    // Build full address string
+    const fullAddress = [
+      listing.address,
+      listing.city,
+      listing.state,
+      listing.zip_code,
+      'USA'
+    ].filter(Boolean).join(', ');
+
+    console.log(`[POST /api/tenants/${id}/geocode] Geocoding address: ${fullAddress}`);
+
+    // Call Google Geocoding API
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "geocoding_not_configured", message: "Google Maps API key not configured" });
+    }
+
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`;
+    const geocodeResponse = await fetch(geocodeUrl);
+    const geocodeData = await geocodeResponse.json() as {
+      status: string;
+      results?: Array<{
+        geometry: {
+          location: {
+            lat: number;
+            lng: number;
+          };
+        };
+      }>;
+      error_message?: string;
+    };
+
+    if (geocodeData.status !== 'OK' || !geocodeData.results || geocodeData.results.length === 0) {
+      console.error(`[POST /api/tenants/${id}/geocode] Geocoding failed:`, geocodeData.status);
+      return res.status(400).json({ error: "geocoding_failed", status: geocodeData.status });
+    }
+
+    const location = geocodeData.results[0].geometry.location;
+    const latitude = location.lat;
+    const longitude = location.lng;
+
+    console.log(`[POST /api/tenants/${id}/geocode] Got coordinates: ${latitude}, ${longitude}`);
+
+    // Update both tables
+    await basePrisma.$executeRaw`
+      UPDATE "tenant_business_profiles_list" 
+      SET latitude = ${latitude}, 
+          longitude = ${longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
+    await basePrisma.$executeRaw`
+      UPDATE "directory_listings_list" 
+      SET latitude = ${latitude}, 
+          longitude = ${longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
+    console.log(`[POST /api/tenants/${id}/geocode] Updated coordinates for ${listing.business_name}`);
+
+    res.json({
+      success: true,
+      coordinates: { latitude, longitude },
+      address: fullAddress,
+      tenant_id: id,
+    });
+  } catch (error: any) {
+    console.error('[POST /api/tenants/:id/geocode] Error:', error);
+    res.status(500).json({ error: "geocoding_error", message: error.message });
+  }
+});
+
+// PATCH /api/tenants/:id/coordinates - Update tenant coordinates (for auto-geocoding)
+const coordinatesSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
+app.patch("/api/tenants/:id/coordinates", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const parsed = coordinatesSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_coordinates", details: parsed.error.flatten() });
+    }
+
+    // Update tenant coordinates in business profile
+    const { basePrisma } = await import('./prisma');
+    await basePrisma.$executeRaw`
+      UPDATE "tenant_business_profiles_list" 
+      SET latitude = ${parsed.data.latitude}, 
+          longitude = ${parsed.data.longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
+    // Also update directory_listings_list so coordinates appear in directory/map immediately
+    await basePrisma.$executeRaw`
+      UPDATE "directory_listings_list" 
+      SET latitude = ${parsed.data.latitude}, 
+          longitude = ${parsed.data.longitude},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ${id}
+    `;
+
+    // Refresh directory_gbp_listings MV to pick up new coordinates
+    // This MV is used by recommendation MVs, so it needs to be current
+    await basePrisma.$executeRaw`
+      REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_listings
+    `;
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id },
+    });
+
+    console.log(`[PATCH /api/tenants/${id}/coordinates] Updated coordinates for ${tenant?.name || 'unknown'} in business_profiles, directory_listings, and refreshed directory_gbp_listings MV:`, parsed.data);
+
+    res.json({
+      success: true,
+      coordinates: parsed.data,
+      tenant_id: id,
+    });
+  } catch (error: any) {
+    console.error('[PATCH /api/tenants/:id/coordinates] Error:', error);
+    if (error.code === 'P2025') {
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+    res.status(500).json({ error: "failed_to_update_coordinates" });
+  }
+});
+
+app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireRoleGroup('IS_TENANT_OWNER'), async (req, res) => {
+  try {
+    const tenant_id = req.params.id;
+
+    // Explicitly delete directory-related data to prevent orphaned listings
+    await prisma.directory_featured_listings_list.deleteMany({
+      where: { tenant_id: req.params.id as string },
+    });
+
+    await prisma.directory_settings_list.deleteMany({
+      where: { tenant_id: req.params.id as string },
+    });
+
+    // Find owners before deleting the tenant so we can check their remaining tenants afterward
+    const ownersBeforeDelete = await prisma.user_tenants.findMany({
+      where: {
+        tenant_id: req.params.id as string,
+        role: 'OWNER',
+      },
+      select: { user_id: true },
+    });
+
+    // Delete the tenant (cascade will handle other relations)
+    await prisma.tenants.delete({ where: { id: req.params.id as string } });
+
+    // Downgrade global role for any owner whose last tenant was just deleted
+    for (const { user_id } of ownersBeforeDelete) {
+      const remainingTenants = await prisma.user_tenants.count({
+        where: { user_id },
+      });
+      if (remainingTenants === 0) {
+        await prisma.users.update({
+          where: { id: user_id },
+          data: { role: USER_ROLES.USER },
+        });
+        console.log(`[Audit] Downgraded user ${user_id} from OWNER to USER (last tenant deleted)`);
+      }
+    }
+
+    console.log(`[Audit] Tenant deleted: ${tenant_id} (including directory listings)`);
     res.status(204).end();
-  } catch {
+  } catch (error: any) {
+    console.error('[DELETE /tenants/:id] Error:', error);
     res.status(500).json({ error: "failed_to_delete_tenant" });
   }
 });
 
+// Location Status Management Endpoints
+import {
+  validateStatusChange,
+  canChangeStatus,
+  getLocationStatusInfo,
+  getStatusChangeImpact,
+  getStatusTransitions,
+  UserRole
+} from './utils/location-status';
+
+// Change location status
+app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async (req, res) => {
+  const startTime = Date.now();
+  const { id } = req.params;
+  const { status, reason, reopening_date } = req.body;
+
+  console.log(`[PATCH /tenants/${id}/status] Starting status change request`, {
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    tenant_id: id,
+    requestedStatus: status,
+    reason: reason?.substring(0, 100), // Truncate long reasons
+    reopening_date,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    // Check if user can change status
+    const userRole = req.user?.role || 'USER';
+    // Map deprecated roles to valid UserRole values
+    let normalizedRole: user_role;
+    switch (userRole) {
+      case 'ADMIN':
+        normalizedRole = user_role.PLATFORM_ADMIN;
+        break;
+      case 'OWNER':
+        normalizedRole = user_role.TENANT_OWNER;
+        break;
+      case 'USER':
+        normalizedRole = user_role.TENANT_VIEWER;
+        break;
+      case user_role.ADMIN:
+        normalizedRole = user_role.PLATFORM_ADMIN;
+        break;
+      case user_role.OWNER:
+        normalizedRole = user_role.TENANT_OWNER;
+        break;
+      case 'USER':
+        normalizedRole = user_role.TENANT_VIEWER;
+        break;
+      default:
+        // Try to map existing valid roles, default to viewer for safety
+        normalizedRole = (['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'PLATFORM_VIEWER', 'TENANT_OWNER', 'TENANT_ADMIN', 'TENANT_MANAGER', 'TENANT_MEMBER', 'TENANT_VIEWER'] as const).includes(userRole as UserRole)
+          ? userRole as UserRole
+          : 'TENANT_VIEWER';
+    }
+    const tenantRole = req.user?.tenantIds?.includes(id as string) ? 'TENANT_ADMIN' : normalizedRole;
+
+    console.log(`[PATCH /tenants/${id}/status] Permission check`, {
+      userRole,
+      normalizedRole,
+      tenantRole,
+      canChange: canChangeStatus(tenantRole)
+    });
+
+    if (!canChangeStatus(tenantRole)) {
+      console.log(`[PATCH /tenants/${id}/status] Permission denied for user ${req.user?.userId}`);
+      return res.status(403).json({
+        error: "insufficient_permissions",
+        message: "You don't have permission to change location status"
+      });
+    }
+
+    // Get current tenant
+    console.log(`[PATCH /tenants/${id}/status] Fetching tenant data`);
+    const tenant = await prisma.tenants.findUnique({ where: { id: id as string } });
+    if (!tenant) {
+      console.log(`[PATCH /tenants/${id}/status] Tenant not found`);
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    console.log(`[PATCH /tenants/${id}/status] Current tenant status`, {
+      currentStatus: tenant.location_status,
+      requestedStatus: status,
+      statusMatch: tenant.location_status === status
+    });
+
+    // Check if status is actually changing
+    if (tenant.location_status === status) {
+      console.log(`[PATCH /tenants/${id}/status] No change needed - tenant already has status '${status}'`);
+      const responseTime = Date.now() - startTime;
+      console.log(`[PATCH /tenants/${id}/status] Completed in ${responseTime}ms (no-op)`);
+      return res.json({
+        ...tenant,
+        statusInfo: getLocationStatusInfo(status),
+        message: "Status unchanged - no update performed"
+      });
+    }
+
+    // Validate status change
+    console.log(`[PATCH /tenants/${id}/status] Validating status change from '${tenant.location_status}' to '${status}'`);
+    const validation = validateStatusChange(tenant.location_status, status, reason);
+    if (!validation.valid) {
+      console.log(`[PATCH /tenants/${id}/status] Validation failed: ${validation.error}`);
+      return res.status(400).json({
+        error: "invalid_status_change",
+        message: validation.error
+      });
+    }
+
+    console.log(`[PATCH /tenants/${id}/status] Validation passed, preparing transaction`);
+
+    let auditLogId: string | null = null;
+
+    // Update tenant status (location status logs are ignored in Prisma schema)
+    const updated = await basePrisma.tenants.update({
+      where: { id: id as string },
+      data: {
+        location_status: status,
+        status_changed_at: new Date(),
+        status_changed_by: req.user?.userId,
+        reopening_date: reopening_date ? new Date(reopening_date) : null,
+        closure_reason: reason || null,
+      },
+    });
+
+    auditLogId = null; // No audit log created since model is ignored
+
+    console.log(`[PATCH /tenants/${id}/status] Transaction successful`, {
+      updatedTenantId: updated.id,
+      auditLogId,
+      newStatus: updated.location_status,
+    });
+
+    // Record status change in history (using raw SQL since table is ignored in Prisma)
+    try {
+      const { basePrisma } = await import('./prisma');
+      await basePrisma.$executeRaw`
+        INSERT INTO location_status_logs (
+          tenant_id, old_status, new_status, changed_by, reason, reopening_date
+        ) VALUES (
+          ${id}, ${tenant.location_status}::location_status, ${status}::location_status, ${req.user?.userId || null}, ${reason || null}, ${reopening_date ? new Date(reopening_date) : null}
+        )
+      `;
+      console.log(`[PATCH /tenants/${id}/status] Status change logged to history`);
+    } catch (historyError) {
+      console.error(`[PATCH /tenants/${id}/status] Failed to log status change to history:`, historyError);
+      // Don't fail the request if history logging fails
+    }
+
+    // Sync to Google Business Profile (async, don't block response)
+    const { syncLocationStatusToGoogle } = await import('./services/GoogleBusinessStatusSync');
+    console.log(`[PATCH /tenants/${id}/status] Triggering GBP sync`);
+    syncLocationStatusToGoogle(id as string, status, reopening_date ? new Date(reopening_date) : null)
+      .then((result) => {
+        if (result.success) {
+          console.log(`[Status Change] Google sync successful for tenant ${id}:`, result.gbpStatus);
+        } else if (result.skipped) {
+          console.log(`[Status Change] Google sync skipped for tenant ${id}:`, result.reason);
+        } else {
+          console.error(`[Status Change] Google sync failed for tenant ${id}:`, result.error);
+        }
+      })
+      .catch((error) => {
+        console.error(`[Status Change] Google sync error for tenant ${id}:`, error);
+      });
+
+    // TODO: Send notifications (Phase 6)
+
+    // Invalidate UniversalIdentifierCache so public API returns fresh data
+    try {
+      const { UniversalIdentifierCache } = await import('./services/UniversalIdentifierCache');
+      const cache = UniversalIdentifierCache.getInstance();
+      await cache.invalidateTenant(id as string);
+      console.log(`[PATCH /tenants/${id}/status] Cache invalidated for tenant ${id}`);
+    } catch (cacheError) {
+      console.error(`[PATCH /tenants/${id}/status] Failed to invalidate cache:`, cacheError);
+      // Don't fail the request if cache invalidation fails
+    }
+
+    const responseTime = Date.now() - startTime;
+    console.log(`[PATCH /tenants/${id}/status] Completed successfully in ${responseTime}ms`);
+
+    res.json({
+      ...updated,
+      statusInfo: getLocationStatusInfo(status),
+      auditLogId,
+    });
+  } catch (error: any) {
+    const responseTime = Date.now() - startTime;
+    console.error(`[PATCH /tenants/${id}/status] Error after ${responseTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      code: error.code,
+      meta: error.meta,
+      userId: req.user?.userId,
+      tenant_id: id,
+      requestedStatus: status
+    });
+    res.status(500).json({ error: "failed_to_update_status", details: error.message });
+  }
+});
+
+// Get status change impact preview
+app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const tenant = await prisma.tenants.findUnique({ where: { id: id as string } });
+    if (!tenant) {
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    const impact = getStatusChangeImpact(tenant.location_status as any, status);
+
+    // For preview, only check if transition is allowed (don't require reason yet)
+    const allowedTransitions = getStatusTransitions(tenant.location_status as any);
+    const valid = allowedTransitions.includes(status);
+    const error = valid ? undefined : `Cannot transition from ${tenant.location_status} to ${status}. Allowed transitions: ${allowedTransitions.join(', ')}`;
+
+    res.json({
+      currentStatus: tenant.location_status,
+      newStatus: status,
+      valid,
+      error,
+      impact,
+    });
+  } catch (error: any) {
+    console.error('[POST /api/tenants/:id/status/preview] Error:', error);
+    res.status(500).json({ error: "failed_to_preview_status", details: error.message });
+  }
+});
+app.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    // Fetch status history using raw SQL
+    const { basePrisma } = await import('./prisma');
+    const historyResults = await basePrisma.$queryRaw`
+      SELECT 
+        id, tenant_id, old_status::text, new_status::text, changed_by, reason, reopening_date, created_at
+      FROM location_status_logs 
+      WHERE tenant_id = ${id}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+
+    // Enrich with user information and status info
+    const history = (historyResults as any[]).map(log => ({
+      id: log.id,
+      tenantId: log.tenant_id,
+      oldStatus: log.old_status,
+      newStatus: log.new_status,
+      changedBy: log.changed_by,
+      reason: log.reason,
+      reopeningDate: log.reopening_date,
+      createdAt: log.created_at,
+      oldStatusInfo: getLocationStatusInfo(log.old_status),
+      newStatusInfo: getLocationStatusInfo(log.new_status),
+    }));
+
+    res.json({
+      history,
+      count: history.length,
+    });
+  } catch (error: any) {
+    console.error('[GET /api/tenants/:id/status-history] Error:', error);
+    res.status(500).json({ error: "failed_to_get_status_history", details: error.message });
+  }
+});
+
+// Get tenants by status (admin only)
+app.get("/api/tenants/by-status/:status", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 25;
+    const skip = (page - 1) * limit;
+
+    const [tenants, total] = await Promise.all([
+      prisma.tenants.findMany({
+        where: { location_status: status as any },
+        skip,
+        take: limit,
+        orderBy: { status_changed_at: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          location_status: true,
+          status_changed_at: true,
+          status_changed_by: true,
+          reopening_date: true,
+          closure_reason: true,
+          subscription_tier: true,
+          subscription_status: true,
+        },
+      }),
+      prisma.tenants.count({ where: { location_status: status as any } }),
+    ]);
+
+    res.json({
+      tenants,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('[GET /api/tenants/by-status/:status] Error:', error);
+    res.status(500).json({ error: "failed_to_get_tenants", details: error.message });
+  }
+});
+
 // Tenant profile (business information)
+const E164 = /^\+[1-9]\d{1,14}$/; // E.164 phone pattern: MUST start with '+'
+const HTTPS_URL = /^https:\/\//i;
+
 const tenantProfileSchema = z.object({
   tenant_id: z.string().min(1),
   business_name: z.string().min(1).optional(),
+  slug: z.string().optional().nullable().transform(v => v || undefined),
   address_line1: z.string().optional(),
-  address_line2: z.string().optional(),
+  address_line2: z.string().optional().nullable().transform(v => v || undefined),
   city: z.string().optional(),
   state: z.string().optional(),
   postal_code: z.string().optional(),
-  country_code: z.string().optional(),
-  phone_number: z.string().optional(),
+  country_code: z.string().length(2).optional(),
+  phone_number: z
+    .string()
+    .refine((v) => !v || E164.test(v), { message: "phone_must_be_e164" })
+    .optional(),
   email: z.string().email().optional(),
-  website: z.string().url().optional(),
+  website: z
+    .string()
+    .refine((v) => {
+      if (!v) return true; // Allow empty
+      try {
+        new URL(v); // Check if it's a valid URL
+        return HTTPS_URL.test(v); // Check if it starts with https://
+      } catch {
+        return false; // Invalid URL format
+      }
+    }, { message: "Invalid URL" })
+    .optional()
+    .nullable()
+    .transform(v => v || undefined),
   contact_person: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
+  banner_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
+  business_description: z.string().optional().nullable().transform(v => v || undefined),
+  hours: z.any().optional(),
+  social_links: z.any().optional(),
+  seo_tags: z.any().optional(),
+  latitude: z.union([z.number(), z.string()]).optional().nullable().transform(v => {
+    if (v === null || v === undefined) return undefined;
+    const num = typeof v === 'string' ? parseFloat(v) : v;
+    return isNaN(num) ? undefined : num;
+  }),
+  longitude: z.union([z.number(), z.string()]).optional().nullable().transform(v => {
+    if (v === null || v === undefined) return undefined;
+    const num = typeof v === 'string' ? parseFloat(v) : v;
+    return isNaN(num) ? undefined : num;
+  }),
+  display_map: z.boolean().optional(),
+  map_privacy_mode: z.enum(["precise", "neighborhood"]).optional(),
 });
 
-app.post("/tenant/profile", authenticateToken, async (req, res) => {
+app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-  
+  if (!parsed.success) {
+    console.error('[POST /tenant/profile] Validation failed:', parsed.error.flatten());
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
+
   try {
     const { tenant_id, ...profileData } = parsed.data;
-    
-    // Update tenant with business profile data
-    const tenant = await prisma.tenant.update({
-      where: { id: tenant_id },
-      data: {
-        name: profileData.business_name || undefined,
-        // Store additional profile data in metadata JSON field
-        metadata: profileData as any,
+    console.log('[POST /tenant/profile] Starting for tenant:', tenant_id);
+    console.log('[POST /tenant/profile] Profile data:', profileData);
+
+    const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!existingTenant) {
+      console.error('[POST /tenant/profile] Tenant not found:', tenant_id);
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+    console.log('[POST /tenant/profile] Found tenant:', existingTenant.name);
+
+    // Ensure the current user has OWNER role for this tenant (defensive check)
+    // Skip for platform admins who may legitimately update any tenant profile
+    const currentUserId = req.user?.id;
+    const isPlatformAdmin = req.user?.role === USER_ROLES.PLATFORM_ADMIN || req.user?.role === USER_ROLES.ADMIN;
+    if (currentUserId && !isPlatformAdmin) {
+      const existingUserTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: currentUserId,
+            tenant_id: tenant_id,
+          },
+        },
+      });
+      if (!existingUserTenant) {
+        await prisma.user_tenants.create({
+          data: {
+            id: generateUserTenantId(currentUserId, tenant_id),
+            user_id: currentUserId,
+            tenant_id: tenant_id,
+            role: USER_ROLES.OWNER,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        });
+        console.log('[POST /tenant/profile] Created user_tenants OWNER link for user:', currentUserId);
+      } else if (existingUserTenant.role !== USER_ROLES.OWNER) {
+        await prisma.user_tenants.update({
+          where: { id: existingUserTenant.id },
+          data: {
+            role: USER_ROLES.OWNER,
+            updated_at: new Date(),
+          },
+        });
+        console.log('[POST /tenant/profile] Updated user_tenants role to OWNER for user:', currentUserId);
+      }
+    }
+
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Import basePrisma to bypass retry wrapper
+    const { basePrisma } = await import('./prisma');
+
+    // Check if profile exists
+    const existingProfiles = await basePrisma.$queryRaw`
+      SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+    `;
+    console.log('[POST /tenant/profile] Existing profiles check result:', existingProfiles);
+
+    let result;
+    if ((existingProfiles as any[]).length > 0) {
+      console.log('[POST /tenant/profile] Updating existing profile');
+      // Update existing profile - build dynamic update query
+      const updateParts = [];
+      const values = [];
+
+      Object.entries(profileData).forEach(([key, value]) => {
+        // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
+        if (key === 'slug') return;
+        if (value !== undefined) {
+          // Cast arrays and JSON fields to JSON for jsonb columns
+          if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
+            updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+            values.push(JSON.stringify(value));
+          } else if (key === 'hours' && typeof value === 'string') {
+            // Handle hours field - if it's a string, parse it as JSON or cast to JSON
+            try {
+              // Try to parse as JSON first
+              const parsed = JSON.parse(value || '{}');
+              updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+              values.push(JSON.stringify(parsed));
+            } catch {
+              // If parsing fails, treat empty string as empty JSON object
+              updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+              values.push(value ? JSON.stringify(value) : '{}');
+            }
+          } else if ((key === 'seo_tags' || key === 'social_links') && typeof value === 'string') {
+            // Handle empty strings for jsonb array fields
+            updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+            values.push(value ? JSON.stringify([value]) : '[]');
+          } else {
+            updateParts.push(`"${key}" = $${values.length + 1}`);
+            values.push(value === '' ? null : value);
+          }
+        }
+      });
+
+      if (updateParts.length > 0) {
+        updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(tenant_id); // Add tenant_id at the end
+        const updateQuery = `
+          UPDATE "tenant_business_profiles_list"
+          SET ${updateParts.join(', ')}
+          WHERE tenant_id = $${values.length}
+        `;
+        console.log('[POST /tenant/profile] Update query:', updateQuery);
+        console.log('[POST /tenant/profile] Update values:', values);
+        await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+        console.log('[POST /tenant/profile] Update executed successfully');
+      }
+
+      // Get updated profile (exclude geography column to avoid Prisma deserialization error)
+      result = await basePrisma.$queryRaw`
+        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+      `;
+      console.log('[POST /tenant/profile] Retrieved updated profile');
+    } else {
+      console.log('[POST /tenant/profile] Creating new profile');
+      // Create new profile
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertValues = [
+        tenant_id,
+        profileData.business_name || existingTenant.name,
+        profileData.address_line1 || '',
+        profileData.city || '',
+        profileData.postal_code || '',
+        (profileData.country_code || 'US').toUpperCase()
+      ];
+      console.log('[POST /tenant/profile] Insert fields:', insertFields);
+      console.log('[POST /tenant/profile] Insert values:', insertValues);
+
+      // Add optional fields
+      const optionalMappings: Record<string, any> = {
+        address_line2: profileData.address_line2,
+        state: profileData.state,
+        phone_number: profileData.phone_number,
+        email: profileData.email,
+        website: profileData.website,
+        contact_person: profileData.contact_person,
+        logo_url: profileData.logo_url,
+        banner_url: profileData.banner_url,
+        business_description: profileData.business_description,
+        hours: (profileData as any).hours,
+        social_links: (profileData as any).social_links,
+        seo_tags: (profileData as any).seo_tags,
+        latitude: (profileData as any).latitude,
+        longitude: (profileData as any).longitude,
+        display_map: (profileData as any).display_map,
+        map_privacy_mode: (profileData as any).map_privacy_mode,
+      };
+
+      // Add optional fields to insert
+      Object.entries(optionalMappings).forEach(([key, value]) => {
+        if (value !== undefined) {
+          insertFields.push(key);
+          // Cast arrays and JSON fields to JSON for jsonb columns
+          if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
+            insertValues.push(JSON.stringify(value));
+          } else if (key === 'hours' && typeof value === 'string') {
+            // Handle hours field - if it's a string, parse it as JSON or cast to JSON
+            try {
+              // Try to parse as JSON first
+              const parsed = JSON.parse(value || '{}');
+              insertValues.push(JSON.stringify(parsed));
+            } catch {
+              // If parsing fails, treat empty string as empty JSON object
+              insertValues.push(value ? JSON.stringify(value) : '{}');
+            }
+          } else if ((key === 'seo_tags' || key === 'social_links') && typeof value === 'string') {
+            // Handle empty strings for jsonb array fields
+            insertValues.push(value ? JSON.stringify([value]) : '[]');
+          } else {
+            insertValues.push(value);
+          }
+        }
+      });
+
+      // Always add updated_at field with current timestamp
+      insertFields.push('updated_at');
+      // Don't push a value for updated_at, we'll use CURRENT_TIMESTAMP in SQL
+
+      // Build placeholders with JSON cast for jsonb columns
+      const placeholders = insertFields.map((field, i) => {
+        if (field === 'updated_at') {
+          return 'CURRENT_TIMESTAMP';
+        }
+        // Calculate parameter index excluding updated_at
+        const paramIndex = insertFields.slice(0, i).filter(f => f !== 'updated_at').length + 1;
+        const value = insertValues[paramIndex - 1];
+        // Add ::jsonb cast for jsonb columns
+        if (Array.isArray(value) && (field === 'seo_tags' || field === 'social_links')) {
+          return `$${paramIndex}::jsonb`;
+        } else if (field === 'hours') {
+          return `$${paramIndex}::jsonb`;
+        } else if (field === 'seo_tags' || field === 'social_links') {
+          return `$${paramIndex}::jsonb`;
+        }
+        return `$${paramIndex}`;
+      });
+
+      const insertQuery = `
+        INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+      console.log('[POST /tenant/profile] Insert query:', insertQuery);
+      console.log('[POST /tenant/profile] Final insert values:', insertValues);
+
+      result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
+        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
+      );
+      console.log('[POST /tenant/profile] Created new profile');
+    }
+
+    // Keep Tenant.name in sync
+    if (profileData.business_name) {
+      console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
+      await prisma.tenants.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
+    }
+
+    // Update slug in directory_settings_list if explicitly provided
+    if ((profileData as any).slug) {
+      console.log('[POST /tenant/profile] Updating slug to:', (profileData as any).slug);
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.updateSlug(tenant_id, (profileData as any).slug);
+        console.log('[POST /tenant/profile] Slug updated successfully');
+      } catch (slugError) {
+        console.error('[POST /tenant/profile] Failed to update slug:', slugError);
+        // Don't fail the entire request if slug update fails
+      }
+    } else if (profileData.business_name) {
+      // Auto-regenerate slug when business name changes (only if slug not explicitly provided)
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
+        console.log('[POST /tenant/profile] Slug regenerated from new business name');
+      } catch (slugError) {
+        console.warn('[POST /tenant/profile] Failed to regenerate slug:', slugError);
+        // Don't fail the entire request if slug regeneration fails
+      }
+    }
+
+    console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
+
+    // Fetch slug from directory_settings_list and include in response
+    const slugResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
+    const hasDirectory = slugResult?.is_published === true;
+    const slug = slugResult?.slug || null;
+
+    const responseWithSlug = {
+      ...(result as any)[0] || result,
+      slug
+    };
+
+    res.json(responseWithSlug);
+  } catch (e: any) {
+    console.error("[POST /tenant/profile] Full error details:", {
+      message: e?.message,
+      stack: e?.stack,
+      code: e?.code,
+      name: e?.name,
+      tenant_id: req.body?.tenant_id
+    });
+    res.status(500).json({ error: "failed_to_save_profile" });
+  }
+});
+
+// GET /api/tenant/profile - retrieve normalized profile
+app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
+  try {
+    const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
+
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Exclude geography column to avoid Prisma deserialization error
+    const { basePrisma } = await import('./prisma');
+    const bpResults = await basePrisma.$queryRaw`
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const bp = (bpResults as any[])[0] || null;
+
+    // Fetch slug from directory_settings_list
+    const slugResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true,
+        slug: true
+      }
+    });
+
+    // const hasDirectory = slugResult?.is_published === true;
+    const slug = slugResult?.slug || tenant.slug || null;
+
+    // Fetch business hours from BusinessHours table (optional - tables may not exist)
+    let businessHours = null;
+    let specialHours = null;
+    try {
+      const businessHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenant_id}
+      `;
+      businessHours = (businessHoursResults as any[])[0] || null;
+
+      const specialHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenant_id}
+      `;
+      specialHours = (specialHoursResults as any[])[0] || null;
+    } catch (error) {
+      // Business hours tables don't exist yet - continue without them
+      console.log('[GET /tenant/profile] Business hours tables not found, continuing without them');
+    }
+
+
+    // Check if tenant has published directory listing
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    const hasDirectory = tenantResult?.is_published === true;
+
+    const md = (tenant.metadata as any) || {};
+    const profile = {
+      tenant_id: tenant.id,
+      business_name: bp?.businessName || md.businessName || tenant.name || null,
+      address_line1: bp?.address_line1 || md.address_line1 || null,
+      address_line2: bp?.address_line2 || md.address_line2 || null,
+      city: bp?.city || md.city || null,
+      state: bp?.state || md.state || null,
+      postal_code: bp?.postal_code || md.postal_code || null,
+      country_code: bp?.country_code || md.country_code || null,
+      phone_number: bp?.phone_number || md.phone_number || null,
+      email: bp?.email || md.email || null,
+      website: bp?.website || md.website || null,
+      contact_person: bp?.contact_person || md.contact_person || null,
+      logo_url: bp?.logo_url ?? md.logo_url ?? null,
+      banner_url: bp?.banner_url ?? md.banner_url ?? null,
+      business_description: bp?.business_description || md.business_description || null,
+      hours: bp?.hours || md.hours || null,
+      social_links: bp?.social_links || md.social_links || null,
+      seo_tags: bp?.seo_tags || md.seo_tags || null,
+      latitude: bp?.latitude ? Number(bp.latitude) : (md.latitude || null),
+      longitude: bp?.longitude ? Number(bp.longitude) : (md.longitude || null),
+      display_map: bp?.display_map ?? md.display_map ?? false,
+      map_privacy_mode: bp?.map_privacy_mode || md.map_privacy_mode || 'precise',
+      // GBP category fields from new dedicated columns (with fallbacks)
+      gbpCategoryId: tenant.gbp_primary_category_id || bp?.gbp_category_id || null,
+      gbpCategoryName: tenant.gbp_primary_category_name || bp?.gbp_category_name || null,
+      gbpCategoryLastMirrored: tenant.gbp_categories_last_synced_at || bp?.gbp_category_last_mirrored || null,
+      gbpCategorySyncStatus: tenant.gbp_categories_sync_status || bp?.gbp_category_sync_status || null,
+      // Secondary categories from new dedicated column (with fallback)
+      gbpSecondaryCategories: tenant.gbp_secondary_categories || md?.gbp_categories?.secondary || [],
+      // Slug from directory_settings_list
+      slug,
+      // Whether tenant has published directory listing
+      hasPublishedDirectory: hasDirectory,
+    };
+    return res.json(profile);
+  } catch (e: any) {
+    console.error("[GET /tenant/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// PUT /api/tenant/gbp-category - update GBP categories
+app.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, primary, secondary } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: "tenant_required" });
+    }
+
+    if (!primary || !primary.id || !primary.name) {
+      return res.status(400).json({ error: "primary_category_required" });
+    }
+
+    console.log('[PUT /api/tenant/gbp-category] Updating GBP categories for tenant:', tenantId);
+    console.log('[PUT /api/tenant/gbp-category] Primary:', primary);
+    console.log('[PUT /api/tenant/gbp-category] Secondary:', secondary);
+
+    // Update business profile with GBP categories using raw SQL
+    // (Prisma client needs regeneration to recognize these fields)
+    const pool = getDirectPool();
+
+    // First, ensure the GBP category exists in gbp_categories_list
+    // Insert if not exists (upsert)
+    await pool.query(
+      `INSERT INTO gbp_categories_list (id, name, display_name, created_at, updated_at)
+       VALUES ($1, $2, $2, NOW(), NOW())
+       ON CONFLICT (id) DO UPDATE
+       SET name = EXCLUDED.name,
+           display_name = EXCLUDED.display_name,
+           updated_at = NOW()`,
+      [primary.id, primary.name]
+    );
+
+    console.log('[PUT /api/tenant/gbp-category] GBP category ensured in gbp_categories_list');
+
+    // Also ensure secondary categories exist in gbp_categories_list
+    if (secondary && Array.isArray(secondary)) {
+      for (const secCategory of secondary) {
+        if (secCategory.id && secCategory.name) {
+          await pool.query(
+            `INSERT INTO gbp_categories_list (id, name, display_name, created_at, updated_at)
+             VALUES ($1, $2, $2, NOW(), NOW())
+             ON CONFLICT (id) DO UPDATE
+             SET name = EXCLUDED.name,
+                 display_name = EXCLUDED.display_name,
+                 updated_at = NOW()`,
+            [secCategory.id, secCategory.name]
+          );
+        }
+      }
+      console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories ensured in gbp_categories_list`);
+    }
+
+    // Now update the business profile
+    await pool.query(
+      `UPDATE tenant_business_profiles_list
+       SET gbp_category_id = $1,
+           gbp_category_name = $2,
+           gbp_category_sync_status = 'synced',
+           gbp_category_last_mirrored = NOW(),
+           updated_at = NOW()
+       WHERE tenant_id = $3`,
+      [primary.id, primary.name, tenantId]
+    );
+
+    console.log('[PUT /api/tenant/gbp-category] Business profile updated successfully');
+
+    // Update tenants with new dedicated GBP columns instead of metadata
+    await pool.query(
+      `UPDATE tenants
+       SET 
+         gbp_primary_category_id = $1,
+         gbp_primary_category_name = $2,
+         gbp_secondary_categories = $3,
+         gbp_categories_sync_status = 'synced',
+         gbp_categories_last_synced_at = NOW()
+       WHERE id = $4`,
+      [
+        primary.id,
+        primary.name,
+        JSON.stringify(secondary || []),
+        tenantId
+      ]
+    );
+
+    console.log('[PUT /api/tenant/gbp-category] Updated tenants table with dedicated GBP columns');
+
+    // NEW: Update junction table with clean relational design
+    // Delete existing categories for this tenant
+    await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
+
+    // Insert primary category
+    await pool.query(
+      `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
+       VALUES ($1, $2, 'primary')`,
+      [tenantId, primary.id]
+    );
+
+    console.log('[PUT /api/tenant/gbp-category] Primary category added to junction table');
+
+    // Insert secondary categories
+    if (secondary && secondary.length > 0) {
+      for (const secCategory of secondary) {
+        await pool.query(
+          `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type)
+           VALUES ($1, $2, 'secondary')`,
+          [tenantId, secCategory.id]
+        );
+      }
+      console.log(`[PUT /api/tenant/gbp-category] ${secondary.length} secondary categories added to junction table`);
+    }
+
+    // Sync GBP categories to gbp_listing_categories junction table
+    // Delete existing associations
+    await pool.query(
+      'DELETE FROM gbp_listing_categories WHERE listing_id = $1',
+      [tenantId]
+    );
+
+    // Insert primary category
+    await pool.query(
+      `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
+       VALUES ($1, $2, true)`,
+      [tenantId, primary.id]
+    );
+
+    // Insert secondary categories
+    if (secondary && secondary.length > 0) {
+      for (const cat of secondary) {
+        await pool.query(
+          `INSERT INTO gbp_listing_categories (listing_id, gbp_category_id, is_primary)
+           VALUES ($1, $2, false)`,
+          [tenantId, cat.id]
+        );
+      }
+    }
+
+    console.log('[PUT /api/tenant/gbp-category] Synced GBP categories to gbp_listing_categories');
+
+    // The trigger will automatically refresh the materialized view (with debounce)
+
+    return res.json({
+      success: true,
+      message: 'GBP categories updated and synced to directory'
+    });
+  } catch (e: any) {
+    console.error("[PUT /api/tenant/gbp-category] Error:", e);
+    return res.status(500).json({ error: "failed_to_update_gbp_category", message: e.message });
+  }
+});
+
+// Public endpoint to get basic tenant info (no auth required)
+app.get("/public/tenant/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenant_id }
+    });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
+
+    // Check location status for storefront visibility
+    const { shouldShowStorefront, getStorefrontMessage } = await import('./utils/location-status');
+    const location_status = tenant.location_status as any || 'active';
+    const canShowStorefront = shouldShowStorefront(location_status);
+    const storefrontMessage = getStorefrontMessage(location_status, tenant.reopening_date);
+
+    // Check if tenant has storefront access (tier-based)
+    const tier = tenant.subscription_tier as string;
+    const hasStorefrontAccess = tier !== 'google_only' && tier !== 'discovery'; // google_only and discovery don't have storefront
+    // Check if tenant has published directory listing
+    // Check if tenant has published directory listing
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    const hasDirectory = tenantResult?.is_published === true;
+
+    // Storefront is accessible if: tier allows it AND location status allows it
+    const finalStorefrontAccess = hasStorefrontAccess && canShowStorefront;
+
+    // Return basic public tenant information with access status
+    return res.json({
+      id: tenant.id,
+      name: tenant.name,
+      subscription_tier: tenant.subscription_tier,
+      has_published_directory: hasDirectory,
+      metadata: tenant.metadata,
+      location_status,
+      reopening_date: tenant.reopening_date,
+      // Add GBP category fields
+      gbp_primary_category_id: tenant.gbp_primary_category_id,
+      gbp_primary_category_name: tenant.gbp_primary_category_name,
+      gbp_secondary_categories: tenant.gbp_secondary_categories,
+      gbp_categories_sync_status: tenant.gbp_categories_sync_status,
+      access: {
+        storefront: finalStorefrontAccess,
+      },
+      storefrontMessage: storefrontMessage || undefined,
+    });
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenant_id] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_tenant" });
+  }
+});
+
+// Public endpoint to get tenant product preview (SWIS - Store Window Inventory Showcase)
+app.get("/tenant/:tenant_id/swis/preview", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 12;
+    const sort = (req.query.sort as string) || 'updated_desc';
+
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Build sort order
+    let orderBy: any = { updated_at: 'desc' };
+    switch (sort) {
+      case 'updated_desc':
+        orderBy = { updated_at: 'desc' };
+        break;
+      case 'updated_asc':
+        orderBy = { updated_at: 'asc' };
+        break;
+      case 'alpha_asc':
+        orderBy = { name: 'asc' };
+        break;
+      case 'alpha_desc':
+        orderBy = { name: 'desc' };
+        break;
+      case 'price_asc':
+        orderBy = { price: 'asc' };
+        break;
+      case 'price_desc':
+        orderBy = { price: 'desc' };
+        break;
+    }
+
+    // Fetch products
+    const products = await prisma.inventory_items.findMany({
+      where: { tenant_id: tenant_id },
+      orderBy,
+      take: limit,
+    });
+
+    return res.json({ products, total: products.length });
+  } catch (e: any) {
+    console.error("[GET /tenant/:tenant_id/swis/preview] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_preview" });
+  }
+});
+
+// Public endpoint for product pages to get tenant business profile (no auth required)
+app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
+
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    const { basePrisma } = await import('./prisma');
+    const bpResults = await basePrisma.$queryRaw`
+      SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const bp = (bpResults as any[])[0] || null;
+
+    // Fetch business hours from BusinessHours table (optional - tables may not exist)
+    let businessHours = null;
+    let specialHours = null;
+    try {
+      const businessHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_list" WHERE tenant_id = ${tenant_id}
+      `;
+      businessHours = (businessHoursResults as any[])[0] || null;
+
+      const specialHoursResults = await basePrisma.$queryRaw`
+        SELECT * FROM "business_hours_special_list" WHERE tenant_id = ${tenant_id}
+      `;
+      specialHours = (specialHoursResults as any[]) || [];
+    } catch (error) {
+      // Business hours tables don't exist yet - continue without them
+      console.log('[GET /public/tenant/:tenant_id/profile] Business hours tables not found, continuing without them');
+    }
+
+    let hoursData = null;
+
+    if (businessHours && businessHours.periods) {
+      // Convert periods array to day-keyed object for storefront
+      const periods = businessHours.periods as any[];
+      const hoursByDay: any = { timezone: businessHours.timezone || 'America/New_York' };
+
+      for (const period of periods) {
+        if (period.day && period.open && period.close) {
+          // Convert MONDAY to Monday for storefront compatibility
+          const dayName = period.day.charAt(0).toUpperCase() + period.day.slice(1).toLowerCase();
+          hoursByDay[dayName] = {
+            open: period.open,
+            close: period.close
+          };
+        }
+      }
+
+      // Add special hours overrides
+      if (specialHours && specialHours.length > 0) {
+        hoursByDay.special = specialHours.map((sh: any) => ({
+          date: sh.date.toISOString().split('T')[0], // YYYY-MM-DD format
+          isClosed: sh.isClosed || sh.is_closed || false,  // ✅ Handle both camelCase and snake_case
+          open: sh.open,
+          close: sh.close,
+          note: sh.note
+        }));
+        // console.log('[Profile API] Special hours raw data:', specialHours.map(sh => ({ isClosed: sh.isClosed, is_closed: sh.is_closed, date: sh.date })));
+        // console.log('[Profile API] Special hours processed:', hoursByDay.special);
+      }
+
+      hoursData = hoursByDay;
+      // console.log('[Profile API] Business hours for', tenant_id, ':', JSON.stringify(hoursData));
+    } else {
+      // console.log('[Profile API] No business hours found for', tenant_id);
+    }
+
+    const md = (tenant.metadata as any) || {};
+    // Check if tenant has published directory listing
+    // Check if tenant has published directory listing
+    const directoryResult = await prisma.directory_settings_list.findUnique({
+      where: { tenant_id: tenant_id },
+      select: {
+        is_published: true
+      }
+    });
+
+    // const hasDirectory = tenantResult?.is_published === true;
+    const hasPublishedDirectory = directoryResult && directoryResult.is_published === true;
+
+
+    // Return public business information only
+    const profile = {
+      business_name: bp?.business_name || md.businessName || tenant.name || null,
+      address_line1: bp?.address_line1 || md.address_line1 || null,
+      address_line2: bp?.address_line2 || md.address_line2 || null,
+      city: bp?.city || md.city || null,
+      state: bp?.state || md.state || null,
+      postal_code: bp?.postal_code || md.postal_code || null,
+      country_code: bp?.country_code || md.country_code || null,
+      phone_number: bp?.phone_number || md.phone_number || null,
+      email: bp?.email || md.email || null,
+      website: bp?.website || md.website || null,
+      contact_person: bp?.contact_person || md.contact_person || null,
+      logo_url: bp?.logo_url ?? md.logo_url ?? null,
+      banner_url: bp?.banner_url ?? md.banner_url ?? null,
+      business_description: bp?.business_description || md.business_description || null,
+      hours: hoursData || bp?.hours || md.hours || null,
+      social_links: bp?.social_links || md.social_links || null,
+      seo_tags: bp?.seo_tags || md.seo_tags || null,
+      latitude: bp?.latitude || md.latitude || null,
+      longitude: bp?.longitude || md.longitude || null,
+      metadata: tenant.metadata || null, // Include metadata for GBP categories
+      has_published_directory: hasPublishedDirectory,
+    };
+    return res.json(profile);
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenant_id/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_profile" });
+  }
+});
+
+// Public endpoint to get tenant items for storefront (no auth required)
+app.get("/public/tenant/:tenant_id/items", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Parse pagination params
+    const page = parseInt(req.query.page as string || '1', 10);
+    const limit = parseInt(req.query.limit as string || '12', 10);
+    const skip = (page - 1) * limit;
+    const search = req.query.search as string;
+    const categorySlug = req.query.category as string;
+
+    // Build where clause - only show active, public items
+    const where: any = {
+      tenant_id,
+      item_status: 'active',
+      visibility: 'public'
+    };
+
+    // Apply category filter
+    if (categorySlug) {
+      where.directoryCategory = {
+        slug: categorySlug,
+      };
+    }
+
+    // Apply search filter
+    if (search) {
+      const searchTerm = search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    // Fetch items with pagination (includes category relation for better UX)
+    const [items, totalCount] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        orderBy: { updated_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    // Return paginated response
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
       },
     });
-    
-    res.json(tenant);
   } catch (e: any) {
-    console.error("Failed to save tenant profile:", e);
-    res.status(500).json({ error: "failed_to_save_profile" });
+    console.error("[GET /public/tenant/:tenant_id/items] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_items" });
+  }
+});
+
+// Public endpoint to get tenant categories with product counts (no auth required)
+app.get("/public/tenant/:tenant_id/categories", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Import category count utility
+    const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
+
+    // Get categories with counts (only active, public products)
+    const categories = await getCategoryCounts(tenant_id, false);
+    const uncategorizedCount = await getUncategorizedCount(tenant_id, false);
+
+    // Calculate total correctly by summing numeric counts, not concatenating strings
+    const totalCount = categories.reduce((sum: number, cat: any) => sum + (Number(cat.count) || 0), 0);
+
+    // Clean response to avoid field duplication
+    const cleanResponse = {
+      categories,
+      uncategorized_count: uncategorizedCount,
+      total_count: totalCount,
+    };
+
+    // Send as raw JSON to bypass Express middleware that adds camelCase fields
+    const jsonString = JSON.stringify(cleanResponse);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(jsonString);
+  } catch (e: any) {
+    console.error("[GET /public/tenant/:tenant_id/categories] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_categories" });
+  }
+});
+
+// Public endpoint to get tenant payment gateway status (no auth required)
+app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Get tenant's payment gateways and Stripe Connect status in parallel
+    const [paymentGateways, stripeConnect] = await Promise.all([
+      prisma.tenant_payment_gateways.findMany({
+        where: {
+          tenant_id: tenant_id,
+          is_active: true,
+        },
+        select: {
+          id: true,
+          gateway_type: true,
+          is_active: true,
+          is_default: true,
+          config: true,
+          created_at: true,
+        },
+        orderBy: [
+          { is_default: 'desc' },
+          { created_at: 'desc' },
+        ],
+      }),
+      prisma.merchant_stripe_connections.findUnique({
+        where: { tenant_id: tenant_id },
+        select: {
+          onboarding_status: true,
+          stripe_payouts_enabled: true,
+          stripe_payments_enabled: true,
+        },
+      }),
+    ]);
+
+    // Add Stripe Connect as a gateway if it's active
+    const allGateways = [...paymentGateways];
+    if (stripeConnect && stripeConnect.onboarding_status === 'completed' && stripeConnect.stripe_payments_enabled) {
+      // Add Stripe as a virtual gateway
+      allGateways.push({
+        id: 'stripe_connect',
+        gateway_type: 'stripe',
+        is_active: true,
+        is_default: false, // Stripe Connect is never default (it's for platform revenue)
+        config: {
+          display_name: 'Stripe',
+        },
+        created_at: new Date(),
+      });
+    }
+
+    // Check if tenant has any active payment gateways
+    const hasActivePaymentGateway = allGateways.length > 0;
+
+    // Get default gateway type (first one with is_default=true, or first active gateway, excluding Stripe Connect)
+    const nonStripeGateways = allGateways.filter(pg => pg.gateway_type !== 'stripe');
+    const defaultGateway = nonStripeGateways.find(pg => pg.is_default) || nonStripeGateways[0];
+    const defaultGatewayType = defaultGateway?.gateway_type || null;
+
+    res.json({
+      success: true,
+      hasActivePaymentGateway,
+      defaultGatewayType,
+      gateways: allGateways.map(pg => {
+        const config = pg.config as any || {};
+        // Provide friendly display names for common gateways
+        let displayName = config.display_name;
+        if (!displayName) {
+          switch (pg.gateway_type.toLowerCase()) {
+            case 'paypal':
+              displayName = 'PayPal';
+              break;
+            case 'stripe':
+              displayName = 'Stripe';
+              break;
+            case 'square':
+              displayName = 'Square';
+              break;
+            default:
+              displayName = pg.gateway_type;
+          }
+        }
+
+        return {
+          id: pg.id,
+          gateway_type: pg.gateway_type,
+          gatewayType: pg.gateway_type, // Legacy format
+          is_active: pg.is_active,
+          isActive: pg.is_active, // Legacy format
+          is_default: pg.is_default,
+          display_name: displayName,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('Public payment gateway status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch payment gateway status',
+    });
+  }
+});
+
+// Public endpoint to get tenant OAuth status for payment gateways (no auth required)
+app.get("/public/tenant/:tenant_id/oauth-status/:gateway_type", async (req, res) => {
+  try {
+    const { tenant_id, gateway_type } = req.params;
+    if (!tenant_id || !gateway_type) {
+      return res.status(400).json({
+        success: false,
+        error: "tenant_id and gateway_type required"
+      });
+    }
+
+    console.log(`[Public OAuth Status] Checking ${gateway_type} OAuth for tenant: ${tenant_id}`);
+
+    // Get the OAuth tokens for this gateway
+    const tokens = await prisma.oauth_tokens.findFirst({
+      where: {
+        tenant_id: tenant_id,
+        gateway_type: gateway_type.toLowerCase(),
+      },
+      select: {
+        id: true,
+        access_token: true,
+        refresh_token: true,
+        expires_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!tokens) {
+      return res.json({
+        success: true,
+        connected: false,
+        isExpired: false,
+        message: 'No OAuth tokens found for this gateway'
+      });
+    }
+
+    // Check if token is expired
+    const isExpired = tokens.expires_at ? new Date(tokens.expires_at) < new Date() : false;
+
+    res.json({
+      success: true,
+      connected: !!tokens.access_token && !isExpired,
+      isExpired,
+      expiresAt: tokens.expires_at,
+    });
+
+  } catch (error) {
+    console.error('Public OAuth status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      connected: false
+    });
+  }
+});
+
+// Get all tenant categories (for category assignment - includes categories without products)
+app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Use direct database pool to avoid Prisma issues
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    // Query ALL tenant categories, not just those with products
+    const result = await pool.query(
+      `SELECT
+        id,
+        name,
+        slug,
+        "googleCategoryId",
+        "isActive",
+        "sortOrder",
+        "parentId",
+        "createdAt",
+        "updatedAt"
+      FROM directory_category
+      WHERE "tenantId" = $1
+        AND "isActive" = true
+      ORDER BY "sortOrder" ASC, name ASC`,
+      [tenant_id]
+    );
+
+    // Transform to expected format
+    const categories = result.rows.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      googleCategoryId: cat.googleCategoryId,
+      isActive: cat.isActive,
+      sortOrder: cat.sortOrder,
+      parentId: cat.parentId,
+      productCount: 0, // Will be calculated separately if needed
+      createdAt: cat.createdAt,
+      updatedAt: cat.updatedAt
+    }));
+
+    const cleanResponse = {
+      success: true,
+      data: {
+        tenant_id: tenant_id,
+        categories: categories,
+        summary: {
+          total_categories: categories.length,
+          category_type: 'tenant-all'
+        }
+      }
+    };
+
+    res.json(cleanResponse);
+  } catch (e: any) {
+    console.error("[GET /api/categories/tenant/:tenant_id] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_tenant_categories" });
+  }
+});
+
+// Product-level categories endpoint (for product sidebar)
+app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Use direct database pool to avoid Prisma issues
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    // Query categories with product counts directly from inventory_items
+    // Group by slug to handle duplicate categories with same slug
+    const result = await pool.query(
+      `SELECT
+        slug,
+        SUM(count) as count,
+        -- Pick the first category by name for each slug group
+        (SELECT json_build_object(
+          'id', dc.id,
+          'name', dc.name,
+          'slug', dc.slug,
+          'googleCategoryId', dc."googleCategoryId"
+        )
+        FROM directory_category dc
+        WHERE dc.slug = category_counts.slug
+          AND dc."tenantId" = $1
+          AND dc."isActive" = true
+        ORDER BY dc.name
+        LIMIT 1) as category
+      FROM (
+        SELECT
+          dc.slug,
+          COUNT(DISTINCT ii.id)::int as count
+        FROM directory_category dc
+        INNER JOIN inventory_items ii ON ii.directory_category_id = dc.id
+        WHERE dc."tenantId" = $1
+          AND dc."isActive" = true
+          AND ii.tenant_id = $1
+          AND ii.item_status = 'active'
+          AND ii.visibility = 'public'
+        GROUP BY dc.slug
+        HAVING COUNT(DISTINCT ii.id) > 0
+      ) category_counts
+      GROUP BY slug
+      ORDER BY slug`,
+      [tenant_id]
+    );
+
+    // Get total product count (ALL active/public products, including uncategorized)
+    const totalProductsResult = await pool.query(
+      `SELECT COUNT(*)::int as count
+       FROM inventory_items ii
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'`,
+      [tenant_id]
+    );
+    const totalProducts = totalProductsResult.rows[0]?.count || 0;
+
+    // Debug: Check for uncategorized products
+    const uncategorizedResult = await pool.query(
+      `SELECT COUNT(*)::int as count
+       FROM inventory_items ii
+       WHERE ii.tenant_id = $1
+         AND ii.item_status = 'active'
+         AND ii.visibility = 'public'
+         AND ii.directory_category_id IS NULL`,
+      [tenant_id]
+    );
+    const uncategorizedCount = uncategorizedResult.rows[0]?.count || 0;
+
+    if (uncategorizedCount > 0) {
+      console.log(`[Product Categories] Tenant ${tenant_id} has ${uncategorizedCount} uncategorized products`);
+    }
+
+    // Transform to expected format
+    const categories = result.rows.map(cat => ({
+      id: cat.category.id,
+      name: cat.category.name,
+      slug: cat.category.slug,
+      googleCategoryId: cat.category.googleCategoryId,
+      count: parseInt(cat.count),
+      category_type: 'tenant'
+    }));
+
+    const cleanResponse = {
+      success: true,
+      data: {
+        tenant_id: tenant_id,
+        categories: categories,
+        summary: {
+          total_categories: categories.length,
+          total_products: totalProducts,
+          category_type: 'product-level'
+        }
+      }
+    };
+
+    // Send as raw JSON to bypass Express middleware
+    const jsonString = JSON.stringify(cleanResponse);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(jsonString);
+  } catch (e: any) {
+    console.error("[GET /api/categories/product-level/:tenant_id] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_product_categories" });
+  }
+});
+
+// Diagnostic endpoint for category count investigation
+app.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    // 1. Check raw inventory_items data
+    const rawProductsResult = await pool.query(`
+      SELECT 
+        directory_category_id,
+        COUNT(*) as total_count,
+        COUNT(CASE WHEN item_status = 'active' AND visibility = 'public' THEN 1 END) as active_public_count
+      FROM inventory_items 
+      WHERE tenant_id = $1
+      GROUP BY directory_category_id
+      ORDER BY directory_category_id
+    `, [tenant_id]);
+
+    // 2. Check directory_category data
+    const categoriesResult = await pool.query(`
+      SELECT id, name, slug, "isActive", "tenantId"
+      FROM directory_category 
+      WHERE "tenantId" = $1
+      ORDER BY name
+    `, [tenant_id]);
+
+    // 3. Check JOIN results (our current count query)
+    const joinCountResult = await pool.query(`
+      SELECT 
+        dc.id,
+        dc.name,
+        dc.slug,
+        COUNT(DISTINCT ii.id)::int as count
+      FROM directory_category dc
+      INNER JOIN inventory_items ii ON ii.directory_category_id = dc.id
+      WHERE dc."tenantId" = $1
+        AND dc."isActive" = true
+        AND ii.tenant_id = $1
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+      GROUP BY dc.id, dc.name, dc.slug
+      ORDER BY dc.name
+    `, [tenant_id]);
+
+    // 4. Check storefront filter query (what actually returns products)
+    const storefrontFilterResult = await pool.query(`
+      SELECT 
+        dc.id,
+        dc.name,
+        dc.slug,
+        COUNT(DISTINCT ii.id)::int as count
+      FROM inventory_items ii
+      LEFT JOIN directory_category dc ON dc.id = ii.directory_category_id
+      WHERE ii.tenant_id = $1
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+        AND dc."tenantId" = $1
+        AND dc."isActive" = true
+      GROUP BY dc.id, dc.name, dc.slug
+      ORDER BY dc.name
+    `, [tenant_id]);
+
+    // 5. Check for any products with invalid category IDs
+    const invalidCategoriesResult = await pool.query(`
+      SELECT 
+        COUNT(*) as count,
+        array_agg(DISTINCT directory_category_id) as invalid_category_ids
+      FROM inventory_items 
+      WHERE tenant_id = $1
+        AND directory_category_id IS NOT NULL
+        AND directory_category_id NOT IN (
+          SELECT id FROM directory_category WHERE "tenantId" = $1
+        )
+    `, [tenant_id]);
+
+    // 6. Check materialized view if it exists
+    let mvResult = null;
+    try {
+      mvResult = await pool.query(`
+        SELECT 
+          category_id,
+          category_name,
+          category_slug,
+          product_count
+        FROM storefront_category_counts
+        WHERE tenant_id = $1
+          AND category_type = 'tenant'
+        ORDER BY category_name
+      `, [tenant_id]);
+    } catch (mvError) {
+      console.log('Materialized view not accessible:', (mvError as Error)?.message || 'Unknown error');
+    }
+
+    const diagnostic = {
+      tenant_id,
+      timestamp: new Date().toISOString(),
+      raw_products: rawProductsResult.rows,
+      categories: categoriesResult.rows,
+      join_counts: joinCountResult.rows,
+      storefront_filter_counts: storefrontFilterResult.rows,
+      invalid_categories: invalidCategoriesResult.rows[0],
+      materialized_view: mvResult?.rows || null,
+      summary: {
+        total_raw_products: rawProductsResult.rows.reduce((sum, r) => sum + parseInt(r.total_count), 0),
+        total_active_public: rawProductsResult.rows.reduce((sum, r) => sum + parseInt(r.active_public_count), 0),
+        total_categories: categoriesResult.rows.length,
+        total_with_valid_categories: joinCountResult.rows.reduce((sum, r) => sum + parseInt(r.count), 0),
+        has_invalid_categories: invalidCategoriesResult.rows[0].count > 0
+      }
+    };
+
+    res.json({
+      success: true,
+      data: diagnostic
+    });
+  } catch (e: any) {
+    console.error("[Diagnostic] Error:", e);
+    return res.status(500).json({ error: "diagnostic_failed", message: e.message });
+  }
+});
+
+// Store-level categories endpoint (for store sidebar)
+// Returns GBP primary and secondary categories for a tenant
+app.get("/api/categories/store-level/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+
+    // Query tenant_google_categories for GBP primary and secondary categories
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    const query = `
+      SELECT 
+        gc.id,
+        gc.name,
+        gc.display_name,
+        tgc.category_type,
+        tgc.gbp_category_id,
+        CASE WHEN tgc.category_type = 'primary' THEN true ELSE false END as is_primary,
+        (SELECT COUNT(*) FROM inventory_items WHERE tenant_id = $1 AND item_status = 'active' AND visibility = 'public') as count
+      FROM tenant_gbp_categories tgc
+      INNER JOIN gbp_categories_list gc ON gc.id = tgc.gbp_category_id
+      WHERE tgc.tenant_id = $1
+        AND tgc.category_type IN ('primary', 'secondary')
+        AND gc.is_active = true
+      ORDER BY 
+        CASE WHEN tgc.category_type = 'primary' THEN 0 ELSE 1 END,
+        gc.display_name ASC
+    `;
+
+    const result = await pool.query(query, [tenant_id]);
+
+    // Transform to expected format
+    const storeCategories = result.rows.map((row: any) => ({
+      id: row.id,
+      name: row.display_name || row.name,
+      slug: row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      category_type: row.category_type === 'primary' ? 'gbp_primary' : 'gbp_secondary',
+      is_primary: row.is_primary,
+      gbp_category_id: row.gbp_category_id,
+      count: parseInt(row.count) || 0
+    }));
+
+    // Clean response to avoid field duplication
+    const cleanResponse = {
+      success: true,
+      data: {
+        tenant_id: tenant_id,
+        categories: storeCategories,
+        summary: {
+          total_categories: storeCategories.length,
+          total_products: storeCategories.length > 0 ? storeCategories[0].count : 0,
+          category_type: 'store-level'
+        }
+      }
+    };
+
+    // Send as raw JSON to bypass Express middleware
+    const jsonString = JSON.stringify(cleanResponse);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(jsonString);
+  } catch (e: any) {
+    console.error("[GET /api/categories/store-level/:tenant_id] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_store_categories" });
+  }
+});
+
+// Debug endpoint to analyze database structure (development only)
+app.post("/public/debug-query", async (req, res) => {
+  try {
+    const { Pool } = await import('pg');
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: "query_required" });
+    }
+
+    console.log('[POST /public/debug-query] Running analysis query...');
+
+    // Use shared connection pool to prevent connection exhaustion
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    const result = await pool.query(query);
+    // Don't close the shared pool
+
+    console.log('[POST /public/debug-query] Query executed successfully');
+
+    res.json({
+      success: true,
+      data: result.rows,
+      rowCount: result.rowCount,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e: any) {
+    console.error('[POST /public/debug-query] Error:', e);
+    return res.status(500).json({
+      error: "failed_to_execute_query",
+      details: e.message
+    });
+  }
+});
+
+// Public endpoint to refresh materialized views (no auth required for development)
+app.post("/public/refresh-materialized-views", async (req, res) => {
+  try {
+    // console.log('[POST /public/refresh-materialized-views] Refreshing storefront_category_counts...');
+
+    // Use shared connection pool to prevent connection exhaustion
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+
+    // Use non-concurrent refresh since concurrent is not available
+    await pool.query('REFRESH MATERIALIZED VIEW storefront_category_counts');
+    // Don't close the shared pool
+
+    console.log('[POST /public/refresh-materialized-views] Materialized view refreshed successfully');
+
+    res.json({
+      success: true,
+      message: 'Materialized views refreshed successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (e: any) {
+    console.error('[POST /public/refresh-materialized-views] Error:', e);
+    return res.status(500).json({
+      error: "failed_to_refresh_views",
+      details: e.message
+    });
+  }
+});
+
+// Public endpoint to lookup Google taxonomy category by ID (no auth required)
+app.get("/public/google-taxonomy/:categoryId", async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    if (!categoryId) return res.status(400).json({ error: "category_id_required" });
+
+    // Import Google taxonomy utility
+    const { getCategoryById } = await import('./lib/google/taxonomy');
+
+    // Get category by ID
+    const category = getCategoryById(categoryId);
+
+    if (!category) {
+      return res.status(400).json({ error: "category_not_found" });
+    }
+
+    res.json(category);
+  } catch (e: any) {
+    console.error("[GET /public/google-taxonomy/:categoryId] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_category" });
+  }
+});
+
+// Authenticated endpoint to get tenant categories with ALL product counts
+app.get("/api/tenants/:tenant_id/categories", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+
+    // Import category count utility
+    const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
+
+    // Get categories with counts (ALL items, not just public)
+    const categories = await getCategoryCounts(tenant_id as string, true);
+    const uncategorizedCount = await getUncategorizedCount(tenant_id as string, true);
+    const totalCount = await getTotalProductCount(tenant_id as string, true);
+
+    res.json({
+      categories,
+      uncategorizedCount,
+      totalCount,
+    });
+  } catch (e: any) {
+    console.error("[GET /api/tenants/:tenant_id/categories] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_categories" });
+  }
+});
+
+// Consolidated Items endpoint - combines /api/items and /api/items/stats into one call
+app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const tenant_id = req.query.tenant_id as string;
+    if (!tenant_id) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    // Parse filters and pagination
+    const {
+      q: search = '',
+      status: statusFilter = 'all',
+      visibility: visibilityFilter = 'all',
+      categoryId,
+      categoryFilter = 'all',
+      page = '1',
+      limit = '25'
+    } = req.query;
+
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 25, 1), 50);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for items query
+    const where: any = {
+      tenant_id,
+    };
+
+    // Apply status filter
+    // Note: 'syncing' is a computed status meaning active + public, not a Prisma enum value
+    // Note: 'trashed' items are excluded by default unless explicitly requested
+    if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter === 'syncing') {
+        // Syncing = active items that are public (visible to sync services)
+        where.item_status = 'active';
+        where.visibility = 'public';
+      } else {
+        // For 'trashed' or any other status, filter directly
+        where.item_status = statusFilter;
+      }
+    } else {
+      // Default: exclude trashed items unless explicitly requested
+      where.item_status = { not: 'trashed' };
+    }
+
+    // Apply visibility filter
+    if (visibilityFilter && visibilityFilter !== 'all') {
+      where.visibility = visibilityFilter;
+    }
+
+    // Apply search filter
+    if (search && typeof search === 'string' && search.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { sku: { contains: search.trim(), mode: 'insensitive' } },
+        { description: { contains: search.trim(), mode: 'insensitive' } },
+        { brand: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Apply category filters
+    if (categoryId) {
+      where.directory_category_id = categoryId;
+    } else if (categoryFilter === 'assigned') {
+      where.directory_category_id = { not: null };
+    } else if (categoryFilter === 'unassigned') {
+      where.directory_category_id = null;
+    }
+
+    // Execute both queries in parallel
+    const [itemsResult, statsResult, totalCountResult] = await Promise.all([
+      // Items with pagination
+      prisma.inventory_items.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: offset,
+        take: limitNum,
+        select: {
+          id: true,
+          tenant_id: true,
+          sku: true,
+          name: true,
+          title: true,
+          description: true,
+          price_cents: true,
+          stock: true,
+          image_url: true,
+          brand: true,
+          category_path: true,
+          directory_category_id: true,
+          item_status: true,
+          availability: true,
+          has_variants: true,
+          product_type: true,
+          featured_type: true,
+          featured_at: true,
+          featured_priority: true,
+          is_featured: true,
+          visibility: true,
+          created_at: true,
+          updated_at: true,
+          metadata: true,
+          marketing_description: true,
+          image_gallery: true,
+          custom_cta: true,
+          social_links: true,
+          custom_branding: true,
+          custom_sections: true,
+          landing_page_theme: true,
+          audit_log_id: true,
+          condition: true,
+          currency: true,
+          eligibility_reason: true,
+          gtin: true,
+          location_id: true,
+          merchant_name: true,
+          mpn: true,
+          price: true,
+          quantity: true,
+          sync_status: true,
+          synced_at: true,
+          manufacturer: true,
+          source: true,
+          enrichment_status: true,
+          enriched_at: true,
+          enriched_by: true,
+          enriched_from_barcode: true,
+          missing_images: true,
+          missing_description: true,
+          missing_specs: true,
+          missing_brand: true,
+          sale_price_cents: true,
+          payment_gateway_type: true,
+          payment_gateway_id: true,
+          digital_delivery_method: true,
+          digital_assets: true,
+          access_duration_days: true,
+          download_limit: true,
+          license_type: true,
+          // Include variants for items that have them
+          product_variants: {
+            select: {
+              id: true,
+              parent_item_id: true,
+              tenant_id: true,
+              variant_name: true,
+              sku: true,
+              price_cents: true,
+              sale_price_cents: true,
+              stock: true,
+              image_url: true,
+              attributes: true,
+              sort_order: true,
+              is_active: true,
+              created_at: true,
+              updated_at: true,
+            },
+          },
+        }
+      }).then(async items => {
+        // Fetch photos for all items in parallel
+        const itemIds = items.map(item => item.id);
+        const photosMap = new Map<string, any[]>();
+
+        if (itemIds.length > 0) {
+          // Fetch all photos for these items in one query
+          const allPhotos = await prisma.photo_assets.findMany({
+            where: {
+              inventoryItemId: { in: itemIds },
+              variant_id: null // Only item-level photos, not variant photos
+            },
+            orderBy: { position: 'asc' },
+            select: {
+              id: true,
+              inventoryItemId: true,
+              variant_id: true,
+              url: true,
+              publicUrl: true,
+              position: true,
+              alt: true,
+              caption: true,
+              createdAt: true
+            }
+          });
+
+          // Group photos by item ID
+          allPhotos.forEach(photo => {
+            const itemId = photo.inventoryItemId;
+            if (!photosMap.has(itemId)) {
+              photosMap.set(itemId, []);
+            }
+            photosMap.get(itemId)!.push({
+              id: photo.id,
+              url: photo.url,
+              position: photo.position,
+              alt: photo.alt,
+              caption: photo.caption,
+              variant_id: photo.variant_id,
+              createdAt: photo.createdAt.toISOString()
+            });
+          });
+        }
+
+        // Add inventory_item_id field and photo gallery for frontend compatibility
+        return items.map(item => ({
+          ...item,
+          inventory_item_id: item.id, // CRITICAL: Frontend expects this field
+          imageGallery: photosMap.get(item.id) || [], // Add actual photo gallery data
+          // Sort variants by sort_order and created_at
+          variants: item.product_variants ?
+            [...item.product_variants].sort((a, b) => {
+              const aSortOrder = a.sort_order || 0;
+              const bSortOrder = b.sort_order || 0;
+              if (aSortOrder !== bSortOrder) {
+                return aSortOrder - bSortOrder;
+              }
+              const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return aCreatedAt - bCreatedAt;
+            }) : []
+        }));
+      }),
+
+      // Stats query
+      Promise.resolve().then(async () => {
+        const [total, active, inactive, publicItems, privateItems, lowStock] = await Promise.all([
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'active', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'inactive', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: 'active', visibility: { not: 'private' } }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'public' }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'private' }
+          }),
+          prisma.inventory_items.count({
+            where: { tenant_id, item_status: { not: 'trashed' }, stock: { lt: 10 } }
+          })
+        ]);
+
+        return {
+          total,
+          active: Math.max(0, active),
+          inactive: Math.max(0, inactive),
+          public: Math.max(0, publicItems),
+          private: Math.max(0, privateItems),
+          lowStock: Math.max(0, lowStock)
+        };
+      }),
+
+      // Total count for pagination
+      prisma.inventory_items.count({ where })
+    ]);
+
+    // Fetch category data for each item (similar to individual item endpoint)
+    const itemsWithCategories = await Promise.all(
+      itemsResult.map(async (item) => {
+        let tenantCategory = null;
+        if (item.directory_category_id) {
+          // Primary lookup: by directory_category_id (most reliable)
+          const category = await prisma.directory_category.findFirst({
+            where: {
+              id: item.directory_category_id,
+              tenantId: item.tenant_id // Use Prisma schema field name (camelCase)
+            },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              googleCategoryId: true,
+            },
+          });
+          if (category) {
+            tenantCategory = {
+              id: category.id,
+              name: category.name,
+              slug: category.slug,
+              googleCategoryId: category.googleCategoryId,
+            };
+          }
+        }
+        return { ...item, tenantCategory };
+      })
+    );
+
+    // Transform items for frontend compatibility
+    const transformedItems = itemsWithCategories.map(item => ({
+      ...item,
+      price: item.price !== null ? Number(item.price) : null,
+      // Remove price_cents from response
+      price_cents: undefined,
+      // Ensure status field is set correctly
+      status: item.item_status || 'active',
+      itemStatus: item.item_status || 'active',
+      // Category info
+      tenantCategory: item.tenantCategory,
+      tenantCategoryId: item.directory_category_id,
+      directory_category: undefined, // Remove from response
+      directory_category_id: undefined, // Remove from response
+      // Map image_url to imageUrl for frontend compatibility
+      imageUrl: item.image_url || null,
+      image_url: undefined, // Remove from response
+      // Include variants if they exist
+      variants: item.product_variants || [],
+      product_variants: undefined, // Remove from response
+    }));
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCountResult / limitNum);
+    const hasMore = pageNum < totalPages;
+
+    const response = {
+      items: transformedItems,
+      stats: statsResult,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems: totalCountResult,
+        totalPages,
+        hasMore
+      },
+      _timestamp: new Date().toISOString()
+    };
+
+    // Cache for 30 seconds (items change more frequently)
+    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.setHeader('Vary', 'Authorization');
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('[Items Complete] Error:', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to fetch complete items data'
+    });
+  }
+});
+
+// Public endpoint for features showcase config (no auth required)
+app.get("/api/public/features-showcase-config", async (req, res) => {
+  try {
+    // Return default config for now (can be extended to read from database later)
+    const defaultConfig = {
+      mode: 'random',
+      rotationEnabled: true,
+      rotationInterval: 24,
+      enabledModes: ['hybrid', 'random', 'tabs', 'grid', 'slider', 'fixed']
+    };
+    return res.json(defaultConfig);
+  } catch (e: any) {
+    console.error("[GET /api/public/features-showcase-config] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_config" });
+  }
+});
+
+// PATCH /api/tenant/profile - partial update
+const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
+app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
+  console.log('[PATCH /tenant/profile] Request body:', JSON.stringify(req.body, null, 2));
+  const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  console.log('[PATCH /tenant/profile] Parsed data:', JSON.stringify(parsed.data, null, 2));
+  try {
+    const { tenant_id, ...delta } = parsed.data;
+    const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!existingTenant) return res.status(400).json({ error: "tenant_not_found" });
+
+    // Use raw SQL instead of Prisma client since it doesn't recognize the new table
+    // Import basePrisma to bypass retry wrapper
+    const { basePrisma } = await import('./prisma');
+    console.log(`[PATCH /tenant/profile] Processing update for tenant ${tenant_id}`);
+    console.log(`[PATCH /tenant/profile] Delta data:`, delta);
+
+    // Check if profile exists
+    const existingProfiles = await basePrisma.$queryRaw`
+      SELECT tenant_id FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+    `;
+    console.log(`[PATCH /tenant/profile] Existing profiles found:`, (existingProfiles as any[]).length);
+    let result;
+    if ((existingProfiles as any[]).length > 0) {
+      console.log(`[PATCH /tenant/profile] Updating existing profile`);
+      // Update existing profile - build dynamic update query
+      const updateParts = [];
+      const values = [];
+
+      Object.entries(delta).forEach(([key, value]) => {
+        // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
+        if (key === 'slug') return;
+        if (value !== undefined) {
+          updateParts.push(`"${key}" = $${values.length + 1}`);
+          values.push(value === '' ? null : value);
+        }
+      });
+
+      if (updateParts.length > 0) {
+        updateParts.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(tenant_id); // Add tenant_id at the end
+        const updateQuery = `
+          UPDATE "tenant_business_profiles_list"
+          SET ${updateParts.join(', ')}
+          WHERE tenant_id = $${values.length}
+        `;
+        console.log(`[PATCH /tenant/profile] Update query:`, updateQuery);
+        console.log(`[PATCH /tenant/profile] Update values:`, values);
+        await basePrisma.$executeRawUnsafe(updateQuery, ...values);
+        console.log(`[PATCH /tenant/profile] Update executed successfully`);
+      }
+
+      // Get updated profile (exclude geography column to avoid Prisma deserialization error)
+      result = await basePrisma.$queryRaw`
+        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+      `;
+      console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
+    } else {
+      console.log(`[PATCH /tenant/profile] Creating new profile`);
+      // Create new profile
+      const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
+      const insertValues = [
+        tenant_id,
+        delta.business_name || existingTenant.name,
+        delta.address_line1 || '',
+        delta.city || '',
+        delta.postal_code || '',
+        (delta.country_code || 'US').toUpperCase()
+      ];
+
+      // Add optional fields
+      const optionalMappings = {
+        address_line2: delta.address_line2,
+        state: delta.state,
+        phone_number: delta.phone_number,
+        email: delta.email,
+        website: delta.website,
+        contact_person: delta.contact_person,
+        logo_url: delta.logo_url,
+        banner_url: delta.banner_url,
+        business_description: delta.business_description,
+      };
+
+      Object.entries(optionalMappings).forEach(([field, value]) => {
+        if (value !== undefined) {
+          insertFields.push(field);
+          insertValues.push(value === '' ? null : (value as any));
+        }
+      });
+
+      // Always add updated_at field with current timestamp
+      insertFields.push('updated_at');
+      insertValues.push(new Date().toISOString());
+
+      const placeholders = insertFields.map((_, i) => `$${i + 1}`);
+      const insertQuery = `
+        INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+      console.log(`[PATCH /tenant/profile] Insert query:`, insertQuery);
+      console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
+
+      result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
+        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
+      );
+      console.log(`[PATCH /tenant/profile] Created new profile:`, result);
+    }
+
+    // Update tenant name if business_name changed
+    if (delta.business_name && typeof delta.business_name === 'string' && delta.business_name.trim()) {
+      await prisma.tenants.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
+    }
+
+    // Update slug in directory_settings_list if explicitly provided
+    if ((delta as any).slug) {
+      console.log('[PATCH /tenant/profile] Updating slug to:', (delta as any).slug);
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.updateSlug(tenant_id, (delta as any).slug);
+        console.log('[PATCH /tenant/profile] Slug updated successfully');
+      } catch (slugError) {
+        console.error('[PATCH /tenant/profile] Failed to update slug:', slugError);
+        // Don't fail the entire request if slug update fails
+      }
+    } else if (delta.business_name) {
+      // Auto-regenerate slug when business name changes (only if slug not explicitly provided)
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
+        console.log('[PATCH /tenant/profile] Slug regenerated from new business name');
+      } catch (slugError) {
+        console.warn('[PATCH /tenant/profile] Failed to regenerate slug:', slugError);
+        // Don't fail the entire request if slug regeneration fails
+      }
+    }
+
+    // Handle logo_url clearing from tenant metadata
+    if ('logo_url' in delta && delta.logo_url === '') {
+      const currentMetadata = (existingTenant.metadata as any) || {};
+      if (currentMetadata.logo_url) {
+        delete currentMetadata.logo_url;
+        await prisma.tenants.update({
+          where: { id: tenant_id },
+          data: { metadata: currentMetadata }
+        });
+      }
+    }
+
+    console.log(`[PATCH /tenant/profile] Final result to return:`, (result as any)[0] || result);
+
+    // Fetch current slug to include in response
+    const slugResult = await basePrisma.$queryRaw`
+      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const currentSlug = (slugResult as any[])[0]?.slug || null;
+
+    const responseProfile = {
+      ...((result as any)[0] || result),
+      slug: currentSlug,
+    };
+
+    return res.json(responseProfile);
+  } catch (e: any) {
+    console.error("[PATCH /tenant/profile] Error:", e);
+    return res.status(500).json({ error: "failed_to_update_profile" });
   }
 });
 
@@ -307,20 +3707,20 @@ const logoDataUrlSchema = z.object({
   contentType: z.string().min(1),
 });
 
-app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
+app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
   try {
-    const tenantId = req.params.id;
-    console.log(`[Logo Upload] Starting upload for tenant ${tenantId}`, {
+    const tenant_id = req.params.id;
+    console.log(`[Logo Upload] Starting upload for tenant ${tenant_id}`, {
       hasFile: !!req.file,
       contentType: req.get('content-type'),
       bodyKeys: req.body ? Object.keys(req.body) : [],
     });
 
     // Verify tenant exists
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id as string } });
     if (!tenant) {
-      console.log(`[Logo Upload] Tenant not found: ${tenantId}`);
-      return res.status(404).json({ error: "tenant_not_found" });
+      console.log(`[Logo Upload] Tenant not found: ${tenant_id}`);
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Initialize Supabase client (will be initialized below in photos section)
@@ -335,23 +3735,23 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
     }
 
     let publicUrl: string;
-    const TENANT_BUCKET_NAME = process.env.TENANT_BUCKET_NAME || "photos"; // Default to photos bucket if not specified
+    const TENANT_BUCKET = StorageBuckets.TENANTS;
 
     // A) multipart/form-data "file" upload
     if (req.file) {
-      const f = req.file as Express.Multer.File;
+      const f = req.file as any;
       const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
-      const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
-      
-      console.log(`[Logo Upload] Uploading to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
-        pathKey, 
-        size: f.size, 
-        mimetype: f.mimetype 
+      const pathKey = `tenants/${tenant_id}/logo-${Date.now()}${ext}`;
+
+      console.log(`[Logo Upload] Uploading to Supabase:`, {
+        bucket: TENANT_BUCKET.name,
+        pathKey,
+        size: f.size,
+        mimetype: f.mimetype
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
@@ -363,12 +3763,11 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: error.message, details: error });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase upload successful:`, { publicUrl });
     }
-    // B) JSON { dataUrl } upload
+    // B) JSON { url } upload
     else if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
-      console.log(`[Logo Upload] Processing dataUrl upload`);
       const parsed = logoDataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
         console.error(`[Logo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
@@ -377,9 +3776,9 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
 
       const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
       if (!match) return res.status(400).json({ error: "invalid_data_url" });
-      
+
       const buf = Buffer.from(match[1], "base64");
-      
+
       // Enforce 5MB limit for logos
       if (buf.length > 5 * 1024 * 1024) {
         return res.status(413).json({ error: "logo_too_large", maxSizeMB: 5 });
@@ -388,19 +3787,19 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       const ext = parsed.data.contentType.includes("png")
         ? ".png"
         : parsed.data.contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
-      
-      const pathKey = `tenants/${tenantId}/logo-${Date.now()}${ext}`;
-      console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, { 
-        bucket: TENANT_BUCKET_NAME,
-        pathKey, 
-        size: buf.length, 
-        contentType: parsed.data.contentType 
+          ? ".webp"
+          : ".jpg";
+
+      const pathKey = `tenants/${tenant_id}/logo-${Date.now()}${ext}`;
+      console.log(`[Logo Upload] Uploading dataUrl to Supabase:`, {
+        bucket: TENANT_BUCKET.name,
+        pathKey,
+        size: buf.length,
+        contentType: parsed.data.contentType
       });
 
       const { error, data } = await supabaseLogo.storage
-        .from(TENANT_BUCKET_NAME)
+        .from(TENANT_BUCKET.name)
         .upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
@@ -412,15 +3811,15 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
         return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
       }
 
-      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET_NAME).getPublicUrl(data.path).data.publicUrl;
+      publicUrl = supabaseLogo.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
       console.log(`[Logo Upload] Supabase dataUrl upload successful:`, { publicUrl });
     } else {
       return res.status(400).json({ error: "unsupported_payload" });
     }
 
     // Update tenant metadata with logo URL
-    const updatedTenant = await prisma.tenant.update({
-      where: { id: tenantId },
+    const updatedTenant = await prisma.tenants.update({
+      where: { id: tenant_id as string },
       data: {
         metadata: {
           ...(tenant.metadata as any || {}),
@@ -429,16 +3828,124 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
       },
     });
 
+    // Also update business profile logo_url for directory listings (if profile exists)
+    try {
+      await prisma.tenant_business_profiles_list.update({
+        where: { tenant_id: tenant_id as string },
+        data: { logo_url: publicUrl },
+      });
+    } catch (profileError: any) {
+      // Business profile doesn't exist yet, skip updating it
+      // It will be created with logo during directory publish
+      console.log(`[Logo Upload] Business profile not found for tenant ${tenant_id}, logo will be set during directory publish`);
+    }
+
     return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
   } catch (e: any) {
     console.error("[Logo Upload Error] Full error details:", {
       message: e?.message,
       stack: e?.stack,
-      tenantId: req.params.id,
+      tenant_id: req.params.id,
     });
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_upload_logo",
-      details: DEV ? e?.message : undefined 
+      details: DEV ? e?.message : undefined
+    });
+  }
+});
+
+// Banner upload endpoint (similar to logo but for wide banners)
+app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
+  try {
+    const tenant_id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    console.log(`[Banner Upload] Starting upload for tenant ${tenant_id}`);
+
+    // Verify tenant exists
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!tenant) {
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseBanner = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      : null;
+
+    if (!supabaseBanner) {
+      return res.status(500).json({ error: "supabase_not_configured" });
+    }
+
+    let publicUrl: string;
+    const TENANT_BUCKET = StorageBuckets.TENANTS;
+
+    // JSON dataUrl upload (frontend sends compressed base64)
+    if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
+      const parsed = logoDataUrlSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        console.error(`[Banner Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+      }
+
+      const match = /^data:[^;]+;base64,(.+)$/i.exec(parsed.data.dataUrl);
+      if (!match) return res.status(400).json({ error: "invalid_data_url" });
+
+      const buf = Buffer.from(match[1], "base64");
+
+      // Enforce 5MB limit for banners
+      if (buf.length > 5 * 1024 * 1024) {
+        return res.status(413).json({ error: "banner_too_large", maxSizeMB: 5 });
+      }
+
+      const ext = parsed.data.contentType.includes("png")
+        ? ".png"
+        : parsed.data.contentType.includes("webp")
+          ? ".webp"
+          : ".jpg";
+
+      const pathKey = `tenants/${tenant_id}/banner-${Date.now()}${ext}`;
+      console.log(`[Banner Upload] Uploading dataUrl to Supabase:`, {
+        bucket: TENANT_BUCKET.name,
+        pathKey,
+        size: buf.length
+      });
+
+      const { error, data } = await supabaseBanner.storage
+        .from(TENANT_BUCKET.name)
+        .upload(pathKey, buf, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: parsed.data.contentType,
+        });
+
+      if (error) {
+        console.error("[Banner Upload] Supabase upload error:", error);
+        return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
+      }
+
+      publicUrl = supabaseBanner.storage.from(TENANT_BUCKET.name).getPublicUrl(data.path).data.publicUrl;
+      console.log(`[Banner Upload] Supabase upload successful:`, { publicUrl });
+    } else {
+      return res.status(400).json({ error: "unsupported_payload" });
+    }
+
+    // Update tenant metadata with banner URL
+    const updatedTenant = await prisma.tenants.update({
+      where: { id: tenant_id },
+      data: {
+        metadata: {
+          ...(tenant.metadata as any || {}),
+          banner_url: publicUrl,
+        },
+      },
+    });
+
+    return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
+  } catch (e: any) {
+    console.error("[Banner Upload Error]:", e?.message);
+    return res.status(500).json({
+      error: "failed_to_upload_banner",
+      details: DEV ? e?.message : undefined
     });
   }
 });
@@ -448,7 +3955,7 @@ app.post("/tenant/:id/logo", logoUploadMulter.single("file"), async (req, res) =
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const jsonUrlSchema = z.object({
-  tenantId: z.string().min(1).optional(), // optional—can be derived from item
+  tenant_id: z.string().min(1).optional(), // optional—can be derived from item
   url: z.string().url(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
@@ -458,7 +3965,7 @@ const jsonUrlSchema = z.object({
 });
 
 const dataUrlSchema = z.object({
-  tenantId: z.string().min(1),
+  tenant_id: z.string().min(1),
   dataUrl: z.string().min(1),
   contentType: z.string().min(1),
 });
@@ -502,13 +4009,13 @@ const photoUploadHandler = async (req: any, res: any) => {
       bodyKeys: req.body ? Object.keys(req.body) : [],
       supabaseConfigured: !!supabase
     });
-    
-    const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+
+    const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
-      return res.status(404).json({ error: "item_not_found" });
+      return res.status(400).json({ error: "item_not_found" });
     }
-    console.log(`[Photo Upload] Item found:`, { id: item.id, tenantId: item.tenantId, sku: item.sku });
+    console.log(`[Photo Upload] Item found:`, { id: item.id, tenant_id: item.tenant_id, sku: item.sku });
 
     // A) JSON { url, ... } → register the asset
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.url === "string") {
@@ -516,9 +4023,10 @@ const photoUploadHandler = async (req: any, res: any) => {
       if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
       const { url, width, height, bytes, contentType, exifRemoved } = parsed.data;
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_assets.create({
         data: {
-          tenantId: item.tenantId,
+          id: generatePhotoId(item.tenant_id, item.id),
+          tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url,
           width: width ?? null,
@@ -529,32 +4037,32 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: url } });
+      // Always update the item's image_url to the latest uploaded photo
+      await prisma.inventory_items.update({ where: { id: item.id }, data: { image_url: url } });
       return res.status(201).json(created);
     }
 
     // B) multipart/form-data "file" → Supabase (if configured) or local FS in dev
     if (req.file) {
-      const f = req.file as Express.Multer.File;
+      const f = req.file as any;
       let publicUrl: string | null = null;
 
       if (supabase) {
-        const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
+        const pathKey = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}-${(f.originalname || "photo").replace(/\s+/g, "_")}`;
         console.log(`[Photo Upload] Uploading to Supabase:`, { pathKey, size: f.size, mimetype: f.mimetype });
-        
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, f.buffer, {
+
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, f.buffer, {
           cacheControl: "3600",
           upsert: false,
           contentType: f.mimetype || "application/octet-stream",
         });
-        
+
         if (error) {
           console.error(`[Photo Upload] Supabase upload error:`, error);
           return res.status(500).json({ error: error.message, details: error });
         }
-        
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase upload successful:`, { publicUrl });
       } else if (DEV) {
         const ext = f.mimetype.includes("png") ? ".png" : f.mimetype.includes("webp") ? ".webp" : ".jpg";
@@ -566,9 +4074,10 @@ const photoUploadHandler = async (req: any, res: any) => {
         return res.status(500).json({ error: "no_upload_backend_configured" });
       }
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_assets.create({
         data: {
-          tenantId: item.tenantId,
+          id: generatePhotoId(item.tenant_id, item.id),
+          tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl!,
           contentType: f.mimetype,
@@ -577,8 +4086,8 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl! } });
+      // Always update the item's image_url to the latest uploaded photo
+      await prisma.inventory_items.update({ where: { id: item.id }, data: { image_url: publicUrl! } });
       return res.status(201).json(created);
     }
 
@@ -599,28 +4108,28 @@ const photoUploadHandler = async (req: any, res: any) => {
       const ext = parsed.data.contentType.includes("png")
         ? ".png"
         : parsed.data.contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
-      
+          ? ".webp"
+          : ".jpg";
+
       let publicUrl: string;
 
       // Prefer Supabase Storage if configured
       if (supabase) {
-        const pathKey = `${item.tenantId}/${item.sku || item.id}/${Date.now()}${ext}`;
+        const pathKey = `${item.tenant_id}/${item.sku || item.id}/${Date.now()}${ext}`;
         console.log(`[Photo Upload] Uploading dataUrl to Supabase:`, { pathKey, size: buf.length, contentType: parsed.data.contentType });
-        
-        const { error, data } = await supabase.storage.from("photos").upload(pathKey, buf, {
+
+        const { error, data } = await supabase.storage.from(StorageBuckets.PHOTOS.name).upload(pathKey, buf, {
           cacheControl: "3600",
           upsert: false,
           contentType: parsed.data.contentType,
         });
-        
+
         if (error) {
           console.error("[Photo Upload] Supabase dataUrl upload error:", error);
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
-        
-        publicUrl = supabase.storage.from("photos").getPublicUrl(data.path).data.publicUrl;
+
+        publicUrl = supabase.storage.from(StorageBuckets.PHOTOS.name).getPublicUrl(data.path).data.publicUrl;
         console.log(`[Photo Upload] Supabase dataUrl upload successful:`, { publicUrl });
       } else {
         // Fallback to filesystem
@@ -630,9 +4139,10 @@ const photoUploadHandler = async (req: any, res: any) => {
         publicUrl = `${baseUrl}/uploads/${encodeURIComponent(filename)}`;
       }
 
-      const created = await prisma.photoAsset.create({
+      const created = await prisma.photo_assets.create({
         data: {
-          tenantId: item.tenantId,
+          id: generatePhotoId(item.tenant_id, item.id),
+          tenantId: item.tenant_id,
           inventoryItemId: item.id,
           url: publicUrl,
           contentType: parsed.data.contentType,
@@ -641,8 +4151,8 @@ const photoUploadHandler = async (req: any, res: any) => {
         },
       });
 
-      // Always update the item's imageUrl to the latest uploaded photo
-      await prisma.inventoryItem.update({ where: { id: item.id }, data: { imageUrl: publicUrl } });
+      // Always update the item's image_url to the latest uploaded photo
+      await prisma.inventory_items.update({ where: { id: item.id }, data: { image_url: publicUrl } });
       return res.status(201).json(created);
     }
 
@@ -662,31 +4172,82 @@ const photoUploadHandler = async (req: any, res: any) => {
       bodyKeys: req.body ? Object.keys(req.body) : [],
       contentType: req.get('content-type')
     });
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "failed_to_upload_photo",
-      details: DEV ? e?.message : undefined 
+      details: DEV ? e?.message : undefined
     });
   }
 };
 
-// Mount explicitly (no array form)
-console.log("🔧 Registering photo upload routes...");
-app.post("/items/:id/photos", upload.single("file"), photoUploadHandler);
-app.post("/inventory/:id/photos", upload.single("file"), photoUploadHandler);
-console.log("✓ Photo upload routes registered");
+// Mount consolidated directory route BEFORE any other /api/directory routes
+import directoryConsolidatedRoutes from './routes/directory-consolidated';
+app.use('/api/directory', directoryConsolidatedRoutes);
+console.log('✅ Directory consolidated routes mounted at /api/directory');
 
+// Mount random featured products route
+import directoryRandomFeaturedRoutes from './routes/directory-random-featured';
+app.use('/api/directory', directoryRandomFeaturedRoutes);
+console.log('✅ Directory random featured routes mounted at /api/directory');
+console.log('✅ Direct random-featured route handler registered');
 
+// Mount global random featured products route
+import directoryRandomFeaturedGlobalRoutes from './routes/directory-random-featured-global';
+app.use('/api/directory', directoryRandomFeaturedGlobalRoutes);
+console.log('✅ Directory random featured global routes mounted at /api/directory');
 
-// List photos for an item
-app.get(["/items/:id/photos", "/inventory/:id/photos"], async (req, res) => {
-  const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
-  if (!item) return res.status(404).json({ error: "item_not_found" });
-  const photos = await prisma.photoAsset.findMany({
-    where: { inventoryItemId: item.id },
-    orderBy: { capturedAt: "desc" },
-  });
-  res.json(photos);
+// Mount store-types route BEFORE any other /api/directory routes
+// VERY SIMPLE TEST - This should definitely work
+app.get('/api/directory/simple-test', (req, res) => {
+  console.log('[SIMPLE-TEST] Route hit!');
+  res.json({ message: 'Simple test working!' });
 });
+
+// Test route to verify mounting order
+app.get('/api/directory/store-types/test', (req, res) => {
+  res.json({ message: 'Test route working!' });
+});
+
+// Direct route handler to bypass any router conflicts
+console.log('[STORE-TYPES] Registering direct route handler...');
+app.get('/api/directory/store-types', async (req, res) => {
+  console.log('[STORE-TYPES] Direct route hit - fetching store types');
+  try {
+    const { storeTypeDirectoryService } = await import('./services/store-type-directory.service');
+    const { lat, lng, radius } = req.query;
+
+    const location = lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string) } : undefined;
+    const radiusMiles = radius ? parseFloat(radius as string) : 25;
+
+    const storeTypes = await storeTypeDirectoryService.getStoreTypes(location, radiusMiles);
+
+    res.json({
+      success: true,
+      data: { storeTypes, totalCount: storeTypes.length }
+    });
+  } catch (error: any) {
+    console.error('[STORE-TYPES] Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch store types' });
+  }
+});
+
+// Mount featured stores router BEFORE other directory routes to avoid conflicts
+import directoryFeaturedStoresRoutes from './routes/directory-featured-stores';
+app.use('/api/directory/featured-stores', directoryFeaturedStoresRoutes);
+console.log('✅ Directory featured stores routes mounted at /api/directory/featured-stores');
+
+// Mount photos router (handles all photo endpoints with position support)
+app.use('/api/directory', directoryPhotosRouter);
+
+// Directory routes are mounted later (line ~5200) after all specific directory paths
+// to avoid catch-all :identifier route intercepting specific paths
+
+// Legacy photo upload handler removed - now handled by photos router
+// Old routes:
+// - POST /items/:id/photos -> now in photos.ts with position logic
+// - GET /items/:id/photos -> now in photos.ts ordered by position
+// - PUT /items/:id/photos/:photoId -> new endpoint for update
+// - DELETE /items/:id/photos/:photoId -> new endpoint for delete
+// - PUT /items/:id/photos/reorder -> new endpoint for bulk reorder
 
 // Optional: helps spot stray POSTs under /items that aren't handled by routes
 // Only matches POSTs under /items that are NOT .../photos
@@ -700,83 +4261,1115 @@ app.get(["/items/:id/photos", "/inventory/:id/photos"], async (req, res) => {
 
 
 /* --------------------------- ITEMS / INVENTORY --------------------------- */
-const listQuery = z.object({ 
-  tenantId: z.string().min(1),
-  count: z.string().optional() // Add count parameter for optimization
+const listQuery = z.object({
+  tenant_id: z.string().min(1).optional(),
+  tenantId: z.string().min(1).optional(), // Accept camelCase variant
+  count: z.string().optional(), // Return only count for performance
+  page: z.string().optional(), // Page number (1-indexed)
+  limit: z.string().optional(), // Items per page
+  search: z.string().optional(), // Search by SKU or name
+  q: z.string().optional(), // Alias for search
+  status: z.enum(['all', 'active', 'inactive', 'syncing', 'trashed']).optional(), // Filter by status
+  visibility: z.enum(['all', 'public', 'private']).optional(), // Filter by visibility
+  category: z.string().optional(), // Filter by category slug (legacy)
+  categoryId: z.string().optional(), // Filter by tenant category ID
+  categoryFilter: z.enum(['all', 'assigned', 'unassigned']).optional(), // Filter by category assignment status
+  sortBy: z.enum(['name', 'sku', 'price', 'stock', 'updated_at', 'created_at']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+}).transform((data) => ({
+  ...data,
+  tenant_id: data.tenant_id || data.tenantId, // Accept both snake_case and camelCase
+  search: data.search || data.q, // Accept both search and q
+}));
+
+/**
+ * GET /api/items/stats - Get aggregated item statistics for a tenant
+ * Returns storewide counts regardless of pagination/filters
+ */
+app.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, async (req, res) => {
+  const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+
+  if (!tenant_id) {
+    return res.status(400).json({ error: "tenant_id_required" });
+  }
+
+  const isAdmin = isPlatformAdmin(req.user);
+  const inJwtTenants = req.user?.tenantIds?.includes(tenant_id) ?? false;
+  let hasAccess = isAdmin || inJwtTenants;
+
+  console.log('[GET /api/items/stats] Access check:', {
+    userId: req.user?.userId,
+    tenant_id,
+    isAdmin,
+    inJwtTenants,
+    jwtTenantIds: req.user?.tenantIds,
+  });
+
+  if (!hasAccess && req.user?.userId && tenant_id) {
+    try {
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user.userId,
+            tenant_id,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+      console.log('[GET /api/items/stats] DB lookup result:', { userTenant, hasAccess });
+    } catch (e) {
+      console.error('[GET /api/items/stats] Error checking tenant membership:', e);
+    }
+  }
+
+  if (!hasAccess) {
+    return res.status(403).json({ error: 'tenant_access_denied' });
+  }
+
+  try {
+    // Get aggregated counts for all non-trashed items
+    const [total, active, inactive, syncing, publicCount, privateCount, lowStock] = await Promise.all([
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' } } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'active' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'inactive' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: 'active', visibility: 'public' } }), // syncing = active + public
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'public' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, visibility: 'private' } }),
+      prisma.inventory_items.count({ where: { tenant_id, item_status: { not: 'trashed' }, stock: { lt: 10 } } }),
+    ]);
+
+    return res.json({
+      total,
+      active,
+      inactive,
+      syncing,
+      public: publicCount,
+      private: privateCount,
+      lowStock,
+    });
+  } catch (error) {
+    console.error('[GET /api/items/stats] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_stats' });
+  }
 });
 
-app.get(["/items", "/inventory"], authenticateToken, async (req, res) => {
-  const parsed = listQuery.safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ error: "tenant_required" });
-  
-  // Check tenant access
-  const tenantId = parsed.data.tenantId;
-  const isAdmin = req.user?.role === 'ADMIN';
-  const hasAccess = isAdmin || req.user?.tenantIds.includes(tenantId);
-  
+// Tenant-scoped route alias for items (supports /api/tenants/:tenantId/items)
+app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
+  // Extract tenant_id from path and merge with query params
+  const queryWithTenant = { ...req.query, tenant_id: req.params.tenantId };
+  const parsed = listQuery.safeParse(queryWithTenant);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
+
+  const tenant_id = parsed.data.tenant_id;
+  if (!tenant_id) {
+    return res.status(400).json({ error: "tenant_id_required" });
+  }
+
+  const isAdmin = isPlatformAdmin(req.user);
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenant_id) ?? false);
+
+  if (!hasAccess && req.user?.userId && tenant_id) {
+    try {
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user.userId,
+            tenant_id,
+          },
+        },
+        select: { id: true },
+      });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/tenants/:tenantId/items] Error checking tenant membership:', e);
+    }
+  }
+
   if (!hasAccess) {
     return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
   }
-  
+
   try {
-    // If count=true, return only the count for performance
-    if (req.query.count === 'true') {
-      const count = await prisma.inventoryItem.count({
-        where: { tenantId: parsed.data.tenantId },
+    const where: any = { tenant_id };
+    if (parsed.data.status !== 'trashed') {
+      where.item_status = { not: 'trashed' };
+    }
+    if (parsed.data.search) {
+      const searchTerm = parsed.data.search.toLowerCase();
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { brand: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    if (parsed.data.category) {
+      where.category = parsed.data.category;
+    }
+    if (parsed.data.status && parsed.data.status !== 'all') {
+      where.item_status = parsed.data.status;
+    }
+    if (parsed.data.visibility && parsed.data.visibility !== 'all') {
+      where.visibility = parsed.data.visibility;
+    }
+
+    // Parse pagination params (page-based, not offset-based)
+    const page = parseInt(parsed.data.page || '1', 10);
+    const limit = parseInt(parsed.data.limit || '25', 10);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: skip,
+        include: {
+          // Include any related data if needed
+        }
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    // Transform the results to match the materialized view structure
+    const transformedItems = items.map((item: any) => ({
+      ...item,
+      // Add featured types array for multiple support (currently single from base table)
+      featured_types: item.featured_type ? [item.featured_type] : [],
+      // Add additional fields that would be in the materialized view
+      featured_expires_at: item.featured_until,
+      is_featured_active: item.is_featured && (!item.featured_until || new Date(item.featured_until) > new Date()),
+      days_until_expiration: item.featured_until ? Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null,
+      is_expired: item.featured_until ? new Date(item.featured_until) <= new Date() : false,
+      is_expiring_soon: item.featured_until ?
+        Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7 : false,
+      // Default product type since it's not in base table
+      product_type: 'physical',
+    }));
+
+    const totalCount = total;
+
+    res.json({
+      items: transformedItems,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: page * limit < totalCount,
+      },
+    });
+  } catch (e: any) {
+    console.error('[GET /api/tenants/:tenantId/items] Error listing items:', e);
+    res.status(500).json({ error: "failed_to_list_items", message: e?.message });
+  }
+});
+
+app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateToken, async (req, res) => {
+  const parsed = listQuery.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query_params", details: parsed.error.flatten() });
+
+  // Check tenant access
+  const tenant_id = parsed.data.tenant_id;
+
+
+  if (!tenant_id) {
+    return res.status(400).json({ error: "tenant_id_required" });
+  }
+
+  const isAdmin = isPlatformAdmin(req.user);
+  let hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenant_id) ?? false);
+
+  // Fallback: if JWT tenantIds are empty, verify membership via userTenant table
+  if (!hasAccess && req.user?.userId && tenant_id) {
+    try {
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user.userId,
+            tenant_id,
+          },
+        },
+        select: { id: true },
       });
+      hasAccess = !!userTenant;
+    } catch (e) {
+      console.error('[GET /api/items] Error checking tenant membership:', e);
+    }
+  }
+
+  if (!hasAccess) {
+    return res.status(403).json({ error: 'tenant_access_denied', message: 'You do not have access to this tenant' });
+  }
+
+  try {
+    // Build where clause
+    const where: any = { tenant_id };
+
+    // Exclude trashed items by default (unless explicitly requested)
+    if (parsed.data.status !== 'trashed') {
+      where.item_status = { not: 'trashed' };
+    }
+
+    // Apply search filter
+    if (parsed.data.search) {
+      const searchTerm = parsed.data.search.toLowerCase();
+      where.OR = [
+        { sku: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    // Apply status filter
+    if (parsed.data.status && parsed.data.status !== 'all') {
+      if (parsed.data.status === 'active') {
+        where.item_status = 'active';
+      } else if (parsed.data.status === 'inactive') {
+        where.item_status = 'inactive';
+      } else if (parsed.data.status === 'trashed') {
+        where.item_status = 'trashed';
+      } else if (parsed.data.status === 'syncing') {
+        where.AND = [
+          { OR: [{ item_status: 'active' }, { item_status: null }] },
+          { OR: [{ visibility: 'public' }, { visibility: null }] },
+        ];
+      }
+    }
+
+    // Apply category filter (legacy - by directory category slug)
+    if (parsed.data.category) {
+      where.directoryCategory = {
+        slug: parsed.data.category,
+      };
+    }
+
+    // Apply tenant category filter (by specific category ID)
+    if (parsed.data.categoryId) {
+      where.directory_category_id = parsed.data.categoryId;
+    }
+
+    // Apply category assignment filter (assigned/unassigned)
+    if (parsed.data.categoryFilter && parsed.data.categoryFilter !== 'all') {
+      if (parsed.data.categoryFilter === 'assigned') {
+        // Has category assigned
+        where.directory_category_id = { not: null };
+      } else if (parsed.data.categoryFilter === 'unassigned') {
+        // No category assigned
+        where.directory_category_id = null;
+      }
+    }
+
+    // Apply visibility filter
+    if (parsed.data.visibility && parsed.data.visibility !== 'all') {
+      if (parsed.data.visibility === 'public') {
+        where.visibility = 'public';
+      } else if (parsed.data.visibility === 'private') {
+        where.visibility = 'private';
+      }
+    }
+
+    // If count=true, return only the count
+    if (req.query.count === 'true') {
+      // Check if Prisma client is properly initialized
+      if (!prisma || !prisma.inventory_items) {
+        console.warn('[GET /items] Prisma client not properly initialized');
+        return res.status(500).json({
+          error: 'database_unavailable',
+        });
+      }
+
+      const count = await prisma.inventory_items.count({ where });
       return res.json({ count });
     }
-    
-    // Otherwise return full items list
-    const items = await prisma.inventoryItem.findMany({
-      where: { tenantId: parsed.data.tenantId },
-      orderBy: { updatedAt: "desc" },
+
+    // Parse pagination params
+    const page = parseInt(parsed.data.page || '1', 10);
+    const limit = parseInt(parsed.data.limit || '25', 10);
+    const skip = (page - 1) * limit;
+
+    // Build orderBy clause
+    const sortBy = parsed.data.sortBy || 'updated_at';
+    const sortOrder = parsed.data.sortOrder || 'desc';
+    const orderBy: any = {};
+
+    if (sortBy === 'price') {
+      orderBy.price_cents = sortOrder;
+    } else {
+      orderBy[sortBy] = sortOrder;
+    }
+
+    // Fetch items with pagination
+    const [items, totalCount] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    // Fetch featured types for all items in batch
+    const itemIds = items.map(item => item.id);
+    const featuredTypesMap = new Map();
+
+    if (itemIds.length > 0) {
+      // Get featured types for all items at once
+      const featuredTypesForAllItems = await Promise.all(
+        itemIds.map(async (itemId) => {
+          const featuredTypes = await FeaturedProductsService.getFeaturedTypesForItem(itemId);
+          return { itemId, featuredTypes };
+        })
+      );
+
+      // Create lookup map
+      featuredTypesForAllItems.forEach(({ itemId, featuredTypes }) => {
+        featuredTypesMap.set(itemId, featuredTypes);
+      });
+    }
+
+    // Fetch all unique category slugs from items' category_path arrays
+    const categorySlugs = [...new Set(items.flatMap(item => item.category_path || []).filter(Boolean))];
+    const categories = categorySlugs.length > 0
+      ? await prisma.directory_category.findMany({
+        where: {
+          slug: { in: categorySlugs },
+          tenantId: tenant_id
+        },
+        select: { id: true, name: true, slug: true, googleCategoryId: true }
+      })
+      : [];
+
+    // Create a category lookup map
+    const categoryMap = new Map(categories.map(cat => [cat.slug, cat]));
+
+    // Return paginated response
+    // Hide price_cents from frontend since price is the authoritative field
+    // Map directory_category_id to tenantCategoryId and include category object
+    // Map image_url to imageUrl for frontend compatibility
+
+    // Also fetch categories by directory_category_id for items that have it set
+    const directCategoryIds = [...new Set(items.map(item => item.directory_category_id).filter((id): id is string => !!id))];
+    const directCategories = directCategoryIds.length > 0
+      ? await prisma.directory_category.findMany({
+        where: {
+          id: { in: directCategoryIds },
+          tenantId: tenant_id
+        },
+        select: { id: true, name: true, slug: true, googleCategoryId: true }
+      })
+      : [];
+
+    // Create a category lookup map by ID
+    const categoryByIdMap = new Map(directCategories.map(cat => [cat.id, cat]));
+
+    const itemsWithoutPriceCents = items.map((item: any) => {
+      const { price_cents, directory_category_id, image_url, id, metadata, ...itemWithoutPriceCents } = item;
+
+      // Get featured types for this item
+      const featuredTypes = featuredTypesMap.get(id) || [];
+
+      // Find tenant category - prefer directory_category_id, fallback to category_path
+      let tenantCategory = null;
+      if (directory_category_id) {
+        // Direct category ID lookup (from Quick Start or manual assignment)
+        tenantCategory = categoryByIdMap.get(directory_category_id) || null;
+      }
+      if (!tenantCategory && item.category_path && item.category_path.length > 0) {
+        // Fallback to category_path lookup (legacy method)
+        tenantCategory = categoryMap.get(item.category_path[0]) || null;
+      }
+
+      // Extract metadata fields if they exist (fallback for any custom fields)
+      const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
+
+      // Extract featured types array and maintain backward compatibility
+      const featuredTypesArray = featuredTypes.map((ft: any) => ft.featured_type);
+      const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
+
+      return {
+        ...itemWithoutPriceCents,
+        price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
+        tenantCategoryId: tenantCategory ? tenantCategory.id : null,
+        tenantCategory: tenantCategory || null,
+        imageUrl: image_url || null, // Map image_url to imageUrl for frontend
+        categoryPath: item.category_path || [], // Also include category_path for completeness
+        // Use real database columns first, fallback to metadata for backward compatibility
+        has_variants: item.has_variants || metadataObj.has_variants || false,
+        default_variant_id: item.default_variant_id || metadataObj.default_variant_id || null,
+        product_type: item.product_type || metadataObj.product_type || 'physical',
+        digital_delivery_method: item.digital_delivery_method || metadataObj.digital_delivery_method,
+        digital_assets: item.digital_assets || metadataObj.digital_assets,
+        license_type: item.license_type || metadataObj.license_type,
+        access_duration_days: item.access_duration_days || metadataObj.access_duration_days,
+        download_limit: item.download_limit || metadataObj.download_limit,
+        payment_gateway_type: item.payment_gateway_type || metadataObj.payment_gateway_type,
+        payment_gateway_id: item.payment_gateway_id || metadataObj.payment_gateway_id,
+        // Multi-type featured products support
+        featuredTypes: featuredTypesArray, // Array of featured types
+        featuredProducts: featuredTypes, // Full featured product details with expirations
+        // Backward compatibility
+        featuredType: primaryFeaturedType, // Primary featured type (first one)
+        is_featured: featuredTypesArray.length > 0, // Boolean for backward compatibility
+        featured_at: featuredTypes.length > 0 ? featuredTypes[0].featured_at : null,
+        featured_priority: featuredTypes.length > 0 ? featuredTypes[0].featured_priority : null,
+        featured_until: featuredTypes.length > 0 ? featuredTypes[0].featured_expires_at : null,
+      };
     });
-    res.json(items);
+
+    res.json({
+      items: itemsWithoutPriceCents,
+      pagination: {
+        page,
+        limit,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + items.length < totalCount,
+      },
+    });
+
   } catch (e: any) {
     console.error('[GET /items] Error listing items:', e);
     res.status(500).json({ error: "failed_to_list_items", message: e?.message });
   }
 });
 
-app.get(["/items/:id", "/inventory/:id"], async (req, res) => {
-  const it = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
-  if (!it) return res.status(404).json({ error: "not_found" });
-  res.json(it);
+app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
+  const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const it = await prisma.inventory_items.findUnique({
+    where: { id: itemId },
+    include: {
+      product_variants: {
+        select: {
+          id: true,
+          parent_item_id: true,
+          tenant_id: true,
+          variant_name: true,
+          sku: true,
+          price_cents: true,
+          sale_price_cents: true,
+          stock: true,
+          image_url: true,
+          attributes: true,
+          sort_order: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true,
+        },
+      },
+    },
+  });
+  if (!it) return res.status(400).json({ error: "not_found" });
+
+  // Security: Only allow public access to items that are active AND public
+  // Draft, archived, and private items should not be accessible via public URLs
+  const isAuthenticated = req.headers.authorization; // Check if request has auth token
+  if (!isAuthenticated) {
+    // For unauthenticated requests, only show active + public items
+    if (it.item_status !== 'active' || it.visibility !== 'public') {
+      return res.status(400).json({ error: "not_found" });
+    }
+  }
+
+  // Check payment gateway status from MV (fast, pre-computed)
+  let hasActivePaymentGateway = false;
+  let defaultGatewayType: string | null = null;
+  try {
+    const mvData = await getDirectPool().query(
+      'SELECT has_active_payment_gateway, default_gateway_type FROM storefront_products WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
+    if (mvData.rows.length > 0) {
+      hasActivePaymentGateway = mvData.rows[0].has_active_payment_gateway || false;
+      defaultGatewayType = mvData.rows[0].default_gateway_type || null;
+    }
+    console.log(`[GET /items/${req.params.id}] MV payment gateway:`, hasActivePaymentGateway, 'type:', defaultGatewayType, 'tenant:', it.tenant_id);
+  } catch (e) {
+    console.log(`[GET /items/${req.params.id}] MV query failed, using fallback for tenant:`, it.tenant_id);
+    // Fallback: query payment gateway table directly if MV fails
+    const gateway = await prisma.tenant_payment_gateways.findFirst({
+      where: {
+        tenant_id: it.tenant_id,
+        is_active: true,
+      },
+      select: { id: true, gateway_type: true },
+    });
+    hasActivePaymentGateway = !!gateway;
+    defaultGatewayType = gateway?.gateway_type || null;
+    console.log(`[GET /items/${req.params.id}] Fallback payment gateway:`, hasActivePaymentGateway, 'type:', defaultGatewayType);
+  }
+
+  // Fetch tenant category - prioritize directory_category_id, fallback to category_path slug lookup
+  let tenantCategory = null;
+  if (it.directory_category_id) {
+    // Primary lookup: by directory_category_id (most reliable)
+    const category = await prisma.directory_category.findFirst({
+      where: {
+        id: it.directory_category_id,
+        tenantId: it.tenant_id
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        googleCategoryId: true,
+      },
+    });
+    if (category) {
+      tenantCategory = {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        googleCategoryId: category.googleCategoryId,
+      };
+    }
+  } else if (it.category_path && it.category_path.length > 0) {
+    // Fallback: try to find by slug from category_path
+    const category = await prisma.directory_category.findFirst({
+      where: {
+        slug: it.category_path[0],
+        tenantId: it.tenant_id
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        googleCategoryId: true,
+      },
+    });
+    if (category) {
+      tenantCategory = {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        googleCategoryId: category.googleCategoryId,
+      };
+    }
+  }
+
+  // Get featured types for this item
+  const featuredTypes = await FeaturedProductsService.getFeaturedTypesForItem(itemId);
+  const featuredTypesArray = featuredTypes.map(ft => ft.featured_type);
+  const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
+
+  // Fetch photo gallery data from photo_assets table
+  let imageGallery: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt: string | null;
+    caption: string | null;
+    variant_id: string | null;
+    createdAt: string;
+  }> = [];
+  try {
+    const photos = await prisma.photo_assets.findMany({
+      where: {
+        inventoryItemId: itemId,
+        variant_id: null // Only item-level photos, not variant photos
+      },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        inventoryItemId: true,
+        variant_id: true,
+        url: true,
+        publicUrl: true,
+        position: true,
+        alt: true,
+        caption: true,
+        createdAt: true
+      }
+    });
+
+    imageGallery = photos.map(photo => ({
+      id: photo.id,
+      url: photo.url,
+      position: photo.position,
+      alt: photo.alt,
+      caption: photo.caption,
+      variant_id: photo.variant_id,
+      createdAt: photo.createdAt.toISOString()
+    }));
+  } catch (error) {
+    console.error(`[GET /items/${itemId}] Error fetching photo gallery:`, error);
+    // Continue without photos if there's an error
+  }
+
+  // Convert Decimal price to number for frontend compatibility
+  // Hide price_cents from frontend since price is the authoritative field
+  // Map image_url to imageUrl for frontend compatibility
+  const { price_cents, image_url, sale_price_cents, metadata, product_variants, ...itemWithoutPriceCents } = it;
+
+  // Extract metadata fields if they exist (fallback for any custom fields)
+  const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
+
+  const transformed = {
+    ...itemWithoutPriceCents,
+    price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
+    priceCents: price_cents !== null && price_cents !== undefined ? Number(price_cents) : null,
+    salePriceCents: metadataObj.sale_price_cents ?? (sale_price_cents !== null && sale_price_cents !== undefined ? Number(sale_price_cents) : null),
+    imageUrl: image_url || null,
+    imageGallery: imageGallery, // Add actual photo gallery data
+    tenantCategory,
+    tenantCategoryId: it.directory_category_id,
+    hasActivePaymentGateway: hasActivePaymentGateway || false,
+    defaultGatewayType: defaultGatewayType || null,
+    // Include variants array with sorting
+    variants: product_variants ?
+      [...product_variants].sort((a, b) => {
+        const aSortOrder = a.sort_order || 0;
+        const bSortOrder = b.sort_order || 0;
+        if (aSortOrder !== bSortOrder) {
+          return aSortOrder - bSortOrder;
+        }
+        const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return aCreatedAt - bCreatedAt;
+      }) : [],
+    // Use real database columns first, fallback to metadata for backward compatibility
+    has_variants: it.has_variants || metadataObj.has_variants || false,
+    product_type: it.product_type || metadataObj.product_type || 'physical',
+    digital_delivery_method: it.digital_delivery_method || metadataObj.digital_delivery_method,
+    digital_assets: it.digital_assets || metadataObj.digital_assets,
+    license_type: it.license_type || metadataObj.license_type,
+    access_duration_days: it.access_duration_days || metadataObj.access_duration_days,
+    download_limit: it.download_limit || metadataObj.download_limit,
+    payment_gateway_type: metadataObj.payment_gateway_type || it.payment_gateway_type,
+    payment_gateway_id: metadataObj.payment_gateway_id || it.payment_gateway_id,
+    // Use direct columns first, fallback to metadata for backward compatibility
+    features: it.features || metadataObj.features || [],
+    specifications: it.specifications || metadataObj.specifications || {},
+    tags: it.tags || metadataObj.tags || [],
+    seo_title: it.seo_title || metadataObj.seo_title || null,
+    seo_description: it.seo_description || metadataObj.seo_description || null,
+    enhanced_description: it.enhanced_description || metadataObj.enhancedDescription || null,
+    track_inventory: it.track_inventory ?? metadataObj.track_inventory ?? true,
+    allow_backorder: it.allow_backorder ?? metadataObj.allow_backorder ?? false,
+    low_stock_threshold: it.low_stock_threshold || metadataObj.low_stock_threshold || 5,
+    video_url: it.video_url || metadataObj.videoUrl || null,
+    videoUrl: it.video_url || metadataObj.videoUrl || null, // Keep videoUrl for backward compatibility
+    // Multi-type featured products support
+    featuredTypes: featuredTypesArray, // Array of featured types
+    featuredProducts: featuredTypes, // Full featured product details with expirations
+    // Backward compatibility
+    featuredType: primaryFeaturedType, // Primary featured type (first one)
+    is_featured: featuredTypesArray.length > 0, // Boolean for backward compatibility
+    featured_at: featuredTypes.length > 0 ? featuredTypes[0].featured_at : null,
+    featured_priority: featuredTypes.length > 0 ? featuredTypes[0].featured_priority : null,
+    featured_until: featuredTypes.length > 0 ? featuredTypes[0].featured_expires_at : null,
+  };
+
+  res.json(transformed);
 });
 
-const createItemSchema = z.object({
-  tenantId: z.string().min(1),
-  sku: z.string().min(1),
+// GET /api/items/:id/photos - Fetch all photos for an item ordered by position (PUBLIC)
+app.get("/api/items/:id/photos", async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    // Verify item exists
+    const item = await prisma.inventory_items.findUnique({
+      where: { id: itemId },
+      select: { id: true, tenant_id: true }
+    });
+
+    if (!item) {
+      return res.status(400).json({ error: "item_not_found" });
+    }
+
+    // Fetch photos ordered by position
+    const photos = await prisma.photo_assets.findMany({
+      where: {
+        inventoryItemId: itemId,
+        variant_id: null // Only item-level photos, not variant photos
+      },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        inventoryItemId: true,
+        variant_id: true,
+        url: true,
+        publicUrl: true,
+        position: true,
+        alt: true,
+        caption: true,
+        createdAt: true
+      }
+    });
+
+    // Transform to match frontend Photo interface
+    const transformedPhotos = photos.map(photo => ({
+      id: photo.id,
+      itemId: photo.inventoryItemId,
+      variantId: photo.variant_id,
+      url: photo.url || photo.publicUrl,
+      position: photo.position,
+      alt: photo.alt,
+      caption: photo.caption,
+      createdAt: photo.createdAt.toISOString()
+    }));
+
+    res.json({ photos: transformedPhotos });
+  } catch (error) {
+    console.error('[GET /api/items/:id/photos] Error:', error);
+    res.status(500).json({ error: "failed_to_fetch_photos" });
+  }
+});
+
+const conditionSchema = z.enum(['new', 'brand_new', 'refurbished', 'used']).transform((v) => (v === 'new' ? 'brand_new' : v));
+
+const baseItemSchema = z.object({
+  tenant_id: z.string().min(1).optional(),
+  tenantId: z.string().min(1).optional(), // Accept camelCase from frontend
+  sku: z.string().min(1).optional(), // Optional - API will auto-generate if not provided
   name: z.string().min(1),
-  priceCents: z.number().int().nonnegative().default(0),
-  stock: z.number().int().nonnegative().default(0),
-  imageUrl: z.string().url().nullable().optional(),
+  price_cents: z.number().int().nonnegative(),
+  stock: z.number().int(), // Allow negative values for items with variants
+  image_url: z.string().nullable().optional(),
+  image_gallery: z.array(z.string()).optional(), // Array of image URLs
   metadata: z.any().optional(),
   description: z.string().optional(),
+  marketing_description: z.string().nullable().optional(),
   // v3.4 SWIS fields (required by schema)
   title: z.string().min(1).optional(),
   brand: z.string().min(1).optional(),
-  manufacturer: z.string().optional(),
+  manufacturer: z.string().nullable().optional(),
   price: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().nonnegative()).optional(),
   currency: z.string().length(3).optional(),
+  availability: z.enum(['in_stock', 'out_of_stock', 'preorder']).optional(),
+  condition: conditionSchema.optional(),
+  // Product identifiers for Google Merchant
+  gtin: z.string().nullable().optional(),
+  mpn: z.string().nullable().optional(),
+  // Item status and visibility
+  item_status: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(),
+  itemStatus: z.enum(['active', 'inactive', 'archived', 'trashed']).optional(), // Accept camelCase from frontend
+  status: z.string().optional(), // Legacy field, ignore
+  visibility: z.enum(['public', 'private']).optional(),
+  // Category path for Google Shopping
+  category_path: z.array(z.string()).optional(),
+  // Tenant category assignment
+  directory_category_id: z.string().nullable().optional(),
+  tenantCategoryId: z.string().nullable().optional(), // Accept camelCase from frontend
+  // Variant support
+  has_variants: z.boolean().optional(),
+  variants: z.array(z.object({
+    variant_name: z.string().min(1).optional(),
+    name: z.string().min(1).optional(), // Accept both 'name' and 'variant_name'
+    sku: z.string().optional(), // Allow empty SKUs - API will generate them
+    price_cents: z.number().int().nonnegative(),
+    sale_price_cents: z.number().int().nonnegative().nullable().optional(),
+    stock: z.number().int().nonnegative(),
+    attributes: z.record(z.string(), z.string()),
+  }).refine((data) => data.variant_name || data.name, {
+    message: "Either 'name' or 'variant_name' must be provided"
+  })).optional(),
+  // Digital product fields
+  product_type: z.enum(['physical', 'digital', 'hybrid']).optional(),
+  digital_delivery_method: z.string().nullable().optional(),
+  digital_assets: z.array(z.any()).nullable().optional(),
+  license_type: z.string().nullable().optional(),
+  access_duration_days: z.number().int().nullable().optional(),
+  download_limit: z.number().int().nullable().optional(),
+  // Payment gateway fields
+  payment_gateway_type: z.string().nullable().optional(),
+  payment_gateway_id: z.string().nullable().optional(),
+  // Sale price
+  sale_price_cents: z.number().int().nonnegative().nullable().optional(),
+  // Tags and SEO
+  tags: z.array(z.string()).optional(),
+  seo_title: z.string().nullable().optional(),
+  seo_description: z.string().nullable().optional(),
+  enhanced_description: z.string().nullable().optional(),
+  // Media fields
+  video_url: z.string().nullable().optional(),
+  video_thumbnail: z.string().nullable().optional(),
+  // Product details
+  features: z.array(z.string()).optional(),
+  specifications: z.any().optional(),
+  // Inventory settings
+  track_inventory: z.boolean().optional(),
+  allow_backorder: z.boolean().optional(),
+  low_stock_threshold: z.number().int().optional(),
+  // Featuring
+  is_featured: z.boolean().optional(),
+  featured_priority: z.number().int().optional(),
+  featured_type: z.string().nullable().optional(),
 });
 
-app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyCompliance, async (req, res) => {
+const createItemSchema = baseItemSchema.extend({
+  // Apply defaults only for creation
+  price_cents: z.number().int().nonnegative().default(0),
+  stock: z.number().int().default(0), // Allow negative values for items with variants
+}).transform((data) => {
+  const { tenant_id, tenantId, itemStatus, item_status, tenantCategoryId, directory_category_id, status, ...rest } = data;
+  return {
+    ...rest,
+    tenant_id: tenant_id || tenantId, // Prefer snake_case, fallback to camelCase
+    item_status: item_status || itemStatus || 'active', // Prefer snake_case, fallback to camelCase, default to active
+    directory_category_id: directory_category_id || tenantCategoryId || null, // Prefer snake_case, fallback to camelCase
+  };
+});
+
+const updateItemSchema = baseItemSchema.partial();
+
+app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubscriptionLimits, */ async (req, res) => {
+  console.log('[POST /items] Raw request body:', JSON.stringify(req.body, null, 2));
+
   const parsed = createItemSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  console.log('[POST /items] Zod validation result:', parsed.success);
+  if (!parsed.success) {
+    console.log('[POST /items] Validation errors:', JSON.stringify(parsed.error.flatten(), null, 2));
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
+
+  console.log('[POST /items] Parsed data:', parsed.data);
   try {
-    // Auto-populate SWIS fields from legacy fields if not provided
+    // Extract variants and other special fields before creating item
+    const {
+      variants,
+      has_variants,
+      product_type,
+      digital_delivery_method,
+      digital_assets,
+      license_type,
+      access_duration_days,
+      download_limit,
+      payment_gateway_type,
+      payment_gateway_id,
+      image_gallery,
+      sale_price_cents,
+      tags,
+      seo_title,
+      seo_description,
+      is_featured,
+      featured_priority,
+      featured_type,
+      marketing_description,
+      track_inventory,
+      allow_backorder,
+      low_stock_threshold,
+      ...itemData
+    } = parsed.data;
+
+    // If category is assigned, look up the slug for category_path
+    let categoryPath: string[] = itemData.category_path || [];
+    if (itemData.directory_category_id && categoryPath.length === 0) {
+      const category = await prisma.directory_category.findFirst({
+        where: {
+          id: itemData.directory_category_id,
+          tenantId: itemData.tenant_id
+        },
+        select: { slug: true }
+      });
+      if (category) {
+        categoryPath = [category.slug];
+        console.log('[POST /items] Auto-populated category_path:', categoryPath);
+      }
+    }
+
     const data = {
-      ...parsed.data,
-      title: parsed.data.title || parsed.data.name,
-      brand: parsed.data.brand || 'Unknown',
-      price: parsed.data.price ?? parsed.data.priceCents / 100,
-      currency: parsed.data.currency || 'USD',
+      ...itemData,
+      title: itemData.title || itemData.name,
+      brand: itemData.brand || 'Unknown',
+      // Auto-generate SKU if not provided
+      sku: itemData.sku || generateSKU({
+        tenantKey: generateTenantKey(itemData.tenant_id || ''),
+        productType: (product_type || 'physical') as 'physical' | 'digital' | 'hybrid',
+      }),
+      // Price logic: prioritize price (dollars) over price_cents (cents)
+      // Ensure price is never undefined since it's required in the schema
+      price: itemData.price ?? (itemData.price_cents ? itemData.price_cents / 100 : 0),
+      price_cents: itemData.price_cents ?? (itemData.price ? Math.round(itemData.price * 100) : 0),
+      currency: itemData.currency || 'USD',
+      // Auto-set availability based on stock if not explicitly provided
+      availability: itemData.availability || (itemData.stock > 0 ? 'in_stock' : 'out_of_stock'),
+      tenant_id: itemData.tenant_id || '', // Ensure tenant_id is always a string
+      // Category assignment - keep both directory_category_id and category_path for storefront compatibility
+      directory_category_id: itemData.directory_category_id || null,
+      category_path: categoryPath,
+      // Media
+      image_url: itemData.image_url || null,
+      image_gallery: image_gallery || [],
+      // Content
+      marketing_description: marketing_description || null,
+      // Sale price is a DIRECT COLUMN (not metadata)
+      sale_price_cents: sale_price_cents || null,
+      // Payment gateway fields are DIRECT COLUMNS
+      payment_gateway_type: payment_gateway_type || null,
+      payment_gateway_id: payment_gateway_id || null,
+      // Featuring
+      is_featured: is_featured || false,
+      featured_priority: featured_priority || 0,
+      featured_type: featured_type || 'store_selection',
+      // Include new fields as direct columns
+      has_variants: has_variants || false,
+      product_type: product_type || 'physical',
+      digital_delivery_method: digital_delivery_method as any,
+      digital_assets: digital_assets as any,
+      license_type: license_type as any,
+      access_duration_days: access_duration_days,
+      download_limit: download_limit,
+      // Keep metadata for any other custom fields
+      metadata: {
+        ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? itemData.metadata : {}),
+        tags: tags || [],
+        // SEO settings (not direct columns, store in metadata)
+        seo_title: seo_title || null,
+        seo_description: seo_description || null,
+        // Inventory settings (not direct columns, store in metadata)
+        track_inventory: track_inventory ?? true,
+        allow_backorder: allow_backorder ?? false,
+        low_stock_threshold: low_stock_threshold || 5,
+        // Media settings (store in metadata)
+        videoUrl: (itemData.metadata as any)?.videoUrl || null,
+        videoThumbnail: (itemData.metadata as any)?.videoThumbnail || null,
+        // Remove fields that are now in dedicated columns to avoid duplication
+        ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? {
+          has_variants: undefined,
+          default_variant_id: undefined,
+          product_type: undefined,
+          digital_delivery_method: undefined,
+          digital_assets: undefined,
+          license_type: undefined,
+          access_duration_days: undefined,
+          download_limit: undefined,
+        } : {}),
+      } as any,
     };
-    const created = await prisma.inventoryItem.create({ data });
-    await audit({ tenantId: created.tenantId, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
-    res.status(201).json(created);
+
+    // Create item and variants in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the main item
+      const created = await tx.inventory_items.create({
+        data: {
+          id: generateTenantItemId(itemData.tenant_id || ''),
+          ...data,
+          updated_at: new Date(),
+        }
+      });
+
+      // Create variants if provided
+      if (has_variants && variants && variants.length > 0) {
+        console.log(`[POST /items] Creating ${variants.length} variants for item ${created.id}`);
+
+        for (const variant of variants) {
+          // Generate SKU if not provided
+          let sku = variant.sku;
+          if (!sku || sku.trim() === '') {
+            sku = generateVariantSkuFromParent(created.sku, variants.indexOf(variant), created.product_type as any);
+          }
+
+          // Handle both 'name' and 'variant_name' fields
+          const variantName = variant.variant_name || variant.name;
+
+          await tx.product_variants.create({
+            data: {
+              id: generateTenantVariantId(created.id, created.tenant_id),
+              parent_item_id: created.id,
+              tenant_id: created.tenant_id,
+              variant_name: variantName || `Variant ${variants.indexOf(variant) + 1}`, // Ensure string value
+              sku: sku, // Now guaranteed to be a string
+              price_cents: variant.price_cents,
+              sale_price_cents: variant.sale_price_cents || null,
+              stock: variant.stock,
+              attributes: variant.attributes as any,
+              is_active: true,
+              sort_order: 0,
+              created_at: new Date(),
+              updated_at: new Date(),
+            }
+          });
+        }
+
+        // Update the item to mark it as having variants
+        await tx.inventory_items.update({
+          where: { id: created.id },
+          data: {
+            has_variants: true,
+          }
+        });
+      }
+
+      return created;
+    });
+
+    // Migrate temp photos to permanent URLs
+    const tenantId = itemData.tenant_id || '';
+    const allPhotoUrls = [
+      result.image_url,
+      ...(result.image_gallery || [])
+    ].filter((url): url is string => Boolean(url));
+
+    let finalPhotoUrls = allPhotoUrls;
+
+    if (allPhotoUrls.some(url => url.includes('/temp/'))) {
+      console.log('[POST /items] Migrating temp photos to permanent URLs...');
+
+      const permanentUrls = await migrateTempPhotos(allPhotoUrls, tenantId, result.id);
+
+      // Update the item with permanent URLs
+      const [permanentPrimaryUrl, ...permanentGalleryUrls] = permanentUrls;
+
+      await prisma.inventory_items.update({
+        where: { id: result.id },
+        data: {
+          image_url: permanentPrimaryUrl || result.image_url,
+          image_gallery: permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery,
+        }
+      });
+
+      // Update result for response
+      result.image_url = permanentPrimaryUrl || result.image_url;
+      result.image_gallery = permanentGalleryUrls.length > 0 ? permanentGalleryUrls : result.image_gallery;
+      finalPhotoUrls = permanentUrls;
+    }
+
+    // Create photo_assets records for all photos
+    if (finalPhotoUrls.length > 0) {
+      console.log(`[POST /items] Creating ${finalPhotoUrls.length} photo_assets records for item ${result.id}`);
+
+      for (let i = 0; i < finalPhotoUrls.length; i++) {
+        const photoUrl = finalPhotoUrls[i];
+        const isPrimary = i === 0;
+
+        try {
+          await prisma.photo_assets.create({
+            data: {
+              id: generatePhotoId(tenantId, result.id),
+              tenantId: tenantId,
+              inventoryItemId: result.id,
+              url: photoUrl,
+              position: i,
+              alt: isPrimary ? `${result.name} - Primary Image` : `${result.name} - Gallery Image ${i}`,
+              caption: null,
+              variant_id: null,
+              width: null,
+              height: null,
+              bytes: null,
+              contentType: 'image/jpeg',
+              exifRemoved: true,
+            }
+          });
+        } catch (photoError) {
+          console.error(`[POST /items] Failed to create photo_assets record for ${photoUrl}:`, photoError);
+          // Continue with other photos even if one fails
+        }
+      }
+    }
+
+    // await audit({ tenant_id: created.tenant_id, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
+
+    // Convert Decimal price to number and hide price_cents for frontend compatibility
+    const { price_cents, ...itemWithoutPriceCents } = result;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: result.price !== null && result.price !== undefined ? Number(result.price) : null,
+      has_variants: result.has_variants,
+    };
+
+    res.status(201).json(transformed);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
     console.error('[POST /items] Error creating item:', e);
@@ -784,81 +5377,764 @@ app.post(["/items", "/inventory"], checkSubscriptionLimits, enforcePolicyComplia
   }
 });
 
-const updateItemSchema = createItemSchema.partial().extend({ tenantId: z.string().min(1).optional() });
-app.put(["/items/:id", "/inventory/:id"], enforcePolicyCompliance, async (req, res) => {
+app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], /* enforcePolicyCompliance, */ async (req, res) => {
+  console.log('[PUT /items/:id] Received body:', JSON.stringify(req.body));
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     console.error('[PUT /items/:id] Validation failed:', JSON.stringify(parsed.error.flatten(), null, 2));
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
+  console.log('[PUT /items/:id] Validation passed, parsed data:', JSON.stringify(parsed.data));
   try {
-    const updated = await prisma.inventoryItem.update({ where: { id: req.params.id }, data: parsed.data });
-    await audit({ tenantId: updated.tenantId, actor: null, action: "inventory.update", payload: { id: updated.id } });
-    res.json(updated);
-  } catch {
-    res.status(500).json({ error: "failed_to_update_item" });
+    // Extract fields that go into metadata (not direct columns)
+    const {
+      tenant_id: _,
+      tenantId: __,
+      itemStatus,
+      item_status,
+      tenantCategoryId,
+      directory_category_id,
+      status,
+      // Fields to store in direct columns (extracted from metadata)
+      tags,
+      seo_title,
+      seo_description,
+      enhanced_description,
+      features,
+      specifications,
+      video_url,
+      video_thumbnail,
+      track_inventory,
+      allow_backorder,
+      low_stock_threshold,
+      // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are DIRECT COLUMNS
+      // Do NOT destructure them - let them pass through to rest for direct storage
+      // Metadata object itself
+      metadata: incomingMetadata,
+      ...rest
+    } = parsed.data;
+
+    // Build update data with proper field mappings
+    const updateData: any = { ...rest };
+
+    // Map camelCase to snake_case for item_status
+    if (itemStatus !== undefined || item_status !== undefined) {
+      updateData.item_status = item_status || itemStatus;
+    }
+
+    // Map camelCase to snake_case for directory_category_id
+    // CRITICAL: Must explicitly set this field as it was destructured out of rest
+    if (tenantCategoryId !== undefined && tenantCategoryId !== null) {
+      updateData.directory_category_id = tenantCategoryId;
+      console.log('[PUT /items/:id] Setting directory_category_id from tenantCategoryId:', tenantCategoryId);
+
+      // When assigning a tenant category, we need to get the category slug and update category_path
+      try {
+        const category = await prisma.directory_category.findFirst({
+          where: {
+            id: tenantCategoryId,
+            isActive: true
+          },
+          select: { slug: true }
+        });
+
+        if (category) {
+          updateData.category_path = [category.slug];
+          console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
+        } else {
+          console.warn('[PUT /items/:id] Category not found for tenantCategoryId:', tenantCategoryId);
+        }
+      } catch (error) {
+        console.error('[PUT /items/:id] Error fetching category for tenantCategoryId:', tenantCategoryId, error);
+      }
+    } else if (directory_category_id !== undefined && directory_category_id !== null) {
+      updateData.directory_category_id = directory_category_id;
+      console.log('[PUT /items/:id] Setting directory_category_id from directory_category_id:', directory_category_id);
+
+      // Also update category_path for storefront compatibility
+      try {
+        const category = await prisma.directory_category.findFirst({
+          where: {
+            id: directory_category_id,
+            isActive: true
+          },
+          select: { slug: true }
+        });
+
+        if (category) {
+          updateData.category_path = [category.slug];
+          console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
+        }
+      } catch (error) {
+        console.error('[PUT /items/:id] Error fetching category for directory_category_id:', directory_category_id, error);
+      }
+    }
+
+    // Handle variants separately - they go to the product_variants table
+    let variantsData;
+    if (updateData.variants) {
+      variantsData = updateData.variants;
+      delete updateData.variants; // Remove from main item update
+    }
+
+    // Handle stock updates
+    if (updateData.stock !== undefined) {
+      const stockValue = typeof updateData.stock === 'string' ? parseInt(updateData.stock, 10) : updateData.stock;
+      if (!isNaN(stockValue)) {
+        updateData.stock = stockValue;
+        // Auto-sync availability based on stock
+        updateData.availability = stockValue > 0 ? 'in_stock' : 'out_of_stock';
+      } else {
+        delete updateData.stock; // Remove invalid stock value
+      }
+    }
+
+    // Add migrated fields to direct columns
+    if (tags !== undefined) updateData.tags = tags;
+    if (seo_title !== undefined) updateData.seo_title = seo_title;
+    if (seo_description !== undefined) updateData.seo_description = seo_description;
+    if (enhanced_description !== undefined) updateData.enhanced_description = enhanced_description;
+    if (features !== undefined) updateData.features = features;
+    if (specifications !== undefined) updateData.specifications = specifications;
+    if (video_url !== undefined) updateData.video_url = video_url;
+    if (video_thumbnail !== undefined) updateData.video_thumbnail = video_thumbnail;
+    if (track_inventory !== undefined) updateData.track_inventory = track_inventory;
+    if (allow_backorder !== undefined) updateData.allow_backorder = allow_backorder;
+    if (low_stock_threshold !== undefined) updateData.low_stock_threshold = low_stock_threshold;
+
+    // Sync price and price_cents fields
+    if (updateData.price !== undefined) {
+      updateData.price_cents = Math.round(updateData.price * 100);
+    } else if (updateData.price_cents !== undefined) {
+      updateData.price = updateData.price_cents / 100;
+    }
+
+    // Build metadata object with fields that are not direct columns
+    const metadataFields: any = {};
+    // NOTE: migrated fields are now stored as direct columns, not in metadata
+    // NOTE: sale_price_cents, payment_gateway_type, payment_gateway_id are stored as direct columns
+    // They are NOT stored in metadata
+
+    // Merge with existing metadata and incoming metadata
+    if (Object.keys(metadataFields).length > 0 || incomingMetadata) {
+      // Get existing item to merge metadata
+      const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const existingItem = await prisma.inventory_items.findUnique({
+        where: { id: itemId },
+        select: { metadata: true }
+      });
+
+      const existingMetadata = (existingItem?.metadata as any) || {};
+      const mergedMetadata = {
+        ...existingMetadata,
+        ...(incomingMetadata || {}),
+        ...metadataFields,
+      };
+
+      updateData.metadata = mergedMetadata;
+      console.log('[PUT /items/:id] Merged metadata:', JSON.stringify(mergedMetadata));
+    }
+
+    // Add updated_at timestamp
+    updateData.updated_at = new Date();
+
+    console.log('[PUT /items/:id] Final update data:', JSON.stringify(updateData));
+
+    const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const updated = await prisma.inventory_items.update({
+      where: { id: itemId },
+      data: updateData,
+    });
+
+    if (!updated) {
+      return res.status(400).json({ error: 'item_not_found' });
+    }
+
+    // Sync variants with parent item status
+    if (updateData.item_status) {
+      const newStatus = updateData.item_status;
+      let variantStatus = true; // Default to active
+
+      // Determine variant status based on item status
+      if (newStatus === 'trashed' || newStatus === 'archived' || newStatus === 'inactive') {
+        variantStatus = false;
+      } else if (newStatus === 'active') {
+        variantStatus = true;
+      }
+
+      // Update all variants to match parent status
+      await prisma.product_variants.updateMany({
+        where: {
+          parent_item_id: itemId,
+          tenant_id: updated.tenant_id
+        },
+        data: { is_active: variantStatus }
+      });
+
+      console.log(`[PUT /items/:id] Synced variants status for item ${itemId}: ${newStatus} -> variants ${variantStatus ? 'active' : 'inactive'}`);
+    }
+
+    // Process variants if they exist
+    if (variantsData && Array.isArray(variantsData)) {
+      const { generateVariantId, generateTenantVariantId, generateVariantSkuFromParent } = await import('./lib/id-generator');
+
+      // Delete existing variants for this item
+      await prisma.product_variants.deleteMany({
+        where: { parent_item_id: itemId }
+      });
+
+      // Create new variants with auto-generated SKUs based on parent SKU pattern
+      const variantPromises = variantsData.map(async (variant: any, index: number) => {
+        // Generate SKU if not provided or empty, using parent item's SKU pattern
+        let sku = variant.sku;
+        if (!sku || sku.trim() === '') {
+          sku = generateVariantSkuFromParent(updated.sku, index, updated.product_type as any);
+        }
+
+        return prisma.product_variants.create({
+          data: {
+            id: generateTenantVariantId(itemId, updated.tenant_id), // Unique variant ID
+            parent_item_id: itemId,
+            tenant_id: updated.tenant_id,
+            sku: sku, // Variant SKU following parent SKU pattern
+            variant_name: variant.variant_name || variant.name || `Variant ${index + 1}`, // Handle both field names
+            price_cents: variant.price_cents || 0,
+            sale_price_cents: variant.sale_price_cents || null,
+            stock: variant.stock || 0,
+            image_url: variant.image_url || null,
+            attributes: variant.attributes || {},
+            sort_order: variant.sort_order || index,
+            is_active: variant.is_active !== false, // default to true
+          }
+        });
+      });
+
+      await Promise.all(variantPromises);
+      console.log(`[PUT /items/:id] Created ${variantsData.length} variants for item ${itemId} with intelligent SKU generation`);
+    }
+
+    console.log('[PUT /items/:id] Database returned directory_category_id:', updated.directory_category_id);
+
+    await audit({ tenantId: updated.tenant_id, actor: null, action: "inventory.update", payload: { id: updated.id } });
+
+    // Convert Decimal price to number and hide price_cents for frontend compatibility
+    const { price_cents, ...itemWithoutPriceCents } = updated;
+    const metadataObj = (updated.metadata as any) || {};
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
+      // sale_price_cents, payment_gateway_type, payment_gateway_id are direct columns
+      sale_price_cents: updated.sale_price_cents || null,
+      salePriceCents: updated.sale_price_cents || null,
+      payment_gateway_type: updated.payment_gateway_type || null,
+      payment_gateway_id: updated.payment_gateway_id || null,
+      // Use direct columns first, fallback to metadata for backward compatibility
+      tags: updated.tags || metadataObj.tags || [],
+      seo_title: updated.seo_title || metadataObj.seo_title || null,
+      seo_description: updated.seo_description || metadataObj.seo_description || null,
+      enhanced_description: updated.enhanced_description || metadataObj.enhancedDescription || null,
+      track_inventory: updated.track_inventory ?? metadataObj.track_inventory ?? true,
+      allow_backorder: updated.allow_backorder ?? metadataObj.allow_backorder ?? false,
+      low_stock_threshold: updated.low_stock_threshold || metadataObj.low_stock_threshold || 5,
+      video_url: updated.video_url || metadataObj.videoUrl || null,
+      videoUrl: updated.video_url || metadataObj.videoUrl || null, // Keep videoUrl for backward compatibility
+    };
+
+    console.log('[PUT /items/:id] Sending to frontend directory_category_id:', transformed.directory_category_id);
+
+    res.json(transformed);
+  } catch (error) {
+    console.error('[PUT /items/:id] Error updating item:', error);
+    res.status(500).json({ error: "failed_to_update_item", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
-app.delete(["/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
+// Soft delete - move item to trash (with capacity check)
+app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
-    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
+    // Get item to find tenant
+    const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
+    if (!item) {
+      return res.status(400).json({ error: "item_not_found" });
+    }
+
+    // Get tenant to check tier
+    const tenant = await prisma.tenants.findUnique({ where: { id: item.tenant_id } });
+    if (!tenant) {
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    // Check trash capacity
+    const { isTrashFull, getTrashCapacity } = await import('./utils/trash-capacity');
+    const trashCount = await prisma.inventory_items.count({
+      where: { tenant_id: item.tenant_id, item_status: 'trashed' }
+    });
+
+    if (isTrashFull(trashCount, tenant.subscription_tier || 'starter')) {
+      const capacity = getTrashCapacity(tenant.subscription_tier || 'starter');
+      return res.status(400).json({
+        error: "trash_capacity_exceeded",
+        message: `Trash bin is full (${trashCount}/${capacity} items). Please purge some items before deleting more.`,
+        current: trashCount,
+        capacity,
+      });
+    }
+
+    // Move to trash
+    const updated = await prisma.inventory_items.update({
+      where: { id: req.params.id },
+      data: { item_status: 'trashed' }
+    });
+
+    // Sync variants with parent item status
+    if (updated.item_status === 'trashed') {
+      // Deactivate all variants when item is trashed
+      await prisma.product_variants.updateMany({
+        where: {
+          parent_item_id: req.params.id,
+          tenant_id: item.tenant_id
+        },
+        data: { is_active: false }
+      });
+
+      console.log(`[Delete Item] Deactivated ${updated.item_status ? updated.item_status : 'trashed'} item variants:`, req.params.id);
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error('[Delete Item] Error:', error);
+    res.status(500).json({ error: "failed_to_trash_item" });
+  }
+});
+
+// Get trash capacity info
+app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (req, res) => {
+  try {
+    const tenant_id = req.query.tenant_id as string;
+
+    console.log('2322 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
+      return res.status(400).json({ error: "tenant_id_required" });
+    }
+
+    // Get tenant to check tier
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    if (!tenant) {
+      return res.status(400).json({ error: "tenant_not_found" });
+    }
+
+    // Get trash count and capacity info
+    const { getTrashCapacityInfo } = await import('./utils/trash-capacity');
+    const trashCount = await prisma.inventory_items.count({
+      where: { tenant_id: tenant_id, item_status: 'trashed' }
+    });
+
+    const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscription_tier || 'starter');
+    res.json(capacityInfo);
+  } catch (error) {
+    console.error('[Trash Capacity] Error:', error);
+    res.status(500).json({ error: "failed_to_get_trash_capacity" });
+  }
+});
+
+// Restore from trash
+app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, requireTenantAdmin, async (req, res) => {
+  try {
+    const item = await prisma.inventory_items.update({
+      where: { id: req.params.id },
+      data: { item_status: 'active' }
+    });
+
+    // Reactivate variants when item is restored
+    if (item.item_status === 'active') {
+      // Reactivate all variants when item is restored
+      await prisma.product_variants.updateMany({
+        where: {
+          parent_item_id: req.params.id,
+          tenant_id: item.tenant_id
+        },
+        data: { is_active: true }
+      });
+
+      console.log(`[Restore Item] Reactivated ${item.item_status} item variants:`, req.params.id);
+    }
+
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: "failed_to_restore_item" });
+  }
+});
+
+// Permanent delete (purge) - only works on trashed items
+app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
+  try {
+    // First check if item is trashed
+    const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
+    if (!item) {
+      return res.status(400).json({ error: "item_not_found" });
+    }
+    if (item.item_status !== 'trashed') {
+      return res.status(400).json({ error: "item_not_in_trash", message: "Item must be in trash before it can be permanently deleted" });
+    }
+
+    // Permanently delete
+    await prisma.inventory_items.delete({ where: { id: req.params.id } });
     res.status(204).end();
   } catch {
-    res.status(500).json({ error: "failed_to_delete_item" });
+    res.status(500).json({ error: "failed_to_purge_item" });
+  }
+});
+
+// Category assignment endpoint
+const categoryAssignmentSchema = z.object({
+  categorySlug: z.string().min(1),
+});
+app.patch("/api/v1/tenants/:tenant_id/items/:itemId/category", authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenant_id, itemId } = req.params;
+    const parsed = categoryAssignmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+    }
+
+    const updated = await categoryService.assignItemCategory(tenant_id, itemId, {
+      categorySlug: parsed.data.categorySlug,
+    });
+
+    // Convert Decimal price to number and hide price_cents for frontend compatibility
+    if (!updated) {
+      return res.status(400).json({ error: 'item_not_found' });
+    }
+
+    const { price_cents, ...itemWithoutPriceCents } = updated;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
+    };
+
+    res.json(transformed);
+  } catch (error: any) {
+    console.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || "failed_to_assign_category" });
   }
 });
 
 // Update item status (for Google sync control)
 app.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, res) => {
   try {
-    const { itemStatus, visibility, availability } = req.body;
+    const { item_status, visibility, availability } = req.body;
     const updateData: any = {};
-    
-    if (itemStatus) updateData.itemStatus = itemStatus;
+
+    if (item_status) updateData.item_status = item_status;
     if (visibility) updateData.visibility = visibility;
     if (availability) updateData.availability = availability;
-    
-    const updated = await prisma.inventoryItem.update({
+
+    const updated = await prisma.inventory_items.update({
       where: { id: req.params.id },
       data: updateData,
     });
-    
-    res.json(updated);
+
+    // Convert Decimal price to number and hide price_cents for frontend compatibility
+    const { price_cents, ...itemWithoutPriceCents } = updated;
+    const transformed = {
+      ...itemWithoutPriceCents,
+      price: updated.price !== null && updated.price !== undefined ? Number(updated.price) : null,
+    };
+
+    res.json(transformed);
   } catch (error) {
     console.error('[PATCH Item] Error:', error);
     res.status(500).json({ error: "failed_to_update_item" });
   }
 });
 
-// Get Google product feed (filtered by status)
-app.get("/google/feed", async (req, res) => {
+// Sync availability status for all items (fix out-of-sync items)
+app.post("/items/sync-availability", authenticateToken, async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    if (!tenantId) {
+    const tenant_id = req.body.tenant_id as string;
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_required" });
     }
 
-    const { generateProductFeed, getFeedStats } = await import('./lib/google/feed-generator');
-    const [feed, stats] = await Promise.all([
-      generateProductFeed(tenantId),
-      getFeedStats(tenantId),
-    ]);
+    // Get all items for the tenant
+    const items = await prisma.inventory_items.findMany({
+      where: { tenant_id },
+      select: { id: true, stock: true, availability: true },
+    });
 
-    res.json({ feed, stats });
+    // Find items that are out of sync
+    const outOfSync = items.filter(item => {
+      const expectedAvailability = item.stock > 0 ? 'in_stock' : 'out_of_stock';
+      return item.availability !== expectedAvailability;
+    });
+
+    // Update out-of-sync items
+    const updates = await Promise.all(
+      outOfSync.map(item =>
+        prisma.inventory_items.update({
+          where: { id: item.id },
+          data: { availability: item.stock > 0 ? 'in_stock' : 'out_of_stock' },
+        })
+      )
+    );
+
+    res.json({
+      success: true,
+      total: items.length,
+      synced: updates.length,
+      message: `Synced ${updates.length} out of ${items.length} items`,
+    });
   } catch (error) {
-    console.error('[Google Feed] Error:', error);
-    res.status(500).json({ error: "failed_to_generate_feed" });
+    console.error('[Sync Availability] Error:', error);
+    res.status(500).json({ error: "failed_to_sync_availability" });
+  }
+});
+
+//* ------------------------------ GOOGLE TAXONOMY SEARCH ------------------------------ */
+
+app.get('/api/google/taxonomy/browse', async (req, res) => {
+  try {
+    const { parent } = req.query;
+    const parentPath = parent ? decodeURIComponent(parent as string) : null;
+
+    // Try database first, fall back to JSON file
+    const dbCount = await prisma.google_taxonomy_list.count();
+    const useDatabase = dbCount > 0;
+
+    let categories: any[] = [];
+
+    if (useDatabase) {
+      if (!parentPath) {
+        // Get top-level categories (level 1)
+        categories = await prisma.google_taxonomy_list.findMany({
+          where: {
+            is_active: true,
+            level: 1
+          },
+          orderBy: { category_path: 'asc' },
+          take: 50
+        });
+      } else {
+        // Get direct children of the specified parent path
+        const parentDepth = parentPath.split(' > ').length;
+
+        categories = await prisma.google_taxonomy_list.findMany({
+          where: {
+            is_active: true,
+            category_path: {
+              startsWith: parentPath + ' > '
+            }
+          },
+          orderBy: { category_path: 'asc' }
+        });
+
+        // Filter to only direct children (one level deeper)
+        categories = categories.filter(cat => {
+          const catDepth = cat.category_path.split(' > ').length;
+          return catDepth === parentDepth + 1;
+        });
+      }
+    } else {
+      // Fallback to JSON file
+      const taxonomyData = require('./lib/google/taxonomy-data.json');
+      const allCategories = taxonomyData.categories || [];
+
+      if (!parentPath) {
+        // Get top-level categories (path length = 1)
+        categories = allCategories
+          .filter((cat: any) => cat.path.length === 1)
+          .map((cat: any) => ({
+            category_id: cat.id,
+            category_path: cat.fullPath,
+            level: 1
+          }));
+      } else {
+        // Get direct children
+        const parentDepth = parentPath.split(' > ').length;
+        categories = allCategories
+          .filter((cat: any) => {
+            return cat.fullPath.startsWith(parentPath + ' > ') &&
+              cat.path.length === parentDepth + 1;
+          })
+          .map((cat: any) => ({
+            category_id: cat.id,
+            category_path: cat.fullPath,
+            level: cat.path.length
+          }));
+      }
+
+      console.log(`[Taxonomy Browse] Using JSON fallback, found ${categories.length} categories for path: ${parentPath || 'root'}`);
+    }
+
+    // For each category, check if it has children
+    let categoriesWithChildInfo: any[];
+
+    if (useDatabase) {
+      categoriesWithChildInfo = await Promise.all(
+        categories.map(async (cat: any) => {
+          const childCount = await prisma.google_taxonomy_list.count({
+            where: {
+              is_active: true,
+              category_path: {
+                startsWith: cat.category_path + ' > '
+              }
+            }
+          });
+
+          return {
+            id: cat.category_id,
+            name: cat.category_path.split(' > ').pop() || cat.category_path,
+            path: cat.category_path.split(' > '),
+            fullPath: cat.category_path,
+            hasChildren: childCount > 0
+          };
+        })
+      );
+    } else {
+      // Use JSON data for child count
+      const taxonomyData = require('./lib/google/taxonomy-data.json');
+      const allCategories = taxonomyData.categories || [];
+
+      categoriesWithChildInfo = categories.map((cat: any) => {
+        const hasChildren = allCategories.some((c: any) =>
+          c.fullPath.startsWith(cat.category_path + ' > ')
+        );
+
+        return {
+          id: cat.category_id,
+          name: cat.category_path.split(' > ').pop() || cat.category_path,
+          path: cat.category_path.split(' > '),
+          fullPath: cat.category_path,
+          hasChildren
+        };
+      });
+    }
+
+    res.json({
+      success: true,
+      categories: categoriesWithChildInfo,
+    });
+  } catch (error) {
+    console.error('[Google Taxonomy Browse] Error:', error);
+    res.status(500).json({ success: false, error: 'Browse failed' });
+  }
+});
+
+app.get('/api/google/taxonomy/search', async (req, res) => {
+  try {
+    const { q: query, limit = '20' } = req.query;
+
+    // Disable caching for search results
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Query parameter required' });
+    }
+
+    const searchQuery = query.trim().toLowerCase();
+    const maxResults = parseInt(limit as string, 10);
+
+    // Search real Google taxonomy data from database
+    // Fetch more results than needed so we can sort by relevance
+    const categories = await prisma.google_taxonomy_list.findMany({
+      where: {
+        is_active: true,
+        OR: [
+          { category_path: { contains: query, mode: 'insensitive' } },
+          { category_id: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: maxResults * 5, // Fetch extra for relevance sorting
+      orderBy: { category_path: 'asc' }
+    });
+
+    // Score and sort results by relevance
+    const scoredResults = categories.map(cat => {
+      const path = cat.category_path;
+      const leafName = path.split(' > ').pop()?.toLowerCase() || '';
+      const pathLower = path.toLowerCase();
+
+      let score = 0;
+
+      // Exact leaf name match (highest priority)
+      if (leafName === searchQuery) {
+        score += 1000;
+      }
+      // Leaf name starts with query
+      else if (leafName.startsWith(searchQuery)) {
+        score += 500;
+      }
+      // Leaf name contains query as whole word
+      else if (new RegExp(`\\b${searchQuery}\\b`, 'i').test(leafName)) {
+        score += 300;
+      }
+      // Leaf name contains query
+      else if (leafName.includes(searchQuery)) {
+        score += 100;
+      }
+
+      // Bonus for shorter paths (more specific categories)
+      const depth = path.split(' > ').length;
+      score += Math.max(0, 50 - depth * 5);
+
+      // Bonus if query appears in path (for context)
+      if (pathLower.includes(searchQuery) && !leafName.includes(searchQuery)) {
+        score += 20;
+      }
+
+      return {
+        id: cat.category_id,
+        name: path.split(' > ').pop() || path,
+        path: path.split(' > '),
+        fullPath: path,
+        score
+      };
+    });
+
+    // Sort by score descending, then by path alphabetically
+    scoredResults.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.fullPath.localeCompare(b.fullPath);
+    });
+
+    // Take top results and remove score from output
+    const results = scoredResults.slice(0, maxResults).map(({ score, ...rest }) => rest);
+
+    res.json({
+      success: true,
+      categories: results,
+    });
+  } catch (error) {
+    console.error('[Google Taxonomy Search] Error:', error);
+    res.status(500).json({ success: false, error: 'Search failed' });
   }
 });
 
 app.get("/__routes", (_req, res) => {
   const out: any[] = [];
-  (app as any)._router?.stack?.forEach((r: any) => {
-    if (r.route?.path && r.route?.methods) {
-      out.push({ methods: Object.keys(r.route.methods).map(m => m.toUpperCase()), path: r.route.path });
-    }
-  });
+  // Always include known core routes
+  out.push({ methods: ["GET"], path: "/health" });
+  out.push({ methods: ["GET"], path: "/__ping" });
+  function collect(stack: any[], base = "") {
+    stack?.forEach((layer: any) => {
+      if (layer.route && layer.route.path) {
+        const methods = layer.route.methods
+          ? Array.isArray(layer.route.methods)
+            ? layer.route.methods
+            : Object.keys(layer.route.methods)
+          : [];
+        const path = base + layer.route.path;
+        out.push({ methods: methods.map((m: string) => m.toUpperCase()), path });
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        const match = layer.regexp && layer.regexp.fast_slash ? "" : (layer.regexp?.source || "");
+        collect(layer.handle.stack, base);
+      }
+    });
+  }
+  const stack = (app as any)._router?.stack || [];
+  collect(stack);
   res.json(out);
 });
 app.get("/__ping", (req, res) => {
@@ -871,32 +6147,44 @@ app.get("/__ping", (req, res) => {
 
 /**
  * Initiate OAuth flow
- * GET /google/auth?tenantId=xxx
+ * GET /google/auth?tenant_id=xxx
  */
 app.get("/google/auth", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    
-    if (!tenantId) {
+    const tenant_id = req.query.tenant_id as string;
+    console.log('2683 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
     // Verify tenant exists
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Validate NAP (Name, Address, Phone) is complete
-    const metadata = tenant.metadata as any;
-    if (!metadata?.business_name || !metadata?.city || !metadata?.state) {
-      return res.status(400).json({ 
+    // Check tenant_business_profiles_list table first, fallback to metadata for backwards compatibility
+    const businessProfileRaw = await prisma.tenant_business_profiles_list.findUnique({
+      where: { tenant_id }
+    });
+
+    // Enhance business profile to have both naming conventions
+    const { enhanceDatabaseResult } = require('./middleware/universal-transform');
+    const businessProfile = enhanceDatabaseResult(businessProfileRaw);
+
+    const hasProfile = businessProfile
+      ? (businessProfile.businessName && businessProfile.city && businessProfile.state)
+      : ((tenant.metadata as any)?.businessName && (tenant.metadata as any)?.city && (tenant.metadata as any)?.state);
+
+    if (!hasProfile) {
+      return res.status(400).json({
         error: "incomplete_business_profile",
         message: "Please complete your business profile before connecting to Google",
       });
     }
 
-    const authUrl = getAuthorizationUrl(tenantId);
+    const authUrl = getAuthorizationUrl(tenant_id);
     res.json({ authUrl });
   } catch (error) {
     console.error("[Google OAuth] Auth initiation error:", error);
@@ -948,55 +6236,28 @@ app.get("/google/callback", async (req, res) => {
     const refreshTokenEncrypted = encryptToken(tokens.refresh_token);
 
     // Store in database (upsert pattern)
-    const account = await prisma.googleOAuthAccount.upsert({
+    const account = await prisma.google_oauth_accounts_list.upsert({
       where: {
-        tenantId_googleAccountId: {
-          tenantId: stateData.tenantId,
-          googleAccountId: userInfo.id,
+        tenant_id_google_account_id: {
+          tenant_id: stateData.tenantId,
+          google_account_id: userInfo.id,
         },
       },
       create: {
-        tenantId: stateData.tenantId,
-        googleAccountId: userInfo.id,
+        id: crypto.randomUUID(),
+        tenant_id: stateData.tenantId,
+        google_account_id: userInfo.id,
         email: userInfo.email,
-        displayName: userInfo.name,
-        profilePictureUrl: userInfo.picture,
+        display_name: userInfo.name,
+        profile_picture_url: userInfo.picture,
         scopes: tokens.scope.split(' '),
-        tokens: {
-          create: {
-            accessTokenEncrypted,
-            refreshTokenEncrypted,
-            tokenType: tokens.token_type,
-            expiresAt,
-            scopes: tokens.scope.split(' '),
-          },
-        },
+        updated_at: new Date(),
       },
       update: {
         email: userInfo.email,
-        displayName: userInfo.name,
-        profilePictureUrl: userInfo.picture,
+        display_name: userInfo.name,
+        profile_picture_url: userInfo.picture,
         scopes: tokens.scope.split(' '),
-        tokens: {
-          upsert: {
-            create: {
-              accessTokenEncrypted,
-              refreshTokenEncrypted,
-              tokenType: tokens.token_type,
-              expiresAt,
-              scopes: tokens.scope.split(' '),
-            },
-            update: {
-              accessTokenEncrypted,
-              refreshTokenEncrypted,
-              expiresAt,
-              scopes: tokens.scope.split(' '),
-            },
-          },
-        },
-      },
-      include: {
-        tokens: true,
       },
     });
 
@@ -1012,23 +6273,19 @@ app.get("/google/callback", async (req, res) => {
 
 /**
  * Get Google account status for tenant
- * GET /google/status?tenantId=xxx
+ * GET /google/status?tenant_id=xxx or ?tenantId=xxx
  */
-app.get("/google/status", async (req, res) => {
+app.get("/api/google/status", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    
-    if (!tenantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+
+    console.log('2810 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
-      include: {
-        tokens: true,
-        merchantLinks: true,
-        gbpLocations: true,
-      },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenant_id },
     });
 
     if (!account) {
@@ -1038,11 +6295,11 @@ app.get("/google/status", async (req, res) => {
     res.json({
       connected: true,
       email: account.email,
-      displayName: account.displayName,
-      profilePictureUrl: account.profilePictureUrl,
+      display_name: account.display_name,
+      profile_picture_url: account.profile_picture_url,
       scopes: account.scopes,
-      merchantLinks: account.merchantLinks.length,
-      gbpLocations: account.gbpLocations.length,
+      merchant_links: 0, // Placeholder - relations not available
+      gbp_locations: 0, // Placeholder - relations not available
     });
   } catch (error) {
     console.error("[Google OAuth] Status check error:", error);
@@ -1052,33 +6309,30 @@ app.get("/google/status", async (req, res) => {
 
 /**
  * Disconnect Google account
- * DELETE /google/disconnect?tenantId=xxx
+ * DELETE /google/disconnect?tenant_id=xxx or ?tenantId=xxx
  */
 app.delete("/google/disconnect", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    
-    if (!tenantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+
+    console.log('2846 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
-      include: { tokens: true },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenant_id },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "account_not_found" });
+      return res.status(400).json({ error: "account_not_found" });
     }
 
-    // Revoke tokens with Google
-    if (account.tokens) {
-      const accessToken = decryptToken(account.tokens.accessTokenEncrypted);
-      await revokeToken(accessToken);
-    }
+    // Note: Token revocation would need to be handled differently without the tokens relation
+    // For now, just delete the account
 
     // Delete from database (cascade will delete tokens, links, locations)
-    await prisma.googleOAuthAccount.delete({
+    await prisma.google_oauth_accounts_list.delete({
       where: { id: account.id },
     });
 
@@ -1094,22 +6348,23 @@ app.delete("/google/disconnect", async (req, res) => {
 
 /**
  * List merchant accounts
- * GET /google/gmc/accounts?tenantId=xxx
+ * GET /google/gmc/accounts?tenant_id=xxx or ?tenantId=xxx
  */
 app.get("/google/gmc/accounts", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    
-    if (!tenantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+
+    console.log('2885 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenant_id },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const merchants = await listMerchantAccounts(account.id);
@@ -1126,22 +6381,22 @@ app.get("/google/gmc/accounts", async (req, res) => {
  */
 app.post("/google/gmc/sync", async (req, res) => {
   try {
-    const { tenantId, merchantId } = req.body;
-    
-    if (!tenantId || !merchantId) {
+    const { tenant_id, merchantId } = req.body;
+
+    if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const success = await syncMerchantAccount(account.id, merchantId);
-    
+
     if (success) {
       res.json({ success: true });
     } else {
@@ -1155,22 +6410,23 @@ app.post("/google/gmc/sync", async (req, res) => {
 
 /**
  * Get merchant products
- * GET /google/gmc/products?tenantId=xxx&merchantId=xxx
+ * GET /google/gmc/products?tenant_id=xxx&merchantId=xxx
  */
 app.get("/google/gmc/products", async (req, res) => {
   try {
-    const { tenantId, merchantId } = req.query;
-    
-    if (!tenantId || !merchantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+    const { merchantId } = req.query;
+
+    if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId: tenantId as string },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenant_id as string },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const products = await listProducts(account.id, merchantId as string);
@@ -1183,22 +6439,23 @@ app.get("/google/gmc/products", async (req, res) => {
 
 /**
  * Get product stats
- * GET /google/gmc/stats?tenantId=xxx&merchantId=xxx
+ * GET /google/gmc/stats?tenant_id=xxx&merchantId=xxx
  */
 app.get("/google/gmc/stats", async (req, res) => {
   try {
-    const { tenantId, merchantId } = req.query;
-    
-    if (!tenantId || !merchantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+    const { merchantId } = req.query;
+
+    if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId: tenantId as string },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenant_id as string },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const stats = await getProductStats(account.id, merchantId as string);
@@ -1213,27 +6470,28 @@ app.get("/google/gmc/stats", async (req, res) => {
 
 /**
  * List business locations
- * GET /google/gbp/locations?tenantId=xxx
+ * GET /google/gbp/locations?tenant_id=xxx or ?tenantId=xxx
  */
 app.get("/google/gbp/locations", async (req, res) => {
   try {
-    const tenantId = req.query.tenantId as string;
-    
-    if (!tenantId) {
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+
+    console.log('3005 Expects tenant_id ' + tenant_id);
+    if (!tenant_id) {
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     // First get business accounts
     const businessAccounts = await listBusinessAccounts(account.id);
-    
+
     if (businessAccounts.length === 0) {
       return res.json({ locations: [] });
     }
@@ -1253,28 +6511,28 @@ app.get("/google/gbp/locations", async (req, res) => {
  */
 app.post("/google/gbp/sync", async (req, res) => {
   try {
-    const { tenantId, locationName } = req.body;
-    
-    if (!tenantId || !locationName) {
+    const { tenant_id, locationName } = req.body;
+
+    if (!tenant_id || !locationName) {
       return res.status(400).json({ error: "tenant_id_and_location_name_required" });
     }
 
-    const account = await prisma.googleOAuthAccount.findFirst({
-      where: { tenantId },
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id },
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const locationData = await getLocation(account.id, locationName);
-    
+
     if (!locationData) {
-      return res.status(404).json({ error: "location_not_found" });
+      return res.status(400).json({ error: "location_not_found" });
     }
 
     const success = await syncLocation(account.id, locationData);
-    
+
     if (success) {
       res.json({ success: true });
     } else {
@@ -1293,14 +6551,14 @@ app.post("/google/gbp/sync", async (req, res) => {
 app.get("/google/gbp/insights", async (req, res) => {
   try {
     const { locationId, days } = req.query;
-    
+
     if (!locationId) {
       return res.status(400).json({ error: "location_id_required" });
     }
 
     const daysNum = days ? parseInt(days as string) : 30;
     const insights = await getAggregatedInsights(locationId as string, daysNum);
-    
+
     res.json({ insights });
   } catch (error) {
     console.error("[GBP] Get insights error:", error);
@@ -1315,7 +6573,7 @@ app.get("/google/gbp/insights", async (req, res) => {
  */
 app.get("/admin/email-config", async (_req, res) => {
   try {
-    const configs = await prisma.emailConfiguration.findMany({
+    const configs = await prisma.email_configuration_list.findMany({
       orderBy: { category: 'asc' }
     });
     res.json(configs);
@@ -1344,17 +6602,17 @@ app.put("/admin/email-config", async (req, res) => {
     // Upsert each configuration
     const results = await Promise.all(
       configs.map(config =>
-        prisma.emailConfiguration.upsert({
-          where: { category: config.category },
-          update: { 
-            email: config.email,
-            updatedAt: new Date()
-          },
-          create: {
-            category: config.category,
-            email: config.email
-          }
-        })
+        // prisma.emailConfiguration.upsert({
+        //   where: { category: config.category },
+        //   update: { 
+        //     email: config.email,
+        //   },
+        //   create: {
+        //     category: config.category,
+        //     email: config.email,
+        //   }
+        // })
+        Promise.resolve({ category: config.category, email: config.email }) // Temporary placeholder
       )
     );
 
@@ -1368,42 +6626,1338 @@ app.put("/admin/email-config", async (req, res) => {
   }
 });
 
-/* ------------------------------ AUTHENTICATION ------------------------------ */
-// Mount auth routes (no authentication required for these endpoints)
-app.use('/auth', authRoutes);
+/* ------------------------------ ROUTE MOUNTING ------------------------------ */
+// Use modular route mounting for better isolation and debugging
+import { mountMinimalRoutes, mountAllRoutes } from './routes';
+// import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId } from './lib/id-generator';
+// import { propagateVariants } from './utils/variant-propagation';
 
-/* ------------------------------ v3.5 AUDIT & BILLING APIs ------------------------------ */
-// Apply audit middleware globally (logs all write operations)
-app.use(auditLogger);
+// For debugging: mount only minimal routes
+// mountMinimalRoutes(app);
 
-// Mount v3.5 routes
-app.use(auditRoutes);
-app.use(policyRoutes);
-app.use(billingRoutes);
-app.use('/subscriptions', subscriptionRoutes);
-app.use('/categories', categoryRoutes);
-app.use('/performance', performanceRoutes);
-app.use('/organizations', organizationRoutes);
-app.use('/organization-requests', organizationRequestRoutes);
-app.use('/upgrade-requests', upgradeRequestsRoutes);
-app.use('/permissions', permissionRoutes);
-app.use('/users', userRoutes);
-app.use('/tenants', tenantUserRoutes);
-app.use(platformSettingsRoutes);
+// For full functionality: mount all routes (enabled for localhost testing)
+mountAllRoutes(app);
+
+/* ------------------------------ VARIANTS ROUTES ------------------------------ */
+// Add variants routes after modular mounting to ensure they're available
+import variantsRoutes from './routes/variants';
+app.use('/api', variantsRoutes);
+console.log('✅ Product variants routes mounted at /api (auth applied per-route)');
+
+/* ------------------------------ TAXONOMY ADMIN API ------------------------------ */
+
+// GET /api/admin/taxonomy/status - Check taxonomy sync status
+app.get('/api/admin/taxonomy/status', requireAdmin, async (req, res) => {
+  try {
+    const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
+    const syncService = new TaxonomySyncService();
+
+    const status = await syncService.checkForUpdates();
+
+    // Get current taxonomy version
+    const currentVersion = await prisma.google_taxonomy_list.findFirst({
+      select: { version: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    res.json({
+      currentVersion: currentVersion?.version || 'unknown',
+      latestVersion: status.latestVersion,
+      hasUpdates: status.hasUpdates,
+      changeCount: status.changes.length,
+      lastChecked: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Taxonomy Status] Error:', error);
+    res.status(500).json({ error: 'Failed to check taxonomy status' });
+  }
+});
+
+// POST /api/admin/taxonomy/sync - Manually trigger taxonomy sync
+app.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
+  try {
+    const { TaxonomySyncService } = await import('./services/TaxonomySyncService');
+    const syncService = new TaxonomySyncService();
+
+    const status = await syncService.checkForUpdates();
+
+    if (!status.hasUpdates) {
+      return res.json({
+        success: true,
+        message: 'Taxonomy is already up to date',
+        changes: []
+      });
+    }
+
+    const migrationResult = await syncService.applySafeUpdates(status.changes);
+    const itemMigration = await syncService.migrateAffectedItems(status.changes);
+
+    res.json({
+      success: true,
+      message: `Applied ${migrationResult.applied} updates, ${migrationResult.needsReview} need review`,
+      applied: migrationResult.applied,
+      needsReview: migrationResult.needsReview,
+      migratedItems: itemMigration.migrated,
+      flaggedItems: itemMigration.flagged
+    });
+  } catch (error) {
+    console.error('[Taxonomy Sync] Error:', error);
+    res.status(500).json({ error: 'Taxonomy sync failed' });
+  }
+});
+// app.use('/admin', authenticateToken, platformFlagsRoutes);
+// app.use('/api/admin', authenticateToken, platformFlagsRoutes);
+// Effective flags: middleware applied per-route (admin for platform, tenant access for tenant)
+// app.use('/admin', authenticateToken, effectiveFlagsRoutes);
+// app.use('/api/admin', authenticateToken, effectiveFlagsRoutes);
+// Category scaffolds (M3 start)
+// app.use(categoriesPlatformRoutes);
+// app.use(categoriesTenantRoutes);
+// app.use(categoriesMirrorRoutes);
+// app.use(mirrorAdminRoutes);
+// app.use(syncLogsRoutes);
+// M4: SKU Scanning routes
+app.use('/api', scanRoutes);
+console.log('✅ Scan routes mounted at /api');
+
+/* ------------------------------ PUBLIC ROUTES - MUST BE BEFORE AUTHENTICATED CATCH-ALLS ------------------------------ */
+/* These routes must be mounted before any authenticated /api catch-all routes */
+
+/* ------------------------------ recommendations (PUBLIC) ------------------------------ */
+import recommendationRoutes from './routes/recommendations';
+app.use('/api/recommendations', recommendationRoutes);
+console.log('✅ Recommendation routes mounted (MVP recommendation system - PUBLIC)');
+
+/* ------------------------------ directory routes (PUBLIC) ------------------------------ */
+/* IMPORTANT: Specific paths MUST be mounted before catch-all /api/directory routes */
+
+/* ------------------------------ directory optimized ------------------------------ */
+import directoryOptimizedRoutes from './routes/directory-optimized';
+app.use('/api/directory-optimized', directoryOptimizedRoutes);
+console.log('✅ Directory optimized routes mounted (materialized view - 6.7x faster)');
+
+/* ------------------------------ directory categories optimized ------------------------------ */
+import directoryCategoriesOptimizedRoutes from './routes/directory-categories-optimized';
+app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
+console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
+
+// Mount enhanced directory categories routes BEFORE store-types routes to avoid catch-all conflicts
+import directoryCategoriesEnhancedRoutes from './routes/directory-categories-enhanced';
+app.use('/api/directory', directoryCategoriesEnhancedRoutes);
+console.log('✅ Directory categories enhanced routes mounted at /api/directory');
+
+/* ------------------------------ slug generation (PLATFORM STANDARD) ------------------------------ */
+import slugGenerationRoutes from './routes/slug-generation';
+app.use('/api/slugs', slugGenerationRoutes);
+console.log('✅ Slug generation routes mounted at /api/slugs (Platform Standard - SlugSingletonService)');
+
+/* ------------------------------ directory map ------------------------------ */
+import directoryMapRoutes from './routes/directory-map';
+app.use('/api/directory', directoryMapRoutes);
+console.log('✅ Directory map routes mounted at /api/directory');
+
+/* ------------------------------ directory main (has catch-all /:identifier) ------------------------------ */
+import directoryRoutes from './routes/directory';
+app.use('/api/directory', directoryRoutes);
+console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
+
+/* ------------------------------ END PUBLIC ROUTES ------------------------------ */
+
+/* ------------------------------ item category assignment ------------------------------ */
+// PATCH /api/v1/tenants/:tenant_id/items/:itemId/category
+// Body: { directory_category_id?: string, categorySlug?: string }
+app.patch('/api/v1/tenants/:tenant_id/items/:itemId/category', async (req, res) => {
+  try {
+    const { tenant_id, itemId } = req.params as { tenant_id: string; itemId: string };
+    const { directory_category_id, categorySlug } = (req.body || {}) as { directory_category_id?: string; categorySlug?: string };
+
+    const updated = await categoryService.assignItemCategory(tenant_id, itemId, { directoryCategoryId: directory_category_id, categorySlug });
+    // ISR revalidation (best-effort) already triggered inside service
+    return res.json({ success: true, data: updated });
+  } catch (e: any) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e?.message || 'failed_to_assign_category';
+    console.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', msg);
+    return res.status(code).json({ success: false, error: msg });
+  }
+});
+
+/* ------------------------------ item updates ------------------------------ */
+// Note: GET /api/items endpoint is handled at line ~1976 with multiple route aliases
+
+// PUT /api/items/:itemId
+// Update an item (general updates, not category assignment)
+// PUT /api/items/:itemId
+// Update an item (general updates, not category assignment)
+app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const updateData = req.body;
+
+    console.log('[PUT /api/items/:itemId] Received request:', { itemId, updateData: JSON.stringify(updateData) });
+    console.log('[PUT /api/items/:itemId] Stock field type:', typeof updateData.stock, 'value:', updateData.stock);
+
+    // Validate required fields
+    if (!updateData) {
+      return res.status(400).json({ error: 'update_data_required' });
+    }
+
+    // Prepare update data for Prisma
+    const prismaUpdateData: any = {};
+
+    // Handle different field names (camelCase from frontend vs snake_case in DB)
+    if (updateData.name !== undefined) prismaUpdateData.name = updateData.name;
+    if (updateData.price !== undefined) prismaUpdateData.price = updateData.price;
+    if (updateData.stock !== undefined) {
+      // Ensure stock is an integer
+      const stockValue = typeof updateData.stock === 'string' ? parseInt(updateData.stock, 10) : updateData.stock;
+      console.log('[PUT /api/items/:itemId] Stock update:', { original: updateData.stock, converted: stockValue, type: typeof stockValue });
+      prismaUpdateData.stock = stockValue;
+      prismaUpdateData.quantity = stockValue; // Keep quantity in sync with stock
+    }
+    if (updateData.description !== undefined) prismaUpdateData.description = updateData.description;
+    if (updateData.visibility !== undefined) prismaUpdateData.visibility = updateData.visibility;
+    if (updateData.item_status !== undefined) prismaUpdateData.item_status = updateData.item_status;
+    if (updateData.category_path !== undefined) prismaUpdateData.category_path = updateData.category_path;
+
+    // Log what we're about to send to Prisma
+    console.log('[PUT /api/items/:itemId] Prisma update data:', JSON.stringify(prismaUpdateData, null, 2));
+    console.log('[PUT /api/items/:itemId] Stock type check:', typeof prismaUpdateData.stock);
+
+    // Update the item
+    const updatedItem = await prisma.inventory_items.update({
+      where: { id: itemId },
+      data: prismaUpdateData,
+    });
+
+    // Transform snake_case back to camelCase for frontend
+    const result = {
+      id: updatedItem.id,
+      tenant_id: updatedItem.tenant_id,
+      sku: updatedItem.sku,
+      name: updatedItem.name,
+      price: updatedItem.price,
+      stock: updatedItem.stock,
+      description: updatedItem.description,
+      visibility: updatedItem.visibility,
+      status: updatedItem.item_status,
+      category_path: updatedItem.category_path,
+      created_at: updatedItem.created_at,
+      updated_at: updatedItem.updated_at,
+    };
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[PUT /api/items/:itemId] Error:', error);
+    return res.status(500).json({ error: 'failed_to_update_item' });
+  }
+});
+
+/* ------------------------------ products needing enrichment ------------------------------ */
+// GET /api/products/needs-enrichment
+// Returns products that need enrichment (missing images, descriptions, etc.)
+app.get('/api/products/needs-enrichment', authenticateToken, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { isPlatformUser } = await import('./utils/platform-admin');
+
+    // Get tenant IDs the user has access to
+    let tenantIds: string[] = [];
+
+    if (isPlatformUser(user)) {
+      // Platform users can see all tenants
+      const allTenants = await prisma.tenants.findMany({
+        select: { id: true }
+      });
+      tenantIds = allTenants.map(t => t.id);
+    } else {
+      // Regular users can only see tenants they have access to
+      const userTenants = await prisma.user_tenants.findMany({
+        where: { user_id: user.userId },
+        select: { tenant_id: true }
+      });
+      tenantIds = userTenants.map(ut => ut.tenant_id);
+    }
+
+    if (tenantIds.length === 0) {
+      return res.json({ products: [] });
+    }
+
+    // Find products that need enrichment
+    // Products created by Quick Start Wizard typically have source = 'QUICK_START_WIZARD' and are missing details
+    const products = await prisma.inventory_items.findMany({
+      where: {
+        tenant_id: { in: tenantIds },
+        OR: [
+          // Products with missing images
+          { missing_images: true },
+          // Products with missing descriptions
+          { missing_description: true },
+          // Products with missing brand
+          { missing_brand: true },
+          // Products with missing specs
+          { missing_specs: true },
+          // Products created by quick start that might need enrichment
+          { source: 'QUICK_START_WIZARD' as any }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        source: true,
+        missing_images: true,
+        missing_description: true,
+        missing_brand: true,
+        missing_specs: true,
+        description: true,
+        brand: true,
+        tenant_id: true,
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50 // Limit results for performance
+    });
+
+    // Transform to match the expected format by ProductEnrichmentBanner
+    const enrichedProducts = products.map(product => ({
+      id: product.id,
+      name: product.name,
+      source: product.source,
+      enrichmentStatus: 'needs_enrichment',
+      missing: {
+        missingImages: product.missing_images,
+        missingDescription: product.missing_description,
+        missingSpecs: product.missing_specs,
+        missingBrand: product.missing_brand
+      }
+    }));
+
+    return res.json({ products: enrichedProducts });
+  } catch (error) {
+    console.error('[GET /api/products/needs-enrichment] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_products_needing_enrichment' });
+  }
+});
 
 /* ------------------------------ jobs ------------------------------ */
 app.post("/jobs/rates/daily", dailyRatesJob);
 
+/* ------------------------------ GBP Categories ------------------------------ */
+// GET /api/gbp/categories/popular - Get popular retail categories
+app.get("/api/gbp/categories/popular", async (req, res) => {
+  try {
+    const pool = getDirectPool();
+
+    // Get popular categories from platform_categories table
+    const popularQuery = `
+      SELECT 
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.google_category_id,
+        pc.icon_emoji,
+        pc.level,
+        pc.parent_id,
+        COUNT(DISTINCT dlc.listing_id) as store_count
+      FROM platform_categories pc
+      LEFT JOIN directory_listing_categories dlc ON dlc.category_id = pc.id
+      WHERE pc.is_active = true
+      GROUP BY pc.id, pc.name, pc.slug, pc.google_category_id, pc.icon_emoji, pc.level, pc.parent_id
+      ORDER BY store_count DESC, pc.name ASC
+      LIMIT 20
+    `;
+
+    const result = await pool.query(popularQuery);
+
+    const popularCategories = result.rows.map((row: any) => ({
+      id: row.google_category_id || `gcid:${row.slug}`,
+      name: row.name,
+      path: ["Shopping", row.level === 1 ? "General" : row.level === 2 ? "Specialty" : "Niche"],
+      storeCount: parseInt(row.store_count || '0'),
+    }));
+
+    return res.json({ items: popularCategories });
+  } catch (error) {
+    console.error('[GET /api/gbp/categories/popular] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_popular_categories' });
+  }
+});
+
+// GET /api/gbp/categories - Search GBP categories
+app.get("/api/gbp/categories", async (req, res) => {
+  try {
+    const { query, limit = '20' } = req.query;
+    const pool = getDirectPool();
+
+    // Disable caching for search results
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Query parameter required' });
+    }
+
+    // Search platform_categories table for matching categories
+    const searchQuery = `
+      SELECT 
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.google_category_id,
+        pc.icon_emoji,
+        pc.level,
+        pc.parent_id
+      FROM platform_categories pc
+      WHERE pc.is_active = true 
+        AND (
+          pc.name ILIKE $1 
+          OR pc.slug ILIKE $1
+          OR pc.description ILIKE $1
+        )
+      ORDER BY 
+        CASE WHEN pc.name ILIKE $1 THEN 1 ELSE 2 END,
+        pc.sort_order ASC,
+        pc.name ASC
+      LIMIT $2
+    `;
+
+    const result = await pool.query(searchQuery, [`%${query}%`, parseInt(limit as string, 10)]);
+
+    const results = result.rows.map((cat: any) => ({
+      id: cat.google_category_id || `gcid:${cat.slug}`,
+      name: cat.name,
+      path: ["Shopping", cat.level === 1 ? "General" : cat.level === 2 ? "Specialty" : "Niche"],
+      icon: cat.icon_emoji,
+      level: cat.level,
+      parentId: cat.parent_id,
+    }));
+
+    return res.json({ items: results, source: 'platform_categories' });
+  } catch (error) {
+    console.error('[GET /api/gbp/categories] Error:', error);
+    return res.status(500).json({ error: 'failed_to_search_categories' });
+  }
+});
+
+// Mount test GBP sync routes
+// app.use('/test', testGbpSyncRoutes);
+
+/* ------------------------------ tenant featured products ------------------------------ */
+import tenantFeaturedRoutes from './routes/tenant-featured';
+app.use('/api', tenantFeaturedRoutes);
+console.log('✅ Tenant featured products routes mounted at /api');
+
+/* ------------------------------ multi-type featured products ------------------------------ */
+import featuredProductsRoutes from './routes/featured-products';
+app.use('/api', featuredProductsRoutes);
+console.log('✅ Multi-type featured products routes mounted at /api');
+
+/* ------------------------------ SMART SALE TAGGING SYSTEM ------------------------------ */
+import smartSaleTaggingRoutes from './routes/smart-sale-tagging';
+app.use('/api/smart-sale-tagging', smartSaleTaggingRoutes);
+console.log('✅ Smart sale tagging routes mounted at /api/smart-sale-tagging (Automatic sale featured type tagging)');
+
+/* ------------------------------ VARIANT BULK OPERATIONS ------------------------------ */
+import variantBulkOperationsRoutes from './routes/variant-bulk-operations';
+app.use('/api/variants', variantBulkOperationsRoutes);
+console.log('✅ Variant bulk operations routes mounted at /api/variants (Bulk featured type, pricing, stock, activation)');
+
+/* ------------------------------ VARIANT FEATURED TYPES ------------------------------ */
+import variantFeaturedTypesRoutes from './routes/variant-featured-types';
+app.use('/api/featured-products', variantFeaturedTypesRoutes);
+console.log('✅ Variant featured types routes mounted at /api/featured-products (Individual variant featured type support)');
+
+/* ------------------------------ VARIANT-AWARE PRODUCTS ------------------------------ */
+import variantAwareProductsRoutes from './routes/variant-aware-products';
+app.use('/api/products', variantAwareProductsRoutes);
+console.log('✅ Variant-aware products routes mounted at /api/products (Enhanced variant relationship support)');
+
+/* ------------------------------ VARIANTS SINGLETON (NEW) ------------------------------ */
+import variantsSingletonRoutes from './routes/variants-singleton';
+app.use('/api/variants-singleton', variantsSingletonRoutes);
+console.log('✅ Variants singleton routes mounted at /api/variants-singleton (UniversalSingleton pattern)');
+
+/* ------------------------------ VARIANT-AWARE PRODUCTS SINGLETON (NEW) ------------------------------ */
+import variantAwareProductsSingletonRoutes from './routes/variant-aware-products-singleton';
+app.use('/api/products-singleton', variantAwareProductsSingletonRoutes);
+console.log('✅ Variant-aware products singleton routes mounted at /api/products-singleton (Materialized views + UniversalSingleton)');
+
+/* ------------------------------ VARIANT BULK OPERATIONS SINGLETON (NEW) ------------------------------ */
+import variantBulkOperationsSingletonRoutes from './routes/variant-bulk-operations-singleton';
+app.use('/api/variants-singleton', variantBulkOperationsSingletonRoutes);
+console.log('✅ Variant bulk operations singleton routes mounted at /api/variants-singleton (UniversalSingleton pattern)');
+
+/* ------------------------------ PHASE 6 ADVANCED FEATURES ------------------------------ */
+import shopsFeaturedRoutes from './routes/shops-featured';
+app.use('/api/shops-featured', shopsFeaturedRoutes);
+console.log('✅ Shops featured routes mounted at /api/shops-featured');
+
+/* ------------------------------ SHOPS DISCOVERY SYSTEM ------------------------------ */
+import shopsRoutes from './routes/shops';
+app.use('/api/shops', shopsRoutes);
+console.log('✅ Shops discovery routes mounted at /api/shops');
+
+import cartRoutes from './routes/cart';
+app.use('/api/cart', cartRoutes);
+console.log('✅ Cart service routes mounted at /api/cart');
+
+import tiersRoutes from './routes/tiers';
+app.use('/api/tiers', tiersRoutes);
+console.log('✅ Tier middleware routes mounted at /api/tiers');
+
+import brandingRoutes from './routes/branding';
+app.use('/api/branding', brandingRoutes);
+console.log('✅ Branding routes mounted at /api/branding');
+
+import testSlugRoutes from './routes/test-slugs';
+app.use('/api/test', testSlugRoutes);
+console.log('✅ Test slug routes mounted at /api/test');
+
+import publishingRoutes from './routes/publishing';
+app.use('/api/publishing', publishingRoutes);
+console.log('✅ Publishing routes mounted at /api/publishing');
+
+/* ------------------------------ TENANT AUTO ID SYSTEM ------------------------------ */
+import tenantAutoIdRoutes from './routes/tenant-auto-id';
+app.use('/api/tenant-auto-id', tenantAutoIdRoutes);
+console.log('✅ Tenant Auto ID routes mounted at /api/tenant-auto-id');
+
+/* ------------------------------ platform settings ------------------------------ */
+app.use('/api', platformSettingsRoutes);
+console.log('✅ Platform settings routes mounted at /api');
+
+/* ------------------------------ rate limit warnings ------------------------------ */
+app.use('/api', rateLimitWarningsRoutes);
+console.log('✅ Rate limit warnings routes mounted at /api');
+
+/* ------------------------------ UNIVERSAL SINGLETON SYSTEM ------------------------------ */
+import securityMonitoringRoutes from './routes/security-monitoring';
+app.use('/api/security', authenticateToken, securityMonitoringRoutes);
+console.log('✅ Security Monitoring routes mounted at /api/security (UniversalSingleton)');
+
+import rateLimitingRoutes from './routes/rate-limiting';
+app.use('/api/rate-limit', rateLimitingRoutes);
+console.log('✅ Rate Limiting routes mounted at /api/rate-limit (UniversalSingleton)');
+
+import behaviorTrackingRoutes from './routes/behavior-tracking';
+app.use('/api/behavior', authenticateToken, behaviorTrackingRoutes);
+console.log('✅ Behavior Tracking routes mounted at /api/behavior (UniversalSingleton)');
+
+import tenantProfileRoutes from './routes/tenant-profile';
+app.use('/api/tenant', authenticateToken, tenantProfileRoutes);
+console.log('✅ Tenant Profile routes mounted at /api/tenant (UniversalSingleton)');
+
+import platformDashboardRoutes from './routes/platform-dashboard';
+app.use('/api/platform', authenticateToken, platformDashboardRoutes);
+console.log('✅ Platform Dashboard routes mounted at /api/platform (UniversalSingleton)');
+console.log('✅ Tenant Profile routes mounted at /api/tenant (UniversalSingleton)');
+
+import usersRoutes from './routes/users-singleton';
+app.use('/api/users-singleton', authenticateToken, usersRoutes);
+console.log('✅ Users routes mounted at /api/users-singleton (UniversalSingleton)');
+
+import tiersSingletonRoutes from './routes/tiers-singleton';
+app.use('/api/tiers-singleton', authenticateToken, tiersSingletonRoutes);
+console.log('✅ Tiers routes mounted at /api/tiers-singleton (UniversalSingleton)');
+
+console.log('🚀 UniversalSingleton System Phase 3 fully integrated and ready for production!');
+
+import inventoryRoutes from './routes/inventory-singleton';
+app.use('/api/inventory-singleton', authenticateToken, inventoryRoutes);
+console.log('✅ Inventory routes mounted at /api/inventory-singleton (UniversalSingleton)');
+
+import categoriesRoutes from './routes/categories-singleton';
+app.use('/api/categories-singleton', authenticateToken, categoriesRoutes);
+console.log('✅ Categories routes mounted at /api/categories-singleton (UniversalSingleton)');
+
+import shopManagementRoutes from './routes/shop-management';
+app.use('/api/shop-management', authenticateToken, shopManagementRoutes);
+console.log('✅ Shop Management routes mounted at /api/shop-management (Real Database Service)');
+
+console.log('🚀 UniversalSingleton System Phase 4 fully integrated and ready for production!');
+
+console.log('🚀 UniversalSingleton System fully integrated and ready for viral traffic!');
+
+/* ------------------------------ permissions ------------------------------ */
+app.use('/api/permissions', permissionRoutes);
+console.log('✅ Permissions routes mounted at /api/permissions');
+
+/* ------------------------------ admin enrichment ------------------------------ */
+import adminEnrichmentRoutes from './routes/admin-enrichment';
+app.use('/api/admin/enrichment', authenticateToken, requireAdmin, adminEnrichmentRoutes);
+console.log('✅ Admin enrichment routes mounted at /api/admin/enrichment');
+
+/* ------------------------------ tier config (tenant-accessible) ------------------------------ */
+import tierConfigRoutes from './routes/tier-config';
+app.use('/api/tier-config', authenticateToken, tierConfigRoutes);
+console.log('✅ Tier config routes mounted at /api/tier-config');
+
+/* ------------------------------ admin tier system ------------------------------ */
+app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
+console.log('✅ Admin tier system routes mounted at /api/admin/tier-system');
+
+/* ------------------------------ admin capabilities ------------------------------ */
+app.use('/api/admin/capabilities', authenticateToken, requireAdmin, capabilityRoutes);
+console.log('✅ Admin capabilities routes mounted at /api/admin/capabilities');
+
+/* ------------------------------ admin tier management ------------------------------ */
+import tierManagementRoutes from './routes/admin/tier-management';
+app.use('/api/admin/tiers', authenticateToken, tierManagementRoutes);
+console.log('✅ Admin tier management routes mounted at /api/admin/tiers');
+
+/* ------------------------------ admin scan metrics ------------------------------ */
+app.use('/api/admin/scan-metrics', scanMetricsRoutes);
+console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
+
+/* ------------------------------ admin cached products ------------------------------ */
+app.use('/api/admin/cached-products', cachedProductsRoutes);
+console.log('✅ Admin cached products routes mounted at /api/admin/cached-products');
+
+/* ------------------------------ admin users ------------------------------ */
+app.use('/api/admin/users', authenticateToken, requireAdmin, adminUsersRoutes);
+console.log('✅ Admin users routes mounted at /api/admin/users');
+
+/* ------------------------------ admin tools ------------------------------ */
+app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
+console.log('✅ Admin tools routes mounted at /api/admin/tools');
+
+/* ------------------------------ admin sentry ------------------------------ */
+import sentryRoutes from './routes/admin/sentry';
+app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
+console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
+
+/* ------------------------------ admin manual billing ------------------------------ */
+import manualBillingRoutes from './routes/admin/manual-billing';
+app.use('/api/admin/manual-billing', manualBillingRoutes);
+console.log('Admin manual billing routes mounted at /api/admin/manual-billing');
+
+/* ------------------------------ admin platform revenue ------------------------------ */
+import platformRevenueRoutes from './routes/platform-revenue';
+app.use('/api/admin/platform-revenue', platformRevenueRoutes);
+console.log('Admin platform revenue routes mounted at /api/admin/platform-revenue');
+
+/* ------------------------------ platform fee invoices ------------------------------ */
+import platformFeeInvoiceRoutes from './routes/platform-fee-invoices';
+app.use('/api/admin/platform-fee-invoices', platformFeeInvoiceRoutes);
+console.log('Platform fee invoice routes mounted at /api/admin/platform-fee-invoices');
+
+/* ------------------------------ paypal connect ------------------------------ */
+import paypalConnectRoutes from './routes/paypal-connect';
+app.use('/api/admin/paypal-connect', paypalConnectRoutes);
+app.use('/api/tenants', paypalConnectRoutes);
+console.log('PayPal Connect routes mounted at /api/admin/paypal-connect and /api/tenants');
+
+/* ------------------------------ admin notification logs ------------------------------ */
+import notificationLogsRoutes from './routes/admin/notification-logs';
+app.use('/api/admin/notification-logs', notificationLogsRoutes);
+console.log('Admin notification logs routes mounted at /api/admin/notification-logs');
+
+/* ------------------------------ admin inventory transfers ------------------------------ */
+import adminInventoryTransferRoutes from './routes/admin/inventory-transfers';
+app.use('/api/admin/inventory-transfers', adminInventoryTransferRoutes);
+console.log('Admin inventory transfer routes mounted at /api/admin/inventory-transfers');
+
+/* ------------------------------ admin slug registry ------------------------------ */
+import adminSlugRegistryRoutes from './routes/admin/slug-registry';
+app.use('/api/admin/slug-registry', adminSlugRegistryRoutes);
+console.log('Admin slug registry routes mounted at /api/admin/slug-registry');
+
+/* ------------------------------ admin catalog ------------------------------ */
+import adminCatalogRoutes from './routes/admin/catalog';
+app.use('/api/admin/catalog', adminCatalogRoutes);
+console.log('Admin catalog routes mounted at /api/admin/catalog');
+
+/* ------------------------------ admin inventory stats ------------------------------ */
+import adminInventoryStatsRoutes from './routes/admin/inventory-stats';
+app.use('/api/admin/inventory', adminInventoryStatsRoutes);
+console.log('Admin inventory stats routes mounted at /api/admin/inventory');
+
+/* ------------------------------ gbp advanced sync singleton ------------------------------ */
+import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
+app.use('/api/gbp-advanced-sync-singleton', gbpAdvancedSyncSingletonRoutes);
+console.log('✅ GBP Advanced Sync singleton routes mounted at /api/gbp-advanced-sync-singleton');
+
+/* ------------------------------ gmc product sync singleton ------------------------------ */
+import gmcProductSyncSingletonRoutes from './routes/gmc-product-sync-singleton';
+app.use('/api/gmc-product-sync-singleton', gmcProductSyncSingletonRoutes);
+console.log('✅ GMC Product Sync singleton routes mounted at /api/gmc-product-sync-singleton');
+
+/* ------------------------------ clover oauth singleton ------------------------------ */
+import cloverOAuthSingletonRoutes from './routes/clover-oauth-singleton';
+app.use('/api/clover-oauth-singleton', cloverOAuthSingletonRoutes);
+console.log('✅ Clover OAuth singleton routes mounted at /api/clover-oauth-singleton');
+
+/* ------------------------------ oauth singleton ------------------------------ */
+import oauthSingletonRoutes from './routes/oauth-singleton';
+app.use('/api/oauth-singleton', oauthSingletonRoutes);
+console.log('✅ OAuth singleton routes mounted at /api/oauth-singleton');
+
+/* ------------------------------ refund singleton ------------------------------ */
+import refundSingletonRoutes from './routes/refund-singleton';
+app.use('/api/refund-singleton', refundSingletonRoutes);
+console.log('✅ Refund singleton routes mounted at /api/refund-singleton');
+
+/* ------------------------------ taxonomy sync singleton ------------------------------ */
+import taxonomySyncSingletonRoutes from './routes/taxonomy-sync-singleton';
+app.use('/api/taxonomy-sync-singleton', taxonomySyncSingletonRoutes);
+console.log('✅ Taxonomy sync singleton routes mounted at /api/taxonomy-sync-singleton');
+
+/* ------------------------------ gbp sync tracking singleton ------------------------------ */
+import gbpSyncTrackingSingletonRoutes from './routes/gbp-sync-tracking-singleton';
+app.use('/api/gbp-sync-tracking-singleton', gbpSyncTrackingSingletonRoutes);
+console.log('✅ GBP sync tracking singleton routes mounted at /api/gbp-sync-tracking-singleton');
+
+/* ------------------------------ recommendation singleton ------------------------------ */
+import recommendationSingletonRoutes from './routes/recommendation-singleton';
+app.use('/api/recommendation-singleton', recommendationSingletonRoutes);
+console.log('✅ Recommendation singleton routes mounted at /api/recommendation-singleton');
+
+/* ------------------------------ gbp category sync singleton ------------------------------ */
+import gbpCategorySyncSingletonRoutes from './routes/gbp-category-sync-singleton';
+app.use('/api/gbp-category-sync-singleton', gbpCategorySyncSingletonRoutes);
+console.log('✅ GBP category sync singleton routes mounted at /api/gbp-category-sync-singleton');
+
+/* ------------------------------ barcode enrichment singleton ------------------------------ */
+import barcodeEnrichmentSingletonRoutes from './routes/barcode-enrichment-singleton';
+app.use('/api/barcode-enrichment-singleton', barcodeEnrichmentSingletonRoutes);
+console.log('✅ Barcode enrichment singleton routes mounted at /api/barcode-enrichment-singleton');
+
+/* ------------------------------ digital asset singleton ------------------------------ */
+import digitalAssetSingletonRoutes from './routes/digital-asset-singleton';
+app.use('/api/digital-asset-singleton', digitalAssetSingletonRoutes);
+console.log('✅ Digital asset singleton routes mounted at /api/digital-asset-singleton');
+
+/* ------------------------------ product cache singleton ------------------------------ */
+import productCacheSingletonRoutes from './routes/product-cache-singleton';
+app.use('/api/product-cache-singleton', productCacheSingletonRoutes);
+console.log('✅ Product cache singleton routes mounted at /api/product-cache-singleton');
+
+/* ------------------------------ ai image singleton ------------------------------ */
+import aiImageSingletonRoutes from './routes/ai-image-singleton';
+app.use('/api/ai-image-singleton', aiImageSingletonRoutes);
+console.log('✅ AI image singleton routes mounted at /api/ai-image-singleton');
+
+/* ------------------------------ featured products singleton ------------------------------ */
+import featuredProductsSingletonRoutes from './routes/featured-products-singleton';
+app.use('/api/featured-products-singleton', featuredProductsSingletonRoutes);
+console.log('✅ Featured products singleton routes mounted at /api/featured-products-singleton');
+
+/* ------------------------------ reviews singleton ------------------------------ */
+import reviewsSingletonRoutes from './routes/reviews-singleton';
+app.use('/api/reviews-singleton', reviewsSingletonRoutes);
+console.log('✅ Reviews singleton routes mounted at /api/reviews-singleton');
+
+/* ------------------------------ product featuring ------------------------------ */
+import productFeaturingRoutes from './routes/product-featuring';
+app.use('/api', productFeaturingRoutes);
+console.log('✅ Product featuring routes mounted at /api');
+
+/* ------------------------------ storefront featured products (MV optimized) ------------------------------ */
+import storefrontFeaturedRoutes from './routes/storefront-featured';
+app.use('/api/storefront', storefrontFeaturedRoutes);
+console.log('✅ Storefront featured products routes mounted at /api/storefront');
+
+/* ------------------------------ featured products with quality scoring ------------------------------ */
+import featuredProductsScoredRoutes from './routes/featured-products-scored';
+app.use('/api/featured-products', featuredProductsScoredRoutes);
+console.log('✅ Featured products with quality scoring routes mounted at /api/featured-products');
+
+/* ------------------------------ OAuth (Payment Gateway Integration) ------------------------------ */
+import oauthRoutes from './routes/oauth';
+app.use('/api/oauth', oauthRoutes);
+console.log('✅ OAuth routes mounted at /api/oauth (PayPal & Square payment gateway OAuth)');
+
+/* ------------------------------ checkout (Guest) ------------------------------ */
+import checkoutRoutes from './routes/checkout';
+import checkoutPaymentsRoutes from './routes/checkout-payments';
+import paypalRoutes from './routes/checkout/paypal';
+import squareCheckoutRoutes from './routes/checkout/square';
+import stripeCheckoutRoutes from './routes/checkout/stripe';
+import depositForfeitureRoutes from './routes/deposit-forfeiture';
+app.use('/api/checkout', checkoutRoutes);
+app.use('/api/checkout', checkoutPaymentsRoutes);
+app.use('/api/checkout/paypal', paypalRoutes);
+app.use('/api/checkout/square', squareCheckoutRoutes);
+app.use('/api/checkout/stripe', stripeCheckoutRoutes);
+app.use('/api/deposit-forfeiture', depositForfeitureRoutes);
+console.log('✅ PayPal checkout routes mounted at /api/checkout/paypal');
+console.log('✅ Square checkout routes mounted at /api/checkout/square');
+console.log('✅ Stripe checkout routes mounted at /api/checkout/stripe');
+console.log('✅ Deposit forfeiture routes mounted at /api/deposit-forfeiture');
+
+/* ------------------------------ buyer orders (Public - No Auth) ------------------------------ */
+app.use('/api/orders', buyerOrdersRoutes);
+console.log('✅ Buyer orders routes mounted at /api/orders/buyer (Public access)');
+
+/* ------------------------------ orders (Phase 3A) ------------------------------ */
+import ordersRoutes from './routes/orders';
+app.use('/api/orders', authenticateToken, ordersRoutes);
+console.log('✅ Orders routes mounted at /api/orders (Phase 3A: Order Management Foundation)');
+
+/* ------------------------------ shopping carts (Phase 3C) ------------------------------ */
+import shoppingCartsRoutes from './routes/shopping-carts';
+app.use('/api/shopping-carts', shoppingCartsRoutes);
+console.log('✅ Shopping carts routes mounted at /api/shopping-carts (Phase 3C: Database-Persisted Carts)');
+
+/* ------------------------------ payments (Phase 3B) ------------------------------ */
+import paymentsRoutes from './routes/payments';
+app.use('/api/payments', authenticateToken, paymentsRoutes);
+app.use('/api/orders', authenticateToken, paymentsRoutes);
+console.log('✅ Payments routes mounted at /api/payments and /api/orders (Phase 3B: Payment Processing)');
+
+/* ------------------------------ directory and recommendations routes moved earlier ------------------------------ */
+/* NOTE: Directory and recommendations routes are now mounted BEFORE authenticated catch-all routes (see line ~5109) */
+
+/* ------------------------------ storefront (materialized view) ------------------------------ */
+app.use('/api/storefront', storefrontRoutes);
+console.log('✅ Storefront routes mounted (materialized view for instant category filtering)');
+
+/* ------------------------------ GBP categories ------------------------------ */
+app.use('/api/gbp', gbpRoutes);
+console.log('✅ GBP routes mounted (Google Business Profile category search)');
+
+/* ------------------------------ tenants ------------------------------ */
+app.use('/api/tenants', tenantsRoutes);
+console.log('✅ Tenants routes mounted at /api/tenants');
+
+/* ------------------------------ payment gateways ------------------------------ */
+app.use('/api/tenants', paymentGatewaysRoutes);
+console.log('Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
+
+/* ------------------------------ tenant stripe connect ------------------------------ */
+import tenantStripeConnectRoutes from './routes/tenant-stripe-connect';
+app.use('/api/tenants', tenantStripeConnectRoutes);
+console.log('Tenant Stripe Connect routes mounted at /api/tenants/:tenantId/stripe-connect');
+
+/* ------------------------------ fulfillment settings ------------------------------ */
+app.use('/api/tenants', fulfillmentSettingsRoutes);
+app.use('/api', fulfillmentSettingsRoutes);
+console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings and /api/public/tenant/:tenantId/fulfillment-settings');
+
+/* ------------------------------ commerce settings ------------------------------ */
+app.use('/api/tenants', commerceSettingsRoutes);
+app.use('/api', commerceSettingsRoutes);
+console.log('✅ Commerce settings routes mounted at /api/tenants/:tenantId/commerce-settings and /api/public/tenant/:tenantId/commerce-settings');
+
+/* ------------------------------ product options settings ------------------------------ */
+app.use('/api/tenants', productOptionsSettingsRoutes);
+console.log('✅ Product options settings routes mounted at /api/tenants/:tenantId/product-options');
+
+/* ------------------------------ featured options settings ------------------------------ */
+app.use('/api/tenants', featuredOptionsSettingsRoutes);
+app.use('/api', featuredOptionsSettingsRoutes);
+console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options and /api/public/tenant/:tenantId/featured-options');
+
+/* ------------------------------ quickstart options settings ------------------------------ */
+app.use('/api/tenants', quickstartOptionsSettingsRoutes);
+console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
+
+/* ------------------------------ storefront options settings ------------------------------ */
+app.use('/api/tenants', storefrontOptionsSettingsRoutes);
+console.log('✅ Storefront options settings routes mounted at /api/tenants/:tenantId/storefront-options');
+
+/* ------------------------------ storefront type settings ------------------------------ */
+app.use('/api/tenants', storefrontTypeSettingsRoutes);
+app.use('/api', storefrontTypeSettingsRoutes);
+console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type and /api/public/tenant/:tenantId/storefront-type');
+
+/* ------------------------------ barcode scan settings ------------------------------ */
+app.use('/api/tenants', barcodeScanSettingsRoutes);
+console.log('✅ Barcode scan settings routes mounted at /api/tenants/:tenantId/barcode-scan');
+
+/* ------------------------------ integration options settings ------------------------------ */
+app.use('/api/tenants', integrationOptionsSettingsRoutes);
+console.log('✅ Integration options settings routes mounted at /api/tenants/:tenantId/integration-options');
+
+/* ------------------------------ payment gateway settings ------------------------------ */
+app.use('/api/tenants', paymentGatewaySettingsRoutes);
+app.use('/api', paymentGatewaySettingsRoutes);
+console.log('✅ Payment gateway settings routes mounted at /api/tenants/:tenantId/payment-gateway-settings and /api/public/tenant/:tenantId/payment-gateway-settings');
+
+/* ------------------------------ organization commerce settings ------------------------------ */
+app.use('/api/organizations', organizationCommerceSettingsRoutes);
+app.use('/api', organizationCommerceSettingsRoutes);
+console.log('✅ Organization commerce settings routes mounted at /api/organizations/:organizationId/commerce-settings and /api/public/organization/:organizationId/commerce-settings');
+
+/* ------------------------------ billing ------------------------------ */
+app.use('/api', billingRoutes);
+console.log('✅ Billing routes mounted at /api/billing');
+
+/* ------------------------------ tenant orders ------------------------------ */
+app.use('/api', tenantOrdersRoutes);
+console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders');
+
+/* ------------------------------ tenant inventory transfers ------------------------------ */
+import tenantInventoryTransferRoutes from './routes/tenant-inventory-transfers';
+app.use('/api/tenant/inventory-transfers', tenantInventoryTransferRoutes); // Temporarily removed auth for testing
+console.log('✅ Tenant inventory transfer routes mounted at /api/tenant/inventory-transfers');
+
+/* ------------------------------ feed validation ------------------------------ */
+// NOTE: Must be mounted BEFORE tenantCategoriesRoutes to avoid /:tenantId/categories/:id matching /coverage
+app.use('/api/tenant', authenticateToken, feedValidationRoutes);
+console.log('✅ Feed validation routes mounted at /api/tenant');
+
+/* ------------------------------ role groups (API-driven security) ------------------------------ */
+app.get('/api/auth/role-groups', authenticateToken, (req, res) => {
+  try {
+    const { ROLE_GROUPS } = require('./config/role-groups');
+    res.json(ROLE_GROUPS);
+  } catch (error) {
+    console.error('[API] Failed to load role groups:', error);
+    res.status(500).json({ error: 'Failed to load role groups' });
+  }
+});
+console.log('✅ Role groups endpoint mounted at /api/auth/role-groups (API-driven security)');
+
+/* ------------------------------ user groups (Phase 1) ------------------------------ */
+app.get('/api/auth/user-groups', authenticateToken, (req, res) => {
+  try {
+    const { getUserRoleGroups } = require('./config/role-groups');
+    const userRole = req.user?.role;
+
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+
+    const userGroups = getUserRoleGroups(userRole);
+    res.json({
+      userId: req.user?.id,
+      userRole,
+      groups: userGroups
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user groups:', error);
+    res.status(500).json({ error: 'Failed to get user groups' });
+  }
+});
+console.log('✅ User groups endpoint mounted at /api/auth/user-groups (Phase 1)');
+
+/* ------------------------------ permissions (Maximum Flexibility) ------------------------------ */
+app.get('/api/auth/permissions', authenticateToken, (req, res) => {
+  try {
+    const { getAllPermissions } = require('./config/role-groups');
+    const permissions = getAllPermissions();
+    res.json(permissions);
+  } catch (error) {
+    console.error('[API] Failed to load permissions:', error);
+    res.status(500).json({ error: 'Failed to load permissions' });
+  }
+});
+console.log('✅ Permissions endpoint mounted at /api/auth/permissions (CAN_ groups)');
+
+app.get('/api/auth/user-permissions', authenticateToken, (req, res) => {
+  try {
+    const { getUserPermissions, isValidRole } = require('./config/role-groups');
+    const userRole = req.user?.role;
+
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+
+    if (!isValidRole(userRole)) {
+      return res.status(401).json({ error: 'Invalid user role', userRole });
+    }
+
+    const userPermissions = getUserPermissions(userRole);
+    res.json({
+      userId: req.user?.id,
+      userRole,
+      permissions: userPermissions
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user permissions:', error);
+    res.status(500).json({ error: 'Failed to get user permissions' });
+  }
+});
+console.log('✅ User permissions endpoint mounted at /api/auth/user-permissions (Maximum flexibility)');
+
+/* ------------------------------ combined user access (Unified Endpoint) ------------------------------ */
+app.get('/api/auth/user-access', authenticateToken, (req, res) => {
+  try {
+    const { getUserRoleGroups, getUserPermissions, isValidRole } = require('./config/role-groups');
+    const userRole = req.user?.role;
+
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+
+    if (!isValidRole(userRole)) {
+      return res.status(401).json({ error: 'Invalid user role', userRole });
+    }
+
+    const userGroups = getUserRoleGroups(userRole);
+    const userPermissions = getUserPermissions(userRole);
+
+    res.json({
+      userId: req.user?.id,
+      userRole,
+      access: {
+        groups: userGroups,        // IS_ prefix - what user IS part of
+        permissions: userPermissions // CAN_ prefix - what user CAN do
+      },
+      summary: {
+        totalGroups: userGroups.length,
+        totalPermissions: userPermissions.length,
+        accessLevel: getAccessLevelSummary(userRole, userGroups, userPermissions)
+      }
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user access:', error);
+    res.status(500).json({ error: 'Failed to get user access' });
+  }
+});
+console.log('✅ Combined user access endpoint mounted at /api/auth/user-access (Unified - Groups + Permissions)');
+
+/**
+ * Get human-readable access level summary
+ */
+function getAccessLevelSummary(userRole: string, groups: string[], permissions: string[]): string {
+  if (permissions.includes('CAN_ADMIN_PLATFORM')) {
+    return 'Platform Administrator (Full System Access)';
+  }
+  if (permissions.includes('CAN_SUPPORT_PLATFORM')) {
+    return 'Platform Support (System Troubleshooting)';
+  }
+  if (groups.includes('IS_TENANT_OWNER')) {
+    return 'Tenant Owner (Billing & Critical Settings)';
+  }
+  if (groups.includes('IS_TENANT_ADMIN')) {
+    return 'Tenant Administrator (Users & Settings)';
+  }
+  if (groups.includes('IS_TENANT_MANAGER')) {
+    return 'Tenant Manager (Operations & Analytics)';
+  }
+  if (groups.includes('IS_TENANT_USER')) {
+    return 'Tenant User (Basic Access)';
+  }
+  return 'Limited Access';
+}
+
+/* ------------------------------ example role-protected routes ------------------------------ */
+// Tenant admin operations - NOTE: Actual tenant user management is handled by tenantsRoutes
+// app.get('/api/tenants/:id/users', authenticateToken, requireRoleGroup('IS_TENANT_ADMIN'), (req, res) => {
+//   res.json({ message: 'Tenant admin access granted', tenantId: req.params.id });
+// });
+
+// Tenant owner operations - NOTE: Actual billing routes are handled by tenant-billing routes
+// app.get('/api/tenants/:id/billing', authenticateToken, requireRoleGroup('IS_TENANT_OWNER'), (req, res) => {
+//   res.json({ message: 'Tenant owner access granted', tenantId: req.params.id });
+// });
+
+// Platform admin operations
+app.get('/api/admin/system/status', authenticateToken, requireRoleGroup('IS_PLATFORM_ADMIN'), (req, res) => {
+  res.json({ message: 'Platform admin access granted', status: 'operational' });
+});
+console.log('✅ Platform admin route mounted at /api/admin/system/status (IS_PLATFORM_ADMIN protected)');
+
+// Platform support operations
+app.get('/api/admin/support/tools', authenticateToken, requireRoleGroup('IS_PLATFORM_SUPPORT'), (req, res) => {
+  res.json({ message: 'Platform support access granted', tools: ['debug', 'logs', 'user_impersonation'] });
+});
+console.log('✅ Platform support route mounted at /api/admin/support/tools (IS_PLATFORM_SUPPORT protected)');
+
+/* ------------------------------ permission-protected routes (Maximum Flexibility) ------------------------------ */
+// Granular permission-based routes - just set permission, platform handles security
+app.get('/api/tenants/:id/users/manage', authenticateToken, requirePermission('CAN_MANAGE_TENANT_USERS'), (req, res) => {
+  res.json({ message: 'User management access granted', tenantId: req.params.id });
+});
+console.log('✅ User management route mounted at /api/tenants/:id/users/manage (CAN_MANAGE_TENANT_USERS)');
+
+app.get('/api/tenants/:id/billing/manage', authenticateToken, requirePermission('CAN_MANAGE_TENANT_BILLING'), (req, res) => {
+  res.json({ message: 'Billing management access granted', tenantId: req.params.id });
+});
+console.log('✅ Billing management route mounted at /api/tenants/:id/billing/manage (CAN_MANAGE_TENANT_BILLING)');
+
+app.get('/api/tenants/:id/analytics', authenticateToken, requirePermission('CAN_MANAGE_TENANT_ANALYTICS'), (req, res) => {
+  res.json({ message: 'Analytics access granted', tenantId: req.params.id });
+});
+console.log('✅ Analytics route mounted at /api/tenants/:id/analytics (CAN_MANAGE_TENANT_ANALYTICS)');
+
+app.get('/api/tenants/:id/inventory', authenticateToken, requirePermission('CAN_MANAGE_TENANT_INVENTORY'), (req, res) => {
+  res.json({ message: 'Inventory management access granted', tenantId: req.params.id });
+});
+console.log('✅ Inventory route mounted at /api/tenants/:id/inventory (CAN_MANAGE_TENANT_INVENTORY)');
+
+app.get('/api/tenants/:id/export', authenticateToken, requirePermission('CAN_EXPORT_TENANT_DATA'), (req, res) => {
+  res.json({ message: 'Data export access granted', tenantId: req.params.id });
+});
+console.log('✅ Data export route mounted at /api/tenants/:id/export (CAN_EXPORT_TENANT_DATA)');
+
+app.get('/api/admin/system/logs', authenticateToken, requirePermission('CAN_VIEW_PLATFORM_LOGS'), (req, res) => {
+  res.json({ message: 'System logs access granted', logs: ['system.log', 'error.log', 'access.log'] });
+});
+console.log('✅ System logs route mounted at /api/admin/system/logs (CAN_VIEW_PLATFORM_LOGS)');
+
+app.get('/api/admin/system/tools', authenticateToken, requirePermission('CAN_ACCESS_SYSTEM_TOOLS'), (req, res) => {
+  res.json({ message: 'System tools access granted', tools: ['database-backup', 'cache-clear', 'system-diagnostic'] });
+});
+console.log('✅ System tools route mounted at /api/admin/system/tools (CAN_ACCESS_SYSTEM_TOOLS)');
+
+app.get('/api/data/sensitive', authenticateToken, requirePermission('CAN_VIEW_SENSITIVE_DATA'), (req, res) => {
+  res.json({ message: 'Sensitive data access granted', dataLevel: 'confidential' });
+});
+console.log('✅ Sensitive data route mounted at /api/data/sensitive (CAN_VIEW_SENSITIVE_DATA)');
+
+app.get('/api/data/bulk-operations', authenticateToken, requirePermission('CAN_BULK_OPERATIONS'), (req, res) => {
+  res.json({ message: 'Bulk operations access granted', operations: ['bulk-import', 'bulk-export', 'bulk-delete'] });
+});
+console.log('✅ Bulk operations route mounted at /api/data/bulk-operations (CAN_BULK_OPERATIONS)');
+
+/* ------------------------------ tenant trial setup ------------------------------ */
+app.use('/api/tenants', authenticateToken, trialSetupRoutes);
+console.log(' Tenant trial setup routes mounted at /api/tenants');
+
+/* ------------------------------ tenant notifications ------------------------------ */
+import tenantNotificationsRoutes from './routes/tenant-notifications';
+app.use('/api/tenants', authenticateToken, tenantNotificationsRoutes);
+console.log('✅ Tenant notifications routes mounted at /api/tenants/:tenantId/notifications');
+
+/* ------------------------------ digital download pages ------------------------------ */
+import digitalDownloadPagesRoutes from './routes/tenant/digital-download-pages';
+app.use('/api/tenants', digitalDownloadPagesRoutes);
+console.log('✅ Digital download pages routes mounted at /api/tenants/:tenantId/digital-download-pages');
+
+/* ------------------------------ tenant categories (GBP) ------------------------------ */
+app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
+console.log('✅ Tenant categories routes mounted at /api/tenant');
+
+/* ------------------------------ products ------------------------------ */
+app.use('/api/products', productLikesRoutes);
+console.log('✅ Product likes routes mounted at /api/products');
+app.use('/api/items', photosRouter);
+console.log('✅ Photos routes mounted at /api/items');
+
+/* ------------------------------ directory photos ------------------------------ */
+app.use('/api/directory', directoryPhotosRouter);
+console.log('✅ Directory photos routes mounted at /api/directory');
+
+/* ------------------------------ cache ------------------------------ */
+app.use('/api/cache', cacheRoutes);
+console.log('✅ Cache routes mounted at /api/cache');
+
+/* ------------------------------ GDPR compliance ------------------------------ */
+import gdprRoutes from './routes/gdpr';
+import accountDeletionRoutes from './routes/account-deletion';
+app.use('/api/gdpr', gdprRoutes);
+app.use('/api/gdpr', accountDeletionRoutes);
+app.use('/api', accountDeletionRoutes);
+console.log('✅ GDPR compliance routes mounted (data export, consent management)');
+console.log('✅ Account deletion request routes mounted (30-day grace period)');
+
+/* ------------------------------ MFA (Multi-Factor Authentication) ------------------------------ */
+import mfaRoutes from './routes/mfa';
+app.use('/api/auth/mfa', mfaRoutes);
+console.log('✅ MFA routes mounted (two-factor authentication)');
+
+/* ------------------------------ Auth0 MFA (Custom UI + Auth0 Backend) ------------------------------ */
+import auth0MFARoutes from './routes/auth0-mfa';
+app.use('/api/auth0-mfa', auth0MFARoutes);
+console.log('✅ Auth0 MFA routes mounted (custom UI + Auth0 backend)');
+
+/* ------------------------------ Security Sessions & Alerts ------------------------------ */
+import authSyncRoutes from './routes/auth-sync';
+import authSessionsRoutes from './routes/auth-sessions';
+import securityAlertsRoutes from './routes/security-alerts';
+import adminSecurityMonitoringRoutes from './routes/admin/security-monitoring';
+import adminSecurityRoutes from './routes/admin-security';
+import securityTelemetryRoutes from './routes/security-telemetry';
+app.use('/api/auth', authSyncRoutes);
+app.use('/api/auth', authSessionsRoutes);
+app.use('/api/security/telemetry', securityTelemetryRoutes); // Mount telemetry first (no auth required)
+app.use('/api/security', securityAlertsRoutes);
+app.use('/api/admin/security', adminSecurityMonitoringRoutes);
+app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityRoutes);
+console.log('✅ Auth0 sync routes mounted at /api/auth/sync-user - Railway redeploy');
+console.log('✅ Security sessions routes mounted at /api/auth/sessions');
+console.log('✅ Security telemetry routes mounted at /api/security/telemetry (no auth required)');
+console.log('✅ Security alerts routes mounted at /api/security/security-alerts');
+console.log('✅ Admin security monitoring routes mounted at /api/admin/security');
+console.log('✅ Admin security analytics routes mounted at /api/admin/security');
+
+/* ------------------------------ clone (products & categories) ------------------------------ */
+import cloneRoutes from './routes/clone';
+app.use('/api/clone', cloneRoutes);
+console.log('✅ Clone routes mounted at /api/clone (product & category cloning)');
+
+/* ------------------------------ upgrade requests ------------------------------ */
+app.use('/api/upgrade-requests', upgradeRequestsRoutes);
+console.log('✅ Upgrade requests routes mounted at /api/upgrade-requests');
+
+/* ------------------------------ organization requests ------------------------------ */
+app.use('/api/organization-requests', organizationRequestRoutes);
+console.log('✅ Organization requests routes mounted at /api/organization-requests');
+
+/* ------------------------------ organizations ------------------------------ */
+app.use('/organizations', organizationRoutes);
+console.log('✅ Organizations routes mounted at /organizations');
+
+// Also mount organizations routes with authentication at /api/organizations
+app.use('/api/organizations', authenticateToken, organizationRoutes);
+console.log('✅ Organizations routes mounted at /api/organizations (with authentication)');
+
+/* ------------------------------ hero location ------------------------------ */
+import heroLocationRoutes from './routes/hero-location';
+app.use('/api/hero-location', heroLocationRoutes);
+console.log('✅ Hero location routes mounted at /api/hero-location');
+
+/* ------------------------------ order management ------------------------------ */
+import orderManagementRoutes from './routes/order-management';
+app.use('/api/order-management', orderManagementRoutes);
+console.log('✅ Order management routes mounted at /api/order-management');
+
+/* ------------------------------ fulfillment coordination ------------------------------ */
+import fulfillmentRoutes from './routes/fulfillment';
+app.use('/api/fulfillment', fulfillmentRoutes);
+console.log('✅ Fulfillment coordination routes mounted at /api/fulfillment');
+
+/* ------------------------------ customer management ------------------------------ */
+import customerRoutes from './routes/customers';
+app.use('/api/customers', customerRoutes);
+console.log('✅ Customer management routes mounted at /api/customers');
+
+/* ------------------------------ customer authentication ------------------------------ */
+import customerAuthRoutes from './routes/customer-auth';
+app.use('/api/customer-auth', customerAuthRoutes);
+console.log('✅ Customer authentication routes mounted at /api/customer-auth');
+
+/* ------------------------------ customer auth token fallback ------------------------------ */
+import customerAuthTokenRoutes from './routes/customer-auth-token';
+app.use('/api/customer-auth-token', customerAuthTokenRoutes);
+console.log('✅ Customer auth token routes mounted at /api/customer-auth-token');
+
+/* ------------------------------ customer addresses ------------------------------ */
+import customerAddressesRoutes from './routes/customer-addresses';
+app.use('/api/customer-addresses', customerAddressesRoutes);
+console.log('✅ Customer addresses routes mounted at /api/customer-addresses');
+
+/* ------------------------------ customer notifications ------------------------------ */
+import customerNotificationsRoutes from './routes/customer-notifications';
+app.use('/api/customer-notifications', customerNotificationsRoutes);
+console.log('✅ Customer notifications routes mounted at /api/customer-notifications');
+
+/* ------------------------------ customer payment methods ------------------------------ */
+import customerPaymentMethodsRoutes from './routes/customer-payment-methods';
+app.use('/api/customer-payment-methods', customerPaymentMethodsRoutes);
+console.log('✅ Customer payment methods routes mounted at /api/customer-payment-methods');
+
+/* ------------------------------ debug cookies ------------------------------ */
+import debugCookiesRoutes from './routes/debug-cookies';
+app.use('/api/debug-cookies', debugCookiesRoutes);
+console.log('✅ Debug cookies route mounted at /api/debug-cookies');
+
+/* ------------------------------ POS integrations ------------------------------ */
+import cloverRoutes from './routes/integrations/clover';
+import squareRoutes from './routes/integrations/square';
+app.use('/api/integrations', cloverRoutes);
+app.use('/api/integrations', squareRoutes);
+console.log('✅ POS integration routes mounted at /api/integrations (Clover, Square)');
+
+/* ------------------------------ Google Business Profile OAuth ------------------------------ */
+app.use('/api', googleBusinessOAuthRoutes);
+app.use('/auth', googleBusinessOAuthRoutes);  // Also mount at /auth for callback (matches GOOGLE_BUSINESS_REDIRECT_URI)
+console.log('✅ Google Business Profile OAuth routes mounted at /api/google/business and /auth/google/business');
+
+/* ------------------------------ Google Merchant Center OAuth ------------------------------ */
+app.use('/api', googleMerchantOAuthRoutes);
+console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oauth');
+
+/* ------------------------------ store reviews ------------------------------ */
+import storeReviewsRoutes from './routes/store-reviews';
+app.use('/api/stores', storeReviewsRoutes);
+app.use('/api', storeReviewsRoutes); // Mount at /api for helpful votes endpoint
+console.log('✅ Store reviews routes mounted at /api/stores and /api');
+
+/* ------------------------------ product queue ------------------------------ */
+import queueRoutes from './routes/queue-routes';
+app.use('/api/queue', queueRoutes);
+console.log('✅ Product queue routes mounted at /api/queue');
+
+/* ------------------------------ subscription billing ------------------------------ */
+import subscriptionBillingRoutes from './routes/subscription-billing';
+app.use('/api/subscription', subscriptionBillingRoutes);
+console.log('✅ Subscription billing routes mounted at /api/subscription');
+
+/* ------------------------------ stripe webhooks ------------------------------ */
+import stripeWebhookRoutes from './routes/stripe-webhook';
+app.use('/api/webhooks/stripe', stripeWebhookRoutes);
+console.log('✅ Stripe webhook routes mounted at /api/webhooks/stripe');
+
+// Sentry error handler must be after all routes but before other error handlers
+if (sentryEnabled) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
+// Log startup environment
+console.log('\n🚀 Starting API server...');
+console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   PORT: ${port}`);
+console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   SUPABASE_URL: ${process.env.SUPABASE_URL ? '✓ Set' : '✗ Missing'}`);
+console.log(`   WEB_URL: ${process.env.WEB_URL || 'Not set'}\n`);
+
 // Only start the server when not running tests
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    console.log(`\n✅ API server running → http://localhost:${port}/health`);
-    console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
-  });
+  try {
+    console.log('🔧 About to start server...');
+    const server = app.listen(port, '0.0.0.0', async () => {
+      console.log(`\n✅ API server running → http://localhost:${port}/health`);
+      console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+
+      // Start GMC scheduled sync (every 6 hours)
+      try {
+        const { startGMCScheduledSync } = await import('./jobs/gmc-scheduled-sync');
+        startGMCScheduledSync();
+        console.log('🔄 GMC scheduled sync started (every 6 hours)');
+      } catch (err) {
+        console.error('⚠️ Failed to start GMC scheduled sync:', err);
+      }
+
+      // Start OAuth token refresh (every hour)
+      try {
+        const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');
+        startOAuthTokenRefresh();
+        console.log('🔑 OAuth token refresh started (every hour)');
+      } catch (err) {
+        console.error('⚠️ Failed to start OAuth token refresh:', err);
+      }
+
+      // Start subscription grace period job (daily at midnight)
+      try {
+        const { startGracePeriodJob } = await import('./jobs/subscription-grace-period');
+        startGracePeriodJob();
+        console.log('💸 Subscription grace period job started (daily at midnight)');
+      } catch (err) {
+        console.error('⚠️ Failed to start grace period job:', err);
+      }
+    });
+
+    // Handle server errors
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use`);
+      } else {
+        console.error('❌ Server error:', error);
+      }
+      process.exit(1);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+  } catch (error) {
+    console.error('❌ Fatal error during server startup:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
+    process.exit(1);
+  }
 }
 
-// Export the app for testing
-export { app };
+// Export the Express app for Vercel compatibility
+export default app;

@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/email-config`, {
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
+    const response = await authenticatedFetch('/admin/email-config', accessToken, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     if (!response.ok) {
@@ -29,12 +34,18 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
+    
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
 
-    const response = await fetch(`${API_BASE_URL}/admin/email-config`, {
+    const response = await authenticatedFetch('/admin/email-config', accessToken, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(body),
     });
 

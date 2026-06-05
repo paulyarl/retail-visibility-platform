@@ -1,0 +1,1 @@
+id,order_id,order_item_id,inventory_item_id,customer_email,access_token,download_count,download_limit,expires_at,first_accessed_at,last_accessed_at,revoked_at,revoked_reason,created_at,updated_at

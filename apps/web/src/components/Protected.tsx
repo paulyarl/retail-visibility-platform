@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 
+
+
 export default function Protected({ children, redirect = true }: { children: React.ReactNode; redirect?: boolean }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);

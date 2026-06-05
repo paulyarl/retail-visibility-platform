@@ -50,7 +50,7 @@ router.post("/validate", async (req, res) => {
   const { categoryPath } = req.body;
 
   if (!categoryPath || !Array.isArray(categoryPath)) {
-    return res.status(400).json({ error: "invalid_category_path" });
+    return res.status(400).json({ error: "invalid_categoryPath" });
   }
 
   const isValid = validateCategoryPath(categoryPath);

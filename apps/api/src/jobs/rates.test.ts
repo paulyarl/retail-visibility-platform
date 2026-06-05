@@ -4,10 +4,17 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { app } from "../index";
+import app from "../index";
 
 describe("Currency Rate Job Stub (REQ-2025-905)", () => {
   const SERVICE_TOKEN = process.env.SERVICE_TOKEN || "test-token";
+
+  beforeAll(() => {
+    // Ensure the handler sees the same token the test uses
+    process.env.SERVICE_TOKEN = SERVICE_TOKEN;
+    // Leave FF_CURRENCY_RATE_STUB unset/false by default for the 503 test
+    if (process.env.FF_CURRENCY_RATE_STUB) delete process.env.FF_CURRENCY_RATE_STUB;
+  });
 
   it("should return 503 when FF_CURRENCY_RATE_STUB is OFF", async () => {
     // Assuming flag is OFF by default

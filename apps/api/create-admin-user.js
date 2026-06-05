@@ -13,7 +13,7 @@ async function main() {
   console.log('🔐 Creating admin user...\n');
 
   const email = 'admin@demo.local';
-  const password = 'admin123';
+  const password = '2481visible';
   
   // Hash password
   const passwordHash = await bcrypt.hash(password, 10);

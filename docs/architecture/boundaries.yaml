@@ -1,0 +1,490 @@
+# Architecture Boundaries
+# Version: v3.6.2-prep (Retrofit R1)
+# Date: 2025-10-31
+# Description: Service boundaries and ownership for RVP microservices architecture
+
+version: "1.0"
+platform: retail-visibility-platform
+
+# Service Definitions
+services:
+  auth:
+    name: Authentication & Authorization Service
+    port: 3001
+    repository: apps/api/src/services/auth
+    owner: auth_team
+    description: Manages user authentication, tenant sessions, and RLS policies
+    
+    owns:
+      tables:
+        - tenant
+        - user
+        - user_roles
+        - tenant_user
+        - session
+      
+      responsibilities:
+        - User authentication (JWT, OAuth)
+        - Tenant isolation via RLS
+        - Role-based access control (RBAC)
+        - Session management
+        - Step-up authentication for sensitive operations
+      
+      api_endpoints:
+        - POST /auth/login
+        - POST /auth/logout
+        - POST /auth/refresh
+        - POST /auth/step-up
+        - GET /auth/session
+        - POST /auth/register
+      
+      dependencies:
+        - redis (session storage)
+        - postgres (user/tenant data)
+    
+    sla:
+      uptime: 99.95%
+      latency_p95: 200ms
+      error_rate: <0.5%
+
+  inventory:
+    name: Inventory Management Service
+    port: 3002
+    repository: apps/api/src/services/inventory
+    owner: api_team
+    description: Manages SKU CRUD, feed sync, and category management
+    
+    owns:
+      tables:
+        - inventory_item
+        - tenant_category
+        - google_taxonomy
+        - category_alignment_audit
+        - feed_push_jobs
+      
+      views:
+        - swis_feed_view
+        - swis_feed_quality_report
+        - v_feed_category_resolved
+        - feed_job_stats
+      
+      responsibilities:
+        - SKU create, read, update, delete
+        - Category management and alignment
+        - Feed generation and validation
+        - Async feed push job processing
+        - Google taxonomy synchronization
+      
+      api_endpoints:
+        - GET /api/v1/tenants/:tenantId/inventory
+        - POST /api/v1/tenants/:tenantId/inventory
+        - PUT /api/v1/tenants/:tenantId/inventory/:sku
+        - DELETE /api/v1/tenants/:tenantId/inventory/:sku
+        - GET /api/v1/tenants/:tenantId/categories
+        - POST /api/v1/tenants/:tenantId/categories
+        - POST /api/v1/tenants/:tenantId/categories/:id/align
+        - POST /api/v1/tenants/:tenantId/feed/precheck
+        - POST /api/v1/tenants/:tenantId/feed/push
+        - GET /api/v1/google-taxonomy
+      
+      dependencies:
+        - auth (tenant context)
+        - postgres (inventory data)
+        - redis (cache)
+        - observability (metrics)
+    
+    sla:
+      uptime: 99.9%
+      latency_p95: 500ms
+      error_rate: <1%
+
+  business_profile:
+    name: Business Profile Service
+    port: 3003
+    repository: apps/api/src/services/business-profile
+    owner: ux_team
+    description: Manages NAP data, hours, SEO, and location information
+    
+    owns:
+      tables:
+        - tenant_business_profile
+      
+      responsibilities:
+        - Business profile CRUD
+        - NAP (Name, Address, Phone) management
+        - Hours and contact information
+        - SEO metadata and tags
+        - Map coordinates and privacy settings
+      
+      api_endpoints:
+        - POST /tenant/profile
+        - GET /tenant/profile
+        - PATCH /tenant/profile
+        - GET /tenant/profile/validation
+      
+      dependencies:
+        - auth (tenant context)
+        - postgres (profile data)
+        - integrations (Google Maps API)
+    
+    sla:
+      uptime: 99.9%
+      latency_p95: 300ms
+      error_rate: <1%
+
+  integrations:
+    name: External Integrations Service
+    port: 3004
+    repository: apps/api/src/services/integrations
+    owner: integrations_team
+    description: Manages OAuth, Google Merchant, GBP, and payment integrations
+    
+    owns:
+      tables:
+        - google_oauth_accounts
+        - google_oauth_tokens
+        - google_merchant_links
+        - gbp_locations
+        - gbp_insights_daily
+        - stripe_customers
+        - stripe_subscriptions
+      
+      responsibilities:
+        - Google OAuth flow (content, business.manage scopes)
+        - Google Merchant Center sync
+        - Google Business Profile integration
+        - Stripe payment processing
+        - Token refresh and rotation (90-day cycle)
+        - External API rate limiting
+      
+      api_endpoints:
+        - POST /google/oauth/link
+        - GET /google/oauth/callback
+        - POST /google/oauth/refresh
+        - DELETE /google/oauth/unlink
+        - POST /google/feeds/push
+        - GET /google/merchant/status
+        - POST /stripe/checkout
+        - POST /stripe/webhook
+      
+      dependencies:
+        - auth (tenant context)
+        - postgres (integration data)
+        - redis (token cache)
+        - external_apis (Google, Stripe)
+    
+    sla:
+      uptime: 99.5%
+      latency_p95: 1000ms  # Higher due to external API calls
+      error_rate: <2%
+
+  observability:
+    name: Observability & Monitoring Service
+    port: 3005
+    repository: apps/api/src/services/observability
+    owner: devops_team
+    description: Metrics export, alert rules, and monitoring dashboards
+    
+    owns:
+      tables:
+        - audit_log
+        - outreach_feedback
+      
+      views:
+        - feedback_analytics
+        - pilot_program_kpis
+      
+      responsibilities:
+        - Audit log collection and storage
+        - Metrics aggregation and export
+        - Alert rule evaluation
+        - Dashboard data preparation
+        - Feedback collection and analysis
+      
+      api_endpoints:
+        - POST /metrics/export
+        - GET /metrics/dashboard/:dashboardId
+        - POST /feedback/submit
+        - GET /feedback/analytics
+        - GET /audit/:tenantId/logs
+      
+      dependencies:
+        - auth (tenant context)
+        - postgres (audit/feedback data)
+        - datadog (metrics sink)
+        - sentry (error tracking)
+    
+    sla:
+      uptime: 99.9%
+      latency_p95: 400ms
+      error_rate: <1%
+
+# API Gateway Configuration
+api_gateway:
+  enabled: true
+  provider: kong  # or nginx, traefik, etc.
+  port: 8080
+  
+  routing:
+    - path: /auth/*
+      service: auth
+      strip_path: true
+    
+    - path: /api/v1/tenants/:tenantId/inventory*
+      service: inventory
+      strip_path: false
+    
+    - path: /api/v1/tenants/:tenantId/categories*
+      service: inventory
+      strip_path: false
+    
+    - path: /api/v1/tenants/:tenantId/feed*
+      service: inventory
+      strip_path: false
+    
+    - path: /api/v1/google-taxonomy*
+      service: inventory
+      strip_path: false
+    
+    - path: /tenant/profile*
+      service: business_profile
+      strip_path: false
+    
+    - path: /google/*
+      service: integrations
+      strip_path: true
+    
+    - path: /stripe/*
+      service: integrations
+      strip_path: true
+    
+    - path: /metrics/*
+      service: observability
+      strip_path: true
+    
+    - path: /feedback/*
+      service: observability
+      strip_path: true
+    
+    - path: /audit/*
+      service: observability
+      strip_path: true
+  
+  rate_limiting:
+    global:
+      requests_per_minute: 1000
+      burst: 100
+    
+    per_service:
+      auth: 500
+      inventory: 1000
+      business_profile: 300
+      integrations: 200  # Lower due to external API limits
+      observability: 500
+    
+    per_tenant:
+      requests_per_minute: 100
+      burst: 20
+  
+  authentication:
+    type: jwt
+    header: Authorization
+    scheme: Bearer
+    public_paths:
+      - /auth/login
+      - /auth/register
+      - /health
+      - /metrics  # For Prometheus scraping
+  
+  cors:
+    allowed_origins:
+      - https://app.retailvisibility.com
+      - https://www.retailvisibility.com
+      - http://localhost:3000  # Development
+    allowed_methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    allowed_headers:
+      - Authorization
+      - Content-Type
+      - X-CSRF-Token
+    expose_headers:
+      - X-RateLimit-Limit
+      - X-RateLimit-Remaining
+      - X-RateLimit-Reset
+    max_age: 3600
+
+# Cross-Service Communication
+communication:
+  protocol: http  # Could be gRPC for better performance
+  timeout: 30s
+  retry_policy:
+    max_attempts: 3
+    backoff: exponential
+    initial_interval: 100ms
+    max_interval: 2s
+  
+  service_discovery:
+    type: kubernetes  # or consul, eureka
+    namespace: rvp-production
+
+# Data Ownership & Boundaries
+data_boundaries:
+  strict_ownership: true
+  cross_service_queries: forbidden
+  
+  shared_data_access:
+    # Services can only access their own tables directly
+    # Cross-service data access must go through APIs
+    
+    exceptions:
+      # Observability can read from all tables for audit/metrics
+      - service: observability
+        tables: ["*"]
+        access: read_only
+      
+      # Auth can read tenant_user for authorization
+      - service: auth
+        tables: ["tenant_user"]
+        access: read_only
+
+# Deployment Configuration
+deployment:
+  strategy: rolling_update
+  replicas:
+    auth: 3
+    inventory: 5
+    business_profile: 2
+    integrations: 3
+    observability: 2
+  
+  resources:
+    auth:
+      cpu: 500m
+      memory: 512Mi
+    inventory:
+      cpu: 1000m
+      memory: 1Gi
+    business_profile:
+      cpu: 500m
+      memory: 512Mi
+    integrations:
+      cpu: 500m
+      memory: 512Mi
+    observability:
+      cpu: 500m
+      memory: 1Gi
+  
+  health_checks:
+    liveness:
+      path: /health/live
+      interval: 10s
+      timeout: 5s
+    readiness:
+      path: /health/ready
+      interval: 5s
+      timeout: 3s
+
+# Monitoring & Observability
+monitoring:
+  metrics_provider: datadog
+  tracing_provider: datadog_apm
+  logging_provider: datadog_logs
+  
+  dashboards:
+    - name: Service Health
+      metrics:
+        - service_uptime
+        - request_rate
+        - error_rate
+        - latency_p50_p95_p99
+    
+    - name: Category Alignment
+      service: inventory
+      metrics:
+        - category_mapping_coverage_pct
+        - feed_approval_rate
+        - time_to_alignment_median_ms
+    
+    - name: Feed Push Jobs
+      service: inventory
+      metrics:
+        - feed_push_success_rate
+        - job_queue_depth
+        - retry_distribution
+    
+    - name: API Performance
+      metrics:
+        - api_latency_by_endpoint
+        - rate_limit_hits
+        - cache_hit_rate
+  
+  alerts:
+    - name: Service Down
+      condition: uptime < 99.9%
+      severity: critical
+      channel: pagerduty
+    
+    - name: High Error Rate
+      condition: error_rate > 5%
+      severity: high
+      channel: slack_alerts
+    
+    - name: High Latency
+      condition: latency_p95 > 1s
+      severity: medium
+      channel: slack_alerts
+
+# Security
+security:
+  authentication:
+    jwt_secret: ${JWT_SECRET}
+    token_expiry: 1h
+    refresh_token_expiry: 30d
+  
+  encryption:
+    at_rest: true
+    in_transit: true
+    algorithm: AES-256-GCM
+  
+  secrets_management:
+    provider: kubernetes_secrets  # or vault, aws_secrets_manager
+    rotation_period: 90d
+  
+  network_policies:
+    default_deny: true
+    allowed_ingress:
+      - from: api_gateway
+      - from: same_namespace
+    allowed_egress:
+      - to: postgres
+      - to: redis
+      - to: external_apis
+
+# Compliance
+compliance:
+  gdpr:
+    data_retention: 2_years
+    right_to_erasure: enabled
+    data_portability: enabled
+  
+  audit_logging:
+    enabled: true
+    retention: 1_year
+    pii_masking: true
+
+# Contact & Ownership
+contacts:
+  platform_owner: tech_lead@retailvisibility.com
+  on_call_rotation: pagerduty_schedule_id
+  
+  team_contacts:
+    auth_team: auth-team@retailvisibility.com
+    api_team: api-team@retailvisibility.com
+    ux_team: ux-team@retailvisibility.com
+    integrations_team: integrations-team@retailvisibility.com
+    devops_team: devops-team@retailvisibility.com

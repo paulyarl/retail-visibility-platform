@@ -1,0 +1,21 @@
+id,tier_name,fee_percentage,fee_fixed_cents,min_transaction_cents,max_transaction_cents,description,is_active,created_at,updated_at,min_transaction_count
+tier_trial,trial,3.00,0,,,Trial tier - 3% platform fee,t,2026-01-10 19:17:18.157454,2026-01-10 19:17:18.157454,0
+tier_google_only,google-only,2.50,0,,,Google Only tier - 2.5% platform fee,t,2026-01-10 19:17:18.157454,2026-01-10 19:17:18.157454,0
+tier_starter,starter,2.00,0,,,Starter tier - 2% platform fee,t,2026-01-10 19:17:18.157454,2026-01-10 19:17:18.157454,0
+6b9f652f-ad8c-4adf-bb01-055bda4d4baf,commitment_deposit,10.00,0,,,Default deposit percentage for Tier 3 commitment checkout (10% holding fee),t,2026-04-19 23:44:47.750366,2026-04-19 23:44:47.750366,0
+ft_discovery,discovery,0.00,0,,,Discovery tier - no transaction fees,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0
+ft_storefront,storefront,0.00,0,,,Storefront tier - no transaction fees,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0
+ft_commitment,commitment,2.00,0,,,"Commitment tier - deposit transaction fees, first 10 free",t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,10
+tier_professional,professional,1.50,0,,,"Professional tier - transaction fees on deposits and payments, first 25 free",t,2026-01-10 19:17:18.157454,2026-04-23 13:22:24.986853,25
+tier_enterprise,enterprise,1.00,0,,,"Enterprise tier - lowest transaction fees, first 50 free",t,2026-01-10 19:17:18.157454,2026-04-23 13:22:24.986853,50
+tier_organization,organization,1.50,0,,,Organization tier - multi-location pricing,t,2026-01-10 19:17:18.157454,2026-04-23 13:22:24.986853,30
+ft_chain_starter,chain_starter,1.25,0,,,Chain Starter - small chains,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,40
+ft_chain_professional,chain_professional,1.00,0,,,Chain Professional - medium chains,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,60
+ft_chain_enterprise,chain_enterprise,0.75,0,,,"Chain Enterprise - large chains, lowest fees",t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,100
+ft_trial_discovery,trial_discovery,0.00,0,,,Trial Discovery,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0
+ft_trial_storefront,trial_storefront,0.00,0,,,Trial Storefront,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0
+ft_trial_commitment,trial_commitment,2.00,0,,,Trial Commitment - limited free transactions,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,5
+ft_trial_professional,trial_professional,1.50,0,,,Trial Professional - limited free transactions,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,10
+ft_trial_google_only,trial_google_only,0.00,0,,,Trial Google-Only - no fees,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0
+ft_trial_chain_starter,trial_chain_starter,1.25,0,,,Trial Chain Starter,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,15
+ft_expired_trial,expired_trial,3.00,0,,,Expired Trial - highest fees,t,2026-04-23 13:22:24.986853,2026-04-23 13:22:24.986853,0

@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PublicFooter() {
   const { settings } = usePlatformSettings();
+  const { isAuthenticated } = useAuth();
   const currentYear = new Date().getFullYear();
 
   return (
@@ -14,19 +16,14 @@ export default function PublicFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand Column */}
           <div className="col-span-1 md:col-span-2">
-            {settings?.logoUrl ? (
-              <Image
-                src={settings.logoUrl}
-                alt={settings.platformName || 'Platform Logo'}
-                width={150}
-                height={40}
-                className="h-10 w-auto object-contain mb-4"
-              />
-            ) : (
-              <h3 className="text-lg font-bold text-neutral-900 mb-4">
-                {settings?.platformName || 'Retail Visibility Platform'}
-              </h3>
-            )}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center text-white font-black text-sm select-none">
+                VS
+              </div>
+              <span className="text-xl font-extrabold tracking-wider text-neutral-900 uppercase font-sans">
+                {settings?.platformName || 'Visible Shelf'}
+              </span>
+            </div>
             <p className="text-neutral-600 text-sm mb-4 max-w-md">
               {settings?.platformDescription || 'Manage your retail operations with ease'}
             </p>
@@ -63,11 +60,6 @@ export default function PublicFooter() {
                   Pricing
                 </Link>
               </li>
-              <li>
-                <Link href="/settings/subscription" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
-                  Subscription
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -83,19 +75,27 @@ export default function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/settings/contact" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link 
+                  href={isAuthenticated ? "/settings/contact" : "/contact"} 
+                  className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors"
+                >
                   Contact
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
-                  Privacy Policy
-                </a>
+                <Link href="/legal" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                  Legal
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                <Link href="/privacy" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -104,7 +104,7 @@ export default function PublicFooter() {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-neutral-200">
           <p className="text-neutral-500 text-sm text-center">
-            © {currentYear} {settings?.platformName || 'Retail Visibility Platform'}. All rights reserved.
+            © {currentYear} {settings?.platformName || 'Visible Shelf'}. All rights reserved.
           </p>
         </div>
       </div>

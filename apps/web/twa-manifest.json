@@ -1,0 +1,103 @@
+{
+  "packageId": "com.visibleshelf.app",
+  "host": "visibleshelf.store",
+  "name": "VisibleShelf",
+  "launcherName": "VisibleShelf",
+  "display": "standalone",
+  "themeColor": "#1971c2",
+  "navigationColor": "#1971c2",
+  "navigationColorDark": "#1971c2",
+  "navigationDividerColor": "#1971c2",
+  "navigationDividerColorDark": "#1971c2",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://visibleshelf.store/icons/icon-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "android.keystore",
+    "alias": "visibleshelf"
+  },
+  "appVersion": {
+    "number": "1.0.0",
+    "name": "1.0.0"
+  },
+  "shortcuts": [
+    {
+      "name": "Browse Products",
+      "shortName": "Products",
+      "url": "/directory",
+      "chosenIconUrl": "https://visibleshelf.store/icons/shortcut-products.png"
+    },
+    {
+      "name": "Categories",
+      "shortName": "Categories",
+      "url": "/directory/categories",
+      "chosenIconUrl": "https://visibleshelf.store/icons/shortcut-categories.png"
+    },
+    {
+      "name": "Stores",
+      "shortName": "Stores",
+      "url": "/directory/stores",
+      "chosenIconUrl": "https://visibleshelf.store/icons/shortcut-stores.png"
+    }
+  ],
+  "generatorService": {
+    "serviceUrl": "https://app.bubblewrap.dev"
+  },
+  "androidManifest": {
+    "uses-feature": [
+      {
+        "name": "android.hardware.camera",
+        "required": false
+      }
+    ],
+    "uses-permission": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.CAMERA",
+      "android.permission.VIBRATE",
+      "android.permission.WAKE_LOCK",
+      "android.permission.RECEIVE_BOOT_COMPLETED"
+    ]
+  },
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    },
+    "shareTarget": {
+      "enabled": true,
+      "action": "/share",
+      "method": "POST",
+      "enctype": "multipart/form-data",
+      "params": {
+        "title": "title",
+        "text": "text",
+        "url": "url",
+        "files": [
+          {
+            "name": "images",
+            "accept": ["image/*"]
+          }
+        ]
+      }
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://visibleshelf.store/",
+  "minSdkVersion": 19,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "appVersionCode": 1
+}

@@ -1,0 +1,1324 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useProductSingleton } from '@/providers/data/ProductSingleton';
+import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
+import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
+import { itemsService } from '@/services/ItemsSingletonService';
+import { Card, CardContent, Badge, Button, Modal, ModalFooter } from '@/components/ui';
+import { SalePrice } from '@/components/products/SalePrice';
+import PageHeader, { Icons } from '@/components/PageHeader';
+import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
+import { QRCodeModal } from '@/components/items/QRCodeModal';
+import EditItemModal from '@/components/items/EditItemModal';
+import ItemPhotoGallery from '@/components/items/ItemPhotoGallery';
+import VariantsView from '@/components/items/VariantsView';
+import { Item as ItemType } from '@/services/itemsDataService';
+import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import ProductCategoryContext from '@/components/products/ProductCategoryContext';
+
+interface ItemDetailPageProps {
+  params: {
+    tenantId: string;
+    itemId: string;
+  };
+}
+
+interface EnrichedItem extends ItemType {
+  // Enriched barcode data
+  upc?: string;
+  gtin?: string;
+  mpn?: string;
+  
+  // Nutrition & dietary
+  nutritionFacts?: {
+    servingSize?: string;
+    calories?: number;
+    totalFat?: string;
+    saturatedFat?: string;
+    transFat?: string;
+    cholesterol?: string;
+    sodium?: string;
+    totalCarbohydrate?: string;
+    dietaryFiber?: string;
+    sugars?: string;
+    protein?: string;
+    [key: string]: any;
+  };
+  allergens?: string[];
+  ingredients?: string;
+  dietaryInfo?: string[];
+  nutriScore?: string;
+  
+  // Physical attributes
+  dimensions?: {
+    length?: number;
+    width?: number;
+    height?: number;
+    unit?: string;
+  };
+  weight?: {
+    value?: number;
+    unit?: string;
+  };
+  
+  // Additional specs
+  specifications?: Record<string, any>;
+  environmentalInfo?: string[];
+}
+
+interface Photo {
+  id: string;
+  url: string;
+  position: number;
+  alt?: string | null;
+  caption?: string | null;
+}
+
+
+export default function ItemDetailPage({ params }: ItemDetailPageProps) {
+  const { tenantId, itemId } = useParams() as { tenantId: string; itemId: string };
+  const router = useRouter();
+  const [item, setItem] = useState<EnrichedItem | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  const { actions: productActions } = useProductSingleton();
+  const { actions: categoryActions } = useCategorySingleton();
+
+  useEffect(() => {
+    loadItemData();
+    loadCategoryData();
+  }, [itemId]);
+
+  const handleSaveItem = async (updatedItem: ItemType) => {
+    try {
+      // Update item via ItemUpdateService with automatic cache invalidation
+      const itemUpdateService = ItemUpdateService.getInstance(tenantId);
+      const result = await itemUpdateService.updateItem(itemId, updatedItem);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update item');
+      }
+      
+      // Reload data to reflect changes (cache will be fresh after invalidation)
+      await loadItemData();
+      
+      // Return the updated item
+      return result.item || updatedItem;
+    } catch (err) {
+      console.error('Error updating item:', err);
+      throw err;
+    }
+  };
+
+  const loadItemData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch item details via ItemsSingletonService (cached, authenticated)
+      const itemData = await itemsService.getItem(itemId);
+      
+      if (!itemData) {
+        throw new Error('Item not found');
+      }
+      
+      // Extract enriched fields from metadata if present
+      const metadata = itemData.metadata || {};
+      const enrichedFields: any = {};
+      
+      // Extract AI-generated enriched content from metadata
+      if (metadata.enhancedDescription) {
+        enrichedFields.marketingDescription = metadata.enhancedDescription;
+      }
+      if (metadata.features && Array.isArray(metadata.features)) {
+        enrichedFields.environmentalInfo = metadata.features; // Reuse environmentalInfo for features display
+      }
+      if (metadata.specifications && typeof metadata.specifications === 'object') {
+        enrichedFields.specifications = {
+          ...((itemData as any).specifications || {}),
+          ...metadata.specifications
+        };
+      }
+
+      // Extract barcode enrichment data from metadata
+      if (metadata.nutrition) {
+        // Extract nutrition facts
+        const nutrition = metadata.nutrition;
+        enrichedFields.nutritionFacts = {};
+
+        if (nutrition.per_100g) {
+          // Map OpenFoodFacts nutrition data to frontend format
+          const per100g = nutrition.per_100g;
+          enrichedFields.nutritionFacts = {
+            servingSize: nutrition.serving_size || 'Per 100g',
+            calories: per100g['energy-kcal_100g'] || per100g.energy_kcal || per100g.energy,
+            totalFat: per100g.fat_100g ? `${per100g.fat_100g}g` : per100g.fat,
+            saturatedFat: per100g['saturated-fat_100g'] ? `${per100g['saturated-fat_100g']}g` : per100g.saturated_fat,
+            transFat: per100g['trans-fat_100g'] ? `${per100g['trans-fat_100g']}g` : per100g.trans_fat,
+            cholesterol: per100g.cholesterol_100g ? `${per100g.cholesterol_100g}mg` : per100g.cholesterol,
+            sodium: per100g.sodium_100g ? `${per100g.sodium_100g}mg` : per100g.sodium,
+            totalCarbohydrate: per100g.carbohydrates_100g ? `${per100g.carbohydrates_100g}g` : per100g.carbohydrates,
+            dietaryFiber: per100g.fiber_100g ? `${per100g.fiber_100g}g` : per100g.fiber,
+            sugars: per100g.sugars_100g ? `${per100g.sugars_100g}g` : per100g.sugars,
+            protein: per100g.proteins_100g ? `${per100g.proteins_100g}g` : per100g.proteins,
+          };
+        }
+
+        // Extract Nutri-Score if available
+        if (nutrition.grade || nutrition.nutrition_grade_fr) {
+          enrichedFields.nutriScore = nutrition.grade || nutrition.nutrition_grade_fr;
+        }
+      }
+
+      // Extract ingredients
+      if (metadata.ingredients) {
+        if (typeof metadata.ingredients === 'string') {
+          enrichedFields.ingredients = metadata.ingredients;
+        } else if (Array.isArray(metadata.ingredients)) {
+          enrichedFields.ingredients = metadata.ingredients.join(', ');
+        }
+      }
+
+      // Extract allergens
+      if (metadata.allergens) {
+        if (typeof metadata.allergens === 'string') {
+          enrichedFields.allergens = metadata.allergens.split(',').map((a: string) => a.trim());
+        } else if (Array.isArray(metadata.allergens)) {
+          enrichedFields.allergens = metadata.allergens;
+        }
+      }
+
+      // Extract allergens tags (additional allergens)
+      if (metadata.allergens_tags && Array.isArray(metadata.allergens_tags)) {
+        enrichedFields.allergens = enrichedFields.allergens || [];
+        enrichedFields.allergens = [...new Set([...enrichedFields.allergens, ...metadata.allergens_tags])];
+      }
+
+      // Extract dietary information from ingredients analysis
+      if (metadata.ingredients_analysis) {
+        const analysis = metadata.ingredients_analysis;
+        enrichedFields.dietaryInfo = [];
+
+        if (analysis.vegan) enrichedFields.dietaryInfo.push('Vegan');
+        if (analysis.vegetarian) enrichedFields.dietaryInfo.push('Vegetarian');
+        if (analysis.palm_oil_free) enrichedFields.dietaryInfo.push('Palm Oil Free');
+      }
+
+      // Extract environmental information
+      if (metadata.environmental) {
+        const env = metadata.environmental;
+        enrichedFields.environmentalInfo = enrichedFields.environmentalInfo || [];
+
+        if (env.ecoscore_grade) {
+          enrichedFields.environmentalInfo.push(`Eco-Score: ${env.ecoscore_grade.toUpperCase()}`);
+        }
+        if (env.carbon_footprint) {
+          enrichedFields.environmentalInfo.push(`Carbon Footprint: ${env.carbon_footprint}g CO₂`);
+        }
+      }
+
+      // Extract Nova group (food processing level)
+      if (metadata.nova_group) {
+        enrichedFields.environmentalInfo = enrichedFields.environmentalInfo || [];
+        enrichedFields.environmentalInfo.push(`Processing Level: NOVA ${metadata.nova_group}`);
+      }
+
+      // Extract product identifiers
+      if (metadata.barcode) enrichedFields.upc = metadata.barcode;
+      if (metadata.ean) enrichedFields.gtin = metadata.ean;
+      if (metadata.mpn) enrichedFields.mpn = metadata.mpn;
+
+      // Extract physical attributes
+      if (metadata.specifications) {
+        const specs = metadata.specifications;
+        if (specs.weight || specs.length || specs.width || specs.height) {
+          enrichedFields.weight = specs.weight ? { value: specs.weight, unit: 'g' } : undefined;
+          enrichedFields.dimensions = specs.length ? {
+            length: specs.length,
+            width: specs.width,
+            height: specs.height,
+            unit: 'cm'
+          } : undefined;
+        }
+      }
+
+      // Extract completeness score
+      if (metadata.completeness) {
+        enrichedFields.completeness = metadata.completeness;
+      }
+      
+      // Normalize the item data to match frontend expectations
+      // Database uses snake_case, frontend expects camelCase
+      const normalizedItem: EnrichedItem = {
+        ...itemData,
+        ...enrichedFields,
+        // Ensure proper field mapping for critical fields
+        status: (itemData as any).item_status || (itemData as any).status || 'draft',
+        visibility: (itemData as any).visibility || 'private',
+        price: (itemData as any).price_cents ? (itemData as any).price_cents / 100 : ((itemData as any).price || 0),
+        stock: (itemData as any).stock || 0,
+        itemStatus: (itemData as any).item_status || (itemData as any).status || 'draft',
+        condition: (itemData as any).condition === 'brand_new' ? 'new' : (itemData as any).condition || 'new',
+        tenantCategory: (itemData as any).tenantCategory || null,
+        tenantCategoryId: (itemData as any).tenant_category_id || (itemData as any).directory_category_id,
+        imageUrl: (itemData as any).image_url || (itemData as any).imageUrl,
+      };
+      
+      // console.log('[ItemDetailPage] Loaded item:', {
+      //   id: normalizedItem.id,
+      //   status: normalizedItem.status,
+      //   visibility: normalizedItem.visibility,
+      //   price: normalizedItem.price,
+      //   stock: normalizedItem.stock,
+      //   itemStatus: normalizedItem.itemStatus,
+      //   tenantCategory: normalizedItem.tenantCategory,
+      //   tenantCategoryId: normalizedItem.tenantCategoryId,
+      //   originalData: {
+      //     item_status: (itemData as any).item_status,
+      //     visibility: (itemData as any).visibility,
+      //     price_cents: (itemData as any).price_cents,
+      //     stock: (itemData as any).stock,
+      //     tenant_category_id: (itemData as any).tenant_category_id,
+      //     image_url: (itemData as any).image_url,
+      //   },
+      //   fullOriginalData: itemData,
+      // });
+      setItem(normalizedItem);
+
+      // Fetch photos via PhotoSingleton, fallback to image_gallery from API
+      // console.log(`Inventory Item: ${JSON.stringify(itemData)}`);
+
+      let imageUrl = (itemData as any).image_url||(itemData as any).imageUrl;
+      let itemGallery = (itemData as any).imageGallery||(itemData as any).image_gallery;
+
+      try {
+        const photoSingleton = PhotoSingleton.getInstance(tenantId);
+        const itemPhotos = await photoSingleton.fetchItemPhotos(itemId);        
+
+        // console.log(`imageUrl    : ${JSON.stringify(imageUrl)}`);
+        // console.log(`itemGallery : ${JSON.stringify(itemGallery)}`);
+
+        switch(true) {
+          case itemPhotos.length > 0:
+            setPhotos(itemPhotos);
+            break;
+          case itemGallery && Array.isArray(itemGallery) && itemGallery.length > 0:           
+            setPhotos(itemGallery);
+            break;
+          case imageUrl && typeof imageUrl === 'string' && imageUrl.length > 0:
+           setPhotos([{
+                id: 'legacy-image',
+                url: imageUrl as string,
+                position: 0,
+                alt: null,
+                caption: 'Legacy image (stored on item, not in photo gallery)',
+              }]);
+            break;
+          default:
+            setPhotos([]);
+            break;
+        }
+      } catch (photoError) {
+        console.warn('Failed to load photos via singleton:', photoError);
+        // Fallback to image_gallery from API
+        if (itemGallery && Array.isArray(itemGallery) && itemGallery.length > 0) {
+
+          setPhotos(itemGallery);
+        } else {
+          setPhotos([{
+                id: 'legacy-image',
+                url: imageUrl as string,
+                position: 0,
+                alt: null,
+                caption: 'Legacy image (stored on item, not in photo gallery)',
+              }]);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load item');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCategoryData = async () => {
+    try {
+      // Fetch categories via singleton (cached)
+      const { categories: fetchedCategories } = await categoryActions.fetchCategories({
+        includeChildren: true,
+        includeProductCount: false
+      });
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.warn('Failed to load categories via singleton, using empty array:', error);
+      setCategories([]);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" />
+            <p className="text-neutral-600 dark:text-neutral-400">Loading item...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <p className="text-red-800 font-medium">{error || 'Item not found'}</p>
+            <Button
+              variant="ghost"
+              onClick={() => router.push(`/t/${tenantId}/items`)}
+              className="mt-4"
+            >
+              Back to Items
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate price summary for items with variants
+  const getPriceSummary = () => {
+    // Check if item has variants with their own pricing
+    if (item.has_variants && item.variants && item.variants.length > 0) {
+      const variantPrices = item.variants
+        .map((variant: any) => variant.price_cents || variant.priceCents || 0)
+        .filter((price: number) => price > 0);
+      
+      if (variantPrices.length > 0) {
+        const minPrice = Math.min(...variantPrices);
+        const maxPrice = Math.max(...variantPrices);
+        const hasPriceRange = minPrice !== maxPrice;
+        
+        return {
+          displayPrice: hasPriceRange 
+            ? `$${(minPrice / 100).toFixed(2)} - $${(maxPrice / 100).toFixed(2)}`
+            : `$${(minPrice / 100).toFixed(2)}`,
+          minPrice: minPrice / 100,
+          maxPrice: maxPrice / 100,
+          hasPriceRange,
+          isVariantBased: true
+        };
+      }
+    }
+    
+    // Fall back to parent product pricing
+    return {
+      displayPrice: `$${(item.price ?? 0).toFixed(2)}`,
+      minPrice: item.price ?? 0,
+      maxPrice: item.price ?? 0,
+      hasPriceRange: false,
+      isVariantBased: false
+    };
+  };
+
+  const priceSummary = getPriceSummary();
+  const displayPhotos = photos.length > 0 ? photos : (item.imageUrl ? [{ id: 'primary', url: item.imageUrl, position: 0 }] : []);
+
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
+      <PageHeader
+        title={item.name}
+        description={`SKU: ${item.sku}`}
+        icon={Icons.Inventory}
+      />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button & Actions */}
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={() => router.push(`/t/${tenantId}/items`)}
+            className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Items
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPhotoGallery(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors font-medium shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Manage Photos
+            </button>
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Item
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Photos */}
+          <div className="space-y-4 lg:col-span-2">
+            <Card data-section="photos">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Photos ({displayPhotos.length})
+                </h2>
+
+                {displayPhotos.length > 0 ? (
+                  <>
+                    {/* Main Photo */}
+                    <div className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden mb-4">
+                      <img
+                        src={displayPhotos[selectedPhotoIndex]?.url}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {/* Thumbnail Carousel */}
+                    {displayPhotos.length > 1 && (
+                      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+                        {displayPhotos.map((photo, index) => (
+                          <button
+                            key={photo.id}
+                            onClick={() => setSelectedPhotoIndex(index)}
+                            className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedPhotoIndex === index
+                                ? 'border-primary-600 ring-2 ring-primary-200'
+                                : 'border-neutral-200 dark:border-neutral-700 hover:border-primary-400'
+                            }`}
+                          >
+                            <img
+                              src={photo.url}
+                              alt={`${item.name} ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg flex items-center justify-center">
+                    <div className="text-center">
+                      <svg className="w-16 h-16 mx-auto text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-sm text-neutral-500">No photos</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Video Player - YouTube embed */}
+            {(item as any).videoUrl && (() => {
+              // Extract YouTube video ID from various URL formats
+              const getYouTubeId = (url: string): string | null => {
+                const patterns = [
+                  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+                  /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/
+                ];
+                for (const pattern of patterns) {
+                  const match = url.match(pattern);
+                  if (match) return match[1];
+                }
+                return null;
+              };
+              const videoId = getYouTubeId((item as any).videoUrl);
+              return videoId ? (
+                <Card data-section="video">
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                      🎬 Product Video
+                    </h2>
+                    <div className="aspect-video bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title="Product Video"
+                        className="w-full h-full"
+                        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                    <a 
+                      href={(item as any).videoUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary-600 hover:text-primary-700 text-sm mt-2 inline-flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      Watch on YouTube
+                    </a>
+                  </CardContent>
+                </Card>
+              ) : null;
+            })()}
+
+            {/* Description */}
+            {item.description && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Description
+                  </h2>
+                  <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                    {item.description}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Marketing Description */}
+            {(item as any).marketing_description && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Marketing Description
+                  </h2>
+                  <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                    {(item as any).marketing_description}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Features */}
+            {(item as any).features && Array.isArray((item as any).features) && (item as any).features.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Features
+                  </h2>
+                  <ul className="space-y-2">
+                    {(item as any).features.map((feature: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2 text-neutral-700 dark:text-neutral-300">
+                        <span className="text-green-500 mt-1">✓</span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Product Details */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Product Details
+                </h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Product Type</dt>
+                    <dd className="text-neutral-900 dark:text-white capitalize">
+                      {(item as any).product_type || 'physical'}
+                    </dd>
+                  </div>
+                  {(item as any).product_slug && (
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Product Slug</dt>
+                      <dd className="text-neutral-900 dark:text-white font-mono text-xs break-all">
+                        {(item as any).product_slug}
+                      </dd>
+                    </div>
+                  )}
+                  {(item as any).payment_gateway_type && (
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Payment Gateway</dt>
+                      <dd className="text-neutral-900 dark:text-white capitalize">
+                        {(item as any).payment_gateway_type}
+                      </dd>
+                    </div>
+                  )}
+                  {(item as any).payment_gateway_id && (
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Gateway ID</dt>
+                      <dd className="text-neutral-900 dark:text-white font-mono text-xs">
+                        {(item as any).payment_gateway_id}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </CardContent>
+            </Card>
+
+            {/* Variants Section */}
+            <VariantsView 
+              item={item}
+              onAddVariant={() => setShowEditModal(true)}
+            />
+          </div>
+
+          {/* Right Column - Details */}
+          <div className="space-y-4">
+            {/* Category Context Widget */}
+            {item.tenantCategory && categories.length > 0 && (
+              <ProductCategoryContext
+                tenantId={tenantId}
+                currentCategory={categories.find(cat => cat.slug === item.tenantCategory?.slug) || categories[0]}
+                allCategories={categories}
+                totalProducts={totalProducts}
+              />
+            )}
+            {/* Status & Badges */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge variant={item.status === 'active' ? 'success' : item.status === 'syncing' ? 'info' : item.status === 'draft' ? 'info' : 'default'}>
+                    {item.status === 'active' ? 'Active' : item.status === 'syncing' ? 'Syncing' : item.status === 'draft' ? 'Draft' : item.status === 'inactive' ? 'Inactive' : 'Archived'}
+                  </Badge>
+                  <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
+                    {item.visibility === 'public' ? 'Public' : 'Private'}
+                  </Badge>
+                </div>
+
+                <SyncStatusIndicator
+                  itemStatus={item.status}
+                  visibility={item.visibility}
+                  tenantCategoryId={item.tenantCategoryId}
+                  showDetails={true}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Category Info */}
+            {item.tenantCategory && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Category
+                  </h2>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-lg border border-blue-200 dark:border-blue-800">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    <span>{typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || ''}</span>
+                    {item.tenantCategory.googleCategoryId && (
+                      <span className="text-blue-600 dark:text-blue-400 font-mono text-xs" title="Google Category ID">
+                        ({item.tenantCategory.googleCategoryId})
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Basic Info */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Basic Information
+                </h2>
+                <dl className="space-y-3">
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-500">SKU</dt>
+                    <dd className="text-base text-neutral-900 dark:text-white font-mono">{item.sku}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-500">Name</dt>
+                    <dd className="text-base text-neutral-900 dark:text-white">{item.name}</dd>
+                  </div>
+                  {item.brand && (
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Brand</dt>
+                      <dd className="text-base text-neutral-900 dark:text-white">{item.brand}</dd>
+                    </div>
+                  )}
+                  {item.manufacturer && (
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Manufacturer</dt>
+                      <dd className="text-base text-neutral-900 dark:text-white">{item.manufacturer}</dd>
+                    </div>
+                  )}
+                  {item.condition && (
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Condition</dt>
+                      <dd className="text-base text-neutral-900 dark:text-white">
+                        {item.condition === 'new' ? 'New' : item.condition === 'used' ? 'Used' : item.condition === 'refurbished' ? 'Refurbished' : item.condition}
+                      </dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-500">
+                      Price
+                      {priceSummary.isVariantBased && (
+                        <span className="text-xs text-purple-600 ml-2 font-normal">
+                          (from {item.variants?.length || 0} variants)
+                        </span>
+                      )}
+                    </dt>
+                    <dd className="text-2xl font-bold text-neutral-900 dark:text-white">
+                      {priceSummary.isVariantBased ? (
+                        <div className="flex flex-col">
+                          <span className="text-xl">{priceSummary.displayPrice}</span>
+                          {priceSummary.hasPriceRange && (
+                            <span className="text-sm text-neutral-500 font-normal">
+                              {item.variants?.length || 0} variants available
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <SalePrice 
+                          product={{
+                            price: {
+                              cents: Math.round((item.price ?? 0) * 100),
+                              currency: 'USD',
+                              formatted: `$${(item.price ?? 0).toFixed(2)}`
+                            },
+                            salePrice: (item as any).salePriceCents ? {
+                              cents: (item as any).salePriceCents,
+                              currency: 'USD', 
+                              formatted: `$${((item as any).salePriceCents / 100).toFixed(2)}`
+                            } : undefined
+                          }}
+                          variant="detail"
+                          showOriginalPrice={true}
+                          showDiscountPercentage={true}
+                          showDiscountAmount={true}
+                        />
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-500">Stock</dt>
+                    <dd className={`text-base font-semibold ${item.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {item.stock} {item.stock === 1 ? 'unit' : 'units'}
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+
+            {/* Product Identifiers */}
+            {(item.upc || item.gtin || item.mpn) && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Product Identifiers
+                  </h2>
+                  <dl className="space-y-2 text-sm">
+                    {item.upc && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-500">UPC</dt>
+                        <dd className="text-neutral-900 dark:text-white font-mono">{item.upc}</dd>
+                      </div>
+                    )}
+                    {item.gtin && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-500">GTIN</dt>
+                        <dd className="text-neutral-900 dark:text-white font-mono">{item.gtin}</dd>
+                      </div>
+                    )}
+                    {item.mpn && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-500">MPN</dt>
+                        <dd className="text-neutral-900 dark:text-white font-mono">{item.mpn}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Ingredients */}
+            {item.ingredients && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Ingredients
+                  </h2>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                    {item.ingredients}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Nutrition Facts */}
+            {item.nutritionFacts && Object.keys(item.nutritionFacts).length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                      Nutrition Facts
+                    </h2>
+                    {item.nutriScore && (
+                      <Badge variant="info" className="text-sm">
+                        Nutri-Score: {item.nutriScore}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="border-2 border-neutral-900 dark:border-white p-4 space-y-2">
+                    {item.nutritionFacts.servingSize && (
+                      <div className="border-b-8 border-neutral-900 dark:border-white pb-2">
+                        <p className="text-sm font-semibold">Serving Size: {item.nutritionFacts.servingSize}</p>
+                      </div>
+                    )}
+                    {item.nutritionFacts.calories !== undefined && (
+                      <div className="border-b-4 border-neutral-900 dark:border-white pb-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-lg">Calories</span>
+                          <span className="font-bold text-2xl">{item.nutritionFacts.calories}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-1 text-sm">
+                      {item.nutritionFacts.totalFat && (
+                        <div className="flex justify-between border-b border-neutral-300 dark:border-neutral-600 py-1">
+                          <span className="font-semibold">Total Fat</span>
+                          <span>{item.nutritionFacts.totalFat}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.saturatedFat && (
+                        <div className="flex justify-between pl-4 py-1">
+                          <span>Saturated Fat</span>
+                          <span>{item.nutritionFacts.saturatedFat}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.transFat && (
+                        <div className="flex justify-between pl-4 py-1">
+                          <span>Trans Fat</span>
+                          <span>{item.nutritionFacts.transFat}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.cholesterol && (
+                        <div className="flex justify-between border-b border-neutral-300 dark:border-neutral-600 py-1">
+                          <span className="font-semibold">Cholesterol</span>
+                          <span>{item.nutritionFacts.cholesterol}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.sodium && (
+                        <div className="flex justify-between border-b border-neutral-300 dark:border-neutral-600 py-1">
+                          <span className="font-semibold">Sodium</span>
+                          <span>{item.nutritionFacts.sodium}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.totalCarbohydrate && (
+                        <div className="flex justify-between border-b border-neutral-300 dark:border-neutral-600 py-1">
+                          <span className="font-semibold">Total Carbohydrate</span>
+                          <span>{item.nutritionFacts.totalCarbohydrate}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.dietaryFiber && (
+                        <div className="flex justify-between pl-4 py-1">
+                          <span>Dietary Fiber</span>
+                          <span>{item.nutritionFacts.dietaryFiber}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.sugars && (
+                        <div className="flex justify-between pl-4 py-1">
+                          <span>Sugars</span>
+                          <span>{item.nutritionFacts.sugars}</span>
+                        </div>
+                      )}
+                      {item.nutritionFacts.protein && (
+                        <div className="flex justify-between border-t-4 border-neutral-900 dark:border-white pt-2 mt-2">
+                          <span className="font-semibold">Protein</span>
+                          <span>{item.nutritionFacts.protein}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Allergens & Dietary */}
+            {((item.allergens && item.allergens.length > 0) || (item.dietaryInfo && item.dietaryInfo.length > 0)) && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Allergens & Dietary Information
+                  </h2>
+                  {item.allergens && item.allergens.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
+                        ⚠️ Contains Allergens:
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {item.allergens.map((allergen, idx) => (
+                          <Badge key={idx} variant="default" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                            {allergen}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {item.dietaryInfo && item.dietaryInfo.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
+                        Dietary Information:
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {item.dietaryInfo.map((info, idx) => (
+                          <Badge key={idx} variant="success">
+                            {info}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Physical Attributes */}
+            {(item.dimensions || item.weight) && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Physical Attributes
+                  </h2>
+                  <dl className="space-y-2 text-sm">
+                    {item.dimensions && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-500">Dimensions</dt>
+                        <dd className="text-neutral-900 dark:text-white">
+                          {item.dimensions.length} × {item.dimensions.width} × {item.dimensions.height} {item.dimensions.unit}
+                        </dd>
+                      </div>
+                    )}
+                    {item.weight && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-500">Weight</dt>
+                        <dd className="text-neutral-900 dark:text-white">
+                          {item.weight.value} {item.weight.unit}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Specifications */}
+            {item.specifications && Object.keys(item.specifications).length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Specifications
+                  </h2>
+                  <dl className="space-y-2 text-sm">
+                    {Object.entries(item.specifications).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <dt className="text-neutral-500 capitalize">{key.replace(/_/g, ' ')}</dt>
+                        <dd className="text-neutral-900 dark:text-white">{String(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Key Features */}
+            {item.environmentalInfo && item.environmentalInfo.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    ✨ Key Features
+                  </h2>
+                  <ul className="space-y-2 text-sm">
+                    {item.environmentalInfo.map((info, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                        <span className="text-neutral-700 dark:text-neutral-300">{info}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Category */}
+            {item.categoryPath && item.categoryPath.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Category
+                  </h2>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {item.categoryPath.join(' > ')}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tags */}
+            {(item as any).tags && (item as any).tags.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Tags
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {(item as any).tags.map((tag: string, idx: number) => (
+                      <Badge key={idx} variant="default" className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* SEO Settings */}
+            {((item as any).seo_title || (item as any).seo_description) && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    SEO Settings
+                  </h2>
+                  <dl className="space-y-2 text-sm">
+                    {(item as any).seo_title && (
+                      <div>
+                        <dt className="text-neutral-500">SEO Title</dt>
+                        <dd className="text-neutral-900 dark:text-white mt-1">
+                          {(item as any).seo_title}
+                        </dd>
+                      </div>
+                    )}
+                    {(item as any).seo_description && (
+                      <div>
+                        <dt className="text-neutral-500">SEO Description</dt>
+                        <dd className="text-neutral-900 dark:text-white mt-1">
+                          {(item as any).seo_description}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Inventory Settings */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Inventory Settings
+                </h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Track Inventory</dt>
+                    <dd className="text-neutral-900 dark:text-white">
+                      {(item as any).track_inventory === false ? 'No' : 'Yes'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Allow Backorder</dt>
+                    <dd className="text-neutral-900 dark:text-white">
+                      {(item as any).allow_backorder ? 'Yes' : 'No'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Low Stock Threshold</dt>
+                    <dd className="text-neutral-900 dark:text-white">
+                      {(item as any).low_stock_threshold || 5} units
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+
+            {/* Metadata */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Metadata
+                </h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-500">Item ID</dt>
+                    <dd className="text-neutral-900 dark:text-white font-mono">{item.id}</dd>
+                  </div>
+                  {item.createdAt && (
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Created</dt>
+                      <dd className="text-neutral-900 dark:text-white">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </dd>
+                    </div>
+                  )}
+                  {item.updatedAt && (
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Last Updated</dt>
+                      <dd className="text-neutral-900 dark:text-white">
+                        {new Date(item.updatedAt).toLocaleDateString()}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </CardContent>
+            </Card>
+
+            {/* Actions */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                  Quick Actions
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {/* Debug info - remove in production */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
+                        Debug: status="{item.status}" visibility="{item.visibility}"
+                      </div>
+                    )}
+                    
+                    <Button
+                      variant="primary"
+                      onClick={() => window.open(`/products/${item.id}`, '_blank')}
+                      className="w-full"
+                      disabled={item.status !== 'active' || item.visibility !== 'public'}
+                      title={
+                        item.status !== 'active' || item.visibility !== 'public'
+                          ? `Cannot view public page. Current status: "${item.status}", visibility: "${item.visibility}". Item must be active and public.`
+                          : 'View public page'
+                      }
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      View Public Page
+                      {item.status !== 'active' || item.visibility !== 'public' && (
+                        <span className="ml-2 text-xs">
+                          (Status: {item.status || 'unknown'}, Visibility: {item.visibility || 'unknown'})
+                        </span>
+                      )}
+                    </Button>
+                    
+                    {/* Quick fix button if item is not active/public */}
+                    {(item.status !== 'active' || item.visibility !== 'public') && (
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await handleSaveItem({
+                              ...item,
+                              status: 'active',
+                              visibility: 'public'
+                            });
+                          } catch (err) {
+                            console.error('Failed to update item:', err);
+                          }
+                        }}
+                        className="w-full"
+                        title="Make item active and public to enable public page"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Make Active & Public
+                      </Button>
+                    )}
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push(`/t/${tenantId}/scan?mode=enrich&itemId=${item.id}&sku=${encodeURIComponent(item.sku)}`)}
+                    className="w-full"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Enrich with Scanner
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code Modal */}
+      {showQRModal && (() => {
+        return (
+          <QRCodeModal
+            isOpen={showQRModal}
+            productUrl={`${window.location.origin}/products/${item.id}`}
+            productName={item.name}
+            onClose={() => setShowQRModal(false)}
+            tenantId={tenantId}
+          />
+        );
+      })()}
+
+      {/* Edit Item Modal */}
+      <EditItemModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        item={item ? {
+          id: item.id,
+          sku: item.sku,
+          name: item.name,
+          description: item.description,
+          brand: item.brand,
+          manufacturer: item.manufacturer,
+          condition: item.condition,
+          price: item.price,
+          stock: item.stock,
+          status: item.status,
+          itemStatus: item.itemStatus,
+          visibility: item.visibility,
+          categoryPath: item.categoryPath,
+          tenantCategoryId: item.tenantCategoryId,
+          tenantCategory: item.tenantCategory,
+          imageUrl: item.imageUrl,
+          images: item.images,
+          metadata: item.metadata,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          variants: item.variants,
+          has_variants: item.has_variants || (item.variants && item.variants.length > 0),
+        } : null}
+        onSave={handleSaveItem}
+        onItemUpdated={loadItemData}
+      />
+
+      {/* Photo Gallery Modal */}
+      {showPhotoGallery && item && (
+        <Modal
+          isOpen={showPhotoGallery}
+          onClose={() => setShowPhotoGallery(false)}
+          title={`Photos - ${item.name}`}
+          size="xl"
+        >
+          <ItemPhotoGallery
+            item={{ id: item.id, sku: item.sku, name: item.name }}
+            tenantId={tenantId}
+            onUpdate={loadItemData}
+          />
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setShowPhotoGallery(false)}>
+              Close
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
+    </div>
+  );
+}

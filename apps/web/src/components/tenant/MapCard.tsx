@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Skeleton } from '@/components/ui';
 
+
+
 export interface MapCardProps {
   businessName: string;
   addressLine1: string;
@@ -19,6 +21,7 @@ export interface MapCardProps {
   onToggleDisplay?: (enabled: boolean) => void;
   editable?: boolean;
 }
+
 
 export default function MapCard({
   businessName,
@@ -47,9 +50,15 @@ export default function MapCard({
       )}`;
 
   // Build embed URL (requires API key in production)
-  const embedUrl = latitude && longitude
-    ? `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'demo'}&q=${latitude},${longitude}&zoom=15`
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  console.log('[MapCard] API Key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET');
+  console.log('[MapCard] Coordinates:', { latitude, longitude });
+  
+  const embedUrl = latitude && longitude && apiKey
+    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${latitude},${longitude}&zoom=15`
     : null;
+  
+  console.log('[MapCard] Embed URL:', embedUrl ? 'Generated' : 'NOT GENERATED');
 
   if (!displayMap) {
     return null; // Hidden when disabled

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 
 interface PolicyRules {
   scope: string;
@@ -16,12 +17,19 @@ interface PolicyRules {
 async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null> {
   try {
     const scope = tenantId || 'global';
-    
-    const result = await prisma.$queryRaw<PolicyRules[]>`
-      SELECT * FROM v_effective_sku_billing_policy
-      WHERE scope = ${scope}
+
+    const result = await prisma.$queryRaw<PolicyRules[]>(Prisma.sql`
+      SELECT
+        tenantId as scope,
+        count_active_private,
+        count_preorder,
+        count_zero_price,
+        require_image,
+        require_currency
+      FROM v_effective_sku_billing_policy
+      WHERE tenantId = ${scope}
       LIMIT 1
-    `;
+    `);
 
     return result[0] || null;
   } catch (error) {
@@ -81,8 +89,13 @@ export async function enforcePolicyCompliance(
       return next();
     }
 
-    // Only enforce on item endpoints
+    // Only enforce on item endpoints, but exclude category assignment routes
     if (!req.path.includes('/items') && !req.path.includes('/inventory')) {
+      return next();
+    }
+
+    // Skip policy enforcement for category assignment routes
+    if (req.path.includes('/category')) {
       return next();
     }
 
@@ -145,16 +158,16 @@ export async function getComplianceReport(tenantId: string) {
     }
 
     // Get all items for tenant
-    const items = await prisma.inventoryItem.findMany({
-      where: { tenantId },
+    const items = await prisma.inventory_items.findMany({
+      where: { tenant_id: tenantId },
       select: {
         id: true,
         sku: true,
         name: true,
-        imageUrl: true,
+        image_url: true,
         currency: true,
         price: true,
-        priceCents: true,
+        price_cents: true,
         availability: true,
         visibility: true,
       },
@@ -162,7 +175,7 @@ export async function getComplianceReport(tenantId: string) {
 
     // Check each item against policy
     const violations: Array<{
-      itemId: string;
+      item_id: string;
       sku: string;
       name: string;
       violations: string[];
@@ -172,7 +185,7 @@ export async function getComplianceReport(tenantId: string) {
       const validation = validateItemAgainstPolicy(item, policy);
       if (!validation.valid) {
         violations.push({
-          itemId: item.id,
+          item_id: item.id,
           sku: item.sku,
           name: item.name,
           violations: validation.violations,

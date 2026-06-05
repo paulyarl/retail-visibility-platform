@@ -1,0 +1,3 @@
+id,message,type,icon,is_scrolling,is_dismissible,target_audience,target_tiers,target_tenants,start_date,end_date,priority,is_active,created_at,updated_at,created_by
+50d96f1f-fda1-4605-ab7d-7ec9822df295,Test message,info,info,f,t,all,{},{},2026-03-02 05:00:00+00,2026-03-08 05:00:00+00,1,f,2026-02-23 13:59:36.525+00,2026-02-23 13:59:36.525+00,system
+8a09be15-4689-43f1-bace-b9ea728a207d,Test info warning message with scrolling,warning,info,t,t,specific_tiers,"{PROFESSIONAL,BASIC,ENTERPRISE}",{},,,1,t,2026-02-24 06:23:12.865+00,2026-02-24 07:09:19.714685+00,system

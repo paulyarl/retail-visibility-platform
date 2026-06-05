@@ -1,32 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyGet, proxyPost } from '@/lib/api-proxy';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const tenantId = searchParams.get('tenantId');
-  if (!tenantId) {
-    return NextResponse.json({ error: 'tenant_required' }, { status: 400 });
+  try {
+    const { searchParams } = new URL(req.url);
+    
+    // Extract and validate tenant_id
+    const tenantId = searchParams.get('tenant_id');
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
+    }
+
+    // Build params for service
+    const params = {
+      tenant_id: tenantId,
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '50'),
+      q: searchParams.get('q') || undefined,
+      status: searchParams.get('status') as any || undefined,
+      visibility: searchParams.get('visibility') as any || undefined,
+      categoryId: searchParams.get('categoryId') || undefined,
+      categoryFilter: searchParams.get('categoryFilter') as any || undefined,
+    };
+
+    // Get items using service with automatic caching
+    const itemsData = await itemsService.getItemsComplete(params);
+    
+    if (!itemsData) {
+      return NextResponse.json({ 
+        error: 'items_not_found',
+        message: 'Unable to fetch items' 
+      }, { status: 404 });
+    }
+    
+    return NextResponse.json(itemsData);
+  } catch (error) {
+    console.error('[Items API] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to fetch items' 
+    }, { status: 500 });
   }
-  
-  const res = await proxyGet(req, `/items?tenantId=${encodeURIComponent(tenantId)}`);
-  const data = await res.json();
-  
-  // If backend returns error, ensure we return empty array to client
-  if (!res.ok || !Array.isArray(data)) {
-    console.error('[items API] Backend error:', data);
-    return NextResponse.json([], { status: res.ok ? 200 : res.status });
-  }
-  
-  return NextResponse.json(data);
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const res = await proxyPost(req, '/items', body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e) {
-    return NextResponse.json({ error: 'proxy_failed' }, { status: 500 });
+    
+    // Extract tenant_id from body or query
+    const tenantId = body.tenant_id || (new URL(req.url).searchParams.get('tenant_id'));
+    if (!tenantId) {
+      return NextResponse.json({ 
+        error: 'tenant_id_required',
+        message: 'Tenant ID is required' 
+      }, { status: 400 });
+    }
+
+    // Create item using service with automatic cache invalidation
+    const newItem = await itemsService.createItem(body, tenantId);
+    
+    if (!newItem) {
+      return NextResponse.json({ 
+        error: 'creation_failed',
+        message: 'Failed to create item' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(newItem, { status: 201 });
+  } catch (error) {
+    console.error('[Items API POST] Error:', error);
+    return NextResponse.json({ 
+      error: 'internal_server_error',
+      message: 'Failed to create item' 
+    }, { status: 500 });
   }
 }

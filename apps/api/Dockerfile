@@ -1,25 +1,18 @@
-# Use Node.js LTS
-FROM node:20-slim AS base
-
-# Install OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y openssl
-
-# Enable corepack for pnpm
-RUN corepack enable
+FROM node:22
 
 WORKDIR /app
 
-# Copy all source code first (needed for prisma schema in postinstall)
+# Copy everything
 COPY . .
 
-# Install dependencies (without frozen lockfile since we're in a subdirectory)
-RUN corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile
+# Install dependencies
+RUN npm install -g pnpm
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
-# Build TypeScript
+# Build
+WORKDIR /app/apps/api
 RUN pnpm build
 
-# Expose port
 EXPOSE 8080
 
-# Start command: run migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["npm", "start"]

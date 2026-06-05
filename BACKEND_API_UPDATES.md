@@ -14,7 +14,7 @@ The frontend now passes these headers with every request:
 ```
 X-User-Id: <supabase_user_id>
 X-User-Email: <user_email>
-X-User-Role: business_owner | admin
+X-User-Role: business_owner | admin | store_owner
 ```
 
 ### Filtering Logic

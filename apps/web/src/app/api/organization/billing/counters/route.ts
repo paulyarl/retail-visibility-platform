@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(req: NextRequest) {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = new URL(req.url);
     const queryString = url.searchParams.toString();
     
-    const res = await fetch(`${base}/organization/billing/counters?${queryString}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch(`/organization/billing/counters?${queryString}`, accessToken, {
+      method: 'GET',
     });
     
     const data = await res.json();

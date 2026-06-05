@@ -10,7 +10,14 @@ export type FeatureFlag =
   | 'FF_SWIS_PREVIEW'
   | 'FF_BUSINESS_PROFILE'
   | 'FF_DARK_MODE'
-  | 'FF_GOOGLE_CONNECT_SUITE';
+  | 'FF_GOOGLE_CONNECT_SUITE'
+  | 'FF_APP_SHELL_NAV'
+  | 'FF_TENANT_URLS'
+  | 'FF_CATEGORY_MANAGEMENT_PAGE'
+  | 'FF_CATEGORY_QUICK_ACTIONS'
+  | 'FF_ITEMS_V2_GRID'
+  | 'FF_TENANT_GBP_CATEGORY_SYNC'
+  | 'FF_CATEGORY_MIRRORING';
 
 export type RolloutStrategy = 
   | 'off'           // Feature disabled for all
@@ -32,7 +39,7 @@ export interface FeatureFlagConfig {
  * Feature flag configurations
  * In production, this would be fetched from a config service or database
  */
-const FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
+let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
   FF_MAP_CARD: {
     flag: 'FF_MAP_CARD',
     strategy: 'off', // Start disabled
@@ -64,7 +71,59 @@ const FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     pilotTenants: [], // Will be populated with pilot merchant IDs
     pilotRegions: ['us-east-1'], // Start with US East region
   },
+  FF_APP_SHELL_NAV: {
+    flag: 'FF_APP_SHELL_NAV',
+    strategy: 'off',
+    percentage: 0,
+  },
+  FF_TENANT_URLS: {
+    flag: 'FF_TENANT_URLS',
+    strategy: 'on',
+    percentage: 100,
+  },
+  FF_CATEGORY_MANAGEMENT_PAGE: {
+    flag: 'FF_CATEGORY_MANAGEMENT_PAGE',
+    strategy: 'on',
+    percentage: 100,
+  },
+  FF_CATEGORY_QUICK_ACTIONS: {
+    flag: 'FF_CATEGORY_QUICK_ACTIONS',
+    strategy: 'off',
+    percentage: 0,
+  },
+  FF_ITEMS_V2_GRID: {
+    flag: 'FF_ITEMS_V2_GRID',
+    strategy: 'off',
+    percentage: 0,
+  },
+  FF_TENANT_GBP_CATEGORY_SYNC: {
+    flag: 'FF_TENANT_GBP_CATEGORY_SYNC',
+    strategy: 'pilot', // M3: Start with pilot
+    percentage: 0,
+    pilotTenants: ['cmhhzd64m0008g8b47ui6ivnd'], // Add staging test tenant
+    pilotRegions: [],
+  },
+  FF_CATEGORY_MIRRORING: {
+    flag: 'FF_CATEGORY_MIRRORING',
+    strategy: 'off', // M3: Enable after UI/API tested
+    percentage: 0,
+    pilotTenants: [],
+    pilotRegions: [],
+  },
 };
+
+// Load persisted flag states from localStorage (if present)
+try {
+  if (typeof window !== 'undefined') {
+    const raw = window.localStorage.getItem('feature_flags');
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Record<FeatureFlag, FeatureFlagConfig>>;
+      FEATURE_FLAGS = { ...FEATURE_FLAGS, ...parsed };
+    }
+  }
+} catch (_e) {
+  // ignore
+}
 
 /**
  * Check if a feature flag is enabled for a tenant
@@ -160,6 +219,20 @@ export function updateFeatureFlag(
 
   // Log the change for audit trail
   console.log(`Feature flag updated: ${flag}`, config);
+
+  // Persist to localStorage and notify listeners (for client-only apps)
+  try {
+    if (typeof window !== 'undefined') {
+      const toPersist: Partial<Record<FeatureFlag, FeatureFlagConfig>> = {
+        ...JSON.parse(window.localStorage.getItem('feature_flags') || '{}'),
+        [flag]: FEATURE_FLAGS[flag],
+      };
+      window.localStorage.setItem('feature_flags', JSON.stringify(toPersist));
+      window.dispatchEvent(new CustomEvent('feature_flags_updated', { detail: { flag, config: FEATURE_FLAGS[flag] } }));
+    }
+  } catch (_e) {
+    // ignore persistence errors
+  }
 }
 
 /**

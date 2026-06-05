@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(req: NextRequest) {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/categories`, {
-      headers: { 'Content-Type': 'application/json' },
+    // Get optional Auth0 session (categories can be public or authenticated)
+    const auth = await getAuth0Session(req);
+    const accessToken = auth?.accessToken || null;
+    
+    // Make request to backend (with or without auth)
+    const res = await authenticatedFetch('/api/categories', accessToken, {
+      method: 'GET',
     });
+    
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {
@@ -17,12 +23,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/categories`, {
+    
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(req);
+    const accessToken = auth?.accessToken || null;
+    
+    // Make request to backend
+    const res = await authenticatedFetch('/api/categories', accessToken, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e) {

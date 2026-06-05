@@ -1,7 +1,11 @@
 // Tenant-level permission middleware
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-import { UserRole, UserTenantRole } from '@prisma/client';
+import { isPlatformAdmin } from '../utils/platform-admin';
+import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSupportLimit } from '../config/tenant-limits';
+// Type extensions are automatically loaded from src/types/express.d.ts
+
+import { user_tenant_role } from '@prisma/client';
 
 /**
  * Get tenant ID from request
@@ -21,13 +25,13 @@ function getTenantIdFromRequest(req: Request): string | null {
  */
 export async function getUserTenantRole(
   userId: string,
-  tenantId: string
-): Promise<UserTenantRole | null> {
-  const userTenant = await prisma.userTenant.findUnique({
+  tenant_id: string
+): Promise<user_tenant_role | null> {
+  const userTenant = await prisma.user_tenants.findUnique({
     where: {
-      userId_tenantId: {
-        userId,
-        tenantId,
+      user_id_tenant_id: {
+        user_id: userId,
+        tenant_id: tenant_id,
       },
     },
   });
@@ -38,7 +42,7 @@ export async function getUserTenantRole(
 /**
  * Middleware to check if user has required tenant-level role
  */
-export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
+export function requireTenantRole(...allowedRoles: user_tenant_role[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -49,19 +53,35 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
       }
 
       // Platform admins bypass tenant role checks
-      if (req.user.role === UserRole.ADMIN) {
+      if (isPlatformAdmin(req.user)) {
         return next();
       }
 
       const tenantId = getTenantIdFromRequest(req);
       if (!tenantId) {
         return res.status(400).json({
-          error: 'tenant_id_required',
+          error: 'tenantId_required',
           message: 'Tenant ID is required',
         });
       }
 
-      const userRole = await getUserTenantRole(req.user.userId, tenantId);
+      if (!req.user.userId && !req.user.user_id) {
+        return res.status(401).json({
+          error: 'authentication_required',
+          message: 'User ID is required',
+        });
+      }
+
+      const userId = req.user.userId || req.user.user_id;
+      
+      if (!userId) {
+        return res.status(401).json({
+          error: 'authentication_required',
+          message: 'User ID is required',
+        });
+      }
+
+      const userRole = await getUserTenantRole(userId, tenantId!);
 
       if (!userRole || !allowedRoles.includes(userRole)) {
         return res.status(403).json({
@@ -87,21 +107,29 @@ export function requireTenantRole(...allowedRoles: UserTenantRole[]) {
  * Middleware to check if user can manage tenant (OWNER or ADMIN only)
  */
 export const requireTenantAdmin = requireTenantRole(
-  UserTenantRole.OWNER,
-  UserTenantRole.ADMIN
+  user_tenant_role.OWNER,
+  user_tenant_role.ADMIN
 );
 
 /**
  * Middleware to check if user can manage inventory (all except VIEWER)
  */
 export const requireInventoryAccess = requireTenantRole(
-  UserTenantRole.OWNER,
-  UserTenantRole.ADMIN,
-  UserTenantRole.MEMBER
+  user_tenant_role.OWNER,
+  user_tenant_role.ADMIN,
+  user_tenant_role.MEMBER
 );
 
 /**
  * Check if user can create tenants based on their subscription tier
+ * 
+ * This checks the user's highest tier across all their owned tenants
+ * and enforces location limits accordingly.
+ * 
+ * PLATFORM ROLES:
+ * - PLATFORM_ADMIN: Unlimited (bypass all checks)
+ * - PLATFORM_SUPPORT: Limited to 3 tenants per owner (regardless of owner's tier)
+ * - PLATFORM_VIEWER: Cannot create tenants (read-only)
  */
 export async function checkTenantCreationLimit(
   req: Request,
@@ -117,36 +145,128 @@ export async function checkTenantCreationLimit(
     }
 
     // Platform admins can create unlimited tenants
-    if (req.user.role === UserRole.ADMIN) {
+    if (isPlatformAdmin(req.user)) {
       return next();
     }
 
+    // Platform support can create tenants BUT is limited to 3 tenants per owner
+    // This limit applies regardless of the owner's actual subscription tier
+    if (req.user.role === 'PLATFORM_SUPPORT') {
+      // Determine who will own the tenant being created
+      // Check if ownerId is provided in request body (for creating on behalf of others)
+      const requestBody = req.body as { ownerId?: string };
+      const ownerId = requestBody.ownerId || req.user.userId;
+      
+      // Count tenants created by THIS support user FOR this owner
+      // First get all tenant IDs created by this support user
+      const tenantsCreatedBySupport = await prisma.$queryRaw`
+        SELECT COUNT(*)::int as count
+        FROM user_tenants ut
+        JOIN tenant t ON ut.tenantId = t.id
+        WHERE ut.userId = ${ownerId}
+        AND ut.role = 'OWNER'
+        AND t.createdBy = ${req.user.userId}
+      `;
+      
+      const supportCount = (tenantsCreatedBySupport as any)[0]?.count || 0;
+      
+      const supportLimit = getPlatformSupportLimit(); // 3
+      
+      if (supportCount >= supportLimit) {
+        return res.status(403).json({
+          error: 'platform_support_limit_reached',
+          message: `Platform support users can only create up to ${supportLimit} tenants per owner. You have already created ${supportCount} locations for this owner.`,
+          current: supportCount,
+          limit: supportLimit,
+          role: 'PLATFORM_SUPPORT',
+          creatorId: req.user.userId,
+          ownerId: ownerId,
+        });
+      }
+      
+      return next();
+    }
+
+    // Platform viewers cannot create tenants
+    if (req.user.role === 'PLATFORM_VIEWER') {
+      return res.status(403).json({
+        error: 'platform_viewer_cannot_create',
+        message: 'Platform viewers have read-only access and cannot create tenants.',
+        role: 'PLATFORM_VIEWER',
+      });
+    }
+
+    if (!req.user.userId && !req.user.user_id) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
     // Count user's owned tenants
-    const ownedTenantCount = await prisma.userTenant.count({
+    const userId = req.user.userId || req.user.user_id;
+    const ownedTenants = await prisma.user_tenants.findMany({
       where: {
-        userId: req.user.userId,
-        role: UserTenantRole.OWNER,
+        user_id: userId,
+        role: user_tenant_role.OWNER,
+      },
+      include: {
+        tenants: {
+          select: {
+            subscription_tier: true,
+            subscription_status: true,
+          },
+        },
       },
     });
 
-    // Get user's tenant limit from their subscription
-    // For now, default limits by role:
-    // OWNER: 10 tenants
-    // USER: 3 tenants
-    const limits: Record<UserRole, number> = {
-      [UserRole.ADMIN]: Infinity,
-      [UserRole.OWNER]: 10,
-      [UserRole.USER]: 3,
+    const ownedTenantCount = ownedTenants.length;
+
+    // Determine user's effective tier (highest tier they own)
+    // Tier hierarchy: organization > enterprise > professional > starter > google_only
+    const tierPriority: Record<string, number> = {
+      organization: 5,
+      enterprise: 4,
+      professional: 3,
+      commitment: 3,
+      storefront: 2,
+      starter: 2,
+      discovery: 1,
+      google_only: 1,
     };
 
-    const limit = limits[req.user.role] || 1;
+    let effectiveTier = 'discovery';
+    let effectiveStatus = 'trial';
+    let highestPriority = 0;
 
-    if (ownedTenantCount >= limit) {
+    for (const ut of ownedTenants) {
+      const tier = ut.tenants.subscription_tier || 'discovery';
+      const status = ut.tenants.subscription_status || 'trial';
+      const priority = tierPriority[tier] || 0;
+      
+      if (priority > highestPriority) {
+        highestPriority = priority;
+        effectiveTier = tier;
+        effectiveStatus = status;
+      }
+    }
+
+    // Get limit for effective tier and status
+    // CRITICAL: Trial status overrides tier limits (always 1 location)
+    const limitConfig = getTenantLimitConfig(effectiveTier, effectiveStatus);
+    const limit = limitConfig.limit;
+
+    // Check if user can create more tenants
+    if (!canCreateTenant(ownedTenantCount, effectiveTier, effectiveStatus)) {
       return res.status(403).json({
         error: 'tenant_limit_reached',
-        message: `Your plan allows ${limit} tenant(s). You currently have ${ownedTenantCount}. Upgrade to create more.`,
+        message: limitConfig.upgradeMessage || `Your ${effectiveTier} plan allows ${limit === Infinity ? 'unlimited' : limit} location(s). You currently have ${ownedTenantCount}.`,
         current: ownedTenantCount,
-        limit,
+        limit: limit === Infinity ? 'unlimited' : limit,
+        tier: effectiveTier,
+        status: effectiveStatus,
+        upgradeToTier: limitConfig.upgradeToTier,
+        upgradeMessage: limitConfig.upgradeMessage,
       });
     }
 
@@ -177,21 +297,34 @@ export async function requireTenantOwner(
     }
 
     // Platform admins can delete any tenant
-    if (req.user.role === UserRole.ADMIN) {
+    if (isPlatformAdmin(req.user)) {
       return next();
     }
 
     const tenantId = getTenantIdFromRequest(req);
     if (!tenantId) {
       return res.status(400).json({
-        error: 'tenant_id_required',
+        error: 'tenantId_required',
         message: 'Tenant ID is required',
       });
     }
 
-    const userRole = await getUserTenantRole(req.user.userId, tenantId);
+    if (!req.user.userId && !req.user.user_id) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
 
-    if (userRole !== UserTenantRole.OWNER) {
+    const userId = req.user.userId || req.user.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    const userRole = await getUserTenantRole(userId, tenantId!);
+
+    if (userRole !== user_tenant_role.OWNER) {
       return res.status(403).json({
         error: 'owner_required',
         message: 'Only the tenant owner can perform this action',

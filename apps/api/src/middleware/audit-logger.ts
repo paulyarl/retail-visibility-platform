@@ -1,14 +1,15 @@
 // Audit logging middleware for Express
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
+import { generateQuickStart } from '../lib/id-generator';
 
 /**
  * Middleware to log all write operations to audit_log table
  */
 export async function auditLogger(req: Request, res: Response, next: NextFunction) {
   // Generate request ID if not present
-  const requestId = req.headers['x-request-id'] as string || nanoid();
+  const requestId = req.headers['x-request-id'] as string || randomUUID();
   req.headers['x-request-id'] = requestId;
 
   // Skip audit for GET requests
@@ -41,22 +42,22 @@ async function logAudit(req: Request, res: Response, requestId: string) {
 
     // Determine entity type and action from path
     let entityType: 'inventory_item' | 'tenant' | 'policy' | 'oauth' | 'other' = 'other';
-    let action: 'create' | 'update' | 'delete' | 'sync' | 'policy_apply' | 'oauth_connect' | 'oauth_refresh' = 'update';
+    let action: 'create' | 'update' | 'delete' | 'sync' | 'policyApply' | 'oauthConnect' | 'oauthRefresh' = 'update';
 
     if (path.includes('/inventory') || path.includes('/items')) {
       entityType = 'inventory_item';
       if (req.method === 'POST') action = 'create';
       if (req.method === 'DELETE') action = 'delete';
       if (req.method === 'PUT' || req.method === 'PATCH') action = 'update';
-    } else if (path.includes('/tenant')) {
+    } else if (path.includes('/tenants')) {
       entityType = 'tenant';
     } else if (path.includes('/policy')) {
       entityType = 'policy';
-      action = 'policy_apply';
+      action = 'policyApply';
     } else if (path.includes('/google') || path.includes('/oauth')) {
       entityType = 'oauth';
-      if (path.includes('/connect')) action = 'oauth_connect';
-      if (path.includes('/refresh')) action = 'oauth_refresh';
+      if (path.includes('/connect')) action = 'oauthConnect';
+      if (path.includes('/refresh')) action = 'oauthRefresh';
     }
 
     // Extract entity ID from path
@@ -64,17 +65,18 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     const entityId = idMatch ? idMatch[1] : 'unknown';
 
     // Create audit log entry
-    await prisma.auditLog.create({
+    await prisma.audit_log.create({ 
       data: {
-        actorType: user ? 'user' : 'system',
-        actorId: (user as any)?.id || 'anonymous',
-        tenantId: (user as any)?.tenantId || 'system',
-        entityType,
-        entityId,
-        action,
-        requestId,
-        ip: req.ip || req.headers['x-forwarded-for'] as string || 'unknown',
-        userAgent: req.headers['user-agent'] || null,
+        id: generateQuickStart("auditid"),
+        tenant_id: (user as any)?.tenantId || 'system', 
+        actor_id: (user as any)?.id || 'anonymous',
+        actor_type: user ? 'user' : 'system',
+        entity_type: entityType,
+        entity_id: entityId,
+        action: action as any,
+        request_id: requestId,
+        ip: req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown',
+        user_agent: (req.headers['user-agent'] as string) || null,
         diff: {
           method: req.method,
           path: req.path,

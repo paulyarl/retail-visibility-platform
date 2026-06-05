@@ -1,0 +1,435 @@
+'use client';
+
+import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+
+// ====================
+// SINGLETON PRODUCT PROVIDER
+// ====================
+class ProductProviderSingleton {
+  private static instance: ProductProviderSingleton;
+  private context: React.Context<any>;
+  private ProviderComponent: React.ComponentType<{ children: ReactNode; initialData?: Record<string, any>; cacheTTL?: number }>;
+
+  private constructor() {
+    this.context = createContext<any>(undefined);
+    this.ProviderComponent = this.createProviderComponent();
+  }
+
+  static getInstance(): ProductProviderSingleton {
+    if (!ProductProviderSingleton.instance) {
+      ProductProviderSingleton.instance = new ProductProviderSingleton();
+    }
+    return ProductProviderSingleton.instance;
+  }
+
+  private createProviderComponent() {
+    return function ProductProviderWrapper({ children, initialData = {}, cacheTTL = 5 * 60 * 1000 }: { children: ReactNode; initialData?: Record<string, any>; cacheTTL?: number }) {
+      const [state, dispatch] = useReducer(productReducer, {
+        products: initialData,
+        loading: {},
+        errors: {},
+        lastFetch: {}
+      });
+
+      // Make instance globally available
+      useEffect(() => {
+        (window as any).__productProviderInstance = { state, dispatch };
+        return () => {
+          delete (window as any).__productProviderInstance;
+        };
+      }, []);
+
+      // API fetching function
+      const fetchProducts = async (productIds: string[]) => {
+        // Filter out already cached products
+        const uncachedIds = productIds.filter(id => {
+          const product = state.products[id];
+          const lastFetch = state.lastFetch[id];
+          const now = Date.now();
+          
+          // Return true if not cached or cache expired
+          return !product || !lastFetch || (now - lastFetch) > cacheTTL;
+        });
+
+        if (uncachedIds.length === 0) {
+          console.log('ProductProvider: All products cached, skipping fetch');
+          return;
+        }
+
+        console.log(`ProductProvider: Fetching ${uncachedIds.length} products, ${productIds.length - uncachedIds.length} cached`);
+        
+        dispatch({ type: 'FETCH_START', productIds: uncachedIds });
+
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+          const response = await fetch(`${apiUrl}/api/products/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productIds: uncachedIds })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch products: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          // Transform API response to UniversalProduct format
+          const universalProducts = data.products.map((product: any) => ({
+            id: product.id,
+            tenantId: product.tenantId,
+            sku: product.sku,
+            name: product.name,
+            title: product.title || product.name,
+            description: product.description,
+            brand: product.brand,
+            priceCents: product.priceCents,
+            salePriceCents: product.salePriceCents,
+            stock: product.stock,
+            availability: product.availability || 'in_stock',
+            imageUrl: product.imageUrl,
+            hasGallery: product.hasGallery || false,
+            tenantCategoryId: product.tenantCategoryId,
+            category: product.category ? {
+              id: product.category.id,
+              name: product.category.name,
+              slug: product.category.slug
+            } : undefined,
+            isFeatured: product.isFeatured || false,
+            featuredType: product.featuredType,
+            featuredPriority: product.featuredPriority,
+            metadata: product.metadata || {},
+            hasDescription: !!product.description,
+            hasBrand: !!product.brand,
+            hasPrice: !!product.priceCents,
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
+            hasVariants: product.hasVariants || false,
+            variantOptions: product.variantOptions || {},
+            storeInfo: product.storeInfo ? {
+              storeId: product.storeInfo.storeId,
+              storeName: product.storeInfo.storeName,
+              storeSlug: product.storeInfo.storeSlug,
+              storeLogo: product.storeInfo.storeLogo,
+              storeCity: product.storeInfo.storeCity,
+              storeState: product.storeInfo.storeState,
+              storeWebsite: product.storeInfo.storeWebsite,
+              storePhone: product.storeInfo.storePhone,
+            } : undefined,
+            // Computed fields
+            formattedPrice: formatPrice(product.priceCents),
+            formattedSalePrice: product.salePriceCents ? formatPrice(product.salePriceCents) : undefined,
+            isOnSale: !!product.salePriceCents && product.salePriceCents < product.priceCents,
+            stockStatus: getStockStatus(product.stock),
+          }));
+
+          dispatch({ type: 'FETCH_SUCCESS', products: universalProducts });
+        } catch (error) {
+          console.error('ProductProvider: Fetch error:', error);
+          uncachedIds.forEach(id => {
+            dispatch({ 
+              type: 'FETCH_ERROR', 
+              productId: id, 
+              error: error instanceof Error ? error.message : 'Unknown error' 
+            });
+          });
+        }
+      };
+
+      // Helper functions
+      const updateProduct = (productId: string, updates: any) => {
+        dispatch({ type: 'UPDATE_PRODUCT', productId, updates });
+      };
+
+      const clearCache = (productIds?: string[]) => {
+        dispatch({ type: 'CLEAR_CACHE', productIds });
+      };
+
+      const getProduct = (productId: string) => {
+        return state.products[productId];
+      };
+
+      const getProducts = (productIds: string[]) => {
+        return productIds.map(id => state.products[id]).filter(Boolean);
+      };
+
+      const isLoading = (productId: string) => {
+        return state.loading[productId] || false;
+      };
+
+      const getError = (productId: string) => {
+        return state.errors[productId];
+      };
+
+      const value = {
+        state,
+        actions: {
+          fetchProducts,
+          updateProduct,
+          clearCache,
+          getProduct,
+          getProducts,
+          isLoading,
+          getError
+        }
+      };
+
+      return (
+        <this.context.Provider value={value}>
+          {children}
+        </this.context.Provider>
+      );
+    };
+  }
+
+  getContext() {
+    return this.context;
+  }
+
+  getProvider() {
+    return this.ProviderComponent;
+  }
+
+  // Global access method
+  static getInstanceGlobal() {
+    return (window as any).__productProviderInstance;
+  }
+}
+
+// ====================
+// UNIVERSAL PRODUCT INTERFACE
+// ====================
+export interface UniversalProduct {
+  id: string;
+  tenantId: string;
+  sku: string;
+  name: string;
+  title?: string;
+  description?: string;
+  brand?: string;
+  priceCents: number;
+  salePriceCents?: number;
+  stock: number;
+  availability: 'in_stock' | 'out_of_stock' | 'preorder' | 'discontinued';
+  imageUrl?: string;
+  hasGallery?: boolean;
+  tenantCategoryId?: string;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  isFeatured?: boolean;
+  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredPriority?: number;
+  metadata?: Record<string, any>;
+  hasDescription?: boolean;
+  hasBrand?: boolean;
+  hasPrice?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  hasVariants?: boolean;
+  variantOptions?: Record<string, string[]>;
+  storeInfo?: {
+    storeId: string;
+    storeName: string;
+    storeSlug: string;
+    storeLogo?: string;
+    storeCity?: string;
+    storeState?: string;
+    storeWebsite?: string;
+    storePhone?: string;
+  };
+  formattedPrice?: string;
+  formattedSalePrice?: string;
+  isOnSale?: boolean;
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+}
+
+// ====================
+// STATE MANAGEMENT
+// ====================
+interface ProductState {
+  products: Record<string, UniversalProduct>;
+  loading: Record<string, boolean>;
+  errors: Record<string, string>;
+  lastFetch: Record<string, number>;
+}
+
+type ProductAction =
+  | { type: 'FETCH_START'; productIds: string[] }
+  | { type: 'FETCH_SUCCESS'; products: UniversalProduct[] }
+  | { type: 'FETCH_ERROR'; productId: string; error: string }
+  | { type: 'UPDATE_PRODUCT'; productId: string; updates: Partial<UniversalProduct> }
+  | { type: 'CLEAR_CACHE'; productIds?: string[] }
+  | { type: 'SET_LOADING'; productId: string; loading: boolean };
+
+function productReducer(state: ProductState, action: ProductAction): ProductState {
+  switch (action.type) {
+    case 'FETCH_START':
+      const newLoading = { ...state.loading };
+      action.productIds.forEach(id => {
+        newLoading[id] = true;
+      });
+      return { ...state, loading: newLoading };
+
+    case 'FETCH_SUCCESS':
+      const newProducts = { ...state.products };
+      const newLoading = { ...state.loading };
+      const newErrors = { ...state.errors };
+      const newLastFetch = { ...state.lastFetch };
+      
+      action.products.forEach(product => {
+        newProducts[product.id] = product;
+        newLoading[product.id] = false;
+        newErrors[product.id] = '';
+        newLastFetch[product.id] = Date.now();
+      });
+      
+      return { ...state, products: newProducts, loading: newLoading, errors: newErrors, lastFetch: newLastFetch };
+
+    case 'FETCH_ERROR':
+      return {
+        ...state,
+        loading: { ...state.loading, [action.productId]: false },
+        errors: { ...state.errors, [action.productId]: action.error }
+      };
+
+    case 'UPDATE_PRODUCT':
+      return {
+        ...state,
+        products: {
+          ...state.products,
+          [action.productId]: {
+            ...state.products[action.productId],
+            ...action.updates
+          }
+        }
+      };
+
+    case 'CLEAR_CACHE':
+      if (action.productIds) {
+        const newProducts = { ...state.products };
+        const newLastFetch = { ...state.lastFetch };
+        action.productIds.forEach(id => {
+          delete newProducts[id];
+          delete newLastFetch[id];
+        });
+        return { ...state, products: newProducts, lastFetch: newLastFetch };
+      }
+      return { products: {}, loading: {}, errors: {}, lastFetch: {} };
+
+    case 'SET_LOADING':
+      return {
+        ...state,
+        loading: { ...state.loading, [action.productId]: action.loading }
+      };
+
+    default:
+      return state;
+  }
+}
+
+// ====================
+// PROVIDER COMPONENT
+// ====================
+interface ProductProviderProps {
+  children: ReactNode;
+  initialData?: Record<string, UniversalProduct>;
+  cacheTTL?: number;
+}
+
+export function ProductProvider({ children, initialData = {}, cacheTTL = 5 * 60 * 1000 }: ProductProviderProps) {
+  const singleton = ProductProviderSingleton.getInstance();
+  const ProviderComponent = singleton.getProvider();
+  return <ProviderComponent children={children} initialData={initialData} cacheTTL={cacheTTL} />;
+}
+
+// ====================
+// HOOKS
+// ====================
+export function useProduct() {
+  const singleton = ProductProviderSingleton.getInstance();
+  const context = useContext(singleton.getContext());
+  if (!context) {
+    throw new Error('useProduct must be used within a ProductProvider');
+  }
+  return context;
+}
+
+export function useProductData(productId: string) {
+  const { getProduct, isLoading, getError, fetchProducts } = useProduct();
+  
+  const product = getProduct(productId);
+  const loading = isLoading(productId);
+  const error = getError(productId);
+
+  useEffect(() => {
+    if (productId && !product && !loading && !error) {
+      fetchProducts([productId]);
+    }
+  }, [productId, product, loading, error]);
+
+  return { product, loading, error };
+}
+
+export function useProductsData(productIds: string[]) {
+  const { getProducts, isLoading, getError, fetchProducts } = useProduct();
+  
+  const products = getProducts(productIds);
+  const loading = productIds.some(id => isLoading(id));
+  const error = productIds.find(id => getError(id));
+
+  useEffect(() => {
+    const uncachedIds = productIds.filter(id => !getProducts([id]).length);
+    if (uncachedIds.length > 0 && !loading) {
+      fetchProducts(uncachedIds);
+    }
+  }, [productIds, loading]);
+
+  return { products, loading, error };
+}
+
+// ====================
+// GLOBAL ACCESS
+// ====================
+export function useProductGlobal() {
+  const instance = ProductProviderSingleton.getInstanceGlobal();
+  if (!instance) {
+    throw new Error('ProductProvider instance not found. Make sure ProductProvider is mounted in the component tree.');
+  }
+  
+  return {
+    state: instance.state,
+    actions: {
+      fetchProducts: async (productIds: string[]) => {
+        throw new Error('Global access to fetchProducts not available outside React context');
+      },
+      updateProduct: (productId: string, updates: Partial<UniversalProduct>) => {
+        instance.dispatch({ type: 'UPDATE_PRODUCT', productId, updates });
+      },
+      clearCache: (productIds?: string[]) => {
+        instance.dispatch({ type: 'CLEAR_CACHE', productIds });
+      },
+      getProduct: (productId: string) => instance.state.products[productId],
+      getProducts: (productIds: string[]) => {
+        return productIds.map(id => instance.state.products[id]).filter(Boolean);
+      },
+      isLoading: (productId: string) => instance.state.loading[productId] || false,
+      getError: (productId: string) => instance.state.errors[productId],
+    }
+  };
+}
+
+// ====================
+// UTILITY FUNCTIONS
+// ====================
+function formatPrice(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function getStockStatus(stock: number): 'in_stock' | 'low_stock' | 'out_of_stock' {
+  if (stock === 0) return 'out_of_stock';
+  if (stock < 5) return 'low_stock';
+  return 'in_stock';
+}

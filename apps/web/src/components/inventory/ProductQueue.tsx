@@ -1,0 +1,996 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { 
+  ShoppingCart, 
+  Plus, 
+  Minus, 
+  Trash2, 
+  Eye,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  RefreshCw,
+  Download,
+  Upload,
+  Info,
+  X,
+  Play,
+  Pause,
+  RotateCcw
+} from 'lucide-react';
+import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
+import { Button } from '@mantine/core';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Separator } from '@/components/ui/Separator';
+import { Alert, AlertDescription } from '@/components/ui/Alert';
+
+interface QueueItem {
+  id: string;
+  tenantId: string;
+  name: string;
+  brand: string;
+  status: 'queued' | 'processing' | 'completed' | 'error' | 'cancelled';
+  priority: 'normal' | 'high' | 'urgent';
+  productData: any;
+  addedAt: string;
+  estimatedTime: number;
+  specialTreatment: string[];
+  processingStartedAt?: string;
+  completedAt?: string;
+  errorMessage?: string;
+  retryCount: number;
+  metadata: {
+    sessionId: string;
+    userAgent?: string;
+    source: 'wizard' | 'import' | 'bulk';
+  };
+}
+
+interface QueueStats {
+  total: number;
+  queued: number;
+  processing: number;
+  completed: number;
+  error: number;
+  cancelled: number;
+  estimatedTotalTime: number;
+  averageProcessingTime: number;
+  successRate: number;
+}
+
+interface ProductQueueProps {
+  tenantId: string;
+  onCheckout?: (items: QueueItem[]) => void;
+  onItemRemove?: (itemId: string) => void;
+  preview?: boolean; // Preview mode for CartButton - no data fetching
+}
+
+export default function ProductQueue({ tenantId, onCheckout, onItemRemove, preview = false }: ProductQueueProps) {
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [stats, setStats] = useState<QueueStats | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+  // Get localStorage items including draft
+  const getLocalStorageItems = () => {
+    if (!tenantId) return [];
+    
+    const items = [];
+    
+    try {
+      // Check for item-creation-draft
+      const draftData = localStorage.getItem('item-creation-draft');
+      if (draftData) {
+        try {
+          const draft = JSON.parse(draftData);
+          if (draft.wizardData) {
+            items.push({
+              id: `draft-${Date.now()}`,
+              productData: draft.wizardData,
+              priority: 'normal',
+              sessionId: `session-${Date.now()}`,
+              userAgent: navigator.userAgent,
+              source: 'wizard',
+              createdAt: new Date().toISOString(),
+              addedAt: new Date().toISOString(),
+              estimatedTime: 0,
+              specialTreatment: [],
+              status: 'pending',
+              isDraft: true
+            });
+          }
+        } catch (error) {
+          console.error('Error parsing draft data:', error);
+        }
+      }
+      
+      // Check for queue-${tenantId} items (if stored as array)
+      const stored = localStorage.getItem(`queue-${tenantId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        
+        // If it's an array (new format), add the items
+        if (Array.isArray(parsed)) {
+          items.push(...parsed);
+        }
+      }
+      
+      return items;
+    } catch (error) {
+      console.error('Error reading localStorage items:', error);
+      return [];
+    }
+  };
+
+  // Sync localStorage items to database
+  const syncLocalStorageItems = async () => {
+    if (!tenantId) return;
+    
+    const localItems = getLocalStorageItems();
+    if (localItems.length === 0) return;
+    
+    try {
+      // Add each local item to the database
+      for (const item of localItems) {
+        await inventoryQueueService.addToQueue(tenantId, [{
+          productData: item.productData,
+          priority: item.priority || 'normal',
+          sessionId: item.sessionId || `session-${Date.now()}`,
+          userAgent: item.userAgent || navigator.userAgent,
+          source: item.source || 'wizard'
+        }], item.priority || 'normal');
+      }
+      
+      // Clear localStorage after successful sync
+      localStorage.removeItem(`queue-${tenantId}`);
+      localStorage.removeItem('item-creation-draft');
+      
+      // Refresh queue data
+      await fetchQueueData();
+      
+    } catch (error) {
+      console.error('Error syncing localStorage items:', error);
+      setError('Failed to sync local items');
+    }
+  };
+
+  // Clear localStorage items
+  const clearLocalStorageItems = () => {
+    if (!tenantId) return;
+    
+    localStorage.removeItem(`queue-${tenantId}`);
+    localStorage.removeItem('item-creation-draft');
+    fetchQueueData(); // Refresh display
+  };
+
+  // Clear entire queue (localStorage + database)
+  const clearEntireQueue = async (action: 'cancel' | 'delete' = 'cancel') => {
+    if (!tenantId) return;
+    
+    const confirmMessage = action === 'delete' 
+      ? 'Are you sure you want to permanently delete ALL items in the queue? This cannot be undone.'
+      : 'Are you sure you want to cancel ALL items in the queue? Items will be marked as cancelled but can be recovered.';
+    
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+      // Clear localStorage
+      localStorage.removeItem(`queue-${tenantId}`);
+      localStorage.removeItem('item-creation-draft');
+      
+      // Clear database queue
+      const result = await inventoryQueueService.clearQueue(tenantId, action);
+      
+      if (result) {
+        console.log(`Cleared queue with action: ${action}`);
+      } else {
+        throw new Error('Failed to clear queue');
+      }
+      
+      // Refresh display
+      await fetchQueueData();
+      
+    } catch (error) {
+      console.error('Error clearing queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to clear queue');
+    }
+  };
+
+  // Fetch queue data from API
+  const fetchQueueData = async () => {
+    if (!tenantId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [itemsData, statsData] = await Promise.all([
+        inventoryQueueService.getQueueItems(tenantId, { includeCompleted: true }),
+        inventoryQueueService.getQueueStats(tenantId)
+      ]);
+
+      setQueueItems(itemsData || []);
+      setStats(statsData);
+    } catch (err) {
+      console.error('Error fetching queue:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load queue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load queue on mount and set up polling (skip in preview mode)
+  useEffect(() => {
+    if (preview) {
+      // In preview mode, only use localStorage data, no API calls
+      setLoading(false);
+      return;
+    }
+
+    fetchQueueData();
+
+    // Auto-refresh removed to allow user interaction
+    // Users can manually refresh using the Refresh button
+    // const interval = setInterval(fetchQueueData, 5000); // 5 seconds
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [tenantId, preview]);
+
+  // Add item to queue
+  const addToQueue = async (productData: any, priority: 'normal' | 'high' | 'urgent' = 'normal') => {
+    try {
+      const result = await inventoryQueueService.addToQueue(tenantId, [{
+        productData,
+        priority,
+        sessionId: generateSessionId(),
+        userAgent: navigator.userAgent,
+        source: 'wizard'
+      }], priority);
+
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+      }
+    } catch (error) {
+      console.error('Error adding to queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to add item');
+    }
+  };
+
+  // Update item status
+  const updateItemStatus = async (itemId: string, newStatus: string) => {
+    try {
+      const result = await inventoryQueueService.updateItemStatus(tenantId, itemId, newStatus);
+      
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+      }
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update item status');
+    }
+  };
+
+  // Cancel item (soft delete)
+  const cancelItem = async (itemId: string) => {
+    await updateItemStatus(itemId, 'cancelled');
+  };
+
+  // Complete item
+  const completeItem = async (itemId: string) => {
+    await updateItemStatus(itemId, 'completed');
+  };
+
+  // Publish item
+  const publishItem = async (itemId: string) => {
+    await updateItemStatus(itemId, 'published');
+  };
+
+  // Enhance item
+  const enhanceItem = async (itemId: string) => {
+    await updateItemStatus(itemId, 'enhanced');
+  };
+
+  // Remove item from queue (hard delete)
+  const removeFromQueue = async (itemId: string) => {
+    try {
+      const result = await inventoryQueueService.removeFromQueue(tenantId, itemId);
+      
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+        if (onItemRemove) {
+          onItemRemove(itemId);
+        }
+      }
+    } catch (error) {
+      console.error('Error removing from queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to remove item');
+    }
+  };
+
+  // Process queue items
+  const processQueue = async (itemIds?: string[]) => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+
+      const result = await inventoryQueueService.processQueue(tenantId, {
+        itemIds,
+        maxConcurrent: 3,
+        timeout: 300000,
+        retryFailed: true
+      });
+
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+        if (onCheckout) {
+          const items = itemIds 
+            ? queueItems.filter(item => itemIds.includes(item.id))
+            : queueItems.filter(item => item.status === 'queued');
+          onCheckout(items);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process queue');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Update item priority
+  const updatePriority = async (itemId: string, priority: 'normal' | 'high' | 'urgent') => {
+    try {
+      const result = await inventoryQueueService.updateItemPriority(tenantId, itemId, priority);
+      
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+      }
+    } catch (error) {
+      console.error('Error updating priority:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update priority');
+    }
+  };
+
+  // Cleanup old items
+  const cleanupOldItems = async () => {
+    try {
+      const result = await inventoryQueueService.cleanupOldItems(tenantId, 7);
+      
+      if (result) {
+        await fetchQueueData(); // Refresh queue
+      }
+    } catch (error) {
+      console.error('Error cleaning up old items:', error);
+      setError(error instanceof Error ? error.message : 'Failed to cleanup old items');
+    }
+  };
+
+  // Export queue
+  const exportQueue = async () => {
+    try {
+      const result = await inventoryQueueService.exportQueue(tenantId);
+      
+      if (result) {
+        const queueData = result;
+        const blob = new Blob([JSON.stringify(queueData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `queue-export-${tenantId}-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error exporting queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to export queue');
+    }
+  };
+
+  // Toggle item selection
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  // Helper functions
+  const generateSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'normal': return 'bg-blue-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'queued': return 'text-blue-600';
+      case 'processing': return 'text-orange-600';
+      case 'completed': return 'text-green-600';
+      case 'published': return 'text-green-600';
+      case 'enhanced': return 'text-purple-600';
+      case 'error': return 'text-red-600';
+      case 'cancelled': return 'text-gray-600';
+      case 'pending': return 'text-yellow-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'queued': return <Clock className="h-4 w-4" />;
+      case 'processing': return <RefreshCw className="h-4 w-4 animate-spin" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
+      case 'published': return <CheckCircle className="h-4 w-4" />;
+      case 'enhanced': return <Plus className="h-4 w-4" />;
+      case 'error': return <AlertTriangle className="h-4 w-4" />;
+      case 'cancelled': return <Trash2 className="h-4 w-4" />;
+      case 'pending': return <AlertTriangle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  // Status explanations for tooltips
+  const getStatusExplanation = (status: string) => {
+    switch (status) {
+      case 'draft': 
+        return 'Draft: New item saved locally, not yet in queue';
+      case 'pending': 
+        return 'Pending: Item waiting to sync to database queue';
+      case 'queued': 
+        return 'Queued: Item in database queue, unpublished, waiting for wizard completion';
+      case 'processing': 
+        return 'Processing: Item currently being processed';
+      case 'completed': 
+        return 'Completed: Item processing finished successfully';
+      case 'published': 
+        return 'Published: Item completed and published, still in queue for reference';
+      case 'enhanced': 
+        return 'Enhanced: Existing published product added to queue for further enhancement';
+      case 'error': 
+        return 'Error: Item processing failed, check error details';
+      case 'cancelled': 
+        return 'Cancelled: Item removed from queue';
+      default: 
+        return 'Unknown: Status not recognized';
+    }
+  };
+
+  // Tooltip component (will be replaced with Mantine Tooltip during migration)
+  const StatusTooltip = ({ status, children }: { status: string; children: React.ReactNode }) => {
+    return (
+      <div className="relative group inline-block">
+        {children}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+          {getStatusExplanation(status)}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 w-2 h-2 bg-gray-900 rotate-45"></div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-4xl mx-auto p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get combined items (database + localStorage)
+  const localItems = getLocalStorageItems();
+  const allItems = [...queueItems, ...localItems];
+  const hasLocalStorageItems = localItems.length > 0;
+
+  return (
+    <div className="w-full max-w-4xl mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              <span>Product Queue</span>
+              {stats && (
+                <Badge variant="default" className="ml-2">
+                  {allItems.length} items
+                </Badge>
+              )}
+              {hasLocalStorageItems && (
+                <Badge variant="warning" className="ml-2">
+                  {localItems.length} pending
+                </Badge>
+              )}
+              <StatusTooltip status="draft">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+              </StatusTooltip>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchQueueData}
+                disabled={loading}
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh
+              </Button>
+              {hasLocalStorageItems && (
+                <>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={syncLocalStorageItems}
+                    disabled={loading}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Sync {localItems.length} Items
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearLocalStorageItems}
+                    disabled={loading}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear Local
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearEntireQueue('cancel')}
+                disabled={loading}
+                className="text-orange-600 hover:text-orange-700"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Cancel All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearEntireQueue('delete')}
+                disabled={loading}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportQueue}
+                disabled={loading || queueItems.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+              {stats && stats.queued > 0 && (
+                <Button 
+                  onClick={() => processQueue()}
+                  disabled={isProcessing || loading}
+                  className="flex items-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Process Queue
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          
+          {error && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Queue Statistics */}
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600">{stats.total}</div>
+                <div className="text-sm text-gray-600">Total Items</div>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{stats.queued}</div>
+                <div className="text-sm text-gray-600">Queued</div>
+              </div>
+              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">{stats.processing}</div>
+                <div className="text-sm text-gray-600">Processing</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+                <div className="text-sm text-gray-600">Completed</div>
+              </div>
+            </div>
+          )}
+
+          {/* Performance Metrics */}
+          {stats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-lg font-bold text-blue-600">
+                  {stats.estimatedTotalTime || 0} min
+                </div>
+                <div className="text-sm text-gray-600">Est. Total Time</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-lg font-bold text-green-600">
+                  {stats.averageProcessingTime ? stats.averageProcessingTime.toFixed(1) : '0.0'} min
+                </div>
+                <div className="text-sm text-gray-600">Avg. Processing</div>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                <div className="text-lg font-bold text-purple-600">
+                  {stats.successRate ? stats.successRate.toFixed(1) : '0.0'}%
+                </div>
+                <div className="text-sm text-gray-600">Success Rate</div>
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Queue Actions */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {selectedItems.length} items selected
+              </span>
+              {selectedItems.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => processQueue(selectedItems)}
+                  disabled={isProcessing}
+                >
+                  Process Selected
+                </Button>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cleanupOldItems}
+              disabled={loading}
+            >
+              Cleanup Old Items
+            </Button>
+          </div>
+
+          {/* Queue Items */}
+          <div className="space-y-3">
+            {allItems.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No products in queue</p>
+                <p className="text-sm">Add products to the queue to process them in batch</p>
+              </div>
+            ) : (
+              allItems.map((item) => {
+                const isLocalStorageItem = item.id.startsWith('local-');
+                const isDraftItem = item.isDraft || item.id.startsWith('draft-');
+                return (
+                <div 
+                  key={item.id} 
+                  className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors ${
+                    selectedItems.includes(item.id) ? 'bg-blue-50 border-blue-200' : ''
+                  } ${isLocalStorageItem || isDraftItem ? 'bg-yellow-50 border-yellow-200' : ''}`}
+                >
+                  <div className="flex items-center space-x-4">
+                    {/* Selection Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.includes(item.id)}
+                      onChange={() => toggleItemSelection(item.id)}
+                      className="rounded border-gray-300"
+                      disabled={isLocalStorageItem || isDraftItem || item.status !== 'queued'}
+                    />
+
+                    {/* Draft/Pending Indicator */}
+                    {(isLocalStorageItem || isDraftItem) && (
+                      <Badge variant="default" className="text-xs">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        {isDraftItem ? 'Draft' : 'Pending'}
+                      </Badge>
+                    )}
+
+                    {/* Priority Indicator */}
+                    <div className={`w-3 h-3 rounded-full ${getPriorityColor(item.priority)}`} />
+                    
+                    {/* Status Icon */}
+                    <StatusTooltip status={isLocalStorageItem || isDraftItem ? 'pending' : item.status}>
+                      <div className={getStatusColor(isLocalStorageItem || isDraftItem ? 'pending' : item.status)}>
+                        {isLocalStorageItem || isDraftItem ? <AlertTriangle className="h-4 w-4" /> : getStatusIcon(item.status)}
+                      </div>
+                    </StatusTooltip>
+                    
+                    {/* Product Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900">
+                        {isLocalStorageItem || isDraftItem ? 
+                          item.productData?.name || 'Unnamed Product' : 
+                          item.name
+                        }
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {isLocalStorageItem || isDraftItem ? 
+                          item.productData?.brand || 'Unknown Brand' : 
+                          item.brand
+                        }
+                      </div>
+                      <div className={`text-xs font-medium ${getStatusColor(isLocalStorageItem || isDraftItem ? 'pending' : item.status)}`}>
+                        {isDraftItem ? 'Draft - Ready to queue' : 
+                         isLocalStorageItem ? 'Pending Sync' : 
+                         item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        {(isLocalStorageItem || isDraftItem) && (
+                          <span className="ml-1 text-yellow-600">
+                            - {isDraftItem ? 'Click Sync to add to queue' : 'Waiting to sync to database'}
+                          </span>
+                        )}
+                        {item.status === 'processing' && item.processingStartedAt && (
+                          <span className="ml-1">
+                            since {new Date(item.processingStartedAt).toLocaleTimeString()}
+                          </span>
+                        )}
+                        {item.status === 'error' && item.errorMessage && (
+                          <span className="ml-1 text-red-600">
+                            - {item.errorMessage}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Added {new Date(isLocalStorageItem ? item.createdAt : item.addedAt).toLocaleDateString()} {new Date(isLocalStorageItem ? item.createdAt : item.addedAt).toLocaleTimeString()}
+                        {item.estimatedTime > 0 && (
+                          <span className="ml-2">
+                            ~{item.estimatedTime} min
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Special Treatment Tags */}
+                  {item.specialTreatment && item.specialTreatment.length > 0 && (
+                    <div className="flex flex-wrap gap-1 max-w-xs">
+                      {item.specialTreatment.slice(0, 2).map((treatment: string, index: number) => (
+                        <Badge key={index} variant="default" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {treatment}
+                        </Badge>
+                      ))}
+                      {item.specialTreatment.length > 2 && (
+                        <Badge variant="default" className="text-xs">
+                          +{item.specialTreatment.length - 2} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center space-x-1">
+                    {/* Priority Control (Queued items only) */}
+                    {item.status === 'queued' && (
+                      <select
+                        value={item.priority}
+                        onChange={(e) => updatePriority(item.id, e.target.value as any)}
+                        className="text-xs border rounded px-1 py-0.5"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    )}
+
+                    {/* Process Control (Queued items only) */}
+                    {item.status === 'queued' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => processQueue([item.id])}
+                        disabled={isProcessing}
+                        title="Start processing this item"
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Status Change Actions */}
+                    {item.status === 'processing' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => completeItem(item.id)}
+                        title="Mark as completed"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {(item.status === 'completed' || item.status === 'processing') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => publishItem(item.id)}
+                        title="Mark as published"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {(item.status === 'published' || item.status === 'completed') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => enhanceItem(item.id)}
+                        title="Mark as enhanced for further improvement"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Cancel Action (Active items only) */}
+                    {['queued', 'processing', 'completed', 'published', 'enhanced'].includes(item.status) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => cancelItem(item.id)}
+                        className="text-orange-600 hover:text-orange-700"
+                        title="Cancel this item (soft delete)"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Hard Delete (All items except localStorage/draft) */}
+                    {!isLocalStorageItem && !isDraftItem && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeFromQueue(item.id)}
+                        className="text-red-600 hover:text-red-700"
+                        title="Permanently delete this item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Local Storage/Draft items get special handling */}
+                    {(isLocalStorageItem || isDraftItem) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Remove from localStorage only
+                          try {
+                            const itemsData = localStorage.getItem(`queue-${tenantId}`) || '[]';
+                            const items = JSON.parse(itemsData);
+                            const filteredItems = Array.isArray(items) ? items.filter((i: any) => i.id !== item.id) : [];
+                            localStorage.setItem(`queue-${tenantId}`, JSON.stringify(filteredItems));
+                            fetchQueueData();
+                          } catch (error) {
+                            console.error('Error removing item from localStorage:', error);
+                            // Clear corrupted data
+                            localStorage.setItem(`queue-${tenantId}`, JSON.stringify([]));
+                            fetchQueueData();
+                          }
+                        }}
+                        className="text-gray-600 hover:text-gray-700"
+                        title="Remove from local storage"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                );
+              })
+            )}
+          
+          {/* Queue Status & Actions Guide - Moved to bottom */}
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <div className="font-medium mb-2">Queue Status & Actions Guide:</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <div className="font-medium mb-2">📊 Statuses:</div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <span className="font-medium">Draft:</span> New item saved locally
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <span className="font-medium">Pending:</span> Waiting to sync to database
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span className="font-medium">Queued:</span> In database, unpublished
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                      <span className="font-medium">Processing:</span> Currently being processed
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="font-medium">Published:</span> Completed and published
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span className="font-medium">Enhanced:</span> Published item for enhancement
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="font-medium mb-2">🎯 Individual Actions:</div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Play className="h-3 w-3 text-blue-600" />
+                      <span className="font-medium">Process:</span> Start processing (queued items)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      <span className="font-medium">Complete:</span> Mark as finished (processing items)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      <span className="font-medium">Publish:</span> Mark as published (completed/processing)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-3 w-3 text-purple-600" />
+                      <span className="font-medium">Enhance:</span> Mark for improvement (published/completed)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <X className="h-3 w-3 text-orange-600" />
+                      <span className="font-medium">Cancel:</span> Soft delete (recoverable)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="h-3 w-3 text-red-600" />
+                      <span className="font-medium">Delete:</span> Permanent removal
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs">
+                💡 <strong>Workflow:</strong> Queued → Processing → Complete → Publish → Enhance<br/>
+                💡 <strong>Recovery:</strong> Cancelled items can be re-queued, Deleted items are permanent
+              </div>
+            </AlertDescription>
+          </Alert>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from './Button';
+import { ReactNode } from 'react';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ export interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showCloseButton?: boolean;
 }
+
 
 export function Modal({
   isOpen,
@@ -111,6 +112,7 @@ export function Modal({
     </AnimatePresence>
   );
 }
+
 
 export function ModalFooter({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (

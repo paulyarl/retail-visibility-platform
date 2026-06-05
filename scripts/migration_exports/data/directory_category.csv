@@ -1,0 +1,401 @@
+id,tenantId,name,slug,parentId,googleCategoryId,isActive,sortOrder,createdAt,updatedAt
+scid-tid-042hi7ju-fu4jv9,tid-042hi7ju,"Oats, Grits amp; Hot Cereal",oats-grits-amp-hot-cereal,,4690,t,0,2026-01-08 01:11:52.525,2026-01-08 01:11:52.524
+scid-tid-m8ijkrnk-rpah0y,tid-m8ijkrnk,Live Animals,live-animals,,3237,t,0,2026-01-31 01:11:07.132,2026-01-31 01:11:07.128
+tid-a3813d7i_dairy-eggs,tid-a3813d7i,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-02-28 01:23:03.212,2026-02-28 01:23:03.211
+tid-a3813d7i_produce,tid-a3813d7i,Produce,produce,,503759,t,1,2026-02-28 01:23:03.417,2026-02-28 01:23:03.416
+tid-r6cccpag_living-room,tid-r6cccpag,Living Room,living-room,,6348,t,0,2025-12-23 22:57:57.022,2025-12-23 22:57:57.02
+tid-r6cccpag_bedroom,tid-r6cccpag,Bedroom,bedroom,,4437,t,1,2025-12-23 22:57:57.439,2025-12-23 22:57:57.436
+tid-r6cccpag_office-furniture,tid-r6cccpag,Office Furniture,office-furniture,,6521,t,2,2025-12-23 22:57:57.836,2025-12-23 22:57:57.835
+tid-r6cccpag_outdoor-furniture,tid-r6cccpag,Outdoor Furniture,outdoor-furniture,,6828,t,3,2025-12-23 22:57:58.262,2025-12-23 22:57:58.256
+tid-r6cccpag_storage-furniture,tid-r6cccpag,Storage Furniture,storage-furniture,,6358,t,4,2025-12-23 22:57:58.653,2025-12-23 22:57:58.651
+tid-m8ijkrnk_hand-tools,tid-m8ijkrnk,Hand Tools,hand-tools,,6965,t,0,2025-12-30 05:51:17.379,2025-12-30 05:51:17.378
+tid-m8ijkrnk_power-tools,tid-m8ijkrnk,Power Tools,power-tools,,2629,t,1,2025-12-30 05:51:17.713,2025-12-30 05:51:17.712
+tid-m8ijkrnk_fasteners-hardware,tid-m8ijkrnk,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2025-12-30 05:51:18.037,2025-12-30 05:51:18.037
+tid-m8ijkrnk_paint-supplies,tid-m8ijkrnk,Paint & Supplies,paint-supplies,,328062,t,3,2025-12-30 05:51:18.361,2025-12-30 05:51:18.361
+tid-m8ijkrnk_electrical,tid-m8ijkrnk,Electrical,electrical,,499932,t,4,2025-12-30 05:51:18.684,2025-12-30 05:51:18.683
+tid-a3813d7i_meat-seafood,tid-a3813d7i,Meat & Seafood,meat-seafood,,5813,t,2,2026-02-28 01:23:03.606,2026-02-28 01:23:03.605
+tid-a3813d7i_bakery,tid-a3813d7i,Bakery,bakery,,5904,t,3,2026-02-28 01:23:03.788,2026-02-28 01:23:03.787
+tid-a3813d7i_frozen-foods,tid-a3813d7i,Frozen Foods,frozen-foods,,499991,t,4,2026-02-28 01:23:03.967,2026-02-28 01:23:03.966
+tid-a3813d7i_beverages,tid-a3813d7i,Beverages,beverages,,5887,t,5,2026-02-28 01:23:04.146,2026-02-28 01:23:04.145
+tid-a3813d7i_snacks,tid-a3813d7i,Snacks,snacks,,2392,t,6,2026-02-28 01:23:04.329,2026-02-28 01:23:04.328
+tid-a3813d7i_pantry-staples,tid-a3813d7i,Pantry Staples,pantry-staples,,7000,t,7,2026-02-28 01:23:04.53,2026-02-28 01:23:04.528
+scid-tid-lt2t1wzu-af22hn,tid-lt2t1wzu,Juice,juice,,Juice,t,0,2026-03-08 23:57:41.218,2026-03-08 23:57:41.217
+scid-tid-m8ijkrnk-rnsfkc,tid-m8ijkrnk,Cameras amp; Optics,cameras-and-optics,,141,t,0,2026-03-23 17:11:32.815,2026-03-23 17:11:32.811
+scid-tid-qki0mjdb-zj45ut,tid-qki0mjdb,Baby Safety,baby-safety,,540,t,0,2026-03-23 20:18:05.77,2026-03-23 20:18:05.769
+scid-tid-qki0mjdb-7clcko,tid-qki0mjdb,Backpacks,backpacks,,100,t,0,2026-03-25 17:38:01.02,2026-03-25 17:38:01.019
+scid-tid-qki0mjdb-c38kiz,tid-qki0mjdb,Bed Canopies,bed-canopies,,505803,t,0,2026-03-25 17:43:30.918,2026-03-25 17:43:30.917
+scid-tid-qki0mjdb-j9ylhx,tid-qki0mjdb,Books & Media,books-media,,543543,t,4,2026-03-25 22:46:49.678,2026-03-25 22:46:49.675
+scid-tid-qki0mjdb-ax6fuf,tid-qki0mjdb,Home & Garden,home-garden,,3221,t,0,2026-03-25 22:46:51.213,2026-03-25 22:46:51.211
+scid-tid-qki0mjdb-90bq7h,tid-qki0mjdb,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-25 22:46:52.347,2026-03-25 22:46:52.345
+scid-tid-qki0mjdb-whsjkk,tid-qki0mjdb,Bakery,bakery,,5904,t,3,2026-03-25 22:46:53.489,2026-03-25 22:46:53.486
+scid-tid-qki0mjdb-isqzik,tid-qki0mjdb,Hand Tools,hand-tools,,6965,t,0,2026-03-25 22:46:54.656,2026-03-25 22:46:54.654
+tid-r6cccpag_dairy-eggs,tid-r6cccpag,Dairy & Eggs,dairy-eggs,,543554,t,0,2025-12-22 20:47:47.826,2025-12-22 20:47:47.825
+scid-tid-qki0mjdb-spxyu8,tid-qki0mjdb,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-25 22:46:56.832,2026-03-25 22:46:56.829
+scid-tid-qki0mjdb-h4nkf0,tid-qki0mjdb,Health & Beauty,health-beauty,,6261,t,1,2026-03-25 22:46:58.565,2026-03-25 22:46:58.563
+scid-tid-qki0mjdb-t7lykk,tid-qki0mjdb,Electrical,electrical,,499932,t,4,2026-03-25 22:46:59.712,2026-03-25 22:46:59.71
+scid-tid-qki0mjdb-66rbu6,tid-qki0mjdb,Storage Furniture,storage-furniture,,6358,t,4,2026-03-25 22:47:00.884,2026-03-25 22:47:00.881
+scid-tid-qki0mjdb-oat4q2,tid-qki0mjdb,Bedroom,bedroom,,4437,t,1,2026-03-25 22:47:02.048,2026-03-25 22:47:02.045
+scid-tid-qki0mjdb-f006vm,tid-qki0mjdb,Frozen Foods,frozen-foods,,499991,t,4,2026-03-25 22:47:04.212,2026-03-25 22:47:04.209
+scid-tid-qki0mjdb-5yg688,tid-qki0mjdb,Toys & Games,toys-games,,1246,t,3,2026-03-25 22:47:05.417,2026-03-25 22:47:05.414
+scid-tid-qki0mjdb-vykcte,tid-qki0mjdb,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-25 22:47:08.565,2026-03-25 22:47:08.562
+scid-tid-mrsyk3w6-2x4dy7,tid-mrsyk3w6,Books & Media,books-media,,543543,t,4,2026-03-26 01:21:10.61,2026-03-26 01:21:10.609
+scid-tid-veid875z-3kqijj,tid-veid875z,Books & Media,books-media,,543543,t,4,2026-03-26 01:21:12.993,2026-03-26 01:21:12.991
+scid-tid-a3813d7i-azlvx7,tid-a3813d7i,Books & Media,books-media,,543543,t,4,2026-03-26 01:21:15.096,2026-03-26 01:21:15.095
+scid-tid-mrsyk3w6-mc0zs6,tid-mrsyk3w6,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:21:19.903,2026-03-26 01:21:19.901
+scid-tid-veid875z-0ulf97,tid-veid875z,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:21:22.001,2026-03-26 01:21:21.999
+scid-tid-a3813d7i-2zc953,tid-a3813d7i,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:21:24.167,2026-03-26 01:21:24.166
+scid-tid-veid875z-2spfwf,tid-veid875z,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-26 01:21:30.723,2026-03-26 01:21:30.722
+scid-tid-veid875z-5arzdg,tid-veid875z,Bakery,bakery,,5904,t,3,2026-03-26 01:21:39.066,2026-03-26 01:21:39.064
+scid-tid-veid875z-mj99xy,tid-veid875z,Hand Tools,hand-tools,,6965,t,0,2026-03-26 01:21:47.436,2026-03-26 01:21:47.435
+scid-tid-a3813d7i-hb83cj,tid-a3813d7i,Hand Tools,hand-tools,,6965,t,0,2026-03-26 01:21:49.535,2026-03-26 01:21:49.534
+scid-tid-mrsyk3w6-e4rh3r,tid-mrsyk3w6,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:21:54.42,2026-03-26 01:21:54.419
+scid-tid-veid875z-k2exxm,tid-veid875z,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:21:56.515,2026-03-26 01:21:56.514
+scid-tid-a3813d7i-ikrgoj,tid-a3813d7i,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:21:58.603,2026-03-26 01:21:58.601
+scid-tid-veid875z-iy1m9s,tid-veid875z,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-26 01:22:04.834,2026-03-26 01:22:04.833
+scid-tid-mrsyk3w6-b1a577,tid-mrsyk3w6,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:22:10.47,2026-03-26 01:22:10.469
+scid-tid-veid875z-xxrxgn,tid-veid875z,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:22:12.68,2026-03-26 01:22:12.679
+scid-tid-8622qs2t-vxliif,tid-8622qs2t,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-26 01:22:08.72,2026-03-26 01:22:08.719
+scid-tid-8622qs2t-sn4avc,tid-8622qs2t,Hand Tools,hand-tools,,6965,t,0,2026-03-26 01:21:52.257,2026-03-26 01:21:52.256
+scid-tid-8622qs2t-i6rpt7,tid-8622qs2t,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:22:01.329,2026-03-26 01:22:01.327
+scid-tid-8622qs2t-b94vkd,tid-8622qs2t,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-26 01:21:35.176,2026-03-26 01:21:35.175
+scid-tid-8622qs2t-cf1sc0,tid-8622qs2t,Bakery,bakery,,5904,t,3,2026-03-26 01:21:43.606,2026-03-26 01:21:43.605
+scid-tid-8622qs2t-mcyh08,tid-8622qs2t,Books & Media,books-media,,543543,t,4,2026-03-26 01:21:17.815,2026-03-26 01:21:17.814
+ccid-fpiksg,tid-mrsyk3w6,Electronics,electronics,,,t,0,2026-01-10 15:38:05.848,2026-01-10 15:38:05.846
+ccid-g7tt08,tid-mrsyk3w6,Home & Kitchen,home-kitchen,,,t,0,2026-01-10 15:38:06.201,2026-01-10 15:38:06.199
+ccid-u77ivu,tid-mrsyk3w6,Apparel,apparel,,,t,0,2026-01-10 15:38:06.552,2026-01-10 15:38:06.55
+ccid-7hf1tu,tid-mrsyk3w6,Sports & Outdoors,sports-outdoors,,,t,0,2026-01-10 15:38:06.898,2026-01-10 15:38:06.896
+ccid-qwnmt9,tid-mrsyk3w6,Office Supplies,office-supplies,,,t,0,2026-01-10 15:38:07.24,2026-01-10 15:38:07.238
+scid-tid-m8ijkrnk-m51zjc,tid-m8ijkrnk,Clothing,clothing,,1604,t,0,2026-01-31 03:34:02.535,2026-01-31 03:34:02.532
+tid-a3813d7i_otc-medicine,tid-a3813d7i,Over-the-Counter Medicine,otc-medicine,,5086,t,0,2026-02-28 01:25:52.813,2026-02-28 01:25:52.812
+tid-r6cccpag_produce,tid-r6cccpag,Produce,produce,,503759,t,1,2025-12-22 20:47:48.199,2025-12-22 20:47:48.198
+tid-r6cccpag_meat-seafood,tid-r6cccpag,Meat & Seafood,meat-seafood,,5813,t,2,2025-12-22 20:47:48.562,2025-12-22 20:47:48.561
+tid-a3813d7i_vitamins-supplements,tid-a3813d7i,Vitamins & Supplements,vitamins-supplements,,525,t,1,2026-02-28 01:25:53.016,2026-02-28 01:25:53.014
+tid-a3813d7i_first-aid,tid-a3813d7i,First Aid,first-aid,,543672,t,2,2026-02-28 01:25:53.207,2026-02-28 01:25:53.205
+tid-a3813d7i_personal-care,tid-a3813d7i,Personal Care,personal-care,,7363,t,3,2026-02-28 01:25:53.391,2026-02-28 01:25:53.389
+tid-a3813d7i_baby-care,tid-a3813d7i,Baby Care,baby-care,,547,t,4,2026-02-28 01:25:53.579,2026-02-28 01:25:53.576
+tid-a3813d7i_eye-ear-care,tid-a3813d7i,Eye & Ear Care,eye-ear-care,,7363,t,5,2026-02-28 01:25:53.77,2026-02-28 01:25:53.769
+scid-tid-lt2t1wzu-uc5tkd,tid-lt2t1wzu,Button Studs,button-studs,,,t,0,2026-03-19 02:41:49.277,2026-03-19 02:41:49.276
+scid-tid-m8ijkrnk-vo6e90,tid-m8ijkrnk,Baby Toys amp; Activity Equipment,baby-toys-and-activity-equipment,,2847,t,0,2026-03-23 17:13:18.398,2026-03-23 17:13:18.395
+cat-1774438254706-qfzsjdj9y,tid-qki0mjdb,Office Furniture,office-furniture,,6521,t,2,2026-03-25 11:30:54.709,2026-03-25 11:30:54.706
+scid-tid-qki0mjdb-gtb6yp,tid-qki0mjdb,Tools,tools,,1167,t,0,2026-03-25 17:40:24.943,2026-03-25 17:40:24.942
+tid-m8ijkrnk_womens-tops,tid-m8ijkrnk,Women's Tops,womens-tops,,212,t,0,2025-12-30 12:41:28.119,2025-12-30 12:41:28.118
+tid-m8ijkrnk_womens-bottoms,tid-m8ijkrnk,Women's Bottoms,womens-bottoms,,6229,t,1,2025-12-30 12:41:28.452,2025-12-30 12:41:28.451
+tid-m8ijkrnk_dresses,tid-m8ijkrnk,Dresses,dresses,,5330,t,2,2025-12-30 12:41:28.778,2025-12-30 12:41:28.777
+tid-m8ijkrnk_mens-shirts,tid-m8ijkrnk,Men's Shirts,mens-shirts,,3794,t,3,2025-12-30 12:41:29.104,2025-12-30 12:41:29.104
+tid-m8ijkrnk_mens-pants,tid-m8ijkrnk,Men's Pants,mens-pants,,3951,t,4,2025-12-30 12:41:29.427,2025-12-30 12:41:29.426
+tid-m8ijkrnk_accessories,tid-m8ijkrnk,Accessories,accessories,,5623,t,5,2025-12-30 12:41:29.752,2025-12-30 12:41:29.751
+tid-m8ijkrnk_shoes,tid-m8ijkrnk,Shoes,shoes,,5567,t,6,2025-12-30 12:41:30.075,2025-12-30 12:41:30.074
+scid-tid-qki0mjdb-zklr4h,tid-qki0mjdb,Entertainment Centers amp; TV Stands,entertainment-centers-and-tv-stands,,457,t,0,2026-03-25 17:44:53.054,2026-03-25 17:44:53.052
+scid-tid-qki0mjdb-htsr2v,tid-qki0mjdb,Produce,produce,,503759,t,1,2026-03-25 22:47:09.716,2026-03-25 22:47:09.714
+scid-tid-qki0mjdb-qj3juq,tid-qki0mjdb,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-25 22:47:10.997,2026-03-25 22:47:10.994
+scid-tid-qki0mjdb-p5r24f,tid-qki0mjdb,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-25 22:47:14.284,2026-03-25 22:47:14.28
+scid-tid-qki0mjdb-qrgk88,tid-qki0mjdb,Living Room,living-room,,6348,t,0,2026-03-25 22:47:15.503,2026-03-25 22:47:15.5
+scid-tid-qki0mjdb-88sxwu,tid-qki0mjdb,Power Tools,power-tools,,2629,t,1,2026-03-25 22:47:20.973,2026-03-25 22:47:20.969
+scid-tid-a3813d7i-uk62ni,tid-a3813d7i,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:22:15.318,2026-03-26 01:22:15.317
+scid-tid-veid875z-tkpvi4,tid-veid875z,Electrical,electrical,,499932,t,4,2026-03-26 01:22:22.044,2026-03-26 01:22:22.043
+scid-tid-a3813d7i-6ydi3o,tid-a3813d7i,Electrical,electrical,,499932,t,4,2026-03-26 01:22:24.209,2026-03-26 01:22:24.208
+scid-tid-mrsyk3w6-eszawm,tid-mrsyk3w6,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:22:29.061,2026-03-26 01:22:29.06
+scid-tid-veid875z-kyln2g,tid-veid875z,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:22:31.17,2026-03-26 01:22:31.167
+scid-tid-a3813d7i-08m5bk,tid-a3813d7i,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:22:33.259,2026-03-26 01:22:33.258
+tid-r6cccpag_bakery,tid-r6cccpag,Bakery,bakery,,5904,t,3,2025-12-22 20:47:48.922,2025-12-22 20:47:48.921
+tid-r6cccpag_frozen-foods,tid-r6cccpag,Frozen Foods,frozen-foods,,499991,t,4,2025-12-22 20:47:49.281,2025-12-22 20:47:49.28
+tid-r6cccpag_beverages,tid-r6cccpag,Beverages,beverages,,5887,t,5,2025-12-22 20:47:49.642,2025-12-22 20:47:49.641
+tid-r6cccpag_snacks,tid-r6cccpag,Snacks,snacks,,2392,t,6,2025-12-22 20:47:50.002,2025-12-22 20:47:50.001
+tid-r6cccpag_pantry-staples,tid-r6cccpag,Pantry Staples,pantry-staples,,7000,t,7,2025-12-22 20:47:50.366,2025-12-22 20:47:50.365
+tid-m8ijkrnk_skincare,tid-m8ijkrnk,Skincare,skincare,,6261,t,0,2025-12-22 21:37:14.292,2025-12-22 21:37:14.291
+tid-m8ijkrnk_haircare,tid-m8ijkrnk,Haircare,haircare,,499992,t,1,2025-12-22 21:37:14.671,2025-12-22 21:37:14.67
+tid-m8ijkrnk_makeup,tid-m8ijkrnk,Makeup,makeup,,6306,t,2,2025-12-22 21:37:15.053,2025-12-22 21:37:15.052
+tid-m8ijkrnk_fragrance,tid-m8ijkrnk,Fragrance,fragrance,,2747,t,3,2025-12-22 21:37:15.428,2025-12-22 21:37:15.427
+tid-m8ijkrnk_mens-grooming,tid-m8ijkrnk,Men's Grooming,mens-grooming,,8531,t,4,2025-12-22 21:37:15.8,2025-12-22 21:37:15.799
+scid-tid-mrsyk3w6-jijt80,tid-mrsyk3w6,Bedroom,bedroom,,4437,t,1,2026-03-26 01:22:38.066,2026-03-26 01:22:38.065
+scid-tid-veid875z-4cc03h,tid-veid875z,Bedroom,bedroom,,4437,t,1,2026-03-26 01:22:40.238,2026-03-26 01:22:40.237
+scid-tid-a3813d7i-ecd26u,tid-a3813d7i,Bedroom,bedroom,,4437,t,1,2026-03-26 01:22:42.326,2026-03-26 01:22:42.325
+scid-tid-veid875z-5ab2wo,tid-veid875z,Frozen Foods,frozen-foods,,499991,t,4,2026-03-26 01:22:56.587,2026-03-26 01:22:56.586
+scid-tid-mrsyk3w6-0rxxyq,tid-mrsyk3w6,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:23:03.587,2026-03-26 01:23:03.586
+scid-tid-veid875z-idkq1q,tid-veid875z,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:23:05.677,2026-03-26 01:23:05.675
+scid-tid-a3813d7i-eaxz9a,tid-a3813d7i,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:23:07.775,2026-03-26 01:23:07.774
+scid-tid-veid875z-hd2s1a,tid-veid875z,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-26 01:23:27.339,2026-03-26 01:23:27.338
+scid-tid-a3813d7i-plf1r8,tid-a3813d7i,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-26 01:23:29.424,2026-03-26 01:23:29.423
+scid-tid-8622qs2t-1ff6dq,tid-8622qs2t,Bedroom,bedroom,,4437,t,1,2026-03-26 01:22:45.07,2026-03-26 01:22:45.069
+scid-tid-8622qs2t-tdneyz,tid-8622qs2t,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-26 01:23:32.147,2026-03-26 01:23:32.145
+scid-tid-8622qs2t-1sm1xk,tid-8622qs2t,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:23:10.475,2026-03-26 01:23:10.474
+scid-tid-8622qs2t-yh7te0,tid-8622qs2t,Electrical,electrical,,499932,t,4,2026-03-26 01:22:26.969,2026-03-26 01:22:26.968
+scid-tid-8622qs2t-iylvcr,tid-8622qs2t,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:22:35.976,2026-03-26 01:22:35.975
+scid-tid-8622qs2t-mxfijm,tid-8622qs2t,Frozen Foods,frozen-foods,,499991,t,4,2026-03-26 01:23:01.067,2026-03-26 01:23:01.065
+tid-lt2t1wzu_dairy-eggs,tid-lt2t1wzu,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-01-18 03:12:54.538,2026-01-18 03:12:54.531
+tid-r6cccpag_home-garden,tid-r6cccpag,Home & Garden,home-garden,,3221,t,0,2025-12-22 20:49:31.338,2025-12-22 20:49:31.336
+tid-lt2t1wzu_produce,tid-lt2t1wzu,Produce,produce,,503759,t,1,2026-01-18 03:12:54.744,2026-01-18 03:12:54.736
+tid-lt2t1wzu_meat-seafood,tid-lt2t1wzu,Meat & Seafood,meat-seafood,,5813,t,2,2026-01-18 03:12:54.926,2026-01-18 03:12:54.918
+tid-lt2t1wzu_bakery,tid-lt2t1wzu,Bakery,bakery,,5904,t,3,2026-01-18 03:12:55.102,2026-01-18 03:12:55.095
+tid-lt2t1wzu_frozen-foods,tid-lt2t1wzu,Frozen Foods,frozen-foods,,499991,t,4,2026-01-18 03:12:55.277,2026-01-18 03:12:55.27
+tid-lt2t1wzu_beverages,tid-lt2t1wzu,Beverages,beverages,,5887,t,5,2026-01-18 03:12:55.453,2026-01-18 03:12:55.446
+tid-lt2t1wzu_snacks,tid-lt2t1wzu,Snacks,snacks,,2392,t,6,2026-01-18 03:12:55.629,2026-01-18 03:12:55.621
+tid-lt2t1wzu_pantry-staples,tid-lt2t1wzu,Pantry Staples,pantry-staples,,7000,t,7,2026-01-18 03:12:55.838,2026-01-18 03:12:55.83
+scid-tid-m8ijkrnk-5dtr8m,tid-m8ijkrnk,Apparel amp; Accessories,apparel-amp-accessories,,166,t,0,2026-01-31 04:32:49.004,2026-01-31 04:32:49
+scid-tid-lt2t1wzu-kpixx5,tid-lt2t1wzu,Live Animals,live-animals,,3237,t,0,2026-03-03 05:20:13.68,2026-03-03 05:20:13.679
+scid-tid-lt2t1wzu-idguqf,tid-lt2t1wzu,Hand Tools,hand-tools,,6965,t,0,2026-03-03 05:20:14.008,2026-03-03 05:20:14.007
+scid-tid-lt2t1wzu-toftso,tid-lt2t1wzu,Clothing,clothing,,1604,t,0,2026-03-03 05:20:14.332,2026-03-03 05:20:14.33
+scid-tid-lt2t1wzu-4a3nw8,tid-lt2t1wzu,Women's Tops,womens-tops,,212,t,0,2026-03-03 05:20:14.661,2026-03-03 05:20:14.659
+scid-tid-lt2t1wzu-pn27r2,tid-lt2t1wzu,Skincare,skincare,,6261,t,0,2026-03-03 05:20:15.024,2026-03-03 05:20:15.022
+scid-tid-lt2t1wzu-ocf4t7,tid-lt2t1wzu,Apparel amp; Accessories,apparel-amp-accessories,,166,t,0,2026-03-03 05:20:15.349,2026-03-03 05:20:15.347
+tid-r6cccpag_health-beauty,tid-r6cccpag,Health & Beauty,health-beauty,,6261,t,1,2025-12-22 20:49:31.76,2025-12-22 20:49:31.759
+scid-tid-lt2t1wzu-dj50pj,tid-lt2t1wzu,Drawing & Painting,drawing-painting,,500038,t,0,2026-03-03 05:20:15.685,2026-03-03 05:20:15.683
+tid-042hi7ju_smartphones,tid-042hi7ju,Smartphones,smartphones,,543515,t,0,2025-12-31 11:32:03.002,2025-12-31 11:32:03.001
+tid-r6cccpag_sports-outdoors,tid-r6cccpag,Sports & Outdoors,sports-outdoors,,499687,t,2,2025-12-22 20:49:32.111,2025-12-22 20:49:32.11
+tid-r6cccpag_toys-games,tid-r6cccpag,Toys & Games,toys-games,,1246,t,3,2025-12-22 20:49:32.46,2025-12-22 20:49:32.459
+tid-r6cccpag_books-media,tid-r6cccpag,Books & Media,books-media,,543543,t,4,2025-12-22 20:49:32.812,2025-12-22 20:49:32.81
+tid-r6cccpag_office-supplies,tid-r6cccpag,Office Supplies,office-supplies,,543675,t,5,2025-12-22 20:49:33.161,2025-12-22 20:49:33.16
+tid-m8ijkrnk_drawing-painting,tid-m8ijkrnk,Drawing & Painting,drawing-painting,,500038,t,0,2025-12-22 21:50:09.131,2025-12-22 21:50:09.13
+tid-m8ijkrnk_craft-supplies,tid-m8ijkrnk,Craft Supplies,craft-supplies,,500038,t,1,2025-12-22 21:50:09.506,2025-12-22 21:50:09.505
+tid-m8ijkrnk_sewing-fabric,tid-m8ijkrnk,Sewing & Fabric,sewing-fabric,,4579,t,2,2025-12-22 21:50:09.874,2025-12-22 21:50:09.873
+tid-m8ijkrnk_kids-crafts,tid-m8ijkrnk,Kids Crafts,kids-crafts,,8168,t,3,2025-12-22 21:50:10.239,2025-12-22 21:50:10.238
+tid-042hi7ju_laptops,tid-042hi7ju,Laptops,laptops,,6416,t,1,2025-12-31 11:32:03.358,2025-12-31 11:32:03.358
+tid-042hi7ju_tablets,tid-042hi7ju,Tablets,tablets,,503002,t,2,2025-12-31 11:32:03.703,2025-12-31 11:32:03.702
+tid-042hi7ju_accessories,tid-042hi7ju,Accessories,accessories,,4736,t,3,2025-12-31 11:32:04.048,2025-12-31 11:32:04.047
+tid-042hi7ju_audio,tid-042hi7ju,Audio,audio,,503004,t,4,2025-12-31 11:32:04.392,2025-12-31 11:32:04.391
+tid-042hi7ju_smart-home,tid-042hi7ju,Smart Home,smart-home,,3873,t,5,2025-12-31 11:32:04.737,2025-12-31 11:32:04.736
+scid-tid-lt2t1wzu-i3wn3n,tid-lt2t1wzu,Arts amp; Entertainment,arts-amp-entertainment,,8,t,0,2026-03-03 05:20:16.018,2026-03-03 05:20:16.016
+scid-tid-lt2t1wzu-pv0at5,tid-lt2t1wzu,Toys amp; Games,toys-amp-games,,1239,t,0,2026-03-03 05:20:16.35,2026-03-03 05:20:16.348
+scid-tid-lt2t1wzu-mjxjco,tid-lt2t1wzu,Juggling,juggling,,Juggling,t,0,2026-03-03 05:20:16.68,2026-03-03 05:20:16.679
+scid-tid-lt2t1wzu-kvvng8,tid-lt2t1wzu,Craft Supplies,craft-supplies,,500038,t,1,2026-03-03 05:20:17.022,2026-03-03 05:20:17.019
+scid-tid-lt2t1wzu-jef5qg,tid-lt2t1wzu,Haircare,haircare,,499992,t,1,2026-03-03 05:20:17.368,2026-03-03 05:20:17.366
+scid-tid-lt2t1wzu-l1at6o,tid-lt2t1wzu,Women's Bottoms,womens-bottoms,,6229,t,1,2026-03-03 05:20:17.7,2026-03-03 05:20:17.698
+scid-tid-lt2t1wzu-tdwi6a,tid-lt2t1wzu,Power Tools,power-tools,,2629,t,1,2026-03-03 05:20:18.034,2026-03-03 05:20:18.032
+scid-tid-lt2t1wzu-xfq6cu,tid-lt2t1wzu,Dresses,dresses,,5330,t,2,2026-03-03 05:20:18.366,2026-03-03 05:20:18.365
+scid-tid-lt2t1wzu-usvgyk,tid-lt2t1wzu,Sewing & Fabric,sewing-fabric,,4579,t,2,2026-03-03 05:20:18.692,2026-03-03 05:20:18.69
+scid-tid-lt2t1wzu-hc5nb2,tid-lt2t1wzu,Makeup,makeup,,6306,t,2,2026-03-03 05:20:19.031,2026-03-03 05:20:19.029
+scid-tid-lt2t1wzu-y06y6z,tid-lt2t1wzu,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-03 05:20:19.403,2026-03-03 05:20:19.401
+scid-tid-lt2t1wzu-iplq80,tid-lt2t1wzu,Men's Shirts,mens-shirts,,3794,t,3,2026-03-03 05:20:19.796,2026-03-03 05:20:19.792
+scid-tid-lt2t1wzu-wqbn8c,tid-lt2t1wzu,Fragrance,fragrance,,2747,t,3,2026-03-03 05:20:20.154,2026-03-03 05:20:20.153
+scid-tid-lt2t1wzu-m1ywle,tid-lt2t1wzu,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-03 05:20:20.545,2026-03-03 05:20:20.543
+scid-tid-lt2t1wzu-lj3c7k,tid-lt2t1wzu,Kids Crafts,kids-crafts,,8168,t,3,2026-03-03 05:20:20.879,2026-03-03 05:20:20.878
+scid-tid-lt2t1wzu-f1rd2t,tid-lt2t1wzu,Electrical,electrical,,499932,t,4,2026-03-03 05:20:21.213,2026-03-03 05:20:21.211
+scid-tid-lt2t1wzu-noes75,tid-lt2t1wzu,Men's Pants,mens-pants,,3951,t,4,2026-03-03 05:20:21.552,2026-03-03 05:20:21.55
+scid-tid-lt2t1wzu-tywazt,tid-lt2t1wzu,Men's Grooming,mens-grooming,,8531,t,4,2026-03-03 05:20:21.887,2026-03-03 05:20:21.884
+scid-tid-lt2t1wzu-ootlyw,tid-lt2t1wzu,Accessories,accessories,,5623,t,5,2026-03-03 05:20:22.217,2026-03-03 05:20:22.215
+scid-tid-lt2t1wzu-ro2nhi,tid-lt2t1wzu,Shoes,shoes,,5567,t,6,2026-03-03 05:20:22.546,2026-03-03 05:20:22.544
+scid-tid-042hi7ju-9uu44w,tid-042hi7ju,Live Animals,live-animals,,3237,t,0,2026-03-03 05:20:22.921,2026-03-03 05:20:22.919
+scid-tid-042hi7ju-2ooa7x,tid-042hi7ju,Hand Tools,hand-tools,,6965,t,0,2026-03-03 05:20:23.252,2026-03-03 05:20:23.25
+scid-tid-042hi7ju-tb54el,tid-042hi7ju,Clothing,clothing,,1604,t,0,2026-03-03 05:20:23.684,2026-03-03 05:20:23.682
+scid-tid-042hi7ju-lmasli,tid-042hi7ju,Women's Tops,womens-tops,,212,t,0,2026-03-03 05:20:24.103,2026-03-03 05:20:24.099
+scid-tid-042hi7ju-etxu02,tid-042hi7ju,Skincare,skincare,,6261,t,0,2026-03-03 05:20:24.516,2026-03-03 05:20:24.513
+scid-tid-042hi7ju-8yg5ma,tid-042hi7ju,Drawing & Painting,drawing-painting,,500038,t,0,2026-03-03 05:20:25.265,2026-03-03 05:20:25.255
+scid-tid-042hi7ju-ucab80,tid-042hi7ju,Arts amp; Entertainment,arts-amp-entertainment,,8,t,0,2026-03-03 05:20:25.767,2026-03-03 05:20:25.735
+scid-tid-042hi7ju-v981a5,tid-042hi7ju,Toys amp; Games,toys-amp-games,,1239,t,0,2026-03-03 05:20:26.232,2026-03-03 05:20:26.228
+scid-tid-042hi7ju-zuvad7,tid-042hi7ju,Juggling,juggling,,Juggling,t,0,2026-03-03 05:20:26.614,2026-03-03 05:20:26.609
+scid-tid-042hi7ju-3oo3bi,tid-042hi7ju,Craft Supplies,craft-supplies,,500038,t,1,2026-03-03 05:20:26.984,2026-03-03 05:20:26.981
+scid-tid-m8ijkrnk-qfropr,tid-m8ijkrnk,Arts amp; Entertainment,arts-amp-entertainment,,8,t,0,2026-01-20 14:38:20.128,2026-01-20 14:38:20.127
+scid-tid-m8ijkrnk-nny13x,tid-m8ijkrnk,Toys amp; Games,toys-amp-games,,1239,t,0,2026-01-31 13:32:32.638,2026-01-31 13:32:32.637
+scid-tid-042hi7ju-lxyw3c,tid-042hi7ju,Haircare,haircare,,499992,t,1,2026-03-03 05:20:27.339,2026-03-03 05:20:27.337
+scid-tid-042hi7ju-hqt5eg,tid-042hi7ju,Women's Bottoms,womens-bottoms,,6229,t,1,2026-03-03 05:20:27.691,2026-03-03 05:20:27.687
+scid-tid-042hi7ju-boxp4m,tid-042hi7ju,Power Tools,power-tools,,2629,t,1,2026-03-03 05:20:28.048,2026-03-03 05:20:28.045
+scid-tid-042hi7ju-lh14ec,tid-042hi7ju,Dresses,dresses,,5330,t,2,2026-03-03 05:20:28.385,2026-03-03 05:20:28.382
+tid-mrsyk3w6_dairy-eggs,tid-mrsyk3w6,Dairy & Eggs,dairy-eggs,,543554,t,0,2025-12-27 11:14:07.447,2025-12-27 11:14:07.445
+tid-mrsyk3w6_produce,tid-mrsyk3w6,Produce,produce,,503759,t,1,2025-12-27 11:14:07.628,2025-12-27 11:14:07.626
+tid-mrsyk3w6_meat-seafood,tid-mrsyk3w6,Meat & Seafood,meat-seafood,,5813,t,2,2025-12-27 11:14:07.805,2025-12-27 11:14:07.803
+tid-mrsyk3w6_bakery,tid-mrsyk3w6,Bakery,bakery,,5904,t,3,2025-12-27 11:14:07.985,2025-12-27 11:14:07.983
+tid-mrsyk3w6_frozen-foods,tid-mrsyk3w6,Frozen Foods,frozen-foods,,499991,t,4,2025-12-27 11:14:08.163,2025-12-27 11:14:08.161
+tid-mrsyk3w6_beverages,tid-mrsyk3w6,Beverages,beverages,,5887,t,5,2025-12-27 11:14:08.342,2025-12-27 11:14:08.339
+tid-mrsyk3w6_snacks,tid-mrsyk3w6,Snacks,snacks,,2392,t,6,2025-12-27 11:14:08.519,2025-12-27 11:14:08.517
+tid-mrsyk3w6_pantry-staples,tid-mrsyk3w6,Pantry Staples,pantry-staples,,7000,t,7,2025-12-27 11:14:08.697,2025-12-27 11:14:08.695
+scid-tid-042hi7ju-jhs20z,tid-042hi7ju,Sewing & Fabric,sewing-fabric,,4579,t,2,2026-03-03 05:20:28.72,2026-03-03 05:20:28.718
+scid-tid-042hi7ju-04b4jy,tid-042hi7ju,Makeup,makeup,,6306,t,2,2026-03-03 05:20:29.056,2026-03-03 05:20:29.054
+scid-tid-042hi7ju-fqmxb7,tid-042hi7ju,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-03 05:20:29.404,2026-03-03 05:20:29.402
+scid-tid-042hi7ju-7p2sbw,tid-042hi7ju,Men's Shirts,mens-shirts,,3794,t,3,2026-03-03 05:20:29.739,2026-03-03 05:20:29.737
+scid-tid-042hi7ju-nc89mp,tid-042hi7ju,Fragrance,fragrance,,2747,t,3,2026-03-03 05:20:30.091,2026-03-03 05:20:30.089
+scid-tid-042hi7ju-s4db1k,tid-042hi7ju,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-03 05:20:30.434,2026-03-03 05:20:30.432
+scid-tid-042hi7ju-rzmyxo,tid-042hi7ju,Kids Crafts,kids-crafts,,8168,t,3,2026-03-03 05:20:30.782,2026-03-03 05:20:30.78
+scid-tid-042hi7ju-tnkhw8,tid-042hi7ju,Electrical,electrical,,499932,t,4,2026-03-03 05:20:31.138,2026-03-03 05:20:31.136
+scid-tid-042hi7ju-s170ss,tid-042hi7ju,Men's Pants,mens-pants,,3951,t,4,2026-03-03 05:20:31.498,2026-03-03 05:20:31.494
+scid-tid-042hi7ju-u89bua,tid-042hi7ju,Men's Grooming,mens-grooming,,8531,t,4,2026-03-03 05:20:31.953,2026-03-03 05:20:31.945
+scid-tid-042hi7ju-kvgebh,tid-042hi7ju,Shoes,shoes,,5567,t,6,2026-03-03 05:20:32.604,2026-03-03 05:20:32.599
+scid-tid-qki0mjdb-f40x5t,tid-qki0mjdb,Beverages,beverages,,,t,0,2026-03-23 05:44:18.957,2026-03-23 05:44:18.951
+scid-tid-qki0mjdb-leql5u,tid-qki0mjdb,Coffee,coffee,,,t,0,2026-03-23 05:48:20.603,2026-03-23 05:48:20.601
+scid-tid-m8ijkrnk-m2u8xn,tid-m8ijkrnk,Business amp; Industrial,business-and-industrial,,111,t,0,2026-03-23 17:24:27.261,2026-03-23 17:24:27.257
+scid-tid-qki0mjdb-e5hqge,tid-qki0mjdb,Drills,drills,,1217,t,0,2026-03-25 17:41:01.838,2026-03-25 17:41:01.837
+scid-tid-qki0mjdb-1gfm2t,tid-qki0mjdb,Manual Hammers,manual-hammers,,2208,t,0,2026-03-25 17:45:47.538,2026-03-25 17:45:47.537
+scid-tid-lt2t1wzu-abd0fp,tid-lt2t1wzu,Books & Media,books-media,,543543,t,4,2026-03-26 01:15:33.17,2026-03-26 01:15:33.167
+scid-tid-lt2t1wzu-w1fzxs,tid-lt2t1wzu,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:15:35.653,2026-03-26 01:15:35.652
+scid-tid-lt2t1wzu-b5urr8,tid-lt2t1wzu,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:15:42.329,2026-03-26 01:15:42.328
+scid-tid-lt2t1wzu-qnxckn,tid-lt2t1wzu,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:15:45.587,2026-03-26 01:15:45.586
+scid-tid-lt2t1wzu-xl8qgb,tid-lt2t1wzu,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:15:49.1,2026-03-26 01:15:49.099
+scid-tid-lt2t1wzu-nrzlmy,tid-lt2t1wzu,Bedroom,bedroom,,4437,t,1,2026-03-26 01:15:51.03,2026-03-26 01:15:51.027
+scid-tid-lt2t1wzu-wdarm2,tid-lt2t1wzu,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:15:56.13,2026-03-26 01:15:56.129
+scid-tid-lt2t1wzu-pefi1i,tid-lt2t1wzu,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-26 01:16:00.705,2026-03-26 01:16:00.704
+scid-tid-lt2t1wzu-dbbi2b,tid-lt2t1wzu,Living Room,living-room,,6348,t,0,2026-03-26 01:16:10.604,2026-03-26 01:16:10.603
+scid-tid-veid875z-dnij1k,tid-veid875z,Produce,produce,,503759,t,1,2026-03-26 01:23:36.037,2026-03-26 01:23:36.036
+scid-tid-veid875z-ckz4n0,tid-veid875z,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-26 01:23:44.319,2026-03-26 01:23:44.318
+scid-tid-a3813d7i-647075,tid-a3813d7i,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-26 01:23:46.406,2026-03-26 01:23:46.405
+scid-tid-veid875z-9q3vng,tid-veid875z,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-26 01:24:08.242,2026-03-26 01:24:08.241
+scid-tid-a3813d7i-nuf3x6,tid-a3813d7i,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-26 01:24:10.334,2026-03-26 01:24:10.332
+scid-tid-mrsyk3w6-7jwjnl,tid-mrsyk3w6,Living Room,living-room,,6348,t,0,2026-03-26 01:24:15.268,2026-03-26 01:24:15.267
+scid-tid-veid875z-pek8co,tid-veid875z,Living Room,living-room,,6348,t,0,2026-03-26 01:24:17.443,2026-03-26 01:24:17.442
+scid-tid-a3813d7i-zzi9mm,tid-a3813d7i,Living Room,living-room,,6348,t,0,2026-03-26 01:24:19.604,2026-03-26 01:24:19.603
+scid-tid-mrsyk3w6-o684ua,tid-mrsyk3w6,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:24:45.933,2026-03-26 01:24:45.932
+scid-tid-veid875z-jd7whz,tid-veid875z,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:24:47.663,2026-03-26 01:24:47.662
+scid-tid-a3813d7i-6cxhdz,tid-a3813d7i,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:24:49.399,2026-03-26 01:24:49.398
+scid-tid-veid875z-xyibyy,tid-veid875z,Power Tools,power-tools,,2629,t,1,2026-03-26 01:24:55.29,2026-03-26 01:24:55.289
+scid-tid-a3813d7i-36348s,tid-a3813d7i,Power Tools,power-tools,,2629,t,1,2026-03-26 01:24:57.365,2026-03-26 01:24:57.364
+scid-tid-8622qs2t-tnoduc,tid-8622qs2t,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:21:26.882,2026-03-26 01:21:26.881
+scid-tid-8622qs2t-4py5gj,tid-8622qs2t,Produce,produce,,503759,t,1,2026-03-26 01:23:40.484,2026-03-26 01:23:40.483
+scid-tid-8622qs2t-qo16rv,tid-8622qs2t,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:22:18.2,2026-03-26 01:22:18.199
+scid-tid-8622qs2t-ikd8d3,tid-8622qs2t,Power Tools,power-tools,,2629,t,1,2026-03-26 01:25:00.073,2026-03-26 01:25:00.071
+scid-tid-8622qs2t-zcrltn,tid-8622qs2t,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-26 01:24:13.164,2026-03-26 01:24:13.163
+scid-tid-8622qs2t-ztlgpk,tid-8622qs2t,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:24:51.821,2026-03-26 01:24:51.82
+scid-tid-8622qs2t-tt5iaf,tid-8622qs2t,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-26 01:23:49.188,2026-03-26 01:23:49.187
+scid-tid-8622qs2t-rn0dtq,tid-8622qs2t,Office Supplies,office-supplies,,543675,t,5,2026-03-26 08:43:44.78,2026-03-26 08:43:44.777
+scid-tid-8622qs2t-dscxnb,tid-8622qs2t,Beverages,beverages,,5887,t,5,2026-03-26 08:43:45.109,2026-03-26 08:43:45.106
+tid-r6cccpag_hand-tools,tid-r6cccpag,Hand Tools,hand-tools,,6965,t,0,2025-12-23 22:57:21.132,2025-12-23 22:57:21.13
+tid-r6cccpag_power-tools,tid-r6cccpag,Power Tools,power-tools,,2629,t,1,2025-12-23 22:57:21.535,2025-12-23 22:57:21.533
+tid-r6cccpag_fasteners-hardware,tid-r6cccpag,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2025-12-23 22:57:21.948,2025-12-23 22:57:21.946
+tid-r6cccpag_paint-supplies,tid-r6cccpag,Paint & Supplies,paint-supplies,,328062,t,3,2025-12-23 22:57:22.353,2025-12-23 22:57:22.351
+tid-r6cccpag_electrical,tid-r6cccpag,Electrical,electrical,,499932,t,4,2025-12-23 22:57:22.748,2025-12-23 22:57:22.745
+scid-tid-m8ijkrnk-lhfw16,tid-m8ijkrnk,Juggling,juggling,,Juggling,t,0,2026-02-18 22:41:30.272,2026-02-18 22:41:30.26
+scid-tid-mrsyk3w6-oawlc7,tid-mrsyk3w6,Live Animals,live-animals,,3237,t,0,2026-03-03 05:20:33.033,2026-03-03 05:20:33.028
+scid-tid-mrsyk3w6-gabtqx,tid-mrsyk3w6,Hand Tools,hand-tools,,6965,t,0,2026-03-03 05:20:33.415,2026-03-03 05:20:33.411
+scid-tid-mrsyk3w6-ajq2rz,tid-mrsyk3w6,Clothing,clothing,,1604,t,0,2026-03-03 05:20:33.764,2026-03-03 05:20:33.762
+scid-tid-mrsyk3w6-dxd3a1,tid-mrsyk3w6,Women's Tops,womens-tops,,212,t,0,2026-03-03 05:20:34.12,2026-03-03 05:20:34.118
+scid-tid-mrsyk3w6-hpdlk0,tid-mrsyk3w6,Skincare,skincare,,6261,t,0,2026-03-03 05:20:34.47,2026-03-03 05:20:34.467
+scid-tid-mrsyk3w6-yitxna,tid-mrsyk3w6,Apparel amp; Accessories,apparel-amp-accessories,,166,t,0,2026-03-03 05:20:34.818,2026-03-03 05:20:34.815
+scid-tid-mrsyk3w6-kh7vl4,tid-mrsyk3w6,Drawing & Painting,drawing-painting,,500038,t,0,2026-03-03 05:20:35.148,2026-03-03 05:20:35.146
+scid-tid-mrsyk3w6-evufmx,tid-mrsyk3w6,Arts amp; Entertainment,arts-amp-entertainment,,8,t,0,2026-03-03 05:20:35.515,2026-03-03 05:20:35.512
+scid-tid-mrsyk3w6-2npt2r,tid-mrsyk3w6,Toys amp; Games,toys-amp-games,,1239,t,0,2026-03-03 05:20:35.866,2026-03-03 05:20:35.864
+scid-tid-mrsyk3w6-dj2dvf,tid-mrsyk3w6,Juggling,juggling,,Juggling,t,0,2026-03-03 05:20:36.201,2026-03-03 05:20:36.198
+scid-tid-mrsyk3w6-n6j8am,tid-mrsyk3w6,Craft Supplies,craft-supplies,,500038,t,1,2026-03-03 05:20:36.559,2026-03-03 05:20:36.556
+scid-tid-mrsyk3w6-54u6xu,tid-mrsyk3w6,Haircare,haircare,,499992,t,1,2026-03-03 05:20:36.911,2026-03-03 05:20:36.908
+scid-tid-mrsyk3w6-8kcfd2,tid-mrsyk3w6,Women's Bottoms,womens-bottoms,,6229,t,1,2026-03-03 05:20:37.25,2026-03-03 05:20:37.248
+scid-tid-mrsyk3w6-cludox,tid-mrsyk3w6,Power Tools,power-tools,,2629,t,1,2026-03-03 05:20:37.592,2026-03-03 05:20:37.589
+scid-tid-mrsyk3w6-6jnj91,tid-mrsyk3w6,Dresses,dresses,,5330,t,2,2026-03-03 05:20:37.963,2026-03-03 05:20:37.958
+scid-tid-mrsyk3w6-sfd5jt,tid-mrsyk3w6,Sewing & Fabric,sewing-fabric,,4579,t,2,2026-03-03 05:20:38.334,2026-03-03 05:20:38.329
+scid-tid-mrsyk3w6-efji5n,tid-mrsyk3w6,Makeup,makeup,,6306,t,2,2026-03-03 05:20:38.72,2026-03-03 05:20:38.716
+scid-tid-mrsyk3w6-uvspix,tid-mrsyk3w6,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-03 05:20:39.118,2026-03-03 05:20:39.114
+scid-tid-mrsyk3w6-tm3a1n,tid-mrsyk3w6,Men's Shirts,mens-shirts,,3794,t,3,2026-03-03 05:20:39.533,2026-03-03 05:20:39.53
+scid-tid-mrsyk3w6-bg6xb8,tid-mrsyk3w6,Fragrance,fragrance,,2747,t,3,2026-03-03 05:20:39.936,2026-03-03 05:20:39.932
+scid-tid-mrsyk3w6-q30957,tid-mrsyk3w6,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-03 05:20:40.315,2026-03-03 05:20:40.311
+scid-tid-mrsyk3w6-3wrgn9,tid-mrsyk3w6,Kids Crafts,kids-crafts,,8168,t,3,2026-03-03 05:20:40.696,2026-03-03 05:20:40.692
+scid-tid-mrsyk3w6-lusr9w,tid-mrsyk3w6,Electrical,electrical,,499932,t,4,2026-03-03 05:20:41.063,2026-03-03 05:20:41.057
+scid-tid-mrsyk3w6-56zawv,tid-mrsyk3w6,Men's Pants,mens-pants,,3951,t,4,2026-03-03 05:20:41.515,2026-03-03 05:20:41.51
+scid-tid-mrsyk3w6-5meqc1,tid-mrsyk3w6,Men's Grooming,mens-grooming,,8531,t,4,2026-03-03 05:20:41.907,2026-03-03 05:20:41.899
+scid-tid-mrsyk3w6-wa6pim,tid-mrsyk3w6,Accessories,accessories,,5623,t,5,2026-03-03 05:20:42.271,2026-03-03 05:20:42.266
+scid-tid-mrsyk3w6-1x1hz4,tid-mrsyk3w6,Shoes,shoes,,5567,t,6,2026-03-03 05:20:42.705,2026-03-03 05:20:42.698
+scid-tid-m8ijkrnk-z1p1y9,tid-m8ijkrnk,Automation Control Components,automation-control-components,,,t,0,2026-03-23 16:26:15.182,2026-03-23 16:26:15.179
+scid-tid-m8ijkrnk-u1fi47,tid-m8ijkrnk,Programmable Logic Controllers,programmable-logic-controllers,,,t,0,2026-03-23 16:26:35.583,2026-03-23 16:26:35.577
+scid-tid-m8ijkrnk-5j81xy,tid-m8ijkrnk,Costume Shoes,costume-shoes,,,t,0,2026-03-23 16:27:15.99,2026-03-23 16:27:15.986
+scid-tid-qki0mjdb-dxz4wg,tid-qki0mjdb,Baby Bathing,baby-bathing,,4678,t,0,2026-03-23 20:17:14.039,2026-03-23 20:17:14.038
+scid-tid-qki0mjdb-d8dmm3,tid-qki0mjdb,Print Books,print-books,,543543,t,0,2026-03-25 17:36:33.137,2026-03-25 17:36:33.136
+scid-tid-qki0mjdb-dffqst,tid-qki0mjdb,Linens amp; Bedding,linens-and-bedding,,4171,t,0,2026-03-25 17:42:12.57,2026-03-25 17:42:12.569
+scid-tid-qki0mjdb-o0pobh,tid-qki0mjdb,Circuit Boards amp; Components,circuit-boards-and-components,,3702,t,0,2026-03-25 17:48:33.793,2026-03-25 17:48:33.792
+cat-1774470888982-wxe26kfya,tid-qki0mjdb,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-25 20:34:48.985,2026-03-25 20:34:48.982
+scid-tid-lt2t1wzu-qzvita,tid-lt2t1wzu,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:16:17.101,2026-03-26 01:16:17.099
+scid-tid-042hi7ju-d5pbdo,tid-042hi7ju,Books & Media,books-media,,543543,t,4,2026-03-26 01:33:05.158,2026-03-26 01:33:05.157
+scid-tid-042hi7ju-kp4mek,tid-042hi7ju,Home & Garden,home-garden,,3221,t,0,2026-03-26 01:33:07.552,2026-03-26 01:33:07.551
+scid-tid-042hi7ju-twr9qf,tid-042hi7ju,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-26 01:33:09.646,2026-03-26 01:33:09.644
+scid-tid-042hi7ju-nl7zlx,tid-042hi7ju,Bakery,bakery,,5904,t,3,2026-03-26 01:33:11.806,2026-03-26 01:33:11.805
+scid-tid-042hi7ju-6yqftx,tid-042hi7ju,Office Furniture,office-furniture,,6521,t,2,2026-03-26 01:33:15.646,2026-03-26 01:33:15.645
+scid-tid-042hi7ju-8f2zgr,tid-042hi7ju,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-26 01:33:17.748,2026-03-26 01:33:17.747
+scid-tid-042hi7ju-tq8d6a,tid-042hi7ju,Health & Beauty,health-beauty,,6261,t,1,2026-03-26 01:33:19.484,2026-03-26 01:33:19.483
+scid-tid-042hi7ju-jx0e4b,tid-042hi7ju,Storage Furniture,storage-furniture,,6358,t,4,2026-03-26 01:33:23.318,2026-03-26 01:33:23.317
+scid-tid-042hi7ju-647lxu,tid-042hi7ju,Bedroom,bedroom,,4437,t,1,2026-03-26 01:33:25.408,2026-03-26 01:33:25.407
+scid-tid-042hi7ju-wf8tw3,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,4,2026-03-26 01:33:29.308,2026-03-26 01:33:29.306
+scid-tid-042hi7ju-0biqxp,tid-042hi7ju,Toys & Games,toys-games,,1246,t,3,2026-03-26 01:33:31.406,2026-03-26 01:33:31.405
+scid-tid-042hi7ju-h80buu,tid-042hi7ju,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-26 01:33:36.287,2026-03-26 01:33:36.286
+scid-tid-042hi7ju-4qpzv0,tid-042hi7ju,Produce,produce,,503759,t,1,2026-03-26 01:33:38.376,2026-03-26 01:33:38.375
+scid-tid-042hi7ju-zfyz9a,tid-042hi7ju,Living Room,living-room,,6348,t,0,2026-03-26 01:33:47.545,2026-03-26 01:33:47.544
+scid-tid-042hi7ju-rzthb9,tid-042hi7ju,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-26 01:33:54.528,2026-03-26 01:33:54.527
+scid-tid-8622qs2t-l4dg9w,tid-8622qs2t,Snacks,snacks,,2392,t,6,2026-03-26 08:43:45.442,2026-03-26 08:43:45.439
+scid-tid-8622qs2t-2t4czi,tid-8622qs2t,Pantry Staples,pantry-staples,,7000,t,7,2026-03-26 08:43:45.772,2026-03-26 08:43:45.768
+scid-tid-8622qs2t-015u4h,tid-8622qs2t,Living Room Furniture Sets,living-room,,6348,t,0,2026-03-26 01:24:22.317,2026-03-26 01:24:22.315
+scid-tid-8622qs2t-vqb0kh,tid-8622qs2t,Baby Belts,baby-belts,,5623,f,0,2026-03-26 09:39:34.079,2026-03-26 09:39:34.077
+scid-tid-042hi7ju-daqp7y,tid-042hi7ju,Apparel amp; Accessories,apparel-amp-accessories,,166,t,0,2026-03-03 05:20:24.871,2026-03-26 15:16:47.691
+scid-tid-042hi7ju-c3ww1h,tid-042hi7ju,Seasonings amp; Spices,seasonings-and-spices,,4608,t,0,2026-03-27 01:11:58.177,2026-03-27 01:11:58.176
+scid-tid-fjwr30ib-fskik0,tid-fjwr30ib,Books & Media,books-media,,543543,t,4,2026-03-28 05:49:37.598,2026-03-28 05:49:37.597
+scid-tid-fjwr30ib-g7c7zh,tid-fjwr30ib,Home & Garden,home-garden,,3221,t,0,2026-03-28 05:49:40.705,2026-03-28 05:49:40.704
+scid-tid-fjwr30ib-z9qqyq,tid-fjwr30ib,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-28 05:49:43.38,2026-03-28 05:49:43.379
+scid-tid-fjwr30ib-b3kyby,tid-fjwr30ib,Bakery,bakery,,5904,t,3,2026-03-28 05:49:46.06,2026-03-28 05:49:46.059
+scid-tid-fjwr30ib-yfd5z4,tid-fjwr30ib,Hand Tools,hand-tools,,6965,t,0,2026-03-28 05:49:48.735,2026-03-28 05:49:48.734
+scid-tid-fjwr30ib-hw15al,tid-fjwr30ib,Office Furniture,office-furniture,,6521,t,2,2026-03-28 05:49:51.474,2026-03-28 05:49:51.473
+scid-tid-fjwr30ib-yy5rlb,tid-fjwr30ib,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-28 05:49:54.154,2026-03-28 05:49:54.153
+scid-tid-fjwr30ib-zjt76p,tid-fjwr30ib,Health & Beauty,health-beauty,,6261,t,1,2026-03-28 05:49:56.49,2026-03-28 05:49:56.488
+scid-tid-fjwr30ib-2j8dvo,tid-fjwr30ib,Electrical,electrical,,499932,t,4,2026-03-28 05:49:59.176,2026-03-28 05:49:59.175
+scid-tid-fjwr30ib-ijevtg,tid-fjwr30ib,Storage Furniture,storage-furniture,,6358,t,4,2026-03-28 05:50:06.148,2026-03-28 05:50:06.147
+scid-tid-fjwr30ib-8annyk,tid-fjwr30ib,Bedroom,bedroom,,4437,t,1,2026-03-28 05:50:08.904,2026-03-28 05:50:08.903
+scid-tid-fjwr30ib-2b2t0s,tid-fjwr30ib,Frozen Foods,frozen-foods,,499991,t,4,2026-03-28 05:50:13.924,2026-03-28 05:50:13.923
+scid-tid-fjwr30ib-epeb1i,tid-fjwr30ib,Toys & Games,toys-games,,1246,t,3,2026-03-28 05:50:16.606,2026-03-28 05:50:16.605
+scid-tid-fjwr30ib-j16lzm,tid-fjwr30ib,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-28 05:50:23.327,2026-03-28 05:50:23.326
+scid-tid-fjwr30ib-cqm0ch,tid-fjwr30ib,Produce,produce,,503759,t,1,2026-03-28 05:50:25.999,2026-03-28 05:50:25.999
+scid-tid-fjwr30ib-k3mf4a,tid-fjwr30ib,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-28 05:50:28.679,2026-03-28 05:50:28.678
+scid-tid-fjwr30ib-pl3gm7,tid-fjwr30ib,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-28 05:50:36.043,2026-03-28 05:50:36.042
+scid-tid-fjwr30ib-itcfl9,tid-fjwr30ib,Living Room,living-room,,6348,t,0,2026-03-28 05:50:38.794,2026-03-28 05:50:38.793
+scid-tid-fjwr30ib-qvl1cc,tid-fjwr30ib,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-28 05:50:48.325,2026-03-28 05:50:48.323
+scid-tid-fjwr30ib-2fcxwh,tid-fjwr30ib,Power Tools,power-tools,,2629,t,1,2026-03-28 05:50:50.658,2026-03-28 05:50:50.657
+scid-tid-r6cccpag-h642t4,tid-r6cccpag,Home & Kitchen,home-kitchen,,,t,0,2026-03-30 02:36:31.642,2026-03-30 02:36:31.64
+scid-tid-r6cccpag-u5en20,tid-r6cccpag,Apparel,apparel,,,t,0,2026-03-30 02:36:31.978,2026-03-30 02:36:31.977
+scid-tid-r6cccpag-hi82wz,tid-r6cccpag,Seasonal Specials,seasonal-specials,,,t,0,2026-03-30 03:12:24.591,2026-03-30 03:12:24.59
+scid-tid-r6cccpag-spiv0x,tid-r6cccpag,Tech & Gadgets,tech-gadgets,,,t,0,2026-03-30 02:36:31.288,2026-03-30 03:13:02.23
+scid-tid-r6cccpag-pqnluf,tid-r6cccpag,Electronics,electronics,,,t,0,2026-03-30 03:18:31.003,2026-03-30 03:18:31.001
+scid-tid-fjwr30ib-9u35ud,tid-fjwr30ib,Electronics,electronics,,,t,0,2026-03-30 05:26:21.138,2026-03-30 05:26:21.137
+scid-tid-fjwr30ib-a32tqf,tid-fjwr30ib,Home & Kitchen,home-kitchen,,,t,0,2026-03-30 05:26:21.76,2026-03-30 05:26:21.759
+scid-tid-fjwr30ib-jkzo29,tid-fjwr30ib,Apparel,apparel,,,t,0,2026-03-30 05:26:22.381,2026-03-30 05:26:22.38
+scid-tid-fjwr30ib-jqtl96,tid-fjwr30ib,Office Supplies,office-supplies,,,t,0,2026-03-30 05:26:23.311,2026-03-30 05:26:23.311
+scid-tenant-1774885228681-psfbdq,tenant-1774885228681,Meat & Seafood,meat-seafood,,5813,t,2,2026-03-30 16:25:51.748,2026-03-30 16:25:51.747
+scid-tenant-1774885228681-stjdhp,tenant-1774885228681,Produce,produce,,503759,t,1,2026-03-30 16:25:54.206,2026-03-30 16:25:54.205
+scid-tenant-1774885228681-o6gt34,tenant-1774885228681,Frozen Foods,frozen-foods,,499991,t,4,2026-03-30 16:25:56.339,2026-03-30 16:25:56.338
+scid-tenant-1774885228681-2ahw3w,tenant-1774885228681,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-03-30 16:26:00.8,2026-03-30 16:26:00.799
+scid-tenant-1774885228681-hfc0dk,tenant-1774885228681,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-03-30 16:26:05.253,2026-03-30 16:26:05.252
+scid-tenant-1774885228681-w6j3qx,tenant-1774885228681,Living Room,living-room,,6348,t,0,2026-03-30 16:26:07.631,2026-03-30 16:26:07.63
+scid-tenant-1774885228681-exhe0y,tenant-1774885228681,Health & Beauty,health-beauty,,6261,t,1,2026-03-30 16:26:10.009,2026-03-30 16:26:10.008
+scid-tenant-1774885228681-xkzhh3,tenant-1774885228681,Office Furniture,office-furniture,,6521,t,2,2026-03-30 16:26:12.445,2026-03-30 16:26:12.444
+scid-tenant-1774885228681-u1whav,tenant-1774885228681,Books & Media,books-media,,543543,t,4,2026-03-30 16:26:16.896,2026-03-30 16:26:16.895
+scid-tenant-1774885228681-77qozp,tenant-1774885228681,Hand Tools,hand-tools,,6965,t,0,2026-03-30 16:26:19.274,2026-03-30 16:26:19.273
+scid-tenant-1774885228681-7ivjlo,tenant-1774885228681,Electrical,electrical,,499932,t,4,2026-03-30 16:26:21.654,2026-03-30 16:26:21.653
+scid-tenant-1774885228681-x54ms5,tenant-1774885228681,Storage Furniture,storage-furniture,,6358,t,4,2026-03-30 16:26:24.032,2026-03-30 16:26:24.031
+scid-tenant-1774885228681-8m29va,tenant-1774885228681,Bedroom,bedroom,,4437,t,1,2026-03-30 16:26:26.472,2026-03-30 16:26:26.471
+scid-tenant-1774885228681-ivkpwe,tenant-1774885228681,Power Tools,power-tools,,2629,t,1,2026-03-30 16:26:30.918,2026-03-30 16:26:30.917
+scid-tenant-1774885228681-5kdx74,tenant-1774885228681,Home & Garden,home-garden,,3221,t,0,2026-03-30 16:26:35.367,2026-03-30 16:26:35.366
+scid-tenant-1774885228681-tgaljh,tenant-1774885228681,Bakery,bakery,,5904,t,3,2026-03-30 16:26:37.745,2026-03-30 16:26:37.744
+scid-tenant-1774885228681-d7qzty,tenant-1774885228681,Toys & Games,toys-games,,1246,t,3,2026-03-30 16:26:42.006,2026-03-30 16:26:42.005
+scid-tenant-1774885228681-lamkec,tenant-1774885228681,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-03-30 16:26:46.159,2026-03-30 16:26:46.159
+scid-tenant-1774885228681-c2guo6,tenant-1774885228681,Paint & Supplies,paint-supplies,,328062,t,3,2026-03-30 16:26:48.541,2026-03-30 16:26:48.54
+scid-tenant-1774885228681-094xgs,tenant-1774885228681,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-03-30 16:26:55.208,2026-03-30 16:26:55.207
+tid-zcp9a56y_otc-medicine,tid-zcp9a56y,Over-the-Counter Medicine,otc-medicine,,5086,t,0,2026-04-02 07:22:18.66,2026-04-02 07:22:18.657
+tid-zcp9a56y_vitamins-supplements,tid-zcp9a56y,Vitamins & Supplements,vitamins-supplements,,525,t,1,2026-04-02 07:22:18.851,2026-04-02 07:22:18.849
+tid-zcp9a56y_first-aid,tid-zcp9a56y,First Aid,first-aid,,543672,t,2,2026-04-02 07:22:19.031,2026-04-02 07:22:19.029
+tid-zcp9a56y_personal-care,tid-zcp9a56y,Personal Care,personal-care,,7363,t,3,2026-04-02 07:22:19.207,2026-04-02 07:22:19.204
+tid-zcp9a56y_baby-care,tid-zcp9a56y,Baby Care,baby-care,,547,t,4,2026-04-02 07:22:19.39,2026-04-02 07:22:19.388
+tid-zcp9a56y_eye-ear-care,tid-zcp9a56y,Eye & Ear Care,eye-ear-care,,7363,t,5,2026-04-02 07:22:19.572,2026-04-02 07:22:19.57
+scid-tid-jcvzufq2-htia6p,tid-jcvzufq2,Meat & Seafood,meat-seafood,,5813,t,2,2026-04-03 15:34:53.739,2026-04-03 15:34:53.736
+scid-tid-jcvzufq2-0avvd2,tid-jcvzufq2,Produce,produce,,503759,t,1,2026-04-03 15:34:55.947,2026-04-03 15:34:55.945
+scid-tid-jcvzufq2-l1484v,tid-jcvzufq2,Frozen Foods,frozen-foods,,499991,t,4,2026-04-03 15:34:57.354,2026-04-03 15:34:57.352
+scid-tid-jcvzufq2-3mtm7y,tid-jcvzufq2,Dairy & Eggs,dairy-eggs,,543554,t,0,2026-04-03 15:35:00.503,2026-04-03 15:35:00.501
+scid-tid-jcvzufq2-851mue,tid-jcvzufq2,Fasteners & Hardware,fasteners-hardware,,6145,t,2,2026-04-03 15:35:03.293,2026-04-03 15:35:03.291
+scid-tid-jcvzufq2-xi4bia,tid-jcvzufq2,Living Room,living-room,,6348,t,0,2026-04-03 15:35:04.697,2026-04-03 15:35:04.695
+scid-tid-jcvzufq2-843oje,tid-jcvzufq2,Health & Beauty,health-beauty,,6261,t,1,2026-04-03 15:35:06.067,2026-04-03 15:35:06.065
+scid-tid-jcvzufq2-x2xuvw,tid-jcvzufq2,Office Furniture,office-furniture,,6521,t,2,2026-04-03 15:35:07.468,2026-04-03 15:35:07.465
+scid-tid-jcvzufq2-tv0lei,tid-jcvzufq2,Books & Media,books-media,,543543,t,4,2026-04-03 15:35:10.204,2026-04-03 15:35:10.202
+scid-tid-jcvzufq2-aslg7f,tid-jcvzufq2,Hand Tools,hand-tools,,6965,t,0,2026-04-03 15:35:11.695,2026-04-03 15:35:11.693
+scid-tid-jcvzufq2-uw8lpf,tid-jcvzufq2,Electrical,electrical,,499932,t,4,2026-04-03 15:35:13.051,2026-04-03 15:35:13.049
+scid-tid-jcvzufq2-uslx7i,tid-jcvzufq2,Storage Furniture,storage-furniture,,6358,t,4,2026-04-03 15:35:14.467,2026-04-03 15:35:14.465
+scid-tid-jcvzufq2-o8jzrs,tid-jcvzufq2,Bedroom,bedroom,,4437,t,1,2026-04-03 15:35:15.964,2026-04-03 15:35:15.962
+scid-tid-jcvzufq2-27qr2a,tid-jcvzufq2,Power Tools,power-tools,,2629,t,1,2026-04-03 15:35:18.677,2026-04-03 15:35:18.675
+scid-tid-jcvzufq2-n2jw3j,tid-jcvzufq2,Home & Garden,home-garden,,3221,t,0,2026-04-03 15:35:21.412,2026-04-03 15:35:21.41
+scid-tid-jcvzufq2-jnjdoc,tid-jcvzufq2,Bakery,bakery,,5904,t,3,2026-04-03 15:35:22.91,2026-04-03 15:35:22.907
+scid-tid-jcvzufq2-56l8le,tid-jcvzufq2,Toys & Games,toys-games,,1246,t,3,2026-04-03 15:35:25.629,2026-04-03 15:35:25.627
+scid-tid-jcvzufq2-ajxhmd,tid-jcvzufq2,Sports & Outdoors,sports-outdoors,,499687,t,2,2026-04-03 15:35:28.026,2026-04-03 15:35:28.022
+scid-tid-jcvzufq2-7fm50s,tid-jcvzufq2,Paint & Supplies,paint-supplies,,328062,t,3,2026-04-03 15:35:29.42,2026-04-03 15:35:29.417
+scid-tid-jcvzufq2-sxvoru,tid-jcvzufq2,Outdoor Furniture,outdoor-furniture,,6828,t,3,2026-04-03 15:35:33.351,2026-04-03 15:35:33.348
+cat-AVR6-dozxuh,tid-8622qs2t,Seasonings amp; Spices,seasonings-and-spices,,4608,t,0,2026-05-02 13:53:41.142,2026-05-02 13:53:41.137
+cat-R4KG-ty0wiq,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-02 22:01:34.721,2026-05-02 22:01:34.721
+cat-R4KG-ghzisj,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-02 22:23:02.443,2026-05-02 22:23:02.443
+cat-AVR6-28gxr1,tid-8622qs2t,Frozen Foods,frozen-foods,,499991,t,0,2026-05-02 22:36:55.256,2026-05-02 22:36:55.256
+cat-R4KG-ngpgf1,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 00:50:00.659,2026-05-03 00:50:00.659
+cat-R4KG-xxff46,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 01:05:08.596,2026-05-03 01:05:08.596
+cat-R4KG-otzjcb,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 01:05:23.835,2026-05-03 01:05:23.835
+cat-R4KG-1s2r9n,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 01:11:44.046,2026-05-03 01:11:44.046
+cat-R4KG-1tu83o,tid-042hi7ju,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 01:58:03.639,2026-05-03 01:58:03.639
+cat-PZQG-16bs1f,tid-jcvzufq2,Frozen Foods,frozen-foods,,499991,t,0,2026-05-03 11:58:44.934,2026-05-03 11:58:44.934
+cat-R4KG-i85zmj,tid-042hi7ju,Liquid Hand Soap,liquid-hand-soap,,3208,t,0,2026-05-03 15:41:05.99,2026-05-03 15:41:05.988
+itemcat-ULCW-z678dn,tid-m8ijkrnk,Water,water,,420,t,0,2026-05-03 23:47:35.722,2026-05-03 23:47:35.721
+itemcat-ULCW-xaxec9,tid-m8ijkrnk,Spring Water,spring-water,,543532,t,0,2026-05-03 23:50:32.474,2026-05-03 23:50:32.473
+itemcat-GPES-tgxvp9,tid-qki0mjdb,Spring Water,spring-water,,543532,t,0,2026-05-04 02:07:50.145,2026-05-04 02:07:50.141
+itemcat-PZQG-rpa9fk,tid-jcvzufq2,Spring Water,spring-water,,543532,t,0,2026-05-06 14:06:49.846,2026-05-06 14:06:49.845
+itemcat-ULCW-txrsao,tid-m8ijkrnk,Flour,flour,,2775,t,0,2026-05-06 16:04:14.749,2026-05-06 16:04:14.745
