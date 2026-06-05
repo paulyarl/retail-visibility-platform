@@ -55,7 +55,7 @@ export default function TaskChecklist({
       {
         id: "payments",
         label: "Connect payment providers",
-        done: !canSetupPayments,
+        done: canSetupPayments,
         link: `/t/${tenantId}/settings/payment-gateways`,
       },
       {
@@ -67,19 +67,19 @@ export default function TaskChecklist({
       {
         id: "shipping",
         label: "Set up shipping rates",
-        done: !canManageShipping,
+        done: canManageShipping,
         link: `/t/${tenantId}/settings/fulfillment`,
       },
       {
         id: "inventory",
         label: "Manage inventory",
-        done: !canManageInventory,
+        done: canManageInventory,
         link: `/t/${tenantId}/items`,
       },
       {
         id: "discounts",
         label: "Create your first discount",
-        done: !canManageDiscounts,
+        done: canManageDiscounts,
         link: `/t/${tenantId}/settings/commerce`,
       },
       {
