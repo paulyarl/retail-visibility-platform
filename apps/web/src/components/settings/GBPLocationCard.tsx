@@ -3,17 +3,18 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Skeleton } from '@/components/ui';
-import { 
-  MapPin, 
-  CheckCircle, 
-  AlertTriangle, 
-  RefreshCw, 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Skeleton } from '@/components/ui';
+import {
+  MapPin,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
   Link as LinkIcon,
   ExternalLink,
   Unlink,
   ChevronRight
 } from 'lucide-react';
+import { Button } from '@mantine/core';
 
 interface GBPLocationCardProps {
   tenantId: string;
@@ -88,13 +89,13 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
     try {
       setLinkingLocation(true);
       setError(null);
-      
+
       const addressStr = location.address?.addressLines?.join(', ') || '';
       const cityState = [location.address?.locality, location.address?.administrativeArea].filter(Boolean).join(', ');
       const fullAddress = [addressStr, cityState, location.address?.postalCode].filter(Boolean).join(' ');
-      
+
       await tenantInfoService.linkGBPLocation(tenantId, location.locationId, location.title || location.name, fullAddress);
-      
+
       setLinkedLocation({
         locationId: location.locationId,
         name: location.title || location.name,
@@ -113,7 +114,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
     try {
       setLinkingLocation(true);
       setError(null);
-      
+
       await tenantInfoService.unlinkGBPLocation(tenantId);
       setLinkedLocation(null);
     } catch (err) {
@@ -146,25 +147,23 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              linkedLocation 
-                ? 'bg-green-100 dark:bg-green-900/30' 
-                : gbpConnected 
-                  ? 'bg-amber-100 dark:bg-amber-900/30'
-                  : 'bg-neutral-100 dark:bg-neutral-800'
-            }`}>
-              <MapPin className={`w-5 h-5 ${
-                linkedLocation 
-                  ? 'text-green-600' 
-                  : gbpConnected 
-                    ? 'text-amber-600'
-                    : 'text-neutral-500'
-              }`} />
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${linkedLocation
+              ? 'bg-green-100 dark:bg-green-900/30'
+              : gbpConnected
+                ? 'bg-amber-100 dark:bg-amber-900/30'
+                : 'bg-neutral-100 dark:bg-neutral-800'
+              }`}>
+              <MapPin className={`w-5 h-5 ${linkedLocation
+                ? 'text-green-600'
+                : gbpConnected
+                  ? 'text-amber-600'
+                  : 'text-neutral-500'
+                }`} />
             </div>
             <div>
               <CardTitle className="text-base">Google Business Profile Location</CardTitle>
               <CardDescription>
-                {linkedLocation 
+                {linkedLocation
                   ? 'Your store is linked to a GBP location for sync'
                   : gbpConnected
                     ? 'Link a GBP location to enable data sync'
@@ -190,13 +189,15 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
               Connect your Google account first to link a GBP location
             </p>
-            <Link
-              href={`/t/${tenantId}/settings/integrations/google`}
+            <Button
+              onClick={() => window.location.href = `/t/${tenantId}/settings/integrations/google`}
+              variant="gradient"
+              style={{ color: 'white' }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               <LinkIcon className="w-4 h-4" />
               Connect Google Account
-            </Link>
+            </Button>
           </div>
         ) : linkedLocation ? (
           <div className="space-y-4">
@@ -274,7 +275,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
                     {gbpLocations.map((location) => {
                       const addressStr = location.address?.addressLines?.join(', ') || '';
                       const cityState = [location.address?.locality, location.address?.administrativeArea].filter(Boolean).join(', ');
-                      
+
                       return (
                         <button
                           key={location.locationId || location.name}

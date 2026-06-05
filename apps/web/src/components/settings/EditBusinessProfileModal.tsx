@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/ui';
+import { Modal, ModalFooter, Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
+import { Button } from '@mantine/core';
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -485,8 +486,9 @@ export default function EditBusinessProfileModal({
               </div>
               <Button
                 type="button"
-                variant="secondary"
-                size="sm"
+                variant="gradient"
+                style={{color:'white'}}
+                size="lg"
                 onClick={handleGeocodeAddress}
                 disabled={geocoding || !formData.address_line1 || !formData.city || !formData.postal_code || !formData.country_code}
                 loading={geocoding}
@@ -760,7 +762,7 @@ export default function EditBusinessProfileModal({
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving} loading={saving}>
+          <Button type="submit" variant="gradient" style={{color:'white'}} disabled={saving} loading={saving}>
             {saving ? 'Saving...' : 'Save Changes'} 
           </Button>
         </ModalFooter>

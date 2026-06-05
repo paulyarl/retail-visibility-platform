@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Skeleton } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Skeleton } from '@/components/ui';
 import EditBusinessProfileModal from './EditBusinessProfileModal';
 import { BusinessProfile, calculateSEOReadiness, isSEOReady, formatPhoneNumber, countries } from '@/lib/validation/businessProfile';
+import { Button } from '@mantine/core';
 
 interface BusinessProfileCardProps {
   profile: BusinessProfile | null;
@@ -56,7 +57,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
             <p className="text-sm text-neutral-500 mb-4">
               Add your business information to improve SEO and customer trust
             </p>
-            <Button onClick={() => setIsEditModalOpen(true)}>
+            <Button variant="gradient" style={{ color: 'white' }} onClick={() => setIsEditModalOpen(true)}>
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -179,9 +180,9 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-500">Website</p>
-                  <a 
-                    href={profile.website} 
-                    target="_blank" 
+                  <a
+                    href={profile.website}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-base text-primary-600 hover:text-primary-700 mt-1 inline-flex items-center gap-1"
                   >
@@ -216,25 +217,24 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
               <div>
                 <p className="text-sm font-medium text-neutral-900">SEO Readiness</p>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  {seoReady 
-                    ? 'Your profile is optimized for search engines' 
+                  {seoReady
+                    ? 'Your profile is optimized for search engines'
                     : 'Complete all fields to improve visibility'}
                 </p>
               </div>
               <span className="text-2xl font-bold text-neutral-900">{seoScore}%</span>
             </div>
-            
+
             {/* Progress Bar */}
             <div className="relative h-2 bg-neutral-200 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${seoScore}%` }}
                 transition={{ duration: 1, ease: 'easeOut' }}
-                className={`h-full rounded-full ${
-                  seoScore >= 85 ? 'bg-success' : 
-                  seoScore >= 50 ? 'bg-warning' : 
-                  'bg-error'
-                }`}
+                className={`h-full rounded-full ${seoScore >= 85 ? 'bg-success' :
+                    seoScore >= 50 ? 'bg-warning' :
+                      'bg-error'
+                  }`}
               />
             </div>
 
@@ -250,7 +250,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
 
           {/* Edit Button */}
           <div className="pt-4">
-            <Button variant="secondary" onClick={() => setIsEditModalOpen(true)} className="w-full">
+            <Button variant="gradient" style={{ color: 'white' }} size='lg' onClick={() => setIsEditModalOpen(true)} className="w-full">
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
