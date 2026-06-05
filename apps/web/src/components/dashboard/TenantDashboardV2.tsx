@@ -470,15 +470,20 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                     <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                   </Link>
 
-                  <Link href={`/directory/${tenantData?.slug || tenantId}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100 transition-colors">
-                      <MapPin className="w-4 h-4 text-emerald-600" />
+                  <Link
+                    href={hasPublishedDirectory ? `/directory/${tenantData?.slug || tenantId}` : `/t/${tenantId}/settings/directory`}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                  >
+                    <div className={`p-2 rounded-lg transition-colors ${hasPublishedDirectory ? "bg-emerald-50 group-hover:bg-emerald-100" : "bg-gray-50 group-hover:bg-gray-100"}`}>
+                      <MapPin className={`w-4 h-4 ${hasPublishedDirectory ? "text-emerald-600" : "text-gray-500"}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Directory Entry</p>
-                      <p className="text-xs text-gray-500 truncate">Your public directory listing</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {hasPublishedDirectory ? "Your public directory listing" : "Publish your directory listing"}
+                      </p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                    <ArrowRight className={`w-4 h-4 transition-colors ${hasPublishedDirectory ? "text-gray-400 group-hover:text-emerald-600" : "text-gray-400 group-hover:text-gray-600"}`} />
                   </Link>
 
                   <Link href={`/t/${tenantId}/reviews`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
