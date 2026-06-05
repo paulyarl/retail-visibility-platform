@@ -21,6 +21,9 @@ import {
   Sparkles,
   Target,
   CreditCard,
+  MessageSquare,
+  MapPin,
+  Rocket,
 } from "lucide-react";
 
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
@@ -383,8 +386,8 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                   <Settings className="w-5 h-5 text-purple-600" />
                   <h3 className="font-semibold text-gray-900">Capabilities for You</h3>
                 </div>
-                {tier && (                
-                  <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />            
+                {tier && (
+                  <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
                 )}
               </div>
             </motion.div>
@@ -451,12 +454,71 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
             </motion.div>
 
+            {/* Quick Links */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.39 }}>
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-900 mb-4">Quick Links</h3>
+                <div className="space-y-2">
+                  <Link href={`/tenant/${tenantId}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                      <Store className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Storefront</p>
+                      <p className="text-xs text-gray-500 truncate">View your public store</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                  </Link>
+
+                  <Link
+                    href={hasPublishedDirectory ? `/directory/${tenantData?.slug || tenantId}` : `/t/${tenantId}/settings/directory`}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                  >
+                    <div className={`p-2 rounded-lg transition-colors ${hasPublishedDirectory ? "bg-emerald-50 group-hover:bg-emerald-100" : "bg-gray-50 group-hover:bg-gray-100"}`}>
+                      <MapPin className={`w-4 h-4 ${hasPublishedDirectory ? "text-emerald-600" : "text-gray-500"}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Directory Entry</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {hasPublishedDirectory ? "Your public directory listing" : "Publish your directory listing"}
+                      </p>
+                    </div>
+                    <ArrowRight className={`w-4 h-4 transition-colors ${hasPublishedDirectory ? "text-gray-400 group-hover:text-emerald-600" : "text-gray-400 group-hover:text-gray-600"}`} />
+                  </Link>
+
+                  <Link href={`/t/${tenantId}/reviews`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                      <MessageSquare className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Reviews</p>
+                      <p className="text-xs text-gray-500 truncate">Manage customer reviews</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
+                  </Link>
+
+                  <Link href={`/t/${tenantId}/quick-start`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
+                      <Rocket className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Quick Start</p>
+                      <p className="text-xs text-gray-500 truncate">Wizard tools & setup</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
               <TaskChecklist
                 tenantId={tenantId}
                 hasProducts={hasProducts}
                 hasStorefront={!!hasStorefront}
                 hasPublishedDirectory={!!hasPublishedDirectory}
+                locationStatus={tenantData?.locationStatus}
+                subscriptionStatus={tenantData?.subscriptionStatus}
               />
             </motion.div>
 

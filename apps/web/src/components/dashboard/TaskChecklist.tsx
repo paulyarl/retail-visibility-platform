@@ -10,6 +10,8 @@ interface TaskChecklistProps {
   hasProducts: boolean;
   hasStorefront: boolean;
   hasPublishedDirectory: boolean;
+  locationStatus?: string;
+  subscriptionStatus?: string;
 }
 
 interface TaskItem {
@@ -24,6 +26,8 @@ export default function TaskChecklist({
   hasProducts,
   hasStorefront,
   hasPublishedDirectory,
+  locationStatus,
+  subscriptionStatus,
 }: TaskChecklistProps) {
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
 
@@ -37,37 +41,61 @@ export default function TaskChecklist({
 
     return [
       {
+        id: "location",
+        label: "Verify your business location",
+        done: locationStatus === "active",
+        link: `/t/${tenantId}/settings/location-status`,
+      },
+      {
+        id: "subscription",
+        label: "Activate your subscription",
+        done: subscriptionStatus === "active",
+        link: `/t/${tenantId}/settings/subscription`,
+      },
+      {
         id: "payments",
         label: "Connect payment providers",
         done: !canSetupPayments,
-        link: `/t/${tenantId}/settings/integrations`,
+        link: `/t/${tenantId}/settings/payment-gateways`,
       },
       {
         id: "products",
         label: "Add your first product",
         done: hasProducts,
-        link: `/t/${tenantId}/items`,
+        link: `/t/${tenantId}/items/create`,
       },
       {
         id: "shipping",
         label: "Set up shipping rates",
         done: !canManageShipping,
-        link: `/t/${tenantId}/settings`,
+        link: `/t/${tenantId}/settings/fulfillment`,
+      },
+      {
+        id: "inventory",
+        label: "Manage inventory",
+        done: !canManageInventory,
+        link: `/t/${tenantId}/settings/items`,
       },
       {
         id: "discounts",
         label: "Create your first discount",
         done: !canManageDiscounts,
-        link: `/t/${tenantId}/settings`,
+        link: `/t/${tenantId}/settings/commerce`,
       },
       {
         id: "storefront",
         label: "Publish your storefront",
-        done: hasStorefront && hasPublishedDirectory,
+        done: hasStorefront,
         link: `/t/${tenantId}/settings/tenant`,
       },
+      {
+        id: "directory",
+        label: "Publish your directory listing",
+        done: hasPublishedDirectory,
+        link: `/t/${tenantId}/settings/directory`,
+      },
     ];
-  }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, tenantId]);
+  }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, locationStatus, subscriptionStatus, tenantId]);
 
   const completed = tasks.filter((t) => t.done).length;
   const percent = Math.round((completed / tasks.length) * 100);
@@ -110,18 +138,16 @@ export default function TaskChecklist({
         {tasks.map((task) => (
           <Link key={task.id} href={task.link} className="flex items-center gap-3 group">
             <div
-              className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                task.done ? "bg-emerald-500" : "border-2 border-gray-200 group-hover:border-blue-400"
-              }`}
+              className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${task.done ? "bg-emerald-500" : "border-2 border-gray-200 group-hover:border-blue-400"
+                }`}
             >
               {task.done && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
             </div>
             <span
-              className={`text-sm transition-colors ${
-                task.done
+              className={`text-sm transition-colors ${task.done
                   ? "text-gray-400 line-through"
                   : "text-gray-700 group-hover:text-blue-600"
-              }`}
+                }`}
             >
               {task.label}
             </span>

@@ -103,7 +103,7 @@ class CustomerAuthService extends CustomerApiSingleton {
    */
   async initialize(): Promise<Customer | null> {
     if (typeof window === 'undefined') {
-      console.log('[CustomerAuthService] Window is undefined, skipping initialization');
+      // console.log('[CustomerAuthService] Window is undefined, skipping initialization');
       return null;
     }
 
@@ -141,7 +141,7 @@ class CustomerAuthService extends CustomerApiSingleton {
       if (result.data?.customer) {
         this.customer = result.data.customer;
         this.setCurrentCustomer(this.customer.id, this.customer);
-        console.log('[CustomerAuthService] Customer initialized:', this.customer);
+        // console.log('[CustomerAuthService] Customer initialized:', this.customer);
         return this.customer;
       }
     } catch (error: any) {
