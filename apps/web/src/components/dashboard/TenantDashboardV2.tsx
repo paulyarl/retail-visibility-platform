@@ -130,6 +130,12 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   const hasProducts = !!usage?.totalItems && usage.totalItems > 0;
   const hasStorefront = tenantData?.statusInfo?.showStorefront;
   const hasPublishedDirectory = tenantData?.hasPublishedDirectory;
+  //new tasks
+  const hasHours = !!businessProfile?.hours;
+  const hasMap = !!businessProfile?.latitude && !!businessProfile?.longitude;
+  const hasStoreCategory = !!businessProfile?.gbpCategoryId;
+  const hasSlug = !!businessProfile?.slug;
+  const hasLogo = !!businessProfile?.logo_url;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -519,6 +525,11 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 hasPublishedDirectory={!!hasPublishedDirectory}
                 locationStatus={tenantData?.locationStatus}
                 subscriptionStatus={tenantData?.subscriptionStatus}
+                hasHours={hasHours}
+                hasMap={hasMap}
+                hasStoreCategory={hasStoreCategory}
+                hasSlug={hasSlug}
+                hasLogo={hasLogo}
               />
             </motion.div>
 
