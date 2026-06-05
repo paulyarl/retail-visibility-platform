@@ -52,7 +52,7 @@ export default function CapabilityShowcase({
           capabilities.commerce?.paymentType === "none"
             ? "Disabled"
             : `Payments: ${capabilities.commerce?.paymentType}`,
-        settingsLink: `/t/${tenantId}/settings/integrations`,
+        settingsLink: `/t/${tenantId}/settings/commerce`,
       },
       {
         key: "paymentGateway",
@@ -63,7 +63,7 @@ export default function CapabilityShowcase({
           (capabilities.paymentGateway?.allowedGateways ?? []).length > 0
             ? capabilities.paymentGateway!.allowedGateways.join(", ")
             : "None connected",
-        settingsLink: `/t/${tenantId}/settings/integrations`,
+        settingsLink: `/t/${tenantId}/settings/payment-gateways`,
       },
       {
         key: "storefront",
@@ -83,7 +83,7 @@ export default function CapabilityShowcase({
         detail: capabilities.fulfillment?.showsPickup
           ? "Pickup enabled"
           : "Shipping / Pickup",
-        settingsLink: `/t/${tenantId}/settings`,
+        settingsLink: `/t/${tenantId}/settings/fulfillment`,
       },
       {
         key: "barcodeScan",
@@ -102,7 +102,7 @@ export default function CapabilityShowcase({
           (capabilities.productOptions?.allowedTypes ?? []).length > 0
             ? capabilities.productOptions!.allowedTypes.join(", ")
             : "Standard",
-        settingsLink: `/t/${tenantId}/items`,
+        settingsLink: `/t/${tenantId}/items/create`,
       },
       {
         key: "integrationOptions",
@@ -177,18 +177,16 @@ export default function CapabilityShowcase({
           >
             <Link
               href={row.settingsLink}
-              className={`group flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
-                row.enabled
+              className={`group flex items-center gap-3 p-2.5 rounded-xl transition-colors ${row.enabled
                   ? "hover:bg-gray-50"
                   : "opacity-60 hover:opacity-80 hover:bg-gray-50"
-              }`}
+                }`}
             >
               <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  row.enabled
+                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${row.enabled
                     ? "bg-indigo-50 text-indigo-600"
                     : "bg-gray-100 text-gray-400"
-                }`}
+                  }`}
               >
                 {row.icon}
               </div>

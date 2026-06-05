@@ -74,7 +74,7 @@ export default function TaskChecklist({
         id: "inventory",
         label: "Manage inventory",
         done: !canManageInventory,
-        link: `/t/${tenantId}/settings/items`,
+        link: `/t/${tenantId}/items`,
       },
       {
         id: "discounts",
