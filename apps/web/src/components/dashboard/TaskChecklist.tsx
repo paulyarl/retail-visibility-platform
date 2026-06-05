@@ -12,6 +12,11 @@ interface TaskChecklistProps {
   hasPublishedDirectory: boolean;
   locationStatus?: string;
   subscriptionStatus?: string;
+  hasHours?: boolean;
+  hasMap?: boolean;
+  hasStoreCategory?: boolean;
+  hasSlug?: boolean;
+  hasLogo?: boolean;
 }
 
 interface TaskItem {
@@ -28,6 +33,11 @@ export default function TaskChecklist({
   hasPublishedDirectory,
   locationStatus,
   subscriptionStatus,
+  hasHours = false,
+  hasMap = false,
+  hasStoreCategory = false,
+  hasSlug = false,
+  hasLogo = false,
 }: TaskChecklistProps) {
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
 
@@ -86,13 +96,43 @@ export default function TaskChecklist({
         id: "storefront",
         label: "Publish your storefront",
         done: hasStorefront,
-        link: `/t/${tenantId}/settings/tenant`,
+        link: `/t/${tenantId}/settings/location-status`,
       },
       {
         id: "directory",
         label: "Publish your directory listing",
         done: hasPublishedDirectory,
         link: `/t/${tenantId}/settings/directory`,
+      },
+      {
+        id: "hours",
+        label: "Add your business hours",
+        done: hasHours,
+        link: `/t/${tenantId}/settings/hours`,
+      },
+      {
+        id: "map",
+        label: "Add your map coordinates",
+        done: hasMap,
+        link: `/t/${tenantId}/settings/tenant`,
+      },
+      {
+        id: "category",
+        label: "Add your store category",
+        done: hasStoreCategory,
+        link: `/t/${tenantId}/settings/gbp-category`,
+      },
+      {
+        id: "slug",
+        label: "Add your shop URL slug",
+        done: hasSlug,
+        link: `/t/${tenantId}/settings/tenant`,
+      },
+      {
+        id: "logo",
+        label: "Upload your store logo",
+        done: hasLogo,
+        link: `/t/${tenantId}/settings/tenant`,
       },
     ];
   }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, locationStatus, subscriptionStatus, tenantId]);
@@ -145,8 +185,8 @@ export default function TaskChecklist({
             </div>
             <span
               className={`text-sm transition-colors ${task.done
-                  ? "text-gray-400 line-through"
-                  : "text-gray-700 group-hover:text-blue-600"
+                ? "text-gray-400 line-through"
+                : "text-gray-700 group-hover:text-blue-600"
                 }`}
             >
               {task.label}
