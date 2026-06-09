@@ -37,6 +37,8 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 // Merchant gate helper for client-side filtering
@@ -400,6 +402,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   // console.log(`[Directory] tenantInfo:`, tenantInfo);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
   const [featuredOptionsSettings, setFeaturedOptionsSettings] = useState<FeaturedOptionsSettings | null>(null);
+  const [faqFlags, setFaqFlags] = useState<PublicFaqOptionsFlags | null>(null);
 
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
@@ -452,7 +455,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           categories,
           productCount,
           optionFlags,
-          featuredPrefs
+          featuredPrefs,
+          faqOptionFlags
         ] = await Promise.all([
           getBusinessProfile(data.listing.tenantId),
           getBusinessHours(data.listing.tenantId),
@@ -460,7 +464,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
           publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId),
-          publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId)
+          publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId),
+          publicFaqService.getFaqOptionsFlags(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -470,6 +475,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         setActualProductCount(productCount);
         if (optionFlags) setOptFlags(optionFlags);
         if (featuredPrefs) setFeaturedOptionsSettings(featuredPrefs);
+        if (faqOptionFlags) setFaqFlags(faqOptionFlags);
 
         // Fetch tenant info for status panel
         const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
@@ -994,6 +1000,17 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           />
         )
       }
+
+      {/* FAQ Section */}
+      {faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion && consolidatedData?.listing?.tenantId && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <FaqStorefrontDisplay
+            tenantId={consolidatedData.listing.tenantId}
+            enabled={faqFlags.faq_enabled && faqFlags.faq_display_storefront_accordion}
+            feedbackEnabled={faqFlags.faq_enabled && faqFlags.faq_display_feedback}
+          />
+        </div>
+      )}
 
       {/* Recently Viewed */}
       {optFlags?.showRecentlyViewed !== false && <LastViewed />}

@@ -7,6 +7,7 @@ import { ArrowLeft, Star } from 'lucide-react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import TenantFeaturedAccessService from '@/services/TenantFeaturedAccessService';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // Force dynamic rendering to prevent caching
@@ -65,12 +66,13 @@ export default function FeaturedProductsSettings({
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<any>(null);
   const [featuredAccessApproved, setFeaturedAccessApproved] = useState<boolean>(false);
+  const [merchantFeaturedEnabled, setMerchantFeaturedEnabled] = useState<boolean>(true);
 
   // Capability check for featured tier gating
   const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
   const isFeaturedEnabled = featuredCap.data?.enabled ?? true;
   const allowedTypes = featuredCap.data?.allowedTypes ?? [];
-  console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved, 'isFeaturedEnabled', isFeaturedEnabled, 'allowedTypes', allowedTypes);
+  // console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved, 'isFeaturedEnabled', isFeaturedEnabled, 'allowedTypes', allowedTypes);
 
   useEffect(() => {
     async function fetchTenant() {
@@ -91,7 +93,7 @@ export default function FeaturedProductsSettings({
         // Set the tenantId in state for use throughout the component
         setTenantId(id);
         
-        console.log('FeaturedProductsSettings: Fetching tenant', id);
+        // console.log('FeaturedProductsSettings: Fetching tenant', id);
         
         const tenantData = await tenantInfoService.getTenantInfo(id);
         if (tenantData) {
@@ -101,12 +103,21 @@ export default function FeaturedProductsSettings({
           // Fetch featured access approval status (tenant-scoped, no admin required)
           try {
             const hasApprovedAccess = await TenantFeaturedAccessService.hasFeaturedAccess(id);
-            console.log(`FeaturedProductsSettings: Has approved access`, hasApprovedAccess);
+            // console.log(`FeaturedProductsSettings: Has approved access`, hasApprovedAccess);
             
             setFeaturedAccessApproved(hasApprovedAccess);
           } catch (approvalError) {
             console.error('FeaturedProductsSettings: Error fetching approval status', approvalError);
             setFeaturedAccessApproved(false); // Default to locked on error
+          }
+
+          // Fetch merchant preference for featured_enabled
+          try {
+            const optsSettings = await platformHomeService.getTenantFeaturedOptionsSettings(id);
+            setMerchantFeaturedEnabled(optsSettings?.featured_enabled !== false);
+          } catch (prefError) {
+            console.error('FeaturedProductsSettings: Error fetching featured options settings', prefError);
+            setMerchantFeaturedEnabled(true); // Default to enabled on error
           }
         } else {
           console.error('FeaturedProductsSettings: Failed to load tenant');
@@ -235,15 +246,34 @@ export default function FeaturedProductsSettings({
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-700">
-              <strong>Storefront Featuring:</strong> Managing storefront featured product types (New Arrivals, Seasonal, Staff Picks, Sale Items, Bestsellers, Clearance, Trending Now, Featured, Recommended)
-            </p>
-          </div>
-          <FeaturedProductsManager 
-            tenantId={tenant.id} 
-            hasFeaturedAccess={featuredAccessApproved}
-          />
+          {!merchantFeaturedEnabled ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
+              <Star className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-amber-800 mb-2">Featured Products Are Disabled</h2>
+              <p className="text-amber-700 mb-6 max-w-lg mx-auto">
+                You have turned off the featured products system in your settings. Product featuring is currently inactive and no featured sections will appear on your storefront or directory listing.
+              </p>
+              <Link
+                href={`/t/${tenant.id}/settings/featured-options`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+              >
+                <Star className="w-4 h-4" />
+                Go to Featured Options to Re-enable
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Storefront Featuring:</strong> Managing storefront featured product types (New Arrivals, Seasonal, Staff Picks, Sale Items, Bestsellers, Clearance, Trending Now, Featured, Recommended)
+                </p>
+              </div>
+              <FeaturedProductsManager 
+                tenantId={tenant.id} 
+                hasFeaturedAccess={featuredAccessApproved}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

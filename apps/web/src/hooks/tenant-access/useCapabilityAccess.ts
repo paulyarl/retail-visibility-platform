@@ -12,6 +12,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
+import { faqService } from '@/services/FaqService';
+
 import {
   CapabilityResolutionService,
   TenantCapabilityResolutionService,
@@ -25,6 +29,7 @@ import {
   IntegrationOptionsState,
   QuickstartOptionsState,
   StorefrontOptionsState,
+  FaqOptionsState,
   AllCapabilitiesState,
   resolveCommerceState,
   resolvePaymentGatewayState,
@@ -386,6 +391,38 @@ export function useStorefrontOptionsCapability(
 }
 
 // ====================
+// useFaqOptionsCapability
+// ====================
+
+export function useFaqOptionsCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<FaqOptionsState> {
+  const [data, setData] = useState<FaqOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getFaqOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch FAQ options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
 // useAllCapabilities
 // ====================
 
@@ -452,4 +489,91 @@ export function useCapabilityFeatureCheck(
   }, [tenantId, featureKey, options?.forTenant]);
 
   return { enabled, loading };
+}
+
+// ====================
+// useMerchantGates
+// ====================
+
+/**
+ * Fetches each capability's merchant-pref-aware state and determines
+ * whether the merchant has disabled the entire capability (tier allows
+ * but merchant turned it off). Returns a Record<capabilityKey, boolean>.
+ *
+ * Uses the same cached option services as the settings pages for reliable
+ * master-switch detection. Falls back to resolve-service effective fields
+ * when direct settings fetch fails.
+ */
+export function useMerchantGates(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): { gates: Record<string, boolean>; loading: boolean } {
+  const [gates, setGates] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    setLoading(true);
+
+    const service = getService(!!options?.forTenant);
+
+    Promise.all([
+      // Tier-allowed states from resolve service
+      service.getCommerceState(tenantId).catch(() => null),
+      service.getPaymentGatewayState(tenantId).catch(() => null),
+      service.getStorefrontState(tenantId).catch(() => null),
+      service.getBarcodeScanState(tenantId).catch(() => null),
+      service.getFulfillmentState(tenantId).catch(() => null),
+      service.getProductOptionsState(tenantId).catch(() => null),
+      service.getFeaturedOptionsState(tenantId).catch(() => null),
+      service.getIntegrationOptionsState(tenantId).catch(() => null),
+      service.getQuickstartOptionsState(tenantId).catch(() => null),
+      service.getStorefrontOptionsState(tenantId).catch(() => null),
+      service.getFaqOptionsState(tenantId).catch(() => null),
+      // Direct merchant settings from option services (for master switches)
+      platformHomeService.getTenantBarcodeScanSettings(tenantId).catch(() => null),
+      platformHomeService.getTenantFulfillmentSettings(tenantId).catch(() => null),
+      tenantInfoService.getStorefrontOptionsSettings(tenantId).catch(() => null),
+      faqService.getOptions(tenantId).then(r => r.settings).catch(() => null),
+      tenantInfoService.getPaymentGatewaySettings(tenantId).catch(() => null),
+      platformHomeService.getTenantFeaturedOptionsSettings(tenantId).catch(() => null),
+      platformHomeService.getTenantProductOptionsSettings(tenantId).catch(() => null),
+      platformHomeService.getTenantIntegrationOptionsSettings(tenantId).catch(() => null),
+      tenantInfoService.getQuickstartOptionsSettings(tenantId).catch(() => null),
+    ]).then(([c, pg, sf, bc, fl, po, fo, io, qo, so, faq, bcSettings, flSettings, soSettings, faqSettings, pgSettings, foSettings, poSettings, ioSettings, qoSettings]) => {
+      setGates({
+        commerce_types: c ? c.enabled && c.effectivePaymentType === 'none' : false,
+        // Payment gateway: check master switch from option service
+        payment_gateway_options: pg ? pg.enabled && (pgSettings ? pgSettings.gateway_enabled === false : pg.effectiveGateways.length === 0) : false,
+        storefront_types: sf ? sf.enabled && sf.effectiveType === 'none' : false,
+        // Barcode: check master switch from option service (resolve fn doesn't accept barcode_enabled)
+        barcode_scan_options: bc ? bc.enabled && (bcSettings ? bcSettings.barcode_enabled === false : bc.effectiveModes.length === 0) : false,
+        // Fulfillment: no master switch — check all 3 individual switches against tier-allowed methods
+        fulfillment_options: fl && fl.enabled && (fl.showsPickup || fl.showsDelivery || fl.showsShipping)
+          ? flSettings
+            ? (!fl.showsPickup || !flSettings.pickup_enabled) && (!fl.showsDelivery || !flSettings.delivery_enabled) && (!fl.showsShipping || !flSettings.shipping_enabled)
+            : !fl.effectiveShowsPickup && !fl.effectiveShowsDelivery && !fl.effectiveShowsShipping
+          : false,
+        // Product options: no master switch — check if all tier-allowed types are disabled by merchant
+        product_options: po && po.enabled && po.allowedTypes.length > 0
+          ? poSettings
+            ? po.allowedTypes.every(t => poSettings[`product_${t}_enabled`] === false)
+            : po.effectiveTypes.length === 0
+          : false,
+        // Featured options: check master switch from option service
+        featured_options: fo ? fo.enabled && (foSettings ? foSettings.featured_enabled === false : fo.effectiveTypes.length === 0) : false,
+        // Integration options: check master switch from option service
+        integration_options: io ? io.enabled && (ioSettings ? ioSettings.integration_enabled === false : io.effectiveTypes.length === 0) : false,
+        // Quickstart options: check master switch from option service
+        quickstart_options: qo ? qo.enabled && (qoSettings ? qoSettings.quickstart_enabled === false : !qo.canUseWizard && !qo.canGenerateImages && !qo.canUseCategoryGenerator && !qo.canUseOpenAI && !qo.canUseGemini && !qo.canUseAIWizard && !qo.canUseHDImages) : false,
+        // Storefront options: check master switch from option service
+        storefront_options: so ? so.enabled && (soSettings ? soSettings.storefront_opt_enabled === false : so.merchantPreferences.storefront_opt_enabled === false) : false,
+        // FAQ: check master switch from option service (resolve fn doesn't accept merchant prefs)
+        faq_options: faq ? faq.enabled && (faqSettings ? faqSettings.faq_enabled === false : false) : false,
+      });
+      setLoading(false);
+    });
+  }, [tenantId, options?.forTenant]);
+
+  return { gates, loading };
 }

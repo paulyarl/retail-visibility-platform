@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import TenantProfileService from '../services/TenantProfileService';
+import { prisma } from '../prisma';
 
 const router = Router();
 
@@ -18,7 +19,7 @@ const tenantService = TenantProfileService.getInstance();
 router.get('/:tenantId/profile', async (req, res) => {
   try {
     const { tenantId } = req.params;
-    
+
     // Check if user has permission to access this tenant
     if (req.user?.tenantIds && !req.user.tenantIds.includes(tenantId)) {
       return res.status(403).json({
@@ -26,20 +27,37 @@ router.get('/:tenantId/profile', async (req, res) => {
         message: 'Access denied: insufficient permissions for this tenant'
       });
     }
-    
+
     const profile = await tenantService.getTenantProfile(tenantId);
-    
+
+    // Check directory publication and featured products status
+    const [directoryResult, featuredProductsResult] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenantId}
+      `,
+      prisma.$queryRaw`
+        SELECT 1 FROM featured_products
+        WHERE tenant_id = ${tenantId} AND is_active = true
+        LIMIT 1
+      `
+    ]);
+
+    const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
+    const hasFeaturedProducts = (featuredProductsResult as any[])?.length > 0;
+
     if (!profile) {
       return res.status(404).json({
         success: false,
         message: 'Tenant profile not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: {
         profile,
+        hasPublishedDirectory,
+        hasFeaturedProducts,
         timestamp: new Date().toISOString()
       },
       message: 'Tenant profile retrieved successfully'

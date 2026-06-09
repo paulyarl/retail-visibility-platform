@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, Check, X, Crown, ExternalLink } from 'lucide-react';
+import { Shield, Check, X, Crown, ExternalLink, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   AllCapabilitiesState,
@@ -24,12 +24,18 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
+  FaqManagementType,
+  FaqPreviewType,
+  FaqDisplayType,
+  FaqKnowledgeBaseType,
 } from '@/services/CapabilityResolutionService';
 import { getFeaturedTypeMeta } from '@/utils/featuredOptions';
 
 interface PlanSummaryPanelProps {
   capabilities: AllCapabilitiesState | null;
   loading?: boolean;
+  /** Per-capability merchant-gate status from merchant-pref-aware service methods */
+  merchantGates?: Record<string, boolean>;
   /** Which capability section to highlight (e.g. 'featured_options' or 'product_options') */
   highlightCapability?: string;
   /** Tenant ID for building settings page navigation links */
@@ -172,6 +178,40 @@ const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> 
   storefront_actions: 'CTA Buttons',
 };
 
+const FAQ_MANAGEMENT_LABELS: Record<FaqManagementType, string> = {
+  faq_management_hub: 'Hub',
+  faq_management_templates: 'Templates',
+  faq_management_import: 'Import',
+  faq_management_wizard_inline: 'Inline Wizard',
+  faq_management_bulk_actions: 'Bulk Actions',
+  faq_management_reorder: 'Reorder',
+  faq_management_search: 'Search',
+};
+
+const FAQ_PREVIEW_LABELS: Record<FaqPreviewType, string> = {
+  faq_preview_bot: 'Bot Preview',
+  faq_preview_gap_report: 'Gap Report',
+  faq_preview_auto_suggest: 'Auto Suggest',
+};
+
+const FAQ_DISPLAY_LABELS: Record<FaqDisplayType, string> = {
+  faq_display_storefront_accordion: 'Storefront',
+  faq_display_product_accordion: 'Product',
+  faq_display_search_overlay: 'Search Overlay',
+  faq_display_feedback: 'Feedback',
+  faq_display_bot_handoff: 'Bot Handoff',
+  faq_display_markdown: 'Markdown',
+  faq_display_deep_link: 'Deep Link',
+};
+
+const FAQ_KB_LABELS: Record<FaqKnowledgeBaseType, string> = {
+  faq_kb_static_lookup: 'Static KB',
+  faq_kb_rag_retrieval: 'RAG',
+  faq_kb_product_scoped: 'Product Scoped',
+  faq_kb_auto_sync: 'Auto Sync',
+  faq_kb_coverage_metrics: 'Coverage',
+};
+
 // --- Capability display config ---
 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
@@ -185,50 +225,77 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
   quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
+  faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
 };
 
 // --- Resolved feature extraction per capability ---
+
+type FeatureStatus = 'enabled' | 'merchant-gated' | 'tier-gated';
+
+interface FeatureItem {
+  label: string;
+  status: FeatureStatus;
+}
 
 interface CapabilitySummary {
   key: string;
   label: string;
   icon: string;
   enabled: boolean;
+  /** Whether any feature in this capability is merchant-gated */
+  merchantGated: boolean;
   /** Human-readable list of specific enabled features */
   specificFeatures: string[];
+  /** Per-feature status for color-coded rendering */
+  featureStatuses: FeatureItem[];
   /** Whether this capability is highlighted in the current view */
   isHighlighted: boolean;
   /** Relative path to the settings page for this capability (null if no dedicated page) */
   settingsPath: string | null;
 }
 
-function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: string): CapabilitySummary[] {
+function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: string, merchantGates?: Record<string, boolean>): CapabilitySummary[] {
   const summaries: CapabilitySummary[] = [];
 
   // Commerce — expand group labels into individual features like Featured Options
   const c = caps.commerce;
   if (Object.keys(c.features).length > 0) {
     const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
     // Expand payment type group into constituent features
     if (c.paymentType && c.paymentType !== 'none') {
       const groupFeatures = COMMERCE_GROUP_FEATURES[c.paymentType];
       if (groupFeatures) {
-        groupFeatures.forEach(f => specifics.push(f));
+        groupFeatures.forEach(f => {
+          specifics.push(f);
+          const isEnabled = c.effectivePaymentType === 'both' ||
+            (f === 'Full Payment' ? c.effectivePaymentType === 'full' : c.effectivePaymentType === 'deposit');
+          statuses.push({ label: f, status: isEnabled ? 'enabled' : 'merchant-gated' });
+        });
       } else {
         const label = COMMERCE_PAYMENT_LABELS[c.paymentType];
-        if (label) specifics.push(label);
+        if (label) {
+          specifics.push(label);
+          statuses.push({ label, status: c.effectivePaymentType !== 'none' ? 'enabled' : 'merchant-gated' });
+        }
       }
     }
     // Add detail features
     Object.entries(COMMERCE_DETAIL_LABELS).forEach(([key, label]) => {
-      if (c[key as keyof CommerceState]) specifics.push(label);
+      if (c[key as keyof CommerceState]) {
+        specifics.push(label);
+        const effectiveKey = `effective${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof CommerceState;
+        statuses.push({ label, status: (c[effectiveKey] as boolean) ? 'enabled' : 'merchant-gated' });
+      }
     });
     summaries.push({
       key: 'commerce_types',
       label: CAPABILITY_DISPLAY.commerce_types.label,
       icon: CAPABILITY_DISPLAY.commerce_types.icon,
       enabled: c.enabled,
+      merchantGated: merchantGates?.['commerce_types'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'commerce_types',
       settingsPath: CAPABILITY_DISPLAY.commerce_types.settingsPath ?? null,
     });
@@ -237,12 +304,18 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   // Payment Gateway
   const pg = caps.paymentGateway;
   if (Object.keys(pg.features).length > 0) {
+    const pgStatuses: FeatureItem[] = pg.allowedGateways.map(g => ({
+      label: GATEWAY_LABELS[g] || g,
+      status: pg.effectiveGateways.includes(g) ? 'enabled' : 'merchant-gated',
+    }));
     summaries.push({
       key: 'payment_gateway_options',
       label: CAPABILITY_DISPLAY.payment_gateway_options.label,
       icon: CAPABILITY_DISPLAY.payment_gateway_options.icon,
       enabled: pg.enabled,
+      merchantGated: merchantGates?.['payment_gateway_options'] ?? false,
       specificFeatures: pg.allowedGateways.map(g => GATEWAY_LABELS[g] || g),
+      featureStatuses: pgStatuses,
       isHighlighted: highlight === 'payment_gateway_options',
       settingsPath: CAPABILITY_DISPLAY.payment_gateway_options.settingsPath ?? null,
     });
@@ -252,22 +325,25 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const sf = caps.storefront;
   if (Object.keys(sf.features).length > 0) {
     const specifics: string[] = [];
-    // Use allowedTypes for accurate feature display (e.g. retail+service, not online+retail)
-    if (sf.allowedTypes && sf.allowedTypes.length > 0) {
-      sf.allowedTypes.forEach(t => {
-        const label = STOREFRONT_TYPE_LABELS[t];
-        if (label) specifics.push(label);
-      });
-    } else if (sf.type && sf.type !== 'none') {
-      const label = STOREFRONT_TYPE_LABELS[sf.type];
-      if (label) specifics.push(label);
-    }
+    const statuses: FeatureItem[] = [];
+    const tierTypes = sf.allowedTypes.length > 0 ? sf.allowedTypes : (sf.type !== 'none' ? [sf.type] : []);
+    tierTypes.forEach(t => {
+      const label = STOREFRONT_TYPE_LABELS[t];
+      if (label) {
+        specifics.push(label);
+        const eff = sf.effectiveType;
+        const isEnabled = eff === t || eff === 'both' || (eff !== 'none' && tierTypes.includes(eff as any) && t === eff);
+        statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
+      }
+    });
     summaries.push({
       key: 'storefront_types',
       label: CAPABILITY_DISPLAY.storefront_types.label,
       icon: CAPABILITY_DISPLAY.storefront_types.icon,
       enabled: sf.enabled,
+      merchantGated: merchantGates?.['storefront_types'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_types',
       settingsPath: CAPABILITY_DISPLAY.storefront_types.settingsPath ?? null,
     });
@@ -276,12 +352,18 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   // Barcode
   const bc = caps.barcodeScan;
   if (Object.keys(bc.features).length > 0) {
+    const bcStatuses: FeatureItem[] = bc.allowedModes.filter(m => m !== 'none').map(m => ({
+      label: BARCODE_MODE_LABELS[m] || m,
+      status: bc.effectiveModes.includes(m) ? 'enabled' : 'merchant-gated',
+    }));
     summaries.push({
       key: 'barcode_scan_options',
       label: CAPABILITY_DISPLAY.barcode_scan_options.label,
       icon: CAPABILITY_DISPLAY.barcode_scan_options.icon,
       enabled: bc.enabled,
+      merchantGated: merchantGates?.['barcode_scan_options'] ?? false,
       specificFeatures: bc.allowedModes.filter(m => m !== 'none').map(m => BARCODE_MODE_LABELS[m] || m),
+      featureStatuses: bcStatuses,
       isHighlighted: highlight === 'barcode_scan_options',
       settingsPath: CAPABILITY_DISPLAY.barcode_scan_options.settingsPath ?? null,
     });
@@ -291,16 +373,22 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const fl = caps.fulfillment;
   if (Object.keys(fl.features).length > 0) {
     const specifics: string[] = [];
-    if (fl.showsPickup) specifics.push(FULFILLMENT_LABELS.showsPickup);
-    if (fl.showsDelivery) specifics.push(FULFILLMENT_LABELS.showsDelivery);
-    if (fl.showsShipping) specifics.push(FULFILLMENT_LABELS.showsShipping);
-    if (fl.showsService) specifics.push(FULFILLMENT_LABELS.showsService);
+    const statuses: FeatureItem[] = [];
+    const addFl = (tier: boolean, label: string, eff: boolean) => {
+      if (tier) { specifics.push(label); statuses.push({ label, status: eff ? 'enabled' : 'merchant-gated' }); }
+    };
+    addFl(fl.showsPickup, FULFILLMENT_LABELS.showsPickup, fl.effectiveShowsPickup);
+    addFl(fl.showsDelivery, FULFILLMENT_LABELS.showsDelivery, fl.effectiveShowsDelivery);
+    addFl(fl.showsShipping, FULFILLMENT_LABELS.showsShipping, fl.effectiveShowsShipping);
+    addFl(fl.showsService, FULFILLMENT_LABELS.showsService, fl.showsService); // no effective for service
     summaries.push({
       key: 'fulfillment_options',
       label: CAPABILITY_DISPLAY.fulfillment_options.label,
       icon: CAPABILITY_DISPLAY.fulfillment_options.icon,
       enabled: fl.enabled,
+      merchantGated: merchantGates?.['fulfillment_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'fulfillment_options',
       settingsPath: CAPABILITY_DISPLAY.fulfillment_options.settingsPath ?? null,
     });
@@ -310,16 +398,26 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const po = caps.productOptions;
   if (Object.keys(po.features).length > 0) {
     const specifics: string[] = [];
-    po.allowedTypes.forEach(t => specifics.push(PRODUCT_TYPE_LABELS[t] || t));
-    if (po.showsVariants) specifics.push('Variants');
-    if (po.showsGallery) specifics.push('Gallery');
-    if (po.showsVideo) specifics.push('Video');
+    const statuses: FeatureItem[] = [];
+    po.allowedTypes.forEach(t => {
+      const label = PRODUCT_TYPE_LABELS[t] || t;
+      specifics.push(label);
+      statuses.push({ label, status: po.effectiveTypes.includes(t) ? 'enabled' : 'merchant-gated' });
+    });
+    const addPo = (tier: boolean, label: string, eff: boolean) => {
+      if (tier) { specifics.push(label); statuses.push({ label, status: eff ? 'enabled' : 'merchant-gated' }); }
+    };
+    addPo(po.showsVariants, 'Variants', po.effectiveShowsVariants);
+    addPo(po.showsGallery, 'Gallery', po.effectiveShowsGallery);
+    addPo(po.showsVideo, 'Video', po.effectiveShowsVideo);
     summaries.push({
       key: 'product_options',
       label: CAPABILITY_DISPLAY.product_options.label,
       icon: CAPABILITY_DISPLAY.product_options.icon,
       enabled: po.enabled,
+      merchantGated: merchantGates?.['product_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'product_options',
       settingsPath: CAPABILITY_DISPLAY.product_options.settingsPath ?? null,
     });
@@ -329,22 +427,25 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const fo = caps.featuredOptions;
   if (Object.keys(fo.features).length > 0) {
     const specifics: string[] = [];
-    // Show tenant-controlled types (resolver handles group enabled/untouched/disabled)
+    const statuses: FeatureItem[] = [];
     fo.allowedTenantTypes.forEach(t => {
       const meta = getFeaturedTypeMeta(t);
       specifics.push(meta.label);
+      statuses.push({ label: meta.label, status: fo.effectiveTenantTypes.includes(t) ? 'enabled' : 'merchant-gated' });
     });
-    // Show platform-controlled types (resolver handles group enabled/untouched/disabled)
     fo.allowedPlatformTypes.forEach(t => {
       const meta = getFeaturedTypeMeta(t);
       specifics.push(meta.label);
+      statuses.push({ label: meta.label, status: fo.effectivePlatformTypes.includes(t) ? 'enabled' : 'merchant-gated' });
     });
     summaries.push({
       key: 'featured_options',
       label: CAPABILITY_DISPLAY.featured_options.label,
       icon: CAPABILITY_DISPLAY.featured_options.icon,
       enabled: fo.enabled,
+      merchantGated: merchantGates?.['featured_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'featured_options',
       settingsPath: CAPABILITY_DISPLAY.featured_options.settingsPath ?? null,
     });
@@ -354,32 +455,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const io = caps.integrationOptions;
   if (Object.keys(io.features).length > 0) {
     const specifics: string[] = [];
-    // POS group types
-    if (io.allowedPosTypes.length > 0) {
-      io.allowedPosTypes.forEach(t => {
-        const label = INTEGRATION_TYPE_LABELS[t];
-        if (label) specifics.push(label);
-      });
-    }
-    // Google group types
-    if (io.allowedGoogleTypes.length > 0) {
-      io.allowedGoogleTypes.forEach(t => {
-        const label = INTEGRATION_TYPE_LABELS[t];
-        if (label) specifics.push(label);
-      });
-    }
-    // Org-only types (not in pos/google groups)
+    const statuses: FeatureItem[] = [];
+    io.allowedPosTypes.forEach(t => {
+      const label = INTEGRATION_TYPE_LABELS[t];
+      if (label) { specifics.push(label); statuses.push({ label, status: io.effectivePosTypes.includes(t) ? 'enabled' : 'merchant-gated' }); }
+    });
+    io.allowedGoogleTypes.forEach(t => {
+      const label = INTEGRATION_TYPE_LABELS[t];
+      if (label) { specifics.push(label); statuses.push({ label, status: io.effectiveGoogleTypes.includes(t) ? 'enabled' : 'merchant-gated' }); }
+    });
     const groupTypes = new Set([...io.allowedPosTypes, ...io.allowedGoogleTypes]);
     io.allowedTypes.filter(t => !groupTypes.has(t)).forEach(t => {
       const label = INTEGRATION_TYPE_LABELS[t];
-      if (label) specifics.push(label);
+      if (label) { specifics.push(label); statuses.push({ label, status: io.effectiveTypes.includes(t) ? 'enabled' : 'merchant-gated' }); }
     });
     summaries.push({
       key: 'integration_options',
       label: CAPABILITY_DISPLAY.integration_options.label,
       icon: CAPABILITY_DISPLAY.integration_options.icon,
       enabled: io.enabled,
+      merchantGated: merchantGates?.['integration_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'integration_options',
       settingsPath: CAPABILITY_DISPLAY.integration_options.settingsPath ?? null,
     });
@@ -389,27 +486,39 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const qo = caps.quickstartOptions;
   if (Object.keys(qo.features).length > 0) {
     const specifics: string[] = [];
-    // Product group
+    const statuses: FeatureItem[] = [];
     qo.allowedProductTypes.forEach(t => {
       const label = QUICKSTART_PRODUCT_LABELS[t];
-      if (label) specifics.push(label);
+      if (label) {
+        specifics.push(label);
+        const isEnabled = t === 'wizard' ? qo.canUseWizard : t === 'image_gen' ? qo.canGenerateImages : false;
+        statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
+      }
     });
-    // Category group
     qo.allowedCategoryTypes.forEach(t => {
       const label = QUICKSTART_CATEGORY_LABELS[t];
-      if (label) specifics.push(label);
+      if (label) {
+        specifics.push(label);
+        const isEnabled = t === 'category_generator' ? qo.canUseCategoryGenerator : false;
+        statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
+      }
     });
-    // AI group
     qo.allowedAITypes.forEach(t => {
       const label = QUICKSTART_AI_LABELS[t];
-      if (label) specifics.push(label);
+      if (label) {
+        specifics.push(label);
+        const isEnabled = t === 'ai_openai' ? qo.canUseOpenAI : t === 'ai_gemini' ? qo.canUseGemini : t === 'wizard_ai' ? qo.canUseAIWizard : t === 'image_hd' ? qo.canUseHDImages : false;
+        statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
+      }
     });
     summaries.push({
       key: 'quickstart_options',
       label: CAPABILITY_DISPLAY.quickstart_options.label,
       icon: CAPABILITY_DISPLAY.quickstart_options.icon,
       enabled: qo.enabled,
+      merchantGated: merchantGates?.['quickstart_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'quickstart_options',
       settingsPath: CAPABILITY_DISPLAY.quickstart_options.settingsPath ?? null,
     });
@@ -419,30 +528,64 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   const so = caps.storefrontOptions;
   if (Object.keys(so.features).length > 0) {
     const specifics: string[] = [];
-    so.allowedHoursTypes.forEach(t => { const l = STOREFRONT_OPT_HOURS_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedCategoryTypes.forEach(t => { const l = STOREFRONT_OPT_CATEGORY_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedRecommendTypes.forEach(t => { const l = STOREFRONT_OPT_RECOMMEND_LABELS[t]; if (l) specifics.push(l); });
-    if (so.recentlyViewedEnabled) specifics.push('Recently Viewed');
-    so.allowedInfoTypes.forEach(t => { const l = STOREFRONT_OPT_INFO_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedQRResolutions.forEach(t => { const l = STOREFRONT_OPT_QR_RESOLUTION_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedQRContentTypes.forEach(t => { const l = STOREFRONT_OPT_QR_CONTENT_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedGalleryTypes.forEach(t => { const l = STOREFRONT_OPT_GALLERY_LABELS[t]; if (l) specifics.push(l); });
-    so.allowedAdvancedTypes.forEach(t => { const l = STOREFRONT_OPT_ADVANCED_LABELS[t]; if (l) specifics.push(l); });
+    const statuses: FeatureItem[] = [];
+    const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    so.allowedHoursTypes.forEach(t => addSo(STOREFRONT_OPT_HOURS_LABELS[t], true, t === 'hours_animated' ? so.canUseAnimatedHours : t === 'hours_status' ? so.canShowHoursStatus : false));
+    so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
+    so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
+    addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
+    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
+    so.allowedQRResolutions.forEach(t => addSo(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, so.canUseQRCodes));
+    so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
+    so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
+    so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
     summaries.push({
       key: 'storefront_options',
       label: CAPABILITY_DISPLAY.storefront_options.label,
       icon: CAPABILITY_DISPLAY.storefront_options.icon,
       enabled: so.enabled,
+      merchantGated: merchantGates?.['storefront_options'] ?? false,
       specificFeatures: specifics,
+      featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_options',
       settingsPath: CAPABILITY_DISPLAY.storefront_options.settingsPath ?? null,
+    });
+  }
+
+  // FAQ Options
+  const faq = caps.faqOptions;
+  if (Object.keys(faq.features).length > 0) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addFaq = (label: string, enabled: boolean) => {
+      if (enabled) { specifics.push(label); statuses.push({ label, status: 'enabled' }); }
+    };
+    addFaq('Storefront FAQs', faq.storefrontEnabled);
+    addFaq('Product FAQs', faq.productEnabled);
+    addFaq('FAQ Templates', faq.templatesEnabled);
+    faq.allowedManagementTypes.forEach(t => addFaq(FAQ_MANAGEMENT_LABELS[t], true));
+    faq.allowedPreviewTypes.forEach(t => addFaq(FAQ_PREVIEW_LABELS[t], true));
+    faq.allowedDisplayTypes.forEach(t => addFaq(FAQ_DISPLAY_LABELS[t], true));
+    faq.allowedKbTypes.forEach(t => addFaq(FAQ_KB_LABELS[t], true));
+    summaries.push({
+      key: 'faq_options',
+      label: CAPABILITY_DISPLAY.faq_options.label,
+      icon: CAPABILITY_DISPLAY.faq_options.icon,
+      enabled: faq.enabled,
+      merchantGated: merchantGates?.['faq_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'faq_options',
+      settingsPath: CAPABILITY_DISPLAY.faq_options.settingsPath ?? null,
     });
   }
 
   return summaries;
 }
 
-export default function PlanSummaryPanel({ capabilities, loading, highlightCapability, tenantId }: PlanSummaryPanelProps) {
+export default function PlanSummaryPanel({ capabilities, loading, highlightCapability, tenantId, merchantGates }: PlanSummaryPanelProps) {
   const router = useRouter();
   if (loading || !capabilities) {
     return (
@@ -455,7 +598,7 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
   }
 
   const { tierKey, tierName, tierDescription } = capabilities;
-  const summaries = resolveCapabilitySummaries(capabilities, highlightCapability);
+  const summaries = resolveCapabilitySummaries(capabilities, highlightCapability, merchantGates);
 
   return (
     <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -493,31 +636,47 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
                 key={cap.key}
                 className={`rounded-lg p-3 border ${cap.isHighlighted
                     ? 'bg-white border-blue-300 ring-1 ring-blue-200'
-                    : 'bg-white/60 border-transparent'
+                    : cap.merchantGated
+                      ? 'bg-amber-50/50 border-amber-200'
+                      : 'bg-white/60 border-transparent'
                   } ${href ? 'cursor-pointer hover:bg-white/80 hover:border-blue-200 transition-colors' : ''}`}
                 onClick={() => href && router.push(href)}
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <span className="text-sm">{cap.icon}</span>
-                  <span className={`text-xs font-semibold ${cap.isHighlighted ? 'text-blue-800' : 'text-neutral-700'}`}>
+                  <span className={`text-xs font-semibold ${cap.isHighlighted ? 'text-blue-800' : cap.merchantGated ? 'text-amber-800' : 'text-neutral-700'}`}>
                     {cap.label}
                   </span>
                   {href && (
-                    <ExternalLink className="h-3 w-3 text-blue-500 ml-0.5" />
+                    <ExternalLink className={`h-3 w-3 ml-0.5 ${cap.merchantGated ? 'text-amber-600' : 'text-blue-500'}`} />
                   )}
-                  {!cap.enabled && (
+                  {!cap.enabled ? (
                     <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">Off</Badge>
-                  )}
+                  ) : cap.merchantGated ? (
+                    <Badge className="ml-auto text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200">Partial</Badge>
+                  ) : null}
                 </div>
-                {cap.specificFeatures.length > 0 ? (
+                {cap.featureStatuses.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
-                    {cap.specificFeatures.map(f => (
+                    {cap.featureStatuses.map(f => (
                       <span
-                        key={f}
-                        className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-800 border border-green-200"
+                        key={f.label}
+                        className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border ${
+                          f.status === 'enabled'
+                            ? 'bg-green-50 text-green-800 border-green-200'
+                            : f.status === 'merchant-gated'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}
                       >
-                        <Check className="h-2.5 w-2.5" />
-                        {f}
+                        {f.status === 'enabled' ? (
+                          <Check className="h-2.5 w-2.5" />
+                        ) : f.status === 'merchant-gated' ? (
+                          <Lock className="h-2.5 w-2.5" />
+                        ) : (
+                          <X className="h-2.5 w-2.5" />
+                        )}
+                        {f.label}
                       </span>
                     ))}
                   </div>

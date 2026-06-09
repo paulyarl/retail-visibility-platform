@@ -164,62 +164,129 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
       where: { key: capTypeData.capability_type_key },
     });
 
+    // ABOUT TO REFACTOR
+    let capType = null;
+    let transformed = null;
+
     if (existing) {
-      return res.status(409).json({
-        error: 'capability_type_key_exists',
-        message: `Capability type with key '${capTypeData.capability_type_key}' already exists`,
+      console.log(`Updating capability type: ${capTypeData.capability_type_key}`);
+      // EXISTING LOGIC
+      // Build update data
+      const dbUpdateData: any = {};
+      if (capTypeData.capability_type_name !== undefined) dbUpdateData.name = capTypeData.capability_type_name;
+      if (capTypeData.description !== undefined) dbUpdateData.description = capTypeData.description || null;
+      if (capTypeData.category !== undefined) dbUpdateData.category = capTypeData.category || null;
+      if (capTypeData.is_active !== undefined) dbUpdateData.is_active = capTypeData.is_active;
+      if (capTypeData.sort_order !== undefined) dbUpdateData.sort_order = capTypeData.sort_order;
+      dbUpdateData.updated_at = new Date();
+
+      // Update basic fields
+      await prisma.capability_type_list.update({
+        where: { key: capTypeData.capability_type_key },
+        data: dbUpdateData,
       });
-    }
 
-    // Resolve feature IDs from keys
-    const featureRecords = await prisma.features_list.findMany({
-      where: {
-        key: { in: allowed_features },
-        is_active: true,
-      },
-      select: { id: true, key: true },
-    });
-
-    const foundKeys = new Set(featureRecords.map(f => f.key));
-    const missingKeys = allowed_features.filter(k => !foundKeys.has(k));
-    if (missingKeys.length > 0) {
-      return res.status(400).json({
-        error: 'invalid_features',
-        message: `Features not found in features_list: ${missingKeys.join(', ')}`,
-      });
-    }
-
-    // Create capability type with feature links
-    const capType = await prisma.capability_type_list.create({
-      data: {
-        key: capTypeData.capability_type_key,
-        name: capTypeData.capability_type_name,
-        description: capTypeData.description || null,
-        category: capTypeData.category || null,
-        sort_order: capTypeData.sort_order,
-        is_active: capTypeData.is_active ?? true,
-        capability_features_list: {
-          create: featureRecords.map((fr, idx) => ({
-            feature_id: fr.id,
+      // If allowed_features provided, replace the feature links
+      if (allowed_features !== undefined) {
+        // Resolve feature IDs
+        const featureRecords = await prisma.features_list.findMany({
+          where: {
+            key: { in: allowed_features },
             is_active: true,
-            sort_order: idx + 1,
-          })),
-        },
-      },
-      include: {
-        capability_features_list: {
-          where: { is_active: true },
-          include: {
-            features_list: {
-              select: { key: true, name: true },
-            },
           },
-          orderBy: { sort_order: 'asc' },
-        },
-      },
-    });
+          select: { id: true, key: true },
+        });
 
-    const transformed = await transformCapabilityType(capType);
+        // Delete existing feature links
+        await prisma.capability_features_list.deleteMany({
+          where: { capability_type_id: existing.id },
+        });
+
+        // Create new feature links
+        if (featureRecords.length > 0) {
+          await prisma.capability_features_list.createMany({
+            data: featureRecords.map((fr, idx) => ({
+              capability_type_id: existing.id,
+              feature_id: fr.id,
+              is_active: true,
+              sort_order: idx + 1,
+            })),
+          });
+        }
+      }
+
+      // Fetch updated record
+      const updated = await prisma.capability_type_list.findUnique({
+        where: { key: capTypeData.capability_type_key },
+        include: {
+          capability_features_list: {
+            where: { is_active: true },
+            include: {
+              features_list: {
+                select: { key: true, name: true },
+              },
+            },
+            orderBy: { sort_order: 'asc' },
+          },
+        }
+      });
+
+      transformed = await transformCapabilityType(updated);
+
+    } else {
+      // NEW LOGIC
+      // Resolve feature IDs from keys
+      
+      console.log(`Creating capability type: ${capTypeData.capability_type_key}`);
+      
+      const featureRecords = await prisma.features_list.findMany({
+        where: {
+          key: { in: allowed_features },
+          is_active: true,
+        },
+        select: { id: true, key: true },
+      });
+
+      const foundKeys = new Set(featureRecords.map(f => f.key));
+      const missingKeys = allowed_features.filter(k => !foundKeys.has(k));
+      if (missingKeys.length > 0) {
+        return res.status(400).json({
+          error: 'invalid_features',
+          message: `Features not found in features_list: ${missingKeys.join(', ')}`,
+        });
+      }
+
+      // Create capability type with feature links
+      capType = await prisma.capability_type_list.create({
+        data: {
+          key: capTypeData.capability_type_key,
+          name: capTypeData.capability_type_name,
+          description: capTypeData.description || null,
+          category: capTypeData.category || null,
+          sort_order: capTypeData.sort_order,
+          is_active: capTypeData.is_active ?? true,
+          capability_features_list: {
+            create: featureRecords.map((fr, idx) => ({
+              feature_id: fr.id,
+              is_active: true,
+              sort_order: idx + 1,
+            })),
+          },
+        },
+        include: {
+          capability_features_list: {
+            where: { is_active: true },
+            include: {
+              features_list: {
+                select: { key: true, name: true },
+              },
+            },
+            orderBy: { sort_order: 'asc' },
+          },
+        },
+      });
+    }
+    transformed = await transformCapabilityType(capType);
     res.status(201).json(transformed);
   } catch (error) {
     console.error('[POST /api/admin/capability-types] Error:', error);

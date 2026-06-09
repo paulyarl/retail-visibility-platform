@@ -3184,6 +3184,35 @@ model tenant_featured_options_settings {
   @@index([tenant_id], map: "idx_featured_options_tenant")
 }
 
+/// Per-tenant FAQ feature toggles for merchant gate
+model tenant_faq_options_settings {
+  id                               String    @id @db.VarChar(255)
+  tenant_id                        String    @unique @db.VarChar(255)
+  faq_enabled                      Boolean?  @default(true)
+  faq_storefront_enabled           Boolean?  @default(true)
+  faq_product_enabled              Boolean?  @default(true)
+  faq_templates_enabled            Boolean?  @default(true)
+  faq_chatbot_knowledge_base       Boolean?  @default(false)
+  faq_management_hub               Boolean?  @default(true)
+  faq_management_templates         Boolean?  @default(true)
+  faq_management_import            Boolean?  @default(true)
+  faq_management_bulk_actions      Boolean?  @default(true)
+  faq_management_reorder           Boolean?  @default(true)
+  faq_management_search            Boolean?  @default(true)
+  faq_preview_bot                  Boolean?  @default(false)
+  faq_preview_gap_report           Boolean?  @default(false)
+  faq_display_storefront_accordion Boolean?  @default(true)
+  faq_display_product_accordion    Boolean?  @default(true)
+  faq_display_feedback             Boolean?  @default(true)
+  faq_display_bot_handoff          Boolean?  @default(false)
+  created_at                       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                       DateTime? @default(now()) @db.Timestamp(6)
+  faq_kb_coverage_metrics          Boolean?  @default(false)
+  tenants                          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faq_options_settings_tenant")
+
+  @@index([tenant_id], map: "idx_faq_options_tenant")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_quickstart_options_settings {
   id                            String    @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
@@ -3514,6 +3543,8 @@ model tenants {
   directory_photos                                                                       directory_photos[]
   directory_settings_list                                                                directory_settings_list?
   download_access_logs                                                                   download_access_logs[]
+  faq_categories                                                                         faq_categories[]
+  faqs                                                                                   faqs[]
   featured_products                                                                      featured_products[]
   fulfillment_notifications                                                              fulfillment_notifications[]
   fulfillment_schedules                                                                  fulfillment_schedules[]
@@ -3559,6 +3590,7 @@ model tenants {
   tenant_barcode_scan_settings                                                           tenant_barcode_scan_settings?
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_commerce_settings                                                               tenant_commerce_settings?
+  tenant_faq_options_settings                                                            tenant_faq_options_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_featured_options_settings                                                       tenant_featured_options_settings?
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
@@ -3895,6 +3927,88 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
+}
+
+model faq_categories {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String   @db.VarChar(255)
+  name          String   @db.VarChar(100)
+  display_order Int      @default(0)
+  is_global     Boolean  @default(false)
+  template_id   String?  @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+  tenants       tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faq_categories_tenant")
+  faqs          faqs[]
+
+  @@index([display_order], map: "idx_faq_categories_display_order")
+  @@index([tenant_id], map: "idx_faq_categories_tenant_id")
+}
+
+model faqs {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String              @db.VarChar(255)
+  category_id   String?             @db.Uuid
+  question      String              @db.VarChar(500)
+  answer        String
+  scope         String              @default("storefront") @db.VarChar(20)
+  status        String              @default("draft") @db.VarChar(20)
+  tags          String[]            @db.VarChar(50)
+  display_order Int                 @default(0)
+  view_count    Int                 @default(0)
+  created_at    DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime            @default(now()) @db.Timestamptz(6)
+  faq_feedback  faq_feedback[]
+  product_links faq_product_links[]
+  category      faq_categories?     @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faqs_category")
+  tenant        tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faqs_tenant")
+
+  @@index([display_order], map: "idx_faqs_display_order")
+  @@index([status], map: "idx_faqs_status")
+  @@index([tenant_id, category_id], map: "idx_faqs_tenant_category")
+  @@index([tenant_id, scope, status], map: "idx_faqs_tenant_scope_status")
+}
+
+model faq_product_links {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  faq_id             String   @db.Uuid
+  product_id         String   @db.VarChar(255)
+  inherit_storefront Boolean  @default(false)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  faq                faqs     @relation(fields: [faq_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faq_product_links_faq")
+
+  @@unique([faq_id, product_id], map: "idx_faq_product_links_faq_product")
+  @@index([product_id], map: "idx_faq_product_links_product_id")
+}
+
+model faq_templates {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?
+  category    String   @db.VarChar(50)
+  status      String   @default("active") @db.VarChar(20)
+  pairs       Json     @default("[]")
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([category], map: "idx_faq_templates_category")
+  @@index([status], map: "idx_faq_templates_status")
+}
+
+model faq_feedback {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  faq_id     String   @db.Uuid
+  tenant_id  String   @db.VarChar(255)
+  type       String   @db.VarChar(20)
+  comment    String?
+  email      String?  @db.VarChar(255)
+  ip_address String?  @db.VarChar(45)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  faqs       faqs     @relation(fields: [faq_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faq_feedback_faq")
+
+  @@index([faq_id], map: "idx_faq_feedback_faq_id")
+  @@index([tenant_id], map: "idx_faq_feedback_tenant_id")
+  @@index([type], map: "idx_faq_feedback_type")
 }
 
 enum action {

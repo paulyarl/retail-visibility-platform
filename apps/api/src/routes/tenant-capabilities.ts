@@ -28,6 +28,8 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
   featured_options: 'featured_',
   integration_options: 'integration_',
   quickstart_options: 'quickstart_',
+  faq_options: 'faq_',
+  chatbot_options: 'chatbot_',
 };
 
 /**

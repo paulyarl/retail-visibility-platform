@@ -392,6 +392,56 @@ export interface StorefrontOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- FAQ Options ---
+
+export type FaqManagementType =
+  | 'faq_management_hub'
+  | 'faq_management_templates'
+  | 'faq_management_import'
+  | 'faq_management_wizard_inline'
+  | 'faq_management_bulk_actions'
+  | 'faq_management_reorder'
+  | 'faq_management_search';
+
+export type FaqPreviewType =
+  | 'faq_preview_bot'
+  | 'faq_preview_gap_report'
+  | 'faq_preview_auto_suggest';
+
+export type FaqDisplayType =
+  | 'faq_display_storefront_accordion'
+  | 'faq_display_product_accordion'
+  | 'faq_display_search_overlay'
+  | 'faq_display_feedback'
+  | 'faq_display_bot_handoff'
+  | 'faq_display_markdown'
+  | 'faq_display_deep_link';
+
+export type FaqKnowledgeBaseType =
+  | 'faq_kb_static_lookup'
+  | 'faq_kb_rag_retrieval'
+  | 'faq_kb_product_scoped'
+  | 'faq_kb_auto_sync'
+  | 'faq_kb_coverage_metrics';
+
+export interface FaqOptionsState {
+  enabled: boolean;
+  storefrontEnabled: boolean;
+  productEnabled: boolean;
+  templatesEnabled: boolean;
+  managementEnabled: boolean;
+  previewEnabled: boolean;
+  displayEnabled: boolean;
+  kbEnabled: boolean;
+  allowedManagementTypes: FaqManagementType[];
+  allowedPreviewTypes: FaqPreviewType[];
+  allowedDisplayTypes: FaqDisplayType[];
+  allowedKbTypes: FaqKnowledgeBaseType[];
+  isFlexible: boolean;
+  faqAvailable: boolean;
+  features: Record<string, boolean>;
+}
+
 // --- Quickstart Options ---
 
 export type QuickstartProductType = 'wizard' | 'image_gen';
@@ -462,6 +512,7 @@ export interface AllCapabilitiesState {
   integrationOptions: IntegrationOptionsState;
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
+  faqOptions: FaqOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -480,6 +531,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   integration_: 'integration_options',
   quickstart_: 'quickstart_options',
   storefront_opt_: 'storefront_options',
+  faq_: 'faq_options',
+  chatbot_: 'chatbot_options',
 };
 
 /**
@@ -1502,6 +1555,113 @@ export function resolveStorefrontState(
   };
 }
 
+/**
+ * Resolve FAQ options state from raw capability features
+ */
+export function resolveFaqOptionsState(
+  features: Record<string, boolean>
+): FaqOptionsState {
+  const enabled = !!features.faq_enabled;
+  const disabled = !!features.faq_disabled;
+  const flexible = !!features.faq_flexible;
+
+  // Scope group gates (storefront, product, templates)
+  const storefrontGroupEnabled = !!features.faq_storefront_enabled;
+  const storefrontGroupDisabled = !!features.faq_storefront_disabled;
+  const productGroupEnabled = !!features.faq_product_enabled;
+  const productGroupDisabled = !!features.faq_product_disabled;
+  const templatesGroupEnabled = !!features.faq_templates_enabled;
+  const templatesGroupDisabled = !!features.faq_templates_disabled;
+
+  const storefrontEnabled = flexible || (storefrontGroupEnabled && !storefrontGroupDisabled);
+  const productEnabled = flexible || (productGroupEnabled && !productGroupDisabled);
+  const templatesEnabled = flexible || (templatesGroupEnabled && !templatesGroupDisabled);
+
+  const managementGroupEnabled = !!features.faq_management_enabled;
+  const managementGroupDisabled = !!features.faq_management_disabled;
+  const previewGroupEnabled = !!features.faq_preview_enabled;
+  const previewGroupDisabled = !!features.faq_preview_disabled;
+  const displayGroupEnabled = !!features.faq_display_enabled;
+  const displayGroupDisabled = !!features.faq_display_disabled;
+  const kbGroupEnabled = !!features.faq_kb_enabled;
+  const kbGroupDisabled = !!features.faq_kb_disabled;
+
+  const managementEnabled = managementGroupEnabled && !managementGroupDisabled;
+  const managementUntouched = !managementGroupEnabled && !managementGroupDisabled;
+  const previewEnabled = previewGroupEnabled && !previewGroupDisabled;
+  const previewUntouched = !previewGroupEnabled && !previewGroupDisabled;
+  const displayEnabled = displayGroupEnabled && !displayGroupDisabled;
+  const displayUntouched = !displayGroupEnabled && !displayGroupDisabled;
+  const kbEnabled = kbGroupEnabled && !kbGroupDisabled;
+  const kbUntouched = !kbGroupEnabled && !kbGroupDisabled;
+
+  const allowedManagementTypes: FaqManagementType[] = [];
+  if (flexible || managementEnabled) {
+    allowedManagementTypes.push('faq_management_hub', 'faq_management_templates', 'faq_management_import', 'faq_management_wizard_inline', 'faq_management_bulk_actions', 'faq_management_reorder', 'faq_management_search');
+  } else if (managementUntouched) {
+    if (features.faq_management_hub) allowedManagementTypes.push('faq_management_hub');
+    if (features.faq_management_templates) allowedManagementTypes.push('faq_management_templates');
+    if (features.faq_management_import) allowedManagementTypes.push('faq_management_import');
+    if (features.faq_management_wizard_inline) allowedManagementTypes.push('faq_management_wizard_inline');
+    if (features.faq_management_bulk_actions) allowedManagementTypes.push('faq_management_bulk_actions');
+    if (features.faq_management_reorder) allowedManagementTypes.push('faq_management_reorder');
+    if (features.faq_management_search) allowedManagementTypes.push('faq_management_search');
+  }
+
+  const allowedPreviewTypes: FaqPreviewType[] = [];
+  if (flexible || previewEnabled) {
+    allowedPreviewTypes.push('faq_preview_bot', 'faq_preview_gap_report', 'faq_preview_auto_suggest');
+  } else if (previewUntouched) {
+    if (features.faq_preview_bot) allowedPreviewTypes.push('faq_preview_bot');
+    if (features.faq_preview_gap_report) allowedPreviewTypes.push('faq_preview_gap_report');
+    if (features.faq_preview_auto_suggest) allowedPreviewTypes.push('faq_preview_auto_suggest');
+  }
+
+  const allowedDisplayTypes: FaqDisplayType[] = [];
+  if (flexible || displayEnabled) {
+    allowedDisplayTypes.push('faq_display_storefront_accordion', 'faq_display_product_accordion', 'faq_display_search_overlay', 'faq_display_feedback', 'faq_display_bot_handoff', 'faq_display_markdown', 'faq_display_deep_link');
+  } else if (displayUntouched) {
+    if (features.faq_display_storefront_accordion) allowedDisplayTypes.push('faq_display_storefront_accordion');
+    if (features.faq_display_product_accordion) allowedDisplayTypes.push('faq_display_product_accordion');
+    if (features.faq_display_search_overlay) allowedDisplayTypes.push('faq_display_search_overlay');
+    if (features.faq_display_feedback) allowedDisplayTypes.push('faq_display_feedback');
+    if (features.faq_display_bot_handoff) allowedDisplayTypes.push('faq_display_bot_handoff');
+    if (features.faq_display_markdown) allowedDisplayTypes.push('faq_display_markdown');
+    if (features.faq_display_deep_link) allowedDisplayTypes.push('faq_display_deep_link');
+  }
+
+  const allowedKbTypes: FaqKnowledgeBaseType[] = [];
+  if (flexible || kbEnabled) {
+    allowedKbTypes.push('faq_kb_static_lookup', 'faq_kb_rag_retrieval', 'faq_kb_product_scoped', 'faq_kb_auto_sync', 'faq_kb_coverage_metrics');
+  } else if (kbUntouched) {
+    if (features.faq_kb_static_lookup) allowedKbTypes.push('faq_kb_static_lookup');
+    if (features.faq_kb_rag_retrieval) allowedKbTypes.push('faq_kb_rag_retrieval');
+    if (features.faq_kb_product_scoped) allowedKbTypes.push('faq_kb_product_scoped');
+    if (features.faq_kb_auto_sync) allowedKbTypes.push('faq_kb_auto_sync');
+    if (features.faq_kb_coverage_metrics) allowedKbTypes.push('faq_kb_coverage_metrics');
+  }
+
+  const allTypes = [...allowedManagementTypes, ...allowedPreviewTypes, ...allowedDisplayTypes, ...allowedKbTypes];
+
+  return {
+    enabled: enabled && !disabled,
+    storefrontEnabled: enabled && !disabled && storefrontEnabled,
+    productEnabled: enabled && !disabled && productEnabled,
+    templatesEnabled: enabled && !disabled && templatesEnabled,
+    managementEnabled,
+    previewEnabled,
+    displayEnabled,
+    kbEnabled,
+    allowedManagementTypes,
+    allowedPreviewTypes,
+    allowedDisplayTypes,
+    allowedKbTypes,
+    isFlexible: flexible,
+    faqAvailable: enabled && !disabled && allTypes.length > 0,
+    features,
+  };
+}
+
 // ====================
 // CUSTOMER-FACING SERVICE (CustomerApiSingleton)
 // ====================
@@ -1794,6 +1954,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
+    const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -1809,8 +1970,17 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
+      faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
+  }
+
+  /**
+   * Get FAQ options state for a tenant
+   */
+  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.faqOptions;
   }
 }
 
@@ -2072,6 +2242,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get FAQ options state for a tenant
+   */
+  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.faqOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -2098,6 +2276,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
+    const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
 
     return {
       tierKey: data.tier_key,
@@ -2113,6 +2292,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
+      faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

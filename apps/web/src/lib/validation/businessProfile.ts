@@ -133,6 +133,8 @@ export type BusinessProfile = {
   longitude?: number | null;
   slug?: string;
   tenant_id?: string;
+  hasFeaturedProducts?: boolean;
+  hasPublishedDirectory?: boolean;
 };
 
 // Onboarding schema - only validates fields shown on the StoreIdentityStep form

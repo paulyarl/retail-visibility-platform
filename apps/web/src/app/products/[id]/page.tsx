@@ -33,6 +33,8 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
@@ -325,6 +327,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
+  const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
@@ -794,6 +797,19 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
 
         </ProductPageStatusWrapper>
+
+        {/* Product FAQs */}
+        {faqOptionsFlags?.faq_enabled && faqOptionsFlags?.faq_display_product_accordion && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <FaqProductDisplay
+              tenantId={product.tenantId}
+              productId={product.id}
+              merchantName={businessName}
+              enabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_product_accordion}
+              feedbackEnabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_feedback}
+            />
+          </div>
+        )}
 
         {/* Recently Viewed Products */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
