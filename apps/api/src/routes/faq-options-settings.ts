@@ -120,10 +120,15 @@ router.get('/:tenantId/faq-options', authenticateToken, async (req, res) => {
       tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
     }
 
-    // Display features
+    // Display features — clamp to scope-specific tier gates
     const displayKeys = ['faq_display_storefront_accordion', 'faq_display_product_accordion', 'faq_display_feedback', 'faq_display_bot_handoff'] as const;
     for (const key of displayKeys) {
-      const isAllowed = tierState.displayEnabled || tierState.allowedDisplayTypes.includes(key as any);
+      let isAllowed = tierState.displayEnabled || tierState.allowedDisplayTypes.includes(key as any);
+      if (key === 'faq_display_storefront_accordion') {
+        isAllowed = isAllowed && tierState.storefrontEnabled;
+      } else if (key === 'faq_display_product_accordion') {
+        isAllowed = isAllowed && tierState.productEnabled;
+      }
       tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
     }
 
@@ -240,9 +245,14 @@ router.put('/:tenantId/faq-options', authenticateToken, async (req, res) => {
         }
         continue;
       }
-      // Display features
+      // Display features — clamp to scope-specific tier gates
       if (key.startsWith('faq_display_')) {
-        const isAllowed = tierState.displayEnabled || tierState.allowedDisplayTypes.includes(key as any);
+        let isAllowed = tierState.displayEnabled || tierState.allowedDisplayTypes.includes(key as any);
+        if (key === 'faq_display_storefront_accordion') {
+          isAllowed = isAllowed && tierState.storefrontEnabled;
+        } else if (key === 'faq_display_product_accordion') {
+          isAllowed = isAllowed && tierState.productEnabled;
+        }
         if (isAllowed) {
           filteredData[key] = value;
         } else if (value === true) {

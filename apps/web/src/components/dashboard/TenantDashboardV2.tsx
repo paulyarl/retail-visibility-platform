@@ -33,7 +33,7 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from "@/utils/behaviorTracking";
 import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 import { faqService } from '@/services/FaqService';
-import { canManageTenantSettings } from "@/lib/auth/access-control";
+import { canManageTenantSettings, isPlatformAdmin, isTenantOwner } from "@/lib/auth/access-control";
 
 import DashboardSkeleton from "./DashboardSkeleton";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
@@ -87,6 +87,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   const [businessFAQsLoading, setBusinessFAQsLoading] = useState(true);
 
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
+  const canManageCapabilities = user ? (isPlatformAdmin(user) || isTenantOwner(user)) : false;
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
   const { status: hoursStatus } = useStoreStatus(tenantId || tenantData?.id || "", false);
@@ -433,7 +434,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                   <Settings className="w-5 h-5 text-purple-600" />
                   <h3 className="font-semibold text-gray-900">Capabilities for You</h3>
                 </div>
-                {tier && (
+                {tier && canManageCapabilities && (
                   <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} merchantGates={merchantGates} />
                 )}
               </div>
