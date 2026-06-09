@@ -38,7 +38,7 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
       id: 'storefront',
       label: 'View Storefront',
       description: 'Preview your online storefront',
-      href: `/t/${tenantId}/storefront`,
+      href: `/tenant/${tenantId}`,
       icon: Globe,
       variant: 'storefront',
     });
@@ -49,7 +49,7 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
       id: 'directory',
       label: 'Directory Listing',
       description: 'Manage your retail directory presence',
-      href: `/t/${tenantId}/directory`,
+      href: `/t/${tenantId}/settings/directory`,
       icon: Building2,
       variant: 'storefront',
     });
@@ -166,9 +166,8 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
       <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="storefront_types" tenantId={tenantId} />
 
       {message && (
-        <div className={`p-3 rounded-lg flex items-center gap-2 ${
-          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
+        <div className={`p-3 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm">{message.text}</span>
         </div>
@@ -237,15 +236,13 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                 <div
                   key={value}
                   onClick={() => canSelect && handleTypeChange(value)}
-                  className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
-                    isSelected && canSelect
+                  className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${isSelected && canSelect
                       ? 'bg-primary-50 border-primary-300 ring-1 ring-primary-300'
                       : 'bg-gray-50 border-gray-200'
-                  } ${canSelect ? 'cursor-pointer hover:border-gray-300' : 'opacity-60 cursor-not-allowed'}`}
+                    } ${canSelect ? 'cursor-pointer hover:border-gray-300' : 'opacity-60 cursor-not-allowed'}`}
                 >
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                    isSelected && canSelect ? 'bg-primary-100' : 'bg-gray-200'
-                  }`}>
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${isSelected && canSelect ? 'bg-primary-100' : 'bg-gray-200'
+                    }`}>
                     <IconComp className={`h-5 w-5 ${isSelected && canSelect ? 'text-primary-600' : 'text-neutral-500'}`} />
                   </div>
                   <div className="flex-1">
@@ -262,11 +259,10 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                     </div>
                     <p className="text-sm text-neutral-600">{description}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    isSelected && canSelect
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected && canSelect
                       ? 'border-primary-500 bg-primary-500'
                       : 'border-gray-300'
-                  }`}>
+                    }`}>
                     {isSelected && canSelect && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
                 </div>
