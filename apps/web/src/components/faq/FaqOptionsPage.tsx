@@ -106,8 +106,8 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     description: 'Control how FAQs appear to customers on your storefront and product pages',
     icon: <Store className="h-5 w-5 text-green-600" />,
     features: [
-      { key: 'faq_display_storefront_accordion', label: 'Storefront Accordion', description: 'Accordion-style FAQ display on storefront', icon: <Store className="h-5 w-5 text-green-600" /> },
-      { key: 'faq_display_product_accordion', label: 'Product Accordion', description: 'Accordion-style FAQ display on product pages', icon: <Package className="h-5 w-5 text-green-600" /> },
+      { key: 'faq_display_storefront_accordion', label: 'Storefront Accordion', description: 'Accordion-style FAQ display on storefront', icon: <Store className="h-5 w-5 text-green-600" />, tierGate: 'storefront' },
+      { key: 'faq_display_product_accordion', label: 'Product Accordion', description: 'Accordion-style FAQ display on product pages', icon: <Package className="h-5 w-5 text-green-600" />, tierGate: 'product' },
       { key: 'faq_display_feedback', label: 'Feedback Buttons', description: 'Thumbs up/down + Suggest Edit on each answer', icon: <ThumbsUp className="h-5 w-5 text-green-600" /> },
       { key: 'faq_display_bot_handoff', label: 'Bot Handoff', description: 'Ask our bot CTA in FAQ sections', icon: <Bot className="h-5 w-5 text-green-600" /> },
     ],
