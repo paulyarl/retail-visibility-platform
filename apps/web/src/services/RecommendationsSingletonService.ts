@@ -636,32 +636,12 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
 
   /**
    * Get tenant directory slug
-   * Public endpoint for directory tenant lookup
+   * Delegates to TenantDirectorySingletonService for a single canonical implementation.
    */
-  async getTenantDirectorySlug(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      const response = await this.makeDefaultRequest<any>(
-        `/api/directory/tenant/${tenantId}`,
-        {},
-        `tenant-directory-slug-${tenantId}`,
-        this.STATIC_TTL
-      );
-
-      if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get tenant directory slug:', response.error);
-        return null;
-      }
-      console.log('[RecommendationsSingleton] Tenant directory slug response:', response.data);
-
-      return response.data;
-    } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get tenant directory slug:', error);
-      return null;
-    }
+  async getTenantDirectorySlug(tenantId: string): Promise<string | null> {
+    const { tenantDirectoryService } = await import('./TenantDirectorySingletonService');
+    const slug = await tenantDirectoryService.getTenantSlug(tenantId);
+    return slug ?? null;
   }
 
   /**

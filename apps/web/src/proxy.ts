@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
+import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
@@ -252,29 +253,23 @@ export async function proxy(req: NextRequest) {
           return res;
         }
         
-        // Try to get the actual slug from directory
-        const directoryRes = await fetch(`${apiBaseUrl}/api/directory/tenant/${tenantId}`);
-        console.log(`[Proxy] Directory res:`, directoryRes);
-        if (directoryRes.ok) {
-          const directoryData = await directoryRes.json();
-          console.log(`[Proxy] Directory data:`, directoryData);
-          if (directoryData.listing?.slug) {
-            const slug = directoryData.listing.slug;
-            const destUrl = new URL(`/shops/${slug}${remainingPath}`, req.url);
-            
-            // Preserve query params
-            const sourceUrl = new URL(req.url);
-            sourceUrl.searchParams.forEach((value, key) => {
-              destUrl.searchParams.set(key, value);
-            });
+        // Try to get the actual slug from directory (uses canonical helper)
+        const slug = await fetchTenantDirectorySlug(tenantId, apiBaseUrl);
+        if (slug) {
+          const destUrl = new URL(`/shops/${slug}${remainingPath}`, req.url);
 
-            console.log(`[Proxy] Shops tenant redirect: ${pathname} → ${destUrl.toString()}`);
-            
-            const res = NextResponse.redirect(destUrl, { status: 301 });
-            const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
-            setCookie(res, 'tcx', tcx);
-            return res;
-          }
+          // Preserve query params
+          const sourceUrl = new URL(req.url);
+          sourceUrl.searchParams.forEach((value, key) => {
+            destUrl.searchParams.set(key, value);
+          });
+
+          console.log(`[Proxy] Shops tenant redirect: ${pathname} → ${destUrl.toString()}`);
+
+          const res = NextResponse.redirect(destUrl, { status: 301 });
+          const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+          setCookie(res, 'tcx', tcx);
+          return res;
         }
       }
     } catch (error) {

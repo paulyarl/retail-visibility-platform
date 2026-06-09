@@ -1,6 +1,5 @@
 'use client';
 
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect, use } from 'react';
 import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
@@ -75,59 +74,39 @@ interface StoreDetailPageProps {
   }>;
 }
 
-async function getConsolidatedDirectoryData(identifier: string) {
+type DirectoryResult =
+  | { type: 'listing'; data: any }
+  | { type: 'pending'; tenantId: string }
+  | null;
+
+async function getConsolidatedDirectoryData(identifier: string): Promise<DirectoryResult> {
   try {
     // First, try to load as a slug (most common case)
-    try {
-      const data = await directoryService.getDirectoryConsolidated(identifier);
-      //  let tenantLogo; 
+    const data = await directoryService.getDirectoryConsolidated(identifier);
 
-      // Check if data has listing property - if not, might be tenant ID case
-      if (!data?.listing) {
-        // More flexible pattern - tenant IDs start with 'tid-' followed by alphanumeric characters
-        const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
-
-        if (isTenantId) {
-          // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
-          const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
-
-          if (resolvedSlug) {
-            // console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
-            const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
-            // console.log(`[Directory] Resolved data:`, resolvedData);
-            //   tenantlogo = await publicTenantInfoService.getTenantLogoFromDiscovery(identifier);
-            return resolvedData;
-          } else {
-            // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
-            return null;
-          }
-        } else {
-          return data; // Return original data (will trigger 404)
-        }
-      }
-
-      return data;
-    } catch (slugError) {
-      // If slug fails, check if it might be a tenant ID and try resolution
-      const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
-
-      if (isTenantId) {
-        // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
-        const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
-        // console.log(`[Directory] Resolved tenant ID to slug: ${resolvedSlug}`);
-
-        if (!resolvedSlug) {
-          // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
-          return null;
-        }
-
-        const data = await directoryService.getDirectoryConsolidated(resolvedSlug);
-        // console.log(`[Directory] Resolved data:`, data);
-        return data;
-      } else {
-        throw slugError;
-      }
+    if (data?.listing) {
+      return { type: 'listing', data };
     }
+
+    // No listing — try resolving identifier (slug or tenantId) to a tenant
+    const status = await tenantDirectoryService.getTenantDirectoryStatus(identifier);
+
+    if (!status) {
+      return null; // Identifier not found anywhere — true 404
+    }
+
+    if (!status.hasDirectoryListing || !status.slug) {
+      // Tenant exists but directory listing is not published
+      return { type: 'pending', tenantId: status.tenantId || identifier };
+    }
+
+    // Has published slug — fetch by slug
+    const resolvedData = await directoryService.getDirectoryConsolidated(status.slug);
+    if (resolvedData?.listing) {
+      return { type: 'listing', data: resolvedData };
+    }
+
+    return null;
   } catch (error) {
     console.error(`[Directory] Error fetching consolidated directory data for ${identifier}:`, error);
     return null;
@@ -425,19 +404,32 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const showsMap = optFlags?.showMapDisplay ?? true;
   const showsLocation = optFlags?.showLocationDisplay ?? true;
 
+  // Pending publication state (tenant exists but no directory listing)
+  const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
+
+  // Explicit not-found state (notFound() inside useEffect is unreliable in client components)
+  const [isNotFound, setIsNotFound] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const { slug: identifier } = await params;
-        // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
-        const data = await getConsolidatedDirectoryData(identifier);
-        // console.log(`[Directory] Consolidated data 2:`, data);
+        const result = await getConsolidatedDirectoryData(identifier);
 
-        if (!data?.listing) {
-          notFound();
+        if (result === null) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
 
+        if (result.type === 'pending') {
+          setPendingTenantId(result.tenantId);
+          setLoading(false);
+          return;
+        }
+
+        // result.type === 'listing'
+        const data = result.data;
         setConsolidatedData(data);
 
         // Fetch tenant logo
@@ -499,6 +491,45 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
     fetchData();
   }, [params]);
+
+  if (isNotFound) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <svg
+              className="w-8 h-8 text-red-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Store Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            We couldn&apos;t find a store with that name. It may have been removed or the URL might be incorrect.
+          </p>
+          <Link
+            href="/directory"
+            className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Browse Directory
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (pendingTenantId) {
+    return <StoreComingSoon tenantId={pendingTenantId} />;
+  }
 
   if (loading || !consolidatedData) {
     return (
@@ -857,6 +888,18 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               )}
 
 
+              {/* FAQ Section */}
+              {faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion && consolidatedData?.listing?.tenantId && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <FaqStorefrontDisplay
+                    tenantId={consolidatedData.listing.tenantId}
+                    enabled={faqFlags.faq_enabled && faqFlags.faq_display_storefront_accordion}
+                    feedbackEnabled={faqFlags.faq_enabled && faqFlags.faq_display_feedback}
+                    defaultExpanded={false}
+                  />
+                </div>
+              )}
+
               {/* Store Ratings and Reviews - Social Proof */}
               {!showStatusPanel && (
                 <div id="reviews-section" className="flex w-full">
@@ -1001,23 +1044,86 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         )
       }
 
-      {/* FAQ Section */}
-      {faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion && consolidatedData?.listing?.tenantId && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <FaqStorefrontDisplay
-            tenantId={consolidatedData.listing.tenantId}
-            enabled={faqFlags.faq_enabled && faqFlags.faq_display_storefront_accordion}
-            feedbackEnabled={faqFlags.faq_enabled && faqFlags.faq_display_feedback}
-          />
-        </div>
-      )}
-
       {/* Recently Viewed */}
       {optFlags?.showRecentlyViewed !== false && <LastViewed />}
 
       {/* Platform Branding Footer */}
       <PoweredByFooter />
     </>
+  );
+}
+
+function StoreComingSoon({ tenantId }: { tenantId: string }) {
+  const { data: storefrontCapability } = useStorefrontCapability(tenantId);
+  const storefrontEnabled = storefrontCapability?.enabled ?? false;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
+          <svg
+            className="w-8 h-8 text-yellow-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+          Store Coming Soon
+        </h1>
+
+        <p className="text-gray-600 mb-6 leading-relaxed">
+          This store&apos;s directory listing is pending publication.
+          Please check back soon to see their full storefront and product catalog.
+        </p>
+
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
+          <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+          <span className="text-sm font-medium text-yellow-800">
+            Awaiting publication
+          </span>
+        </div>
+
+        {storefrontEnabled && (
+          <Link
+            href={`/tenant/${tenantId}`}
+            className="inline-flex items-center justify-center w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors mb-4"
+          >
+            <Globe className="w-5 h-5 mr-2" />
+            Visit Storefront
+          </Link>
+        )}
+
+        <Link
+          href="/directory"
+          className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <svg
+            className="w-5 h-5 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
+          </svg>
+          Browse Directory
+        </Link>
+      </div>
+    </div>
   );
 }
 

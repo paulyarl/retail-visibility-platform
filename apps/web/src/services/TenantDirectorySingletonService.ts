@@ -48,6 +48,13 @@ export interface TenantDirectoryListing {
   publishedAt?: string;
 }
 
+export interface TenantDirectoryStatus {
+  slug: string | null;
+  tenantId: string;
+  identifierType?: string;
+  hasDirectoryListing: boolean;
+}
+
 class TenantDirectorySingletonService extends TenantApiSingleton {
   public getServiceCachePatterns(): string[] {
     throw new Error('Method not implemented.');
@@ -71,6 +78,39 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get full tenant directory status (slug + hasDirectoryListing)
+   * Safe for SSR; returns null on error or when tenant is not found.
+   */
+  async getTenantDirectoryStatus(tenantId: string): Promise<TenantDirectoryStatus | null> {
+    if (!tenantId) {
+      console.error('[TenantDirectorySingleton] getTenantDirectoryStatus: tenantId is required');
+      return null;
+    }
+
+    const isServer = typeof window === 'undefined';
+
+    try {
+      const result = isServer
+        ? await this.makeDefaultRequest<TenantDirectoryStatus>(`/directory/tenant/${tenantId}`, { method: 'GET' })
+        : await super.makeDefaultRequest<TenantDirectoryStatus>(
+            `/api/directory/tenant/${tenantId}`,
+            {},
+            `tenant-directory-status-${tenantId}`,
+            this.cacheTTL
+          );
+
+      if (!result.success || !result.data) {
+        return null;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to get tenant directory status:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get tenant slug with caching
    * Uses the /api/directory/tenant/:tenantId endpoint
    */
@@ -89,12 +129,12 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       console.log('[TenantDirectorySingleton] Making tenant slug request during SSR');
       try {
         // Use makeDefaultRequest for SSR requests (this is already a TenantApiSingleton)
-        const result = await this.makeDefaultRequest<{ slug: string }>(`/directory/tenant/${tenantId}`, {
+        const result = await this.makeDefaultRequest<{ slug: string | null }>(`/directory/tenant/${tenantId}`, {
           method: 'GET'
         });
         console.log('[TenantDirectorySingleton] SSR tenant slug result:', result);
-        
-        return result.data?.slug;
+
+        return result.data?.slug ?? undefined;
       } catch (error) {
         console.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', error);
         return undefined;

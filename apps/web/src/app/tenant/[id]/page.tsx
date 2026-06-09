@@ -37,6 +37,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
 import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
 import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
@@ -439,7 +440,15 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch storefront type settings:', e);
     }
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings };
+    // Fetch FAQ option flags server-side (no client waterfall)
+    let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
+    try {
+      faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch FAQ option flags:', e);
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -509,7 +518,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {
@@ -687,6 +696,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
           initialCommerceSettings={commerceSettings}
           initialPaymentGatewaySettings={paymentGatewaySettings}
           initialStorefrontTypeSettings={storefrontTypeSettings}
+          initialFaqFlags={faqOptionsFlags}
         />
       </TenantPaymentProvider>
     </ProductSingletonProvider>

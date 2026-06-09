@@ -76,65 +76,11 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
 
   /**
    * Get tenant slug with caching
-   * Uses delegation pattern: setup → execution
+   * Delegates to TenantDirectorySingletonService for a single canonical implementation.
    */
   async getTenantSlug(tenantId: string): Promise<string | undefined> {
-    if (!tenantId) {
-      console.error('[TenantDirectorySingletonV2] getTenantSlug: tenantId is required');
-      return undefined;
-    }
-
-    // Check if we're in a server environment where auth might not be available
-    const isServer = typeof window === 'undefined';
-    
-    // During SSR, we should not make authenticated requests at all
-    // The tenant slug will be fetched client-side
-    if (isServer) {
-      // console.log('[TenantDirectorySingletonV2] Skipping tenant slug fetch during SSR');
-      return undefined;
-    }
-    
-    // Add retry logic for connection issues during startup
-    const maxRetries = 3;
-    const retryDelay = 1000; // 1 second
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Using makeDefaultRequest with delegation pattern
-        const result = await this.makeDefaultRequest<TenantSlugResponse>(
-          `/api/directory/tenant/${tenantId}`,
-          {},
-          `tenant-slug-${tenantId}`,
-          this.cacheTTL,
-          {
-            requestType: RequestType.PUBLIC,
-            requestTarget: RequestTarget.API
-          }
-        );
-        
-        // Handle legitimate API responses (should not be 404 for missing records)
-        if (result.success && result.data) {
-          return result.data.slug;
-        } else {
-          console.error(`[TenantDirectorySingletonV2] Failed to get tenant slug (attempt ${attempt}):`, result.error);
-          if (attempt === maxRetries) {
-            return undefined;
-          }
-        }
-      } catch (error) {
-        console.error(`[TenantDirectorySingletonV2] Error getting tenant slug (attempt ${attempt}):`, error);
-        if (attempt === maxRetries) {
-          return undefined;
-        }
-      }
-      
-      // Wait before retry
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
-    }
-    
-    return undefined;
+    const { tenantDirectoryService } = await import('./TenantDirectorySingletonService');
+    return tenantDirectoryService.getTenantSlug(tenantId);
   }
 
   /**

@@ -423,9 +423,11 @@ router.get('/tenant/:identifier', async (req, res) => {
     const result = await pool.query(query, [resolvedTenant.id]);
 
     if (!result.rows || result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'directory_listing_not_found',
-        message: 'No published directory listing found for this tenant'
+      return res.status(200).json({
+        slug: null,
+        tenantId: resolvedTenant.id,
+        identifierType: resolvedTenant.type,
+        hasDirectoryListing: false
       });
     }
 

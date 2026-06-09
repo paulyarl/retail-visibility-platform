@@ -358,14 +358,33 @@ router.patch('/tenants/:tenantId/products/:productId/feature/active', authentica
     const { tenantId, productId } = req.params;
     const { is_active } = req.body;
 
+    // When resuming, extend expiration if it has already passed so the product
+    // actually appears in the active featured list.
+    let updateData: any = { is_active };
+    if (is_active === true) {
+      const existingRecord = await prisma.featured_products.findFirst({
+        where: {
+          inventory_item_id: productId,
+          tenant_id: tenantId
+        }
+      });
+      if (existingRecord) {
+        const now = new Date();
+        const expiresAt = existingRecord.featured_expires_at;
+        if (!expiresAt || new Date(expiresAt) <= now) {
+          const newExpiry = new Date();
+          newExpiry.setDate(newExpiry.getDate() + 30);
+          updateData.featured_expires_at = newExpiry;
+        }
+      }
+    }
+
     const product = await prisma.featured_products.updateMany({
       where: {
         inventory_item_id: productId,
         tenant_id: tenantId
       },
-      data: {
-        is_active: is_active
-      }
+      data: updateData
     });
 
     if (product.count === 0) {

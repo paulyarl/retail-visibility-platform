@@ -788,6 +788,19 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
           </div>
 
+          {/* Product FAQs */}
+          {faqOptionsFlags?.faq_enabled && faqOptionsFlags?.faq_display_product_accordion && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <FaqProductDisplay
+                tenantId={product.tenantId}
+                productId={product.id}
+                merchantName={businessName}
+                enabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_product_accordion}
+                feedbackEnabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_feedback}
+              />
+            </div>
+          )}
+
           {/* Product Reviews - Full Width */}
           <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
           <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
@@ -797,19 +810,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
 
         </ProductPageStatusWrapper>
-
-        {/* Product FAQs */}
-        {faqOptionsFlags?.faq_enabled && faqOptionsFlags?.faq_display_product_accordion && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <FaqProductDisplay
-              tenantId={product.tenantId}
-              productId={product.id}
-              merchantName={businessName}
-              enabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_product_accordion}
-              feedbackEnabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_feedback}
-            />
-          </div>
-        )}
 
         {/* Recently Viewed Products */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

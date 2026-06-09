@@ -621,17 +621,58 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         `featured-capability-${this.tenantId}`,
         300000 // 5 minutes cache
       );
+
+      // Also fetch merchant gate settings so disabled types are respected
+      let settingsResult: any = null;
+      try {
+        settingsResult = await this.makeDefaultRequest(
+          `/api/tenants/${this.tenantId}/featured-options`,
+          undefined,
+          `featured-options-settings-${this.tenantId}`,
+          300000
+        );
+      } catch (settingsErr) {
+        console.warn('[TenantFeaturedProductsSingleton] Failed to fetch featured options settings, using tier-only state:', settingsErr);
+      }
+
       if (result.success) {
         const data = result.data as any;
         const capability = data.capability || data;
         if (capability?.allowedTypes) {
-          this.setState({ allowedTypes: capability.allowedTypes });
+          // Compute effective allowed types: tier allows AND merchant enabled
+          const settings = settingsResult?.success ? settingsResult.data?.settings || settingsResult.data : null;
+          const masterEnabled = settings ? !!settings.featured_enabled : true;
+
+          const settingKeyToType: Record<string, string> = {
+            featured_store_selection: 'store_selection',
+            featured_new_arrival: 'new_arrival',
+            featured_seasonal: 'seasonal',
+            featured_sale: 'sale',
+            featured_staff_pick: 'staff_pick',
+            featured_clearance: 'clearance',
+            featured_featured: 'featured',
+            featured_bestseller: 'bestseller',
+            featured_trending: 'trending',
+            featured_recommended: 'recommended',
+            featured_random_featured: 'random_featured',
+          };
+
+          const tierAllowedTypes: string[] = capability.allowedTypes;
+          const effectiveAllowedTypes = masterEnabled
+            ? tierAllowedTypes.filter((type: string) => {
+                const settingKey = Object.entries(settingKeyToType).find(([, t]) => t === type)?.[0];
+                if (!settingKey) return true; // unknown type, allow by default
+                return settings ? !!(settings as any)[settingKey] : true;
+              })
+            : [];
+
+          this.setState({ allowedTypes: effectiveAllowedTypes });
 
           // Rebuild featuredTypes now that allowedTypes is populated
           // (fetchFeaturedLimits may have run before this, with empty allowedTypes)
           const allTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.platformControlledTypes, ...this.directoryOnlyTypes];
           const filteredTypes = allTypes
-            .filter(type => capability.allowedTypes.includes(type.id))
+            .filter(type => effectiveAllowedTypes.includes(type.id))
             .map((type: FeaturedType) => ({
               ...type,
               maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts

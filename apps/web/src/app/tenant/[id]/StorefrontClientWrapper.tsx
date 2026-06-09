@@ -51,6 +51,8 @@ import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalo
 import { StorefrontRecommendations } from './StorefrontClient';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
 
@@ -102,6 +104,8 @@ interface StorefrontClientWrapperProps {
   initialPaymentGatewaySettings?: { gateway_enabled?: boolean; stripe_enabled?: boolean; paypal_enabled?: boolean; square_enabled?: boolean; clover_enabled?: boolean } | null;
   // Server-side resolved storefront type settings (merchant gate)
   initialStorefrontTypeSettings?: { settings?: { storefront_type_enabled?: boolean; selected_storefront_type?: string | null }; tierState?: { enabled?: boolean; type?: string; effectiveType?: string } } | null;
+  // Server-side resolved FAQ option flags
+  initialFaqFlags?: PublicFaqOptionsFlags | null;
 }
 
 export default function StorefrontClientWrapper({
@@ -141,6 +145,7 @@ export default function StorefrontClientWrapper({
   initialCommerceSettings,
   initialPaymentGatewaySettings,
   initialStorefrontTypeSettings,
+  initialFaqFlags,
 }: StorefrontClientWrapperProps) {
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
@@ -202,6 +207,11 @@ export default function StorefrontClientWrapper({
 
   // Storefront options capability flags — initialized from server-side fetch (no waterfall)
   const [storefrontOptionFlags] = useState<StorefrontOptionFlags | null>(initialStorefrontOptionFlags ?? null);
+
+  // FAQ options flags — initialized from server-side fetch
+  const [faqFlags] = useState<PublicFaqOptionsFlags | null>(initialFaqFlags ?? null);
+  const faqEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion;
+  const faqFeedbackEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_feedback;
 
   // Capability-aware visibility flags (fall back to true while loading)
   const optFlags = storefrontOptionFlags;
@@ -1073,6 +1083,17 @@ export default function StorefrontClientWrapper({
           />
         </div>
       )}
+      {/* FAQ Section */}
+      {faqEnabled && tenantId && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <FaqStorefrontDisplay
+            tenantId={tenantId}
+            enabled={faqEnabled}
+            feedbackEnabled={faqFeedbackEnabled}
+          />
+        </div>
+      )}
+
       {!storefrontStatus.shouldShowPanel && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
@@ -1091,6 +1112,7 @@ export default function StorefrontClientWrapper({
       {!storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
         <LastViewed />
       )}
+
       {/* Tier-Based Footer */}
 
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">

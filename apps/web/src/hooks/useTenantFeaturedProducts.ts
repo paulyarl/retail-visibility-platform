@@ -125,7 +125,7 @@ export function useTenantFeaturedProducts(
     // console.log(`[useTenantFeaturedProducts] Context: ${context}, Available types: ${types.map(t => t.id).join(', ')}`);
     
     return types;
-  }, [context, singleton, state.selectedType, state.featuredLimits]);
+  }, [context, singleton, state.selectedType, state.featuredLimits, state.allowedTypes]);
 
   // Set context-appropriate default selected type
   useEffect(() => {

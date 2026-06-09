@@ -24,9 +24,11 @@ interface FaqStorefrontDisplayProps {
   enabled?: boolean;
   /** If provided, feedback buttons are hidden when not enabled */
   feedbackEnabled?: boolean;
+  /** If false, all accordion categories start collapsed (default: true) */
+  defaultExpanded?: boolean;
 }
 
-export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabled = true, feedbackEnabled = true }: FaqStorefrontDisplayProps) {
+export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabled = true, feedbackEnabled = true, defaultExpanded = true }: FaqStorefrontDisplayProps) {
   const [faqs, setFaqs] = useState<PublicFaq[]>([]);
   const [categories, setCategories] = useState<PublicFaqCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +154,7 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
   const rightCats = isTwoColumn ? sortedCategories.slice(halfIndex) : [];
 
   const renderCategoryAccordion = (cats: PublicFaqCategory[]) => (
-    <Accordion type="single" collapsible className="w-full">
+    <Accordion type="multiple" defaultValue={defaultExpanded ? cats.map((c) => `faq-${c.slug}`) : undefined} className="w-full">
       {cats.map((cat) => {
         const catFaqs = filteredFaqs.get(cat.id);
         if (!catFaqs || catFaqs.length === 0) return null;

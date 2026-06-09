@@ -537,37 +537,12 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   /**
    * Get tenant directory slug
+   * Delegates to TenantDirectorySingletonService for a single canonical implementation.
    */
-  async getTenantDirectorySlug(tenantId: string): Promise<{ slug: string } | null> {
-    if (!tenantId) {
-      throw new Error('Tenant ID is required');
-    }
-
-    const response = await super.makeDefaultRequest<{ slug: string }>(
-      `/api/directory/tenant/${tenantId}`,
-      {},
-      `tenant-directory-slug-${tenantId}`,
-      this.CACHE_TTL_MEDIUM,{
-        context: AppContext.TENANT,
-        isolation: CacheIsolation.TENANT
-      }
-
-    );
-
-    if (!response.success) {
-      console.log('[DirectorySingleton] Failed to get tenant directory slug:', response.error);
-      return null;
-    }
-    // console.log(`[DirectorySingleton] Tenant directory slug response:`, response.data);
-
-    // Handle case where tenant exists but has no published directory
-    // This is expected behavior, not an error
-    if (response.data && response.data.slug === null) {
-      console.log('[DirectorySingleton] Tenant has no published directory:', tenantId);
-      return null;
-    }
-
-    return response.data || null;
+  async getTenantDirectorySlug(tenantId: string): Promise<string | null> {
+    const { tenantDirectoryService } = await import('./TenantDirectorySingletonService');
+    const slug = await tenantDirectoryService.getTenantSlug(tenantId);
+    return slug ?? null;
   }
 
   /**
