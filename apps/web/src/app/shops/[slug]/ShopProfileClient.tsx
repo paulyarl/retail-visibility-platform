@@ -59,6 +59,8 @@ import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusP
 import { PublicTenantInfo } from '@/services/TenantPublicService';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge'; 
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 
 // Types
 interface DirectoryConsolidated {
@@ -163,7 +165,8 @@ interface ShopProfileClientProps {
   businessHours?: any;
   tenantInfo?: PublicTenantInfo | null;
   showStatusPanel?: boolean;
-  initialOptFlags?: StorefrontOptionFlags | null; // Server-side resolved flags
+  initialOptFlags?: StorefrontOptionFlags | null;
+  initialFaqFlags?: PublicFaqOptionsFlags | null;
 }
 
 // Shop profile header component
@@ -465,7 +468,8 @@ export default function ShopProfileClient({
   businessHours, 
   tenantInfo, 
   showStatusPanel,
-  initialOptFlags
+  initialOptFlags,
+  initialFaqFlags
 }: {
   shop: {
     success: boolean;
@@ -478,6 +482,7 @@ export default function ShopProfileClient({
   tenantInfo?: PublicTenantInfo | null;
   showStatusPanel?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
+  initialFaqFlags?: PublicFaqOptionsFlags | null;
 }) {
   // Extract shop data once at the top
   const shopData = (shop.data as any)?.data;
@@ -500,6 +505,11 @@ export default function ShopProfileClient({
 
   // Storefront options capability flags — initialized from server-side fetch (no waterfall)
   const [optFlags] = useState<StorefrontOptionFlags | null>(initialOptFlags ?? null);
+
+  // FAQ options flags — initialized from server-side fetch
+  const [faqFlags] = useState<PublicFaqOptionsFlags | null>(initialFaqFlags ?? null);
+  const faqEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion;
+  const faqFeedbackEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_feedback;
   
   // Fetch categories on mount
   useEffect(() => {
@@ -858,6 +868,17 @@ export default function ShopProfileClient({
           <div className="mb-12">
             {optFlags?.showRecentlyViewed !== false && <LastViewed />}
           </div>
+
+          {/* FAQ Section */}
+          {faqEnabled && shopData?.id && (
+            <div className="mb-12">
+              <FaqStorefrontDisplay
+                tenantId={shopData.id}
+                enabled={faqEnabled}
+                feedbackEnabled={faqFeedbackEnabled}
+              />
+            </div>
+          )}
         </div>
       </div>
   {/* Platform Branding Footer */}

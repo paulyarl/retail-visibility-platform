@@ -13,6 +13,7 @@ import { shopsService } from '@/services/ShopsService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 
 // Types
@@ -180,6 +181,16 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
     console.error('Error fetching storefront option flags:', error);
   }
 
+  // Fetch FAQ options flags server-side (no client waterfall)
+  let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
+  try {
+    if (tenantId) {
+      faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(tenantId);
+    }
+  } catch (error) {
+    console.error('Error fetching FAQ options flags:', error);
+  }
+
   // Check if tenant has non-active status - show status panel instead of "not found"
   const showStatusPanel = tenantInfo ? (
     tenantInfo.subscriptionTier === 'google_only' || 
@@ -229,6 +240,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
           tenantInfo={tenantInfo}
           showStatusPanel={true}
           initialOptFlags={storefrontOptionFlags}
+          initialFaqFlags={faqOptionsFlags}
         />
       </Suspense>
     );
@@ -264,6 +276,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
         tenantInfo={tenantInfo}
         showStatusPanel={showStatusPanel}
         initialOptFlags={storefrontOptionFlags}
+        initialFaqFlags={faqOptionsFlags}
       />
     </Suspense>
   );

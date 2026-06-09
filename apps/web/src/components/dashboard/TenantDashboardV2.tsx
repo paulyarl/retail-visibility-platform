@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from "@/utils/behaviorTracking";
 import { platformHomeService } from "@/services/PlatformHomeSingletonService";
+import { faqService } from '@/services/FaqService';
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 
 import DashboardSkeleton from "./DashboardSkeleton";
@@ -52,7 +53,7 @@ import RecommendationCard from "./RecommendationCard";
 import GrowthTipCard from "./GrowthTipCard";
 import TierHeroIllustration from "./TierHeroIllustration";
 import CapabilityShowcase from "./CapabilityShowcase";
-import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
+import { useAllCapabilities, useMerchantGates } from "@/hooks/tenant-access/useCapabilityAccess";
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -78,13 +79,21 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
   const { profile, loading: profileLoading } = useUserProfile();
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const { gates: merchantGates } = useMerchantGates(tenantId, { forTenant: true });
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [businessProfileLoading, setBusinessProfileLoading] = useState(true);
+
+  const [businessFAQs, setBusinessFAQs] = useState<any>(null);
+  const [businessFAQsLoading, setBusinessFAQsLoading] = useState(true);
 
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
   const { status: hoursStatus } = useStoreStatus(tenantId || tenantData?.id || "", false);
+
+  const faqSize = businessFAQs ? (businessFAQs as any).length : 0;
+
+  // console.log(`faqSize: ${faqSize}`);
 
   /* Track view */
   useEffect(() => {
@@ -114,6 +123,37 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
     if (tenantId) fetchBusinessProfile();
   }, [tenantId]);
 
+  /* Fetch business profile for logo */
+  useEffect(() => {
+    const fetchBusinessFAQs = async () => {
+      try {
+        const data = await faqService.listFAQs(tenantId);
+        if (data) setBusinessFAQs(data);
+      } catch {
+        /* ignore */
+      } finally {
+        setBusinessFAQsLoading(false);
+      }
+    };
+    if (tenantId) fetchBusinessFAQs();
+  }, [tenantId]);
+
+  // Merchant gate settings (tier-filtered merchant preferences)
+  const [merchantSettings, setMerchantSettings] = useState<Record<string, boolean>>({});
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+
+  useEffect(() => {
+    if (!tenantId) return;
+    faqService.getOptions(tenantId)
+      .then(({ settings }) => setMerchantSettings(settings))
+      .catch(() => setMerchantSettings({}))
+      .finally(() => setSettingsLoading(false));
+  }, [tenantId]);
+
+  const canManageFaq = merchantSettings.faq_enabled ?? true;
+
+
   if (loading) return <DashboardSkeleton />;
   if (error) {
     return (
@@ -130,6 +170,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   const hasProducts = !!usage?.totalItems && usage.totalItems > 0;
   const hasStorefront = tenantData?.statusInfo?.showStorefront;
   const hasPublishedDirectory = tenantData?.hasPublishedDirectory;
+  const hasFeaturedProducts = businessProfile?.hasFeaturedProducts;
   //new tasks
   const hasHours = !!businessProfile?.hours;
   const hasMap = !!businessProfile?.latitude && !!businessProfile?.longitude;
@@ -393,7 +434,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                   <h3 className="font-semibold text-gray-900">Capabilities for You</h3>
                 </div>
                 {tier && (
-                  <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+                  <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} merchantGates={merchantGates} />
                 )}
               </div>
             </motion.div>
@@ -523,6 +564,9 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 hasProducts={hasProducts}
                 hasStorefront={!!hasStorefront}
                 hasPublishedDirectory={!!hasPublishedDirectory}
+                hasFeaturedProducts={!!hasFeaturedProducts}
+                hasFAQs={faqSize > 0}
+                canManageFaq={canManageFaq}
                 locationStatus={tenantData?.locationStatus}
                 subscriptionStatus={tenantData?.subscriptionStatus}
                 hasHours={hasHours}

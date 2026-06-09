@@ -170,6 +170,7 @@ import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
 import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
+import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
@@ -177,6 +178,8 @@ import organizationCommerceSettingsRoutes from './routes/organization-commerce-s
 import buyerOrdersRoutes from './routes/buyer-orders';
 import tenantOrdersRoutes from './routes/tenant-orders';
 import productLikesRoutes from './routes/product-likes';
+import faqRoutes from './routes/faq';
+import faqPublicRoutes from './routes/faq-public';
 import adminToolsRoutes from './routes/admin-tools';
 import adminUsersRoutes from './routes/admin-users';
 import cachedProductsRoutes from './routes/cached-products';
@@ -2016,6 +2019,20 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
 
     const hasDirectory = tenantResult?.is_published === true;
 
+    // Check if tenant has active featured products
+    let hasFeaturedProducts = false;
+    try {
+      const featuredResult = await basePrisma.$queryRaw`
+        SELECT 1 FROM featured_products
+        WHERE tenant_id = ${tenant_id} AND is_active = true
+        LIMIT 1
+      `;
+      hasFeaturedProducts = (featuredResult as any[])?.length > 0;
+    } catch (error) {
+      // featured_products may not exist yet — default to false
+      console.log('[GET /tenant/profile] featured_products query failed, defaulting hasFeaturedProducts to false');
+    }
+
     const md = (tenant.metadata as any) || {};
     const profile = {
       tenant_id: tenant.id,
@@ -2051,6 +2068,8 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       slug,
       // Whether tenant has published directory listing
       hasPublishedDirectory: hasDirectory,
+      // Whether tenant has active featured products
+      hasFeaturedProducts,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -2399,6 +2418,18 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
     // const hasDirectory = tenantResult?.is_published === true;
     const hasPublishedDirectory = directoryResult && directoryResult.is_published === true;
 
+    // Check if tenant has active featured products
+    let hasFeaturedProducts = false;
+    try {
+      const featuredResult = await basePrisma.$queryRaw`
+        SELECT 1 FROM featured_products
+        WHERE tenant_id = ${tenant_id} AND is_active = true
+        LIMIT 1
+      `;
+      hasFeaturedProducts = (featuredResult as any[])?.length > 0;
+    } catch (error) {
+      console.log('[GET /public/tenant/:tenant_id/profile] featured_products query failed, defaulting hasFeaturedProducts to false');
+    }
 
     // Return public business information only
     const profile = {
@@ -2423,6 +2454,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       longitude: bp?.longitude || md.longitude || null,
       metadata: tenant.metadata || null, // Include metadata for GBP categories
       has_published_directory: hasPublishedDirectory,
+      hasFeaturedProducts,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -7448,6 +7480,11 @@ app.use('/api/tenants', featuredOptionsSettingsRoutes);
 app.use('/api', featuredOptionsSettingsRoutes);
 console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options and /api/public/tenant/:tenantId/featured-options');
 
+/* ------------------------------ faq options settings ------------------------------ */
+app.use('/api/tenants', faqOptionsSettingsRoutes);
+app.use('/api', faqOptionsSettingsRoutes);
+console.log('✅ FAQ options settings routes mounted at /api/tenants/:tenantId/faq-options and /api/public/tenant/:tenantId/faq-options');
+
 /* ------------------------------ quickstart options settings ------------------------------ */
 app.use('/api/tenants', quickstartOptionsSettingsRoutes);
 console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
@@ -7724,6 +7761,15 @@ console.log('✅ Tenant categories routes mounted at /api/tenant');
 /* ------------------------------ products ------------------------------ */
 app.use('/api/products', productLikesRoutes);
 console.log('✅ Product likes routes mounted at /api/products');
+
+/* ------------------------------ FAQ (merchant) ------------------------------ */
+app.use('/api/tenants/:tenantId/faqs', faqRoutes);
+console.log('✅ FAQ routes mounted at /api/tenants/:tenantId/faqs');
+
+/* ------------------------------ FAQ (public) ------------------------------ */
+app.use('/api/public/tenants/:tenantId', faqPublicRoutes);
+console.log('✅ FAQ public routes mounted at /api/public/tenants/:tenantId/faqs');
+
 app.use('/api/items', photosRouter);
 console.log('✅ Photos routes mounted at /api/items');
 

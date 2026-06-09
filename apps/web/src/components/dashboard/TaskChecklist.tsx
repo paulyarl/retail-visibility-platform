@@ -10,6 +10,8 @@ interface TaskChecklistProps {
   hasProducts: boolean;
   hasStorefront: boolean;
   hasPublishedDirectory: boolean;
+  hasFeaturedProducts: boolean;
+  hasFAQs: boolean;
   locationStatus?: string;
   subscriptionStatus?: string;
   hasHours?: boolean;
@@ -17,6 +19,7 @@ interface TaskChecklistProps {
   hasStoreCategory?: boolean;
   hasSlug?: boolean;
   hasLogo?: boolean;
+  canManageFaq?: boolean;
 }
 
 interface TaskItem {
@@ -31,6 +34,8 @@ export default function TaskChecklist({
   hasProducts,
   hasStorefront,
   hasPublishedDirectory,
+  hasFeaturedProducts,
+  hasFAQs,
   locationStatus,
   subscriptionStatus,
   hasHours = false,
@@ -38,6 +43,7 @@ export default function TaskChecklist({
   hasStoreCategory = false,
   hasSlug = false,
   hasLogo = false,
+  canManageFaq = false,
 }: TaskChecklistProps) {
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
 
@@ -48,6 +54,7 @@ export default function TaskChecklist({
     const canManageInventory = caps?.productOptions?.enabled ?? true;
     const canManageShipping = caps?.fulfillment?.enabled ?? true;
     const canManageDiscounts = caps?.commerce?.enabled ?? true;
+    const canManageFAQs = caps?.faqOptions?.enabled ?? true;
 
     return [
       {
@@ -57,58 +64,16 @@ export default function TaskChecklist({
         link: `/t/${tenantId}/settings/location-status`,
       },
       {
-        id: "subscription",
-        label: "Activate your subscription",
-        done: subscriptionStatus === "active",
-        link: `/t/${tenantId}/settings/subscription`,
+        id: "logo",
+        label: "Upload your store logo",
+        done: hasLogo,
+        link: `/t/${tenantId}/settings/tenant`,
       },
       {
-        id: "payments",
-        label: "Connect payment providers",
-        done: canSetupPayments,
-        link: `/t/${tenantId}/settings/payment-gateways`,
-      },
-      {
-        id: "products",
-        label: "Add your first product",
-        done: hasProducts,
-        link: `/t/${tenantId}/items/create`,
-      },
-      {
-        id: "shipping",
-        label: "Set up shipping rates",
-        done: canManageShipping,
-        link: `/t/${tenantId}/settings/fulfillment`,
-      },
-      {
-        id: "inventory",
-        label: "Manage inventory",
-        done: canManageInventory,
-        link: `/t/${tenantId}/items`,
-      },
-      {
-        id: "discounts",
-        label: "Create your first discount",
-        done: canManageDiscounts,
-        link: `/t/${tenantId}/settings/commerce`,
-      },
-      {
-        id: "storefront",
-        label: "Publish your storefront",
-        done: hasStorefront,
-        link: `/t/${tenantId}/settings/location-status`,
-      },
-      {
-        id: "directory",
-        label: "Publish your directory listing",
-        done: hasPublishedDirectory,
-        link: `/t/${tenantId}/settings/directory`,
-      },
-      {
-        id: "hours",
-        label: "Add your business hours",
-        done: hasHours,
-        link: `/t/${tenantId}/settings/hours`,
+        id: "slug",
+        label: "Add your shop URL slug",
+        done: hasSlug,
+        link: `/t/${tenantId}/settings/tenant`,
       },
       {
         id: "map",
@@ -123,16 +88,64 @@ export default function TaskChecklist({
         link: `/t/${tenantId}/settings/gbp-category`,
       },
       {
-        id: "slug",
-        label: "Add your shop URL slug",
-        done: hasSlug,
-        link: `/t/${tenantId}/settings/tenant`,
+        id: "hours",
+        label: "Add your business hours",
+        done: hasHours,
+        link: `/t/${tenantId}/settings/hours`,
       },
       {
-        id: "logo",
-        label: "Upload your store logo",
-        done: hasLogo,
-        link: `/t/${tenantId}/settings/tenant`,
+        id: "products",
+        label: "Add your first product",
+        done: hasProducts,
+        link: `/t/${tenantId}/items/create`,
+      },
+      {
+        id: "inventory",
+        label: "Manage inventory",
+        done: canManageInventory,
+        link: `/t/${tenantId}/items`,
+      },
+      {
+        id: "featured products",
+        label: "Feature your first product",
+        done: hasFeaturedProducts,
+        link: `/t/${tenantId}/settings/featured-products`,
+      },
+      {
+        id: "payments",
+        label: "Connect payment providers",
+        done: canSetupPayments,
+        link: `/t/${tenantId}/settings/payment-gateways`,
+      },
+      {
+        id: "shipping",
+        label: "Set up shipping rates",
+        done: canManageShipping,
+        link: `/t/${tenantId}/settings/fulfillment`,
+      },
+      {
+        id: "discounts",
+        label: "Create your first discount",
+        done: canManageDiscounts,
+        link: `/t/${tenantId}/settings/commerce`,
+      },
+      {
+        id: "FAQs",
+        label: (canManageFAQs && canManageFaq) ? `Add your first FAQs` : canManageFAQs ? `Switch Toggle ON to Manage FAQs` : `FAQs are not available`,
+        done: hasFAQs || (!canManageFAQs && !canManageFaq),
+        link: (canManageFAQs && canManageFaq) ? `/t/${tenantId}/faq` : canManageFAQs ? `/t/${tenantId}/faq/options` : [] as any,
+      },
+      {
+        id: "subscription",
+        label: "Activate your subscription",
+        done: subscriptionStatus === "active",
+        link: `/t/${tenantId}/settings/subscription`,
+      },
+      {
+        id: "directory",
+        label: "Publish your directory listing",
+        done: hasPublishedDirectory,
+        link: `/t/${tenantId}/settings/directory`,
       },
     ];
   }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, locationStatus, subscriptionStatus, tenantId]);
@@ -196,7 +209,7 @@ export default function TaskChecklist({
       </div>
 
       <Link
-        href={`/t/${tenantId}/quick-start`}
+        href={`/t/${tenantId}/settings`}
         className="mt-4 inline-flex items-center text-sm text-blue-600 font-medium hover:underline"
       >
         View all tasks <ArrowRight className="w-3.5 h-3.5 ml-1" />

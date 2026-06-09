@@ -12,10 +12,12 @@ import {
   Package,
   Globe,
   Settings,
+  HelpCircle,
   CheckCircle2,
   XCircle,
   Lock,
   ArrowRight,
+  Rocket,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 
@@ -25,11 +27,14 @@ interface CapabilityShowcaseProps {
   canUpgrade: boolean;
 }
 
+type CapabilityStatus = 'enabled' | 'merchant-gated' | 'tier-gated';
+
 interface CapabilityRow {
   key: string;
   label: string;
   icon: React.ReactNode;
   enabled: boolean;
+  status: CapabilityStatus;
   detail: string;
   settingsLink: string;
 }
@@ -42,87 +47,215 @@ export default function CapabilityShowcase({
   const rows: CapabilityRow[] = useMemo(() => {
     if (!capabilities) return [];
 
+    const getStatus = (tierEnabled: boolean, merchantGated: boolean): CapabilityStatus => {
+      if (!tierEnabled) return 'tier-gated';
+      if (merchantGated) return 'merchant-gated';
+      return 'enabled';
+    };
+
+    const cap = capabilities;
+
+    // --- Commerce ---
+    const c = cap.commerce;
+    const cTier = c?.enabled ?? false;
+    const cMerchantGated = cTier && (c?.effectivePaymentType !== c?.paymentType || c?.effectiveCartVisible !== c?.cartVisible);
+
+    // --- Payment Gateway ---
+    const pg = cap.paymentGateway;
+    const pgTier = pg?.enabled ?? false;
+    const pgMerchantGated = pgTier && (pg?.effectiveGateways.length ?? 0) < (pg?.allowedGateways.length ?? 0);
+
+    // --- Storefront ---
+    const sf = cap.storefront;
+    const sfTier = (sf?.type !== 'none') && (sf?.allowedTypes.length ?? 0) > 0;
+    const sfMerchantGated = sfTier && (sf?.effectiveType === 'none' || sf?.effectiveType !== sf?.type);
+
+    // --- Fulfillment ---
+    const fl = cap.fulfillment;
+    const flTier = fl?.enabled ?? false;
+    const flMerchantGated = flTier && (
+      fl?.effectiveShowsPickup !== fl?.showsPickup ||
+      fl?.effectiveShowsDelivery !== fl?.showsDelivery ||
+      fl?.effectiveShowsShipping !== fl?.showsShipping
+    );
+
+    // --- Barcode ---
+    const bc = cap.barcodeScan;
+    const bcTier = bc?.enabled ?? false;
+    const bcMerchantGated = bcTier && (bc?.effectiveModes.length ?? 0) < (bc?.allowedModes.length ?? 0);
+
+    // --- Product Options ---
+    const po = cap.productOptions;
+    const poTier = po?.enabled ?? false;
+    const poMerchantGated = poTier && (
+      (po?.effectiveTypes.length ?? 0) < (po?.allowedTypes.length ?? 0) ||
+      po?.effectiveShowsVariants !== po?.showsVariants ||
+      po?.effectiveShowsGallery !== po?.showsGallery ||
+      po?.effectiveShowsVideo !== po?.showsVideo
+    );
+
+    // --- Integration Options ---
+    const io = cap.integrationOptions;
+    const ioTier = io?.enabled ?? false;
+    const ioMerchantGated = ioTier && (io?.effectiveTypes.length ?? 0) < (io?.allowedTypes.length ?? 0);
+
+    // --- Featured Options ---
+    const fo = cap.featuredOptions;
+    const foTier = fo?.enabled ?? false;
+    const foMerchantGated = foTier && (fo?.effectiveTypes.length ?? 0) < (fo?.allowedTypes.length ?? 0);
+
+    // --- Quickstart Options ---
+    const qo = cap.quickstartOptions;
+    const qoTier = qo?.enabled ?? false;
+    const qoMerchantGated = qoTier && (
+      (qo?.allowedProductTypes.includes('wizard') && !qo?.canUseWizard) ||
+      (qo?.allowedProductTypes.includes('image_gen') && !qo?.canGenerateImages) ||
+      (qo?.allowedCategoryTypes.includes('category_generator') && !qo?.canUseCategoryGenerator) ||
+      (qo?.allowedAITypes.includes('ai_openai') && !qo?.canUseOpenAI) ||
+      (qo?.allowedAITypes.includes('ai_gemini') && !qo?.canUseGemini) ||
+      (qo?.allowedAITypes.includes('wizard_ai') && !qo?.canUseAIWizard) ||
+      (qo?.allowedAITypes.includes('image_hd') && !qo?.canUseHDImages)
+    );
+
+    // --- Storefront Options ---
+    const so = cap.storefrontOptions;
+    const soTier = so?.enabled ?? false;
+    const soMerchantGated = soTier && (
+      (so?.allowedHoursTypes.length ?? 0) > (so?.canUseAnimatedHours || so?.canShowHoursStatus ? (so?.canUseAnimatedHours && so?.canShowHoursStatus ? 2 : 1) : 0) ||
+      (so?.allowedCategoryTypes.length ?? 0) > ((so?.canUseCategoryStore ? 1 : 0) + (so?.canUseCategoryProduct ? 1 : 0)) ||
+      (so?.allowedRecommendTypes.length ?? 0) > ((so?.canUseRecommendStore ? 1 : 0) + (so?.canUseRecommendProducts ? 1 : 0)) ||
+      (so?.recentlyViewedEnabled && !so?.canUseRecentlyViewed) ||
+      (so?.allowedInfoTypes.length ?? 0) > ((so?.canUseSocialMedia ? 1 : 0) + (so?.canUseContact ? 1 : 0) + (so?.canUseInteractiveMaps ? 1 : 0)) ||
+      (so?.allowedQRResolutions.length ?? 0) > (so?.canUseQRCodes ? so?.allowedQRResolutions.length : 0) ||
+      (so?.allowedGalleryTypes.length ?? 0) > ((so?.allowedGalleryTypes.filter(t => (so?.merchantPreferences?.[t as keyof typeof so.merchantPreferences] ?? false)).length)) ||
+      (so?.allowedAdvancedTypes.length ?? 0) > ((so?.canUseEnhancedSEO ? 1 : 0) + (so?.canUseStorefrontActions ? 1 : 0))
+    );
+
+    // --- FAQ Options (no merchant prefs in state yet) ---
+    const faq = cap.faqOptions;
+    const faqTier = faq?.enabled ?? false;
+    const faqMerchantGated = false;
+
     return [
       {
         key: "commerce",
         label: "Commerce",
         icon: <ShoppingCart className="w-4 h-4" />,
-        enabled: capabilities.commerce?.enabled ?? false,
-        detail:
-          capabilities.commerce?.paymentType === "none"
-            ? "Disabled"
-            : `Payments: ${capabilities.commerce?.paymentType}`,
+        enabled: cTier || !cMerchantGated,
+        status: getStatus(cTier, cMerchantGated),
+        detail: c?.effectivePaymentType === "none" ? "Disabled" : `Payments: ${c?.effectivePaymentType ?? c?.paymentType}`,
         settingsLink: `/t/${tenantId}/settings/commerce`,
       },
       {
         key: "paymentGateway",
         label: "Payment Gateways",
         icon: <CreditCard className="w-4 h-4" />,
-        enabled: capabilities.paymentGateway?.enabled ?? false,
+        enabled: pgTier && (pg?.effectiveGateways.length ?? 0) > 0,
+        status: getStatus(pgTier, pgMerchantGated),
         detail:
-          (capabilities.paymentGateway?.allowedGateways ?? []).length > 0
-            ? capabilities.paymentGateway!.allowedGateways.join(", ")
-            : "None connected",
+          (pg?.effectiveGateways ?? []).length > 0
+            ? pg!.effectiveGateways.join(", ")
+            : (pg?.allowedGateways ?? []).length > 0
+              ? `${pg!.allowedGateways.join(", ")} (merchant off)`
+              : "None connected",
         settingsLink: `/t/${tenantId}/settings/payment-gateways`,
       },
       {
         key: "storefront",
         label: "Storefront",
         icon: <Store className="w-4 h-4" />,
-        enabled: capabilities.storefront?.enabled ?? false,
-        detail: capabilities.storefront?.type
-          ? `Type: ${capabilities.storefront.type}`
-          : "Not configured",
+        enabled: sf?.effectiveType !== 'none',
+        status: getStatus(sfTier, sfMerchantGated),
+        detail: sf?.effectiveType && sf.effectiveType !== 'none'
+          ? `Type: ${sf.effectiveType}`
+          : sf?.type && sf.type !== 'none'
+            ? `Type: ${sf.type} (merchant off)`
+            : "Not configured",
         settingsLink: `/t/${tenantId}/settings/tenant`,
       },
       {
         key: "fulfillment",
         label: "Fulfillment",
         icon: <Truck className="w-4 h-4" />,
-        enabled: capabilities.fulfillment?.enabled ?? false,
-        detail: capabilities.fulfillment?.showsPickup
-          ? "Pickup enabled"
-          : "Shipping / Pickup",
+        enabled: flTier && (fl?.effectiveShowsPickup || fl?.effectiveShowsDelivery || fl?.effectiveShowsShipping),
+        status: getStatus(flTier, flMerchantGated),
+        detail: fl?.effectiveShowsPickup || fl?.effectiveShowsDelivery || fl?.effectiveShowsShipping
+          ? [
+              fl?.effectiveShowsPickup && 'Pickup',
+              fl?.effectiveShowsDelivery && 'Delivery',
+              fl?.effectiveShowsShipping && 'Shipping',
+            ].filter(Boolean).join(', ') || 'Shipping / Pickup'
+          : 'Not configured',
         settingsLink: `/t/${tenantId}/settings/fulfillment`,
       },
       {
         key: "barcodeScan",
         label: "Barcode Scan",
         icon: <Barcode className="w-4 h-4" />,
-        enabled: capabilities.barcodeScan?.enabled ?? false,
-        detail: capabilities.barcodeScan?.enabled ? "Active" : "Not available",
+        enabled: bcTier && (bc?.effectiveModes.length ?? 0) > 0,
+        status: getStatus(bcTier, bcMerchantGated),
+        detail: bc?.effectiveModes.length ? `Modes: ${bc.effectiveModes.join(', ')}` : "Not available",
         settingsLink: `/t/${tenantId}/scan`,
       },
       {
         key: "productOptions",
         label: "Product Types",
         icon: <Package className="w-4 h-4" />,
-        enabled: capabilities.productOptions?.enabled ?? false,
+        enabled: poTier && (po?.effectiveTypes.length ?? 0) > 0,
+        status: getStatus(poTier, poMerchantGated),
         detail:
-          (capabilities.productOptions?.allowedTypes ?? []).length > 0
-            ? capabilities.productOptions!.allowedTypes.join(", ")
-            : "Standard",
+          (po?.effectiveTypes ?? []).length > 0
+            ? po!.effectiveTypes.join(", ")
+            : (po?.allowedTypes ?? []).length > 0
+              ? `${po!.allowedTypes.join(", ")} (merchant off)`
+              : "Standard",
         settingsLink: `/t/${tenantId}/items/create`,
       },
       {
         key: "integrationOptions",
         label: "Integrations",
         icon: <Globe className="w-4 h-4" />,
-        enabled: capabilities.integrationOptions?.enabled ?? false,
-        detail: capabilities.integrationOptions?.enabled
+        enabled: ioTier && (io?.effectiveTypes.length ?? 0) > 0,
+        status: getStatus(ioTier, ioMerchantGated),
+        detail: (io?.effectiveTypes ?? []).length > 0
           ? "Connected"
-          : "Not configured",
+          : (io?.allowedTypes ?? []).length > 0
+            ? `${io!.allowedTypes.join(", ")} (merchant off)`
+            : "Not configured",
         settingsLink: `/t/${tenantId}/settings/integrations`,
       },
       {
         key: "storefrontOptions",
         label: "Storefront Options",
         icon: <Settings className="w-4 h-4" />,
-        enabled: capabilities.storefrontOptions?.enabled ?? false,
-        detail: capabilities.storefrontOptions?.enabled
-          ? "Customizable"
-          : "Default",
+        enabled: soTier && soMerchantGated === false,
+        status: getStatus(soTier, soMerchantGated),
+        detail: soTier && !soMerchantGated ? "Customizable" : soTier ? "Partially disabled" : "Default",
         settingsLink: `/t/${tenantId}/settings/tenant`,
+      },
+      {
+        key: "quickstartOptions",
+        label: "Quick Start",
+        icon: <Rocket className="w-4 h-4" />,
+        enabled: qoTier && qoMerchantGated === false,
+        status: getStatus(qoTier, qoMerchantGated),
+        detail: qoTier && !qoMerchantGated ? "Active" : qoTier ? "Partially disabled" : "Not available",
+        settingsLink: `/t/${tenantId}/quick-start`,
+      },
+      {
+        key: "faqOptions",
+        label: "FAQ",
+        icon: <HelpCircle className="w-4 h-4" />,
+        enabled: faqTier,
+        status: getStatus(faqTier, faqMerchantGated),
+        detail: faq?.faqAvailable
+          ? `${[
+            faq?.storefrontEnabled && 'Storefront',
+            faq?.productEnabled && 'Product',
+            faq?.templatesEnabled && 'Templates',
+          ].filter(Boolean).join(', ') || 'Basic'} FAQs`
+          : "Not available",
+        settingsLink: `/t/${tenantId}/faq/options`,
       },
     ];
   }, [capabilities, tenantId]);
@@ -177,15 +310,20 @@ export default function CapabilityShowcase({
           >
             <Link
               href={row.settingsLink}
-              className={`group flex items-center gap-3 p-2.5 rounded-xl transition-colors ${row.enabled
-                  ? "hover:bg-gray-50"
+              className={`group flex items-center gap-3 p-2.5 rounded-xl transition-colors ${row.status === 'enabled'
+                ? "hover:bg-gray-50"
+                : row.status === 'merchant-gated'
+                  ? "opacity-80 hover:opacity-100 hover:bg-amber-50/50"
                   : "opacity-60 hover:opacity-80 hover:bg-gray-50"
                 }`}
             >
               <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${row.enabled
+                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  row.status === 'enabled'
                     ? "bg-indigo-50 text-indigo-600"
-                    : "bg-gray-100 text-gray-400"
+                    : row.status === 'merchant-gated'
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-gray-100 text-gray-400"
                   }`}
               >
                 {row.icon}
@@ -196,8 +334,10 @@ export default function CapabilityShowcase({
                   <span className="text-sm font-medium text-gray-900">
                     {row.label}
                   </span>
-                  {row.enabled ? (
+                  {row.status === 'enabled' ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : row.status === 'merchant-gated' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
                   ) : (
                     <XCircle className="w-3.5 h-3.5 text-gray-300" />
                   )}

@@ -70,7 +70,15 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
 export default function StorefrontTypeOptionsSettingsClient({ tenantId }: StorefrontTypeOptionsSettingsClientProps) {
   const storefrontCap = useStorefrontCapability(tenantId, { forTenant: true });
   const allCaps = useAllCapabilities(tenantId, { forTenant: true });
-  const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
+  const resolvedState = storefrontCap.data;
+  // Distinguish tier-gated from merchant-gated:
+  // - enabled=true → fully enabled
+  // - enabled=false + merchantPrefs.storefront_type_enabled=false → merchant-gated (tier allows, merchant disabled)
+  // - enabled=false + merchantPrefs.storefront_type_enabled=true → tier-gated (not in plan)
+  const isTierAllowed = resolvedState
+    ? resolvedState.enabled || resolvedState.merchantPreferences.storefront_type_enabled === false
+    : true;
+  const isStorefrontEnabled = resolvedState?.enabled ?? true;
   const tierType = storefrontCap.data?.type ?? 'none';
   const isFlexible = storefrontCap.data?.isFlexible ?? false;
   const allowedTypes = storefrontCap.data?.allowedTypes ?? [];
@@ -187,14 +195,17 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {!isStorefrontEnabled && (
+              {!isTierAllowed && (
                 <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+              )}
+              {isTierAllowed && !settings.storefront_type_enabled && (
+                <span className="text-xs text-amber-600 font-medium">Disabled by you</span>
               )}
               <Switch
                 id="storefront-enabled-toggle"
-                checked={isStorefrontEnabled && settings.storefront_type_enabled}
+                checked={isTierAllowed ? settings.storefront_type_enabled : false}
                 onCheckedChange={() => handleToggle('storefront_type_enabled')}
-                disabled={!isStorefrontEnabled}
+                disabled={!isTierAllowed}
               />
             </div>
           </div>

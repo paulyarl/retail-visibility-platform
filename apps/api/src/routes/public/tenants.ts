@@ -34,9 +34,9 @@ router.get('/', async (req: Request, res: Response) => {
       HAVING COUNT(DISTINCT sp.id) > 0
       ORDER BY t.id, t.name ASC
     `;
-    
+
     const result = await getDirectPool().query(query);
-    
+
     const tenants = result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
@@ -44,9 +44,9 @@ router.get('/', async (req: Request, res: Response) => {
       business_name: row.business_name,
       logo_url: row.logo_url
     }));
-    
+
     res.json({ tenants });
-    
+
   } catch (error) {
     console.error('Public tenants error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -57,7 +57,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/tenant/:tenantId/slug', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    
+
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID is required' });
     }
@@ -68,15 +68,15 @@ router.get('/tenant/:tenantId/slug', async (req: Request, res: Response) => {
       WHERE id = $1 AND is_active = true
       LIMIT 1
     `;
-    
+
     const result = await getDirectPool().query(query, [tenantId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
-    
+
     res.json({ slug: result.rows[0].slug });
-    
+
   } catch (error) {
     console.error('Tenant slug error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -87,7 +87,7 @@ router.get('/tenant/:tenantId/slug', async (req: Request, res: Response) => {
 router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-    
+
     if (!slug) {
       return res.status(400).json({ error: 'Slug is required' });
     }
@@ -98,15 +98,15 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
       WHERE slug = $1 AND is_active = true
       LIMIT 1
     `;
-    
+
     const result = await getDirectPool().query(query, [slug]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
-    
+
     res.json({ tenantId: result.rows[0].id });
-    
+
   } catch (error) {
     console.error('Slug tenant error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -117,11 +117,11 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
 router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    
+
     if (!tenantId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Tenant ID is required' 
+        error: 'Tenant ID is required'
       });
     }
 
@@ -129,10 +129,10 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
 
     // Get singleton instance of TenantProfileService
     const tenantService = TenantProfileService.getInstance();
-    
+
     // Get the tenant profile (this includes contact information)
     const profile = await tenantService.getTenantProfile(tenantId);
-    
+
     // Check if tenant has published directory listing and get subscription data
     const { prisma } = await import('../../prisma');
     const [directoryResult, tenantData] = await Promise.all([
@@ -156,11 +156,26 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
           gbp_primary_category_name: true,
           gbp_secondary_categories: true,
         }
-      } as any)
+      } as any),
     ]);
-    
+
     const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
-    
+
+    // Check featured products separately — featured_products is the source of truth
+    let hasFeaturedProducts = false;
+    try {
+      const featuredProductsResult = await prisma.$queryRaw`
+        SELECT 1 FROM featured_products
+        WHERE tenant_id = ${tenantId} AND is_active = true
+        LIMIT 1
+      `;
+      hasFeaturedProducts = (featuredProductsResult as any[])?.length > 0;
+    } catch (error) {
+      console.log('[Public Tenant Profile] featured_products query failed, defaulting hasFeaturedProducts to false');
+    }
+
+    console.log(`[Public Tenant Profile] hasPublishedDirectory: ${hasPublishedDirectory}, hasFeaturedProducts: ${hasFeaturedProducts}`);
+
     if (!profile) {
       console.log(`[Public Tenant Profile] No profile found for tenant: ${tenantId}`);
       return res.status(404).json({
@@ -177,24 +192,24 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
     });
 
     // Calculate effective expiration
-    const effectiveExpiration = tenantData?.manual_subscription_control 
+    const effectiveExpiration = tenantData?.manual_subscription_control
       ? {
-          expiresAt: tenantData.manual_subscription_expires_at,
-          type: 'manual' as const,
-          source: 'manual_override' as const
-        }
+        expiresAt: tenantData.manual_subscription_expires_at,
+        type: 'manual' as const,
+        source: 'manual_override' as const
+      }
       : tenantData?.subscription_status === 'trial' && tenantData?.trial_ends_at
         ? {
-            expiresAt: tenantData.trial_ends_at,
-            type: 'trial' as const,
-            source: 'automatic_trial' as const
-          }
+          expiresAt: tenantData.trial_ends_at,
+          type: 'trial' as const,
+          source: 'automatic_trial' as const
+        }
         : tenantData?.subscription_ends_at
           ? {
-              expiresAt: tenantData.subscription_ends_at,
-              type: 'subscription' as const,
-              source: 'automatic_subscription' as const
-            }
+            expiresAt: tenantData.subscription_ends_at,
+            type: 'subscription' as const,
+            source: 'automatic_subscription' as const
+          }
           : null;
 
     // Return the profile data (contact info is included in the profile object)
@@ -207,6 +222,7 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         subscriptionStatus: tenantData?.subscription_status,
         subscriptionTier: tenantData?.subscription_tier,
         hasPublishedDirectory: hasPublishedDirectory,
+        hasFeaturedProducts,
         primaryCategory: profile.business?.category,
         seoKeywords: profile.seo?.keywords || [],
         seoDescriptions: profile.description || '',
@@ -273,10 +289,10 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         identifierType: 'tenant_id'
       }
     });
-    
+
   } catch (error) {
     console.error('[Public Tenant Profile] Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Internal server error',
       message: 'Failed to retrieve tenant profile'
@@ -288,11 +304,11 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
 router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    
+
     if (!tenantId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Tenant ID is required' 
+        error: 'Tenant ID is required'
       });
     }
 
@@ -313,7 +329,7 @@ router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Respo
 
     // Query active payment gateways for the tenant
     const gateways = await prisma.tenant_payment_gateways.findMany({
-      where: { 
+      where: {
         tenant_id: tenantId,
         is_active: true, // Only return active gateways
       },
@@ -352,10 +368,10 @@ router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Respo
         identifierType: 'tenant_id'
       }
     });
-    
+
   } catch (error) {
     console.error('Public tenant payment gateways error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Internal server error',
       gateways: []
@@ -367,11 +383,11 @@ router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Respo
 router.get('/tenant/:tenantId/oauth-status/:gatewayType', async (req: Request, res: Response) => {
   try {
     const { tenantId, gatewayType } = req.params;
-    
+
     if (!tenantId || !gatewayType) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Tenant ID and gateway type are required' 
+        error: 'Tenant ID and gateway type are required'
       });
     }
 
@@ -411,10 +427,10 @@ router.get('/tenant/:tenantId/oauth-status/:gatewayType', async (req: Request, r
       isExpired,
       expiresAt: tokens.expires_at,
     });
-    
+
   } catch (error) {
     console.error('Public OAuth status error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Internal server error',
       connected: false
