@@ -38,6 +38,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
+import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 // Merchant gate helper for client-side filtering
@@ -1023,6 +1024,24 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   Our Location
                 </h2>
                 <GoogleMapEmbed address={listing.address} />
+              </div>
+            )}
+
+            {/* Inquiry Form */}
+            {!showStatusPanel && consolidatedData?.listing?.tenantId && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Send an Inquiry</h3>
+                    <p className="text-xs text-neutral-500">Ask {listing.businessName || listing.name || 'this store'} a question</p>
+                  </div>
+                </div>
+                <PublicInquiryForm tenantId={consolidatedData.listing.tenantId} tenantName={listing.businessName || listing.name} sourceLabel="Directory" />
               </div>
             )}
           </div>

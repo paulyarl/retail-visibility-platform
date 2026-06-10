@@ -26,6 +26,7 @@ const faqOptionsSettingsSchema = z.object({
   faq_display_feedback: z.boolean().optional(),
   faq_display_bot_handoff: z.boolean().optional(),
   faq_kb_coverage_metrics: z.boolean().optional(),
+  faq_kb_auto_sync: z.boolean().optional(),
 });
 
 // Default settings — core features on, advanced/chatbot features off
@@ -48,6 +49,7 @@ const DEFAULT_SETTINGS = {
   faq_display_feedback: true,
   faq_display_bot_handoff: false,
   faq_kb_coverage_metrics: false,
+  faq_kb_auto_sync: false,
 };
 
 // All feature keys for iteration
@@ -70,6 +72,7 @@ const FAQ_FEATURE_KEYS = [
   'faq_display_feedback',
   'faq_display_bot_handoff',
   'faq_kb_coverage_metrics',
+  'faq_kb_auto_sync',
 ] as const;
 
 // Get FAQ options settings for a tenant
@@ -135,6 +138,7 @@ router.get('/:tenantId/faq-options', authenticateToken, async (req, res) => {
     // KB / advanced features
     tierFilteredSettings.faq_chatbot_knowledge_base = tierState.kbEnabled ? !!rawSettings.faq_chatbot_knowledge_base : false;
     tierFilteredSettings.faq_kb_coverage_metrics = tierState.kbEnabled ? !!rawSettings.faq_kb_coverage_metrics : false;
+    tierFilteredSettings.faq_kb_auto_sync = (tierState.kbEnabled && tierState.allowedKbTypes?.includes('faq_kb_auto_sync')) ? !!rawSettings.faq_kb_auto_sync : false;
     tierFilteredSettings.faq_storefront_enabled = !!rawSettings.faq_storefront_enabled && tierState.storefrontEnabled;
     tierFilteredSettings.faq_product_enabled = !!rawSettings.faq_product_enabled && tierState.productEnabled;
     tierFilteredSettings.faq_templates_enabled = !!rawSettings.faq_templates_enabled && tierState.templatesEnabled;
@@ -279,6 +283,20 @@ router.put('/:tenantId/faq-options', authenticateToken, async (req, res) => {
         }
         continue;
       }
+      // Inquiry-to-FAQ curation (requires faq_kb_auto_sync in tier)
+      if (key === 'faq_kb_auto_sync') {
+        if (tierState.kbEnabled && tierState.allowedKbTypes?.includes('faq_kb_auto_sync')) {
+          filteredData[key] = value;
+        } else if (value === true) {
+          return res.status(403).json({
+            success: false,
+            error: 'tier_restricted',
+            message: 'Inquiry-to-FAQ curation requires a higher tier plan',
+            feature_key: key,
+          });
+        }
+        continue;
+      }
       // Unknown key — skip
     }
 
@@ -327,6 +345,7 @@ router.put('/:tenantId/faq-options', authenticateToken, async (req, res) => {
         faq_display_feedback: settings.faq_display_feedback,
         faq_display_bot_handoff: settings.faq_display_bot_handoff,
         faq_kb_coverage_metrics: settings.faq_kb_coverage_metrics,
+        faq_kb_auto_sync: settings.faq_kb_auto_sync,
       },
     });
   } catch (error) {

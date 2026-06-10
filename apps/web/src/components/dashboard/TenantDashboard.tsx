@@ -31,6 +31,7 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 const QuickActions = lazy(() => import("./QuickActions"));
 const VisibilityCards = lazy(() => import("./VisibilityCards"));
 const TierGainsWelcome = lazy(() => import("./TierGainsWelcome"));
+const CrmTenantWidget = lazy(() => import('@/components/crm/CrmTenantWidget'));
 
 // Simple loading fallback for lazy components
 const ComponentLoader = () => (
@@ -489,6 +490,34 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             canManageSettings={canManageSettings}
           />
         </Suspense>
+
+        {/* CRM Support Widget — left column for page balance */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <Suspense fallback={<ComponentLoader />}>
+              <MantineCard padding="md" radius="md" withBorder className="p-4 sm:p-6">
+                <CrmTenantWidget tenantId={tenantId} />
+              </MantineCard>
+            </Suspense>
+          </div>
+          <div className="lg:col-span-1">
+            <Suspense fallback={<ComponentLoader />}>
+              <MantineCard padding="md" radius="md" withBorder className="p-4 sm:p-6">
+                <div className="text-center py-4">
+                  <Text size="sm" c="dimmed">Quick support links</Text>
+                  <Stack gap="xs" mt="sm" align="center">
+                    <Link href={`/t/${tenantId}/support`} className="text-sm text-amber-600 hover:text-amber-700 font-medium">
+                      All Tickets →
+                    </Link>
+                    <Link href={`/t/${tenantId}/support?action=new`} className="text-sm text-amber-600 hover:text-amber-700 font-medium">
+                      + New Ticket
+                    </Link>
+                  </Stack>
+                </div>
+              </MantineCard>
+            </Suspense>
+          </div>
+        </div>
 
         {/* Visibility Cards - Path to Visibility */}
         <Suspense fallback={<ComponentLoader />}>

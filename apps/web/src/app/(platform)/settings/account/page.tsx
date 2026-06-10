@@ -29,6 +29,7 @@ import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageB
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import { userManagementService } from '@/services/UserManagementService';
+import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 
 
 export default function AccountPage() {
@@ -611,6 +612,9 @@ export default function AccountPage() {
           </Grid.Col>
         </Grid>
       </Card>
+
+      {/* Support Widget */}
+      <CrmCustomerWidget />
     </Stack>
   );
 }
