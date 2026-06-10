@@ -3606,4 +3606,123 @@ router.get('/platform-fee', async (_req, res) => {
   }
 });
 
+// ====================
+// PUBLIC INQUIRIES (anonymous + authenticated)
+// ====================
+
+const PublicInquirySchema = z.object({
+  tenant_id: z.string().min(1, 'Tenant ID is required'),
+  subject: z.string().min(2, 'Subject is required').max(200),
+  body: z.string().max(2000).optional(),
+  sender_name: z.string().max(100).optional(),
+  sender_email: z.string().email().optional(),
+  // CAPTCHA fields
+  captcha_answer: z.string().min(1, 'CAPTCHA verification required'),
+  captcha_seed: z.string().min(1, 'CAPTCHA seed required'),
+  // Honeypot — must be empty (bot fills hidden fields)
+  website_hp: z.string().max(0).optional(),
+});
+
+/**
+ * POST /api/public/inquiries
+ * Submit an inquiry to a tenant — no auth required.
+ * Protected by client-side math CAPTCHA + honeypot.
+ * If a valid customer session exists, links the inquiry to that customer.
+ */
+router.post('/inquiries', async (req, res) => {
+  try {
+    const parse = PublicInquirySchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'validation_error',
+        details: parse.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenant_id, subject, body, sender_name, sender_email, captcha_answer, captcha_seed, website_hp } = parse.data;
+
+    // Honeypot check — if filled, silently accept (don't tell bots it failed)
+    if (website_hp !== undefined && website_hp !== '') {
+      return res.json({ success: true, data: { id: 'hp-rejected' } });
+    }
+
+    // Verify math CAPTCHA: seed encodes two numbers and the answer must match
+    // Format: seed = "num1,num2" → answer must equal num1 + num2
+    try {
+      const [a, b] = captcha_seed.split(',').map(Number);
+      if (isNaN(a) || isNaN(b) || Number(captcha_answer) !== a + b) {
+        return res.status(400).json({
+          success: false,
+          error: 'captcha_failed',
+          message: 'CAPTCHA verification failed. Please try again.',
+        });
+      }
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'captcha_failed',
+        message: 'CAPTCHA verification failed. Please try again.',
+      });
+    }
+
+    // Verify tenant exists
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenant_id },
+      select: { id: true, name: true },
+    });
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found' });
+    }
+
+    // Determine source and optional customer link
+    let customerId: string | undefined;
+    let source = 'public_form';
+
+    // Check if customer session exists (authenticated customer submitting)
+    if (req.customer?.id) {
+      customerId = req.customer.id;
+      source = 'customer_portal';
+    }
+
+    const { CrmInquiryService } = await import('../services/CrmInquiryService');
+    const inquiryService = CrmInquiryService.getInstance();
+
+    const inquiry = await inquiryService.create({
+      tenant_id,
+      subject,
+      body: body || undefined,
+      customer_id: customerId,
+      source,
+      // Store sender info in contact_id field for anonymous (we'll use a sentinel)
+      contact_id: sender_email ? `anon:${sender_email}` : undefined,
+    });
+
+    // Log activity
+    try {
+      const { prisma: p } = await import('../prisma');
+      await p.crm_activities.create({
+        data: {
+          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          tenant_id,
+          actor_id: sender_email || 'anonymous',
+          actor_name: sender_name || 'Anonymous',
+          activity_type: 'inquiry_created',
+          content: `New inquiry: ${subject}`,
+          is_internal: false,
+        },
+      });
+    } catch (actErr) {
+      console.error('[Public Inquiry] Activity log error (non-critical):', actErr);
+    }
+
+    console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${sender_email || 'anonymous'}`);
+
+    res.status(201).json({ success: true, data: inquiry });
+  } catch (error) {
+    console.error('[Public Inquiry] Error creating inquiry:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit inquiry' });
+  }
+});
+
 export default router;

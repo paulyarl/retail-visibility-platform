@@ -43,6 +43,7 @@ interface FaqOptionsSettings {
   faq_display_feedback: boolean;
   faq_display_bot_handoff: boolean;
   faq_kb_coverage_metrics: boolean;
+  faq_kb_auto_sync: boolean;
 }
 
 interface FaqOptionsPageProps {
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: FaqOptionsSettings = {
   faq_display_feedback: true,
   faq_display_bot_handoff: false,
   faq_kb_coverage_metrics: false,
+  faq_kb_auto_sync: false,
 };
 
 type FeatureGroup = {
@@ -128,6 +130,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     features: [
       { key: 'faq_chatbot_knowledge_base', label: 'Chatbot Knowledge Base', description: 'Feed FAQs into chatbot responses', icon: <MessageSquare className="h-5 w-5 text-orange-600" /> },
       { key: 'faq_kb_coverage_metrics', label: 'Coverage Metrics', description: 'Coverage score, category coverage, product coverage dashboard', icon: <BarChart3 className="h-5 w-5 text-orange-600" /> },
+      { key: 'faq_kb_auto_sync', label: 'Inquiry-to-FAQ Curation', description: 'Create draft FAQs directly from customer inquiries', icon: <HelpCircle className="h-5 w-5 text-orange-600" /> },
     ],
   },
 ];

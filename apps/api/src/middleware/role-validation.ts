@@ -300,7 +300,12 @@ function getPermissionDescription(permission: PermissionGroup): string {
     CAN_TRANSFER_OWNERSHIP: 'Transfer organization ownership',
     CAN_DELETE_ORGANIZATION: 'Delete organization and all associated data',
     CAN_SUPPORT_TENANTS: 'Provide support for organization tenants',
-    CAN_TROUBLESHOOT: 'Access troubleshooting tools and diagnostics'
+    CAN_TROUBLESHOOT: 'Access troubleshooting tools and diagnostics',
+    // CRM permissions
+    CAN_VIEW_CRM: 'View CRM data (contacts, tickets, tasks, activities)',
+    CAN_MANAGE_CRM_SALES: 'Manage CRM sales operations (contacts, opportunities)',
+    CAN_MANAGE_CRM_SUPPORT: 'Manage CRM support operations (tickets, inquiries)',
+    CAN_MANAGE_CRM_OPS: 'Manage CRM operations (tasks, workflows)'
   };
   
   return descriptions[permission] || 'Unknown permission';

@@ -8,6 +8,7 @@ import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { customerAddressesService } from '@/services/CustomerAddressesService';
 import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download } from 'lucide-react';
+import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 
 export default function AccountOverviewPage() {
   const { customer } = useCustomerAuth();
@@ -238,6 +239,9 @@ export default function AccountOverviewPage() {
           </Card>
         </Link>
       </div>
+
+      {/* Support Widget */}
+      <CrmCustomerWidget />
     </div>
   );
 }

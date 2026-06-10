@@ -82,13 +82,13 @@ class FaqCoverageService {
       }),
       // Products with FAQ links
       prisma.faq_product_links.findMany({
-        where: { faq: { tenant_id: tenantId } },
+        where: { faqs: { tenant_id: tenantId } },
         distinct: ['product_id'],
         select: { product_id: true },
       }),
       // Total products (approximation from product links table)
       prisma.faq_product_links.findMany({
-        where: { faq: { tenant_id: tenantId } },
+        where: { faqs: { tenant_id: tenantId } },
         distinct: ['product_id'],
         select: { product_id: true },
       }),

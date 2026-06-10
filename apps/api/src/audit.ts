@@ -27,6 +27,14 @@ export async function audit(opts: {
       mappedAction = 'update'; // default fallback
     }
 
+    // Map entity_type from payload if provided, otherwise default to 'other'
+    // CRM entities use: crm_contact, crm_ticket, crm_task, crm_activity, crm_inquiry
+    const validEntityTypes = ['inventory_item', 'tenant', 'policy', 'oauth', 'other',
+      'crm_contact', 'crm_ticket', 'crm_task', 'crm_activity', 'crm_inquiry'];
+    const entityType = (opts.payload?.entity_type && validEntityTypes.includes(opts.payload.entity_type))
+      ? opts.payload.entity_type
+      : 'other';
+
     const auditData: any = {
       id: generateQuickStart("auditid"),
       tenant_id: opts.tenantId,
@@ -34,7 +42,7 @@ export async function audit(opts: {
       actor_id: opts.actor || 'system', // Prisma model expects snake_case
       actor_type: 'system', // Prisma model expects snake_case
       entity_id: opts.payload?.id || 'unknown', // Prisma model expects snake_case
-      entity_type: 'other', // Valid EntityType enum value for categories
+      entity_type: entityType,
       diff: opts.payload || {}, // Required field
     };
 

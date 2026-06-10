@@ -42,11 +42,20 @@ export interface JWTPayload {
   tenantIds: string[];
 }
 
-// Extend Express Request type to include user
+// Customer payload interface
+export interface CustomerPayload {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+// Extend Express Request type to include user and customer
 declare global {
   namespace Express {
     interface Request {
       user?: JWTPayload;
+      customer?: CustomerPayload;
     }
   }
 }
@@ -534,6 +543,54 @@ export function requirePlatformStaffOrAdmin(req: Request, res: Response, next: N
   }
   
   next();
+}
+
+/**
+ * Middleware to check if user is tenant admin/owner
+ * Used for tenant-level operations like propagation
+ * Platform admins bypass this check
+ */
+/**
+ * Customer authentication middleware
+ * Validates JWT Bearer token from customer sessions via CustomerTokenService
+ * Resolves to customers table (NOT users table)
+ * Sets req.customer for downstream use
+ */
+export async function authenticateCustomer(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { CustomerTokenService } = await import('../services/CustomerTokenService');
+    const tokenService = CustomerTokenService.getInstance();
+
+    // Try Bearer token first
+    const token = CustomerTokenService.extractBearerToken(req);
+
+    if (!token) {
+      return res.status(401).json({ error: 'customer_auth_required', message: 'Customer authentication required' });
+    }
+
+    const payload = tokenService.verifyAccessToken(token);
+
+    if (!payload || !payload.customerId) {
+      return res.status(401).json({ error: 'customer_auth_failed', message: 'Invalid or expired customer token' });
+    }
+
+    // Resolve to customers table
+    const { prisma } = await import('../prisma');
+    const customer = await prisma.customers.findUnique({
+      where: { id: payload.customerId },
+      select: { id: true, email: true, first_name: true, last_name: true }
+    });
+
+    if (!customer) {
+      return res.status(401).json({ error: 'customer_not_found', message: 'Customer not found' });
+    }
+
+    req.customer = customer;
+    next();
+  } catch (error) {
+    console.error('[AUTH] Customer authentication failed:', error);
+    return res.status(401).json({ error: 'customer_auth_failed', message: 'Customer authentication failed' });
+  }
 }
 
 /**

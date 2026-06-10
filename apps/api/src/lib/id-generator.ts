@@ -863,6 +863,76 @@ export function generateLicenseKey(): string {
 }
 
 /**
+ * Generate CRM contact ID
+ * Format: crmct-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmContactId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmct-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate CRM support ticket ID
+ * Format: crmtk-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmTicketId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmtk-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate CRM ticket message ID
+ * Format: crmmsg-{nanoid} (14 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmTicketMessageId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmmsg-${nanoid()}`;
+}
+
+/**
+ * Generate CRM task ID
+ * Format: crmtask-{tenantKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmTaskId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmtask-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate CRM activity ID
+ * Format: crmact-{tenantKey}-{nanoid} (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmActivityId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmact-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate CRM inquiry ID
+ * Format: crminq-{tenantKey}-{nanoid} (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmInquiryId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crminq-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate CRM request read ID
+ * Format: crmrd-{nanoid} (13 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmRequestReadId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmrd-${nanoid()}`;
+}
+
+/**
  * Generate product slug using new UPC/LPC system
  * Matches database trigger logic exactly
  * 

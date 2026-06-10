@@ -54,6 +54,7 @@ import GrowthTipCard from "./GrowthTipCard";
 import TierHeroIllustration from "./TierHeroIllustration";
 import CapabilityShowcase from "./CapabilityShowcase";
 import { useAllCapabilities, useMerchantGates } from "@/hooks/tenant-access/useCapabilityAccess";
+import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -427,6 +428,13 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               </div>
             </motion.div>
 
+            {/* CRM Support Widget */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <CrmTenantWidget tenantId={tenantId} />
+              </div>
+            </motion.div>
+
             {/* Capabilities */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -554,6 +562,19 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                       <p className="text-xs text-gray-500 truncate">Wizard tools & setup</p>
                     </div>
                     <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                  </Link>
+
+                  <Link href={`/t/${tenantId}/support`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <div className="p-2 bg-orange-50 rounded-lg group-hover:bg-orange-100 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-orange-600">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Support Hub</p>
+                      <p className="text-xs text-gray-500 truncate">Tickets, tasks & help</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
                   </Link>
                 </div>
               </div>

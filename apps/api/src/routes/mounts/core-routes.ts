@@ -33,6 +33,9 @@ import catalogAdoptionRoutes from '../catalog-adoption';
 import locationAvailabilityRoutes from '../location-availability';
 import crossTenantProductsRoutes from '../cross-tenant-products';
 import tenantCapabilitiesRoutes from '../tenant-capabilities';
+import crmTenantRoutes from '../crm/tenant/crm-tenant';
+import { authenticateCustomer } from '../../middleware/auth';
+import crmCustomerRoutes from '../crm/customer/crm-customer';
 
 /**
  * Mount core business routes
@@ -94,6 +97,12 @@ export function mountCoreRoutes(app: Express) {
   
   // Cross-tenant product routes (leverage product_slug for platform-wide queries)
   app.use('/api/cross-tenant', crossTenantProductsRoutes);
+
+  // CRM tenant routes (tenant-scoped, requires tenant access)
+  app.use('/api/tenant/crm', authenticateToken, checkTenantAccess, crmTenantRoutes);
+
+  // CRM customer routes (customer-scoped, requires customer JWT auth)
+  app.use('/api/customer/crm', authenticateCustomer, crmCustomerRoutes);
 
   console.log('✅ Core business routes mounted');
 }

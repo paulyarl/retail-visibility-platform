@@ -162,6 +162,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   ),
+  Headset: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 18V9a6 6 0 0112 0v9M3 18a2 2 0 002 2h1a2 2 0 002-2v-2a2 2 0 00-2-2H3v4zm15-2a2 2 0 002 2h1a2 2 0 002-2v-2a2 2 0 00-2-2h-3v2z" />
+    </svg>
+  ),
 };
 
 // ─── Nav definition (only real pages) ────────────────────────────────────────
@@ -291,6 +296,20 @@ const buildAdminNavItems = (): NavItem[] => [
     prefetch: false,
     children: [
       { label: 'Scan Metrics', href: '/settings/admin/scan-metrics' },
+    ],
+  },
+  {
+    label: 'CRM',
+    icon: <Icon.Headset />,
+    href: '/settings/admin/crm',
+    prefetch: false,
+    requiredPermission: 'CAN_VIEW_CRM',
+    children: [
+      { label: 'Dashboard', href: '/settings/admin/crm' },
+      { label: 'Requests Hub', href: '/settings/admin/crm/requests' },
+      { label: 'Tenants', href: '/settings/admin/crm/tenants' },
+      { label: 'Tickets', href: '/settings/admin/crm/tickets' },
+      { label: 'Tasks', href: '/settings/admin/crm/tasks' },
     ],
   },
   {

@@ -69,8 +69,8 @@ class FaqService {
     return prisma.faqs.findMany({
       where,
       include: {
-        category: { select: { id: true, name: true } },
-        product_links: { select: { product_id: true, inherit_storefront: true } },
+        faq_categories: { select: { id: true, name: true } },
+        faq_product_links: { select: { product_id: true, inherit_storefront: true } },
       },
       orderBy: [
         { display_order: 'asc' },
@@ -83,8 +83,8 @@ class FaqService {
     return prisma.faqs.findFirst({
       where: { id: faqId, tenant_id: tenantId },
       include: {
-        category: { select: { id: true, name: true } },
-        product_links: { select: { product_id: true, inherit_storefront: true } },
+        faq_categories: { select: { id: true, name: true } },
+        faq_product_links: { select: { product_id: true, inherit_storefront: true } },
       },
     });
   }
@@ -95,8 +95,8 @@ class FaqService {
     const faq = await prisma.faqs.create({
       data: faqData,
       include: {
-        category: { select: { id: true, name: true } },
-        product_links: true,
+        faq_categories: { select: { id: true, name: true } },
+        faq_product_links: true,
       },
     });
 
@@ -221,15 +221,15 @@ class FaqService {
     const productLinks = await prisma.faq_product_links.findMany({
       where: { product_id: productId },
       include: {
-        faq: {
+        faqs: {
           include: {
-            category: { select: { id: true, name: true } },
+            faq_categories: { select: { id: true, name: true } },
           },
         },
       },
     });
 
-    return productLinks.map(link => link.faq);
+    return productLinks.map(link => link.faqs);
   }
 
   // ====================
@@ -321,10 +321,10 @@ class FaqService {
         status: 'active',
       },
       include: {
-        category: { select: { id: true, name: true, display_order: true } },
+        faq_categories: { select: { id: true, name: true, display_order: true } },
       },
       orderBy: [
-        { category: { display_order: 'asc' } },
+        { faq_categories: { display_order: 'asc' } },
         { display_order: 'asc' },
       ],
     });
@@ -335,15 +335,15 @@ class FaqService {
     const productLinks = await prisma.faq_product_links.findMany({
       where: { product_id: productId },
       include: {
-        faq: {
-          include: { category: { select: { id: true, name: true } } },
+        faqs: {
+          include: { faq_categories: { select: { id: true, name: true } } },
         },
       },
     });
 
     const productFAQs = productLinks
-      .filter(link => link.faq.status === 'active')
-      .map(link => link.faq);
+      .filter(link => link.faqs.status === 'active')
+      .map(link => link.faqs);
 
     // Check if any link has inherit_storefront
     const hasInherit = productLinks.some(link => link.inherit_storefront);
@@ -357,10 +357,10 @@ class FaqService {
           status: 'active',
         },
         include: {
-          category: { select: { id: true, name: true, display_order: true } },
+          faq_categories: { select: { id: true, name: true, display_order: true } },
         },
         orderBy: [
-          { category: { display_order: 'asc' } },
+          { faq_categories: { display_order: 'asc' } },
           { display_order: 'asc' },
         ],
         take: 3,
