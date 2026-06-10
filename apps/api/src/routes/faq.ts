@@ -9,11 +9,13 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import FaqService from '../services/FaqService';
 import FaqCoverageService from '../services/FaqCoverageService';
+import FaqOptionsService from '../services/FaqOptionsService';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router({ mergeParams: true });
 const faqService = FaqService.getInstance();
 const faqCoverageService = FaqCoverageService.getInstance();
+const faqOptionsService = FaqOptionsService.getInstance();
 
 // ====================
 // VALIDATION SCHEMAS
@@ -61,6 +63,22 @@ router.get('/', checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const { scope, status, categoryId, search } = req.query;
+
+    // Resolve tier gate before serving data
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+    if (scope === 'storefront' && !tierState.storefrontEnabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+    if (scope === 'product' && !tierState.productEnabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
     const faqs = await faqService.listFAQs(tenantId, {
       scope: scope as string | undefined,
       status: status as string | undefined,
@@ -154,6 +172,14 @@ router.post('/bulk-delete', checkTenantAccess, async (req: Request, res: Respons
 router.get('/categories', checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
+
+    // Resolve tier gate before serving data
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
     const categories = await faqService.listCategories(tenantId);
     res.json({ success: true, data: categories });
   } catch (error) {
@@ -219,6 +245,14 @@ router.delete('/categories/:categoryId', checkTenantAccess, async (req: Request,
 router.get('/products/:productId/faqs', checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, productId } = req.params;
+
+    // Resolve tier gate before serving data
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled || !tierState.productEnabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
     const faqs = await faqService.listProductFAQs(tenantId, productId);
     res.json({ success: true, data: faqs });
   } catch (error) {

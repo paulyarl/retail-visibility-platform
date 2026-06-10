@@ -7,9 +7,11 @@
 
 import { Router, Request, Response } from 'express';
 import FaqService from '../services/FaqService';
+import FaqOptionsService from '../services/FaqOptionsService';
 
 const router = Router({ mergeParams: true });
 const faqService = FaqService.getInstance();
+const faqOptionsService = FaqOptionsService.getInstance();
 
 // ====================
 // Public Storefront FAQs
@@ -21,7 +23,18 @@ router.get('/faqs', async (req: Request, res: Response) => {
     const tenantId = req.params.tenantId;
     const { scope, productId } = req.query;
 
+    // Resolve tier gate before serving data
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled) {
+      res.json({ success: true, data: scope === 'product' && productId ? { productFAQs: [], storefrontFAQs: [] } : [] });
+      return;
+    }
+
     if (scope === 'product' && productId) {
+      if (!tierState.productEnabled) {
+        res.json({ success: true, data: { productFAQs: [], storefrontFAQs: [] } });
+        return;
+      }
       const { productFAQs, storefrontFAQs } = await faqService.getPublicProductFAQs(
         tenantId,
         productId as string
@@ -33,6 +46,11 @@ router.get('/faqs', async (req: Request, res: Response) => {
           storefrontFAQs,
         },
       });
+      return;
+    }
+
+    if (!tierState.storefrontEnabled) {
+      res.json({ success: true, data: [] });
       return;
     }
 
@@ -48,6 +66,14 @@ router.get('/faqs', async (req: Request, res: Response) => {
 router.get('/faq-categories', async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
+
+    // Resolve tier gate before serving data
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
     const categories = await faqService.listCategories(tenantId);
     res.json({ success: true, data: categories });
   } catch (error) {

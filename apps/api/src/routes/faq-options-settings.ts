@@ -371,8 +371,8 @@ router.get('/public/tenant/:tenantId/faq-options', async (req, res) => {
     // Enforce tier gates on display features only (public only needs display info)
     const publicSettings: Record<string, boolean> = {
       faq_enabled: !!rawSettings.faq_enabled && tierState.enabled,
-      faq_display_storefront_accordion: tierState.displayEnabled ? !!rawSettings.faq_display_storefront_accordion : false,
-      faq_display_product_accordion: tierState.displayEnabled ? !!rawSettings.faq_display_product_accordion : false,
+      faq_display_storefront_accordion: (tierState.displayEnabled && tierState.storefrontEnabled) ? !!rawSettings.faq_display_storefront_accordion : false,
+      faq_display_product_accordion: (tierState.displayEnabled && tierState.productEnabled) ? !!rawSettings.faq_display_product_accordion : false,
       faq_display_feedback: tierState.displayEnabled ? !!rawSettings.faq_display_feedback : false,
       faq_display_bot_handoff: tierState.displayEnabled ? !!rawSettings.faq_display_bot_handoff : false,
     };

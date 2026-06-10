@@ -249,18 +249,22 @@ export function StorefrontStatusPanel({
   // Capability-gated panel (storefront disabled by capability type)
   if (panelType === 'capability_gated') {
     return (
-      <div className={`bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-800 rounded-lg p-6 ${className}`}>
-        <div className="flex items-start gap-4">
-          <div className="text-gray-600 dark:text-gray-400 flex-shrink-0">
-            <Archive className="w-6 h-6" />
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
+            <Archive className="w-8 h-8 text-gray-600 dark:text-gray-400" />
           </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              Online Storefront Unavailable
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 opacity-90 mb-4">
-              This store does not currently offer an online storefront experience. Please visit the physical location or contact the store directly.
-            </p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+            Online Storefront Unavailable
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+            This store does not currently offer an online storefront experience. Please visit the physical location or contact the store directly.
+          </p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <span className="w-2 h-2 bg-gray-500 rounded-full" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Storefront Disabled
+            </span>
           </div>
         </div>
       </div>
@@ -272,30 +276,38 @@ export function StorefrontStatusPanel({
     const config = GOOGLE_ONLY_CONFIG;
 
     return (
-      <div className={`${config.bgClass} ${config.borderClass} border-2 rounded-lg p-6 ${className}`}>
-        <div className="flex items-start gap-4">
-          <div className={`${config.textClass} flex-shrink-0`}>
-            {config.icon}
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-6">
+            <MapPin className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="flex-1">
-            <h2 className={`text-xl font-semibold ${config.textClass} mb-2`}>
-              {config.title}
-            </h2>
-            <p className={`${config.textClass} opacity-90 mb-4`}>
-              {config.description}
-            </p>
-            {showGoogleListingLink && tenant.profileData && (
-              <a
-                href={googleListingUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.profileData.business_name || tenant.name)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                <MapPin className="w-4 h-4" />
-                View on Google Maps
-              </a>
-            )}
+
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+            {config.title}
+          </h1>
+
+          <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+            {config.description}
+          </p>
+
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-8">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+              Google Maps Active
+            </span>
           </div>
+
+          {showGoogleListingLink && tenant.profileData && (
+            <a
+              href={googleListingUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.profileData.business_name || tenant.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              <MapPin className="w-5 h-5 mr-2" />
+              View on Google Maps
+            </a>
+          )}
         </div>
       </div>
     );
@@ -308,19 +320,25 @@ export function StorefrontStatusPanel({
 
     if (!config) return null;
 
+    const isPastDue = subStatus === 'past_due';
+
     return (
-      <div className={`${config.bgClass} ${config.borderClass} border-2 rounded-lg p-6 ${className}`}>
-        <div className="flex items-start gap-4">
-          <div className={`${config.textClass} flex-shrink-0`}>
-            {config.icon}
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+          <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${config.bgClass}`}>
+            <div className={config.textClass}>{config.icon}</div>
           </div>
-          <div className="flex-1">
-            <h2 className={`text-xl font-semibold ${config.textClass} mb-2`}>
-              {tenant.subscriptionStatusInfo.label || config.title}
-            </h2>
-            <p className={`${config.textClass} opacity-90`}>
-              {tenant.subscriptionStatusInfo.description || config.description}
-            </p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+            {tenant.subscriptionStatusInfo.label || config.title}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+            {tenant.subscriptionStatusInfo.description || config.description}
+          </p>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${config.bgClass} ${config.borderClass} border`}>
+            <span className={`w-2 h-2 rounded-full ${isPastDue ? 'bg-orange-500 animate-pulse' : 'bg-red-500'}`} />
+            <span className={`text-sm font-medium ${config.textClass}`}>
+              {isPastDue ? 'Payment Overdue' : 'Subscription Canceled'}
+            </span>
           </div>
         </div>
       </div>
@@ -338,26 +356,32 @@ export function StorefrontStatusPanel({
   // Get reopening date from profileData if available
   const reopeningDate = tenant.profileData?.reopening_date || tenant.metadata?.reopening_date;
 
+  const statusBadgeLabel: Record<string, string> = {
+    pending: 'Setup in Progress',
+    inactive: 'Temporarily Unavailable',
+    closed: 'Permanently Closed',
+    archived: 'Unavailable',
+  };
+
+  const statusHasPulse = status === 'pending' || status === 'inactive';
+
   return (
-    <div className={`${config.bgClass} ${config.borderClass} border-2 rounded-lg p-6 ${className}`}>
-      <div className="flex items-start gap-4">
-        <div className={`${config.textClass} flex-shrink-0`}>
-          {config.icon}
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+        <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${config.bgClass}`}>
+          <div className={config.textClass}>{config.icon}</div>
         </div>
-        <div className="flex-1">
-          <h2 className={`text-xl font-semibold ${config.textClass} mb-2`}>
-            {config.title}
-          </h2>
-          <p className={`${config.textClass} opacity-90`}>
-            {config.getDescription(tenant.statusInfo, reopeningDate)}
-          </p>
-          {tenant.statusInfo && (
-            <div className="mt-4 flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${config.bgClass} ${config.textClass} border ${config.borderClass}`}>
-                {tenant.statusInfo.icon} {tenant.statusInfo.label}
-              </span>
-            </div>
-          )}
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+          {config.title}
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+          {config.getDescription(tenant.statusInfo, reopeningDate)}
+        </p>
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${config.bgClass} ${config.borderClass} border`}>
+          <span className={`w-2 h-2 rounded-full ${statusHasPulse ? 'animate-pulse' : ''} ${config.textClass.replace('text-', 'bg-').replace('dark:text-', 'dark:bg-')}`} />
+          <span className={`text-sm font-medium ${config.textClass}`}>
+            {statusBadgeLabel[status] || config.title}
+          </span>
         </div>
       </div>
     </div>

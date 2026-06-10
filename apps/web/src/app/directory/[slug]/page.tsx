@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, use } from 'react';
-import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 
@@ -494,32 +494,28 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
   if (isNotFound) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
-            <svg
-              className="w-8 h-8 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+            <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Store Not Found</h1>
-          <p className="text-gray-600 mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+            Store Not Found
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
             We couldn&apos;t find a store with that name. It may have been removed or the URL might be incorrect.
           </p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-8">
+            <span className="w-2 h-2 bg-red-500 rounded-full" />
+            <span className="text-sm font-medium text-red-800 dark:text-red-300">
+              No Listing Found
+            </span>
+          </div>
           <Link
             href="/directory"
-            className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
           >
+            <ArrowLeft className="w-5 h-5 mr-2" />
             Browse Directory
           </Link>
         </div>
@@ -1058,37 +1054,24 @@ function StoreComingSoon({ tenantId }: { tenantId: string }) {
   const storefrontEnabled = storefrontCapability?.enabled ?? false;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
-        <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
-          <svg
-            className="w-8 h-8 text-yellow-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-gray-200 dark:border-neutral-700 p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-6">
+          <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
           Store Coming Soon
         </h1>
 
-        <p className="text-gray-600 mb-6 leading-relaxed">
+        <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
           This store&apos;s directory listing is pending publication.
           Please check back soon to see their full storefront and product catalog.
         </p>
 
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg mb-8">
           <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-          <span className="text-sm font-medium text-yellow-800">
+          <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
             Awaiting publication
           </span>
         </div>
@@ -1096,7 +1079,7 @@ function StoreComingSoon({ tenantId }: { tenantId: string }) {
         {storefrontEnabled && (
           <Link
             href={`/tenant/${tenantId}`}
-            className="inline-flex items-center justify-center w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors mb-4"
+            className="inline-flex items-center justify-center w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors mb-4"
           >
             <Globe className="w-5 h-5 mr-2" />
             Visit Storefront
@@ -1105,21 +1088,9 @@ function StoreComingSoon({ tenantId }: { tenantId: string }) {
 
         <Link
           href="/directory"
-          className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
         >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
+          <ArrowLeft className="w-5 h-5 mr-2" />
           Browse Directory
         </Link>
       </div>
