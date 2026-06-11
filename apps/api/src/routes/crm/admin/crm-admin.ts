@@ -16,6 +16,7 @@ import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmRequestReadService from '../../../services/CrmRequestReadService';
 import CrmRequestHubService from '../../../services/CrmRequestHubService';
+import CrmAlertService from '../../../services/CrmAlertService';
 import { audit } from '../../../audit';
 
 interface RequestItem {
@@ -42,6 +43,7 @@ const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
 const requestReadService = CrmRequestReadService.getInstance();
 const requestHubService = CrmRequestHubService.getInstance();
+const alertService = CrmAlertService.getInstance();
 
 // ====================
 // Dashboard Stats
@@ -114,6 +116,9 @@ router.get('/tenants/:tenantId/transactions', async (req: Request, res: Response
 // GET /api/admin/crm/tenants/:tenantId/contacts
 router.get('/tenants/:tenantId/contacts', async (req: Request, res: Response) => {
   try {
+    // Auto-sync contacts from orders before listing
+    await contactService.syncFromOrders(req.params.tenantId);
+
     const contacts = await contactService.listByTenant(req.params.tenantId);
     res.json({ success: true, data: contacts });
   } catch (error) {
@@ -169,6 +174,18 @@ router.delete('/contacts/:contactId', async (req: Request, res: Response) => {
 // ====================
 // Tickets (global + tenant-scoped)
 // ====================
+
+// GET /api/admin/crm/tickets/:ticketId
+router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
+  try {
+    const ticket = await ticketService.getById(req.params.ticketId);
+    if (!ticket) return res.status(404).json({ error: 'ticket_not_found' });
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    console.error('[CRM Admin] Error fetching ticket:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch ticket' });
+  }
+});
 
 // GET /api/admin/crm/tickets (global queue)
 router.get('/tickets', async (req: Request, res: Response) => {
@@ -555,6 +572,49 @@ router.post('/requests/read-all', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CRM Admin] Error marking all requests read:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark all requests as read' });
+  }
+});
+
+// ====================
+// Alerts (admin creates alerts for tenants)
+// ====================
+
+// POST /api/admin/crm/alerts
+router.post('/alerts', async (req: Request, res: Response) => {
+  try {
+    const { tenant_id, type, title, body, icon, metadata } = req.body;
+    if (!tenant_id || !type || !title) {
+      return res.status(400).json({ error: 'invalid_input', message: 'tenant_id, type, and title are required' });
+    }
+
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const alert = await alertService.create({ tenant_id, type, title, body, icon, metadata });
+    await audit({ tenantId: tenant_id, actor: actorId, action: 'create', payload: { entity_type: 'crm_alert', id: alert.id, type, title } });
+    res.json({ success: true, data: alert });
+  } catch (error) {
+    console.error('[CRM Admin] Error creating alert:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create alert' });
+  }
+});
+
+// POST /api/admin/crm/alerts/broadcast
+// Send the same alert to multiple tenants
+router.post('/alerts/broadcast', async (req: Request, res: Response) => {
+  try {
+    const { tenant_ids, type, title, body, icon, metadata } = req.body;
+    if (!Array.isArray(tenant_ids) || tenant_ids.length === 0 || !type || !title) {
+      return res.status(400).json({ error: 'invalid_input', message: 'tenant_ids array, type, and title are required' });
+    }
+
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const results = await Promise.all(
+      tenant_ids.map(tid => alertService.create({ tenant_id: tid, type, title, body, icon, metadata }))
+    );
+    await audit({ tenantId: 'broadcast', actor: actorId, action: 'create', payload: { entity_type: 'crm_alert_broadcast', count: results.length, type, title } });
+    res.json({ success: true, data: results });
+  } catch (error) {
+    console.error('[CRM Admin] Error broadcasting alerts:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to broadcast alerts' });
   }
 });
 

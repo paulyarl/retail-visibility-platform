@@ -88,6 +88,9 @@ export class CustomerAuthService {
             },
           });
 
+          // Reconcile any guest orders placed with this email
+          await this.reconcileGuestOrders(customer.id, customer.email);
+
           return {
             success: true,
             customer: this.formatCustomer(customer),
@@ -121,6 +124,9 @@ export class CustomerAuthService {
           email_verification_expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       });
+
+      // Reconcile any guest orders placed with this email before account existed
+      await this.reconcileGuestOrders(customer.id, customer.email);
 
       return {
         success: true,
@@ -385,6 +391,9 @@ export class CustomerAuthService {
         });
       }
 
+      // Reconcile any guest orders placed with this email
+      await this.reconcileGuestOrders(customer.id, customer.email);
+
       return {
         success: true,
         customer: this.formatCustomer(customer),
@@ -561,6 +570,33 @@ export class CustomerAuthService {
     });
 
     return customer ? this.formatCustomer(customer) : null;
+  }
+
+  /**
+   * Reconcile guest orders — backfills customer_id on orders that were placed
+   * as guest (customer_id = null) but match this customer by email.
+   * Returns the number of orders linked.
+   */
+  async reconcileGuestOrders(customerId: string, email: string): Promise<number> {
+    try {
+      const result = await prisma.orders.updateMany({
+        where: {
+          customer_id: null,
+          customer_email: email.toLowerCase(),
+        },
+        data: {
+          customer_id: customerId,
+          updated_at: new Date(),
+        },
+      });
+      if (result.count > 0) {
+        console.log(`[CustomerAuth] Reconciled ${result.count} guest orders for customer ${customerId}`);
+      }
+      return result.count;
+    } catch (error: any) {
+      console.error('[CustomerAuth] Reconcile guest orders error:', error);
+      return 0;
+    }
   }
 
   // Private helper methods

@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { RefundService } from '../services/refunds/RefundService';
 import { generateOrderItemHistoryId } from '../lib/id-generator';
+import { generateTrackingUrl } from '../utils/tracking-url-generator';
 
 const router = Router();
 
@@ -243,7 +244,10 @@ router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
         } : null,
         createdAt: order.created_at,
         paidAt: order.paid_at,
-        notes: order.notes
+        notes: order.notes,
+        trackingNumber: order.shipments?.[0]?.tracking_number || null,
+        trackingUrl: order.shipments?.[0]?.tracking_url || null,
+        carrier: order.shipments?.[0]?.carrier || null
       };
     });
 
@@ -402,6 +406,8 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
       notes: order.notes,
       internalNotes: order.internal_notes,
       trackingNumber: order.shipments?.[0]?.tracking_number || null,
+      trackingUrl: order.shipments?.[0]?.tracking_url || null,
+      carrier: order.shipments?.[0]?.carrier || null,
       refunds: order.refunds?.map(refund => ({
         id: refund.id,
         amount: refund.amount_cents,
@@ -483,9 +489,9 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
     const updateData: any = {};
     if (fulfillmentStatus) {
       updateData.fulfillment_status = fulfillmentStatus;
+
       if (fulfillmentStatus === 'fulfilled') {
         updateData.fulfilled_at = new Date();
-        // Add shipping provider if provided
         if (shippingProvider) {
           updateData.shipping_provider = shippingProvider;
         }
@@ -511,21 +517,18 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
             }
           } catch (revenueError) {
             console.error('[Tenant Orders] Failed to record deposit revenue:', revenueError);
-            // Don't fail the fulfillment if revenue recording fails
           }
         }
       } else if (fulfillmentStatus === 'cancelled') {
         updateData.cancelled_at = new Date();
-        // Add tenant cancellation note with reason
         const timestamp = new Date().toISOString();
         const reason = cancellationReason || 'No reason provided';
         const cancellationNote = `[${timestamp}] STORE CANCELLATION: ${reason}`;
         const existingNotes = existingOrder.internal_notes || '';
-        updateData.internal_notes = existingNotes 
+        updateData.internal_notes = existingNotes
           ? `${existingNotes}\n\n${cancellationNote}`
           : cancellationNote;
 
-        // Send order cancelled notification (async, don't wait)
         const { getOrderNotificationService } = await import('../services/OrderNotificationService');
         getOrderNotificationService().notifyOrderCancelled({
           tenantId: tenantId,
@@ -537,18 +540,13 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
           cancelledBy: 'merchant',
         }).catch(err => console.error('[Tenant Orders] Failed to send cancellation notification:', err));
 
-        // Process refund if order was paid
         if (existingOrder.payment_status === 'paid') {
           console.log('[Tenant Orders] Order is paid, initiating refund for order:', orderId);
-          
-          // Get payment record
           const payment = await prisma.payments.findFirst({
             where: { order_id: orderId },
             orderBy: { created_at: 'desc' },
           });
-
           if (payment) {
-            // Process refund asynchronously
             RefundService.processRefund({
               orderId: orderId,
               paymentId: payment.id,
@@ -569,11 +567,17 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
           }
         }
       }
+    } else if (trackingNumber && existingOrder.fulfillment_status === 'unfulfilled') {
+      // Auto-set to processing when tracking is added but order is still unfulfilled
+      updateData.fulfillment_status = 'processing';
     }
 
     const updatedOrder = await prisma.orders.update({
       where: { id: orderId },
-      data: updateData
+      data: {
+        ...updateData,
+        updated_at: new Date(),
+      },
     });
 
     // Create status history entry if fulfillment status changed
@@ -626,11 +630,30 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
         }
       });
 
+      // Resolve carrier and generate tracking URL (gated by order_tracking capability)
+      const carrier = shippingProvider || existingShipment?.carrier || null;
+      let trackingUrl: string | null = null;
+      try {
+        const { checkTierAccessWithOverrides } = await import('../middleware/tier-access');
+        const access = await checkTierAccessWithOverrides(tenantId, 'order_tracking');
+        if (access.hasAccess) {
+          trackingUrl = generateTrackingUrl(carrier, trackingNumber);
+        }
+      } catch (err) {
+        // If capability check fails, still allow manual tracking without auto URL
+        console.warn('[Tenant Orders] Order tracking capability check failed, skipping auto URL:', err);
+      }
+
       if (existingShipment) {
         // Update existing shipment
         const updatedShipment = await prisma.shipments.update({
           where: { id: existingShipment.id },
-          data: { tracking_number: trackingNumber }
+          data: {
+            tracking_number: trackingNumber,
+            ...(carrier && { carrier }),
+            ...(trackingUrl && { tracking_url: trackingUrl }),
+            ...(fulfillmentStatus === 'fulfilled' && { shipment_status: 'in_transit', shipped_at: new Date() }),
+          }
         });
         shipmentTrackingNumber = updatedShipment.tracking_number;
       } else if (trackingNumber) {
@@ -641,7 +664,10 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
             order_id: orderId,
             tenant_id: tenantId,
             tracking_number: trackingNumber,
-            shipment_status: 'pending',
+            carrier: carrier,
+            tracking_url: trackingUrl,
+            shipment_status: fulfillmentStatus === 'fulfilled' ? 'in_transit' : 'pending',
+            ...(fulfillmentStatus === 'fulfilled' && { shipped_at: new Date() }),
             address_line1: existingOrder.shipping_address_line1 || 'N/A',
             address_line2: existingOrder.shipping_address_line2,
             city: existingOrder.shipping_city || 'N/A',
@@ -653,6 +679,27 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
           }
         });
         shipmentTrackingNumber = newShipment.tracking_number;
+      }
+
+      // Send order shipped notification for shipping orders with tracking (gated by order_tracking capability)
+      const fulfillmentMethod = (existingOrder.metadata as any)?.fulfillment_method;
+      if (trackingNumber && carrier && fulfillmentMethod === 'shipping' && trackingUrl) {
+        try {
+          const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+          getOrderNotificationService().notifyOrderShipped({
+            tenantId: tenantId,
+            orderId: orderId,
+            orderNumber: existingOrder.order_number,
+            customerEmail: existingOrder.customer_email,
+            customerName: existingOrder.customer_name || undefined,
+            amount: existingOrder.total_cents,
+            trackingNumber: trackingNumber,
+            carrier: carrier,
+            trackingUrl: trackingUrl || undefined,
+          }).catch(err => console.error('[Tenant Orders] Failed to send shipped notification:', err));
+        } catch (err) {
+          console.warn('[Tenant Orders] Failed to send shipped notification:', err);
+        }
       }
     }
 

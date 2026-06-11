@@ -95,6 +95,13 @@ export interface UpdateContactInput {
   customer_id?: string;
 }
 
+export interface CrmContactDetail extends CrmContact {
+  crm_support_tickets: CrmTicket[];
+  crm_tasks: CrmTask[];
+  crm_inquiries: CrmInquiry[];
+  customers: { id: string; first_name: string | null; last_name: string | null; email: string } | null;
+}
+
 // --- Ticket ---
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -257,6 +264,23 @@ export interface UpdateInquiryInput {
   body?: string;
 }
 
+// --- Alert ---
+export type AlertType = 'milestone' | 'subscription' | 'welcome' | 'info' | 'warning' | 'congratulations' | 'order';
+
+export interface CrmAlert {
+  id: string;
+  tenant_id: string;
+  type: AlertType;
+  title: string;
+  body: string | null;
+  icon: string | null;
+  is_read: boolean;
+  is_dismissed: boolean;
+  metadata: Record<string, any> | null;
+  created_at: string;
+  read_at: string | null;
+}
+
 // --- Requests Hub ---
 export type RequestType = 'ticket' | 'task' | 'inquiry';
 
@@ -290,4 +314,10 @@ export interface CrmTenantCrmStats {
   pending_tasks: CrmTask[];
   recent_activities: CrmActivity[];
   open_inquiries: CrmInquiry[];
+  recent_alerts: CrmAlert[];
+  unread_count: number;
+  open_ticket_count: number;
+  pending_task_count: number;
+  open_inquiry_count: number;
+  unread_alert_count: number;
 }

@@ -3,6 +3,7 @@
  */
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
+import CrmContactService from './CrmContactService';
 
 export class CrmTenantService extends BaseService {
   private static instance: CrmTenantService;
@@ -126,6 +127,10 @@ export class CrmTenantService extends BaseService {
 
     if (!tenant) return null;
 
+    // Auto-sync contacts from orders before fetching
+    const contactService = CrmContactService.getInstance();
+    await contactService.syncFromOrders(tenantId);
+
     const [orderAgg, openTickets, pendingTasks, recentOrders, contacts, recentActivities] = await Promise.all([
       prisma.orders.aggregate({
         where: { tenant_id: tenantId },
@@ -212,7 +217,7 @@ export class CrmTenantService extends BaseService {
    * Get CRM dashboard stats for a tenant (tenant-scoped view)
    */
   async getTenantCrmStats(tenantId: string) {
-    const [openTickets, pendingTasks, recentActivities, openInquiries] = await Promise.all([
+    const [openTickets, pendingTasks, recentActivities, openInquiries, recentAlerts, openTicketCount, pendingTaskCount, openInquiryCount, unreadAlertCount] = await Promise.all([
       prisma.crm_support_tickets.findMany({
         where: { tenant_id: tenantId, status: { in: ['open', 'in_progress', 'waiting'] } },
         orderBy: { priority: 'desc' },
@@ -237,9 +242,38 @@ export class CrmTenantService extends BaseService {
         take: 5,
         select: { id: true, subject: true, status: true, contact_id: true, customer_id: true, body: true, created_at: true },
       }),
+      prisma.crm_alerts.findMany({
+        where: { tenant_id: tenantId, is_dismissed: false },
+        orderBy: { created_at: 'desc' },
+        take: 5,
+        select: { id: true, type: true, title: true, body: true, icon: true, is_read: true, is_dismissed: true, metadata: true, created_at: true, read_at: true },
+      }),
+      prisma.crm_support_tickets.count({
+        where: { tenant_id: tenantId, status: { in: ['open', 'in_progress', 'waiting'] } },
+      }),
+      prisma.crm_tasks.count({
+        where: { tenant_id: tenantId, status: { in: ['pending', 'in_progress'] } },
+      }),
+      prisma.crm_inquiries.count({
+        where: { tenant_id: tenantId, status: { in: ['new', 'in_progress'] } },
+      }),
+      prisma.crm_alerts.count({
+        where: { tenant_id: tenantId, is_read: false, is_dismissed: false },
+      }),
     ]);
 
-    return { open_tickets: openTickets, pending_tasks: pendingTasks, recent_activities: recentActivities, open_inquiries: openInquiries };
+    return {
+      open_tickets: openTickets,
+      pending_tasks: pendingTasks,
+      recent_activities: recentActivities,
+      open_inquiries: openInquiries,
+      recent_alerts: recentAlerts,
+      unread_count: openTicketCount + pendingTaskCount + openInquiryCount + unreadAlertCount,
+      open_ticket_count: openTicketCount,
+      pending_task_count: pendingTaskCount,
+      open_inquiry_count: openInquiryCount,
+      unread_alert_count: unreadAlertCount,
+    };
   }
 }
 

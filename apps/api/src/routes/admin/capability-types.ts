@@ -157,7 +157,8 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
       });
     }
 
-    const { allowed_features, ...capTypeData } = parsed.data;
+    const allowed_features = (parsed.data.allowed_features || []).map((k: string) => k.trim()).filter(Boolean);
+    const { ...capTypeData } = parsed.data;
 
     // Check if key already exists
     const existing = await prisma.capability_type_list.findUnique({
@@ -248,7 +249,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
       });
 
       const foundKeys = new Set(featureRecords.map(f => f.key));
-      const missingKeys = allowed_features.filter(k => !foundKeys.has(k));
+      const missingKeys = allowed_features.filter((k: string) => !foundKeys.has(k));
       if (missingKeys.length > 0) {
         return res.status(400).json({
           error: 'invalid_features',
@@ -320,7 +321,9 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
       });
     }
 
-    const { capability_type_key, allowed_features, ...updateData } = parsed.data;
+    const { capability_type_key } = parsed.data;
+    const allowed_features = parsed.data.allowed_features?.map((k: string) => k.trim()).filter(Boolean);
+    const { ...updateData } = parsed.data;
 
     // Find existing
     const existing = await prisma.capability_type_list.findUnique({

@@ -13,7 +13,7 @@ import type {
   CrmTask, CreateTaskInput, UpdateTaskInput,
   CrmActivity, CreateActivityInput,
   CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
-  CrmOrder, RequestListParams, CrmRequestItem,
+  CrmAlert, CrmOrder, RequestListParams, CrmRequestItem,
 } from '@/types/crm';
 
 class CrmAdminService extends AdminApiSingleton {
@@ -136,6 +136,17 @@ class CrmAdminService extends AdminApiSingleton {
   }
 
   // --- Tickets (CRUD + status) ---
+  async getTicket(ticketId: string): Promise<CrmTicket> {
+    const cacheKey = `crm-ticket-${ticketId}`;
+    const result = await this.makeDefaultRequest<CrmTicket>(
+      `/api/admin/crm/tickets/${ticketId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTicket>(result);
+  }
+
   async listTickets(tenantId: string, filters?: { status?: string; priority?: string }): Promise<CrmTicket[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
@@ -376,6 +387,40 @@ class CrmAdminService extends AdminApiSingleton {
       2 * 60 * 1000
     );
     return this.unwrap<{ openTickets: number; overdueTasks: number; activeTenants: number; avgResponseTimeMs: number | null }>(result);
+  }
+
+  // --- Alerts ---
+  async createAlert(data: { tenant_id: string; type: string; title: string; body?: string; icon?: string; metadata?: Record<string, any> }): Promise<CrmAlert> {
+    const result = await this.makeDefaultRequest<CrmAlert>(
+      '/api/admin/crm/alerts',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmAlert>(result);
+  }
+
+  async broadcastAlert(data: { tenant_ids: string[]; type: string; title: string; body?: string; icon?: string; metadata?: Record<string, any> }): Promise<CrmAlert[]> {
+    const result = await this.makeDefaultRequest<CrmAlert[]>(
+      '/api/admin/crm/alerts/broadcast',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmAlert[]>(result);
+  }
+
+  // --- Global Inquiries ---
+  async listGlobalInquiries(filters?: { assignedTo?: string; status?: string; priority?: string }): Promise<CrmInquiry[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString() : '';
+    const cacheKey = `crm-inquiries-global-${qs}`;
+    const result = await this.makeDefaultRequest<CrmInquiry[]>(
+      `/api/admin/crm/inquiries${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      5 * 60 * 1000
+    );
+    return this.unwrap<CrmInquiry[]>(result);
   }
 }
 

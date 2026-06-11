@@ -13,6 +13,7 @@ interface TenantCrmPageShellProps {
   navCounts?: {
     tickets?: number;
     inquiries?: number;
+    alerts?: number;
   };
   children: ReactNode;
   actions?: ReactNode;

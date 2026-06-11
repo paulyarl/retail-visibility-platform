@@ -10,6 +10,7 @@ import { generateOrderNumber } from '../utils/order-number-generator';
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 
 import { generateOrderId, generateOrderItemHistoryId, generateOrderItemId } from '../lib/id-generator';
+import CrmAlertService from '../services/CrmAlertService';
 
 const router = Router();
 
@@ -450,6 +451,18 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
 
       return order;
     });
+
+    // Create CRM alert if status changed (fire-and-forget)
+    if (order_status && order_status !== currentOrder.order_status) {
+      CrmAlertService.getInstance().createOrderAlert({
+        tenantId: updatedOrder.tenant_id,
+        orderId: updatedOrder.id,
+        orderNumber: updatedOrder.order_number,
+        eventType: order_status,
+        customerName: updatedOrder.customer_name || undefined,
+        amount: updatedOrder.total_cents,
+      }).catch(err => console.error('[Orders] Failed to create CRM alert:', err));
+    }
 
     res.json({
       success: true,

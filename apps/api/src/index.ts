@@ -178,6 +178,7 @@ import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
 import organizationCommerceSettingsRoutes from './routes/organization-commerce-settings';
 import buyerOrdersRoutes from './routes/buyer-orders';
 import tenantOrdersRoutes from './routes/tenant-orders';
+import shipmentRoutes from './routes/shipments';
 import productLikesRoutes from './routes/product-likes';
 import faqRoutes from './routes/faq';
 import faqPublicRoutes from './routes/faq-public';
@@ -7529,6 +7530,10 @@ console.log('✅ Billing routes mounted at /api/billing');
 /* ------------------------------ tenant orders ------------------------------ */
 app.use('/api', tenantOrdersRoutes);
 console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders');
+
+/* ------------------------------ shipments ------------------------------ */
+app.use('/api/tenants', shipmentRoutes);
+console.log('✅ Shipment routes mounted at /api/tenants/:tenantId/shipments');
 
 /* ------------------------------ tenant inventory transfers ------------------------------ */
 import tenantInventoryTransferRoutes from './routes/tenant-inventory-transfers';

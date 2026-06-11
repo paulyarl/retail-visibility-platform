@@ -933,6 +933,16 @@ export function generateCrmRequestReadId(): string {
 }
 
 /**
+ * Generate CRM Alert ID
+ * Format: crmalt-{tenantKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateCrmAlertId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmalt-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate product slug using new UPC/LPC system
  * Matches database trigger logic exactly
  * 

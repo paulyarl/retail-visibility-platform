@@ -26,6 +26,8 @@ export interface CustomerOrder {
   paidAt: string;
   fulfilledAt?: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
   shippingAddress: {
     addressLine1: string;
     addressLine2?: string;

@@ -95,7 +95,7 @@ export default function CrmDashboardPage() {
             ) : (
               <div className="space-y-2">
                 {myTickets.map((t: any) => (
-                  <Link key={t.id} href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                  <Link key={t.id} href={`/settings/admin/crm/tickets/${t.id}`} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{t.title}</p>
                       <p className="text-xs text-neutral-500">{t.tenant_id}</p>

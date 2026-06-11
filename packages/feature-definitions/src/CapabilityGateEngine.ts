@@ -187,6 +187,24 @@ const CAPABILITY_DEFINITIONS = {
     }
   },
 
+  // Order Tracking Capabilities
+  'order_tracking': {
+    commitment: {
+      name: 'Order Tracking',
+      enabled: true,
+      level: 4,
+      features: ['manual_tracking', 'auto_tracking_url', 'shipped_notification'],
+      restrictions: {}
+    },
+    professional: {
+      name: 'Order Tracking',
+      enabled: true,
+      level: 5,
+      features: ['manual_tracking', 'auto_tracking_url', 'shipped_notification', 'tracking_events', 'status_progression'],
+      restrictions: {}
+    }
+  },
+
   // Payment Method Capabilities
   'payment_methods': {
     commitment: {

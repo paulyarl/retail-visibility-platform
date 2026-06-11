@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
 import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
-import type { CrmTicket } from '@/types/crm';
+import type { CrmTicket, CrmAlert } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -15,8 +15,21 @@ const STATUS_COLORS: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-800',
 };
 
+const ALERT_CONFIG: Record<string, { icon: string; color: string; bg: string; border: string }> = {
+  milestone: { icon: '🏆', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  subscription: { icon: '🔔', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+  welcome: { icon: '👋', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  info: { icon: 'ℹ️', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' },
+  warning: { icon: '⚠️', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+  congratulations: { icon: '🎉', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+  order: { icon: '🛒', color: 'text-teal-700', bg: 'bg-teal-50', border: 'border-teal-200' },
+};
+
 export default function CustomerSupportPage() {
   const [tickets, setTickets] = useState<CrmTicket[]>([]);
+  const [alerts, setAlerts] = useState<CrmAlert[]>([]);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
+  const [alertFilter, setAlertFilter] = useState<'all' | 'order' | 'platform'>('all');
   const [loading, setLoading] = useState(true);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -30,12 +43,18 @@ export default function CustomerSupportPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [ticketList, orderList] = await Promise.allSettled([
+        const [ticketList, orderList, alertList] = await Promise.allSettled([
           crmCustomerService.listTickets(),
           crmCustomerService.listOrders(),
+          crmCustomerService.listAlerts(),
         ]);
 
         if (ticketList.status === 'fulfilled') setTickets(ticketList.value);
+
+        if (alertList.status === 'fulfilled') {
+          setAlerts(alertList.value);
+          setUnreadAlertCount(alertList.value.filter((a: CrmAlert) => !a.is_read && !a.is_dismissed).length);
+        }
 
         // Derive tenant list from orders for the new ticket tenant selector
         if (orderList.status === 'fulfilled') {
@@ -175,6 +194,93 @@ export default function CustomerSupportPage() {
               >
                 {submitting ? 'Creating...' : 'Submit Ticket'}
               </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Alerts ({alerts.length})</CardTitle>
+            {unreadAlertCount > 0 && (
+              <button
+                onClick={async () => { await crmCustomerService.markAllAlertsRead(); const a = await crmCustomerService.listAlerts(); setAlerts(a); setUnreadAlertCount(a.filter((x: CrmAlert) => !x.is_read && !x.is_dismissed).length); }}
+                className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
+              >
+                Mark all read
+              </button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Filter tabs */}
+            <div className="flex gap-2">
+              {(['all', 'order', 'platform'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setAlertFilter(f)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    alertFilter === f
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                      : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : f === 'order' ? 'Orders' : 'Platform'}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {alerts
+                .filter(a => {
+                  if (alertFilter === 'order') return a.type === 'order';
+                  if (alertFilter === 'platform') return a.type !== 'order';
+                  return true;
+                })
+                .map(a => {
+                  const config = ALERT_CONFIG[a.type] || ALERT_CONFIG.info;
+                  const orderId = a.metadata?.order_id;
+                  const href = a.type === 'order' && orderId ? `/account/orders/${orderId}` : '#';
+                  return (
+                    <div key={a.id} className={`flex items-start justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 rounded-lg px-2 -mx-2 ${!a.is_read ? 'bg-purple-50/50 dark:bg-purple-900/10' : ''}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {a.icon && <span className="text-base">{a.icon}</span>}
+                          <p className={`text-sm font-medium ${!a.is_read ? 'text-purple-800 dark:text-purple-200' : ''}`}>
+                            {a.type === 'order' && orderId ? (
+                              <Link href={href} className="hover:underline">{a.title}</Link>
+                            ) : (
+                              a.title
+                            )}
+                          </p>
+                          {!a.is_read && <span className="inline-flex w-2 h-2 rounded-full bg-purple-500" />}
+                        </div>
+                        {a.body && (
+                          <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{a.body}</p>
+                        )}
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                          {a.type?.replace('_', ' ')} · {new Date(a.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        {!a.is_read && (
+                          <button
+                            onClick={async () => { await crmCustomerService.markAlertRead(a.id); const updated = await crmCustomerService.listAlerts(); setAlerts(updated); setUnreadAlertCount(updated.filter((x: CrmAlert) => !x.is_read && !x.is_dismissed).length); }}
+                            className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
+                          >
+                            Read
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => { await crmCustomerService.dismissAlert(a.id); const updated = await crmCustomerService.listAlerts(); setAlerts(updated); setUnreadAlertCount(updated.filter((x: CrmAlert) => !x.is_read && !x.is_dismissed).length); }}
+                          className="text-xs text-neutral-400 hover:text-neutral-600"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </CardContent>
         </Card>

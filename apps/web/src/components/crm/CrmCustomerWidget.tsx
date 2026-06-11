@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, Group, Title, Text, Badge, Stack, ThemeIcon, Paper, ActionIcon, Divider, Loader, NavLink, Spoiler } from '@mantine/core';
 import { IconTicket, IconInbox, IconPlus, IconChevronRight } from '@tabler/icons-react';
 import Link from 'next/link';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
-import type { CrmTicket, CrmInquiry } from '@/types/crm';
+import { toast } from '@/hooks/use-toast';
+import type { CrmTicket, CrmInquiry, CrmAlert } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'blue',
@@ -22,19 +23,64 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'gray',
 };
 
+const ALERT_CONFIG: Record<string, { icon: string; color: string; bg: string; border: string }> = {
+  milestone: { icon: '🏆', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  subscription: { icon: '🔔', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+  welcome: { icon: '👋', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  info: { icon: 'ℹ️', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' },
+  warning: { icon: '⚠️', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+  congratulations: { icon: '🎉', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+  order: { icon: '🛒', color: 'text-teal-700', bg: 'bg-teal-50', border: 'border-teal-200' },
+};
+
 export default function CrmCustomerWidget() {
   const [tickets, setTickets] = useState<CrmTicket[]>([]);
   const [inquiries, setInquiries] = useState<CrmInquiry[]>([]);
+  const [alerts, setAlerts] = useState<CrmAlert[]>([]);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const isFirstLoadRef = useRef(true);
+  const prevAlertIdsRef = useRef<Set<string>>(new Set());
+  const prevUnreadRef = useRef<number>(0);
 
   const loadData = useCallback(async () => {
     try {
-      const [t, i] = await Promise.allSettled([
+      const [t, i, a] = await Promise.allSettled([
         crmCustomerService.listTickets({ status: 'open' }),
         crmCustomerService.listInquiries({ status: 'open' }),
+        crmCustomerService.listAlerts(),
       ]);
       if (t.status === 'fulfilled') setTickets(t.value.slice(0, 3));
       if (i.status === 'fulfilled') setInquiries(i.value.slice(0, 3));
+
+      let newAlerts: CrmAlert[] = [];
+      let newUnreadAlertCount = 0;
+      if (a.status === 'fulfilled') {
+        newAlerts = a.value.slice(0, 3);
+        newUnreadAlertCount = a.value.filter((x: CrmAlert) => !x.is_read && !x.is_dismissed).length;
+      }
+
+      // Detect new alerts for toast (skip on first load)
+      if (!isFirstLoadRef.current) {
+        const prevAlertIds = prevAlertIdsRef.current;
+        const prevUnread = prevUnreadRef.current;
+        const newAlertItems = newAlerts.filter(x => !prevAlertIds.has(x.id));
+        if (newAlertItems.length > 0 && newUnreadAlertCount > prevUnread) {
+          toast({
+            title: newAlertItems[0].title,
+            description: newAlertItems[0].body || 'New alert',
+            variant: 'info',
+          });
+        }
+      }
+
+      // Update refs for next diff
+      prevAlertIdsRef.current = new Set(newAlerts.map(x => x.id));
+      prevUnreadRef.current = newUnreadAlertCount;
+
+      setAlerts(newAlerts);
+      setUnreadAlertCount(newUnreadAlertCount);
+      isFirstLoadRef.current = false;
     } catch (err) {
       console.error('[CRM Customer Widget] Load error:', err);
     } finally {
@@ -44,6 +90,8 @@ export default function CrmCustomerWidget() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
   }, [loadData]);
 
   if (loading) {
@@ -57,7 +105,7 @@ export default function CrmCustomerWidget() {
     );
   }
 
-  const totalOpen = tickets.length + inquiries.length;
+  const totalOpen = tickets.length + inquiries.length + unreadAlertCount;
 
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -70,7 +118,7 @@ export default function CrmCustomerWidget() {
           <div>
             <Title order={4}>Support</Title>
             <Text size="xs" c="dimmed">
-              {totalOpen === 0 ? 'All caught up' : `${totalOpen} open item${totalOpen > 1 ? 's' : ''}`}
+              {totalOpen === 0 ? 'All caught up' : `${totalOpen} item${totalOpen > 1 ? 's' : ''} needing attention`}
             </Text>
           </div>
         </Group>
@@ -80,6 +128,61 @@ export default function CrmCustomerWidget() {
       </Group>
 
       <Divider my="sm" />
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <Stack gap="xs" mb="sm">
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+              Alerts
+            </Text>
+            {unreadAlertCount > 0 && (
+              <button
+                onClick={async () => { await crmCustomerService.markAllAlertsRead(); loadData(); }}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+              >
+                Mark all read
+              </button>
+            )}
+          </Group>
+          {alerts.map(alert => {
+            const config = ALERT_CONFIG[alert.type] || ALERT_CONFIG.info;
+            return (
+              <div
+                key={alert.id}
+                className={`flex items-start gap-2 p-2 rounded-lg border ${config.bg} ${config.border}`}
+              >
+                <span className="text-sm flex-shrink-0">{alert.icon || config.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-semibold ${config.color}`}>{alert.title}</p>
+                  {alert.body && (
+                    <p className="text-[10px] text-neutral-500 line-clamp-2">{alert.body}</p>
+                  )}
+                  <p className="text-[10px] text-neutral-400 mt-0.5">
+                    {new Date(alert.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 ml-1 shrink-0">
+                  {!alert.is_read && (
+                    <button
+                      onClick={async () => { await crmCustomerService.markAlertRead(alert.id); loadData(); }}
+                      className="text-[10px] text-purple-600 hover:text-purple-800 font-medium"
+                    >
+                      Read
+                    </button>
+                  )}
+                  <button
+                    onClick={async () => { await crmCustomerService.dismissAlert(alert.id); loadData(); }}
+                    className="text-[10px] text-neutral-400 hover:text-neutral-600"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </Stack>
+      )}
 
       {/* Open Tickets */}
       {tickets.length > 0 && (
@@ -145,7 +248,7 @@ export default function CrmCustomerWidget() {
       )}
 
       {/* Empty state */}
-      {tickets.length === 0 && inquiries.length === 0 && (
+      {tickets.length === 0 && inquiries.length === 0 && alerts.length === 0 && (
         <Paper p="md" radius="md" bg="green.0">
           <Group>
             <Text size="sm" c="green.8" fw={500}>

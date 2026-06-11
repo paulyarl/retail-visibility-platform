@@ -189,7 +189,7 @@ export default function CrmRequestsHubPage() {
                 </span>
               </div>
               <Link
-                href={`/settings/admin/crm/tenants/${r.tenant_id}`}
+                href={r.type === 'ticket' ? `/settings/admin/crm/tickets/${r.id}` : `/settings/admin/crm/tenants/${r.tenant_id}`}
                 className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400"
                 onClick={(e) => e.stopPropagation()}
               >

@@ -110,6 +110,17 @@ export const FEATURE_OPERATIONS: Record<string, FeatureOperation> = {
     category: 'commerce'
   },
   
+  'order_tracking': {
+    canonicalKey: 'order_tracking',
+    requiredPermission: 'canEdit',
+    tierRequirement: 'commitment',
+    apiEndpoints: ['/api/orders/fulfillment', '/api/shipments'],
+    components: ['TrackingNumberInput', 'ShipmentStatusBadge'],
+    riskLevel: 'low',
+    description: 'Automatic tracking URL generation and shipment notifications',
+    category: 'commerce'
+  },
+  
   // Analytics Operations
   'advanced_analytics': {
     canonicalKey: 'analytics',
