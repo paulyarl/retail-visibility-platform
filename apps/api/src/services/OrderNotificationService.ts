@@ -11,12 +11,16 @@
 
 import { prisma } from '../prisma';
 import { emailService } from './email-service';
+import CrmAlertService from './CrmAlertService';
 
 export type OrderNotificationType = 
   | 'order_placed'
   | 'order_cancelled'
   | 'order_fulfilled'
   | 'order_picked_up'
+  | 'order_shipped'
+  | 'order_out_for_delivery'
+  | 'order_delivered'
   | 'deposit_forfeited'
   | 'refund_processed';
 
@@ -62,7 +66,7 @@ class OrderNotificationService {
       }
 
       // Send to customer for certain notification types
-      if (data.customerEmail && ['order_cancelled', 'order_fulfilled', 'deposit_forfeited', 'refund_processed'].includes(data.type)) {
+      if (data.customerEmail && ['order_cancelled', 'order_fulfilled', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'deposit_forfeited', 'refund_processed'].includes(data.type)) {
         const customerEmailPayload = this.buildCustomerEmailPayload(data.customerEmail, data.customerName || 'Customer', tenantName, data);
         const customerSent = await emailService.sendEmail(customerEmailPayload);
         emailsSent.push(customerSent.success);
@@ -72,6 +76,17 @@ class OrderNotificationService {
 
       // Log notification
       await this.logNotification(data, sent);
+
+      // Create CRM alert (fire-and-forget)
+      CrmAlertService.getInstance().createOrderAlert({
+        tenantId: data.tenantId,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        eventType: data.type,
+        customerName: data.customerName,
+        amount: data.amount,
+        metadata: data.metadata,
+      }).catch(err => console.error('[OrderNotification] Failed to create CRM alert:', err));
 
       console.log('[OrderNotification] Notification processed:', {
         type: data.type,
@@ -189,22 +204,136 @@ class OrderNotificationService {
           text: `Order Cancelled\n\nHi ${customerName},\n\nYour order ${orderRef} has been cancelled.\nAmount: ${amountFormatted}${data.reason ? `\nReason: ${data.reason}` : ''}\n\nIf you have any questions, please contact us.\n\nBest regards,\n${tenantName}`,
         };
 
-      case 'order_fulfilled':
+      case 'order_fulfilled': {
+        const fulfillmentMethod = data.metadata?.fulfillmentMethod || 'pickup';
+        const isShipping = fulfillmentMethod === 'shipping';
+        const trackingNumber = data.metadata?.trackingNumber;
+        const carrier = data.metadata?.carrier;
+        const trackingUrl = data.metadata?.trackingUrl;
+
+        const subject = isShipping
+          ? `Order Shipped - ${orderRef}`
+          : `Order Ready for Pickup - ${orderRef}`;
+        const headline = isShipping ? 'Order Shipped!' : 'Order Fulfilled';
+        const message = isShipping
+          ? `Your order <strong>${orderRef}</strong> has been shipped!`
+          : `Your order <strong>${orderRef}</strong> has been fulfilled and is ready!`;
+
+        let trackingHtml = '';
+        let trackingText = '';
+        if (isShipping && trackingNumber) {
+          trackingHtml = `
+            <div style="margin: 16px 0; padding: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+              <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">Tracking Information</p>
+              ${carrier ? `<p style="margin: 0 0 4px 0;"><strong>Carrier:</strong> ${carrier}</p>` : ''}
+              <p style="margin: 0 0 4px 0;"><strong>Tracking #:</strong> ${trackingNumber}</p>
+              ${trackingUrl ? `<p style="margin: 8px 0 0 0;"><a href="${trackingUrl}" style="color: #2563eb;">Track your package →</a></p>` : ''}
+            </div>`;
+          trackingText = `\nTracking Information:\n${carrier ? `Carrier: ${carrier}\n` : ''}Tracking #: ${trackingNumber}${trackingUrl ? `\nTrack: ${trackingUrl}` : ''}\n`;
+        }
+
         return {
           to: toEmail,
-          subject: `Order Ready for Pickup - ${orderRef}`,
+          subject: subject,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #059669;">Order Fulfilled</h2>
+              <h2 style="color: #059669;">${headline}</h2>
               <p>Hi ${customerName},</p>
-              <p>Your order <strong>${orderRef}</strong> has been fulfilled and is ready!</p>
+              <p>${message}</p>
+              ${trackingHtml}
               <p><strong>Total:</strong> ${amountFormatted}</p>
               <p>Thank you for your business!</p>
               <p>Best regards,<br>${tenantName}</p>
             </div>
           `,
-          text: `Order Fulfilled\n\nHi ${customerName},\n\nYour order ${orderRef} has been fulfilled and is ready!\nTotal: ${amountFormatted}\n\nThank you for your business!\n\nBest regards,\n${tenantName}`,
+          text: `${headline}\n\nHi ${customerName},\n\n${isShipping ? `Your order ${orderRef} has been shipped!` : `Your order ${orderRef} has been fulfilled and is ready!`}${trackingText}\nTotal: ${amountFormatted}\n\nThank you for your business!\n\nBest regards,\n${tenantName}`,
         };
+      }
+
+      case 'order_shipped': {
+        const shippedTrackingNumber = data.metadata?.trackingNumber || '';
+        const shippedCarrier = data.metadata?.carrier || '';
+        const shippedTrackingUrl = data.metadata?.trackingUrl || '';
+
+        return {
+          to: toEmail,
+          subject: `Order Shipped - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Order Shipped!</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your order <strong>${orderRef}</strong> is on its way!</p>
+              <div style="margin: 16px 0; padding: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">Tracking Information</p>
+                ${shippedCarrier ? `<p style="margin: 0 0 4px 0;"><strong>Carrier:</strong> ${shippedCarrier}</p>` : ''}
+                <p style="margin: 0 0 4px 0;"><strong>Tracking #:</strong> ${shippedTrackingNumber}</p>
+                ${shippedTrackingUrl ? `<p style="margin: 8px 0 0 0;"><a href="${shippedTrackingUrl}" style="color: #2563eb;">Track your package →</a></p>` : ''}
+              </div>
+              <p><strong>Total:</strong> ${amountFormatted}</p>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Order Shipped!\n\nHi ${customerName},\n\nYour order ${orderRef} is on its way!\n\nTracking Information:\n${shippedCarrier ? `Carrier: ${shippedCarrier}\n` : ''}Tracking #: ${shippedTrackingNumber}${shippedTrackingUrl ? `\nTrack: ${shippedTrackingUrl}` : ''}\n\nTotal: ${amountFormatted}\n\nBest regards,\n${tenantName}`,
+        };
+      }
+
+      case 'order_out_for_delivery': {
+        const oodTrackingNumber = data.metadata?.trackingNumber || '';
+        const oodCarrier = data.metadata?.carrier || '';
+        const oodTrackingUrl = data.metadata?.trackingUrl || '';
+        const estimatedDelivery = data.metadata?.estimatedDelivery;
+
+        return {
+          to: toEmail,
+          subject: `Out for Delivery - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #ea580c;">Out for Delivery!</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your order <strong>${orderRef}</strong> is out for delivery and will arrive today!</p>
+              <div style="margin: 16px 0; padding: 12px; background-color: #fff7ed; border: 1px solid #fdba74; border-radius: 8px;">
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #9a3412;">Tracking Information</p>
+                ${oodCarrier ? `<p style="margin: 0 0 4px 0;"><strong>Carrier:</strong> ${oodCarrier}</p>` : ''}
+                <p style="margin: 0 0 4px 0;"><strong>Tracking #:</strong> ${oodTrackingNumber}</p>
+                ${estimatedDelivery ? `<p style="margin: 0 0 4px 0;"><strong>Estimated Delivery:</strong> ${estimatedDelivery}</p>` : ''}
+                ${oodTrackingUrl ? `<p style="margin: 8px 0 0 0;"><a href="${oodTrackingUrl}" style="color: #2563eb;">Track your package →</a></p>` : ''}
+              </div>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Out for Delivery!\n\nHi ${customerName},\n\nYour order ${orderRef} is out for delivery and will arrive today!\n\nTracking Information:\n${oodCarrier ? `Carrier: ${oodCarrier}\n` : ''}Tracking #: ${oodTrackingNumber}${estimatedDelivery ? `\nEstimated Delivery: ${estimatedDelivery}` : ''}${oodTrackingUrl ? `\nTrack: ${oodTrackingUrl}` : ''}\n\nBest regards,\n${tenantName}`,
+        };
+      }
+
+      case 'order_delivered': {
+        const delTrackingNumber = data.metadata?.trackingNumber || '';
+        const delCarrier = data.metadata?.carrier || '';
+        const delTrackingUrl = data.metadata?.trackingUrl || '';
+        const remainingBalance = data.metadata?.remainingBalance;
+
+        return {
+          to: toEmail,
+          subject: `Delivered - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #059669;">Delivered!</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your order <strong>${orderRef}</strong> has been delivered!</p>
+              <div style="margin: 16px 0; padding: 12px; background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #166534;">Tracking Information</p>
+                ${delCarrier ? `<p style="margin: 0 0 4px 0;"><strong>Carrier:</strong> ${delCarrier}</p>` : ''}
+                <p style="margin: 0 0 4px 0;"><strong>Tracking #:</strong> ${delTrackingNumber}</p>
+                ${delTrackingUrl ? `<p style="margin: 8px 0 0 0;"><a href="${delTrackingUrl}" style="color: #2563eb;">View tracking details →</a></p>` : ''}
+              </div>
+              <p><strong>Total:</strong> ${amountFormatted}</p>
+              ${remainingBalance ? `<p style="color: #dc2626;"><strong>Remaining Balance:</strong> $${(remainingBalance / 100).toFixed(2)}</p>` : ''}
+              <p>Thank you for your business!</p>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Delivered!\n\nHi ${customerName},\n\nYour order ${orderRef} has been delivered!\n\nTracking Information:\n${delCarrier ? `Carrier: ${delCarrier}\n` : ''}Tracking #: ${delTrackingNumber}${delTrackingUrl ? `\nTrack: ${delTrackingUrl}` : ''}\n\nTotal: ${amountFormatted}${remainingBalance ? `\nRemaining Balance: $${(remainingBalance / 100).toFixed(2)}` : ''}\n\nThank you for your business!\n\nBest regards,\n${tenantName}`,
+        };
+      }
 
       case 'deposit_forfeited':
         return {
@@ -337,6 +466,10 @@ class OrderNotificationService {
     customerEmail: string;
     customerName?: string;
     amount: number;
+    fulfillmentMethod?: string;
+    trackingNumber?: string;
+    carrier?: string;
+    trackingUrl?: string;
   }): Promise<boolean> {
     return this.sendNotification({
       tenantId: params.tenantId,
@@ -346,6 +479,42 @@ class OrderNotificationService {
       customerEmail: params.customerEmail,
       customerName: params.customerName,
       amount: params.amount,
+      metadata: {
+        fulfillmentMethod: params.fulfillmentMethod || 'pickup',
+        trackingNumber: params.trackingNumber || null,
+        carrier: params.carrier || null,
+        trackingUrl: params.trackingUrl || null,
+      },
+    });
+  }
+
+  /**
+   * Notify when order is shipped (carrier tracking provided)
+   */
+  async notifyOrderShipped(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+    trackingNumber: string;
+    carrier: string;
+    trackingUrl?: string;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'order_shipped',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
+      metadata: {
+        trackingNumber: params.trackingNumber,
+        carrier: params.carrier,
+        trackingUrl: params.trackingUrl || null,
+      },
     });
   }
 
@@ -392,6 +561,70 @@ class OrderNotificationService {
       customerName: params.customerName,
       amount: params.refundAmount,
       reason: params.reason,
+    });
+  }
+
+  /**
+   * Notify when order is out for delivery
+   */
+  async notifyOrderOutForDelivery(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+    trackingNumber?: string;
+    carrier?: string;
+    trackingUrl?: string;
+    estimatedDelivery?: string;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'order_out_for_delivery',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
+      metadata: {
+        trackingNumber: params.trackingNumber || null,
+        carrier: params.carrier || null,
+        trackingUrl: params.trackingUrl || null,
+        estimatedDelivery: params.estimatedDelivery || null,
+      },
+    });
+  }
+
+  /**
+   * Notify when order has been delivered
+   */
+  async notifyOrderDelivered(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+    trackingNumber?: string;
+    carrier?: string;
+    trackingUrl?: string;
+    remainingBalance?: number;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'order_delivered',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
+      metadata: {
+        trackingNumber: params.trackingNumber || null,
+        carrier: params.carrier || null,
+        trackingUrl: params.trackingUrl || null,
+        remainingBalance: params.remainingBalance || null,
+      },
     });
   }
 }

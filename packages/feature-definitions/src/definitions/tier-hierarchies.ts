@@ -151,6 +151,7 @@ const COMMITMENT_FEATURES = [
   ...STOREFRONT_FEATURES,
   'commerce',
   'delivery_options',
+  'order_tracking',
   'analytics'
 ];
 
@@ -230,6 +231,7 @@ export const FEATURE_TIER_REQUIREMENTS: Record<string, number> = {
   'commerce': 4,                 // commitment+
   'payment_client_credentials': 4, // commitment+
   'delivery_options': 5,         // professional+
+  'order_tracking': 4,          // commitment+
   
   // Analytics
   'analytics': 4,                 // commitment+

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import type { TicketStatus, TicketPriority } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -26,6 +27,7 @@ export default function CrmGlobalTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -95,29 +97,76 @@ export default function CrmGlobalTicketsPage() {
                 <th className="text-left px-4 py-3 font-medium">Priority</th>
                 <th className="text-left px-4 py-3 font-medium">Assigned</th>
                 <th className="text-left px-4 py-3 font-medium">Created</th>
+                <th className="text-right px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {tickets.map(t => (
                 <tr key={t.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                   <td className="px-4 py-3">
-                    <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400">
+                    <Link href={`/settings/admin/crm/tickets/${t.id}`} className="font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 block">
                       {t.title}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-neutral-500 text-xs">{t.tenant_id}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {t.status?.replace('_', ' ')}
-                    </span>
+                  <td className="px-4 py-3 text-neutral-500 text-xs">
+                    <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}>
-                      {t.priority}
-                    </span>
+                    {updatingId === t.id ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <select
+                        value={t.status}
+                        onChange={async (e) => {
+                          setUpdatingId(t.id);
+                          try {
+                            const updated = await crmAdminService.updateTicket(t.id, { status: e.target.value as TicketStatus });
+                            setTickets(prev => prev.map(ticket => ticket.id === t.id ? { ...ticket, ...updated } : ticket));
+                          } catch (err) { console.error(err); }
+                          setUpdatingId(null);
+                        }}
+                        className={`text-xs rounded-full px-2 py-0.5 border-0 font-medium cursor-pointer ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}
+                      >
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="waiting">Waiting</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-neutral-500">{t.assigned_to || '—'}</td>
+                  <td className="px-4 py-3">
+                    {updatingId === t.id ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <select
+                        value={t.priority}
+                        onChange={async (e) => {
+                          setUpdatingId(t.id);
+                          try {
+                            const updated = await crmAdminService.updateTicket(t.id, { priority: e.target.value as TicketPriority });
+                            setTickets(prev => prev.map(ticket => ticket.id === t.id ? { ...ticket, ...updated } : ticket));
+                          } catch (err) { console.error(err); }
+                          setUpdatingId(null);
+                        }}
+                        className={`text-xs rounded-full px-2 py-0.5 border-0 font-medium cursor-pointer ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-neutral-500 text-xs">{t.assigned_to || '—'}</td>
                   <td className="px-4 py-3 text-xs text-neutral-500">{new Date(t.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link href={`/settings/admin/crm/tickets/${t.id}`} className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 font-medium">
+                        View
+                      </Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

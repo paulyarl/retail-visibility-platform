@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
-import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry } from '@/types/crm';
+import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -26,6 +26,8 @@ export default function TenantSupportPage() {
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [activities, setActivities] = useState<CrmActivity[]>([]);
   const [inquiries, setInquiries] = useState<CrmInquiry[]>([]);
+  const [alerts, setAlerts] = useState<CrmAlert[]>([]);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -41,6 +43,8 @@ export default function TenantSupportPage() {
         setTasks(stats?.pending_tasks ?? []);
         setActivities((stats?.recent_activities ?? []).filter((a: any) => !a.is_internal));
         setInquiries(stats?.open_inquiries ?? []);
+        setAlerts(stats?.recent_alerts ?? []);
+        setUnreadAlertCount(stats?.unread_alert_count ?? 0);
       } catch (err) {
         console.error('[Tenant Support] Load error:', err);
       } finally {
@@ -94,6 +98,7 @@ export default function TenantSupportPage() {
       navCounts={{
         tickets: tickets.length,
         inquiries: inquiries.length,
+        alerts: unreadAlertCount,
       }}
       actions={
         <button
@@ -108,7 +113,11 @@ export default function TenantSupportPage() {
       }
     >
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10">
+          <p className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Alerts</p>
+          <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 mt-1">{unreadAlertCount}</p>
+        </div>
         <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10">
           <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Open Tickets</p>
           <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">{tickets.length}</p>
@@ -123,6 +132,58 @@ export default function TenantSupportPage() {
         </div>
       </div>
 
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Alerts ({alerts.length})</CardTitle>
+            <button
+              onClick={async () => { await crmTenantCrmService.markAllAlertsRead(); const s = await crmTenantCrmService.getStats(); setAlerts(s?.recent_alerts ?? []); setUnreadAlertCount(s?.unread_alert_count ?? 0); }}
+              className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
+            >
+              Mark all read
+            </button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {alerts.map(a => (
+                <div key={a.id} className={`flex items-start justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 rounded-lg px-2 -mx-2 ${!a.is_read ? 'bg-purple-50/50 dark:bg-purple-900/10' : ''}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {a.icon && <span className="text-base">{a.icon}</span>}
+                      <p className={`text-sm font-medium ${!a.is_read ? 'text-purple-800 dark:text-purple-200' : ''}`}>{a.title}</p>
+                      {!a.is_read && <span className="inline-flex w-2 h-2 rounded-full bg-purple-500" />}
+                    </div>
+                    {a.body && (
+                      <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{a.body}</p>
+                    )}
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      {a.type?.replace('_', ' ')} · {new Date(a.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2 shrink-0">
+                    {!a.is_read && (
+                      <button
+                        onClick={async () => { await crmTenantCrmService.markAlertRead(a.id); const s = await crmTenantCrmService.getStats(); setAlerts(s?.recent_alerts ?? []); setUnreadAlertCount(s?.unread_alert_count ?? 0); }}
+                        className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
+                      >
+                        Read
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => { await crmTenantCrmService.dismissAlert(a.id); const s = await crmTenantCrmService.getStats(); setAlerts(s?.recent_alerts ?? []); setUnreadAlertCount(s?.unread_alert_count ?? 0); }}
+                      className="text-xs text-neutral-400 hover:text-neutral-600"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tickets */}
         <Card>
@@ -133,7 +194,7 @@ export default function TenantSupportPage() {
             ) : (
               <div className="space-y-2">
                 {tickets.map(t => (
-                  <div key={t.id} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                  <Link key={t.id} href={`/t/${tenantId}/support/tickets/${t.id}`} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{t.title}</p>
                       <p className="text-xs text-neutral-500 mt-0.5">
@@ -144,8 +205,9 @@ export default function TenantSupportPage() {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
                         {t.status?.replace('_', ' ')}
                       </span>
+                      <svg className="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -161,7 +223,7 @@ export default function TenantSupportPage() {
             ) : (
               <div className="space-y-2">
                 {inquiries.map(i => (
-                  <div key={i.id} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                  <Link key={i.id} href={`/t/${tenantId}/support/inquiries/${i.id}`} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{i.subject}</p>
                       <p className="text-xs text-neutral-500 mt-0.5">
@@ -171,10 +233,13 @@ export default function TenantSupportPage() {
                         <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{i.body}</p>
                       )}
                     </div>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[i.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {i.status?.replace('_', ' ')}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[i.status] || 'bg-gray-100 text-gray-800'}`}>
+                        {i.status?.replace('_', ' ')}
+                      </span>
+                      <svg className="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -190,16 +255,28 @@ export default function TenantSupportPage() {
             <p className="text-sm text-neutral-500 text-center py-4">No recent activity</p>
           ) : (
             <div className="space-y-2">
-              {activities.map(a => (
-                <div key={a.id} className="flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{a.content}</p>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      {a.actor_name} · {a.activity_type} · {new Date(a.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              {activities.map(a => {
+                const detailHref = a.ticket_id
+                  ? `/t/${tenantId}/support/tickets/${a.ticket_id}`
+                  : null;
+                const Wrapper = detailHref ? Link : 'div';
+                const wrapperProps = detailHref
+                  ? { href: detailHref, className: 'flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer' }
+                  : { className: 'flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0' };
+                return (
+                  <Wrapper key={a.id} {...(wrapperProps as any)}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">{a.content}</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        {a.actor_name} · {a.activity_type} · {new Date(a.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {detailHref && (
+                      <svg className="w-4 h-4 text-neutral-400 self-center shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    )}
+                  </Wrapper>
+                );
+              })}
             </div>
           )}
         </CardContent>

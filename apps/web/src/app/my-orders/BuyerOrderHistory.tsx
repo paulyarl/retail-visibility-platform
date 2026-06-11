@@ -63,6 +63,8 @@ interface BuyerOrder {
   internalNotes?: string;
   cancellationReason?: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
   shippingProvider?: string;
   statusHistory?: any[];
   // Deposit order fields
@@ -548,26 +550,44 @@ export default function BuyerOrderHistory() {
           )}
           
           {/* Shipping Information */}
-          {selectedOrder.fulfillmentStatus === 'fulfilled' && selectedOrder.fulfillmentMethod === 'shipping' && (selectedOrder.trackingNumber || selectedOrder.shippingProvider) && (
+          {selectedOrder.fulfillmentMethod === 'shipping' && (selectedOrder.trackingNumber || selectedOrder.carrier || selectedOrder.shippingProvider) && (
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle>Shipping Information</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  {selectedOrder.shippingProvider && (
+                  {(selectedOrder.carrier || selectedOrder.shippingProvider) && (
                     <div>
-                      <p className="text-sm font-medium text-gray-700 mb-1">Shipping Provider:</p>
-                      <p className="text-gray-900 font-semibold">{selectedOrder.shippingProvider}</p>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Carrier:</p>
+                      <p className="text-gray-900 font-semibold">{selectedOrder.carrier || selectedOrder.shippingProvider}</p>
                     </div>
                   )}
                   {selectedOrder.trackingNumber && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-1">Tracking Number:</p>
-                      <p className="text-gray-900 font-mono text-sm">{selectedOrder.trackingNumber}</p>
-                      <p className="text-xs text-blue-600 mt-2">
-                        📦 Use this tracking number on the carrier's website to track your shipment
-                      </p>
+                      {selectedOrder.trackingUrl ? (
+                        <a
+                          href={selectedOrder.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 font-mono text-sm underline"
+                        >
+                          {selectedOrder.trackingNumber}
+                        </a>
+                      ) : (
+                        <p className="text-gray-900 font-mono text-sm">{selectedOrder.trackingNumber}</p>
+                      )}
+                      {!selectedOrder.trackingUrl && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          📦 Use this tracking number on the carrier's website to track your shipment
+                        </p>
+                      )}
+                      {selectedOrder.trackingUrl && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          📦 Click the tracking number above to track your shipment
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

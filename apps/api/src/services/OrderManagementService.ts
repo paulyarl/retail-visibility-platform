@@ -10,6 +10,7 @@
 
 import { prisma } from '../prisma';
 import { HeroLocationService } from './HeroLocationService';
+import CrmAlertService from './CrmAlertService';
 import { order_status } from '@prisma/client';
 
 export interface OrderLocationInfo {
@@ -317,6 +318,16 @@ export class OrderManagementService {
         }
       }
     });
+
+    // Create CRM alert for status change (fire-and-forget)
+    CrmAlertService.getInstance().createOrderAlert({
+      tenantId: updatedOrder.tenant_id,
+      orderId: updatedOrder.id,
+      orderNumber: updatedOrder.order_number,
+      eventType: newStatus,
+      customerName: updatedOrder.customer_name || undefined,
+      amount: updatedOrder.total_cents,
+    }).catch(err => console.error('[OrderManagement] Failed to create CRM alert:', err));
 
     return {
       orderId: updatedOrder.id,

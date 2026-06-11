@@ -126,6 +126,18 @@ export const CANONICAL_FEATURES: Record<string, FeatureCapability> = {
     }
   },
   
+  'order_tracking': {
+    key: 'order_tracking',
+    name: 'Order Tracking',
+    description: 'Automatic tracking URL generation and shipment notifications',
+    category: 'commerce',
+    metadata: {
+      autoTrackingUrl: true,
+      shippedNotifications: true,
+      supportedCarriers: ['usps', 'ups', 'fedex', 'dhl', 'amazon', 'ontrac', 'lasership']
+    }
+  },
+  
   // Analytics Features
   'analytics': {
     key: 'analytics',

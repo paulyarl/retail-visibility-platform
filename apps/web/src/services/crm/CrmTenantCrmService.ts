@@ -6,10 +6,11 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import type {
-  CrmTenantCrmStats, CrmContact, CreateContactInput, UpdateContactInput,
+  CrmTenantCrmStats, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
   CrmTask, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
+  CrmAlert,
 } from '@/types/crm';
 
 class CrmTenantCrmService extends TenantApiSingleton {
@@ -30,10 +31,12 @@ class CrmTenantCrmService extends TenantApiSingleton {
     return [
       'crm-tenant-stats',
       'crm-tenant-contacts',
+      'crm-tenant-contact-detail',
       'crm-tenant-tickets',
       'crm-tenant-tasks',
       'crm-tenant-activities',
       'crm-tenant-inquiries',
+      'crm-tenant-alerts',
     ];
   }
 
@@ -90,6 +93,17 @@ class CrmTenantCrmService extends TenantApiSingleton {
     );
     await this.invalidateServiceCaches();
     return this.unwrap<CrmContact>(result);
+  }
+
+  async getContactDetail(contactId: string): Promise<CrmContactDetail> {
+    const cacheKey = `crm-tenant-contact-detail-${contactId}`;
+    const result = await this.makeDefaultRequest<CrmContactDetail>(
+      `/api/tenant/crm/contacts/${contactId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmContactDetail>(result);
   }
 
   // --- Tickets ---
@@ -216,6 +230,48 @@ class CrmTenantCrmService extends TenantApiSingleton {
     );
     await this.invalidateServiceCaches();
     return this.unwrap<any>(result);
+  }
+
+  // --- Alerts ---
+  async listAlerts(filters?: { type?: string; unreadOnly?: boolean }): Promise<CrmAlert[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)] as [string, string])
+    ).toString() : '';
+    const cacheKey = `crm-tenant-alerts-${qs}`;
+    const result = await this.makeDefaultRequest<CrmAlert[]>(
+      `/api/tenant/crm/alerts${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmAlert[]>(result);
+  }
+
+  async markAlertRead(alertId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenant/crm/alerts/${alertId}/read`,
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async markAllAlertsRead(): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/tenant/crm/alerts/read-all',
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async dismissAlert(alertId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenant/crm/alerts/${alertId}/dismiss`,
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
   }
 
   // --- Options Settings ---

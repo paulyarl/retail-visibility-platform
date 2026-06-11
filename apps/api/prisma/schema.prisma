@@ -449,6 +449,25 @@ model crm_ticket_messages {
   @@index([ticket_id, created_at], map: "idx_crm_messages_ticket_created")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_alerts {
+  id           String    @id(map: "pk_crm_alerts") @default(dbgenerated("('alert_'::text || (gen_random_uuid())::text)")) @db.VarChar(255)
+  tenant_id    String    @db.VarChar(255)
+  type         String    @db.VarChar(50)
+  title        String    @db.VarChar(255)
+  body         String?
+  icon         String?   @db.VarChar(10)
+  is_read      Boolean?  @default(false)
+  is_dismissed Boolean?  @default(false)
+  metadata     Json?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  read_at      DateTime? @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_alerts_tenant")
+
+  @@index([tenant_id, is_read, is_dismissed, created_at], map: "idx_crm_alerts_tenant_unread")
+  @@index([tenant_id, type], map: "idx_crm_alerts_tenant_type")
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -3826,6 +3845,7 @@ model tenants {
   business_hours_list                                                                    business_hours_list?
   business_hours_special_list                                                            business_hours_special_list[]
   crm_activities                                                                         crm_activities[]
+  crm_alerts                                                                             crm_alerts[]
   crm_contacts                                                                           crm_contacts[]
   crm_inquiries                                                                          crm_inquiries[]
   crm_support_tickets                                                                    crm_support_tickets[]

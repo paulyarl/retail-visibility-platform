@@ -25,6 +25,15 @@ export interface TenantOrder {
   createdAt: string;
   paidAt: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
+  shipmentStatus?: string;
+  trackingEvents?: Array<{
+    status: string;
+    timestamp: string;
+    location?: string;
+    description?: string;
+  }>;
   shippingAddress?: any;
   billingAddress?: any;
   internalNotes?: string;
@@ -106,6 +115,7 @@ export interface OrderStats {
 export interface FulfillmentUpdate {
   fulfillmentStatus: string;
   trackingNumber?: string;
+  shippingProvider?: string;
   carrier?: string;
   notes?: string;
   cancellationReason?: string;

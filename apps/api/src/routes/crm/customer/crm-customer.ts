@@ -12,6 +12,7 @@ import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmOptionsService from '../../../services/CrmOptionsService';
+import { CrmAlertService } from '../../../services/CrmAlertService';
 import { audit } from '../../../audit';
 import { prisma } from '../../../prisma';
 
@@ -34,6 +35,21 @@ const ticketService = CrmTicketService.getInstance();
 const messageService = CrmTicketMessageService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
+const alertService = CrmAlertService.getInstance();
+
+/**
+ * Get the set of tenant IDs and order IDs belonging to a customer (by email).
+ * Used to scope CRM alerts to only those the customer owns or has a relationship with.
+ */
+async function getCustomerAlertScope(customerEmail: string): Promise<{ tenantIds: string[]; orderIds: string[] }> {
+  const orders = await prisma.orders.findMany({
+    where: { customer_email: customerEmail },
+    select: { id: true, tenant_id: true },
+  });
+  const tenantIds = [...new Set(orders.map(o => o.tenant_id))];
+  const orderIds = orders.map(o => o.id);
+  return { tenantIds, orderIds };
+}
 
 // ====================
 // Tickets
@@ -322,6 +338,161 @@ router.post('/inquiries', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'customer_tenant_relationship_required', message });
     }
     res.status(500).json({ error: 'internal_error', message });
+  }
+});
+
+// ====================
+// Alerts
+// ====================
+
+// GET /api/customer/crm/alerts
+router.get('/alerts', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    const customerEmail = req.customer?.email;
+    if (!customerId || !customerEmail) {
+      return res.status(401).json({ error: 'customer_auth_required' });
+    }
+
+    const { tenantIds, orderIds } = await getCustomerAlertScope(customerEmail);
+    if (tenantIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Query all undismissed alerts from customer-related tenants
+    const where: any = {
+      tenant_id: { in: tenantIds },
+      is_dismissed: false,
+    };
+
+    if (req.query.type) {
+      where.type = req.query.type as string;
+    }
+    if (req.query.unread === 'true') {
+      where.is_read = false;
+    }
+
+    const alerts = await prisma.crm_alerts.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Scope order alerts to only those matching customer's own order IDs
+    const filtered = alerts.filter((a: any) => {
+      if (a.type === 'order') {
+        const metaOrderId = a.metadata?.order_id;
+        return metaOrderId && orderIds.includes(metaOrderId);
+      }
+      return true; // info, warning, subscription, etc. are tenant-scoped
+    });
+
+    res.json({ success: true, data: filtered });
+  } catch (error) {
+    console.error('[CRM Customer] Error listing alerts:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list alerts' });
+  }
+});
+
+// PUT /api/customer/crm/alerts/:alertId/read
+router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    const customerEmail = req.customer?.email;
+    if (!customerId || !customerEmail) {
+      return res.status(401).json({ error: 'customer_auth_required' });
+    }
+
+    const alert = await alertService.getById(req.params.alertId);
+    if (!alert) {
+      return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
+    }
+
+    // Verify ownership: tenant must be in customer's tenant list
+    const { tenantIds, orderIds } = await getCustomerAlertScope(customerEmail);
+    if (!tenantIds.includes(alert.tenant_id)) {
+      return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+    }
+    // For order alerts, also verify the order belongs to the customer
+    if (alert.type === 'order') {
+      const metaOrderId = (alert.metadata as any)?.order_id;
+      if (!metaOrderId || !orderIds.includes(metaOrderId)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+      }
+    }
+
+    await alertService.markRead(req.params.alertId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Customer] Error marking alert read:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to mark alert read' });
+  }
+});
+
+// PUT /api/customer/crm/alerts/read-all
+router.put('/alerts/read-all', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    const customerEmail = req.customer?.email;
+    if (!customerId || !customerEmail) {
+      return res.status(401).json({ error: 'customer_auth_required' });
+    }
+
+    const { tenantIds } = await getCustomerAlertScope(customerEmail);
+    if (tenantIds.length === 0) {
+      return res.json({ success: true });
+    }
+
+    // Mark all non-dismissed alerts in customer-related tenants as read
+    // Note: this marks ALL tenant alerts read, not just order-scoped ones,
+    // because non-order alerts (info/warning) are tenant-level and legitimate to mark read
+    await prisma.crm_alerts.updateMany({
+      where: {
+        tenant_id: { in: tenantIds },
+        is_dismissed: false,
+        is_read: false,
+      },
+      data: { is_read: true, read_at: new Date() },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Customer] Error marking all alerts read:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to mark all alerts read' });
+  }
+});
+
+// PUT /api/customer/crm/alerts/:alertId/dismiss
+router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    const customerEmail = req.customer?.email;
+    if (!customerId || !customerEmail) {
+      return res.status(401).json({ error: 'customer_auth_required' });
+    }
+
+    const alert = await alertService.getById(req.params.alertId);
+    if (!alert) {
+      return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
+    }
+
+    // Verify ownership: tenant must be in customer's tenant list
+    const { tenantIds, orderIds } = await getCustomerAlertScope(customerEmail);
+    if (!tenantIds.includes(alert.tenant_id)) {
+      return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+    }
+    // For order alerts, also verify the order belongs to the customer
+    if (alert.type === 'order') {
+      const metaOrderId = (alert.metadata as any)?.order_id;
+      if (!metaOrderId || !orderIds.includes(metaOrderId)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+      }
+    }
+
+    await alertService.dismiss(req.params.alertId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Customer] Error dismissing alert:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
   }
 });
 

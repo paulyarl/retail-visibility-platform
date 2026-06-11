@@ -14,6 +14,7 @@ import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmTaskService from '../../../services/CrmTaskService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
+import CrmAlertService from '../../../services/CrmAlertService';
 import CrmOptionsService from '../../../services/CrmOptionsService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
@@ -27,6 +28,7 @@ const messageService = CrmTicketMessageService.getInstance();
 const taskService = CrmTaskService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
+const alertService = CrmAlertService.getInstance();
 const crmOptionsService = CrmOptionsService.getInstance();
 
 // Helper to get tenant ID from request context
@@ -77,6 +79,9 @@ router.get('/contacts', async (req: Request, res: Response) => {
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     if (!(await checkCrmEnabled(tenantId, res))) return;
 
+    // Auto-sync contacts from orders before listing
+    await contactService.syncFromOrders(tenantId);
+
     const contacts = await contactService.listByTenant(tenantId);
     res.json({ success: true, data: contacts });
   } catch (error) {
@@ -98,6 +103,24 @@ router.post('/contacts', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CRM Tenant] Error creating contact:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to create contact' });
+  }
+});
+
+// GET /api/tenant/crm/contacts/:contactId
+router.get('/contacts/:contactId', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const contact = await contactService.getDetail(req.params.contactId);
+    if (!contact || contact.tenant_id !== tenantId) {
+      return res.status(404).json({ error: 'not_found', message: 'Contact not found' });
+    }
+    res.json({ success: true, data: contact });
+  } catch (error) {
+    console.error('[CRM Tenant] Error fetching contact detail:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch contact detail' });
   }
 });
 
@@ -149,7 +172,16 @@ router.post('/tickets', async (req: Request, res: Response) => {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
 
-    const ticket = await ticketService.create({ tenant_id: tenantId, ...req.body });
+    // Resolve customer_id from contact_id if not explicitly provided
+    let customer_id = req.body.customer_id;
+    if (req.body.contact_id && !customer_id) {
+      const contact = await contactService.getById(req.body.contact_id);
+      if (contact && contact.tenant_id === tenantId && contact.customer_id) {
+        customer_id = contact.customer_id;
+      }
+    }
+
+    const ticket = await ticketService.create({ tenant_id: tenantId, ...req.body, customer_id });
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
 
     // Auto-log ticket creation as activity
@@ -417,6 +449,83 @@ router.post('/inquiries/:inquiryId/create-faq', async (req: Request, res: Respon
   } catch (error) {
     console.error('[CRM Tenant] Error creating FAQ from inquiry:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to create FAQ from inquiry' });
+  }
+});
+
+// ====================
+// Alerts
+// ====================
+
+// GET /api/tenant/crm/alerts
+router.get('/alerts', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const alerts = await alertService.listByTenant(tenantId, {
+      type: req.query.type as string,
+      unreadOnly: req.query.unread === 'true',
+    });
+    res.json({ success: true, data: alerts });
+  } catch (error) {
+    console.error('[CRM Tenant] Error listing alerts:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list alerts' });
+  }
+});
+
+// PUT /api/tenant/crm/alerts/:alertId/read
+router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const alert = await alertService.getById(req.params.alertId);
+    if (!alert || alert.tenant_id !== tenantId) {
+      return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
+    }
+
+    await alertService.markRead(req.params.alertId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Tenant] Error marking alert read:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to mark alert read' });
+  }
+});
+
+// PUT /api/tenant/crm/alerts/read-all
+router.put('/alerts/read-all', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    await alertService.markAllRead(tenantId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Tenant] Error marking all alerts read:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to mark all alerts read' });
+  }
+});
+
+// PUT /api/tenant/crm/alerts/:alertId/dismiss
+router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const alert = await alertService.getById(req.params.alertId);
+    if (!alert || alert.tenant_id !== tenantId) {
+      return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
+    }
+
+    await alertService.dismiss(req.params.alertId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Tenant] Error dismissing alert:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
   }
 });
 

@@ -10,6 +10,7 @@ import type {
   CrmTicketMessage, CreateTicketMessageInput,
   CrmActivity, CrmInquiry, CreateInquiryInput,
   CrmOrder,
+  CrmAlert,
 } from '@/types/crm';
 
 class CrmCustomerService extends CustomerApiSingleton {
@@ -33,6 +34,7 @@ class CrmCustomerService extends CustomerApiSingleton {
       'crm-customer-activities',
       'crm-customer-orders',
       'crm-customer-inquiries',
+      'crm-customer-alerts',
     ];
   }
 
@@ -154,6 +156,48 @@ class CrmCustomerService extends CustomerApiSingleton {
     );
     await this.invalidateServiceCaches();
     return this.unwrap<CrmInquiry>(result);
+  }
+
+  // --- Alerts ---
+  async listAlerts(filters?: { type?: string; unreadOnly?: boolean }): Promise<CrmAlert[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)] as [string, string])
+    ).toString() : '';
+    const cacheKey = `crm-customer-alerts-${qs}`;
+    const result = await this.makeDefaultRequest<CrmAlert[]>(
+      `/api/customer/crm/alerts${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmAlert[]>(result);
+  }
+
+  async markAlertRead(alertId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/crm/alerts/${alertId}/read`,
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async markAllAlertsRead(): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/crm/alerts/read-all',
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async dismissAlert(alertId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/customer/crm/alerts/${alertId}/dismiss`,
+      { method: 'PUT' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
   }
 }
 

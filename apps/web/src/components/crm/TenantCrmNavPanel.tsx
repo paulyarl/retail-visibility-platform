@@ -6,6 +6,7 @@ import { Paper, NavLink, Group, Text, Divider, Badge, Box } from '@mantine/core'
 
 const NAV_ITEMS = [
   { href: '/support', label: 'Dashboard', emoji: '📊' },
+  { href: '/support/alerts', label: 'Alerts', emoji: '🔔' },
   { href: '/support/tickets', label: 'Tickets', emoji: '🎫' },
   { href: '/support/contacts', label: 'Contacts', emoji: '👥' },
   { href: '/support/inquiries', label: 'Inquiries', emoji: '❓' },
@@ -16,6 +17,7 @@ interface TenantCrmNavPanelProps {
   counts?: {
     tickets?: number;
     inquiries?: number;
+    alerts?: number;
   };
 }
 

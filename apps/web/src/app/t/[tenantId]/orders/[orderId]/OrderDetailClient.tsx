@@ -6,14 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { tenantOrderService, TenantOrder } from '@/services/TenantOrderService';
-import { 
-  Package, 
-  ArrowLeft, 
-  CheckCircle2, 
-  Clock, 
-  Truck, 
-  MapPin, 
-  Mail, 
+import { ShipmentStatusBadge } from '@/components/orders/ShipmentStatusBadge';
+import { CarrierSelect } from '@/components/orders/CarrierSelect';
+import { ShipmentTimeline } from '@/components/orders/ShipmentTimeline';
+import {
+  Package,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Truck,
+  MapPin,
+  Mail,
   Phone,
   User,
   CreditCard,
@@ -60,6 +63,15 @@ interface OrderDetail {
   notes?: string;
   internalNotes?: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
+  shipmentStatus?: string;
+  trackingEvents?: Array<{
+    status: string;
+    timestamp: string;
+    location?: string;
+    description?: string;
+  }>;
   refunds?: Array<{
     id: string;
     amount: number;
@@ -104,6 +116,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
   const [customReason, setCustomReason] = useState('');
   const [showFulfillDialog, setShowFulfillDialog] = useState(false);
   const [shippingProvider, setShippingProvider] = useState('');
+  const [carrier, setCarrier] = useState('');
   const [fulfillmentSettings, setFulfillmentSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -135,6 +148,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
       if (data) {
         setOrder(data);
         setTrackingNumber(data.trackingNumber || '');
+        setCarrier(data.carrier || '');
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
@@ -223,13 +237,14 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
   const updateTrackingNumber = async () => {
     try {
       setUpdating(true);
-      
+
       const response = await tenantOrderService.updateOrderFulfillment(tenantId, orderId, {
         trackingNumber: trackingNumber,
+        carrier: carrier || undefined,
       });
-      
+
       if (!response) throw new Error('Failed to update tracking number');
-      
+
       setShowTrackingInput(false);
       await fetchOrderDetail();
     } catch (error) {
@@ -346,7 +361,12 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
               Placed on {formatDate(order.createdAt)}
             </p>
           </div>
-          {getStatusBadge(order.fulfillmentStatus)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(order.fulfillmentStatus)}
+            {order.shipmentStatus && (
+              <ShipmentStatusBadge status={order.shipmentStatus} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -615,9 +635,9 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
 
               {/* Tracking Number (for shipping orders) */}
               {order.fulfillmentMethod === 'shipping' && (
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-neutral-700">Tracking Number</p>
+                    <p className="text-sm font-medium text-neutral-700">Tracking Information</p>
                     {!showTrackingInput && (
                       <Button
                         onClick={() => setShowTrackingInput(true)}
@@ -628,37 +648,75 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                       </Button>
                     )}
                   </div>
-                  
+
                   {showTrackingInput ? (
-                    <div className="flex gap-2">
-                      <Input
-                        value={trackingNumber}
-                        onChange={(e) => setTrackingNumber(e.target.value)}
-                        placeholder="Enter tracking number"
-                        className="flex-1"
+                    <div className="space-y-2">
+                      <CarrierSelect
+                        value={carrier}
+                        onChange={setCarrier}
+                        placeholder="Select carrier..."
+                        label="Carrier"
                       />
-                      <Button
-                        onClick={updateTrackingNumber}
-                        disabled={updating || !trackingNumber.trim()}
-                        size="sm"
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowTrackingInput(false);
-                          setTrackingNumber(order.trackingNumber || '');
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Cancel
-                      </Button>
+                      <div className="flex gap-2">
+                        <Input
+                          value={trackingNumber}
+                          onChange={(e) => setTrackingNumber(e.target.value)}
+                          placeholder="Enter tracking number"
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={updateTrackingNumber}
+                          disabled={updating || !trackingNumber.trim()}
+                          size="sm"
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setShowTrackingInput(false);
+                            setTrackingNumber(order.trackingNumber || '');
+                            setCarrier(order.carrier || '');
+                          }}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   ) : order.trackingNumber ? (
-                    <p className="text-neutral-900 font-mono bg-neutral-100 px-3 py-2 rounded">
-                      {order.trackingNumber}
-                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        {order.carrier && (
+                          <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 font-medium uppercase">
+                            {order.carrier}
+                          </span>
+                        )}
+                        {order.trackingUrl ? (
+                          <a
+                            href={order.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 font-mono bg-blue-50 px-3 py-2 rounded underline text-sm"
+                          >
+                            {order.trackingNumber}
+                          </a>
+                        ) : (
+                          <p className="text-neutral-900 font-mono bg-neutral-100 px-3 py-2 rounded text-sm">
+                            {order.trackingNumber}
+                          </p>
+                        )}
+                        {order.shipmentStatus && (
+                          <ShipmentStatusBadge status={order.shipmentStatus} />
+                        )}
+                      </div>
+                      {order.trackingEvents && order.trackingEvents.length > 0 && (
+                        <ShipmentTimeline
+                          events={order.trackingEvents}
+                          currentStatus={order.shipmentStatus}
+                        />
+                      )}
+                    </div>
                   ) : (
                     <p className="text-neutral-500 text-sm">No tracking number added yet</p>
                   )}

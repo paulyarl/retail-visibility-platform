@@ -356,6 +356,19 @@ router.get('/orders/:orderId', authenticateToken, async (req: Request, res: Resp
         },
         order_items: true,
         payments: true,
+        shipments: {
+          select: {
+            id: true,
+            tracking_number: true,
+            carrier: true,
+            tracking_url: true,
+            shipment_status: true,
+            shipped_at: true,
+          },
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
       }
     });
 
@@ -428,6 +441,11 @@ router.get('/orders/:orderId', authenticateToken, async (req: Request, res: Resp
         country: order.billing_country,
       },
       fulfillmentMethod: metadata.fulfillment_method,
+      trackingNumber: order.shipments?.[0]?.tracking_number || null,
+      trackingUrl: order.shipments?.[0]?.tracking_url || null,
+      carrier: order.shipments?.[0]?.carrier || null,
+      shipmentStatus: order.shipments?.[0]?.shipment_status || null,
+      shippedAt: order.shipments?.[0]?.shipped_at || null,
       source: order.source,
       notes: order.notes,
       totals: {

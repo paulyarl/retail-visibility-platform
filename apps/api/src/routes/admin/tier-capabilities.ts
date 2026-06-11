@@ -148,7 +148,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
     if (!capType) return res.status(404).json({ error: 'capability_type_not_found' });
 
     // Get features to link — either from request body or from capability type's allowed features
-    let featureKeys = features?.map((f: any) => f.feature_key) || [];
+    let featureKeys = features?.map((f: any) => f.feature_key?.trim()).filter(Boolean) || [];
     if (featureKeys.length === 0) {
       const capFeatures = await prisma.capability_features_list.findMany({
         where: { capability_type_id: capType.id, is_active: true },
@@ -165,7 +165,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
     // Upsert tier_features_list entries (create or update if already exists)
     const created = [];
     for (const fr of featureRecords) {
-      const isEnabled = features?.find((f: any) => f.feature_key === fr.key)?.is_enabled ?? (capability_enabled ?? true);
+      const isEnabled = features?.find((f: any) => f.feature_key?.trim() === fr.key)?.is_enabled ?? (capability_enabled ?? true);
       const tf = await prisma.tier_features_list.upsert({
         where: {
           tier_id_feature_key: { tier_id: tier.id, feature_key: fr.key },
@@ -234,8 +234,10 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
     // Update features for this capability type on this tier
     if (updateData.features) {
       for (const f of updateData.features) {
+        const cleanKey = f.feature_key?.trim();
+        if (!cleanKey) continue;
         await prisma.tier_features_list.updateMany({
-          where: { tier_id: tier.id, feature_key: f.feature_key, capability_type_id: capType.id },
+          where: { tier_id: tier.id, feature_key: cleanKey, capability_type_id: capType.id },
           data: {
             is_enabled: f.is_enabled,
             ...(f.effective_restrictions !== undefined && { tier_specific_restrictions: f.effective_restrictions }),

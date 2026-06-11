@@ -18,6 +18,7 @@ import {
 import { HeroLocationService } from './HeroLocationService';
 import { OrderManagementService } from './OrderManagementService';
 import { CustomerService } from './CustomerService';
+import CrmAlertService from './CrmAlertService';
 
 export interface PickupTimeSlot {
   id: string;
@@ -459,6 +460,19 @@ export class FulfillmentService {
         );
       }
     }
+
+    // Create CRM alert for scheduled pickup status change (fire-and-forget)
+    CrmAlertService.getInstance().createOrderAlert({
+      tenantId: schedule.tenant_id,
+      orderId: orderId,
+      eventType: newStatus,
+      customerName: order.customer_name || undefined,
+      metadata: {
+        fulfillment_method: schedule.fulfillment_method,
+        scheduled_date: schedule.scheduled_date,
+        scheduled_time: schedule.scheduled_time,
+      },
+    }).catch(err => console.error('[FulfillmentService] Failed to create CRM alert:', err));
   }
 
   /**

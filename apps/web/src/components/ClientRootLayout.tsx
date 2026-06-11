@@ -14,6 +14,7 @@ import { UniversalProvider } from "@/providers/UniversalProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { Notifications } from "@mantine/notifications";
+import { Toaster } from "@/components/ui/Toaster";
 
 interface ClientRootLayoutProps {
   children: React.ReactNode;
@@ -56,6 +57,7 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
                     <CustomerAuthProvider>
                       <UniversalProvider>
                         <Notifications position="top-right" />
+                        <Toaster />
                         <div key="error-boundary-wrapper">
                           <ErrorBoundary>
                             {children}

@@ -34,6 +34,8 @@ interface Order {
   createdAt: string;
   paidAt: string;
   trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
   shippingAddress?: any;
   payment?: {
     id: string;
@@ -214,7 +216,7 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
       ['Order Number', 'Date', 'Status', 'Customer', 'Email', 'Items', 'Total'].join(','),
       ...filteredOrders.map(order => [
         order.orderNumber,
-        formatDate(new Date(order.paidAt)),
+        formatDate(new Date(order.paidAt || order.createdAt)),
         order.fulfillmentStatus,
         order.customerName || 'N/A',
         order.customerEmail || 'N/A',
@@ -483,7 +485,7 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-neutral-600">
                       <div>
-                        <span className="font-medium">Date:</span> {formatDate(new Date(order.paidAt))}
+                        <span className="font-medium">Date:</span> {formatDate(new Date(order.paidAt || order.createdAt))}
                       </div>
                       <div>
                         <span className="font-medium">Customer:</span>{' '}

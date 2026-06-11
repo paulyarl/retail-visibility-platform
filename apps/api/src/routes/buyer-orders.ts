@@ -125,7 +125,9 @@ router.get('/buyer', async (req, res) => {
         platformFee: 0, // Platform fee not stored in orders table
         fulfillmentFee: order.shipping_cents || 0,
         fulfillmentMethod: (order.metadata as any)?.fulfillment_method || null,
-        trackingNumber: shipment?.tracking_number || order.shipping_provider || undefined,
+        trackingNumber: shipment?.tracking_number || undefined,
+        trackingUrl: shipment?.tracking_url || undefined,
+        carrier: shipment?.carrier || undefined,
         shippingProvider: order.shipping_provider || undefined,
         customerInfo: {
           email: order.customer_email,
@@ -410,6 +412,11 @@ router.get('/:orderId', async (req, res) => {
             created_at: 'desc',
           },
         },
+        shipments: {
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
       },
     });
 
@@ -458,6 +465,7 @@ router.get('/:orderId', async (req, res) => {
 
     const payment = order.payments[0];
     const tenant = order.tenants;
+    const shipment = order.shipments?.[0];
 
     const orderDetail = {
       orderId: order.id,
@@ -477,6 +485,10 @@ router.get('/:orderId', async (req, res) => {
       platformFee: 0,
       fulfillmentFee: order.shipping_cents || 0,
       fulfillmentMethod: (order.metadata as any)?.fulfillment_method || null,
+      trackingNumber: shipment?.tracking_number || undefined,
+      trackingUrl: shipment?.tracking_url || undefined,
+      carrier: shipment?.carrier || undefined,
+      shippingProvider: order.shipping_provider || undefined,
       // Deposit order fields
       checkoutMode: order.checkout_mode || 'full_payment',
       depositCents: order.deposit_cents || 0,
@@ -662,12 +674,21 @@ router.patch('/:orderId/pickup', async (req, res) => {
     }
 
     // Send order fulfilled notification (async, don't wait) 
+    const orderShipment = await prisma.shipments.findFirst({
+      where: { order_id: orderId },
+      orderBy: { created_at: 'desc' },
+    });
+    const orderFulfillmentMethod = (order.metadata as any)?.fulfillment_method || 'pickup';
     getOrderNotificationService().notifyOrderFulfilled({
       tenantId: order.tenant_id,
       orderId: orderId,
       customerEmail: order.customer_email,
       customerName: order.customer_name || undefined,
       amount: order.total_cents,
+      fulfillmentMethod: orderFulfillmentMethod,
+      trackingNumber: orderShipment?.tracking_number || undefined,
+      carrier: orderShipment?.carrier || undefined,
+      trackingUrl: orderShipment?.tracking_url || undefined,
     }).catch((err: any) => console.error('[Buyer Orders] Failed to send fulfillment notification:', err));
 
     res.json({
