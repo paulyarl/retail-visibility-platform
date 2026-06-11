@@ -3436,6 +3436,38 @@ model tenant_faq_options_settings {
   @@index([tenant_id], map: "idx_faq_options_tenant")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_crm_options_settings {
+  id                             String    @id @db.VarChar(255)
+  tenant_id                      String    @unique @db.VarChar(255)
+  crm_enabled                    Boolean?  @default(true)
+  crm_inquiry_product_enabled    Boolean?  @default(true)
+  crm_inquiry_storefront_enabled Boolean?  @default(true)
+  crm_inquiry_directory_enabled  Boolean?  @default(true)
+  crm_inquiry_anonymous          Boolean?  @default(true)
+  crm_inquiry_customer           Boolean?  @default(true)
+  crm_inquiry_assignment         Boolean?  @default(true)
+  crm_inquiry_auto_response      Boolean?  @default(false)
+  crm_contact_management         Boolean?  @default(true)
+  crm_contact_import             Boolean?  @default(false)
+  crm_contact_sync               Boolean?  @default(false)
+  crm_ticket_priority            Boolean?  @default(true)
+  crm_ticket_assignment          Boolean?  @default(true)
+  crm_ticket_templates           Boolean?  @default(false)
+  crm_ticket_escalation          Boolean?  @default(false)
+  crm_message_rich_text          Boolean?  @default(false)
+  crm_message_attachments        Boolean?  @default(false)
+  crm_message_templates          Boolean?  @default(false)
+  crm_customer_tickets           Boolean?  @default(false)
+  crm_dashboard_analytics        Boolean?  @default(false)
+  crm_requests_hub               Boolean?  @default(false)
+  created_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  tenants                        tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_options_settings_tenant")
+
+  @@index([tenant_id], map: "idx_crm_options_tenant")
+}
+
 model tenant_feature_flags_list {
   id          String   @id
   tenant_id   String
@@ -3481,6 +3513,7 @@ model tenant_featured_options_settings {
   featured_random_featured Boolean?  @default(false)
   created_at               DateTime? @default(now()) @db.Timestamp(6)
   updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  featured_expiry_monitor  Boolean?  @default(false)
   tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id], map: "idx_featured_options_tenant")
@@ -3852,6 +3885,7 @@ model tenants {
   tenant_barcode_scan_settings                                                           tenant_barcode_scan_settings?
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_commerce_settings                                                               tenant_commerce_settings?
+  tenant_crm_options_settings                                                            tenant_crm_options_settings?
   tenant_faq_options_settings                                                            tenant_faq_options_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_featured_options_settings                                                       tenant_featured_options_settings?

@@ -112,6 +112,7 @@ export interface CrmTicket {
   priority: TicketPriority;
   category: string | null;
   assigned_to: string | null;
+  faq_id: string | null;
   first_responded_at: string | null;
   resolved_at: string | null;
   created_at: string;
@@ -126,6 +127,7 @@ export interface CreateTicketInput {
   category?: string;
   contact_id?: string;
   assigned_to?: string;
+  faq_id?: string;
 }
 
 export interface UpdateTicketInput {

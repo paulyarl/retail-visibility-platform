@@ -89,27 +89,27 @@ class StorefrontTypeService {
 
       const tierIds = tiers.map(t => t.id);
 
-      // Fetch storefront_ feature keys from tier_features_list
+      // Primary: query by capability_type_id (robust against feature key typos/spaces)
+      // Fallback: query by feature_key prefix if capability type not found
+      const sfTypeCapType = await prisma.capability_type_list.findUnique({
+        where: { key: 'storefront_types' },
+      });
+
       const tierFeatures = await prisma.tier_features_list.findMany({
         where: {
           tier_id: { in: tierIds },
-          feature_key: { startsWith: 'storefront_' },
+          ...(sfTypeCapType
+            ? { capability_type_id: sfTypeCapType.id }
+            : { feature_key: { startsWith: 'storefront_' } }),
           is_enabled: true,
-        },
-        include: {
-          capability_type_list: { select: { key: true } },
         },
       });
 
-      // Only include features from the storefront_types capability type (not storefront_options)
-      const storefrontTypeFeatures = tierFeatures.filter(
-        tf => tf.capability_type_list?.key === 'storefront_types'
-      );
-
       // Merge features: union across tiers (most-permissive-wins)
       const mergedFeatures: Record<string, boolean> = {};
-      for (const tf of storefrontTypeFeatures) {
-        mergedFeatures[tf.feature_key] = mergedFeatures[tf.feature_key] || tf.is_enabled;
+      for (const tf of tierFeatures) {
+        const cleanKey = tf.feature_key.trim();
+        mergedFeatures[cleanKey] = mergedFeatures[cleanKey] || tf.is_enabled;
       }
 
       return this.resolveFromFeatures(mergedFeatures);

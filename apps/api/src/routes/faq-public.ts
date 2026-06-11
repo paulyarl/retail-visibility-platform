@@ -8,10 +8,12 @@
 import { Router, Request, Response } from 'express';
 import FaqService from '../services/FaqService';
 import FaqOptionsService from '../services/FaqOptionsService';
+import FaqCrmIntegrationService from '../services/FaqCrmIntegrationService';
 
 const router = Router({ mergeParams: true });
 const faqService = FaqService.getInstance();
 const faqOptionsService = FaqOptionsService.getInstance();
+const faqCrmIntegrationService = FaqCrmIntegrationService.getInstance();
 
 // ====================
 // Public Storefront FAQs
@@ -123,6 +125,64 @@ router.post('/faqs/:faqId/suggest-edit', async (req: Request, res: Response) => 
   } catch (error) {
     console.error('[FAQ Public] Error submitting suggested edit:', error);
     res.status(500).json({ success: false, error: 'Failed to submit suggested edit' });
+  }
+});
+
+// ====================
+// FAQ-CRM Integration
+// ====================
+
+// GET /api/public/tenants/:tenantId/faqs/search?query=...
+// NOTE: Must be placed before /faqs/:faqId routes to avoid shadowing
+router.get('/faqs/search', async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.params.tenantId;
+    const { query, limit } = req.query;
+
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled || !tierState.storefrontEnabled) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const suggestions = await faqCrmIntegrationService.searchRelevantFAQs(
+      tenantId,
+      String(query || ''),
+      Math.min(parseInt(String(limit || '5'), 10), 10)
+    );
+    res.json({ success: true, data: suggestions });
+  } catch (error) {
+    console.error('[FAQ Public] Error searching FAQs:', error);
+    res.status(500).json({ success: false, error: 'Failed to search FAQs' });
+  }
+});
+
+// POST /api/public/tenants/:tenantId/faqs/:faqId/create-ticket
+router.post('/faqs/:faqId/create-ticket', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, faqId } = req.params;
+    const { customer_id, title, description, email, source } = req.body;
+
+    const tierState = await faqOptionsService.resolveFaqOptionsState(tenantId);
+    if (!tierState.enabled) {
+      res.status(403).json({ success: false, error: 'FAQ feature not enabled for this tenant' });
+      return;
+    }
+
+    const ticket = await faqCrmIntegrationService.createTicketFromFeedback({
+      tenant_id: tenantId,
+      faq_id: faqId,
+      customer_id: customer_id || undefined,
+      title: title || undefined,
+      description: description || undefined,
+      email: email || undefined,
+      source: source || 'faq_feedback',
+    });
+
+    res.status(201).json({ success: true, data: ticket });
+  } catch (error: any) {
+    console.error('[FAQ Public] Error creating ticket from feedback:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to create ticket' });
   }
 });
 

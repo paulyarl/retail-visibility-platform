@@ -217,6 +217,28 @@ class CrmTenantCrmService extends TenantApiSingleton {
     await this.invalidateServiceCaches();
     return this.unwrap<any>(result);
   }
+
+  // --- Options Settings ---
+  async getOptions(tenantId: string): Promise<{ settings: Record<string, boolean>; tierState: any }> {
+    const result = await this.makeDefaultRequest<{ success: boolean; settings: Record<string, boolean>; tierState: any; error?: string }>(
+      `/api/tenants/${tenantId}/crm-options`,
+      { method: 'GET' },
+      `crm-options-${tenantId}`,
+      3 * 60 * 1000,
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    return { settings: result.data.settings, tierState: result.data.tierState };
+  }
+
+  async updateOptions(tenantId: string, settings: Record<string, boolean>): Promise<Record<string, boolean>> {
+    const result = await this.makeDefaultRequest<{ success: boolean; settings: Record<string, boolean>; error?: string }>(
+      `/api/tenants/${tenantId}/crm-options`,
+      { method: 'PUT', body: JSON.stringify(settings) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    await this.invalidateCache(`crm-options-${tenantId}`);
+    return result.data.settings;
+  }
 }
 
 export const crmTenantCrmService = CrmTenantCrmService.getInstance();

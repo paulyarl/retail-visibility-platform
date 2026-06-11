@@ -64,6 +64,18 @@ export const CANONICAL_FEATURES: Record<string, FeatureCapability> = {
     }
   },
   
+  'featured_expiry_monitor': {
+    key: 'featured_expiry_monitor',
+    name: 'Featured Expiry Monitor',
+    description: 'Proactive CRM task alerts when featured products are expiring or expired',
+    category: 'product',
+    metadata: {
+      warningDays: 3,
+      autoUnfeature: true,
+      crmTaskAlerts: true
+    }
+  },
+  
   'categories': {
     key: 'categories',
     name: 'Product Categories',

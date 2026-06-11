@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
+import { publicFaqService, FaqSuggestion } from '@/services/PublicFaqService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Package, MessageSquare, ChevronLeft } from 'lucide-react';
+import { Package, MessageSquare, ChevronLeft, HelpCircle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewTicketPage() {
@@ -22,6 +23,12 @@ export default function NewTicketPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const [faqSuggestions, setFaqSuggestions] = useState<FaqSuggestion[]>([]);
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [selectedFaqId, setSelectedFaqId] = useState<string | null>(null);
+  const [ticketCreatedFromFaq, setTicketCreatedFromFaq] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (customer?.email) {
@@ -70,6 +77,7 @@ export default function NewTicketPage() {
         description: description.trim() || undefined,
         category,
         priority: 'medium',
+        faq_id: selectedFaqId || undefined,
       });
       router.push(`/account/support/${ticket.id}`);
     } catch (err: any) {
@@ -77,6 +85,32 @@ export default function NewTicketPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Debounced FAQ search when title changes
+  useEffect(() => {
+    if (!selectedTenantId || !title.trim() || title.trim().length < 3) {
+      setFaqSuggestions([]);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setFaqLoading(true);
+      try {
+        const results = await publicFaqService.searchFAQs(selectedTenantId, title.trim(), 3);
+        setFaqSuggestions(results);
+      } catch {
+        setFaqSuggestions([]);
+      } finally {
+        setFaqLoading(false);
+      }
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [title, selectedTenantId]);
+
+  const handleFaqResolved = (faqId: string) => {
+    setSelectedFaqId(faqId);
+    setTicketCreatedFromFaq(true);
   };
 
   if (loading) {
@@ -178,6 +212,45 @@ export default function NewTicketPage() {
               className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
             />
           </div>
+
+          {/* FAQ Deflection Suggestions */}
+          {selectedTenantId && faqSuggestions.length > 0 && !ticketCreatedFromFaq && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-amber-600" />
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Before you submit, did these articles help?
+                </p>
+              </div>
+              <div className="space-y-2">
+                {faqSuggestions.map((faq) => (
+                  <div key={faq.id} className="flex items-start gap-2 p-2 rounded-md bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">{faq.question}</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">{faq.answer}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleFaqResolved(faq.id)}
+                      className="shrink-0 inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Yes
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ticketCreatedFromFaq && (
+            <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/10 p-4 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <p className="text-sm text-green-700 dark:text-green-300">
+                Great! We&apos;ll link this ticket to the FAQ article for reference.
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div>

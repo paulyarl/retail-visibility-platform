@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { CrmTaskService } from '../CrmTaskService';
 
 export type BillingNotificationType = 
   | 'payment_success'
@@ -636,6 +637,95 @@ Your new plan is now active.`;
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Create a CRM task for a critical subscription event.
+   * This surfaces subscription issues as actionable tasks in the tenant's CRM dashboard,
+   * providing an equal alternative channel to email notifications.
+   */
+  async createSubscriptionCrmTask(data: BillingNotificationData): Promise<void> {
+    try {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: data.tenantId },
+        select: { name: true },
+      });
+      const tenantName = tenant?.name || data.tenantId;
+
+      const { title, description, priority, dueDate } = this.buildCrmTaskPayload(data, tenantName);
+
+      const taskService = CrmTaskService.getInstance();
+      await taskService.create({
+        tenant_id: data.tenantId,
+        title,
+        description,
+        priority,
+        due_date: dueDate,
+        created_by: 'system-subscription-job',
+      });
+
+      console.log(`[BillingNotification] CRM task created for tenant ${data.tenantId}: ${title}`);
+    } catch (error) {
+      console.error('[BillingNotification] Failed to create CRM task:', error);
+    }
+  }
+
+  private buildCrmTaskPayload(
+    data: BillingNotificationData,
+    tenantName: string,
+  ): { title: string; description: string; priority: string; dueDate?: Date } {
+    const billingUrl = `${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/billing/payment-methods`;
+
+    switch (data.type) {
+      case 'trial_payment_failed':
+      case 'payment_failed':
+        return {
+          title: `Payment failed — ${tenantName} entered grace period`,
+          description: `Tenant "${tenantName}" failed to complete payment and has entered the grace period. A payment method needs to be added or updated.\n\nBilling settings: ${billingUrl}`,
+          priority: 'high',
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        };
+
+      case 'grace_period_warning': {
+        const daysLeft = data.gracePeriodDaysRemaining ?? 0;
+        const daysPast = 30 - daysLeft; // grace period is 30 days total
+        return {
+          title: `Grace period warning (${daysPast}d past due) — ${tenantName}`,
+          description: `Tenant "${tenantName}" is ${daysPast} days past due with ${daysLeft} days remaining in grace period. No payment method on file.\n\nBilling settings: ${billingUrl}`,
+          priority: daysLeft <= 7 ? 'urgent' : 'high',
+          dueDate: new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000),
+        };
+      }
+
+      case 'grace_period_final':
+        return {
+          title: `Final grace period notice — ${tenantName}`,
+          description: `Tenant "${tenantName}" is nearing the end of the grace period. Subscription will be canceled if payment is not resolved.\n\nBilling settings: ${billingUrl}`,
+          priority: 'urgent',
+          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+        };
+
+      case 'subscription_canceled':
+        return {
+          title: `Subscription canceled — ${tenantName} demoted to expired_trial`,
+          description: `Tenant "${tenantName}" has been demoted to expired_trial after grace period expiry. Reason: ${data.reason || 'Grace period expired'}. The tenant is now invisible on public pages.\n\nIf the tenant adds a payment method, the subscription can be reactivated.\n\nBilling settings: ${billingUrl}`,
+          priority: 'urgent',
+        };
+
+      case 'trial_expired':
+        return {
+          title: `Trial expired — ${tenantName}`,
+          description: `Tenant "${tenantName}" trial has expired without conversion. The tenant has been demoted.\n\nBilling settings: ${billingUrl}`,
+          priority: 'high',
+        };
+
+      default:
+        return {
+          title: `Subscription event: ${data.type} — ${tenantName}`,
+          description: `Subscription event "${data.type}" for tenant "${tenantName}".`,
+          priority: 'medium',
+        };
+    }
   }
 
   private buildPaymentMethodAddedText(name: string, business: string, data: BillingNotificationData): string {

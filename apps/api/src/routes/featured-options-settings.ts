@@ -20,6 +20,7 @@ const featuredOptionsSettingsSchema = z.object({
   featured_trending: z.boolean().optional(),
   featured_recommended: z.boolean().optional(),
   featured_random_featured: z.boolean().optional(),
+  featured_expiry_monitor: z.boolean().optional(),
 });
 
 // Default settings — tenant types on, platform types off by default
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS = {
   featured_trending: false,
   featured_recommended: false,
   featured_random_featured: false,
+  featured_expiry_monitor: false,
 };
 
 // Map feature key (DB column) to FeaturedType
@@ -79,6 +81,7 @@ router.get('/:tenantId/featured-options', authenticateToken, async (req, res) =>
           featured_trending: false,
           featured_recommended: false,
           featured_random_featured: false,
+          featured_expiry_monitor: false,
         },
         tierState,
       });
@@ -94,6 +97,7 @@ router.get('/:tenantId/featured-options', authenticateToken, async (req, res) =>
     // Enforce tier gates: force off any feature not in tier's allowedTypes
     const tierFilteredSettings: Record<string, boolean> = {
       featured_enabled: !!rawSettings.featured_enabled && tierState.enabled,
+      featured_expiry_monitor: !!rawSettings.featured_expiry_monitor && tierState.expiryMonitorEnabled,
     };
     for (const [key, type] of Object.entries(FEATURE_KEY_TO_TYPE)) {
       const isAllowed = tierState.allowedTypes.includes(type);
@@ -153,6 +157,19 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
         filteredData[key] = value;
         continue;
       }
+      if (key === 'featured_expiry_monitor') {
+        // Tier-gated: only allow enabling if tier has the capability
+        if (value && !tierState.expiryMonitorEnabled) {
+          return res.status(403).json({
+            success: false,
+            error: 'tier_restricted',
+            message: 'Featured expiry monitor is not available on your current plan',
+            feature_key: key,
+          });
+        }
+        filteredData[key] = value;
+        continue;
+      }
       const type = FEATURE_KEY_TO_TYPE[key];
       if (type && tierState.allowedTypes.includes(type)) {
         filteredData[key] = value;
@@ -209,6 +226,7 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
         featured_trending: settings.featured_trending,
         featured_recommended: settings.featured_recommended,
         featured_random_featured: settings.featured_random_featured,
+        featured_expiry_monitor: settings.featured_expiry_monitor,
       },
     });
   } catch (error) {
@@ -247,6 +265,7 @@ router.get('/public/tenant/:tenantId/featured-options', async (req, res) => {
           featured_trending: false,
           featured_recommended: false,
           featured_random_featured: false,
+          featured_expiry_monitor: false,
         },
         tierState,
       });
@@ -262,6 +281,7 @@ router.get('/public/tenant/:tenantId/featured-options', async (req, res) => {
     // Enforce tier gates: force off any feature not in tier's allowedTypes
     const tierFilteredSettings: Record<string, boolean> = {
       featured_enabled: !!rawSettings.featured_enabled && tierState.enabled,
+      featured_expiry_monitor: !!rawSettings.featured_expiry_monitor && tierState.expiryMonitorEnabled,
     };
     for (const [key, type] of Object.entries(FEATURE_KEY_TO_TYPE)) {
       const isAllowed = tierState.allowedTypes.includes(type);

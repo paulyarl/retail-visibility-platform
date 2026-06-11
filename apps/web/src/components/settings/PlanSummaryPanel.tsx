@@ -226,6 +226,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
+  crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -579,6 +580,48 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'faq_options',
       settingsPath: CAPABILITY_DISPLAY.faq_options.settingsPath ?? null,
+    });
+  }
+
+  // CRM Options
+  const crm = caps.crmOptions;
+  if (Object.keys(crm.features).length > 0) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (crm.allowedInquiryTypes.length > 0) {
+      specifics.push('Inquiries');
+      statuses.push({ label: 'Inquiries', status: (crm.inquiryProductEnabled || crm.inquiryStorefrontEnabled || crm.inquiryDirectoryEnabled) ? 'enabled' : 'merchant-gated' });
+    }
+    if (crm.allowedContactTypes.length > 0) {
+      specifics.push('Contacts');
+      statuses.push({ label: 'Contacts', status: crm.contactsEnabled ? 'enabled' : 'merchant-gated' });
+    }
+    if (crm.allowedTicketTypes.length > 0) {
+      specifics.push('Tickets');
+      statuses.push({ label: 'Tickets', status: crm.ticketFeaturesEnabled ? 'enabled' : 'merchant-gated' });
+    }
+    if (crm.allowedMessageTypes.length > 0) {
+      specifics.push('Messages');
+      statuses.push({ label: 'Messages', status: crm.messageFeaturesEnabled ? 'enabled' : 'merchant-gated' });
+    }
+    if (crm.allowedCustomerTicketTypes.length > 0) {
+      specifics.push('Customer Portal');
+      statuses.push({ label: 'Customer Portal', status: crm.customerTicketsEnabled ? 'enabled' : 'merchant-gated' });
+    }
+    if (crm.allowedDashboardTypes.length > 0) {
+      specifics.push('Dashboard');
+      statuses.push({ label: 'Dashboard', status: crm.dashboardEnabled ? 'enabled' : 'merchant-gated' });
+    }
+    summaries.push({
+      key: 'crm_options',
+      label: CAPABILITY_DISPLAY.crm_options.label,
+      icon: CAPABILITY_DISPLAY.crm_options.icon,
+      enabled: crm.enabled,
+      merchantGated: merchantGates?.['crm_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'crm_options',
+      settingsPath: CAPABILITY_DISPLAY.crm_options.settingsPath ?? null,
     });
   }
 

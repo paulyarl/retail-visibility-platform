@@ -23,6 +23,7 @@ export default function CustomerTicketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -34,8 +35,16 @@ export default function CustomerTicketDetailPage() {
         setTicket(ticketData);
         // Filter out internal notes for customers
         setMessages(messageData.filter(m => !m.is_internal));
-      } catch (err) {
+      } catch (err: any) {
         console.error('[Customer Ticket Detail] Load error:', err);
+        const msg = err?.message || '';
+        if (msg.includes('crm_disabled') || msg.includes('not enabled')) {
+          setError('Support tickets are not available for this store.');
+        } else if (msg.includes('access_denied')) {
+          setError('You do not have access to this ticket.');
+        } else {
+          setError('Failed to load ticket details. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
@@ -67,10 +76,10 @@ export default function CustomerTicketDetailPage() {
     );
   }
 
-  if (!ticket) {
+  if (!ticket || error) {
     return (
       <div className="text-center py-20">
-        <p className="text-neutral-500">Ticket not found</p>
+        <p className="text-neutral-500">{error || 'Ticket not found'}</p>
         <Link href="/account/support" className="text-amber-600 hover:underline text-sm mt-2 inline-block">
           Back to Support
         </Link>

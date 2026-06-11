@@ -37,6 +37,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
@@ -383,6 +384,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [slugForRelated, setSlugForRelated] = useState<string>('');
   const [featuredOptionsSettings, setFeaturedOptionsSettings] = useState<FeaturedOptionsSettings | null>(null);
   const [faqFlags, setFaqFlags] = useState<PublicFaqOptionsFlags | null>(null);
+  const [crmFlags, setCrmFlags] = useState<PublicCrmOptionsFlags | null>(null);
 
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
@@ -449,7 +451,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           productCount,
           optionFlags,
           featuredPrefs,
-          faqOptionFlags
+          faqOptionFlags,
+          crmOptionFlags
         ] = await Promise.all([
           getBusinessProfile(data.listing.tenantId),
           getBusinessHours(data.listing.tenantId),
@@ -458,7 +461,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           getActualProductCount(data.listing.tenantId),
           publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId),
           publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId),
-          publicFaqService.getFaqOptionsFlags(data.listing.tenantId)
+          publicFaqService.getFaqOptionsFlags(data.listing.tenantId),
+          publicCrmService.getCrmOptionsFlags(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -469,6 +473,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         if (optionFlags) setOptFlags(optionFlags);
         if (featuredPrefs) setFeaturedOptionsSettings(featuredPrefs);
         if (faqOptionFlags) setFaqFlags(faqOptionFlags);
+        if (crmOptionFlags) setCrmFlags(crmOptionFlags);
 
         // Fetch tenant info for status panel
         const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
@@ -1028,7 +1033,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
             )}
 
             {/* Inquiry Form */}
-            {!showStatusPanel && consolidatedData?.listing?.tenantId && (
+            {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && consolidatedData?.listing?.tenantId && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">

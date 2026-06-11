@@ -335,6 +335,8 @@ function generateActionUrl(type: string, metadata: any, tenantId: string): strin
     case 'payment_reminder':
     case 'payment_failed':
     case 'risk_alert':
+    case 'grace_period_warning':
+    case 'grace_period_final':
       return `/t/${tenantId}/settings/billing/payment-methods`;
     case 'new_invoice':
     case 'monthly_statement':
@@ -351,6 +353,8 @@ function generateActionText(type: string): string | undefined {
   switch (type) {
     case 'payment_reminder':
     case 'payment_failed':
+    case 'grace_period_warning':
+    case 'grace_period_final':
       return 'Update Payment Method';
     case 'risk_alert':
       return 'Update Card';

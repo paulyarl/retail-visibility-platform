@@ -214,7 +214,7 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
     for (const tf of mergedFeatures.values()) {
       const capKey = tf.capability_type_list?.key;
 
-      if (capKey && tf.capability_type_list?.category) {
+      if (capKey) {
         if (!capabilities[capKey]) {
           capabilities[capKey] = {
             capability_enabled: true,

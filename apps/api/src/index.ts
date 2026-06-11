@@ -171,6 +171,7 @@ import quickstartOptionsSettingsRoutes from './routes/quickstart-options-setting
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
+import crmOptionsSettingsRoutes from './routes/crm-options-settings';
 import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
@@ -7485,6 +7486,11 @@ app.use('/api/tenants', faqOptionsSettingsRoutes);
 app.use('/api', faqOptionsSettingsRoutes);
 console.log('✅ FAQ options settings routes mounted at /api/tenants/:tenantId/faq-options and /api/public/tenant/:tenantId/faq-options');
 
+/* ------------------------------ crm options settings ------------------------------ */
+app.use('/api/tenants', crmOptionsSettingsRoutes);
+app.use('/api', crmOptionsSettingsRoutes);
+console.log('✅ CRM options settings routes mounted at /api/tenants/:tenantId/crm-options and /api/public/tenant/:tenantId/crm-options');
+
 /* ------------------------------ quickstart options settings ------------------------------ */
 app.use('/api/tenants', quickstartOptionsSettingsRoutes);
 console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
@@ -7977,6 +7983,15 @@ if (process.env.NODE_ENV !== "test") {
         console.log('💸 Subscription grace period job started (daily at midnight)');
       } catch (err) {
         console.error('⚠️ Failed to start grace period job:', err);
+      }
+
+      // Start featured products expiry monitor (daily at midnight)
+      try {
+        const { startFeaturedExpiryMonitor } = await import('./jobs/featured-products-expiry-monitor');
+        startFeaturedExpiryMonitor();
+        console.log('⭐ Featured products expiry monitor started (daily at midnight)');
+      } catch (err) {
+        console.error('⚠️ Failed to start featured products expiry monitor:', err);
       }
     });
 

@@ -29,6 +29,7 @@ interface FeaturedOptionsSettings {
   featured_trending: boolean;
   featured_recommended: boolean;
   featured_random_featured: boolean;
+  featured_expiry_monitor: boolean;
 }
 
 interface FeaturedOptionsSettingsClientProps {
@@ -117,6 +118,7 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
     featured_trending: true,
     featured_recommended: true,
     featured_random_featured: true,
+    featured_expiry_monitor: false,
   });
 
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,7 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
           featured_trending: settings.featured_trending ?? true,
           featured_recommended: settings.featured_recommended ?? true,
           featured_random_featured: settings.featured_random_featured ?? true,
+          featured_expiry_monitor: settings.featured_expiry_monitor ?? false,
         });
       }
     } catch (err) {
@@ -323,6 +326,41 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
                 </div>
               );
             })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Featured Expiry Monitor — Tier-Gated Capability */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary-600" />
+            Expiry Monitor
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Proactive CRM task alerts when your featured products are about to expire or have expired. Auto-unfeature expired products and get notified before they disappear.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <Zap className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-medium text-neutral-900">Featured Expiry Monitor</p>
+                <p className="text-sm text-neutral-600">Get CRM task alerts 3 days before featured products expire, and when they auto-unfeature</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {!featuredCap.data?.expiryMonitorEnabled && (
+                <span className="text-xs text-amber-600 font-medium">Professional plan and above</span>
+              )}
+              <Switch
+                id="featured-expiry-monitor-toggle"
+                checked={settings.featured_expiry_monitor}
+                onCheckedChange={() => handleToggle('featured_expiry_monitor')}
+                disabled={!featuredCap.data?.expiryMonitorEnabled || !settings.featured_enabled}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

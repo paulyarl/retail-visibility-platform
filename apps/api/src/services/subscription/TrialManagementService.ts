@@ -255,13 +255,18 @@ export class TrialManagementService {
       },
     });
 
-    // Send payment failed notification
+    // Send payment failed notification (email + CRM task)
     const notificationService = getBillingNotificationService();
     notificationService.sendNotification({
       tenantId,
       type: 'trial_payment_failed',
       reason,
     }).catch(err => console.error('[TrialManagement] Failed to send notification:', err));
+    notificationService.createSubscriptionCrmTask({
+      tenantId,
+      type: 'trial_payment_failed',
+      reason,
+    }).catch(err => console.error('[TrialManagement] Failed to create CRM task:', err));
 
     return {
       success: false,
