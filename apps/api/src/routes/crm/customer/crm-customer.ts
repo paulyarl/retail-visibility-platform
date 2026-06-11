@@ -11,8 +11,22 @@ import CrmTicketService from '../../../services/CrmTicketService';
 import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
+import CrmOptionsService from '../../../services/CrmOptionsService';
 import { audit } from '../../../audit';
 import { prisma } from '../../../prisma';
+
+async function checkCrmCustomerEnabled(tenantId: string, res: Response): Promise<boolean> {
+  const crmOptions = await CrmOptionsService.getInstance().resolveCrmOptionsState(tenantId);
+  if (!crmOptions.enabled) {
+    res.status(403).json({ error: 'crm_disabled', message: 'CRM is not enabled for this tenant' });
+    return false;
+  }
+  if (!crmOptions.customerTicketsEnabled) {
+    res.status(403).json({ error: 'crm_customer_tickets_disabled', message: 'Customer tickets are not enabled for this tenant' });
+    return false;
+  }
+  return true;
+}
 
 const router = Router({ mergeParams: true });
 
@@ -35,14 +49,20 @@ router.get('/tickets', async (req: Request, res: Response) => {
       status: req.query.status as string,
     });
 
-    // Enrich with tenant name/logo from business profile
+    // Filter out tickets from tenants where CRM customer tickets are disabled
     const tenantIds = [...new Set(tickets.map((t: any) => t.tenant_id))];
+    const crmStates = await Promise.all(tenantIds.map(id => CrmOptionsService.getInstance().resolveCrmOptionsState(id).then(s => ({ id, enabled: s.enabled && s.customerTicketsEnabled })).catch(() => ({ id, enabled: false }))));
+    const enabledTenantIds = new Set(crmStates.filter(s => s.enabled).map(s => s.id));
+    const filteredTickets = tickets.filter((t: any) => enabledTenantIds.has(t.tenant_id));
+
+    // Enrich with tenant name/logo from business profile
+    const enrichedTenantIds = [...new Set(filteredTickets.map((t: any) => t.tenant_id))];
     const profiles = await prisma.tenant_business_profiles_list.findMany({
-      where: { tenant_id: { in: tenantIds } },
+      where: { tenant_id: { in: enrichedTenantIds } },
       select: { tenant_id: true, business_name: true, logo_url: true },
     });
     const profileMap = new Map(profiles.map((p: any) => [p.tenant_id, p]));
-    const enriched = tickets.map((t: any) => ({
+    const enriched = filteredTickets.map((t: any) => ({
       ...t,
       tenant_name: profileMap.get(t.tenant_id)?.business_name || null,
       tenant_logo: profileMap.get(t.tenant_id)?.logo_url || null,
@@ -64,6 +84,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
     if (!req.body.tenant_id) {
       return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required to create a ticket' });
     }
+    if (!(await checkCrmCustomerEnabled(req.body.tenant_id, res))) return;
 
     const ticket = await ticketService.createFromCustomer(customerId, {
       tenant_id: req.body.tenant_id,
@@ -71,6 +92,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
       description: req.body.description,
       priority: req.body.priority,
       category: req.body.category,
+      faq_id: req.body.faq_id || undefined,
     });
 
     await audit({
@@ -117,6 +139,7 @@ router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only view your own tickets' });
     }
+    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     // Enrich with tenant name/logo from business profile
     const profile = await prisma.tenant_business_profiles_list.findUnique({
@@ -143,6 +166,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only view your own tickets' });
     }
+    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     // Customer cannot see internal notes
     const messages = await messageService.listByTicket(req.params.ticketId, false);
@@ -165,6 +189,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only reply to your own tickets' });
     }
+    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     const customerName = [req.customer?.first_name, req.customer?.last_name].filter(Boolean).join(' ') || req.customer?.email || 'Customer';
 
@@ -197,7 +222,12 @@ router.get('/activities', async (req: Request, res: Response) => {
     const activities = await activityService.listByCustomer(customerId, {
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
     });
-    res.json({ success: true, data: activities });
+    // Filter out activities from tenants where CRM customer tickets are disabled
+    const tenantIds = [...new Set(activities.map((a: any) => a.tenant_id).filter(Boolean))];
+    const crmStates = await Promise.all(tenantIds.map(id => CrmOptionsService.getInstance().resolveCrmOptionsState(id).then(s => ({ id, enabled: s.enabled && s.customerTicketsEnabled })).catch(() => ({ id, enabled: false }))));
+    const enabledTenantIds = new Set(crmStates.filter(s => s.enabled).map(s => s.id));
+    const filteredActivities = activities.filter((a: any) => !a.tenant_id || enabledTenantIds.has(a.tenant_id));
+    res.json({ success: true, data: filteredActivities });
   } catch (error) {
     console.error('[CRM Customer] Error listing activities:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
@@ -268,6 +298,7 @@ router.post('/inquiries', async (req: Request, res: Response) => {
     if (!req.body.tenant_id) {
       return res.status(400).json({ error: 'tenant_id_required', message: 'Tenant ID is required to submit an inquiry' });
     }
+    if (!(await checkCrmCustomerEnabled(req.body.tenant_id, res))) return;
 
     const inquiry = await inquiryService.createFromCustomer(customerId, {
       tenant_id: req.body.tenant_id,

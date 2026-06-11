@@ -10,8 +10,9 @@ import {
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
-import { Search, MessageSquare, ThumbsUp, ThumbsDown, FileEdit, Loader2, CheckCircle2 } from 'lucide-react';
+import { Search, MessageSquare, ThumbsUp, ThumbsDown, FileEdit, Loader2, CheckCircle2, Ticket } from 'lucide-react';
 import { publicFaqService, PublicFaq, PublicFaqCategory } from '@/services/PublicFaqService';
+import Link from 'next/link';
 
 interface FeedbackState {
   [faqId: string]: 'up' | 'down' | null;
@@ -43,6 +44,9 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
   }, [searchQuery]);
 
   const [feedback, setFeedback] = useState<FeedbackState>({});
+  const [showCreateTicket, setShowCreateTicket] = useState<Record<string, boolean>>({});
+  const [createTicketLoading, setCreateTicketLoading] = useState<Record<string, boolean>>({});
+  const [createTicketSuccess, setCreateTicketSuccess] = useState<Record<string, boolean>>({});
   const [editDialog, setEditDialog] = useState<{ faqId: string; question: string } | null>(null);
   const [editComment, setEditComment] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -105,6 +109,27 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
   const handleFeedback = async (faqId: string, type: 'up' | 'down') => {
     setFeedback((prev) => ({ ...prev, [faqId]: type }));
     await publicFaqService.submitFeedback(tenantId, faqId, type);
+    if (type === 'down') {
+      setShowCreateTicket((prev) => ({ ...prev, [faqId]: true }));
+    }
+  };
+
+  const handleCreateTicketFromFeedback = async (faq: PublicFaq) => {
+    setCreateTicketLoading((prev) => ({ ...prev, [faq.id]: true }));
+    try {
+      const ticket = await publicFaqService.createTicketFromFeedback(tenantId, faq.id, {
+        title: `Question about: ${faq.question}`,
+        description: `Customer needs more help after viewing FAQ: "${faq.question}"`,
+        source: 'faq_feedback',
+      });
+      if (ticket) {
+        setCreateTicketSuccess((prev) => ({ ...prev, [faq.id]: true }));
+      }
+    } catch {
+      // Non-critical
+    } finally {
+      setCreateTicketLoading((prev) => ({ ...prev, [faq.id]: false }));
+    }
   };
 
   const handleSuggestEdit = async () => {
@@ -200,6 +225,29 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
                       </button>
                     </div>
                     )}
+                    {/* Create ticket from negative feedback */}
+                    {showCreateTicket[faq.id] && !createTicketSuccess[faq.id] && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-neutral-500">Still need help?</span>
+                        <button
+                          onClick={() => handleCreateTicketFromFeedback(faq)}
+                          disabled={createTicketLoading[faq.id]}
+                          className="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                        >
+                          <Ticket className="w-3 h-3" />
+                          {createTicketLoading[faq.id] ? 'Creating...' : 'Create support ticket'}
+                        </button>
+                      </div>
+                    )}
+                    {createTicketSuccess[faq.id] && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Support ticket created!</span>
+                        <Link href="/account/support" className="underline ml-1 hover:text-green-700">
+                          View tickets
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -240,13 +288,15 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
         renderCategoryAccordion(sortedCategories)
       )}
 
-      {/* Ask Bot CTA */}
+      {/* Create Support Ticket CTA (replaces chatbot since chatbot is blocked) */}
       {askBotCta && (
         <div className="mt-8 text-center">
-          <Button variant="outline" className="gap-2">
-            <MessageSquare className="w-4 h-4" />
-            Ask our bot
-          </Button>
+          <Link href="/account/support/new">
+            <Button variant="outline" className="gap-2">
+              <Ticket className="w-4 h-4" />
+              Create support ticket
+            </Button>
+          </Link>
         </div>
       )}
 

@@ -18,6 +18,7 @@ import {
   Lock,
   ArrowRight,
   Rocket,
+  Users,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 
@@ -135,6 +136,17 @@ export default function CapabilityShowcase({
     const faq = cap.faqOptions;
     const faqTier = faq?.enabled ?? false;
     const faqMerchantGated = false;
+
+    // --- CRM Options ---
+    const crm = cap.crmOptions;
+    const crmTier = crm?.crmAvailable ?? false;
+    const crmMerchantGated = false;
+    const crmDetailParts: string[] = [];
+    if (crm?.allowedInquiryTypes.length) crmDetailParts.push('Inquiries');
+    if (crm?.contactsEnabled) crmDetailParts.push('Contacts');
+    if (crm?.ticketFeaturesEnabled) crmDetailParts.push('Tickets');
+    if (crm?.customerTicketsEnabled) crmDetailParts.push('Customer Portal');
+    if (crm?.dashboardEnabled) crmDetailParts.push('Dashboard');
 
     return [
       {
@@ -256,6 +268,17 @@ export default function CapabilityShowcase({
           ].filter(Boolean).join(', ') || 'Basic'} FAQs`
           : "Not available",
         settingsLink: `/t/${tenantId}/faq/options`,
+      },
+      {
+        key: "crmOptions",
+        label: "CRM",
+        icon: <Users className="w-4 h-4" />,
+        enabled: crmTier,
+        status: getStatus(crmTier, crmMerchantGated),
+        detail: crmTier
+          ? (crmDetailParts.length > 0 ? crmDetailParts.join(', ') : 'Support Hub')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/support`,
       },
     ];
   }, [capabilities, tenantId]);

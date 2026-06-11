@@ -161,6 +161,7 @@ const PROFESSIONAL_FEATURES = [
   'advanced_analytics',
   'api_access',
   'custom_domain',
+  'featured_expiry_monitor',
   'image_gallery' // Higher limit
 ];
 

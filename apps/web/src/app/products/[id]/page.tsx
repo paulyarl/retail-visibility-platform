@@ -36,6 +36,7 @@ import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/service
 import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
+import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
@@ -329,6 +330,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
   const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
+  const crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
@@ -803,24 +805,26 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Inquiry Form — for tenants without storefront/directory */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="max-w-lg mx-auto">
-              <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
+          {crmOptionsFlags?.crm_enabled && crmOptionsFlags?.crm_inquiry_product_enabled && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <div className="max-w-lg mx-auto">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Ask about this product</h3>
+                      <p className="text-xs text-neutral-500">Send an inquiry to {businessName}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Ask about this product</h3>
-                    <p className="text-xs text-neutral-500">Send an inquiry to {businessName}</p>
-                  </div>
+                  <PublicInquiryForm tenantId={product.tenantId} tenantName={businessName} sourceLabel="Product" />
                 </div>
-                <PublicInquiryForm tenantId={product.tenantId} tenantName={businessName} sourceLabel="Product" />
               </div>
             </div>
-          </div>
+          )}
 
           {/* Product Reviews - Full Width */}
           <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />

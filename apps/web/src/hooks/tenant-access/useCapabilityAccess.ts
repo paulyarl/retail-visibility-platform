@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { faqService } from '@/services/FaqService';
+import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 
 import {
   CapabilityResolutionService,
@@ -30,6 +31,7 @@ import {
   QuickstartOptionsState,
   StorefrontOptionsState,
   FaqOptionsState,
+  CrmOptionsState,
   AllCapabilitiesState,
   resolveCommerceState,
   resolvePaymentGatewayState,
@@ -423,6 +425,38 @@ export function useFaqOptionsCapability(
 }
 
 // ====================
+// useCrmOptionsCapability
+// ====================
+
+export function useCrmOptionsCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<CrmOptionsState> {
+  const [data, setData] = useState<CrmOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getCrmOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch CRM options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
 // useAllCapabilities
 // ====================
 
@@ -530,6 +564,7 @@ export function useMerchantGates(
       service.getQuickstartOptionsState(tenantId).catch(() => null),
       service.getStorefrontOptionsState(tenantId).catch(() => null),
       service.getFaqOptionsState(tenantId).catch(() => null),
+      service.getCrmOptionsState(tenantId).catch(() => null),
       // Direct merchant settings from option services (for master switches)
       platformHomeService.getTenantBarcodeScanSettings(tenantId).catch(() => null),
       platformHomeService.getTenantFulfillmentSettings(tenantId).catch(() => null),
@@ -540,7 +575,8 @@ export function useMerchantGates(
       platformHomeService.getTenantProductOptionsSettings(tenantId).catch(() => null),
       platformHomeService.getTenantIntegrationOptionsSettings(tenantId).catch(() => null),
       tenantInfoService.getQuickstartOptionsSettings(tenantId).catch(() => null),
-    ]).then(([c, pg, sf, bc, fl, po, fo, io, qo, so, faq, bcSettings, flSettings, soSettings, faqSettings, pgSettings, foSettings, poSettings, ioSettings, qoSettings]) => {
+      crmTenantCrmService.getOptions(tenantId).then(r => r.settings).catch(() => null),
+    ]).then(([c, pg, sf, bc, fl, po, fo, io, qo, so, faq, crm, bcSettings, flSettings, soSettings, faqSettings, pgSettings, foSettings, poSettings, ioSettings, qoSettings, crmSettings]) => {
       setGates({
         commerce_types: c ? c.enabled && c.effectivePaymentType === 'none' : false,
         // Payment gateway: check master switch from option service
@@ -570,6 +606,8 @@ export function useMerchantGates(
         storefront_options: so ? so.enabled && (soSettings ? soSettings.storefront_opt_enabled === false : so.merchantPreferences.storefront_opt_enabled === false) : false,
         // FAQ: check master switch from option service (resolve fn doesn't accept merchant prefs)
         faq_options: faq ? faq.enabled && (faqSettings ? faqSettings.faq_enabled === false : false) : false,
+        // CRM: check master switch from option service
+        crm_options: crm ? crm.enabled && (crmSettings ? crmSettings.crm_enabled === false : false) : false,
       });
       setLoading(false);
     });

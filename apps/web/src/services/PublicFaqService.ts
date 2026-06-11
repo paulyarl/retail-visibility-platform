@@ -35,6 +35,14 @@ export interface PublicFaqOptionsFlags {
   faq_display_bot_handoff: boolean;
 }
 
+export interface FaqSuggestion {
+  id: string;
+  question: string;
+  answer: string;
+  category_name?: string;
+  relevance: number;
+}
+
 interface ApiEnvelope<T> {
   success: boolean;
   data: T;
@@ -163,6 +171,47 @@ class PublicFaqService extends PublicApiSingleton {
       return result.success;
     } catch {
       return false;
+    }
+  }
+
+  // ====================
+  // FAQ-CRM Integration
+  // ====================
+
+  async searchFAQs(tenantId: string, query: string, limit?: number): Promise<FaqSuggestion[]> {
+    try {
+      const qs = new URLSearchParams();
+      if (query) qs.set('query', query);
+      if (limit) qs.set('limit', String(limit));
+      const result = await this.makeDefaultRequest<ApiEnvelope<FaqSuggestion[]>>(
+        `/api/public/tenants/${tenantId}/faqs/search?${qs.toString()}`,
+        { method: 'GET' },
+        `public-faq-search-${tenantId}-${query}`,
+        30 * 1000 // 30s cache
+      );
+      if (!result.success) throw new Error(getErrorMessage(result.error));
+      if (!result.data?.success) throw new Error(result.data?.error || 'Failed to search FAQs');
+      return result.data.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async createTicketFromFeedback(
+    tenantId: string,
+    faqId: string,
+    data: { customer_id?: string; title?: string; description?: string; email?: string; source?: string }
+  ): Promise<{ id: string; tenant_id: string; title: string; status: string } | null> {
+    try {
+      const result = await this.makeDefaultRequest<ApiEnvelope<{ id: string; tenant_id: string; title: string; status: string }>>(
+        `/api/public/tenants/${tenantId}/faqs/${faqId}/create-ticket`,
+        { method: 'POST', body: JSON.stringify(data) }
+      );
+      if (!result.success) throw new Error(getErrorMessage(result.error));
+      if (!result.data?.success) throw new Error(result.data?.error || 'Failed to create ticket');
+      return result.data.data || null;
+    } catch {
+      return null;
     }
   }
 }

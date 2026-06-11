@@ -52,6 +52,7 @@ import { StorefrontRecommendations } from './StorefrontClient';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 
@@ -107,6 +108,8 @@ interface StorefrontClientWrapperProps {
   initialStorefrontTypeSettings?: { settings?: { storefront_type_enabled?: boolean; selected_storefront_type?: string | null }; tierState?: { enabled?: boolean; type?: string; effectiveType?: string } } | null;
   // Server-side resolved FAQ option flags
   initialFaqFlags?: PublicFaqOptionsFlags | null;
+  // Server-side resolved CRM option flags
+  initialCrmFlags?: PublicCrmOptionsFlags | null;
 }
 
 export default function StorefrontClientWrapper({
@@ -147,6 +150,7 @@ export default function StorefrontClientWrapper({
   initialPaymentGatewaySettings,
   initialStorefrontTypeSettings,
   initialFaqFlags,
+  initialCrmFlags,
 }: StorefrontClientWrapperProps) {
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
@@ -213,6 +217,10 @@ export default function StorefrontClientWrapper({
   const [faqFlags] = useState<PublicFaqOptionsFlags | null>(initialFaqFlags ?? null);
   const faqEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion;
   const faqFeedbackEnabled = faqFlags?.faq_enabled && faqFlags?.faq_display_feedback;
+
+  // CRM options flags — initialized from server-side fetch
+  const [crmFlags] = useState<PublicCrmOptionsFlags | null>(initialCrmFlags ?? null);
+  const crmInquiryStorefrontEnabled = crmFlags?.crm_enabled && crmFlags?.crm_inquiry_storefront_enabled;
 
   // Capability-aware visibility flags (fall back to true while loading)
   const optFlags = storefrontOptionFlags;
@@ -1096,7 +1104,7 @@ export default function StorefrontClientWrapper({
       )}
 
       {/* Contact / Inquiry Form */}
-      {!storefrontStatus.shouldShowPanel && tenantId && (
+      {crmInquiryStorefrontEnabled && !storefrontStatus.shouldShowPanel && tenantId && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-lg mx-auto">
             <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">

@@ -60,6 +60,13 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
           console.log(`[GracePeriodJob] Trial converted for tenant ${tenantId}`);
         } else {
           console.log(`[GracePeriodJob] Trial entered grace period for tenant ${tenantId}: ${chargeResult.error}`);
+          // Create CRM task for tenant entering grace period
+          const notificationService = getBillingNotificationService();
+          await notificationService.createSubscriptionCrmTask({
+            tenantId,
+            type: 'trial_payment_failed',
+            reason: chargeResult.error,
+          }).catch(err => console.error('[GracePeriodJob] Failed to create CRM task for grace period entry:', err));
         }
       } catch (error: any) {
         console.error(`[GracePeriodJob] Error processing trial end for ${tenantId}:`, error);
@@ -100,13 +107,18 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
       try {
         await trialService.downgradeToExpired(tenantId);
         
-        // Send subscription canceled notification
+        // Send subscription canceled notification (email + CRM task)
         const notificationService = getBillingNotificationService();
         await notificationService.sendNotification({
           tenantId,
           type: 'subscription_canceled',
           reason: 'Grace period expired',
         }).catch(err => console.error('[GracePeriodJob] Failed to send cancellation email:', err));
+        await notificationService.createSubscriptionCrmTask({
+          tenantId,
+          type: 'subscription_canceled',
+          reason: 'Grace period expired',
+        }).catch(err => console.error('[GracePeriodJob] Failed to create CRM task for cancellation:', err));
         
         console.log(`[GracePeriodJob] Demoted tenant ${tenantId} to expired_trial - grace period expired`);
         result.demoted++;
@@ -116,11 +128,27 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
       }
     }
 
-    // 4. Send grace period warning emails
+    // 4. Send grace period warning emails + CRM tasks
     try {
       const notificationService = getBillingNotificationService();
       const warningResults = await notificationService.sendGracePeriodWarnings();
       console.log(`[GracePeriodJob] Grace period warnings sent: 7d=${warningResults.sevenDays}, 14d=${warningResults.fourteenDays}, 21d=${warningResults.twentyOneDays}, 28d=${warningResults.twentyEightDays}`);
+
+      // Create CRM tasks for tenants approaching expiry
+      const tenantsApproaching = await getTenantsApproachingExpiry();
+      const allWarnings = [
+        ...tenantsApproaching.sevenDays.map(t => ({ ...t, daysRemaining: 7 })),
+        ...tenantsApproaching.fourteenDays.map(t => ({ ...t, daysRemaining: 14 })),
+        ...tenantsApproaching.twentyOneDays.map(t => ({ ...t, daysRemaining: 21 })),
+        ...tenantsApproaching.twentyEightDays.map(t => ({ ...t, daysRemaining: 28 })),
+      ];
+      for (const tenant of allWarnings) {
+        await notificationService.createSubscriptionCrmTask({
+          tenantId: tenant.id,
+          type: 'grace_period_warning',
+          gracePeriodDaysRemaining: tenant.daysRemaining,
+        }).catch(err => console.error(`[GracePeriodJob] Failed to create CRM task for tenant ${tenant.id}:`, err));
+      }
     } catch (error: any) {
       console.error('[GracePeriodJob] Error sending grace period warnings:', error);
       result.errors.push(`Grace period warnings: ${error.message}`);
@@ -161,7 +189,8 @@ export async function getTenantsApproachingExpiry(): Promise<{
     return basePrisma.$queryRaw<Array<{ id: string; name: string; email: string }>>`
       SELECT t.id, t.name, u.email
       FROM tenants t
-      JOIN users u ON u.tenant_id = t.id AND u.role = 'owner'
+      JOIN user_tenants ut ON ut.tenant_id = t.id AND ut.role = 'owner'
+      JOIN users u ON u.id = ut.user_id
       WHERE t.subscription_status = 'past_due'
         AND t.status_changed_at >= ${startOfDay}
         AND t.status_changed_at <= ${endOfDay}

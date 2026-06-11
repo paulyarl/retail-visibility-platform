@@ -203,6 +203,7 @@ export interface FeaturedOptionsState {
     featured_trending: boolean;
     featured_recommended: boolean;
     featured_random_featured: boolean;
+    featured_expiry_monitor: boolean;
   };
   /** Whether all featured options are available (flexible tier) */
   isFlexible: boolean;
@@ -210,6 +211,8 @@ export interface FeaturedOptionsState {
   featuredAvailable: boolean;
   /** Whether at least one effective featured type is available */
   effectiveFeaturedAvailable: boolean;
+  /** Whether the expiry monitor capability is enabled (tier-gated, professional+) */
+  expiryMonitorEnabled: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -442,6 +445,44 @@ export interface FaqOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- CRM Options ---
+
+export type CrmInquiryType =
+  | 'crm_inquiry_product_enabled'
+  | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_enabled'
+  | 'crm_inquiry_anonymous'
+  | 'crm_inquiry_customer'
+  | 'crm_inquiry_assignment'
+  | 'crm_inquiry_auto_response';
+
+export type CrmContactType = 'crm_contact_management' | 'crm_contact_import' | 'crm_contact_sync';
+export type CrmTicketType = 'crm_ticket_priority' | 'crm_ticket_assignment' | 'crm_ticket_templates' | 'crm_ticket_escalation';
+export type CrmMessageType = 'crm_message_rich_text' | 'crm_message_attachments' | 'crm_message_templates';
+export type CrmCustomerTicketType = 'crm_customer_tickets';
+export type CrmDashboardType = 'crm_dashboard_analytics' | 'crm_requests_hub';
+
+export interface CrmOptionsState {
+  enabled: boolean;
+  inquiryProductEnabled: boolean;
+  inquiryStorefrontEnabled: boolean;
+  inquiryDirectoryEnabled: boolean;
+  contactsEnabled: boolean;
+  ticketFeaturesEnabled: boolean;
+  messageFeaturesEnabled: boolean;
+  customerTicketsEnabled: boolean;
+  dashboardEnabled: boolean;
+  allowedInquiryTypes: CrmInquiryType[];
+  allowedContactTypes: CrmContactType[];
+  allowedTicketTypes: CrmTicketType[];
+  allowedMessageTypes: CrmMessageType[];
+  allowedCustomerTicketTypes: CrmCustomerTicketType[];
+  allowedDashboardTypes: CrmDashboardType[];
+  isFlexible: boolean;
+  crmAvailable: boolean;
+  features: Record<string, boolean>;
+}
+
 // --- Quickstart Options ---
 
 export type QuickstartProductType = 'wizard' | 'image_gen';
@@ -513,6 +554,7 @@ export interface AllCapabilitiesState {
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
   faqOptions: FaqOptionsState;
+  crmOptions: CrmOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -532,6 +574,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   quickstart_: 'quickstart_options',
   storefront_opt_: 'storefront_options',
   faq_: 'faq_options',
+  crm_: 'crm_options',
   chatbot_: 'chatbot_options',
 };
 
@@ -859,6 +902,7 @@ export function resolveFeaturedOptionsState(
     featured_trending?: boolean;
     featured_recommended?: boolean;
     featured_random_featured?: boolean;
+    featured_expiry_monitor?: boolean;
   } | null
 ): FeaturedOptionsState {
   const enabled = !!features.featured_enabled;
@@ -922,6 +966,7 @@ export function resolveFeaturedOptionsState(
     featured_trending: merchantPrefs?.featured_trending !== false,
     featured_recommended: merchantPrefs?.featured_recommended !== false,
     featured_random_featured: merchantPrefs?.featured_random_featured !== false,
+    featured_expiry_monitor: merchantPrefs?.featured_expiry_monitor === true,
   };
 
   // Map featured type to merchant pref key
@@ -962,6 +1007,7 @@ export function resolveFeaturedOptionsState(
     isFlexible: flexible,
     featuredAvailable: enabled && !disabled && allTypes.length > 0,
     effectiveFeaturedAvailable: enabled && !disabled && effectiveTypes.length > 0,
+    expiryMonitorEnabled: !!features.featured_expiry_monitor,
     features,
   };
 }
@@ -1662,6 +1708,112 @@ export function resolveFaqOptionsState(
   };
 }
 
+/**
+ * Resolve CRM options state from raw capability features
+ */
+export function resolveCrmOptionsState(
+  features: Record<string, boolean>,
+  capabilityEnabled?: boolean
+): CrmOptionsState {
+  // Trim feature keys to handle potential leading/trailing spaces in DB
+  const cleanFeatures: Record<string, boolean> = {};
+  for (const [key, val] of Object.entries(features)) {
+    cleanFeatures[key.trim()] = val;
+  }
+  const feat = cleanFeatures;
+
+  const enabled = capabilityEnabled ?? !!feat.crm_enabled;
+  const disabled = !!feat.crm_disabled;
+  const flexible = !!feat.crm_flexible;
+
+  const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
+  const inquiryStorefrontEnabled = flexible || !!feat.crm_inquiry_storefront_enabled;
+  const inquiryDirectoryEnabled = flexible || !!feat.crm_inquiry_directory_enabled;
+
+  const contactsEnabled = flexible || !!feat.crm_contact_management;
+  const ticketFeaturesEnabled = flexible || (!!feat.crm_ticket_priority || !!feat.crm_ticket_assignment || !!feat.crm_ticket_templates || !!feat.crm_ticket_escalation);
+  const messageFeaturesEnabled = flexible || (!!feat.crm_message_rich_text || !!feat.crm_message_attachments || !!feat.crm_message_templates);
+  const customerTicketsEnabled = flexible || !!feat.crm_customer_tickets;
+  const dashboardEnabled = flexible || (!!feat.crm_dashboard_analytics || !!feat.crm_requests_hub);
+
+  const allInquiry: CrmInquiryType[] = [];
+  if (flexible) {
+    allInquiry.push('crm_inquiry_product_enabled', 'crm_inquiry_storefront_enabled', 'crm_inquiry_directory_enabled', 'crm_inquiry_anonymous', 'crm_inquiry_customer', 'crm_inquiry_assignment', 'crm_inquiry_auto_response');
+  } else {
+    if (feat.crm_inquiry_product_enabled) allInquiry.push('crm_inquiry_product_enabled');
+    if (feat.crm_inquiry_storefront_enabled) allInquiry.push('crm_inquiry_storefront_enabled');
+    if (feat.crm_inquiry_directory_enabled) allInquiry.push('crm_inquiry_directory_enabled');
+    if (feat.crm_inquiry_anonymous) allInquiry.push('crm_inquiry_anonymous');
+    if (feat.crm_inquiry_customer) allInquiry.push('crm_inquiry_customer');
+    if (feat.crm_inquiry_assignment) allInquiry.push('crm_inquiry_assignment');
+    if (feat.crm_inquiry_auto_response) allInquiry.push('crm_inquiry_auto_response');
+  }
+
+  const allContact: CrmContactType[] = [];
+  if (flexible) {
+    allContact.push('crm_contact_management', 'crm_contact_import', 'crm_contact_sync');
+  } else {
+    if (feat.crm_contact_management) allContact.push('crm_contact_management');
+    if (feat.crm_contact_import) allContact.push('crm_contact_import');
+    if (feat.crm_contact_sync) allContact.push('crm_contact_sync');
+  }
+
+  const allTicket: CrmTicketType[] = [];
+  if (flexible) {
+    allTicket.push('crm_ticket_priority', 'crm_ticket_assignment', 'crm_ticket_templates', 'crm_ticket_escalation');
+  } else {
+    if (feat.crm_ticket_priority) allTicket.push('crm_ticket_priority');
+    if (feat.crm_ticket_assignment) allTicket.push('crm_ticket_assignment');
+    if (feat.crm_ticket_templates) allTicket.push('crm_ticket_templates');
+    if (feat.crm_ticket_escalation) allTicket.push('crm_ticket_escalation');
+  }
+
+  const allMessage: CrmMessageType[] = [];
+  if (flexible) {
+    allMessage.push('crm_message_rich_text', 'crm_message_attachments', 'crm_message_templates');
+  } else {
+    if (feat.crm_message_rich_text) allMessage.push('crm_message_rich_text');
+    if (feat.crm_message_attachments) allMessage.push('crm_message_attachments');
+    if (feat.crm_message_templates) allMessage.push('crm_message_templates');
+  }
+
+  const allCustomerTicket: CrmCustomerTicketType[] = [];
+  if (flexible || feat.crm_customer_tickets) {
+    allCustomerTicket.push('crm_customer_tickets');
+  }
+
+  const allDashboard: CrmDashboardType[] = [];
+  if (flexible) {
+    allDashboard.push('crm_dashboard_analytics', 'crm_requests_hub');
+  } else {
+    if (feat.crm_dashboard_analytics) allDashboard.push('crm_dashboard_analytics');
+    if (feat.crm_requests_hub) allDashboard.push('crm_requests_hub');
+  }
+
+  const allTypes = [...allInquiry, ...allContact, ...allTicket, ...allMessage, ...allCustomerTicket, ...allDashboard];
+
+  return {
+    enabled: enabled && !disabled,
+    inquiryProductEnabled: enabled && !disabled && inquiryProductEnabled,
+    inquiryStorefrontEnabled: enabled && !disabled && inquiryStorefrontEnabled,
+    inquiryDirectoryEnabled: enabled && !disabled && inquiryDirectoryEnabled,
+    contactsEnabled: enabled && !disabled && contactsEnabled,
+    ticketFeaturesEnabled: enabled && !disabled && ticketFeaturesEnabled,
+    messageFeaturesEnabled: enabled && !disabled && messageFeaturesEnabled,
+    customerTicketsEnabled: enabled && !disabled && customerTicketsEnabled,
+    dashboardEnabled: enabled && !disabled && dashboardEnabled,
+    allowedInquiryTypes: allInquiry,
+    allowedContactTypes: allContact,
+    allowedTicketTypes: allTicket,
+    allowedMessageTypes: allMessage,
+    allowedCustomerTicketTypes: allCustomerTicket,
+    allowedDashboardTypes: allDashboard,
+    isFlexible: flexible,
+    crmAvailable: enabled && !disabled && allTypes.length > 0,
+    features: cleanFeatures,
+  };
+}
+
 // ====================
 // CUSTOMER-FACING SERVICE (CustomerApiSingleton)
 // ====================
@@ -1955,6 +2107,8 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
     const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
+    const crmFeatures = data.capabilities?.crm_options?.features || {};
+    const crmCapabilityEnabled = data.capabilities?.crm_options?.capability_enabled ?? undefined;
 
     return {
       tierKey: data.tier_key,
@@ -1971,6 +2125,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
+      crmOptions: resolveCrmOptionsState(crmFeatures, crmCapabilityEnabled),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }
@@ -1981,6 +2136,14 @@ class CapabilityResolutionService extends CustomerApiSingleton {
   async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
     return all.faqOptions;
+  }
+
+  /**
+   * Get CRM options state for a tenant
+   */
+  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.crmOptions;
   }
 }
 
@@ -2250,6 +2413,14 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
   }
 
   /**
+   * Get CRM options state for a tenant
+   */
+  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.crmOptions;
+  }
+
+  /**
    * Check a specific feature key against capability data.
    * If the feature belongs to a capability type, use the capability's features.
    * Returns null if the feature doesn't belong to any capability type (uncategorized).
@@ -2277,6 +2448,8 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
     const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
+    const crmFeatures = data.capabilities?.crm_options?.features || {};
+    const crmCapabilityEnabled = data.capabilities?.crm_options?.capability_enabled ?? undefined;
 
     return {
       tierKey: data.tier_key,
@@ -2293,6 +2466,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
+      crmOptions: resolveCrmOptionsState(crmFeatures, crmCapabilityEnabled),
       uncategorizedFeatures: data.uncategorized_features || [],
     };
   }

@@ -47,6 +47,7 @@ export interface FeaturedOptionsState {
   allowedTypes: FeaturedType[];
   isFlexible: boolean;
   featuredAvailable: boolean;
+  expiryMonitorEnabled: boolean;
   features: Record<string, boolean>;
 }
 
@@ -131,22 +132,27 @@ class FeaturedOptionsService {
 
       const tierIds = tiers.map(t => t.id);
 
-      // Fetch featured_ feature keys from tier_features_list
+      // Primary: query by capability_type_id (robust against feature key typos/spaces)
+      // Fallback: query by feature_key prefix if capability type not found
+      const featCapType = await prisma.capability_type_list.findUnique({
+        where: { key: 'featured_options' },
+      });
+
       const tierFeatures = await prisma.tier_features_list.findMany({
         where: {
           tier_id: { in: tierIds },
-          feature_key: { startsWith: 'featured_' },
+          ...(featCapType
+            ? { capability_type_id: featCapType.id }
+            : { feature_key: { startsWith: 'featured_' } }),
           is_enabled: true,
-        },
-        include: {
-          capability_type_list: { select: { key: true } },
         },
       });
 
       // Merge features: union across tiers (most-permissive-wins)
       const mergedFeatures: Record<string, boolean> = {};
       for (const tf of tierFeatures) {
-        mergedFeatures[tf.feature_key] = mergedFeatures[tf.feature_key] || tf.is_enabled;
+        const cleanKey = tf.feature_key.trim();
+        mergedFeatures[cleanKey] = mergedFeatures[cleanKey] || tf.is_enabled;
       }
 
       return this.resolveFromFeatures(mergedFeatures);
@@ -216,6 +222,7 @@ class FeaturedOptionsService {
       allowedTypes: allTypes,
       isFlexible: flexible,
       featuredAvailable: enabled && !disabled && allTypes.length > 0,
+      expiryMonitorEnabled: !!features.featured_expiry_monitor,
       features,
     };
   }
@@ -272,6 +279,7 @@ class FeaturedOptionsService {
       allowedTypes: [],
       isFlexible: false,
       featuredAvailable: false,
+      expiryMonitorEnabled: false,
       features: {},
     };
   }

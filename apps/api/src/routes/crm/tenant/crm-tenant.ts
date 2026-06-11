@@ -14,6 +14,7 @@ import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmTaskService from '../../../services/CrmTaskService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
+import CrmOptionsService from '../../../services/CrmOptionsService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
 
@@ -26,10 +27,24 @@ const messageService = CrmTicketMessageService.getInstance();
 const taskService = CrmTaskService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
+const crmOptionsService = CrmOptionsService.getInstance();
 
 // Helper to get tenant ID from request context
 function getTenantId(req: Request): string | null {
   return (req.headers['x-tenant-id'] as string) || req.user?.tenantIds?.[0] || null;
+}
+
+// Merchant gate check: returns false and sends 403 response if CRM is disabled
+async function checkCrmEnabled(tenantId: string, res: Response): Promise<boolean> {
+  const state = await crmOptionsService.resolveCrmOptionsState(tenantId);
+  if (!state.enabled) {
+    res.status(403).json({
+      error: 'merchant_gate_disabled',
+      message: 'CRM is disabled. Enable it in CRM Options settings.',
+    });
+    return false;
+  }
+  return true;
 }
 
 // ====================
@@ -41,6 +56,7 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const stats = await tenantService.getTenantCrmStats(tenantId);
     res.json({ success: true, data: stats });
@@ -59,6 +75,7 @@ router.get('/contacts', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const contacts = await contactService.listByTenant(tenantId);
     res.json({ success: true, data: contacts });
@@ -73,6 +90,7 @@ router.post('/contacts', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const contact = await contactService.create({ tenant_id: tenantId, ...req.body });
     await audit({ tenantId, actor: req.user?.userId, action: 'create', payload: { entity_type: 'crm_contact', id: contact.id, ...req.body } });
@@ -88,6 +106,7 @@ router.put('/contacts/:contactId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const contact = await contactService.update(req.params.contactId, req.body);
     await audit({ tenantId, actor: req.user?.userId, action: 'update', payload: { entity_type: 'crm_contact', id: contact.id } });
@@ -107,6 +126,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const tickets = await ticketService.listByTenant(tenantId, {
       status: req.query.status as string,
@@ -124,6 +144,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -155,6 +176,7 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -171,6 +193,9 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
 // GET /api/tenant/crm/tickets/:ticketId/messages
 router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) => {
   try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
     // Tenant users can see internal notes
     const messages = await messageService.listByTicket(req.params.ticketId, true);
     res.json({ success: true, data: messages });
@@ -185,6 +210,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -213,6 +239,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const tasks = await taskService.listByTenant(tenantId, { status: req.query.status as string });
     res.json({ success: true, data: tasks });
@@ -231,6 +258,7 @@ router.get('/activities', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const activities = await activityService.listByTenant(tenantId, {
       type: req.query.type as string,
@@ -253,6 +281,7 @@ router.get('/inquiries', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const inquiries = await inquiryService.listByTenant(tenantId, {
       status: req.query.status as string,
@@ -270,6 +299,7 @@ router.post('/inquiries', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
 
@@ -287,6 +317,7 @@ router.put('/inquiries/:inquiryId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -394,6 +425,7 @@ router.patch('/tickets/reorder', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
     const { items } = req.body as { items: { id: string; sort_order: number }[] };
     if (!Array.isArray(items)) return res.status(400).json({ error: 'invalid_input', message: 'items array required' });
     await ticketService.reorder(items);
@@ -409,6 +441,7 @@ router.patch('/tasks/reorder', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
     const { items } = req.body as { items: { id: string; sort_order: number }[] };
     if (!Array.isArray(items)) return res.status(400).json({ error: 'invalid_input', message: 'items array required' });
     await taskService.reorder(items);

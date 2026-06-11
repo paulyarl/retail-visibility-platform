@@ -174,13 +174,18 @@ export class SubscriptionStatusService {
     // Log the transition
     await this.logStatusTransition(tenantId, current.status, 'past_due', current.tier, current.tier, `payment_failed: ${reason}`);
 
-    // Send notification
+    // Send notification (email + CRM task)
     const notificationService = getBillingNotificationService();
     notificationService.sendNotification({
       tenantId,
       type: 'payment_failed',
       reason,
     }).catch(err => console.error('[SubscriptionStatus] Failed to send notification:', err));
+    notificationService.createSubscriptionCrmTask({
+      tenantId,
+      type: 'payment_failed',
+      reason,
+    }).catch(err => console.error('[SubscriptionStatus] Failed to create CRM task:', err));
 
     return {
       previousStatus: current.status,

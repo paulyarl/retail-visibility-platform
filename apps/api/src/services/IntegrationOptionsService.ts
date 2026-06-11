@@ -132,22 +132,27 @@ class IntegrationOptionsService {
 
       const tierIds = tiers.map(t => t.id);
 
-      // Fetch integration_ feature keys from tier_features_list
+      // Primary: query by capability_type_id (robust against feature key typos/spaces)
+      // Fallback: query by feature_key prefix if capability type not found
+      const intCapType = await prisma.capability_type_list.findUnique({
+        where: { key: 'integration_options' },
+      });
+
       const tierFeatures = await prisma.tier_features_list.findMany({
         where: {
           tier_id: { in: tierIds },
-          feature_key: { startsWith: 'integration_' },
+          ...(intCapType
+            ? { capability_type_id: intCapType.id }
+            : { feature_key: { startsWith: 'integration_' } }),
           is_enabled: true,
-        },
-        include: {
-          capability_type_list: { select: { key: true } },
         },
       });
 
       // Merge features: union across tiers (most-permissive-wins)
       const mergedFeatures: Record<string, boolean> = {};
       for (const tf of tierFeatures) {
-        mergedFeatures[tf.feature_key] = mergedFeatures[tf.feature_key] || tf.is_enabled;
+        const cleanKey = tf.feature_key.trim();
+        mergedFeatures[cleanKey] = mergedFeatures[cleanKey] || tf.is_enabled;
       }
 
       return this.resolveFromFeatures(mergedFeatures);

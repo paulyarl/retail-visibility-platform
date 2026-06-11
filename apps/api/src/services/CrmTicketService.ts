@@ -63,6 +63,7 @@ export class CrmTicketService extends BaseService {
     priority?: string;
     category?: string;
     assigned_to?: string;
+    faq_id?: string;
   }) {
     return prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(data.tenant_id), ...data } });
   }
@@ -76,6 +77,7 @@ export class CrmTicketService extends BaseService {
     description?: string;
     priority?: string;
     category?: string;
+    faq_id?: string;
   }) {
     // Verify or create customer-tenant relationship
     // Customers who placed orders may not have an explicit relationship record yet

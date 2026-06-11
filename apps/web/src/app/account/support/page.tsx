@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
+import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 import type { CrmTicket } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -23,6 +24,8 @@ export default function CustomerSupportPage() {
   const [newTenantId, setNewTenantId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
+  const [crmFlagsMap, setCrmFlagsMap] = useState<Record<string, PublicCrmOptionsFlags | null>>({});
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -39,7 +42,20 @@ export default function CustomerSupportPage() {
           const uniqueTenants = Array.from(
             new Map(orderList.value.map((o: any) => [o.tenant_id, { id: o.tenant_id, name: o.tenant_name || o.tenant_id }])).values()
           );
-          setTenants(uniqueTenants);
+          // Fetch CRM flags for each tenant to filter by customer ticket eligibility
+          const flagsEntries = await Promise.all(
+            uniqueTenants.map(async (t) => {
+              const flags = await publicCrmService.getCrmOptionsFlags(t.id);
+              return [t.id, flags] as [string, PublicCrmOptionsFlags | null];
+            })
+          );
+          const flagsMap = Object.fromEntries(flagsEntries);
+          setCrmFlagsMap(flagsMap);
+          const eligibleTenants = uniqueTenants.filter(t => {
+            const f = flagsMap[t.id];
+            return f?.crm_enabled && f?.crm_customer_tickets;
+          });
+          setTenants(eligibleTenants);
         }
       } catch (err) {
         console.error('[Customer Support] Load error:', err);
@@ -53,6 +69,7 @@ export default function CustomerSupportPage() {
   async function handleCreateTicket() {
     if (!newTitle.trim() || !newTenantId) return;
     setSubmitting(true);
+    setCreateError(null);
     try {
       const ticket = await crmCustomerService.createTicket({
         tenant_id: newTenantId,
@@ -64,8 +81,16 @@ export default function CustomerSupportPage() {
       setNewTitle('');
       setNewDescription('');
       setNewTenantId('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Customer Support] Create ticket error:', err);
+      const msg = err?.message || '';
+      if (msg.includes('crm_disabled') || msg.includes('not enabled')) {
+        setCreateError('Support tickets are not available for this store.');
+      } else if (msg.includes('relationship')) {
+        setCreateError('You must have a purchase history with this store to create a ticket.');
+      } else {
+        setCreateError('Failed to create ticket. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -83,12 +108,14 @@ export default function CustomerSupportPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Support</h1>
-        <button
-          onClick={() => setShowNewTicket(true)}
-          className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
-        >
-          + New Ticket
-        </button>
+        {tenants.length > 0 && (
+          <button
+            onClick={() => setShowNewTicket(true)}
+            className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
+          >
+            + New Ticket
+          </button>
+        )}
       </div>
 
       {/* New ticket form */}
@@ -96,6 +123,11 @@ export default function CustomerSupportPage() {
         <Card>
           <CardHeader><CardTitle>Create Support Ticket</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            {createError && (
+              <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm border border-red-200">
+                {createError}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1">Store</label>
               <select
@@ -131,7 +163,7 @@ export default function CustomerSupportPage() {
             </div>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setShowNewTicket(false)}
+                onClick={() => { setShowNewTicket(false); setCreateError(null); }}
                 className="px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm"
               >
                 Cancel
@@ -155,7 +187,11 @@ export default function CustomerSupportPage() {
             <div className="text-center py-12">
               <p className="text-4xl mb-2">🎫</p>
               <p className="text-neutral-500">No support tickets yet</p>
-              <p className="text-sm text-neutral-400 mt-1">Click &quot;+ New Ticket&quot; to get help</p>
+              {tenants.length > 0 ? (
+                <p className="text-sm text-neutral-400 mt-1">Click &quot;+ New Ticket&quot; to get help</p>
+              ) : (
+                <p className="text-sm text-neutral-400 mt-1">Support tickets are not available for your stores.</p>
+              )}
             </div>
           </CardContent>
         </Card>
