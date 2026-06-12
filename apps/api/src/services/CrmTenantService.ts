@@ -237,7 +237,7 @@ export class CrmTenantService extends BaseService {
         select: { id: true, actor_name: true, activity_type: true, content: true, created_at: true },
       }),
       prisma.crm_inquiries.findMany({
-        where: { tenant_id: tenantId, status: { in: ['new', 'in_progress'] } },
+        where: { tenant_id: tenantId, status: { in: ['open', 'new', 'in_progress'] } },
         orderBy: { created_at: 'desc' },
         take: 5,
         select: { id: true, subject: true, status: true, contact_id: true, customer_id: true, body: true, created_at: true },
@@ -255,7 +255,7 @@ export class CrmTenantService extends BaseService {
         where: { tenant_id: tenantId, status: { in: ['pending', 'in_progress'] } },
       }),
       prisma.crm_inquiries.count({
-        where: { tenant_id: tenantId, status: { in: ['new', 'in_progress'] } },
+        where: { tenant_id: tenantId, status: { in: ['open', 'new', 'in_progress'] } },
       }),
       prisma.crm_alerts.count({
         where: { tenant_id: tenantId, is_read: false, is_dismissed: false },

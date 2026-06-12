@@ -820,7 +820,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       <p className="text-xs text-neutral-500">Send an inquiry to {businessName}</p>
                     </div>
                   </div>
-                  <PublicInquiryForm tenantId={product.tenantId} tenantName={businessName} sourceLabel="Product" />
+                  <PublicInquiryForm
+                    tenantId={product.tenantId}
+                    tenantName={businessName}
+                    sourceLabel="Product"
+                    productId={product.id}
+                    productName={product.name || product.title}
+                  />
                 </div>
               </div>
             </div>
