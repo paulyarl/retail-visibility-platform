@@ -48,6 +48,7 @@ export interface CustomerPayload {
   email: string;
   first_name: string | null;
   last_name: string | null;
+  phone: string | null;
 }
 
 // Extend Express Request type to include user and customer
