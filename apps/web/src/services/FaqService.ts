@@ -242,6 +242,18 @@ class FaqService extends TenantApiSingleton {
     return result.data.data;
   }
 
+  async updateCategory(tenantId: string, categoryId: string, name: string, displayOrder?: number): Promise<FaqCategory> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<FaqCategory>>(
+      `/api/tenants/${tenantId}/faqs/categories/${categoryId}`,
+      { method: 'PUT', body: JSON.stringify({ name, display_order: displayOrder }) },
+      `faq-update-category-${tenantId}-${categoryId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to update category');
+    await this.invalidateServiceCaches(tenantId);
+    return result.data.data;
+  }
+
   async deleteCategory(tenantId: string, categoryId: string): Promise<void> {
     const result = await this.makeDefaultRequest<ApiEnvelope<null>>(
       `/api/tenants/${tenantId}/faqs/categories/${categoryId}`,

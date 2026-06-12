@@ -934,7 +934,8 @@ function TransactionsTab({ tenantId }: { tenantId: string }) {
             <tr>
               <th className="text-left px-4 py-3 font-medium">Order #</th>
               <th className="text-left px-4 py-3 font-medium">Total</th>
-              <th className="text-left px-4 py-3 font-medium">Status</th>
+              <th className="text-left px-4 py-3 font-medium">Order Status</th>
+              <th className="text-left px-4 py-3 font-medium">Payment Status</th>
               <th className="text-left px-4 py-3 font-medium">Date</th>
             </tr>
           </thead>
@@ -943,7 +944,8 @@ function TransactionsTab({ tenantId }: { tenantId: string }) {
               <tr key={o.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                 <td className="px-4 py-3 font-mono text-xs">{o.order_number || o.id}</td>
                 <td className="px-4 py-3">${((o.total_cents || 0) / 100).toFixed(2)}</td>
-                <td className="px-4 py-3">{o.status}</td>
+                <td className="px-4 py-3">{o.order_status}</td>
+                <td className="px-4 py-3">{o.payment_status}</td>
                 <td className="px-4 py-3 text-xs text-neutral-500">{o.created_at ? new Date(o.created_at).toLocaleDateString() : '—'}</td>
               </tr>
             ))}
