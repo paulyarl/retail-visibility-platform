@@ -48,6 +48,7 @@ export interface CustomerPayload {
   email: string;
   first_name: string | null;
   last_name: string | null;
+  phone: string | null;
 }
 
 // Extend Express Request type to include user and customer
@@ -578,7 +579,7 @@ export async function authenticateCustomer(req: Request, res: Response, next: Ne
     const { prisma } = await import('../prisma');
     const customer = await prisma.customers.findUnique({
       where: { id: payload.customerId },
-      select: { id: true, email: true, first_name: true, last_name: true }
+      select: { id: true, email: true, first_name: true, last_name: true, phone: true }
     });
 
     if (!customer) {
@@ -591,6 +592,45 @@ export async function authenticateCustomer(req: Request, res: Response, next: Ne
     console.error('[AUTH] Customer authentication failed:', error);
     return res.status(401).json({ error: 'customer_auth_failed', message: 'Customer authentication failed' });
   }
+}
+
+/**
+ * Optional customer authentication middleware
+ * Attempts to authenticate via customer JWT token but doesn't fail if no token is present
+ * Sets req.customer if valid token found, otherwise continues as anonymous
+ */
+export async function optionalCustomerAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { CustomerTokenService } = await import('../services/CustomerTokenService');
+    const tokenService = CustomerTokenService.getInstance();
+
+    // Try Bearer token
+    const token = CustomerTokenService.extractBearerToken(req);
+
+    if (!token) {
+      return next(); // No token - continue as anonymous
+    }
+
+    const payload = tokenService.verifyAccessToken(token);
+
+    if (!payload || !payload.customerId) {
+      return next(); // Invalid token - continue as anonymous
+    }
+
+    // Resolve to customers table
+    const { prisma } = await import('../prisma');
+    const customer = await prisma.customers.findUnique({
+      where: { id: payload.customerId },
+      select: { id: true, email: true, first_name: true, last_name: true, phone: true }
+    });
+
+    if (customer) {
+      req.customer = customer;
+    }
+  } catch (error) {
+    // Silently fail - authentication is optional
+  }
+  next();
 }
 
 /**

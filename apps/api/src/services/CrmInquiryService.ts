@@ -50,6 +50,9 @@ export class CrmInquiryService extends BaseService {
     priority?: string;
     assigned_to?: string;
     source?: string;
+    sender_name?: string;
+    sender_email?: string;
+    sender_phone?: string;
   }) {
     return prisma.crm_inquiries.create({ data: { id: generateCrmInquiryId(data.tenant_id), ...data } });
   }

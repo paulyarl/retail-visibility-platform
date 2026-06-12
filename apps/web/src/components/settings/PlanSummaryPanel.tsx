@@ -483,6 +483,64 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     });
   }
 
+  // FAQ Options
+  const faq = caps.faqOptions;
+  if (Object.keys(faq.features).length > 0) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addFaq = (label: string, enabled: boolean) => {
+      if (enabled) { specifics.push(label); statuses.push({ label, status: 'enabled' }); }
+    };
+    addFaq('Storefront FAQs', faq.storefrontEnabled);
+    addFaq('Product FAQs', faq.productEnabled);
+    addFaq('FAQ Templates', faq.templatesEnabled);
+    faq.allowedManagementTypes.forEach(t => addFaq(FAQ_MANAGEMENT_LABELS[t], true));
+    faq.allowedPreviewTypes.forEach(t => addFaq(FAQ_PREVIEW_LABELS[t], true));
+    faq.allowedDisplayTypes.forEach(t => addFaq(FAQ_DISPLAY_LABELS[t], true));
+    faq.allowedKbTypes.forEach(t => addFaq(FAQ_KB_LABELS[t], true));
+    summaries.push({
+      key: 'faq_options',
+      label: CAPABILITY_DISPLAY.faq_options.label,
+      icon: CAPABILITY_DISPLAY.faq_options.icon,
+      enabled: faq.enabled,
+      merchantGated: merchantGates?.['faq_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'faq_options',
+      settingsPath: CAPABILITY_DISPLAY.faq_options.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Options — list groups and features
+  const so = caps.storefrontOptions;
+  if (Object.keys(so.features).length > 0) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    so.allowedHoursTypes.forEach(t => addSo(STOREFRONT_OPT_HOURS_LABELS[t], true, t === 'hours_animated' ? so.canUseAnimatedHours : t === 'hours_status' ? so.canShowHoursStatus : false));
+    so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
+    so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
+    addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
+    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
+    so.allowedQRResolutions.forEach(t => addSo(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, so.canUseQRCodes));
+    so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
+    so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
+    so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
+    summaries.push({
+      key: 'storefront_options',
+      label: CAPABILITY_DISPLAY.storefront_options.label,
+      icon: CAPABILITY_DISPLAY.storefront_options.icon,
+      enabled: so.enabled,
+      merchantGated: merchantGates?.['storefront_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_options',
+      settingsPath: CAPABILITY_DISPLAY.storefront_options.settingsPath ?? null,
+    });
+  }
+
   // Quickstart Options — list product, category, and AI types
   const qo = caps.quickstartOptions;
   if (Object.keys(qo.features).length > 0) {
@@ -522,64 +580,6 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'quickstart_options',
       settingsPath: CAPABILITY_DISPLAY.quickstart_options.settingsPath ?? null,
-    });
-  }
-
-  // Storefront Options — list groups and features
-  const so = caps.storefrontOptions;
-  if (Object.keys(so.features).length > 0) {
-    const specifics: string[] = [];
-    const statuses: FeatureItem[] = [];
-    const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
-      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
-    };
-    so.allowedHoursTypes.forEach(t => addSo(STOREFRONT_OPT_HOURS_LABELS[t], true, t === 'hours_animated' ? so.canUseAnimatedHours : t === 'hours_status' ? so.canShowHoursStatus : false));
-    so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
-    so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
-    addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
-    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
-    so.allowedQRResolutions.forEach(t => addSo(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, so.canUseQRCodes));
-    so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
-    so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
-    so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
-    summaries.push({
-      key: 'storefront_options',
-      label: CAPABILITY_DISPLAY.storefront_options.label,
-      icon: CAPABILITY_DISPLAY.storefront_options.icon,
-      enabled: so.enabled,
-      merchantGated: merchantGates?.['storefront_options'] ?? false,
-      specificFeatures: specifics,
-      featureStatuses: statuses,
-      isHighlighted: highlight === 'storefront_options',
-      settingsPath: CAPABILITY_DISPLAY.storefront_options.settingsPath ?? null,
-    });
-  }
-
-  // FAQ Options
-  const faq = caps.faqOptions;
-  if (Object.keys(faq.features).length > 0) {
-    const specifics: string[] = [];
-    const statuses: FeatureItem[] = [];
-    const addFaq = (label: string, enabled: boolean) => {
-      if (enabled) { specifics.push(label); statuses.push({ label, status: 'enabled' }); }
-    };
-    addFaq('Storefront FAQs', faq.storefrontEnabled);
-    addFaq('Product FAQs', faq.productEnabled);
-    addFaq('FAQ Templates', faq.templatesEnabled);
-    faq.allowedManagementTypes.forEach(t => addFaq(FAQ_MANAGEMENT_LABELS[t], true));
-    faq.allowedPreviewTypes.forEach(t => addFaq(FAQ_PREVIEW_LABELS[t], true));
-    faq.allowedDisplayTypes.forEach(t => addFaq(FAQ_DISPLAY_LABELS[t], true));
-    faq.allowedKbTypes.forEach(t => addFaq(FAQ_KB_LABELS[t], true));
-    summaries.push({
-      key: 'faq_options',
-      label: CAPABILITY_DISPLAY.faq_options.label,
-      icon: CAPABILITY_DISPLAY.faq_options.icon,
-      enabled: faq.enabled,
-      merchantGated: merchantGates?.['faq_options'] ?? false,
-      specificFeatures: specifics,
-      featureStatuses: statuses,
-      isHighlighted: highlight === 'faq_options',
-      settingsPath: CAPABILITY_DISPLAY.faq_options.settingsPath ?? null,
     });
   }
 
@@ -678,10 +678,10 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
               <div
                 key={cap.key}
                 className={`rounded-lg p-3 border ${cap.isHighlighted
-                    ? 'bg-white border-blue-300 ring-1 ring-blue-200'
-                    : cap.merchantGated
-                      ? 'bg-amber-50/50 border-amber-200'
-                      : 'bg-white/60 border-transparent'
+                  ? 'bg-white border-blue-300 ring-1 ring-blue-200'
+                  : cap.merchantGated
+                    ? 'bg-amber-50/50 border-amber-200'
+                    : 'bg-white/60 border-transparent'
                   } ${href ? 'cursor-pointer hover:bg-white/80 hover:border-blue-200 transition-colors' : ''}`}
                 onClick={() => href && router.push(href)}
               >
@@ -704,13 +704,12 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
                     {cap.featureStatuses.map(f => (
                       <span
                         key={f.label}
-                        className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border ${
-                          f.status === 'enabled'
-                            ? 'bg-green-50 text-green-800 border-green-200'
-                            : f.status === 'merchant-gated'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}
+                        className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border ${f.status === 'enabled'
+                          ? 'bg-green-50 text-green-800 border-green-200'
+                          : f.status === 'merchant-gated'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                          }`}
                       >
                         {f.status === 'enabled' ? (
                           <Check className="h-2.5 w-2.5" />

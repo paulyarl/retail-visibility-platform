@@ -14,6 +14,7 @@ interface PublicInquiryInput {
   body?: string;
   sender_name?: string;
   sender_email?: string;
+  sender_phone?: string;
   captcha_answer: string;
   captcha_seed: string;
 }

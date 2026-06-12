@@ -428,13 +428,28 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               </div>
             </motion.div>
 
-            {/* CRM Support Widget */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+
+            {/* Systems Operational | Quick Links */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <CrmTenantWidget tenantId={tenantId} />
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-gray-900">System Operations & Support for You</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
+                    <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
+                  </motion.div>
+                  {/* CRM Support Widget */}
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                      <CrmTenantWidget tenantId={tenantId} />
+                    </div>
+                  </motion.div>
+                </div>
               </div>
             </motion.div>
-
             {/* Capabilities */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -506,8 +521,24 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               />
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
-              <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <TaskChecklist
+                tenantId={tenantId}
+                hasProducts={hasProducts}
+                hasStorefront={!!hasStorefront}
+                hasPublishedDirectory={!!hasPublishedDirectory}
+                hasFeaturedProducts={!!hasFeaturedProducts}
+                hasFAQs={faqSize > 0}
+                canManageFaq={canManageFaq}
+                locationStatus={tenantData?.locationStatus}
+                subscriptionStatus={tenantData?.subscriptionStatus}
+                hasHours={hasHours}
+                hasMap={hasMap}
+                hasStoreCategory={hasStoreCategory}
+                hasSlug={hasSlug}
+                hasLogo={hasLogo}
+              />
             </motion.div>
 
             {/* Quick Links */}
@@ -553,21 +584,10 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                     <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                   </Link>
 
-                  <Link href={`/t/${tenantId}/quick-start`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
-                      <Rocket className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Quick Start</p>
-                      <p className="text-xs text-gray-500 truncate">Wizard tools & setup</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
-                  </Link>
-
                   <Link href={`/t/${tenantId}/support`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
                     <div className="p-2 bg-orange-50 rounded-lg group-hover:bg-orange-100 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-orange-600">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -579,26 +599,6 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 </div>
               </div>
             </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <TaskChecklist
-                tenantId={tenantId}
-                hasProducts={hasProducts}
-                hasStorefront={!!hasStorefront}
-                hasPublishedDirectory={!!hasPublishedDirectory}
-                hasFeaturedProducts={!!hasFeaturedProducts}
-                hasFAQs={faqSize > 0}
-                canManageFaq={canManageFaq}
-                locationStatus={tenantData?.locationStatus}
-                subscriptionStatus={tenantData?.subscriptionStatus}
-                hasHours={hasHours}
-                hasMap={hasMap}
-                hasStoreCategory={hasStoreCategory}
-                hasSlug={hasSlug}
-                hasLogo={hasLogo}
-              />
-            </motion.div>
-
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
               <GrowthTipCard />
             </motion.div>

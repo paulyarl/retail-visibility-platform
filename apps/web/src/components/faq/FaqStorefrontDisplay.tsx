@@ -290,7 +290,10 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
 
       {/* Create Support Ticket CTA (replaces chatbot since chatbot is blocked) */}
       {askBotCta && (
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-y-2">
+          <p className="text-xs text-neutral-500">
+            Are you a customer and need help? Open a support ticket here and we will get back to you.
+          </p>
           <Link href="/account/support/new">
             <Button variant="outline" className="gap-2">
               <Ticket className="w-4 h-4" />

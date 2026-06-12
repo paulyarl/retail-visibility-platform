@@ -3616,6 +3616,7 @@ const PublicInquirySchema = z.object({
   body: z.string().max(2000).optional(),
   sender_name: z.string().max(100).optional(),
   sender_email: z.string().email().optional(),
+  sender_phone: z.string().max(50).optional(),
   // CAPTCHA fields
   captcha_answer: z.string().min(1, 'CAPTCHA verification required'),
   captcha_seed: z.string().min(1, 'CAPTCHA seed required'),
@@ -3630,6 +3631,10 @@ const PublicInquirySchema = z.object({
  * If a valid customer session exists, links the inquiry to that customer.
  */
 router.post('/inquiries', async (req, res) => {
+  // Optional customer auth - if valid token present, attach customer context
+  const { optionalCustomerAuth } = await import('../middleware/auth');
+  await optionalCustomerAuth(req, res, () => {});
+
   try {
     const parse = PublicInquirySchema.safeParse(req.body);
     if (!parse.success) {
@@ -3640,7 +3645,7 @@ router.post('/inquiries', async (req, res) => {
       });
     }
 
-    const { tenant_id, subject, body, sender_name, sender_email, captcha_answer, captcha_seed, website_hp } = parse.data;
+    const { tenant_id, subject, body, sender_name, sender_email, sender_phone, captcha_answer, captcha_seed, website_hp } = parse.data;
 
     // Honeypot check — if filled, silently accept (don't tell bots it failed)
     if (website_hp !== undefined && website_hp !== '') {
@@ -3688,14 +3693,24 @@ router.post('/inquiries', async (req, res) => {
     const { CrmInquiryService } = await import('../services/CrmInquiryService');
     const inquiryService = CrmInquiryService.getInstance();
 
+    // Use customer contact info if authenticated, otherwise use form input
+    const finalSenderName = sender_name || (req.customer?.first_name && req.customer?.last_name
+      ? `${req.customer.first_name} ${req.customer.last_name}`
+      : req.customer?.first_name || req.customer?.email?.split('@')[0] || undefined);
+    const finalSenderEmail = sender_email || req.customer?.email || undefined;
+    const finalSenderPhone = sender_phone || req.customer?.phone || undefined;
+
     const inquiry = await inquiryService.create({
       tenant_id,
       subject,
       body: body || undefined,
       customer_id: customerId,
       source,
-      // Store sender info in contact_id field for anonymous (we'll use a sentinel)
-      contact_id: sender_email ? `anon:${sender_email}` : undefined,
+      sender_name: finalSenderName,
+      sender_email: finalSenderEmail,
+      sender_phone: finalSenderPhone,
+      // contact_id links to crm_contacts; only set when a verified contact exists
+      contact_id: undefined,
     });
 
     // Log activity
