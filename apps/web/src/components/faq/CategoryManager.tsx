@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { Plus, X, Trash2, Loader2, FolderOpen } from 'lucide-react';
+import { Plus, X, Loader2, FolderOpen, Pencil, Check } from 'lucide-react';
 import { faqService, FaqCategory } from '@/services/FaqService';
 
 interface CategoryManagerProps {
@@ -18,6 +18,10 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +36,35 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
       console.error('Failed to create category:', err);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEdit = (cat: FaqCategory) => {
+    setEditingId(cat.id);
+    setEditName(cat.name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+  };
+
+  const handleUpdate = async (catId: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      cancelEdit();
+      return;
+    }
+    setUpdatingId(catId);
+    try {
+      await faqService.updateCategory(tenantId, catId, trimmed);
+      setEditingId(null);
+      setEditName('');
+      onChange();
+    } catch (err: any) {
+      console.error('Failed to update category:', err);
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -79,20 +112,72 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
                 variant="secondary"
                 className="px-2.5 py-1 gap-1.5 text-sm font-normal"
               >
-                {cat.name}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(cat.id)}
-                  disabled={deletingId === cat.id}
-                  className="inline-flex text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                  title="Delete category"
-                >
-                  {deletingId === cat.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <X className="w-3 h-3" />
-                  )}
-                </button>
+                {editingId === cat.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="h-6 min-w-[120px] px-1.5 py-0 text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleUpdate(cat.id);
+                        }
+                        if (e.key === 'Escape') {
+                          cancelEdit();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdate(cat.id)}
+                      disabled={updatingId === cat.id}
+                      className="inline-flex text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                      title="Save"
+                    >
+                      {updatingId === cat.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3 h-3" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      disabled={updatingId === cat.id}
+                      className="inline-flex text-neutral-400 hover:text-neutral-600 transition-colors disabled:opacity-50"
+                      title="Cancel"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    {cat.name}
+                    <button
+                      type="button"
+                      onClick={() => startEdit(cat)}
+                      className="inline-flex text-neutral-400 hover:text-blue-500 transition-colors"
+                      title="Rename category"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(cat.id)}
+                      disabled={deletingId === cat.id}
+                      className="inline-flex text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                      title="Delete category"
+                    >
+                      {deletingId === cat.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <X className="w-3 h-3" />
+                      )}
+                    </button>
+                  </>
+                )}
               </Badge>
             ))}
           </div>

@@ -1025,9 +1025,10 @@ export function resolveIntegrationState(
     integration_google_shopping?: boolean;
     integration_google_merchant_center?: boolean;
     integration_gmc_sync?: boolean;
-  } | null
+  } | null,
+  capabilityEnabled?: boolean
 ): IntegrationOptionsState {
-  const enabled = !!features.integration_enabled;
+  const enabled = capabilityEnabled ?? !!features.integration_enabled;
   const disabled = !!features.integration_disabled;
   const flexible = !!features.integration_flexible;
   const posGroupEnabled = !!features.integration_pos_enabled;
@@ -2027,7 +2028,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
 
       const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
       if (prefs) {
-        return resolveIntegrationState(tierState.features, prefs);
+        return resolveIntegrationState(tierState.features, prefs, tierState.enabled);
       }
     } catch (err) {
       console.warn('[CapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
@@ -2104,6 +2105,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
+    const integrationCapabilityEnabled = data.capabilities?.integration_options?.capability_enabled ?? undefined;
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
     const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
@@ -2121,7 +2123,7 @@ class CapabilityResolutionService extends CustomerApiSingleton {
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
-      integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
+      integrationOptions: resolveIntegrationState(integrationOptionsFeatures, undefined, integrationCapabilityEnabled),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
@@ -2355,7 +2357,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
 
       const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
       if (prefs) {
-        return resolveIntegrationState(tierState.features, prefs);
+        return resolveIntegrationState(tierState.features, prefs, tierState.enabled);
       }
     } catch (err) {
       console.warn('[TenantCapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
@@ -2445,6 +2447,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
     const productOptionsFeatures = data.capabilities?.product_options?.features || {};
     const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
     const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
+    const integrationCapabilityEnabled = data.capabilities?.integration_options?.capability_enabled ?? undefined;
     const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
     const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
     const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
@@ -2462,7 +2465,7 @@ class TenantCapabilityResolutionService extends TenantApiSingleton {
       fulfillment: resolveFulfillmentState(fulfillmentFeatures),
       productOptions: resolveProductOptionsState(productOptionsFeatures),
       featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
-      integrationOptions: resolveIntegrationState(integrationOptionsFeatures),
+      integrationOptions: resolveIntegrationState(integrationOptionsFeatures, undefined, integrationCapabilityEnabled),
       quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
       storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
       faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
