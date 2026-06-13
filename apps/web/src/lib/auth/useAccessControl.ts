@@ -73,7 +73,6 @@ export function useAccessControl(
     if (!authUser) return null;
     return authUser as unknown as UserData;
   }, [authUser]);
-
   const fetchTenantData = useCallback(async () => {
     if (!tenantId || !user) return;
     

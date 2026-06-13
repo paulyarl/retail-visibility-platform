@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
+import { useAuth } from '@/contexts/AuthContext';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 
 interface DashboardStats {
@@ -29,13 +30,20 @@ export default function CrmDashboardPage() {
   const [myTickets, setMyTickets] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'all' | 'my-work'>('all');
+  const { user } = useAuth();
 
   useEffect(() => {
     async function load() {
       try {
+        const ticketFilters: { status?: string; assignedTo?: string } = { status: 'open' };
+        if (viewMode === 'my-work' && user?.id) {
+          ticketFilters.assignedTo = user.id;
+        }
+
         const [statsRes, ticketsRes, activityRes] = await Promise.allSettled([
           crmAdminService.getDashboardStats(),
-          crmAdminService.listGlobalTickets({ status: 'open' }),
+          crmAdminService.listGlobalTickets(ticketFilters),
           crmAdminService.listGlobalActivities({ limit: 8 }),
         ]);
 
@@ -54,8 +62,9 @@ export default function CrmDashboardPage() {
         setLoading(false);
       }
     }
+    setLoading(true);
     load();
-  }, []);
+  }, [viewMode, user?.id]);
 
   if (loading) {
     return (
@@ -75,9 +84,33 @@ export default function CrmDashboardPage() {
         tasks: stats?.overdueTasks,
       }}
     >
+      {/* View toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setViewMode('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            viewMode === 'all'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setViewMode('my-work')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            viewMode === 'my-work'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+          }`}
+        >
+          My Work
+        </button>
+      </div>
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Open Tickets" value={stats?.openTickets ?? 0} href="/settings/admin/crm/tickets" color="blue" />
+        <StatCard label={viewMode === 'my-work' ? 'My Tickets' : 'Open Tickets'} value={myTickets.length} href="/settings/admin/crm/tickets" color="blue" />
         <StatCard label="Overdue Tasks" value={stats?.overdueTasks ?? 0} href="/settings/admin/crm/tasks" color="red" />
         <StatCard label="Active Tenants" value={stats?.activeTenants ?? 0} href="/settings/admin/crm/tenants" color="green" />
         <StatCard label="Avg Response" value={formatDuration(stats?.avgResponseTimeMs ?? null)} color="purple" />
@@ -87,7 +120,7 @@ export default function CrmDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>My Open Tickets</CardTitle>
+            <CardTitle>{viewMode === 'my-work' ? 'My Open Tickets' : 'Open Tickets'}</CardTitle>
           </CardHeader>
           <CardContent>
             {myTickets.length === 0 ? (
@@ -119,17 +152,23 @@ export default function CrmDashboardPage() {
               <p className="text-sm text-neutral-500">No recent activity</p>
             ) : (
               <div className="space-y-2">
-                {recentActivity.map((a: any) => (
-                  <div key={a.id} className="flex gap-2 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{a.content}</p>
-                      <p className="text-xs text-neutral-500 mt-0.5">
-                        {a.actor_name} · {a.activity_type} · {new Date(a.created_at).toLocaleString()}
-                      </p>
+                {recentActivity.map((a: any) => {
+                  const currentUserName = user?.firstName || user?.lastName
+                    ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                    : null;
+                  const displayName = a.actor_id === user?.id ? currentUserName : a.actor_name;
+                  return (
+                    <div key={a.id} className="flex gap-2 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{a.content}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          {displayName} · {a.activity_type} · {new Date(a.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {a.is_internal && <Badge variant="warning">Internal</Badge>}
                     </div>
-                    {a.is_internal && <Badge variant="warning">Internal</Badge>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

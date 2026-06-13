@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
-import type { CrmTicket } from '@/types/crm';
+import type { CrmTicket, CrmActivity } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -29,14 +30,22 @@ export default function TenantTicketsPage() {
   const [tickets, setTickets] = useState<CrmTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
+  const [activities, setActivities] = useState<CrmActivity[]>([]);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await crmTenantCrmService.listTickets(
-          statusFilter !== 'all' ? { status: statusFilter } : undefined
-        );
+        const [data, users, activityList] = await Promise.all([
+          crmTenantCrmService.listTickets(
+            statusFilter !== 'all' ? { status: statusFilter } : undefined
+          ),
+          tenantUserService.getTenantUsers(tenantId),
+          crmTenantCrmService.listActivities({ limit: 100 }),
+        ]);
         setTickets(data ?? []);
+        setTenantUsers(users ?? []);
+        setActivities(activityList ?? []);
       } catch (err) {
         console.error('[Tenant Tickets] Load error:', err);
       } finally {
@@ -44,7 +53,7 @@ export default function TenantTicketsPage() {
       }
     }
     load();
-  }, [statusFilter]);
+  }, [statusFilter, tenantId]);
 
   return (
     <TenantCrmPageShell
@@ -83,30 +92,43 @@ export default function TenantTicketsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {tickets.map(t => (
-            <Link
-              key={t.id}
-              href={`/t/${tenantId}/support/tickets/${t.id}`}
-              className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{t.title}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  {t.assigned_to ? `Assigned: ${t.assigned_to}` : 'Unassigned'} · {new Date(t.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 ml-3">
-                {t.priority && (
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}>
-                    {t.priority}
+          {tickets.map(t => {
+            const assignedName = t.assigned_to
+              ? tenantUsers.find(u => u.id === t.assigned_to)?.name || t.assigned_to
+              : null;
+            const lastActivity = activities
+              .filter(a => a.ticket_id === t.id)
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            return (
+              <Link
+                key={t.id}
+                href={`/t/${tenantId}/support/tickets/${t.id}`}
+                className="flex items-start justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{t.title}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {assignedName ? `Assigned: ${assignedName}` : 'Unassigned'} · {new Date(t.created_at).toLocaleString()}
+                  </p>
+                  {lastActivity?.content && (
+                    <p className="text-xs text-neutral-400 mt-1 truncate max-w-[90%]">
+                      {lastActivity.content} · {new Date(lastActivity.created_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 ml-3 shrink-0">
+                  {t.priority && (
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}>
+                      {t.priority}
+                    </span>
+                  )}
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
+                    {t.status?.replace('_', ' ')}
                   </span>
-                )}
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                  {t.status?.replace('_', ' ')}
-                </span>
-              </div>
-            </Link>
-          ))}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </TenantCrmPageShell>

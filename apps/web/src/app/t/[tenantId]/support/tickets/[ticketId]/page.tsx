@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { tenantUserService, User } from '@/services/TenantUserService';
+import { useAuth } from '@/contexts/AuthContext';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 
@@ -18,6 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_OPTIONS: TicketStatus[] = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 const PRIORITY_OPTIONS: TicketPriority[] = ['low', 'medium', 'high', 'urgent'];
+const CATEGORY_OPTIONS = ['support', 'billing', 'technical', 'sales', 'general', 'bug', 'feature_request', 'account'];
 
 export default function TenantTicketDetailPage() {
   const params = useParams();
@@ -33,17 +36,28 @@ export default function TenantTicketDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     async function load() {
       try {
-        const [ticketData, messageData] = await Promise.all([
+        const [ticketData, messageData, users] = await Promise.all([
           crmTenantCrmService.listTickets(),
           crmTenantCrmService.listTicketMessages(ticketId),
+          tenantUserService.getTenantUsers(tenantId),
         ]);
         const found = (ticketData ?? []).find((t: CrmTicket) => t.id === ticketId) ?? null;
         setTicket(found);
         setMessages(messageData ?? []);
+        setTenantUsers(users ?? []);
+        // Load activities related to this ticket
+        const activityList = await crmTenantCrmService.listActivities({ limit: 50 });
+        const related = (activityList ?? []).filter((a: any) => a.ticket_id === ticketId);
+        setActivities(related);
       } catch (err) {
         console.error('[Tenant Ticket Detail] Load error:', err);
       } finally {
@@ -51,7 +65,7 @@ export default function TenantTicketDetailPage() {
       }
     }
     load();
-  }, [ticketId]);
+  }, [ticketId, tenantId]);
 
   async function handleReply() {
     if (!reply.trim()) return;
@@ -71,6 +85,16 @@ export default function TenantTicketDetailPage() {
     }
   }
 
+  async function refreshActivities() {
+    try {
+      const activityList = await crmTenantCrmService.listActivities({ limit: 50 });
+      const related = (activityList ?? []).filter((a: any) => a.ticket_id === ticketId);
+      setActivities(related);
+    } catch (err) {
+      console.error('[Tenant Ticket Detail] Activity refresh error:', err);
+    }
+  }
+
   async function handleStatusChange(newStatus: TicketStatus) {
     if (!ticket) return;
     setUpdating(true);
@@ -78,6 +102,7 @@ export default function TenantTicketDetailPage() {
     try {
       const updated = await crmTenantCrmService.updateTicket(ticketId, { status: newStatus });
       setTicket(updated);
+      await refreshActivities();
     } catch (err) {
       console.error('[Tenant Ticket Detail] Status change error:', err);
     } finally {
@@ -92,8 +117,39 @@ export default function TenantTicketDetailPage() {
     try {
       const updated = await crmTenantCrmService.updateTicket(ticketId, { priority: newPriority });
       setTicket(updated);
+      await refreshActivities();
     } catch (err) {
       console.error('[Tenant Ticket Detail] Priority change error:', err);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleAssignChange(userId: string | null) {
+    if (!ticket) return;
+    setUpdating(true);
+    setShowAssignDropdown(false);
+    try {
+      const updated = await crmTenantCrmService.updateTicket(ticketId, { assigned_to: userId ?? undefined });
+      setTicket(updated);
+      await refreshActivities();
+    } catch (err) {
+      console.error('[Tenant Ticket Detail] Assign change error:', err);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleCategoryChange(newCategory: string) {
+    if (!ticket) return;
+    setUpdating(true);
+    setShowCategoryDropdown(false);
+    try {
+      const updated = await crmTenantCrmService.updateTicket(ticketId, { category: newCategory });
+      setTicket(updated);
+      await refreshActivities();
+    } catch (err) {
+      console.error('[Tenant Ticket Detail] Category change error:', err);
     } finally {
       setUpdating(false);
     }
@@ -152,7 +208,7 @@ export default function TenantTicketDetailPage() {
           {/* Status dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); }}
+              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
               disabled={updating}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity`}
             >
@@ -174,10 +230,41 @@ export default function TenantTicketDetailPage() {
             )}
           </div>
 
+          {/* Category dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowCategoryDropdown(!showCategoryDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:opacity-80 transition-opacity"
+            >
+              {ticket.category || 'No category'}
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {showCategoryDropdown && (
+              <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
+                <button
+                  onClick={() => handleCategoryChange('')}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${!ticket.category ? 'font-semibold' : ''}`}
+                >
+                  No category
+                </button>
+                {CATEGORY_OPTIONS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => handleCategoryChange(c)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${c === ticket.category ? 'font-semibold' : ''}`}
+                  >
+                    {c.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Priority dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); }}
+              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
               disabled={updating}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity"
             >
@@ -198,6 +285,39 @@ export default function TenantTicketDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Assign dropdown */}
+          {tenantUsers.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowCategoryDropdown(false); }}
+                disabled={updating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity"
+              >
+                {ticket.assigned_to ? tenantUsers.find(u => u.id === ticket.assigned_to)?.name || 'Assigned' : 'Assign'}
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showAssignDropdown && (
+                <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 min-w-[180px] max-h-48 overflow-y-auto">
+                  <button
+                    onClick={() => handleAssignChange(null)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${!ticket.assigned_to ? 'font-semibold' : ''}`}
+                  >
+                    Unassigned
+                  </button>
+                  {tenantUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => handleAssignChange(u.id)}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${u.id === ticket.assigned_to ? 'font-semibold' : ''}`}
+                    >
+                      {u.name || u.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -209,6 +329,52 @@ export default function TenantTicketDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Metadata */}
+      <Card>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-neutral-500 text-xs">Customer</p>
+              <p className="font-medium">{ticket.customer_id || '—'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Assigned To</p>
+              <p className="font-medium">{ticket.assigned_to ? tenantUsers.find(u => u.id === ticket.assigned_to)?.name || ticket.assigned_to : 'Unassigned'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Priority</p>
+              <p className="font-medium">{ticket.priority || '—'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Category</p>
+              <p className="font-medium">{ticket.category || '—'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Created</p>
+              <p className="font-medium">{new Date(ticket.created_at).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Updated</p>
+              <p className="font-medium">{new Date(ticket.updated_at).toLocaleString()}</p>
+            </div>
+            {ticket.resolved_at && (
+              <div>
+                <p className="text-neutral-500 text-xs">Resolved</p>
+                <p className="font-medium">{new Date(ticket.resolved_at).toLocaleString()}</p>
+              </div>
+            )}
+            {ticket.inquiry_id && (
+              <div>
+                <p className="text-neutral-500 text-xs">Source Inquiry</p>
+                <Link href={`/t/${tenantId}/support/inquiries/${ticket.inquiry_id}`} className="font-medium text-amber-600 hover:underline">
+                  View Inquiry →
+                </Link>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Conversation */}
       <div className="space-y-3">
@@ -223,7 +389,7 @@ export default function TenantTicketDetailPage() {
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-medium">{m.author_name}</span>
+              <span className="text-xs font-medium">{m.author_type === 'tenant' ? (tenantUsers.find(u => u.id === m.author_id)?.name || m.author_name) : m.author_name}</span>
               <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${
                 m.author_type === 'customer' ? 'bg-blue-100 text-blue-700' :
                 m.author_type === 'tenant' ? 'bg-amber-100 text-amber-700' :
@@ -243,6 +409,36 @@ export default function TenantTicketDetailPage() {
           <p className="text-sm text-neutral-400 text-center py-4">No messages yet</p>
         )}
       </div>
+
+      {/* Activity History */}
+      <Card>
+        <CardContent>
+          <h3 className="text-sm font-semibold mb-3">Activity History</h3>
+          {activities.length === 0 ? (
+            <p className="text-sm text-neutral-500">No activity recorded for this ticket.</p>
+          ) : (
+            <div className="space-y-3">
+              {activities.map((a) => {
+                const actorUser = tenantUsers.find(u => u.id === a.actor_id);
+                const currentUserName = user?.firstName || user?.lastName
+                  ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                  : null;
+                const displayName = actorUser?.name || (a.actor_id === user?.id ? currentUserName : null) || a.actor_name;
+                return (
+                  <div key={a.id} className="flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">{a.content || a.activity_type}</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        {displayName} · {a.activity_type} · {new Date(a.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Reply composer */}
       {ticket.status !== 'closed' && (

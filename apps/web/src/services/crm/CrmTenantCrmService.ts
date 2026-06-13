@@ -107,7 +107,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   }
 
   // --- Tickets ---
-  async listTickets(filters?: { status?: string }): Promise<CrmTicket[]> {
+  async listTickets(filters?: { status?: string; assignedTo?: string }): Promise<CrmTicket[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';
@@ -125,6 +125,15 @@ class CrmTenantCrmService extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<CrmTicket>(
       '/api/tenant/crm/tickets',
       { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTicket>(result);
+  }
+
+  async createTicketFromInquiry(inquiryId: string): Promise<CrmTicket> {
+    const result = await this.makeDefaultRequest<CrmTicket>(
+      `/api/tenant/crm/inquiries/${inquiryId}/create-ticket`,
+      { method: 'POST' }
     );
     await this.invalidateServiceCaches();
     return this.unwrap<CrmTicket>(result);
@@ -161,7 +170,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   }
 
   // --- Tasks (read-only) ---
-  async listTasks(filters?: { status?: string }): Promise<CrmTask[]> {
+  async listTasks(filters?: { status?: string; assignedTo?: string }): Promise<CrmTask[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';
@@ -191,7 +200,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   }
 
   // --- Inquiries ---
-  async listInquiries(filters?: { status?: string }): Promise<CrmInquiry[]> {
+  async listInquiries(filters?: { status?: string; assignedTo?: string }): Promise<CrmInquiry[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';

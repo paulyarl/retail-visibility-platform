@@ -1,14 +1,6 @@
-import { Button } from '@mantine/core';
-import SetTenantId from "@/components/client/SetTenantId";
-import LegacyUsersPage from "@/app/tenants/[id]/users/page";
+import { redirect } from 'next/navigation';
 
 export default async function TenantScopedUsersPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  return (
-    <>
-      {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      {/* Render the existing tenant users page directly */}
-      <LegacyUsersPage />
-    </>
-  );
+  redirect(`/t/${tenantId}/settings/users`);
 }

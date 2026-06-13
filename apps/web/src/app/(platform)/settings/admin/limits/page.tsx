@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, ArrowUp, ArrowDown, ChevronRight } from 'lucide-react';
+import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, ArrowUp, ArrowDown, ChevronRight, Users } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Button } from '@mantine/core';
@@ -27,6 +27,10 @@ export default function AdminLimitsPage() {
   const [editValue, setEditValue] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [lastSavedTier, setLastSavedTier] = useState<string | null>(null);
+  const [userSeatLimits, setUserSeatLimits] = useState<Record<string, { maxUsers: number | null; displayName: string; unlimited: boolean; tierName: string }> | null>(null);
+  const [editingSeatTier, setEditingSeatTier] = useState<string | null>(null);
+  const [editingSeatValue, setEditingSeatValue] = useState('');
+  const [savingSeat, setSavingSeat] = useState(false);
   const toastHook = useToast();
   const { toasts, toast, success, error: showError, removeToast } = toastHook;
 
@@ -67,6 +71,10 @@ export default function AdminLimitsPage() {
       const types = await adminTenantLimitsService.getFeaturedTypes();
       // console.log(`[FetchLimits] getFeaturedTypes result:`, types);
       setFeaturedTypes(types);
+
+      // Get user seat limits
+      const seatLimits = await adminTenantLimitsService.getUserSeatLimits();
+      setUserSeatLimits(seatLimits);
       
       // console.log(`[FetchLimits] Data fetch completed successfully`);
     } catch (err) {
@@ -498,6 +506,7 @@ export default function AdminLimitsPage() {
           <TabsList>
             <TabsTrigger value="tenant-limits">Tenant Limits</TabsTrigger>
             <TabsTrigger value="featured-products">Featured Products</TabsTrigger>
+          <TabsTrigger value="user-seats">User Seats</TabsTrigger>
           </TabsList>
 
       <TabsContent value="tenant-limits" className="space-y-6">
@@ -982,6 +991,121 @@ export default function AdminLimitsPage() {
                 </div>
                 {getTierComparison()}
               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+      <TabsContent value="user-seats" className="space-y-6">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                User Seat Limits by Tier
+              </h2>
+              <p className="text-gray-600 mt-1">
+                Maximum number of team members (users) each subscription tier can have per tenant. 0 = unlimited.
+              </p>
+            </div>
+            <div className="grid gap-4">
+              {userSeatLimits && limitsData?.tiers ? (
+                limitsData.tiers
+                  .filter((tier: TierSystemTier) => tier.isActive)
+                  .sort((a: TierSystemTier, b: TierSystemTier) => a.sortOrder - b.sortOrder)
+                  .map((tier: TierSystemTier) => {
+                    const seat = userSeatLimits[tier.tierKey];
+                    const isEditing = editingSeatTier === tier.tierKey;
+                    return (
+                      <div
+                        key={tier.tierKey}
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{tier.displayName}</h4>
+                            <span className="text-xs text-gray-500">({tier.tierKey})</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {seat?.unlimited ? 'Unlimited team members' : `Up to ${seat?.maxUsers ?? '-'} team members`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {isEditing ? (
+                            <>
+                              <input
+                                type="number"
+                                min="0"
+                                max="999"
+                                value={editingSeatValue}
+                                onChange={(e) => setEditingSeatValue(e.target.value)}
+                                className="w-20 px-3 py-2 border border-gray-300 rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="0 = unlimited"
+                              />
+                              <Button
+                                onClick={async () => {
+                                  const val = parseInt(editingSeatValue, 10);
+                                  if (isNaN(val)) return;
+                                  setSavingSeat(true);
+                                  const result = await adminTenantLimitsService.updateUserSeatLimit(tier.tierKey, val);
+                                  if (result.success) {
+                                    setUserSeatLimits(prev => prev ? {
+                                      ...prev,
+                                      [tier.tierKey]: { ...prev[tier.tierKey], maxUsers: val, unlimited: val === 0 }
+                                    } : null);
+                                    success(`Updated ${tier.displayName} seat limit to ${val === 0 ? 'unlimited' : val}`);
+                                  } else {
+                                    showError('Failed to update seat limit');
+                                  }
+                                  setEditingSeatTier(null);
+                                  setEditingSeatValue('');
+                                  setSavingSeat(false);
+                                }}
+                                disabled={savingSeat}
+                                variant="default"
+                                w="auto"
+                                miw="fit-content"
+                              >
+                                <Save className="w-4 h-4 mr-1" />
+                                Save
+                              </Button>
+                              <Button
+                                onClick={() => { setEditingSeatTier(null); setEditingSeatValue(''); }}
+                                variant="outline"
+                                w="auto"
+                                miw="fit-content"
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-gray-900">
+                                  {seat?.unlimited ? '\u221e' : (seat?.maxUsers ?? '-')}
+                                </div>
+                                <div className="text-sm text-gray-500">users</div>
+                              </div>
+                              <Button
+                                onClick={() => {
+                                  setEditingSeatTier(tier.tierKey);
+                                  setEditingSeatValue((seat?.maxUsers ?? 0).toString());
+                                }}
+                                variant="outline"
+                                w="auto"
+                                miw="fit-content"
+                              >
+                                <Edit2 className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="text-center py-8 text-gray-500">Loading seat limits...</div>
+              )}
             </div>
           </div>
         </TabsContent>

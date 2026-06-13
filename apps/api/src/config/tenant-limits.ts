@@ -313,3 +313,81 @@ export function getUpgradeTier(tier: string, status?: string): TenantLimitTier |
   const config = getTenantLimitConfig(tier, status);
   return config.upgradeToTier;
 }
+
+/**
+ * User (Team Member) Seat Limits by Subscription Tier
+ * Controls how many users can be invited/added per tenant
+ */
+export interface UserLimitConfig {
+  maxUsers: number;       // 0 = unlimited
+  allowInvitations: boolean;
+  displayName: string;
+  upgradeMessage: string;
+  upgradeToTier?: TenantLimitTier;
+}
+
+export const USER_LIMITS: Record<TenantLimitTier, UserLimitConfig> = {
+  google_only: {
+    maxUsers: 1,
+    allowInvitations: false,
+    displayName: 'Owner Only',
+    upgradeMessage: 'Upgrade to Discovery to invite team members',
+    upgradeToTier: 'discovery',
+  },
+  discovery: {
+    maxUsers: 2,
+    allowInvitations: true,
+    displayName: 'Up to 2 Team Members',
+    upgradeMessage: 'Upgrade to Starter for up to 3 team members',
+    upgradeToTier: 'starter',
+  },
+  starter: {
+    maxUsers: 3,
+    allowInvitations: true,
+    displayName: 'Up to 3 Team Members',
+    upgradeMessage: 'Upgrade to Storefront for up to 5 team members',
+    upgradeToTier: 'storefront',
+  },
+  storefront: {
+    maxUsers: 5,
+    allowInvitations: true,
+    displayName: 'Up to 5 Team Members',
+    upgradeMessage: 'Upgrade to Commitment for up to 10 team members',
+    upgradeToTier: 'commitment',
+  },
+  commitment: {
+    maxUsers: 10,
+    allowInvitations: true,
+    displayName: 'Up to 10 Team Members',
+    upgradeMessage: 'Upgrade to Professional for up to 15 team members',
+    upgradeToTier: 'professional',
+  },
+  professional: {
+    maxUsers: 15,
+    allowInvitations: true,
+    displayName: 'Up to 15 Team Members',
+    upgradeMessage: 'Upgrade to Enterprise for up to 25 team members',
+    upgradeToTier: 'enterprise',
+  },
+  enterprise: {
+    maxUsers: 25,
+    allowInvitations: true,
+    displayName: 'Up to 25 Team Members',
+    upgradeMessage: 'Upgrade to Organization for unlimited team members',
+    upgradeToTier: 'organization',
+  },
+  organization: {
+    maxUsers: 0, // unlimited
+    allowInvitations: true,
+    displayName: 'Unlimited Team Members',
+    upgradeMessage: '',
+  },
+};
+
+/**
+ * Get user limit config for a specific tier
+ */
+export function getUserLimit(tier?: TenantLimitTier): UserLimitConfig {
+  if (!tier) return USER_LIMITS.starter;
+  return USER_LIMITS[tier] || USER_LIMITS.starter;
+}

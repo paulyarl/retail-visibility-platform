@@ -3720,8 +3720,8 @@ router.post('/inquiries', async (req, res) => {
         data: {
           id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           tenant_id,
-          actor_id: sender_email || 'anonymous',
-          actor_name: sender_name || 'Anonymous',
+          actor_id: finalSenderEmail || 'anonymous',
+          actor_name: finalSenderName || 'Anonymous',
           activity_type: 'inquiry_created',
           content: `New inquiry: ${subject}`,
           is_internal: false,
@@ -3731,7 +3731,7 @@ router.post('/inquiries', async (req, res) => {
       console.error('[Public Inquiry] Activity log error (non-critical):', actErr);
     }
 
-    console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${sender_email || 'anonymous'}`);
+    console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${finalSenderEmail || 'anonymous'} (customer_id: ${customerId || 'none'})`);
 
     res.status(201).json({ success: true, data: inquiry });
   } catch (error) {

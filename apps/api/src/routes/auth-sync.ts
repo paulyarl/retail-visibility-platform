@@ -7,10 +7,65 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { user_role } from '@prisma/client';
-import { generateUserId } from '../lib/id-generator';
+import { generateUserId, generateUserTenantId } from '../lib/id-generator';
 import { audit } from '../audit';
 
 const router = Router();
+
+/**
+ * Auto-accept any pending invitations for this user email
+ * Called after user is created or updated on login
+ */
+async function autoAcceptPendingInvitations(userId: string, email: string) {
+  try {
+    const pendingInvites = await prisma.invitations.findMany({
+      where: { email: email.toLowerCase(), accepted_at: null },
+    });
+
+    for (const invite of pendingInvites) {
+      // Check if user is already in this tenant (shouldn't happen, but safety check)
+      const existing = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: userId,
+            tenant_id: invite.tenant_id,
+          },
+        },
+      });
+
+      if (!existing) {
+        await prisma.user_tenants.create({
+          data: {
+            id: generateUserTenantId(userId, invite.tenant_id),
+            user_id: userId,
+            tenant_id: invite.tenant_id,
+            role: invite.role,
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      await prisma.invitations.update({
+        where: { id: invite.id },
+        data: { accepted_at: new Date() },
+      });
+
+      await audit({
+        tenantId: invite.tenant_id,
+        actor: userId,
+        action: 'sync',
+        payload: { entity_type: 'other', invitationId: invite.id, email, role: invite.role },
+      });
+    }
+
+    if (pendingInvites.length > 0) {
+      console.log(`[AuthSync] Auto-accepted ${pendingInvites.length} pending invitation(s) for ${email}`);
+    }
+  } catch (error) {
+    // Non-fatal: log but don't block login
+    console.error('[AuthSync] Error auto-accepting invitations:', error);
+  }
+}
 
 /**
  * POST /api/auth/sync-user
@@ -154,39 +209,62 @@ router.post('/sync-user', async (req: Request, res: Response) => {
       });
 
       console.log('[AuthSync] Updated existing user:', user.id);
-      
+
+      // Auto-accept any pending invitations
+      await autoAcceptPendingInvitations(user.id, user.email);
+
+      // Re-fetch user with any newly accepted tenants
+      user = await prisma.users.findUnique({
+        where: { id: user.id },
+        include: {
+          user_tenants: {
+            select: {
+              tenant_id: true,
+              role: true,
+              tenants: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
       // Audit log
       await audit({
         tenantId: 'platform',
-        actor: user.id,
+        actor: user!.id,
         action: 'auth.login',
-        payload: { 
-          auth0Id, 
-          email, 
+        payload: {
+          auth0Id,
+          email,
           method: auth0Id.includes('google') ? 'google' : 'auth0',
-          userId: user.id 
+          userId: user!.id
         },
       });
 
       return res.json({
         success: true,
         user: {
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          business_name: user.business_name,
-          business_type: user.business_type,
-          phone: user.phone,
-          role: user.role,
-          email_verified: user.email_verified,
-          is_active: user.is_active,
-          last_login: user.last_login,
-          created_at: user.created_at,
-          onboarding_completed: user.onboarding_completed,
-          onboarding_step: user.onboarding_step,
-          picture: user.picture,
-          tenants: user.user_tenants?.map((ut: any) => ({
+          id: user!.id,
+          email: user!.email,
+          first_name: user!.first_name,
+          last_name: user!.last_name,
+          business_name: user!.business_name,
+          business_type: user!.business_type,
+          phone: user!.phone,
+          role: user!.role,
+          email_verified: user!.email_verified,
+          is_active: user!.is_active,
+          last_login: user!.last_login,
+          created_at: user!.created_at,
+          onboarding_completed: user!.onboarding_completed,
+          onboarding_step: user!.onboarding_step,
+          picture: user!.picture,
+          tenants: user!.user_tenants?.map((ut: any) => ({
             id: ut.tenants?.id || ut.tenant_id,
             name: ut.tenants?.name,
             slug: ut.tenants?.slug,
@@ -236,38 +314,66 @@ router.post('/sync-user', async (req: Request, res: Response) => {
 
     console.log('[AuthSync] Created new user:', user.id);
 
+    // Auto-accept any pending invitations
+    await autoAcceptPendingInvitations(user.id, user.email);
+
+    // Re-fetch user with any newly accepted tenants
+    user = await prisma.users.findUnique({
+      where: { id: user.id },
+      include: {
+        user_tenants: {
+          select: {
+            tenant_id: true,
+            role: true,
+            tenants: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
     // Audit log
     await audit({
       tenantId: 'platform',
-      actor: user.id,
+      actor: user!.id,
       action: 'auth.register',
-      payload: { 
-        auth0Id, 
-        email, 
+      payload: {
+        auth0Id,
+        email,
         method: auth0Id.includes('google') ? 'google' : 'auth0',
-        userId: user.id 
+        userId: user!.id
       },
     });
 
     return res.status(201).json({
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        business_name: user.business_name,
-        business_type: user.business_type,
-        phone: user.phone,
-        role: user.role,
-        email_verified: user.email_verified,
-        is_active: user.is_active,
-        last_login: user.last_login,
-        created_at: user.created_at,
-        onboarding_completed: user.onboarding_completed,
-        onboarding_step: user.onboarding_step,
-        picture: user.picture,
-        tenants: [], // New users have no tenants
+        id: user!.id,
+        email: user!.email,
+        first_name: user!.first_name,
+        last_name: user!.last_name,
+        business_name: user!.business_name,
+        business_type: user!.business_type,
+        phone: user!.phone,
+        role: user!.role,
+        email_verified: user!.email_verified,
+        is_active: user!.is_active,
+        last_login: user!.last_login,
+        created_at: user!.created_at,
+        onboarding_completed: user!.onboarding_completed,
+        onboarding_step: user!.onboarding_step,
+        picture: user!.picture,
+        tenants: user!.user_tenants?.map((ut: any) => ({
+          id: ut.tenants?.id || ut.tenant_id,
+          name: ut.tenants?.name,
+          slug: ut.tenants?.slug,
+          role: ut.role,
+        })) || [],
       },
       isNewUser: true,
     });

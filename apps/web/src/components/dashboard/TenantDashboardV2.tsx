@@ -434,20 +434,14 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h3 className="font-semibold text-gray-900">System Operations & Support for You</h3>
+                  <h3 className="font-semibold text-gray-900">Help Desk</h3>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
-                    <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
-                  </motion.div>
-                  {/* CRM Support Widget */}
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-                    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                      <CrmTenantWidget tenantId={tenantId} />
-                    </div>
-                  </motion.div>
-                </div>
+                {/* CRM Support Widget */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-md">
+                    <CrmTenantWidget tenantId={tenantId} />
+                  </div>
+                </motion.div>
               </div>
             </motion.div>
             {/* Capabilities */}
@@ -513,33 +507,6 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
           {/* Right (1/3) */}
           <div className="space-y-6">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-              <CapabilityShowcase
-                capabilities={allCaps.data}
-                tenantId={tenantId}
-                canUpgrade={tier?.canUpgrade ?? false}
-              />
-            </motion.div>
-
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <TaskChecklist
-                tenantId={tenantId}
-                hasProducts={hasProducts}
-                hasStorefront={!!hasStorefront}
-                hasPublishedDirectory={!!hasPublishedDirectory}
-                hasFeaturedProducts={!!hasFeaturedProducts}
-                hasFAQs={faqSize > 0}
-                canManageFaq={canManageFaq}
-                locationStatus={tenantData?.locationStatus}
-                subscriptionStatus={tenantData?.subscriptionStatus}
-                hasHours={hasHours}
-                hasMap={hasMap}
-                hasStoreCategory={hasStoreCategory}
-                hasSlug={hasSlug}
-                hasLogo={hasLogo}
-              />
-            </motion.div>
 
             {/* Quick Links */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.39 }}>
@@ -573,6 +540,17 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                     <ArrowRight className={`w-4 h-4 transition-colors ${hasPublishedDirectory ? "text-gray-400 group-hover:text-emerald-600" : "text-gray-400 group-hover:text-gray-600"}`} />
                   </Link>
 
+                  <Link href={`/t/${tenantId}/settings/users`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                      <MessageSquare className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Team</p>
+                      <p className="text-xs text-gray-500 truncate">Manage your team</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
+                  </Link>
+
                   <Link href={`/t/${tenantId}/reviews`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
                     <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
                       <MessageSquare className="w-4 h-4 text-amber-600" />
@@ -599,6 +577,37 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 </div>
               </div>
             </motion.div>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+              <CapabilityShowcase
+                capabilities={allCaps.data}
+                tenantId={tenantId}
+                canUpgrade={tier?.canUpgrade ?? false}
+              />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
+              <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <TaskChecklist
+                tenantId={tenantId}
+                hasProducts={hasProducts}
+                hasStorefront={!!hasStorefront}
+                hasPublishedDirectory={!!hasPublishedDirectory}
+                hasFeaturedProducts={!!hasFeaturedProducts}
+                hasFAQs={faqSize > 0}
+                canManageFaq={canManageFaq}
+                locationStatus={tenantData?.locationStatus}
+                subscriptionStatus={tenantData?.subscriptionStatus}
+                hasHours={hasHours}
+                hasMap={hasMap}
+                hasStoreCategory={hasStoreCategory}
+                hasSlug={hasSlug}
+                hasLogo={hasLogo}
+              />
+            </motion.div>
+
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
               <GrowthTipCard />
             </motion.div>

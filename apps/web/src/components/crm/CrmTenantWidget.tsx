@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { tenantUserService, User } from '@/services/TenantUserService';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -64,6 +66,7 @@ interface CrmTenantWidgetProps {
 }
 
 export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
+  const { user } = useAuth();
   const [tickets, setTickets] = useState<CrmTicket[]>([]);
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [activities, setActivities] = useState<CrmActivity[]>([]);
@@ -75,11 +78,25 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
   const [openInquiryCount, setOpenInquiryCount] = useState(0);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
   const [crmDisabled, setCrmDisabled] = useState(false);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Activity read tracking
+  const activityReadKey = `crm-widget-activity-last-read-${tenantId || 'global'}-${user?.id || 'anon'}`;
+  const [lastReadActivityAt, setLastReadActivityAt] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(activityReadKey);
+  });
+
+  function markActivitiesRead() {
+    const now = new Date().toISOString();
+    localStorage.setItem(activityReadKey, now);
+    setLastReadActivityAt(now);
+  }
 
   const prevUnreadRef = useRef<number>(0);
   const prevTicketIdsRef = useRef<Set<string>>(new Set());
@@ -88,6 +105,10 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
 
   const loadData = useCallback(async () => {
     try {
+      if (tenantId) {
+        const users = await tenantUserService.getTenantUsers(tenantId);
+        setTenantUsers(users ?? []);
+      }
       const stats = await crmTenantCrmService.getStats();
       if (!stats) return;
 
@@ -156,7 +177,11 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       setActivities(newActivities);
       setInquiries(newInquiries);
       setAlerts(newAlerts);
-      setUnreadCount(newUnread);
+      const unreadActivityCount = newActivities.filter(
+        (a) => !lastReadActivityAt || new Date(a.created_at).getTime() > new Date(lastReadActivityAt).getTime()
+      ).length;
+
+      setUnreadCount(newUnread + unreadActivityCount);
       setOpenTicketCount(newOpenTicketCount);
       setPendingTaskCount(newPendingTaskCount);
       setOpenInquiryCount(newOpenInquiryCount);
@@ -170,7 +195,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, [loading, tenantId]);
 
   useEffect(() => {
     loadData();
@@ -265,6 +290,20 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       {/* Quick count pills */}
       {(openTicketCount > 0 || pendingTaskCount > 0 || openInquiryCount > 0 || unreadAlertCount > 0) && (
         <div className="flex gap-2 flex-wrap">
+          {user?.id && (() => {
+            const myCount = tickets.filter(t => t.assigned_to === user.id).length
+              + tasks.filter(t => t.assigned_to === user.id).length
+              + inquiries.filter(i => i.assigned_to === user.id).length;
+            return myCount > 0 ? (
+              <Link
+                href={tenantId ? `/t/${tenantId}/support` : `/support`}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-medium hover:bg-indigo-100 transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                {myCount} assigned to me
+              </Link>
+            ) : null;
+          })()}
           {unreadAlertCount > 0 && (
             <Link
               href={tenantId ? `/t/${tenantId}/support` : `/support`}
@@ -337,21 +376,35 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       {tickets.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Open Tickets</p>
-          {tickets.map(t => (
-            <Link
-              key={t.id}
-              href={tenantId ? `/t/${tenantId}/support/tickets/${t.id}` : `/support/tickets/${t.id}`}
-              className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group"
-            >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-orange-400' : 'bg-blue-400'}`} />
-                <p className="text-sm truncate">{t.title}</p>
-              </div>
-              <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2 flex-shrink-0 ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                {t.status?.replace('_', ' ')}
-              </span>
-            </Link>
-          ))}
+          {tickets.map(t => {
+            const assignedName = t.assigned_to
+              ? tenantUsers.find(u => u.id === t.assigned_to)?.name || t.assigned_to
+              : null;
+            const lastActivity = activities
+              .filter(a => a.ticket_id === t.id)
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            return (
+              <Link
+                key={t.id}
+                href={tenantId ? `/t/${tenantId}/support/tickets/${t.id}` : `/support/tickets/${t.id}`}
+                className="flex items-start justify-between py-1.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-orange-400' : 'bg-blue-400'}`} />
+                    <p className="text-sm truncate">{t.title}</p>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5 truncate">
+                    {assignedName ? `Assigned: ${assignedName}` : 'Unassigned'}
+                    {lastActivity?.content ? ` · ${lastActivity.content} · ${new Date(lastActivity.created_at).toLocaleString()}` : ''}
+                  </p>
+                </div>
+                <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2 flex-shrink-0 self-center ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
+                  {t.status?.replace('_', ' ')}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       )}
 
@@ -385,21 +438,45 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       {/* Recent Activity */}
       {activities.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Recent Activity</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Recent Activity</p>
+            {(() => {
+              const unreadCountAct = activities.filter(
+                (a) => !lastReadActivityAt || new Date(a.created_at).getTime() > new Date(lastReadActivityAt).getTime()
+              ).length;
+              return unreadCountAct > 0 ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); markActivitiesRead(); }}
+                  className="text-[10px] text-green-600 hover:text-green-800 dark:text-green-400 font-medium"
+                >
+                  Mark read
+                </button>
+              ) : null;
+            })()}
+          </div>
           {activities.map(a => {
+            const isUnread = !lastReadActivityAt || new Date(a.created_at).getTime() > new Date(lastReadActivityAt).getTime();
             const config = ACTIVITY_CONFIG[a.activity_type] || { icon: '📋', color: 'text-neutral-600', bg: 'bg-neutral-50' };
+            const actorUser = tenantUsers.find(u => u.id === a.actor_id);
+            const currentUserName = user?.firstName || user?.lastName
+              ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+              : null;
+            const displayName = actorUser?.name || (a.actor_id === user?.id ? currentUserName : null) || a.actor_name;
             return (
               <Link
                 key={a.id}
                 href={tenantId ? `/t/${tenantId}/support` : `/support`}
-                className="flex items-start gap-2 py-1.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                className={`flex items-start gap-2 py-1.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${isUnread ? 'bg-green-50/40 dark:bg-green-900/10' : ''}`}
               >
                 <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] flex-shrink-0 ${config.bg}`}>
                   {config.icon}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-xs truncate ${config.color}`}>{a.content || a.activity_type}</p>
-                  <p className="text-[10px] text-neutral-400 mt-0.5">{relativeTime(a.created_at)}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className={`text-xs truncate ${isUnread ? 'font-medium' : ''} ${config.color}`}>{a.content || a.activity_type}</p>
+                    {isUnread && <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">{displayName} · {relativeTime(a.created_at)}</p>
                 </div>
               </Link>
             );

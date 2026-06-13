@@ -154,6 +154,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
     const tickets = await ticketService.listByTenant(tenantId, {
       status: req.query.status as string,
       priority: req.query.priority as string,
+      assignedTo: req.query.assignedTo as string,
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
@@ -273,7 +274,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     if (!(await checkCrmEnabled(tenantId, res))) return;
 
-    const tasks = await taskService.listByTenant(tenantId, { status: req.query.status as string });
+    const tasks = await taskService.listByTenant(tenantId, { status: req.query.status as string, assignedTo: req.query.assignedTo as string });
     res.json({ success: true, data: tasks });
   } catch (error) {
     console.error('[CRM Tenant] Error listing tasks:', error);
@@ -318,6 +319,7 @@ router.get('/inquiries', async (req: Request, res: Response) => {
     const inquiries = await inquiryService.listByTenant(tenantId, {
       status: req.query.status as string,
       priority: req.query.priority as string,
+      assignedTo: req.query.assignedTo as string,
     });
     res.json({ success: true, data: inquiries });
   } catch (error) {
@@ -449,6 +451,53 @@ router.post('/inquiries/:inquiryId/create-faq', async (req: Request, res: Respon
   } catch (error) {
     console.error('[CRM Tenant] Error creating FAQ from inquiry:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to create FAQ from inquiry' });
+  }
+});
+
+// POST /api/tenant/crm/inquiries/:inquiryId/create-ticket
+// Promotes an inquiry into a tracked support ticket
+router.post('/inquiries/:inquiryId/create-ticket', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const actorName = req.user?.email || 'Tenant User';
+
+    const inquiry = await inquiryService.getById(req.params.inquiryId);
+    if (!inquiry || inquiry.tenant_id !== tenantId) {
+      return res.status(404).json({ error: 'inquiry_not_found', message: 'Inquiry not found' });
+    }
+
+    const ticket = await ticketService.create({
+      tenant_id: tenantId,
+      contact_id: inquiry.contact_id ?? undefined,
+      customer_id: inquiry.customer_id ?? undefined,
+      title: inquiry.subject,
+      description: inquiry.body || undefined,
+      priority: inquiry.priority ?? 'medium',
+      assigned_to: inquiry.assigned_to ?? undefined,
+      inquiry_id: inquiry.id,
+    });
+
+    // Log activity on the new ticket
+    await activityService.create({
+      tenant_id: tenantId,
+      ticket_id: ticket.id,
+      actor_id: actorId,
+      actor_type: 'tenant',
+      actor_name: actorName,
+      activity_type: 'status_change',
+      content: `Ticket created from inquiry: ${inquiry.subject}`,
+      metadata: { inquiry_id: inquiry.id, source: 'inquiry_promotion' },
+    });
+
+    await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_ticket', source: 'inquiry', inquiry_id: inquiry.id, ticket_id: ticket.id } });
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    console.error('[CRM Tenant] Error creating ticket from inquiry:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket from inquiry' });
   }
 });
 

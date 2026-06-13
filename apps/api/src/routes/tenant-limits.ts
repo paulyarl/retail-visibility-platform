@@ -501,4 +501,85 @@ router.put('/featured-products', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/tenant-limits/user-seats
+ *
+ * Get all user seat limits per tier (admin endpoint)
+ */
+router.get('/user-seats', authenticateToken, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!isPlatformAdmin(user)) {
+      return res.status(403).json({ error: 'Platform admin access required' });
+    }
+
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { is_active: true },
+      select: {
+        tier_key: true,
+        name: true,
+        display_name: true,
+        max_users: true,
+        max_locations: true,
+        price_monthly: true,
+      },
+      orderBy: { sort_order: 'asc' },
+    });
+
+    const limits: Record<string, any> = {};
+    tiers.forEach((tier) => {
+      limits[tier.tier_key] = {
+        maxUsers: tier.max_users,
+        displayName: tier.display_name,
+        unlimited: tier.max_users === 0,
+        tierName: tier.name,
+      };
+    });
+
+    return res.json({ limits, tiers: Object.keys(limits) });
+  } catch (error) {
+    console.error('[GET /api/tenant-limits/user-seats] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_user_seat_limits' });
+  }
+});
+
+/**
+ * PUT /api/tenant-limits/user-seats
+ *
+ * Update user seat limit for a tier (admin endpoint)
+ */
+router.put('/user-seats', authenticateToken, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!isPlatformAdmin(user)) {
+      return res.status(403).json({ error: 'Platform admin access required' });
+    }
+
+    const { tier, maxUsers } = req.body;
+    if (!tier || maxUsers === undefined) {
+      return res.status(400).json({ error: 'tier and maxUsers are required' });
+    }
+
+    const updatedTier = await prisma.subscription_tiers_list.update({
+      where: { tier_key: tier },
+      data: {
+        max_users: maxUsers,
+        updated_at: new Date(),
+        updated_by: user.email || user.id,
+      },
+    });
+
+    return res.json({
+      success: true,
+      tier,
+      maxUsers: updatedTier.max_users,
+      unlimited: updatedTier.max_users === 0,
+      message: 'User seat limit updated successfully',
+    });
+  } catch (error) {
+    console.error('[PUT /api/tenant-limits/user-seats] Error:', error);
+    return res.status(500).json({ error: 'failed_to_update_user_seat_limits' });
+  }
+});
+
 export default router;

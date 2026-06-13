@@ -234,13 +234,13 @@ export class CrmTenantService extends BaseService {
         where: { tenant_id: tenantId, is_internal: false },
         orderBy: { created_at: 'desc' },
         take: 5,
-        select: { id: true, actor_name: true, activity_type: true, content: true, created_at: true },
+        select: { id: true, actor_id: true, actor_name: true, activity_type: true, content: true, ticket_id: true, task_id: true, created_at: true },
       }),
       prisma.crm_inquiries.findMany({
         where: { tenant_id: tenantId, status: { in: ['open', 'new', 'in_progress'] } },
         orderBy: { created_at: 'desc' },
         take: 5,
-        select: { id: true, subject: true, status: true, contact_id: true, customer_id: true, body: true, created_at: true },
+        select: { id: true, subject: true, status: true, contact_id: true, customer_id: true, sender_name: true, sender_email: true, sender_phone: true, body: true, created_at: true },
       }),
       prisma.crm_alerts.findMany({
         where: { tenant_id: tenantId, is_dismissed: false },
