@@ -361,6 +361,66 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
   }
 
   /**
+   * Get all user seat limits per tier
+   * Uses GET /api/tenant-limits/user-seats
+   */
+  async getUserSeatLimits(): Promise<Record<string, { maxUsers: number | null; displayName: string; unlimited: boolean; tierName: string }> | null> {
+    try {
+      const result = await this.makeDefaultRequest<{ limits: Record<string, { maxUsers: number | null; displayName: string; unlimited: boolean; tierName: string }> }>(
+        '/api/tenant-limits/user-seats',
+        {},
+        'user-seat-limits',
+        this.cacheTTL
+      );
+
+      if (!result.success) {
+        console.error('[AdminTenantLimits] Failed to get user seat limits:', result.error);
+        return null;
+      }
+
+      return result.data?.limits || null;
+    } catch (error) {
+      console.error('[AdminTenantLimits] Failed to get user seat limits:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user seat limit for a tier
+   * Uses PUT /api/tenant-limits/user-seats
+   */
+  async updateUserSeatLimit(tier: string, maxUsers: number): Promise<{ success: boolean; maxUsers?: number | null; unlimited?: boolean; message?: string }> {
+    try {
+      const result = await this.makeDefaultRequest(
+        '/api/tenant-limits/user-seats',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ tier, maxUsers })
+        },
+        `update-user-seat-${tier}`,
+        0
+      );
+
+      if (!result.success) {
+        console.error('[AdminTenantLimits] Failed to update user seat limit:', result.error);
+        return { success: false };
+      }
+
+      await this.invalidateServiceCaches();
+
+      return {
+        success: true,
+        maxUsers: (result.data as any)?.maxUsers,
+        unlimited: (result.data as any)?.unlimited,
+        message: (result.data as any)?.message
+      };
+    } catch (error) {
+      console.error('[AdminTenantLimits] Failed to update user seat limit:', error);
+      return { success: false };
+    }
+  }
+
+  /**
    * Get all available featured types from database constraint
    */
   async getFeaturedTypes(): Promise<string[]> {

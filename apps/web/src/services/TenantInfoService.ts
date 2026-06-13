@@ -938,6 +938,97 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
+   * Update a user's role within a tenant
+   * Uses PATCH /api/tenants/:tenantId/users/:userId
+   */
+  async updateUserRole(tenantId: string, userId: string, role: string): Promise<any> {
+    try {
+      if (!tenantId || !userId) {
+        throw new Error('Tenant ID and User ID are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/users/${userId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ role })
+        },
+        `tenant-update-role-${tenantId}-${userId}`
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to update user role:', result.error);
+        throw result.error;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update user role:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending invitations for a tenant
+   * Uses GET /api/tenants/:tenantId/invitations
+   */
+  async getPendingInvitations(tenantId: string): Promise<any[]> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/invitations`,
+        {},
+        `tenant-invitations-${tenantId}`,
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to get invitations:', result.error);
+        return [];
+      }
+
+      const invitations = result.data?.invitations || [];
+      return Array.isArray(invitations) ? invitations : [];
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get invitations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Cancel a pending invitation
+   * Uses DELETE /api/tenants/:tenantId/invitations/:id
+   */
+  async cancelInvitation(tenantId: string, invitationId: string): Promise<any> {
+    try {
+      if (!tenantId || !invitationId) {
+        throw new Error('Tenant ID and Invitation ID are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/invitations/${invitationId}`,
+        { method: 'DELETE' },
+        `tenant-cancel-invite-${tenantId}-${invitationId}`
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to cancel invitation:', result.error);
+        return null;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to cancel invitation:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get OAuth authorization URL for payment gateway
    * Uses the /api/oauth/:gatewayType/authorize endpoint
    */

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Card, CardContent, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { faqService } from '@/services/FaqService';
+import { tenantUserService, User } from '@/services/TenantUserService';
+import { useAuth } from '@/contexts/AuthContext';
 import { useFaqOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmInquiry, InquiryStatus, InquiryPriority } from '@/types/crm';
@@ -30,9 +32,17 @@ export default function TenantInquiryDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
+  const { user } = useAuth();
   const [creatingFaq, setCreatingFaq] = useState(false);
   const [faqCreated, setFaqCreated] = useState(false);
   const [faqError, setFaqError] = useState<string | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [ticketCreated, setTicketCreated] = useState(false);
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
 
   // Check FAQ KB capability for inquiry-to-FAQ feature
   const faqCap = useFaqOptionsCapability(tenantId, { forTenant: true });
@@ -51,9 +61,20 @@ export default function TenantInquiryDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await crmTenantCrmService.listInquiries();
+        const [data, users, activityList] = await Promise.all([
+          crmTenantCrmService.listInquiries(),
+          tenantUserService.getTenantUsers(tenantId),
+          crmTenantCrmService.listActivities({ limit: 50 }),
+        ]);
         const found = (data ?? []).find((i: CrmInquiry) => i.id === inquiryId) ?? null;
         setInquiry(found);
+        setTenantUsers(users ?? []);
+        // Filter activities related to this inquiry (via metadata or inquiry creation)
+        const related = (activityList ?? []).filter((a: any) =>
+          a.metadata?.inquiry_id === inquiryId ||
+          a.activity_type === 'inquiry_created'
+        );
+        setActivities(related);
       } catch (err) {
         console.error('[Tenant Inquiry Detail] Load error:', err);
       } finally {
@@ -61,7 +82,20 @@ export default function TenantInquiryDetailPage() {
       }
     }
     load();
-  }, [inquiryId]);
+  }, [inquiryId, tenantId]);
+
+  async function refreshActivities() {
+    try {
+      const activityList = await crmTenantCrmService.listActivities({ limit: 50 });
+      const related = (activityList ?? []).filter((a: any) =>
+        a.metadata?.inquiry_id === inquiryId ||
+        a.activity_type === 'inquiry_created'
+      );
+      setActivities(related);
+    } catch (err) {
+      console.error('[Tenant Inquiry Detail] Activity refresh error:', err);
+    }
+  }
 
   async function handleStatusChange(newStatus: InquiryStatus) {
     if (!inquiry) return;
@@ -70,6 +104,7 @@ export default function TenantInquiryDetailPage() {
     try {
       const updated = await crmTenantCrmService.updateInquiry(inquiryId, { status: newStatus });
       setInquiry(updated);
+      await refreshActivities();
     } catch (err) {
       console.error('[Tenant Inquiry Detail] Status change error:', err);
     } finally {
@@ -84,8 +119,24 @@ export default function TenantInquiryDetailPage() {
     try {
       const updated = await crmTenantCrmService.updateInquiry(inquiryId, { priority: newPriority });
       setInquiry(updated);
+      await refreshActivities();
     } catch (err) {
       console.error('[Tenant Inquiry Detail] Priority change error:', err);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleAssignChange(userId: string | null) {
+    if (!inquiry) return;
+    setUpdating(true);
+    setShowAssignDropdown(false);
+    try {
+      const updated = await crmTenantCrmService.updateInquiry(inquiryId, { assigned_to: userId ?? undefined });
+      setInquiry(updated);
+      await refreshActivities();
+    } catch (err) {
+      console.error('[Tenant Inquiry Detail] Assign change error:', err);
     } finally {
       setUpdating(false);
     }
@@ -104,6 +155,24 @@ export default function TenantInquiryDetailPage() {
       setFaqError(msg);
     } finally {
       setCreatingFaq(false);
+    }
+  }
+
+  async function handleCreateTicketFromInquiry() {
+    if (!inquiry) return;
+    setCreatingTicket(true);
+    setTicketCreated(false);
+    setTicketError(null);
+    setCreatedTicketId(null);
+    try {
+      const ticket = await crmTenantCrmService.createTicketFromInquiry(inquiryId);
+      setTicketCreated(true);
+      setCreatedTicketId(ticket.id);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create ticket from inquiry';
+      setTicketError(msg);
+    } finally {
+      setCreatingTicket(false);
     }
   }
 
@@ -153,14 +222,18 @@ export default function TenantInquiryDetailPage() {
         <div>
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">{inquiry.subject}</h2>
           <p className="text-sm text-neutral-500 mt-1">
-            {inquiry.customer_id ? `Customer: ${inquiry.customer_id}` : inquiry.contact_id ? `Contact: ${inquiry.contact_id}` : 'Anonymous'} · Source: {inquiry.source || 'N/A'} · {new Date(inquiry.created_at).toLocaleDateString()}
+            {inquiry.sender_name || 'Anonymous'}
+            {inquiry.sender_email ? ` · ${inquiry.sender_email}` : ''}
+            {inquiry.sender_phone ? ` · ${inquiry.sender_phone}` : ''}
+            {' · Source: '}{inquiry.source || 'N/A'}
+            {' · '}{new Date(inquiry.created_at).toLocaleDateString()}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); }}
+              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
               disabled={updating}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[inquiry.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity`}
             >
@@ -185,7 +258,7 @@ export default function TenantInquiryDetailPage() {
           {/* Priority dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); }}
+              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowAssignDropdown(false); }}
               disabled={updating}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity"
             >
@@ -206,6 +279,50 @@ export default function TenantInquiryDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Assign dropdown */}
+          {tenantUsers.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); }}
+                disabled={updating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity"
+              >
+                {inquiry.assigned_to ? tenantUsers.find(u => u.id === inquiry.assigned_to)?.name || 'Assigned' : 'Assign'}
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showAssignDropdown && (
+                <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 min-w-[180px] max-h-48 overflow-y-auto">
+                  <button
+                    onClick={() => handleAssignChange(null)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${!inquiry.assigned_to ? 'font-semibold' : ''}`}
+                  >
+                    Unassigned
+                  </button>
+                  {tenantUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => handleAssignChange(u.id)}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${u.id === inquiry.assigned_to ? 'font-semibold' : ''}`}
+                    >
+                      {u.name || u.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Create Ticket from inquiry */}
+          <button
+            onClick={handleCreateTicketFromInquiry}
+            disabled={creatingTicket}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+            title="Promote this inquiry to a tracked support ticket"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+            {creatingTicket ? 'Creating...' : 'Create Ticket'}
+          </button>
+
           {/* Create FAQ from inquiry (tier-gated) */}
           {canCreateFaq && (
             <button
@@ -229,6 +346,23 @@ export default function TenantInquiryDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Ticket creation feedback */}
+      {ticketCreated && (
+        <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-300">
+          Ticket created successfully from this inquiry.
+          {createdTicketId && (
+            <Link href={`/t/${tenantId}/support/tickets/${createdTicketId}`} className="ml-1 underline font-medium hover:text-green-800">
+              View Ticket →
+            </Link>
+          )}
+        </div>
+      )}
+      {ticketError && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-300">
+          {ticketError}
+        </div>
+      )}
 
       {/* FAQ creation feedback */}
       {faqCreated && (
@@ -256,12 +390,24 @@ export default function TenantInquiryDetailPage() {
         <CardContent>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-neutral-500 text-xs">Assigned To</p>
-              <p className="font-medium">{inquiry.assigned_to || 'Unassigned'}</p>
+              <p className="text-neutral-500 text-xs">From</p>
+              <p className="font-medium">{inquiry.sender_name || 'Anonymous'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Email</p>
+              <p className="font-medium">{inquiry.sender_email || '—'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Phone</p>
+              <p className="font-medium">{inquiry.sender_phone || '—'}</p>
             </div>
             <div>
               <p className="text-neutral-500 text-xs">Source</p>
               <p className="font-medium">{inquiry.source || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Assigned To</p>
+              <p className="font-medium">{inquiry.assigned_to ? tenantUsers.find(u => u.id === inquiry.assigned_to)?.name || inquiry.assigned_to : 'Unassigned'}</p>
             </div>
             <div>
               <p className="text-neutral-500 text-xs">Created</p>
@@ -278,6 +424,36 @@ export default function TenantInquiryDetailPage() {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Activity History */}
+      <Card>
+        <CardContent>
+          <h3 className="text-sm font-semibold mb-3">Activity History</h3>
+          {activities.length === 0 ? (
+            <p className="text-sm text-neutral-500">No activity recorded for this inquiry.</p>
+          ) : (
+            <div className="space-y-3">
+              {activities.map((a) => (
+                <div key={a.id} className="flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm">{a.content || a.activity_type}</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      {(() => {
+                        const actorUser = tenantUsers.find(u => u.id === a.actor_id);
+                        const currentUserName = user?.firstName || user?.lastName
+                          ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                          : null;
+                        const displayName = actorUser?.name || (a.actor_id === user?.id ? currentUserName : null) || a.actor_name;
+                        return `${displayName} · ${a.activity_type} · ${new Date(a.created_at).toLocaleString()}`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </TenantCrmPageShell>

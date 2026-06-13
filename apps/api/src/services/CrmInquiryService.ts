@@ -17,10 +17,11 @@ export class CrmInquiryService extends BaseService {
     return CrmInquiryService.instance;
   }
 
-  async listByTenant(tenantId: string, filters: { status?: string; priority?: string } = {}) {
+  async listByTenant(tenantId: string, filters: { status?: string; priority?: string; assignedTo?: string } = {}) {
     const where: any = { tenant_id: tenantId };
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     return prisma.crm_inquiries.findMany({ where, orderBy: { created_at: 'desc' } });
   }
 
@@ -103,7 +104,7 @@ export class CrmInquiryService extends BaseService {
     subject?: string;
     body?: string;
   }) {
-    const updateData: any = { ...data };
+    const updateData: any = { ...data, updated_at: new Date() };
     if (data.status === 'resolved') {
       updateData.resolved_at = new Date();
     }

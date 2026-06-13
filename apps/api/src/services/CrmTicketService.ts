@@ -20,10 +20,11 @@ export class CrmTicketService extends BaseService {
   /**
    * List tickets for a specific tenant
    */
-  async listByTenant(tenantId: string, filters: { status?: string; priority?: string } = {}) {
+  async listByTenant(tenantId: string, filters: { status?: string; priority?: string; assignedTo?: string } = {}) {
     const where: any = { tenant_id: tenantId };
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     return prisma.crm_support_tickets.findMany({ where, orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }] });
   }
 
@@ -63,6 +64,7 @@ export class CrmTicketService extends BaseService {
     priority?: string;
     category?: string;
     assigned_to?: string;
+    inquiry_id?: string;
     faq_id?: string;
   }) {
     return prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(data.tenant_id), ...data } });
@@ -120,11 +122,12 @@ export class CrmTicketService extends BaseService {
     priority?: string;
     category?: string;
     assigned_to?: string;
+    inquiry_id?: string;
   }, actorId: string, actorName: string, actorType: string = 'platform') {
     const ticket = await prisma.crm_support_tickets.findUnique({ where: { id: ticketId } });
     if (!ticket) throw new Error('Ticket not found');
 
-    const updateData: any = { ...data };
+    const updateData: any = { ...data, updated_at: new Date() };
 
     // Track first response for SLA
     if (data.status && data.status !== 'open' && !ticket.first_responded_at) {

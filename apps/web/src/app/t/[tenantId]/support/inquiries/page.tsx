@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
-import type { CrmInquiry } from '@/types/crm';
+import type { CrmInquiry, CrmActivity } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -21,14 +22,22 @@ export default function TenantInquiriesPage() {
   const [inquiries, setInquiries] = useState<CrmInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
+  const [activities, setActivities] = useState<CrmActivity[]>([]);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await crmTenantCrmService.listInquiries(
-          statusFilter !== 'all' ? { status: statusFilter } : undefined
-        );
+        const [data, users, activityList] = await Promise.all([
+          crmTenantCrmService.listInquiries(
+            statusFilter !== 'all' ? { status: statusFilter } : undefined
+          ),
+          tenantUserService.getTenantUsers(tenantId),
+          crmTenantCrmService.listActivities({ limit: 100 }),
+        ]);
         setInquiries(data ?? []);
+        setTenantUsers(users ?? []);
+        setActivities(activityList ?? []);
       } catch (err) {
         console.error('[Tenant Inquiries] Load error:', err);
       } finally {
@@ -36,7 +45,7 @@ export default function TenantInquiriesPage() {
       }
     }
     load();
-  }, [statusFilter]);
+  }, [statusFilter, tenantId]);
 
   return (
     <TenantCrmPageShell
@@ -75,28 +84,43 @@ export default function TenantInquiriesPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {inquiries.map(i => (
-            <Link
-              key={i.id}
-              href={`/t/${tenantId}/support/inquiries/${i.id}`}
-              className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{i.subject}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  {i.contact_id || i.customer_id || 'Anonymous'} · {new Date(i.created_at).toLocaleDateString()}
-                </p>
-                {i.body && (
-                  <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{i.body}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 ml-3">
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[i.status] || 'bg-gray-100 text-gray-800'}`}>
-                  {i.status?.replace('_', ' ')}
-                </span>
-              </div>
-            </Link>
-          ))}
+          {inquiries.map(i => {
+            const assignedName = i.assigned_to
+              ? tenantUsers.find(u => u.id === i.assigned_to)?.name || i.assigned_to
+              : null;
+            const lastActivity = activities
+              .filter(a => a.metadata?.inquiry_id === i.id || a.activity_type === 'inquiry_created')
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            return (
+              <Link
+                key={i.id}
+                href={`/t/${tenantId}/support/inquiries/${i.id}`}
+                className="flex items-start justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{i.subject}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {i.sender_name || i.customer_id || i.contact_id || 'Anonymous'}
+                    {i.sender_email ? ` · ${i.sender_email}` : ''}
+                    {i.sender_phone ? ` · ${i.sender_phone}` : ''}
+                    {' · '}
+                    {new Date(i.created_at).toLocaleString()}
+                    {assignedName ? ` · Assigned: ${assignedName}` : ''}
+                  </p>
+                  {lastActivity?.content && (
+                    <p className="text-xs text-neutral-400 mt-1 truncate max-w-[90%]">
+                      {lastActivity.content} · {new Date(lastActivity.created_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 ml-3 shrink-0">
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[i.status] || 'bg-gray-100 text-gray-800'}`}>
+                    {i.status?.replace('_', ' ')}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </TenantCrmPageShell>

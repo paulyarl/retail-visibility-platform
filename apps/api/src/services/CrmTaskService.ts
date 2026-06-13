@@ -20,9 +20,10 @@ export class CrmTaskService extends BaseService {
   /**
    * List tasks for a specific tenant
    */
-  async listByTenant(tenantId: string, filters: { status?: string } = {}) {
+  async listByTenant(tenantId: string, filters: { status?: string; assignedTo?: string } = {}) {
     const where: any = { tenant_id: tenantId };
     if (filters.status) where.status = filters.status;
+    if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     return prisma.crm_tasks.findMany({ where, orderBy: [{ sort_order: 'asc' }, { due_date: 'asc' }] });
   }
 
