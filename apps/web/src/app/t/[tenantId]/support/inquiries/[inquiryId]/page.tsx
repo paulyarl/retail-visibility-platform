@@ -43,6 +43,7 @@ export default function TenantInquiryDetailPage() {
   const [ticketCreated, setTicketCreated] = useState(false);
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
+  const isClosed = inquiry?.status === 'closed';
 
   // Check FAQ KB capability for inquiry-to-FAQ feature
   const faqCap = useFaqOptionsCapability(tenantId, { forTenant: true });
@@ -99,6 +100,12 @@ export default function TenantInquiryDetailPage() {
 
   async function handleStatusChange(newStatus: InquiryStatus) {
     if (!inquiry) return;
+    if (newStatus === 'closed') {
+      const confirmed = window.confirm(
+        'Are you sure you want to close this inquiry?\n\nThis action is final. Once closed, you will not be able to change status, priority, or assignment.'
+      );
+      if (!confirmed) return;
+    }
     setUpdating(true);
     setShowStatusDropdown(false);
     try {
@@ -233,9 +240,9 @@ export default function TenantInquiryDetailPage() {
           {/* Status dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
-              disabled={updating}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[inquiry.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity`}
+              onClick={() => { if (isClosed) return; setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating || isClosed}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[inquiry.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {inquiry.status?.replace('_', ' ')}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -258,9 +265,9 @@ export default function TenantInquiryDetailPage() {
           {/* Priority dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowAssignDropdown(false); }}
-              disabled={updating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity"
+              onClick={() => { if (isClosed) return; setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating || isClosed}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {inquiry.priority || 'No priority'}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -284,9 +291,9 @@ export default function TenantInquiryDetailPage() {
           {tenantUsers.length > 0 && (
             <div className="relative">
               <button
-                onClick={() => { setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); }}
-                disabled={updating}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity"
+                onClick={() => { if (isClosed) return; setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); }}
+                disabled={updating || isClosed}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {inquiry.assigned_to ? tenantUsers.find(u => u.id === inquiry.assigned_to)?.name || 'Assigned' : 'Assign'}
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

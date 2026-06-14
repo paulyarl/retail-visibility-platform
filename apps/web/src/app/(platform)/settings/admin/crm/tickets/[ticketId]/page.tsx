@@ -50,6 +50,7 @@ export default function CrmTicketDetailPage() {
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const isClosed = ticket?.status === 'closed';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +80,12 @@ export default function CrmTicketDetailPage() {
 
   async function handleUpdateTicket(data: Partial<{ status: TicketStatus; priority: TicketPriority; assigned_to: string; category: string }>) {
     if (!ticket) return;
+    if (data.status === 'closed') {
+      const confirmed = window.confirm(
+        'Are you sure you want to close this ticket?\n\nThis action is final. Once closed, you will not be able to change status, priority, category, or assignment.'
+      );
+      if (!confirmed) return;
+    }
     setUpdating(true);
     try {
       const updated = await crmAdminService.updateTicket(ticketId, data);
@@ -172,7 +179,7 @@ export default function CrmTicketDetailPage() {
                 <Select
                   value={ticket.status}
                   onChange={(e) => handleUpdateTicket({ status: e.target.value as TicketStatus })}
-                  disabled={updating}
+                  disabled={updating || isClosed}
                   options={STATUS_OPTIONS}
                 />
               </div>
@@ -181,7 +188,7 @@ export default function CrmTicketDetailPage() {
                 <Select
                   value={ticket.priority}
                   onChange={(e) => handleUpdateTicket({ priority: e.target.value as TicketPriority })}
-                  disabled={updating}
+                  disabled={updating || isClosed}
                   options={PRIORITY_OPTIONS}
                 />
               </div>
@@ -190,7 +197,7 @@ export default function CrmTicketDetailPage() {
                 <Select
                   value={ticket.assigned_to || ''}
                   onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value || undefined })}
-                  disabled={updating}
+                  disabled={updating || isClosed}
                   options={[{ value: '', label: '— Unassigned —' }, ...admins.map(a => ({ value: a.id, label: a.email }))]}
                 />
               </div>
@@ -199,9 +206,10 @@ export default function CrmTicketDetailPage() {
                 <input
                   type="text"
                   value={ticket.category || ''}
-                  onChange={(e) => handleUpdateTicket({ category: e.target.value || undefined })}
-                  onBlur={(e) => handleUpdateTicket({ category: e.target.value || undefined })}
-                  className="w-full px-3 py-2 border rounded-lg text-neutral-900 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  onChange={(e) => !isClosed && handleUpdateTicket({ category: e.target.value || undefined })}
+                  onBlur={(e) => !isClosed && handleUpdateTicket({ category: e.target.value || undefined })}
+                  disabled={isClosed}
+                  className={`w-full px-3 py-2 border rounded-lg text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${isClosed ? 'bg-neutral-100 cursor-not-allowed' : 'bg-white'}`}
                   placeholder="Category"
                 />
               </div>
