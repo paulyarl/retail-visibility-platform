@@ -175,7 +175,7 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
  */
 const addUserToTenantSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'SUPPORT']),
 });
 
 router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
@@ -280,7 +280,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
  * Requires: TENANT_OWNER or TENANT_ADMIN role
  */
 const updateUserRoleSchema = z.object({
-  role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'SUPPORT']),
 });
 
 router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
