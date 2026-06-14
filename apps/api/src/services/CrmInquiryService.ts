@@ -104,6 +104,10 @@ export class CrmInquiryService extends BaseService {
     subject?: string;
     body?: string;
   }) {
+    const inquiry = await prisma.crm_inquiries.findUnique({ where: { id: inquiryId } });
+    if (!inquiry) throw new Error('Inquiry not found');
+    if (inquiry.status === 'closed') throw new Error('Inquiry is closed and cannot be modified');
+
     const updateData: any = { ...data, updated_at: new Date() };
     if (data.status === 'resolved') {
       updateData.resolved_at = new Date();

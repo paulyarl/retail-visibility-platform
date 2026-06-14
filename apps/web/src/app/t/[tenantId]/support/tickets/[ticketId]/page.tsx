@@ -41,6 +41,7 @@ export default function TenantTicketDetailPage() {
   const [tenantUsers, setTenantUsers] = useState<User[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const { user } = useAuth();
+  const isClosed = ticket?.status === 'closed';
 
   useEffect(() => {
     async function load() {
@@ -97,6 +98,12 @@ export default function TenantTicketDetailPage() {
 
   async function handleStatusChange(newStatus: TicketStatus) {
     if (!ticket) return;
+    if (newStatus === 'closed') {
+      const confirmed = window.confirm(
+        'Are you sure you want to close this ticket?\n\nThis action is final. Once closed, you will not be able to change status, priority, category, or assignment.'
+      );
+      if (!confirmed) return;
+    }
     setUpdating(true);
     setShowStatusDropdown(false);
     try {
@@ -208,9 +215,9 @@ export default function TenantTicketDetailPage() {
           {/* Status dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
-              disabled={updating}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity`}
+              onClick={() => { if (isClosed) return; setShowStatusDropdown(!showStatusDropdown); setShowPriorityDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating || isClosed}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[ticket.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {ticket.status?.replace('_', ' ')}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -233,9 +240,9 @@ export default function TenantTicketDetailPage() {
           {/* Category dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowCategoryDropdown(!showCategoryDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
-              disabled={updating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:opacity-80 transition-opacity"
+              onClick={() => { if (isClosed) return; setShowCategoryDropdown(!showCategoryDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating || isClosed}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {ticket.category || 'No category'}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -264,9 +271,9 @@ export default function TenantTicketDetailPage() {
           {/* Priority dropdown */}
           <div className="relative">
             <button
-              onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
-              disabled={updating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity"
+              onClick={() => { if (isClosed) return; setShowPriorityDropdown(!showPriorityDropdown); setShowStatusDropdown(false); setShowCategoryDropdown(false); setShowAssignDropdown(false); }}
+              disabled={updating || isClosed}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {ticket.priority || 'No priority'}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -290,9 +297,9 @@ export default function TenantTicketDetailPage() {
           {tenantUsers.length > 0 && (
             <div className="relative">
               <button
-                onClick={() => { setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowCategoryDropdown(false); }}
-                disabled={updating}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity"
+                onClick={() => { if (isClosed) return; setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); setShowPriorityDropdown(false); setShowCategoryDropdown(false); }}
+                disabled={updating || isClosed}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {ticket.assigned_to ? tenantUsers.find(u => u.id === ticket.assigned_to)?.name || 'Assigned' : 'Assign'}
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

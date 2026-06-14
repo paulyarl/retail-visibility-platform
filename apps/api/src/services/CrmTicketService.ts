@@ -126,6 +126,7 @@ export class CrmTicketService extends BaseService {
   }, actorId: string, actorName: string, actorType: string = 'platform') {
     const ticket = await prisma.crm_support_tickets.findUnique({ where: { id: ticketId } });
     if (!ticket) throw new Error('Ticket not found');
+    if (ticket.status === 'closed') throw new Error('Ticket is closed and cannot be modified');
 
     const updateData: any = { ...data, updated_at: new Date() };
 
