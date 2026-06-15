@@ -255,6 +255,7 @@ export interface ProductOptionsState {
   /** Product page section gates */
   showsRecentlyViewed: boolean;
   showsQRCodes: boolean;
+  showsQRLogo: boolean;
   showsRecommended: boolean;
   showsMapDisplay: boolean;
   showsLocationDisplay: boolean;
@@ -264,6 +265,19 @@ export interface ProductOptionsState {
   showsFulfillment: boolean;
   showsCategories: boolean;
   showsLocationAvailability: boolean;
+  /** Effective section gates after applying merchant preferences */
+  effectiveShowsRecentlyViewed: boolean;
+  effectiveShowsQRCodes: boolean;
+  effectiveShowsQRLogo: boolean;
+  effectiveShowsRecommended: boolean;
+  effectiveShowsMapDisplay: boolean;
+  effectiveShowsLocationDisplay: boolean;
+  effectiveShowsHoursDisplay: boolean;
+  effectiveShowsEnhancedSEO: boolean;
+  effectiveShowsReviews: boolean;
+  effectiveShowsFulfillment: boolean;
+  effectiveShowsCategories: boolean;
+  effectiveShowsLocationAvailability: boolean;
   /** Merchant preference toggles for product options */
   merchantPreferences: {
     product_physical_enabled: boolean;
@@ -877,6 +891,7 @@ export function resolveProductOptionsState(
     product_layout?: ProductLayoutType;
     product_opt_recently_viewed?: boolean;
     product_opt_qr_codes?: boolean;
+    product_opt_qr_logo?: boolean;
     product_opt_recommended?: boolean;
     product_opt_map_display?: boolean;
     product_opt_location_display?: boolean;
@@ -919,6 +934,7 @@ export function resolveProductOptionsState(
   // Product page section feature gates
   const showsRecentlyViewed = flexible || !!features.product_opt_recently_viewed;
   const showsQRCodes = flexible || !!features.product_opt_qr_codes;
+  const showsQRLogo = flexible || !!features.product_opt_qr_logo;
   const showsRecommended = flexible || !!features.product_opt_recommended;
   const showsMapDisplay = flexible || !!features.product_opt_map_display;
   const showsLocationDisplay = flexible || !!features.product_opt_location_display;
@@ -941,6 +957,7 @@ export function resolveProductOptionsState(
     product_layout: merchantPrefs?.product_layout || 'classic',
     product_opt_recently_viewed: merchantPrefs?.product_opt_recently_viewed !== false,
     product_opt_qr_codes: merchantPrefs?.product_opt_qr_codes !== false,
+    product_opt_qr_logo: merchantPrefs?.product_opt_qr_logo !== false,
     product_opt_recommended: merchantPrefs?.product_opt_recommended !== false,
     product_opt_map_display: merchantPrefs?.product_opt_map_display !== false,
     product_opt_location_display: merchantPrefs?.product_opt_location_display !== false,
@@ -965,6 +982,20 @@ export function resolveProductOptionsState(
     ? prefs.product_layout
     : (allowedLayouts[0] || 'classic');
 
+  // Effective product page section gates = tier allows AND merchant enabled
+  const effectiveShowsRecentlyViewed = showsRecentlyViewed && prefs.product_opt_recently_viewed;
+  const effectiveShowsQRCodes = showsQRCodes && prefs.product_opt_qr_codes;
+  const effectiveShowsQRLogo = showsQRLogo && prefs.product_opt_qr_logo;
+  const effectiveShowsRecommended = showsRecommended && prefs.product_opt_recommended;
+  const effectiveShowsMapDisplay = showsMapDisplay && prefs.product_opt_map_display;
+  const effectiveShowsLocationDisplay = showsLocationDisplay && prefs.product_opt_location_display;
+  const effectiveShowsHoursDisplay = showsHoursDisplay && prefs.product_opt_hours_display;
+  const effectiveShowsEnhancedSEO = showsEnhancedSEO && prefs.product_opt_enhanced_seo;
+  const effectiveShowsReviews = showsReviews && prefs.product_opt_reviews;
+  const effectiveShowsFulfillment = showsFulfillment && prefs.product_opt_fulfillment;
+  const effectiveShowsCategories = showsCategories && prefs.product_opt_categories;
+  const effectiveShowsLocationAvailability = showsLocationAvailability && prefs.product_opt_location_availability;
+
   return {
     enabled: enabled && !disabled,
     allowedTypes,
@@ -983,6 +1014,7 @@ export function resolveProductOptionsState(
     canUseLayoutImmersive: flexible || layoutImmersive,
     showsRecentlyViewed,
     showsQRCodes,
+    showsQRLogo,
     showsRecommended,
     showsMapDisplay,
     showsLocationDisplay,
@@ -992,6 +1024,18 @@ export function resolveProductOptionsState(
     showsFulfillment,
     showsCategories,
     showsLocationAvailability,
+    effectiveShowsRecentlyViewed,
+    effectiveShowsQRCodes,
+    effectiveShowsQRLogo,
+    effectiveShowsRecommended,
+    effectiveShowsMapDisplay,
+    effectiveShowsLocationDisplay,
+    effectiveShowsHoursDisplay,
+    effectiveShowsEnhancedSEO,
+    effectiveShowsReviews,
+    effectiveShowsFulfillment,
+    effectiveShowsCategories,
+    effectiveShowsLocationAvailability,
     merchantPreferences: prefs,
     isFlexible: flexible,
     features,
