@@ -189,7 +189,7 @@ export async function getTenantsApproachingExpiry(): Promise<{
     return basePrisma.$queryRaw<Array<{ id: string; name: string; email: string }>>`
       SELECT t.id, t.name, u.email
       FROM tenants t
-      JOIN user_tenants ut ON ut.tenant_id = t.id AND ut.role = 'owner'
+      JOIN user_tenants ut ON ut.tenant_id = t.id AND ut.role = 'OWNER'
       JOIN users u ON u.id = ut.user_id
       WHERE t.subscription_status = 'past_due'
         AND t.status_changed_at >= ${startOfDay}

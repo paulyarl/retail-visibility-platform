@@ -403,6 +403,34 @@ form label {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ---------------------------------------------------------------------------
+ * Layout system tokens — product page & storefront layouts
+ * Used by Layout B (Showcase), Layout C (Quick Commerce), and storefront
+ * Editorial / Immersive variants.
+ * --------------------------------------------------------------------------- */
+
+:root {
+  /* Product gallery dimensions */
+  --product-gallery-height-sm: 20rem;    /* 320px — mobile */
+  --product-gallery-height-md: 24rem;    /* 384px — tablet (matches current h-96) */
+  --product-gallery-height-lg: 32rem;    /* 512px — desktop (Showcase) */
+
+  /* Split-panel proportions (Showcase desktop) */
+  --product-split-gallery: 55%;
+  --product-split-details: 45%;
+  --product-split-gap: 2rem;
+
+  /* Sticky purchase bar */
+  --sticky-bar-height: 4rem;
+  --sticky-bar-bg: rgba(255, 255, 255, 0.95);
+  --sticky-bar-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+  --sticky-bar-backdrop: blur(8px);
+}
+
+.dark {
+  --sticky-bar-bg: rgba(23, 23, 23, 0.95);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

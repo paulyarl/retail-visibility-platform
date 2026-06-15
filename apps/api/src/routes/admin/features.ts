@@ -55,7 +55,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
 
     const feature = await prisma.features_list.create({
       data: { key: feature_key, name: feature_name, description: description || null,
-        category: category || 'product_types', marketing_name: marketing_name || null,
+        category: category || null, marketing_name: marketing_name || null,
         icon_name: icon_name || null, sort_order: sort_order ?? 0, is_active: true },
     });
     res.status(201).json(transformFeature(feature));

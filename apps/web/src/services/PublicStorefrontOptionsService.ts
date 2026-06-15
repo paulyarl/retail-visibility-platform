@@ -33,6 +33,8 @@ export interface StorefrontOptionFlags {
   galleryLimit: number;
   showEnhancedSEO: boolean;
   showStorefrontActions: boolean;
+  /** Selected storefront layout variant — 'classic' (default), 'editorial', or 'immersive' */
+  storefrontLayout?: 'classic' | 'editorial' | 'immersive';
 }
 
 class PublicStorefrontOptionsService extends PublicApiSingleton {

@@ -9,7 +9,10 @@ import { type ReviewSummary, type Review } from '@/services/ReviewsSingletonServ
 interface StoreRatingDisplayProps {
   tenantId: string;
   showWriteReview?: boolean;
+  /** @deprecated Use variant='compact' instead */
   compact?: boolean;
+  /** 'full' | 'compact' | 'inline' — inline renders a single-line "★ 4.8 (127 reviews)" */
+  variant?: 'full' | 'compact' | 'inline';
   isPublic?: boolean; // New prop to determine service scope
   className?: string;
 }
@@ -18,9 +21,13 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
   tenantId,
   showWriteReview = true,
   compact = false,
+  variant: variantProp,
   isPublic = true, // Default to public for public pages
   className = ''
 }) => {
+  // Legacy compact prop maps to variant='compact'
+  const variant = variantProp ?? (compact ? 'compact' : 'full');
+
   const {
     summary,
     reviews,
@@ -132,7 +139,17 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
     );
   }
 
-  if (compact) {
+  if (variant === 'inline') {
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-sm text-neutral-700 dark:text-neutral-300 ${className}`}>
+        {renderStars(Math.round(summary.rating_avg), 'sm')}
+        <span className="font-medium">{summary.rating_avg.toFixed(1)}</span>
+        <span className="text-neutral-500 dark:text-neutral-400">({summary.rating_count} reviews)</span>
+      </span>
+    );
+  }
+
+  if (variant === 'compact') {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         {renderStars(Math.round(summary.rating_avg), 'sm')}

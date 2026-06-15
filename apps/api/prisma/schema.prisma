@@ -1160,7 +1160,7 @@ model features_list {
   key                      String                     @unique
   name                     String
   description              String?
-  category                 String
+  category                 String?
   is_active                Boolean?                   @default(true)
   sort_order               Int?                       @default(0)
   marketing_name           String?
@@ -3764,6 +3764,7 @@ model tenant_storefront_options_settings {
   hours_display           Boolean?  @default(true)
   map_display             Boolean?  @default(true)
   location_display        Boolean?  @default(true)
+  storefront_layout       String?   @default("classic") @db.VarChar(20)
   tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_options_tenant")
 
   @@index([tenant_id], map: "idx_storefront_options_tenant")

@@ -220,6 +220,7 @@ export interface FeaturedOptionsState {
 // --- Product Options ---
 
 export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
+export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export interface ProductOptionsState {
   enabled: boolean;
@@ -239,6 +240,30 @@ export interface ProductOptionsState {
   effectiveShowsGallery: boolean;
   /** Whether video attachment is effectively available after merchant preferences */
   effectiveShowsVideo: boolean;
+  /** Product page layout group enabled */
+  layoutEnabled: boolean;
+  /** Available product page layouts based on capability features (tier-allowed, hard gate) */
+  allowedLayouts: ProductLayoutType[];
+  /** Product page layout effectively used after applying merchant preferences */
+  effectiveLayout: ProductLayoutType;
+  /** Whether classic product page layout is allowed */
+  canUseLayoutClassic: boolean;
+  /** Whether editorial product page layout is allowed */
+  canUseLayoutEditorial: boolean;
+  /** Whether immersive product page layout is allowed */
+  canUseLayoutImmersive: boolean;
+  /** Product page section gates */
+  showsRecentlyViewed: boolean;
+  showsQRCodes: boolean;
+  showsRecommended: boolean;
+  showsMapDisplay: boolean;
+  showsLocationDisplay: boolean;
+  showsHoursDisplay: boolean;
+  showsEnhancedSEO: boolean;
+  showsReviews: boolean;
+  showsFulfillment: boolean;
+  showsCategories: boolean;
+  showsLocationAvailability: boolean;
   /** Merchant preference toggles for product options */
   merchantPreferences: {
     product_physical_enabled: boolean;
@@ -248,6 +273,18 @@ export interface ProductOptionsState {
     product_variant_enabled: boolean;
     product_gallery_enabled: boolean;
     product_video_enabled: boolean;
+    product_layout: ProductLayoutType;
+    product_opt_recently_viewed: boolean;
+    product_opt_qr_codes: boolean;
+    product_opt_recommended: boolean;
+    product_opt_map_display: boolean;
+    product_opt_location_display: boolean;
+    product_opt_hours_display: boolean;
+    product_opt_enhanced_seo: boolean;
+    product_opt_reviews: boolean;
+    product_opt_fulfillment: boolean;
+    product_opt_categories: boolean;
+    product_opt_location_availability: boolean;
   };
   /** Whether all product options are available (flexible tier) */
   isFlexible: boolean;
@@ -313,6 +350,7 @@ export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | '
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
+export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export interface StorefrontOptionsState {
   /** Main gate (hard) — storefront_opt_enabled */
@@ -343,6 +381,9 @@ export interface StorefrontOptionsState {
   // Advanced group
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
+  // Layout group
+  layoutEnabled: boolean;
+  allowedLayouts: StorefrontOptLayoutType[];
   // Convenience flags
   canShowHoursDisplay: boolean;
   canUseAnimatedHours: boolean;
@@ -360,6 +401,9 @@ export interface StorefrontOptionsState {
   canUseQRCodes: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
+  canUseLayoutClassic: boolean;
+  canUseLayoutEditorial: boolean;
+  canUseLayoutImmersive: boolean;
   /** Merchant preference toggles */
   merchantPreferences: {
     storefront_opt_enabled: boolean;
@@ -388,6 +432,7 @@ export interface StorefrontOptionsState {
     image_gallery_15: boolean;
     enhanced_seo: boolean;
     storefront_actions: boolean;
+    storefront_layout: 'classic' | 'editorial' | 'immersive';
     default_qr_resolution: string;
     default_gallery_limit: number;
   };
@@ -829,6 +874,18 @@ export function resolveProductOptionsState(
     product_variant_enabled?: boolean;
     product_gallery_enabled?: boolean;
     product_video_enabled?: boolean;
+    product_layout?: ProductLayoutType;
+    product_opt_recently_viewed?: boolean;
+    product_opt_qr_codes?: boolean;
+    product_opt_recommended?: boolean;
+    product_opt_map_display?: boolean;
+    product_opt_location_display?: boolean;
+    product_opt_hours_display?: boolean;
+    product_opt_enhanced_seo?: boolean;
+    product_opt_reviews?: boolean;
+    product_opt_fulfillment?: boolean;
+    product_opt_categories?: boolean;
+    product_opt_location_availability?: boolean;
   } | null
 ): ProductOptionsState {
   const enabled = !!features.product_enabled;
@@ -849,6 +906,29 @@ export function resolveProductOptionsState(
   if (flexible || hybrid) allowedTypes.push('hybrid');
   if (flexible || service) allowedTypes.push('service');
 
+  // Product page layout feature gates
+  const layoutClassic = !!features.product_layout_classic;
+  const layoutEditorial = !!features.product_layout_editorial;
+  const layoutImmersive = !!features.product_layout_immersive;
+
+  const allowedLayouts: ProductLayoutType[] = [];
+  if (flexible || layoutClassic) allowedLayouts.push('classic');
+  if (flexible || layoutEditorial) allowedLayouts.push('editorial');
+  if (flexible || layoutImmersive) allowedLayouts.push('immersive');
+
+  // Product page section feature gates
+  const showsRecentlyViewed = flexible || !!features.product_opt_recently_viewed;
+  const showsQRCodes = flexible || !!features.product_opt_qr_codes;
+  const showsRecommended = flexible || !!features.product_opt_recommended;
+  const showsMapDisplay = flexible || !!features.product_opt_map_display;
+  const showsLocationDisplay = flexible || !!features.product_opt_location_display;
+  const showsHoursDisplay = flexible || !!features.product_opt_hours_display;
+  const showsEnhancedSEO = flexible || !!features.product_opt_enhanced_seo;
+  const showsReviews = flexible || !!features.product_opt_reviews;
+  const showsFulfillment = flexible || !!features.product_opt_fulfillment;
+  const showsCategories = flexible || !!features.product_opt_categories;
+  const showsLocationAvailability = flexible || !!features.product_opt_location_availability;
+
   // Merchant preferences (soft toggle, defaults to true if not set)
   const prefs = {
     product_physical_enabled: merchantPrefs?.product_physical_enabled !== false,
@@ -858,6 +938,18 @@ export function resolveProductOptionsState(
     product_variant_enabled: merchantPrefs?.product_variant_enabled !== false,
     product_gallery_enabled: merchantPrefs?.product_gallery_enabled !== false,
     product_video_enabled: merchantPrefs?.product_video_enabled !== false,
+    product_layout: merchantPrefs?.product_layout || 'classic',
+    product_opt_recently_viewed: merchantPrefs?.product_opt_recently_viewed !== false,
+    product_opt_qr_codes: merchantPrefs?.product_opt_qr_codes !== false,
+    product_opt_recommended: merchantPrefs?.product_opt_recommended !== false,
+    product_opt_map_display: merchantPrefs?.product_opt_map_display !== false,
+    product_opt_location_display: merchantPrefs?.product_opt_location_display !== false,
+    product_opt_hours_display: merchantPrefs?.product_opt_hours_display !== false,
+    product_opt_enhanced_seo: merchantPrefs?.product_opt_enhanced_seo !== false,
+    product_opt_reviews: merchantPrefs?.product_opt_reviews !== false,
+    product_opt_fulfillment: merchantPrefs?.product_opt_fulfillment !== false,
+    product_opt_categories: merchantPrefs?.product_opt_categories !== false,
+    product_opt_location_availability: merchantPrefs?.product_opt_location_availability !== false,
   };
 
   // Effective types = tier allows AND merchant enabled
@@ -867,6 +959,11 @@ export function resolveProductOptionsState(
   const effectiveShowsVariants = (flexible || variant) && prefs.product_variant_enabled;
   const effectiveShowsGallery = (flexible || gallery) && prefs.product_gallery_enabled;
   const effectiveShowsVideo = (flexible || video) && prefs.product_video_enabled;
+
+  // Effective layout = tier allows AND merchant preference
+  const effectiveLayout = allowedLayouts.includes(prefs.product_layout)
+    ? prefs.product_layout
+    : (allowedLayouts[0] || 'classic');
 
   return {
     enabled: enabled && !disabled,
@@ -878,6 +975,23 @@ export function resolveProductOptionsState(
     effectiveShowsVariants,
     effectiveShowsGallery,
     effectiveShowsVideo,
+    layoutEnabled: allowedLayouts.length > 0,
+    allowedLayouts,
+    effectiveLayout,
+    canUseLayoutClassic: flexible || layoutClassic,
+    canUseLayoutEditorial: flexible || layoutEditorial,
+    canUseLayoutImmersive: flexible || layoutImmersive,
+    showsRecentlyViewed,
+    showsQRCodes,
+    showsRecommended,
+    showsMapDisplay,
+    showsLocationDisplay,
+    showsHoursDisplay,
+    showsEnhancedSEO,
+    showsReviews,
+    showsFulfillment,
+    showsCategories,
+    showsLocationAvailability,
     merchantPreferences: prefs,
     isFlexible: flexible,
     features,
@@ -1277,6 +1391,7 @@ export function resolveStorefrontOptionsState(
     image_gallery_15?: boolean;
     enhanced_seo?: boolean;
     storefront_actions?: boolean;
+    storefront_layout?: 'classic' | 'editorial' | 'immersive';
     default_qr_resolution?: string;
     default_gallery_limit?: number;
   } | null
@@ -1315,6 +1430,7 @@ export function resolveStorefrontOptionsState(
     image_gallery_15: merchantPrefs?.image_gallery_15 ?? false,
     enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
     storefront_actions: merchantPrefs?.storefront_actions ?? false,
+    storefront_layout: merchantPrefs?.storefront_layout || 'classic',
     default_qr_resolution: merchantPrefs?.default_qr_resolution || '1024',
     default_gallery_limit: merchantPrefs?.default_gallery_limit || 5,
   };
@@ -1434,6 +1550,21 @@ export function resolveStorefrontOptionsState(
     if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
   }
 
+  // --- Layout feature gate ---
+  const layoutGroupEnabled = !!features.storefront_opt_layout_enabled;
+  const layoutGroupDisabled = !!features.storefront_opt_layout_disabled;
+  const layoutEnabled = layoutGroupEnabled && !layoutGroupDisabled;
+  const layoutUntouched = !layoutGroupEnabled && !layoutGroupDisabled;
+
+  const allowedLayouts: StorefrontOptLayoutType[] = [];
+  if (flexible || layoutEnabled) {
+    allowedLayouts.push('classic', 'editorial', 'immersive');
+  } else if (layoutUntouched) {
+    if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
+    if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
+    if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
+  }
+
   const mainOn = enabled && !disabled;
 
   // Effective flags = main gate AND tier allows AND merchant enabled
@@ -1466,6 +1597,9 @@ export function resolveStorefrontOptionsState(
     ? allowedAdvancedTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
     : [];
 
+  // Effective layout = tier allowed (merchant selects one via storefront_layout preference)
+  const effectiveLayouts = prefs.storefront_opt_enabled ? allowedLayouts : [];
+
   return {
     enabled: mainOn,
     isFlexible: flexible,
@@ -1485,6 +1619,8 @@ export function resolveStorefrontOptionsState(
     allowedGalleryTypes,
     advancedEnabled: mainOn && (advancedEnabled || allowedAdvancedTypes.length > 0),
     allowedAdvancedTypes,
+    layoutEnabled: mainOn && (layoutEnabled || allowedLayouts.length > 0),
+    allowedLayouts,
     canShowHoursDisplay: mainOn && effectiveHoursDisplay,
     canUseAnimatedHours: mainOn && effectiveHoursTypes.includes('hours_animated'),
     canShowHoursStatus: mainOn && effectiveHoursTypes.includes('hours_status'),
@@ -1501,6 +1637,9 @@ export function resolveStorefrontOptionsState(
     canUseQRCodes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
     canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+    canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
+    canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
+    canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),
     merchantPreferences: prefs,
     features,
   };

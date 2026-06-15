@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EnhancedStorefrontProductCard, { EnhancedProductData } from '@/components/products/EnhancedStorefrontProductCard';
 
 interface ProductDisplayProps {
-  products: EnhancedProductData[];  // ← Direct interface match!
+  products: EnhancedProductData[];
   tenantId: string;
-  tenantSlug?: string; 
+  tenantSlug?: string;
   tenantLogo?: string;
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
@@ -20,12 +20,16 @@ interface ProductDisplayProps {
   maxGalleryImages?: number;
   maxVariants?: number;
   className?: string;
+  /** 'grid' (default) | 'carousel' — horizontal scroll with snap */
+  displayMode?: 'grid' | 'carousel';
+  /** Number of visible items in carousel mode (affects min-width) */
+  carouselItemsVisible?: number;
 }
 
 export default function EnhancedProductDisplay({
   products,
   tenantId,
-  tenantSlug, 
+  tenantSlug,
   tenantLogo,
   hasActivePaymentGateway,
   defaultGatewayType,
@@ -39,15 +43,25 @@ export default function EnhancedProductDisplay({
   maxGalleryImages = 3,
   maxVariants = 2,
   className = '',
+  displayMode = 'grid',
+  carouselItemsVisible = 4,
 }: ProductDisplayProps) {
   const [mounted, setMounted] = useState(false);
-  
-  // Handle hydration
-  useState(() => {
+
+  useEffect(() => {
     setMounted(true);
-  });
+  }, []);
 
   if (!mounted) {
+    if (displayMode === 'carousel') {
+      return (
+        <div className="flex gap-4 overflow-hidden">
+          {products.slice(0, carouselItemsVisible).map((_, index) => (
+            <div key={index} className="flex-shrink-0 w-64 h-80 bg-white rounded-lg shadow-sm animate-pulse" />
+          ))}
+        </div>
+      );
+    }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map((_, index) => (
@@ -60,17 +74,56 @@ export default function EnhancedProductDisplay({
   if (products.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-500">No products available</div>
+        <div className="text-gray-500 dark:text-gray-400">No products available</div>
       </div>
     );
   }
 
+  // ── Carousel mode ──
+  if (displayMode === 'carousel') {
+    return (
+      <div className={`relative ${className}`}>
+        <div
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="flex-shrink-0 snap-start"
+              style={{ minWidth: `${100 / Math.min(carouselItemsVisible, products.length)}%`, maxWidth: '280px' }}
+            >
+              <EnhancedStorefrontProductCard
+                product={product}
+                tenantId={tenantId}
+                tenantSlug={tenantSlug}
+                tenantLogo={tenantLogo}
+                hasActivePaymentGateway={hasActivePaymentGateway}
+                defaultGatewayType={defaultGatewayType}
+                useSingletonData={useSingletonData}
+                showFeaturedBadges={showFeaturedBadges}
+                initialPageSize={initialPageSize}
+                showPageSizeControl={showPageSizeControl}
+                variant={variant}
+                showGallery={showGallery}
+                showVariants={showVariants}
+                maxGalleryImages={maxGalleryImages}
+                maxVariants={maxVariants}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Grid mode (default) ──
   return (
     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${className}`}>
       {products.map((product) => (
         <EnhancedStorefrontProductCard
           key={product.id}
-          product={product}  // ← Direct pass-through!
+          product={product}
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           tenantLogo={tenantLogo}

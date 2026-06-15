@@ -36,6 +36,7 @@ export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | '
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
+export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
@@ -45,6 +46,7 @@ export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_5
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
+export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
 export interface StorefrontOptionsState {
   enabled: boolean;
@@ -73,6 +75,9 @@ export interface StorefrontOptionsState {
   // Advanced group
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
+  // Layout group
+  layoutEnabled: boolean;
+  allowedLayouts: StorefrontOptLayoutType[];
   // Convenience flags
   canUseAnimatedHours: boolean;
   canShowHoursStatus: boolean;
@@ -87,6 +92,9 @@ export interface StorefrontOptionsState {
   canUseQRCodes: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
+  canUseLayoutClassic: boolean;
+  canUseLayoutEditorial: boolean;
+  canUseLayoutImmersive: boolean;
   // Raw features
   features: Record<string, boolean>;
 }
@@ -95,7 +103,7 @@ export interface StorefrontOptTypeMeta {
   key: string;
   label: string;
   description: string;
-  group: 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'advanced';
+  group: 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'advanced' | 'layout';
 }
 
 const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
@@ -121,6 +129,9 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   image_gallery_15: { key: 'image_gallery_15', label: '15 Images', description: 'Gallery limit of 15 images', group: 'gallery' },
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced' },
+  classic: { key: 'classic', label: 'Classic Layout', description: 'Traditional single-column layout', group: 'layout' },
+  editorial: { key: 'editorial', label: 'Modern Editorial', description: 'Storytelling emphasis, hero banner layout', group: 'layout' },
+  immersive: { key: 'immersive', label: 'Immersive Commerce', description: 'Conversion-optimized compact purchase flow', group: 'layout' },
 };
 
 // ====================
@@ -327,6 +338,21 @@ class StorefrontOptionsService {
       if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
     }
 
+    // --- Layout feature gate ---
+    const layoutGroupEnabled = !!features.storefront_opt_layout_enabled;
+    const layoutGroupDisabled = !!features.storefront_opt_layout_disabled;
+    const layoutEnabled = layoutGroupEnabled && !layoutGroupDisabled;
+    const layoutUntouched = !layoutGroupEnabled && !layoutGroupDisabled;
+
+    const allowedLayouts: StorefrontOptLayoutType[] = [];
+    if (flexible || layoutEnabled) {
+      allowedLayouts.push('classic', 'editorial', 'immersive');
+    } else if (layoutUntouched) {
+      if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
+      if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
+      if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
+    }
+
     const mainOn = enabled && !disabled;
 
     return {
@@ -348,6 +374,8 @@ class StorefrontOptionsService {
       allowedGalleryTypes,
       advancedEnabled: mainOn && (advancedEnabled || allowedAdvancedTypes.length > 0),
       allowedAdvancedTypes,
+      layoutEnabled: mainOn && (layoutEnabled || allowedLayouts.length > 0),
+      allowedLayouts,
       // Convenience flags
       canUseAnimatedHours: mainOn && allowedHoursTypes.includes('hours_animated'),
       canShowHoursStatus: mainOn && allowedHoursTypes.includes('hours_status'),
@@ -362,6 +390,9 @@ class StorefrontOptionsService {
       canUseQRCodes: mainOn && (allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
       canUseEnhancedSEO: mainOn && allowedAdvancedTypes.includes('enhanced_seo'),
       canUseStorefrontActions: mainOn && allowedAdvancedTypes.includes('storefront_actions'),
+      canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
+      canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
+      canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),
       features,
     };
   }
@@ -382,6 +413,7 @@ class StorefrontOptionsService {
     if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return state.allowedQRContentTypes.includes(type as StorefrontOptQRContentType);
     if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return state.allowedGalleryTypes.includes(type as StorefrontOptGalleryType);
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
+    if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
   }
 
@@ -404,7 +436,8 @@ class StorefrontOptionsService {
       : group === 'qr' ? [...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES]
       : group === 'gallery' ? GALLERY_TYPES
       : group === 'advanced' ? ADVANCED_TYPES
-      : [...HOURS_TYPES, ...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed', ...INFO_TYPES, ...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES, ...GALLERY_TYPES, ...ADVANCED_TYPES];
+      : group === 'layout' ? LAYOUT_TYPES
+      : [...HOURS_TYPES, ...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed', ...INFO_TYPES, ...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES, ...GALLERY_TYPES, ...ADVANCED_TYPES, ...LAYOUT_TYPES];
     return allTypes.map(t => STOREFRONT_OPT_TYPE_META[t]).filter(Boolean);
   }
 
@@ -431,6 +464,8 @@ class StorefrontOptionsService {
       allowedGalleryTypes: [],
       advancedEnabled: false,
       allowedAdvancedTypes: [],
+      layoutEnabled: false,
+      allowedLayouts: [],
       canUseAnimatedHours: false,
       canShowHoursStatus: false,
       canUseCategoryStore: false,
@@ -444,6 +479,9 @@ class StorefrontOptionsService {
       canUseQRCodes: false,
       canUseEnhancedSEO: false,
       canUseStorefrontActions: false,
+      canUseLayoutClassic: false,
+      canUseLayoutEditorial: false,
+      canUseLayoutImmersive: false,
       features: {},
     };
   }

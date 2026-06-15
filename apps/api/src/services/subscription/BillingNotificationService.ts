@@ -11,6 +11,7 @@
 
 import { prisma } from '../../prisma';
 import { CrmTaskService } from '../CrmTaskService';
+import { CrmAlertService } from '../CrmAlertService';
 
 export type BillingNotificationType = 
   | 'payment_success'
@@ -54,25 +55,30 @@ class BillingNotificationService {
    */
   async sendNotification(data: BillingNotificationData): Promise<boolean> {
     try {
-      // Get tenant owner email
-      const owner = await this.getTenantOwner(data.tenantId);
-      if (!owner) {
-        console.error(`[BillingNotification] No email found for tenant ${data.tenantId}`);
+      // Get all tenant owner emails
+      const owners = await this.getTenantOwners(data.tenantId);
+      if (owners.length === 0) {
+        console.error(`[BillingNotification] No owner emails found for tenant ${data.tenantId}`);
         // Still log the notification attempt
         await this.logNotification(data, false);
         return false;
       }
 
-      // Build email payload based on notification type
-      const emailPayload = await this.buildEmailPayload(owner.email, owner.name, data);
-      
-      // Send email (via configured email service)
-      const sent = await this.sendEmail(emailPayload);
-      
+      // Send email to each owner
+      let anySent = false;
+      for (const owner of owners) {
+        const emailPayload = await this.buildEmailPayload(owner.email, owner.name, data);
+        const sent = await this.sendEmail(emailPayload);
+        if (sent) anySent = true;
+      }
+
+      // Create CRM alert (tenant-facing notification) — once per event, not per owner
+      await this.createSubscriptionCrmAlert(data);
+
       // Log notification
-      await this.logNotification(data, sent);
-      
-      return sent;
+      await this.logNotification(data, anySent);
+
+      return anySent;
     } catch (error) {
       console.error('[BillingNotification] Error sending notification:', error);
       // Still log the failed attempt
@@ -82,52 +88,46 @@ class BillingNotificationService {
   }
 
   /**
-   * Get tenant contact email from business profile
+   * Get all tenant owner emails
    */
-  private async getTenantOwner(tenantId: string): Promise<{ email: string; name: string } | null> {
-    // Get tenant's contact email from business profile
-    const businessProfile = await prisma.tenant_business_profiles_list.findUnique({
-      where: { tenant_id: tenantId },
-      select: { email: true, contact_person: true }
-    });
+  private async getTenantOwners(tenantId: string): Promise<Array<{ email: string; name: string }>> {
+    const owners: Array<{ email: string; name: string }> = [];
 
-    if (businessProfile?.email) {
-      // Get tenant name as fallback
-      const tenant = await prisma.tenants.findUnique({
-        where: { id: tenantId },
-        select: { name: true }
-      });
-
-      return {
-        email: businessProfile.email,
-        name: businessProfile.contact_person || tenant?.name || 'Tenant'
-      };
-    }
-
-    // Fallback: Get the owner user's email
-    const ownerUser = await prisma.users.findFirst({
-      where: { 
-        role: 'OWNER',
+    // 1. Get all owner users via user_tenants (the source of truth)
+    const ownerUsers = await prisma.users.findMany({
+      where: {
         user_tenants: {
-          some: { tenant_id: tenantId }
+          some: { tenant_id: tenantId, role: 'OWNER' }
         }
       },
       select: { email: true, first_name: true, last_name: true }
     });
 
-    if (ownerUser) {
-      const tenant = await prisma.tenants.findUnique({
-        where: { id: tenantId },
-        select: { name: true }
-      });
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+    const tenantName = tenant?.name || 'Tenant';
 
-      return {
-        email: ownerUser.email,
-        name: `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() || tenant?.name || 'Tenant'
-      };
+    for (const user of ownerUsers) {
+      const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || tenantName;
+      owners.push({ email: user.email, name });
     }
 
-    return null;
+    // 2. Include business profile email if it exists and isn't already an owner
+    const businessProfile = await prisma.tenant_business_profiles_list.findUnique({
+      where: { tenant_id: tenantId },
+      select: { email: true, contact_person: true }
+    });
+
+    if (businessProfile?.email && !owners.some(o => o.email === businessProfile.email)) {
+      owners.push({
+        email: businessProfile.email,
+        name: businessProfile.contact_person || tenantName
+      });
+    }
+
+    return owners;
   }
 
   /**
@@ -724,6 +724,135 @@ Your new plan is now active.`;
           title: `Subscription event: ${data.type} — ${tenantName}`,
           description: `Subscription event "${data.type}" for tenant "${tenantName}".`,
           priority: 'medium',
+        };
+    }
+  }
+
+  /**
+   * Create a CRM alert for a billing/subscription event.
+   * This surfaces subscription issues as tenant-facing alerts in the CRM dashboard.
+   */
+  private async createSubscriptionCrmAlert(data: BillingNotificationData): Promise<void> {
+    try {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: data.tenantId },
+        select: { name: true },
+      });
+      const tenantName = tenant?.name || data.tenantId;
+
+      const { title, body, icon } = this.buildCrmAlertPayload(data, tenantName);
+
+      const alertService = CrmAlertService.getInstance();
+      await alertService.create({
+        tenant_id: data.tenantId,
+        type: 'subscription',
+        title,
+        body,
+        icon,
+        metadata: {
+          notification_type: data.type,
+          ...(data.gracePeriodDaysRemaining !== undefined ? { grace_period_days_remaining: data.gracePeriodDaysRemaining } : {}),
+          ...(data.reason ? { reason: data.reason } : {}),
+          ...(data.tier ? { tier: data.tier } : {}),
+        },
+      });
+
+      console.log(`[BillingNotification] CRM alert created for tenant ${data.tenantId}: ${title}`);
+    } catch (error) {
+      console.error('[BillingNotification] Failed to create CRM alert:', error);
+    }
+  }
+
+  private buildCrmAlertPayload(
+    data: BillingNotificationData,
+    tenantName: string,
+  ): { title: string; body: string; icon: string } {
+    switch (data.type) {
+      case 'payment_success':
+        return {
+          title: 'Payment successful',
+          body: `Your payment for ${tenantName} was processed successfully.`,
+          icon: '💳',
+        };
+      case 'payment_failed':
+        return {
+          title: 'Payment failed',
+          body: `We were unable to process your payment for ${tenantName}. Please update your payment method to avoid service interruption.`,
+          icon: '⚠️',
+        };
+      case 'grace_period_warning': {
+        const days = data.gracePeriodDaysRemaining ?? 0;
+        return {
+          title: 'Payment overdue',
+          body: `Your subscription payment for ${tenantName} is overdue. ${days} day${days === 1 ? '' : 's'} remaining in grace period. Update your payment method to maintain your current plan.`,
+          icon: '⏳',
+        };
+      }
+      case 'grace_period_final':
+        return {
+          title: 'Final notice: payment overdue',
+          body: `Your subscription for ${tenantName} will be downgraded tomorrow if payment is not received. Update your payment method now to avoid losing access.`,
+          icon: '🚨',
+        };
+      case 'payment_method_update_reminder':
+        return {
+          title: 'Update payment method',
+          body: `Please update your payment method for ${tenantName} to avoid subscription interruption.`,
+          icon: '💳',
+        };
+      case 'payment_method_added':
+        return {
+          title: 'Payment method added',
+          body: `A new payment method has been added to ${tenantName}.`,
+          icon: '✅',
+        };
+      case 'subscription_canceled':
+        return {
+          title: 'Subscription canceled',
+          body: `Your subscription for ${tenantName} has been canceled. You can reactivate your subscription at any time.`,
+          icon: '❌',
+        };
+      case 'subscription_reactivated':
+        return {
+          title: 'Subscription reactivated',
+          body: `Your subscription for ${tenantName} has been reactivated. Welcome back!`,
+          icon: '✅',
+        };
+      case 'tier_changed':
+        return {
+          title: 'Plan updated',
+          body: `Your subscription plan for ${tenantName} has been updated.`,
+          icon: '📋',
+        };
+      case 'trial_started':
+        return {
+          title: 'Trial started',
+          body: `Your trial for ${tenantName} has started. Enjoy exploring the platform!`,
+          icon: '🚀',
+        };
+      case 'trial_converted':
+        return {
+          title: 'Trial converted',
+          body: `Your trial for ${tenantName} has been converted to a paid subscription. Thank you!`,
+          icon: '🎉',
+        };
+      case 'trial_payment_failed':
+        return {
+          title: 'Trial payment failed',
+          body: `We could not process your payment for ${tenantName}. Please update your payment method to continue.`,
+          icon: '⚠️',
+        };
+      case 'trial_expired':
+        return {
+          title: 'Trial expired',
+          body: `Your trial for ${tenantName} has expired. Upgrade to a paid plan to continue using all features.`,
+          icon: '⌛',
+        };
+      default:
+        return {
+          title: 'Subscription update',
+          body: `Your subscription for ${tenantName} has been updated.`,
+          icon: '📋',
         };
     }
   }

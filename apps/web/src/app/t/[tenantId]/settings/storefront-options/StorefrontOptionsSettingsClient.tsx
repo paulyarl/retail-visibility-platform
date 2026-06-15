@@ -35,6 +35,7 @@ interface StorefrontOptionsSettings {
   image_gallery_15: boolean;
   enhanced_seo: boolean;
   storefront_actions: boolean;
+  storefront_layout: 'classic' | 'editorial' | 'immersive';
   default_qr_resolution: string;
   default_gallery_limit: number;
 }
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   image_gallery_15: false,
   enhanced_seo: false,
   storefront_actions: false,
+  storefront_layout: 'classic',
   default_qr_resolution: '1024',
   default_gallery_limit: 5,
 };
@@ -156,6 +158,7 @@ const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
   qr: <QrCode className="w-5 h-5 text-indigo-600" />,
   gallery: <Image className="w-5 h-5 text-orange-600" />,
   advanced: <Zap className="w-5 h-5 text-lime-600" />,
+  layout: <LayoutGrid className="w-5 h-5 text-violet-600" />,
 };
 
 export default function StorefrontOptionsSettingsClient({ tenantId }: StorefrontOptionsSettingsClientProps) {
@@ -229,6 +232,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
   const tierAllowsQR = (cap?.allowedQRResolutions.length ?? 0) > 0 || (cap?.allowedQRContentTypes.length ?? 0) > 0;
   const tierAllowsGallery = cap?.allowedGalleryTypes.length ?? 0 > 0;
   const tierAllowsAdvanced = cap?.allowedAdvancedTypes.length ?? 0 > 0;
+  const tierAllowsLayout = (cap?.allowedLayouts.length ?? 0) > 0;
 
   if (loading) {
     return (
@@ -709,6 +713,101 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
           </CardContent>
         </Card>
       )}
+
+      {/* Storefront Layout Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LayoutGrid className="w-5 h-5 text-violet-600" />
+            Storefront Layout
+          </CardTitle>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Choose how your storefront and product pages look to customers
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Classic */}
+            <button
+              type="button"
+              onClick={() => {
+                if (cap?.canUseLayoutClassic) {
+                  setSettings(s => ({ ...s, storefront_layout: 'classic' }));
+                }
+              }}
+              disabled={!cap?.canUseLayoutClassic}
+              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
+                settings.storefront_layout === 'classic'
+                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } ${!cap?.canUseLayoutClassic ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {settings.storefront_layout === 'classic' && cap?.canUseLayoutClassic && (
+                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
+              )}
+              <span className="font-semibold text-sm">Classic</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Traditional single-column layout.
+                {!cap?.canUseLayoutClassic && (
+                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
+                )}
+              </span>
+            </button>
+            {/* Editorial */}
+            <button
+              type="button"
+              onClick={() => {
+                if (cap?.canUseLayoutEditorial) {
+                  setSettings(s => ({ ...s, storefront_layout: 'editorial' }));
+                }
+              }}
+              disabled={!cap?.canUseLayoutEditorial}
+              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
+                settings.storefront_layout === 'editorial'
+                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } ${!cap?.canUseLayoutEditorial ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {settings.storefront_layout === 'editorial' && cap?.canUseLayoutEditorial && (
+                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
+              )}
+              <span className="font-semibold text-sm">Modern Editorial</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Storytelling emphasis, hero banner, split-panel product pages.
+                {!cap?.canUseLayoutEditorial && (
+                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
+                )}
+              </span>
+            </button>
+            {/* Immersive */}
+            <button
+              type="button"
+              onClick={() => {
+                if (cap?.canUseLayoutImmersive) {
+                  setSettings(s => ({ ...s, storefront_layout: 'immersive' }));
+                }
+              }}
+              disabled={!cap?.canUseLayoutImmersive}
+              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
+                settings.storefront_layout === 'immersive'
+                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } ${!cap?.canUseLayoutImmersive ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {settings.storefront_layout === 'immersive' && cap?.canUseLayoutImmersive && (
+                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
+              )}
+              <span className="font-semibold text-sm">Immersive Commerce</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Conversion-optimized, compact purchase flow, sticky cart.
+                {!cap?.canUseLayoutImmersive && (
+                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
+                )}
+              </span>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Save Button */}
       <div className="flex items-center justify-between">

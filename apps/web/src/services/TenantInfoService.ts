@@ -1973,6 +1973,7 @@ class TenantInfoService extends TenantApiSingleton {
     image_gallery_15: boolean;
     enhanced_seo: boolean;
     storefront_actions: boolean;
+    storefront_layout: 'classic' | 'editorial' | 'immersive';
     default_qr_resolution: string;
     default_gallery_limit: number;
   } | null> {

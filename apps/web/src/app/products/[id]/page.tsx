@@ -33,6 +33,7 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
 import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -41,6 +42,9 @@ import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/service
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
+import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
+import ProductShowcaseLayout from './ProductShowcaseLayout';
+import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -307,7 +311,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ layout_preview?: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);
   // console.log(`ProductPage product 2: `, product);
@@ -329,6 +333,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
+  const productOptFlags = await publicProductOptionsService.getProductOptionFlags(product.tenantId);
   const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
   const crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
@@ -426,6 +431,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       },
     },
   };
+
+  // Resolve product page layout from storefront preference + preview param
+  const { layout_preview } = await searchParams;
+  const productLayout: ProductLayoutKey = resolveProductLayout(
+    optFlags?.storefrontLayout,
+    layout_preview,
+  );
 
   return (
     <>
@@ -591,140 +603,307 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* Two-Column Layout: Categories + Product Description only */}
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Desktop Category Sidebar */}
-            <div className="hidden lg:block lg:w-64 flex-shrink-0">
-              <ProductCategorySidebar
-                tenantId={product.tenantId}
-                categories={storefrontCategories.categories.map((cat: any) => ({
-                  id: cat.id,
-                  name: cat.name,
-                  slug: cat.slug,
-                  count: parseInt(cat.productCount) || 0,
-                }))}
-                totalProducts={totalProducts || 0}
+        {/* Product Detail Area — layout-dependent composition */}
+        {productLayout === 'showcase' ? (
+          /* ── Layout B: Product Showcase ── */
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <TenantPaymentProvider tenantId={product.tenantId}>
+              <ProductShowcaseLayout
+                product={{
+                  id: product.id,
+                  tenantId: product.tenantId,
+                  name: product.name,
+                  title: product.title,
+                  description: product.description,
+                  marketingDescription: product.marketingDescription || product.enhanced_description,
+                  price: product.price,
+                  priceCents: product.priceCents,
+                  listPriceCents: product.listPriceCents,
+                  salePriceCents: product.salePriceCents,
+                  currency: product.currency,
+                  imageUrl: product.imageUrl,
+                  imageGallery: productWithGallery.imageGallery,
+                  brand: product.brand,
+                  sku: product.sku,
+                  stock: product.stock,
+                  availability: product.availability,
+                  condition: product.condition,
+                  tenantCategoryId: product.category?.id,
+                  tenantCategory: product.category ? {
+                    id: product.category.id,
+                    name: product.category.name,
+                    slug: product.category.slug,
+                  } : undefined,
+                  featuredTypes: merchantFilteredFeaturedTypes,
+                  bucketCounts,
+                  features: product.features || [],
+                  specifications: product.specifications,
+                  slug: product.tenant?.slug || '',
+                  variants: product.variants,
+                  productType: product.productType,
+                  digitalDeliveryMethod: product.digitalDeliveryMethod,
+                  digitalAssets: product.digitalAssets,
+                  licenseType: product.licenseType,
+                  accessDurationDays: product.accessDurationDays,
+                  downloadLimit: product.downloadLimit,
+                  productSlug: product.productSlug,
+                  slugType: product.slugType,
+                } as any}
+                tenant={{
+                  id: product.tenantId,
+                  name: product.tenant?.name,
+                  slug: product.tenant?.slug || '',
+                  subscriptionTier: product.tenant?.subscriptionTier,
+                  hasActivePaymentGateway: false,
+                  defaultGatewayType: undefined,
+                  trialEndsAt: tenantProfile?.trialEndsAt,
+                  locationStatus: tenantProfile?.locationStatus,
+                  statusInfo: tenantProfile?.statusInfo,
+                  organizationId: tenantProfile?.organizationId,
+                  subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
+                  showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
+                  hasDirectory: tenantProfile?.hasDirectory,
+                  directoryData: tenantProfile?.directoryData,
+                  profileData: tenantProfile?.profileData,
+                  businessName: product.tenant?.name || tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
+                  phone: tenantProfile?.profileData?.phone_number,
+                  email: tenantProfile?.profileData?.email,
+                  website: tenantProfile?.profileData?.website,
+                  address: tenantProfile?.profileData?.address_line1,
+                  logo_url: tenantProfile?.profileData?.logo_url,
+                  social_links: tenantProfile?.profileData?.social_links,
+                  metadata: tenantProfile?.metadata,
+                } as any}
+                storeStatus={null}
+                gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                currentUrl={currentUrl}
+                initialOptFlags={optFlags}
               />
-              {/* QR Code - under categories */}
-              <TenantQRCode
-                url={currentUrl}
-                tenantId={product.tenantId}
-                label="Scan to Share"
-                capabilityFlags={optFlags}
-                pageType="product"
-              />
-            </div>
-
-            {/* Mobile Category Dropdown */}
-            <div className="lg:hidden w-full">
-              <CategoryMobileDropdown
-                tenantId={product.tenantId}
-                categories={storefrontCategories.categories.map((cat: any) => ({
-                  id: cat.id,
-                  name: cat.name,
-                  slug: cat.slug,
-                  count: parseInt(cat.productCount) || 0,
-                }))}
-                totalProducts={totalProducts || 0}
-              />
-              {/* QR Code - under categories */}
-              <TenantQRCode
-                url={currentUrl}
-                tenantId={product.tenantId}
-                label="Scan to Share"
-                capabilityFlags={optFlags}
-                pageType="product"
-              />
-            </div>
-
-            {/* Product Description Section */}
-
-            <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
-              <TenantPaymentProvider tenantId={product.tenantId}>
-                <TierBasedLandingPage
-                  disableQRCode
-                  product={{
-                    id: product.id,
-                    tenantId: product.tenantId,
-                    name: product.name,
-                    title: product.title,
-                    description: product.description,
-                    marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
-                    price: product.price,
-                    priceCents: product.priceCents,
-                    listPriceCents: product.listPriceCents,
-                    salePriceCents: product.salePriceCents,
-                    currency: product.currency,
-                    imageUrl: product.imageUrl,
-                    imageGallery: productWithGallery.imageGallery,
-                    brand: product.brand,
-                    sku: product.sku,
-                    stock: product.stock,
-                    availability: product.availability,
-                    condition: product.condition,
-                    tenantCategoryId: product.category?.id,
-                    tenantCategory: product.category ? {
-                      id: product.category.id,
-                      name: product.category.name,
-                      slug: product.category.slug,
-                    } : undefined,
-                    featuredTypes: merchantFilteredFeaturedTypes,
-                    bucketCounts,
-                    gtin: undefined, // Not available in new API
-                    mpn: undefined, // Not available in new API
-                    defaultGatewayType: undefined, // Will be determined by tenant
-                    // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
-                    features: product.features || [],
-                    specifications: product.specifications, // Now available from direct field
-                    slug: product.tenant?.slug || '',
-                    variants: product.variants,
-                    productType: product.productType,
-                    digitalDeliveryMethod: product.digitalDeliveryMethod,
-                    digitalAssets: product.digitalAssets,
-                    licenseType: product.licenseType,
-                    accessDurationDays: product.accessDurationDays,
-                    downloadLimit: product.downloadLimit,
-                    productSlug: product.productSlug,
-                    slugType: product.slugType,
-                  } as any}
-                  tenant={{
-                    id: product.tenantId,
-                    name: product.tenant?.name,
-                    slug: product.tenant?.slug || '',
-                    subscriptionTier: product.tenant?.subscriptionTier,
-                    hasActivePaymentGateway: false, // Will be determined by service
-                    defaultGatewayType: undefined,
-                    trialEndsAt: tenantProfile?.trialEndsAt,
-                    locationStatus: tenantProfile?.locationStatus,
-                    statusInfo: tenantProfile?.statusInfo,
-                    organizationId: tenantProfile?.organizationId,
-                    subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
-                    showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
-                    hasDirectory: tenantProfile?.hasDirectory,
-                    directoryData: tenantProfile?.directoryData,
-                    profileData: tenantProfile?.profileData,
-                    businessName: product.tenant?.name || tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
-                    phone: tenantProfile?.profileData?.phone_number,
-                    email: tenantProfile?.profileData?.email,
-                    website: tenantProfile?.profileData?.website,
-                    address: tenantProfile?.profileData?.address_line1,
-                    logo_url: tenantProfile?.profileData?.logo_url,
-                    social_links: tenantProfile?.profileData?.social_links,
-
-                    metadata: tenantProfile?.metadata,
-                  } as any}
-                  storeStatus={null}
-                  gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-                  fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
-                  currentUrl={currentUrl}
-                  initialOptFlags={optFlags}
-                />
-              </TenantPaymentProvider>
-            </div>
-
+            </TenantPaymentProvider>
           </div>
-        </div>
+        ) : productLayout === 'quick-commerce' ? (
+          /* ── Layout C: Quick Commerce ── */
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <TenantPaymentProvider tenantId={product.tenantId}>
+              <ProductQuickCommerceLayout
+                product={{
+                  id: product.id,
+                  tenantId: product.tenantId,
+                  name: product.name,
+                  title: product.title,
+                  description: product.description,
+                  marketingDescription: product.marketingDescription || product.enhanced_description,
+                  price: product.price,
+                  priceCents: product.priceCents,
+                  listPriceCents: product.listPriceCents,
+                  salePriceCents: product.salePriceCents,
+                  currency: product.currency,
+                  imageUrl: product.imageUrl,
+                  imageGallery: productWithGallery.imageGallery,
+                  brand: product.brand,
+                  sku: product.sku,
+                  stock: product.stock,
+                  availability: product.availability,
+                  condition: product.condition,
+                  tenantCategoryId: product.category?.id,
+                  tenantCategory: product.category ? {
+                    id: product.category.id,
+                    name: product.category.name,
+                    slug: product.category.slug,
+                  } : undefined,
+                  featuredTypes: merchantFilteredFeaturedTypes,
+                  bucketCounts,
+                  features: product.features || [],
+                  specifications: product.specifications,
+                  slug: product.tenant?.slug || '',
+                  variants: product.variants,
+                  productType: product.productType,
+                  digitalDeliveryMethod: product.digitalDeliveryMethod,
+                  digitalAssets: product.digitalAssets,
+                  licenseType: product.licenseType,
+                  accessDurationDays: product.accessDurationDays,
+                  downloadLimit: product.downloadLimit,
+                  productSlug: product.productSlug,
+                  slugType: product.slugType,
+                } as any}
+                tenant={{
+                  id: product.tenantId,
+                  name: product.tenant?.name,
+                  slug: product.tenant?.slug || '',
+                  subscriptionTier: product.tenant?.subscriptionTier,
+                  hasActivePaymentGateway: false,
+                  defaultGatewayType: undefined,
+                  trialEndsAt: tenantProfile?.trialEndsAt,
+                  locationStatus: tenantProfile?.locationStatus,
+                  statusInfo: tenantProfile?.statusInfo,
+                  organizationId: tenantProfile?.organizationId,
+                  subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
+                  showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
+                  hasDirectory: tenantProfile?.hasDirectory,
+                  directoryData: tenantProfile?.directoryData,
+                  profileData: tenantProfile?.profileData,
+                  businessName: product.tenant?.name || tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
+                  phone: tenantProfile?.profileData?.phone_number,
+                  email: tenantProfile?.profileData?.email,
+                  website: tenantProfile?.profileData?.website,
+                  address: tenantProfile?.profileData?.address_line1,
+                  logo_url: tenantProfile?.profileData?.logo_url,
+                  social_links: tenantProfile?.profileData?.social_links,
+                  metadata: tenantProfile?.metadata,
+                } as any}
+                storeStatus={null}
+                gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                currentUrl={currentUrl}
+                initialOptFlags={optFlags}
+              />
+            </TenantPaymentProvider>
+          </div>
+        ) : (
+          /* ── Layout A: Classic (default, unchanged) ── */
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Desktop Category Sidebar */}
+              <div className="hidden lg:block lg:w-64 flex-shrink-0">
+                {productOptFlags?.showsCategories !== false && (
+                  <ProductCategorySidebar
+                    tenantId={product.tenantId}
+                    categories={storefrontCategories.categories.map((cat: any) => ({
+                      id: cat.id,
+                      name: cat.name,
+                      slug: cat.slug,
+                      count: parseInt(cat.productCount) || 0,
+                    }))}
+                    totalProducts={totalProducts || 0}
+                  />
+                )}
+                {/* QR Code - under categories */}
+                {productOptFlags?.showsQRCodes !== false && (
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={product.tenantId}
+                    label="Scan to Share"
+                    capabilityFlags={optFlags}
+                    pageType="product"
+                  />
+                )}
+              </div>
+
+              {/* Mobile Category Dropdown */}
+              <div className="lg:hidden w-full">
+                {productOptFlags?.showsCategories !== false && (
+                  <CategoryMobileDropdown
+                    tenantId={product.tenantId}
+                    categories={storefrontCategories.categories.map((cat: any) => ({
+                      id: cat.id,
+                      name: cat.name,
+                      slug: cat.slug,
+                      count: parseInt(cat.productCount) || 0,
+                    }))}
+                    totalProducts={totalProducts || 0}
+                  />
+                )}
+                {/* QR Code - under categories */}
+                {productOptFlags?.showsQRCodes !== false && (
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={product.tenantId}
+                    label="Scan to Share"
+                    capabilityFlags={optFlags}
+                    pageType="product"
+                  />
+                )}
+              </div>
+
+              {/* Product Description Section */}
+
+              <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
+                <TenantPaymentProvider tenantId={product.tenantId}>
+                  <TierBasedLandingPage
+                    disableQRCode
+                    product={{
+                      id: product.id,
+                      tenantId: product.tenantId,
+                      name: product.name,
+                      title: product.title,
+                      description: product.description,
+                      marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
+                      price: product.price,
+                      priceCents: product.priceCents,
+                      listPriceCents: product.listPriceCents,
+                      salePriceCents: product.salePriceCents,
+                      currency: product.currency,
+                      imageUrl: product.imageUrl,
+                      imageGallery: productWithGallery.imageGallery,
+                      brand: product.brand,
+                      sku: product.sku,
+                      stock: product.stock,
+                      availability: product.availability,
+                      condition: product.condition,
+                      tenantCategoryId: product.category?.id,
+                      tenantCategory: product.category ? {
+                        id: product.category.id,
+                        name: product.category.name,
+                        slug: product.category.slug,
+                      } : undefined,
+                      featuredTypes: merchantFilteredFeaturedTypes,
+                      bucketCounts,
+                      gtin: undefined, // Not available in new API
+                      mpn: undefined, // Not available in new API
+                      defaultGatewayType: undefined, // Will be determined by tenant
+                      // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
+                      features: product.features || [],
+                      specifications: product.specifications, // Now available from direct field
+                      slug: product.tenant?.slug || '',
+                      variants: product.variants,
+                      productType: product.productType,
+                      digitalDeliveryMethod: product.digitalDeliveryMethod,
+                      digitalAssets: product.digitalAssets,
+                      licenseType: product.licenseType,
+                      accessDurationDays: product.accessDurationDays,
+                      downloadLimit: product.downloadLimit,
+                      productSlug: product.productSlug,
+                      slugType: product.slugType,
+                    } as any}
+                    tenant={{
+                      id: product.tenantId,
+                      name: product.tenant?.name,
+                      slug: product.tenant?.slug || '',
+                      subscriptionTier: product.tenant?.subscriptionTier,
+                      hasActivePaymentGateway: false, // Will be determined by service
+                      defaultGatewayType: undefined,
+                      trialEndsAt: tenantProfile?.trialEndsAt,
+                      locationStatus: tenantProfile?.locationStatus,
+                      statusInfo: tenantProfile?.statusInfo,
+                      organizationId: tenantProfile?.organizationId,
+                      subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
+                      showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
+                      hasDirectory: tenantProfile?.hasDirectory,
+                      directoryData: tenantProfile?.directoryData,
+                      profileData: tenantProfile?.profileData,
+                      businessName: product.tenant?.name || tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
+                      phone: tenantProfile?.profileData?.phone_number,
+                      email: tenantProfile?.profileData?.email,
+                      website: tenantProfile?.profileData?.website,
+                      address: tenantProfile?.profileData?.address_line1,
+                      logo_url: tenantProfile?.profileData?.logo_url,
+                      social_links: tenantProfile?.profileData?.social_links,
+
+                      metadata: tenantProfile?.metadata,
+                    } as any}
+                    storeStatus={null}
+                    gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                    fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                    currentUrl={currentUrl}
+                    initialOptFlags={optFlags}
+                  />
+                </TenantPaymentProvider>
+              </div>
+
+            </div>
+          </div>
+        )}
         {/* Business Description - Merchant Branding - Full Width */}
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
 
@@ -775,7 +954,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Available Nearby - Cross-Tenant Product Discovery */}
-          {product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
+          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
               <AvailableNearby
                 productSlug={product.productSlug}
@@ -833,18 +1012,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Product Reviews - Full Width */}
-          <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-          <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-              <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
-            </div>
-          </div>
+          {productOptFlags?.showsReviews !== false && (
+            <>
+              <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+              <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                  <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
+                </div>
+              </div>
+            </>
+          )}
 
         </ProductPageStatusWrapper>
 
         {/* Recently Viewed Products */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {optFlags?.showRecentlyViewed !== false && <LastViewed
+          {productOptFlags?.showsRecentlyViewed !== false && <LastViewed
             title="Recently Viewed Products"
             entityType="product"
             limit={4}

@@ -12,6 +12,7 @@ import tenantsRoutes from './public/tenants';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { DEFAULT_SETTINGS } from './storefront-options-settings';
+import ProductOptionsService from '../services/ProductOptionsService';
 
 const router = Router();
 
@@ -3492,6 +3493,20 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
       if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
     }
 
+    // Layout group
+    const layoutGroupEnabled = !!features.storefront_opt_layout_enabled;
+    const layoutGroupDisabled = !!features.storefront_opt_layout_disabled;
+    const layoutEnabled = layoutGroupEnabled && !layoutGroupDisabled;
+    const layoutUntouched = !layoutGroupEnabled && !layoutGroupDisabled;
+    const allowedLayouts: string[] = [];
+    if (flexible || layoutEnabled) {
+      allowedLayouts.push('classic', 'editorial', 'immersive');
+    } else if (layoutUntouched) {
+      if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
+      if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
+      if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
+    }
+
     // Compute effective flags (tier-allowed AND merchant-enabled)
     const optEnabled = prefs.storefront_opt_enabled !== false;
     const effectiveHoursTypes = optEnabled
@@ -3565,6 +3580,9 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
         galleryLimit,
         showEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
         showStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+        storefrontLayout: allowedLayouts.includes(prefs.storefront_layout || 'classic')
+          ? (prefs.storefront_layout || 'classic')
+          : (allowedLayouts[0] || 'classic'),
       },
       tierKey: effectiveTierKey,
     });
@@ -3574,6 +3592,99 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to fetch storefront options',
+    });
+  }
+});
+
+// ====================
+// PRODUCT OPTIONS - Public resolved flags
+// ====================
+
+router.get('/tenant/:tenantId/product-options', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const productService = ProductOptionsService.getInstance();
+    const tierState = await productService.resolveProductOptionsState(tenantId);
+
+    // Fetch merchant preferences
+    const merchantPrefs = await prisma.tenant_product_options_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    // Build resolved section flags (tier-allowed AND merchant-enabled)
+    const prefs = merchantPrefs || {
+      product_opt_recently_viewed: true,
+      product_opt_qr_codes: true,
+      product_opt_recommended: true,
+      product_opt_map_display: true,
+      product_opt_location_display: true,
+      product_opt_hours_display: true,
+      product_opt_enhanced_seo: true,
+      product_opt_reviews: true,
+      product_opt_fulfillment: true,
+      product_opt_categories: true,
+      product_opt_location_availability: true,
+    };
+
+    const enabled = tierState.enabled;
+
+    const sectionFlags = {
+      showsRecentlyViewed: enabled && tierState.showsRecentlyViewed && (prefs as any).product_opt_recently_viewed !== false,
+      showsQRCodes: enabled && tierState.showsQRCodes && (prefs as any).product_opt_qr_codes !== false,
+      showsRecommended: enabled && tierState.showsRecommended && (prefs as any).product_opt_recommended !== false,
+      showsMapDisplay: enabled && tierState.showsMapDisplay && (prefs as any).product_opt_map_display !== false,
+      showsLocationDisplay: enabled && tierState.showsLocationDisplay && (prefs as any).product_opt_location_display !== false,
+      showsHoursDisplay: enabled && tierState.showsHoursDisplay && (prefs as any).product_opt_hours_display !== false,
+      showsEnhancedSEO: enabled && tierState.showsEnhancedSEO && (prefs as any).product_opt_enhanced_seo !== false,
+      showsReviews: enabled && tierState.showsReviews && (prefs as any).product_opt_reviews !== false,
+      showsFulfillment: enabled && tierState.showsFulfillment && (prefs as any).product_opt_fulfillment !== false,
+      showsCategories: enabled && tierState.showsCategories && (prefs as any).product_opt_categories !== false,
+      showsLocationAvailability: enabled && tierState.showsLocationAvailability && (prefs as any).product_opt_location_availability !== false,
+    };
+
+    res.setHeader('Cache-Control', 'public, max-age=60'); // 1 min cache
+    res.json({
+      success: true,
+      flags: {
+        enabled: tierState.enabled,
+        allowedTypes: tierState.allowedTypes,
+        showsVariants: tierState.showsVariants,
+        showsGallery: tierState.showsGallery,
+        showsVideo: tierState.showsVideo,
+        layoutEnabled: tierState.layoutEnabled,
+        allowedLayouts: tierState.allowedLayouts,
+        effectiveLayout: tierState.allowedLayouts.includes((prefs as any).product_layout || 'classic')
+          ? (prefs as any).product_layout || 'classic'
+          : (tierState.allowedLayouts[0] || 'classic'),
+        ...sectionFlags,
+      },
+      tierState: {
+        enabled: tierState.enabled,
+        allowedTypes: tierState.allowedTypes,
+        showsVariants: tierState.showsVariants,
+        showsGallery: tierState.showsGallery,
+        showsVideo: tierState.showsVideo,
+        layoutEnabled: tierState.layoutEnabled,
+        allowedLayouts: tierState.allowedLayouts,
+        showsRecentlyViewed: tierState.showsRecentlyViewed,
+        showsQRCodes: tierState.showsQRCodes,
+        showsRecommended: tierState.showsRecommended,
+        showsMapDisplay: tierState.showsMapDisplay,
+        showsLocationDisplay: tierState.showsLocationDisplay,
+        showsHoursDisplay: tierState.showsHoursDisplay,
+        showsEnhancedSEO: tierState.showsEnhancedSEO,
+        showsReviews: tierState.showsReviews,
+        showsFulfillment: tierState.showsFulfillment,
+        showsCategories: tierState.showsCategories,
+        showsLocationAvailability: tierState.showsLocationAvailability,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching public product options:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch product options',
     });
   }
 });

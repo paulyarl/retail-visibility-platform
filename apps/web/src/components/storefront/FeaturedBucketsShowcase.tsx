@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import FeaturedBucket from './FeaturedBucket';
 
 interface FeaturedBucketsShowcaseProps {
@@ -19,21 +20,30 @@ interface FeaturedBucketsShowcaseProps {
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
   commerceDisabled?: boolean;
+  /** 'stacked' (default) | 'carousel' | 'tabbed' */
+  displayMode?: 'stacked' | 'carousel' | 'tabbed';
 }
 
 /**
  * Featured Buckets Showcase with Pagination
- * 
+ *
  * Displays all featured product types as separate buckets,
  * each with 3 products per page and pagination controls.
+ *
+ * displayMode:
+ *   stacked  — each bucket as a vertical section (default)
+ *   carousel — each bucket as a horizontal scroll carousel
+ *   tabbed   — all buckets behind a tab interface
  */
-export default function FeaturedBucketsShowcase({ 
-  featuredData, 
+export default function FeaturedBucketsShowcase({
+  featuredData,
   tenantId,
   hasActivePaymentGateway,
   defaultGatewayType,
-  commerceDisabled
+  commerceDisabled,
+  displayMode = 'stacked',
 }: FeaturedBucketsShowcaseProps) {
+  const [activeTab, setActiveTab] = useState(0);
   if (!featuredData) {
     return null;
   }
@@ -174,6 +184,111 @@ export default function FeaturedBucketsShowcase({
     return null;
   }
 
+  // ── Tabbed mode ──
+  if (displayMode === 'tabbed') {
+    const activeBucket = bucketsWithProducts[activeTab];
+    if (!activeBucket) return null;
+
+    return (
+      <div className="featured-buckets-showcase">
+        {/* Tab bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide">
+          {bucketsWithProducts.map((bucket, index) => (
+            <button
+              key={bucket.key || bucket.bucketType}
+              onClick={() => setActiveTab(index)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                index === activeTab
+                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+              }`}
+            >
+              <span>{bucket.icon || '⭐'}</span>
+              {bucket.title || 'Featured Products'}
+              <span className="text-xs opacity-60">({bucket.totalCount || 0})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Active bucket */}
+        <FeaturedBucket
+          key={activeBucket.key || activeBucket.bucketType}
+          title={activeBucket.title || 'Featured Products'}
+          icon={activeBucket.icon || '⭐'}
+          gradient={activeBucket.gradient || 'from-blue-500 to-cyan-500'}
+          products={activeBucket.products || []}
+          totalCount={activeBucket.totalCount || 0}
+          bucketType={activeBucket.bucketType || 'featured'}
+          tenantId={tenantId}
+          initialLimit={4}
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
+          commerceDisabled={commerceDisabled}
+        />
+      </div>
+    );
+  }
+
+  // ── Carousel mode ──
+  if (displayMode === 'carousel') {
+    return (
+      <div className="featured-buckets-showcase space-y-10">
+        {bucketsWithProducts.map((bucket) => (
+          <div key={bucket.key || bucket.bucketType}>
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${bucket.gradient || 'from-blue-500 to-cyan-500'} flex items-center justify-center text-white`}>
+                  <span className="text-base">{bucket.icon || '⭐'}</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{bucket.title || 'Featured Products'}</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{bucket.totalCount || 0} products</p>
+                </div>
+              </div>
+              {bucket.totalCount > 3 && (
+                <a
+                  href={`/shops/${tenantId}/featured/${bucket.bucketType}`}
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                >
+                  View All →
+                </a>
+              )}
+            </div>
+
+            {/* Horizontal scroll carousel */}
+            <div
+              className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {(bucket.products || []).map((product: any) => (
+                <div
+                  key={product.id}
+                  className="flex-shrink-0 snap-start w-56 sm:w-64"
+                >
+                  <FeaturedBucket
+                    title=""
+                    icon=""
+                    gradient=""
+                    products={[product]}
+                    totalCount={1}
+                    bucketType={bucket.bucketType || 'featured'}
+                    tenantId={tenantId}
+                    initialLimit={1}
+                    hasActivePaymentGateway={hasActivePaymentGateway}
+                    defaultGatewayType={defaultGatewayType}
+                    commerceDisabled={commerceDisabled}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Stacked mode (default) ──
   return (
     <div className="featured-buckets-showcase space-y-12">
       {bucketsWithProducts.map((bucket) => (
