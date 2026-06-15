@@ -185,6 +185,20 @@ const getFeaturedTypes = (product: ProductData): string[] => {
   return [];
 };
 
+// Aspect ratio classes for image container
+const aspectRatioClasses: Record<string, string> = {
+  '1:1': 'aspect-square',
+  '4:3': 'aspect-[4/3]',
+  '3:4': 'aspect-[3/4]',
+  '16:9': 'aspect-video',
+};
+
+// Truncate text helper
+const truncateText = (text: string, maxLength?: number): string => {
+  if (!maxLength || text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
+
 // Get priority order for badge display (most important first)
 const getBadgePriority = (typeId: string): number => {
   switch (typeId) {
@@ -394,6 +408,11 @@ interface SmartProductCardProps {
   defaultGatewayType?: string;
   // Button layout for narrow cards
   buttonLayout?: 'horizontal' | 'stacked';
+  // Immersive layout enhancements
+  showQuickAdd?: boolean;       // Overlay add-to-cart on hover
+  showQuickView?: boolean;      // "Quick View" eye icon on hover
+  imageAspectRatio?: '1:1' | '4:3' | '3:4' | '16:9';  // Configurable aspect
+  truncateTitle?: number;       // Max chars before ellipsis
 }
 
 export default function SmartProductCard({
@@ -414,6 +433,10 @@ export default function SmartProductCard({
   hasActivePaymentGateway: propHasActivePaymentGateway,
   defaultGatewayType: propDefaultGatewayType,
   buttonLayout = 'stacked',
+  showQuickAdd = false,
+  showQuickView = false,
+  imageAspectRatio = '1:1',
+  truncateTitle,
 }: SmartProductCardProps) {
   // Debug: Log tenant info for directory featured products
   // if (variant === 'featured') {
@@ -1216,45 +1239,93 @@ export default function SmartProductCard({
   }
 
   // Grid variant (default)
+  const aspectClass = aspectRatioClasses[imageAspectRatio] || 'aspect-square';
   return (
     <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
       {/* Grid Image */}
-      <Link href={`/products/${product.id}`} className="block relative aspect-square bg-neutral-100 dark:bg-neutral-700">
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={displayTitle}
-            width={512}
-            height={512}
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover group-hover:scale-105 transition-transform"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
-            <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        )}
+      <div className={`block relative ${aspectClass} bg-neutral-100 dark:bg-neutral-700 overflow-hidden`}>
+        <Link href={`/products/${product.id}`} className="absolute inset-0">
+          {product.imageUrl ? (
+            <Image
+              src={product.imageUrl}
+              alt={displayTitle}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
+              <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+        </Link>
+
         {/* Featured Type Icons Overlay */}
         {product.featuredTypes && product.featuredTypes.length > 0 && (
-          <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+          <div className="absolute bottom-2 left-2 flex flex-col gap-1 z-10">
             {product.featuredTypes.map((type, index) => (
               <FeaturedTypeIcon key={index} type={type} />
             ))}
           </div>
         )}
+
+        {/* Availability badges */}
         {product.availability === 'out_of_stock' && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded z-10">
             Out of Stock
           </div>
         )}
         {product.availability === 'preorder' && (
-          <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded z-10">
             Pre-order
           </div>
         )}
-      </Link>
+
+        {/* Hover overlay: Quick Add + Quick View */}
+        {(showQuickAdd || showQuickView) && (
+          <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex items-center justify-center gap-2 z-20">
+            {showQuickView && (
+              <Link
+                href={`/products/${product.id}`}
+                className="p-2 rounded-full bg-white/90 text-neutral-700 hover:bg-white transition-colors"
+                aria-label="Quick view"
+                title="Quick view"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </Link>
+            )}
+            {showQuickAdd && !product.has_variants && effectiveCanPurchase && (
+              <AddToCartButton
+                product={product}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                hasActivePaymentGateway={effectiveCanPurchase}
+                defaultGatewayType={effectiveGatewayType}
+                layout="horizontal"
+                commerceDisabled={commerceDisabled}
+                className="text-xs py-1.5 px-3"
+              />
+            )}
+            {showQuickAdd && product.has_variants && (
+              <Link
+                href={`/products/${product.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 text-neutral-700 text-xs font-medium hover:bg-white transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Options
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Grid Info */}
       <div className="p-4">
@@ -1270,23 +1341,19 @@ export default function SmartProductCard({
             </span>
           )}
         </div>
-        
+
         <Link href={`/products/${product.id}`}>
           <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
-           
-            {displayTitle}
-
-                      
-                <HoursStatusBadge status={hoursStatus} />
+            {truncateText(displayTitle, truncateTitle)}
           </h3>
         </Link>
-        
+
         {showDescription && product.description && (
           <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
             {product.description}
           </p>
         )}
-        
+
         <div className="flex items-center justify-between mb-3">
           {/* Condition and Stock Status */}
           <div className="flex items-center gap-2 text-xs">
@@ -1306,16 +1373,16 @@ export default function SmartProductCard({
               </span>
             )}
           </div>
-          
+
           <div className="flex-1">
             {product.has_variants && product.price_range ? (
               <>
-                <PriceRangeDisplay 
-                  priceRange={product.price_range} 
+                <PriceRangeDisplay
+                  priceRange={product.price_range}
                   size="default"
                 />
-                <VariantBadge 
-                  variantCount={product.variant_count || 0} 
+                <VariantBadge
+                  variantCount={product.variant_count || 0}
                   size="sm"
                   className="mt-1"
                 />
@@ -1335,10 +1402,10 @@ export default function SmartProductCard({
             </p>
             {product.stock !== undefined && product.stock !== null && (
               <p className={`text-xs font-medium ${
-                product.stock === 0 
-                  ? 'text-red-600 dark:text-red-400' 
-                  : product.stock < 10 
-                    ? 'text-amber-600 dark:text-amber-400' 
+                product.stock === 0
+                  ? 'text-red-600 dark:text-red-400'
+                  : product.stock < 10
+                    ? 'text-amber-600 dark:text-amber-400'
                     : 'text-green-600 dark:text-green-400'
               }`}>
                 Stock: {product.stock}

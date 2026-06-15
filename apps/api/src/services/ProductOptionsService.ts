@@ -18,6 +18,7 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 // ====================
 
 export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
+export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export interface ProductOptionsState {
   enabled: boolean;
@@ -26,6 +27,24 @@ export interface ProductOptionsState {
   showsGallery: boolean;
   showsVideo: boolean;
   isFlexible: boolean;
+  // Product page layout group
+  layoutEnabled: boolean;
+  allowedLayouts: ProductLayoutType[];
+  canUseLayoutClassic: boolean;
+  canUseLayoutEditorial: boolean;
+  canUseLayoutImmersive: boolean;
+  // Product page section group
+  showsRecentlyViewed: boolean;
+  showsQRCodes: boolean;
+  showsRecommended: boolean;
+  showsMapDisplay: boolean;
+  showsLocationDisplay: boolean;
+  showsHoursDisplay: boolean;
+  showsEnhancedSEO: boolean;
+  showsReviews: boolean;
+  showsFulfillment: boolean;
+  showsCategories: boolean;
+  showsLocationAvailability: boolean;
   features: Record<string, boolean>;
 }
 
@@ -140,6 +159,29 @@ class ProductOptionsService {
     if (flexible || hybrid) allowedTypes.push('hybrid');
     if (flexible || service) allowedTypes.push('service');
 
+    // Product page layout feature gates
+    const layoutClassic = !!features.product_layout_classic;
+    const layoutEditorial = !!features.product_layout_editorial;
+    const layoutImmersive = !!features.product_layout_immersive;
+
+    const allowedLayouts: ProductLayoutType[] = [];
+    if (flexible || layoutClassic) allowedLayouts.push('classic');
+    if (flexible || layoutEditorial) allowedLayouts.push('editorial');
+    if (flexible || layoutImmersive) allowedLayouts.push('immersive');
+
+    // Product page section feature gates
+    const showsRecentlyViewed = flexible || !!features.product_opt_recently_viewed;
+    const showsQRCodes = flexible || !!features.product_opt_qr_codes;
+    const showsRecommended = flexible || !!features.product_opt_recommended;
+    const showsMapDisplay = flexible || !!features.product_opt_map_display;
+    const showsLocationDisplay = flexible || !!features.product_opt_location_display;
+    const showsHoursDisplay = flexible || !!features.product_opt_hours_display;
+    const showsEnhancedSEO = flexible || !!features.product_opt_enhanced_seo;
+    const showsReviews = flexible || !!features.product_opt_reviews;
+    const showsFulfillment = flexible || !!features.product_opt_fulfillment;
+    const showsCategories = flexible || !!features.product_opt_categories;
+    const showsLocationAvailability = flexible || !!features.product_opt_location_availability;
+
     return {
       enabled: enabled && !disabled,
       allowedTypes,
@@ -147,6 +189,22 @@ class ProductOptionsService {
       showsGallery: flexible || gallery,
       showsVideo: flexible || video,
       isFlexible: flexible,
+      layoutEnabled: allowedLayouts.length > 0,
+      allowedLayouts,
+      canUseLayoutClassic: flexible || layoutClassic,
+      canUseLayoutEditorial: flexible || layoutEditorial,
+      canUseLayoutImmersive: flexible || layoutImmersive,
+      showsRecentlyViewed,
+      showsQRCodes,
+      showsRecommended,
+      showsMapDisplay,
+      showsLocationDisplay,
+      showsHoursDisplay,
+      showsEnhancedSEO,
+      showsReviews,
+      showsFulfillment,
+      showsCategories,
+      showsLocationAvailability,
       features,
     };
   }
@@ -170,6 +228,22 @@ class ProductOptionsService {
       showsGallery: false,
       showsVideo: false,
       isFlexible: false,
+      layoutEnabled: false,
+      allowedLayouts: [],
+      canUseLayoutClassic: false,
+      canUseLayoutEditorial: false,
+      canUseLayoutImmersive: false,
+      showsRecentlyViewed: false,
+      showsQRCodes: false,
+      showsRecommended: false,
+      showsMapDisplay: false,
+      showsLocationDisplay: false,
+      showsHoursDisplay: false,
+      showsEnhancedSEO: false,
+      showsReviews: false,
+      showsFulfillment: false,
+      showsCategories: false,
+      showsLocationAvailability: false,
       features: {},
     };
   }

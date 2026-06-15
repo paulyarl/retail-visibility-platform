@@ -42,6 +42,9 @@ import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmSer
 import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
 import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
 import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
+import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
+import StorefrontEditorialLayout from './StorefrontEditorialLayout';
+import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 
@@ -662,6 +665,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     );
   }
 
+  // Resolve storefront layout from option flags + preview param
+  const storefrontLayout: StorefrontLayoutKey = resolveStorefrontLayout(
+    storefrontOptionFlags?.storefrontLayout,
+    view === 'editorial' ? 'editorial' : view === 'immersive' ? 'immersive' : undefined,
+  );
+
   return (
     <ProductSingletonProvider>
       <TenantPaymentProvider
@@ -669,45 +678,132 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
         initialCommerceSettings={commerceSettings}
         initialPaymentGatewaySettings={paymentGatewaySettings}
       >
-        <StorefrontClientWrapper
-          tenantId={resolvedTenantId || tenant.id || id}
-          tenant={tenant}
-          platformSettings={platformSettings}
-          mapLocation={mapLocation}
-          hasBranding={hasBranding}
-          storeStatus={storeStatus}
-          categories={categories}
-          productCategories={productCategories}
-          storeCategories={storeCategories}
-          uncategorizedCount={uncategorizedCount}
-          businessName={businessName}
-          businessHours={businessHours}
-          search={search}
-          category={category}
-          featured={featured}
-          view={view}
-          isProductsOnly={isProductsOnly}
-          directoryPublished={directoryPublished}
-          tenantSlug={tenantSlug}
-          primaryGBPCategory={primaryGBPCategory}
-          secondaryGBPCategories={secondaryGBPCategories}
-          tier={tier}
-          features={features}
-          totalAllProducts={totalAllProducts}
-          fullWidthLayout={false} // Default to constrained layout
-          products={products}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={total}
-          locationStatus={tenant?.locationStatus}
-          statusInfo={tenant?.statusInfo}
-          initialStorefrontOptionFlags={storefrontOptionFlags}
-          initialCommerceSettings={commerceSettings}
-          initialPaymentGatewaySettings={paymentGatewaySettings}
-          initialStorefrontTypeSettings={storefrontTypeSettings}
-          initialFaqFlags={faqOptionsFlags}
-          initialCrmFlags={crmOptionsFlags}
-        />
+        {storefrontLayout === 'editorial' ? (
+          /* ── Layout B: Modern Editorial ── */
+          <StorefrontEditorialLayout
+            tenantId={resolvedTenantId || tenant.id || id}
+            tenant={tenant}
+            platformSettings={platformSettings}
+            mapLocation={mapLocation}
+            hasBranding={hasBranding}
+            storeStatus={storeStatus}
+            categories={categories}
+            productCategories={productCategories}
+            storeCategories={storeCategories}
+            uncategorizedCount={uncategorizedCount}
+            businessName={businessName}
+            businessHours={businessHours}
+            search={search}
+            category={category}
+            featured={featured}
+            view={view}
+            isProductsOnly={isProductsOnly}
+            directoryPublished={directoryPublished}
+            tenantSlug={tenantSlug}
+            primaryGBPCategory={primaryGBPCategory}
+            secondaryGBPCategories={secondaryGBPCategories}
+            tier={tier}
+            features={features}
+            totalAllProducts={totalAllProducts}
+            fullWidthLayout={false}
+            products={products}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={total}
+            locationStatus={tenant?.locationStatus}
+            statusInfo={tenant?.statusInfo}
+            initialStorefrontOptionFlags={storefrontOptionFlags}
+            initialCommerceSettings={commerceSettings}
+            initialPaymentGatewaySettings={paymentGatewaySettings}
+            initialStorefrontTypeSettings={storefrontTypeSettings}
+            initialFaqFlags={faqOptionsFlags}
+            initialCrmFlags={crmOptionsFlags}
+            layoutVariant="editorial"
+          />
+        ) : storefrontLayout === 'immersive' ? (
+          /* ── Layout C: Immersive Commerce ── */
+          <StorefrontImmersiveLayout
+            tenantId={resolvedTenantId || tenant.id || id}
+            tenant={tenant}
+            platformSettings={platformSettings}
+            mapLocation={mapLocation}
+            hasBranding={hasBranding}
+            storeStatus={storeStatus}
+            categories={categories}
+            productCategories={productCategories}
+            storeCategories={storeCategories}
+            uncategorizedCount={uncategorizedCount}
+            businessName={businessName}
+            businessHours={businessHours}
+            search={search}
+            category={category}
+            featured={featured}
+            view={view}
+            isProductsOnly={isProductsOnly}
+            directoryPublished={directoryPublished}
+            tenantSlug={tenantSlug}
+            primaryGBPCategory={primaryGBPCategory}
+            secondaryGBPCategories={secondaryGBPCategories}
+            tier={tier}
+            features={features}
+            totalAllProducts={totalAllProducts}
+            fullWidthLayout={false}
+            products={products}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={total}
+            locationStatus={tenant?.locationStatus}
+            statusInfo={tenant?.statusInfo}
+            initialStorefrontOptionFlags={storefrontOptionFlags}
+            initialCommerceSettings={commerceSettings}
+            initialPaymentGatewaySettings={paymentGatewaySettings}
+            initialStorefrontTypeSettings={storefrontTypeSettings}
+            initialFaqFlags={faqOptionsFlags}
+            initialCrmFlags={crmOptionsFlags}
+            layoutVariant="immersive"
+          />
+        ) : (
+          /* ── Layout A: Classic (default, unchanged) ── */
+          <StorefrontClientWrapper
+            tenantId={resolvedTenantId || tenant.id || id}
+            tenant={tenant}
+            platformSettings={platformSettings}
+            mapLocation={mapLocation}
+            hasBranding={hasBranding}
+            storeStatus={storeStatus}
+            categories={categories}
+            productCategories={productCategories}
+            storeCategories={storeCategories}
+            uncategorizedCount={uncategorizedCount}
+            businessName={businessName}
+            businessHours={businessHours}
+            search={search}
+            category={category}
+            featured={featured}
+            view={view}
+            isProductsOnly={isProductsOnly}
+            directoryPublished={directoryPublished}
+            tenantSlug={tenantSlug}
+            primaryGBPCategory={primaryGBPCategory}
+            secondaryGBPCategories={secondaryGBPCategories}
+            tier={tier}
+            features={features}
+            totalAllProducts={totalAllProducts}
+            fullWidthLayout={false} // Default to constrained layout
+            products={products}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={total}
+            locationStatus={tenant?.locationStatus}
+            statusInfo={tenant?.statusInfo}
+            initialStorefrontOptionFlags={storefrontOptionFlags}
+            initialCommerceSettings={commerceSettings}
+            initialPaymentGatewaySettings={paymentGatewaySettings}
+            initialStorefrontTypeSettings={storefrontTypeSettings}
+            initialFaqFlags={faqOptionsFlags}
+            initialCrmFlags={crmOptionsFlags}
+          />
+        )}
       </TenantPaymentProvider>
     </ProductSingletonProvider>
   );

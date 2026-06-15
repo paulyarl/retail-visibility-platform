@@ -15,6 +15,7 @@ import {
   StorefrontOptQRContentType as QRContentTypeInternal,
   StorefrontOptGalleryType as GalleryTypeInternal,
   StorefrontOptAdvancedType as AdvancedTypeInternal,
+  StorefrontOptLayoutType as LayoutTypeInternal,
   StorefrontOptionsState,
 } from '@/services/CapabilityResolutionService';
 
@@ -27,12 +28,13 @@ export type StorefrontOptQRResolutionType = QRResolutionTypeInternal;
 export type StorefrontOptQRContentType = QRContentTypeInternal;
 export type StorefrontOptGalleryType = GalleryTypeInternal;
 export type StorefrontOptAdvancedType = AdvancedTypeInternal;
+export type StorefrontOptLayoutType = LayoutTypeInternal;
 
 // ====================
 // GROUP DEFINITIONS
 // ====================
 
-export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'advanced';
+export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'advanced' | 'layout';
 
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
@@ -42,6 +44,7 @@ export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_5
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
+export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
 // ====================
 // TYPE GUARDS
@@ -77,6 +80,10 @@ export function isGalleryType(type: string): type is StorefrontOptGalleryType {
 
 export function isAdvancedType(type: string): type is StorefrontOptAdvancedType {
   return ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType);
+}
+
+export function isLayoutType(type: string): type is StorefrontOptLayoutType {
+  return LAYOUT_TYPES.includes(type as StorefrontOptLayoutType);
 }
 
 // ====================
@@ -126,6 +133,10 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   // Advanced
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced', icon: '🔍', color: 'lime', selectionMode: 'toggle' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced', icon: '⚡', color: 'yellow', selectionMode: 'toggle' },
+  // Layout
+  classic: { key: 'classic', label: 'Classic Layout', description: 'Traditional single-column layout', group: 'layout', icon: '📄', color: 'slate', selectionMode: 'radio' },
+  editorial: { key: 'editorial', label: 'Modern Editorial', description: 'Storytelling emphasis, hero banner layout', group: 'layout', icon: '📰', color: 'violet', selectionMode: 'radio' },
+  immersive: { key: 'immersive', label: 'Immersive Commerce', description: 'Conversion-optimized compact purchase flow', group: 'layout', icon: '🛒', color: 'emerald', selectionMode: 'radio' },
 };
 
 /**
@@ -148,6 +159,7 @@ export function getTypesByGroup(group: StorefrontOptGroup): string[] {
     case 'qr': return [...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES];
     case 'gallery': return [...GALLERY_TYPES];
     case 'advanced': return [...ADVANCED_TYPES];
+    case 'layout': return [...LAYOUT_TYPES];
     default: return [];
   }
 }
@@ -181,6 +193,7 @@ export const STOREFRONT_OPT_GROUPS: StorefrontOptGroupMeta[] = [
   { key: 'qr', label: 'QR Code Display', description: 'QR code generation and display options', icon: '📱', color: 'indigo' },
   { key: 'gallery', label: 'Gallery Display', description: 'Image gallery limits', icon: '🖼️', color: 'orange' },
   { key: 'advanced', label: 'Advanced', description: 'Advanced storefront features', icon: '⚡', color: 'lime' },
+  { key: 'layout', label: 'Storefront Layout', description: 'Storefront page layout options', icon: '📐', color: 'violet' },
 ];
 
 export function getGroupMeta(group: StorefrontOptGroup): StorefrontOptGroupMeta | undefined {
@@ -201,7 +214,7 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
   const allTypes = group ? getTypesByGroup(group) : [
     ...HOURS_TYPES, ...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed',
     ...INFO_TYPES, ...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES,
-    ...GALLERY_TYPES, ...ADVANCED_TYPES,
+    ...GALLERY_TYPES, ...ADVANCED_TYPES, ...LAYOUT_TYPES,
   ];
 
   return allTypes.filter(type => {
@@ -214,6 +227,7 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
     if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return state.allowedQRContentTypes.includes(type as StorefrontOptQRContentType);
     if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return state.allowedGalleryTypes.includes(type as StorefrontOptGalleryType);
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
+    if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
   });
 }
@@ -244,6 +258,9 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (state.allowedGalleryTypes.length > 0) effective.push(...state.allowedGalleryTypes);
   if (state.canUseEnhancedSEO) effective.push('enhanced_seo');
   if (state.canUseStorefrontActions) effective.push('storefront_actions');
+  if (state.canUseLayoutClassic) effective.push('classic');
+  if (state.canUseLayoutEditorial) effective.push('editorial');
+  if (state.canUseLayoutImmersive) effective.push('immersive');
 
   return effective;
 }
@@ -312,6 +329,8 @@ export interface StorefrontOptionFlags {
   // Advanced
   showEnhancedSEO: boolean;
   showStorefrontActions: boolean;
+  // Layout
+  storefrontLayout: 'classic' | 'editorial' | 'immersive';
 }
 
 /**
@@ -339,6 +358,9 @@ export function getStorefrontOptionFlags(state: StorefrontOptionsState): Storefr
     galleryLimit: getActiveGalleryLimit(state),
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
+    storefrontLayout: state.canUseLayoutClassic
+      ? state.merchantPreferences.storefront_layout || 'classic'
+      : state.allowedLayouts[0] || 'classic',
   };
 }
 
@@ -366,6 +388,7 @@ export const DEFAULT_STOREFRONT_OPTION_FLAGS: StorefrontOptionFlags = {
   galleryLimit: 0,
   showEnhancedSEO: false,
   showStorefrontActions: false,
+  storefrontLayout: 'classic',
 };
 
 /**
@@ -389,6 +412,7 @@ export interface StorefrontPageFlags {
   showEnhancedSEO: boolean;
   showStorefrontActions: boolean;
   galleryLimit: number;
+  storefrontLayout: 'classic' | 'editorial' | 'immersive';
 }
 
 /** Flags relevant to the public directory entry page */
@@ -429,6 +453,7 @@ export function getStorefrontPageFlags(flags: StorefrontOptionFlags): Storefront
     showEnhancedSEO: flags.showEnhancedSEO,
     showStorefrontActions: flags.showStorefrontActions,
     galleryLimit: flags.galleryLimit,
+    storefrontLayout: flags.storefrontLayout,
   };
 }
 

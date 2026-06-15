@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import StorefrontOptionsService from '../services/StorefrontOptionsService';
 
 const router = Router();
 
@@ -42,6 +43,8 @@ const storefrontOptionsSettingsSchema = z.object({
   // Advanced group
   enhanced_seo: z.boolean().optional(),
   storefront_actions: z.boolean().optional(),
+  // Layout selection
+  storefront_layout: z.enum(['classic', 'editorial', 'immersive']).optional(),
   // Defaults
   default_qr_resolution: z.string().optional(),
   default_gallery_limit: z.number().int().min(5).max(15).optional(),
@@ -75,6 +78,7 @@ export const DEFAULT_SETTINGS = {
   image_gallery_15: false,
   enhanced_seo: false,
   storefront_actions: false,
+  storefront_layout: 'classic',
   default_qr_resolution: '1024',
   default_gallery_limit: 5,
 };
@@ -88,10 +92,23 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
       where: { tenant_id: tenantId },
     });
 
+    const rawSettings = settings || DEFAULT_SETTINGS;
+
+    // Resolve tier-gated layout options
+    const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
+    const allowedLayouts = tierState.enabled ? tierState.allowedLayouts : [];
+    const effectiveLayout: 'classic' | 'editorial' | 'immersive' =
+      allowedLayouts.includes(rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive')
+        ? rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive'
+        : (allowedLayouts[0] || 'classic');
+
     if (!settings) {
       return res.json({
         success: true,
-        settings: DEFAULT_SETTINGS,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          storefront_layout: effectiveLayout,
+        },
       });
     }
 
@@ -121,6 +138,7 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
         image_gallery_15: settings.image_gallery_15,
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
+        storefront_layout: effectiveLayout,
         default_qr_resolution: settings.default_qr_resolution,
         default_gallery_limit: settings.default_gallery_limit,
       },
@@ -155,6 +173,18 @@ router.put('/:tenantId/storefront-options', authenticateToken, async (req, res) 
     }
 
     const data = validationResult.data;
+
+    // Enforce tier gate for layout selection
+    if (data.storefront_layout) {
+      const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
+      if (!tierState.enabled || !tierState.allowedLayouts.includes(data.storefront_layout)) {
+        return res.status(403).json({
+          success: false,
+          error: 'tier_restricted',
+          message: `Layout '${data.storefront_layout}' is not available on your current plan`,
+        });
+      }
+    }
 
     // Enforce radio logic for gallery: only one of image_gallery_5/10/15 can be true
     if (data.image_gallery_5 || data.image_gallery_10 || data.image_gallery_15) {
@@ -221,6 +251,7 @@ router.put('/:tenantId/storefront-options', authenticateToken, async (req, res) 
         image_gallery_15: settings.image_gallery_15,
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
+        storefront_layout: settings.storefront_layout || 'classic',
         default_qr_resolution: settings.default_qr_resolution,
         default_gallery_limit: settings.default_gallery_limit,
       },

@@ -15,6 +15,18 @@ const productOptionsSettingsSchema = z.object({
   product_variant_enabled: z.boolean().optional(),
   product_gallery_enabled: z.boolean().optional(),
   product_video_enabled: z.boolean().optional(),
+  product_layout: z.enum(['classic', 'editorial', 'immersive']).optional(),
+  product_opt_recently_viewed: z.boolean().optional(),
+  product_opt_qr_codes: z.boolean().optional(),
+  product_opt_recommended: z.boolean().optional(),
+  product_opt_map_display: z.boolean().optional(),
+  product_opt_location_display: z.boolean().optional(),
+  product_opt_hours_display: z.boolean().optional(),
+  product_opt_enhanced_seo: z.boolean().optional(),
+  product_opt_reviews: z.boolean().optional(),
+  product_opt_fulfillment: z.boolean().optional(),
+  product_opt_categories: z.boolean().optional(),
+  product_opt_location_availability: z.boolean().optional(),
 });
 
 // Default settings
@@ -26,6 +38,18 @@ const DEFAULT_SETTINGS = {
   product_variant_enabled: true,
   product_gallery_enabled: true,
   product_video_enabled: false,
+  product_layout: 'classic' as const,
+  product_opt_recently_viewed: true,
+  product_opt_qr_codes: true,
+  product_opt_recommended: true,
+  product_opt_map_display: true,
+  product_opt_location_display: true,
+  product_opt_hours_display: true,
+  product_opt_enhanced_seo: true,
+  product_opt_reviews: true,
+  product_opt_fulfillment: true,
+  product_opt_categories: true,
+  product_opt_location_availability: true,
 };
 
 // Map feature key (DB column) to ProductType
@@ -41,6 +65,21 @@ const FEATURE_KEY_TO_TIER_FLAG: Record<string, keyof Pick<import('../services/Pr
   product_variant_enabled: 'showsVariants',
   product_gallery_enabled: 'showsGallery',
   product_video_enabled: 'showsVideo',
+};
+
+// Section feature keys gated by tier section flags
+const SECTION_FEATURE_KEYS: Record<string, keyof import('../services/ProductOptionsService').ProductOptionsState> = {
+  product_opt_recently_viewed: 'showsRecentlyViewed',
+  product_opt_qr_codes: 'showsQRCodes',
+  product_opt_recommended: 'showsRecommended',
+  product_opt_map_display: 'showsMapDisplay',
+  product_opt_location_display: 'showsLocationDisplay',
+  product_opt_hours_display: 'showsHoursDisplay',
+  product_opt_enhanced_seo: 'showsEnhancedSEO',
+  product_opt_reviews: 'showsReviews',
+  product_opt_fulfillment: 'showsFulfillment',
+  product_opt_categories: 'showsCategories',
+  product_opt_location_availability: 'showsLocationAvailability',
 };
 
 // Get product options settings for a tenant
@@ -64,6 +103,18 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
           product_variant_enabled: false,
           product_gallery_enabled: false,
           product_video_enabled: false,
+          product_layout: 'classic',
+          product_opt_recently_viewed: false,
+          product_opt_qr_codes: false,
+          product_opt_recommended: false,
+          product_opt_map_display: false,
+          product_opt_location_display: false,
+          product_opt_hours_display: false,
+          product_opt_enhanced_seo: false,
+          product_opt_reviews: false,
+          product_opt_fulfillment: false,
+          product_opt_categories: false,
+          product_opt_location_availability: false,
         },
         tierState,
       });
@@ -77,7 +128,7 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
     const rawSettings = merchantPrefs || DEFAULT_SETTINGS;
 
     // Enforce tier gates: force off any type not in tier's allowedTypes, force off toggles not allowed by tier
-    const tierFilteredSettings: Record<string, boolean> = {};
+    const tierFilteredSettings: Record<string, boolean | string> = {};
     for (const [key, type] of Object.entries(FEATURE_KEY_TO_TYPE)) {
       const isAllowed = tierState.allowedTypes.includes(type);
       tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
@@ -86,6 +137,17 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
       const isAllowed = tierState[tierFlag];
       tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
     }
+    for (const [key, tierFlag] of Object.entries(SECTION_FEATURE_KEYS)) {
+      const isAllowed = tierState[tierFlag as keyof typeof tierState];
+      tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
+    }
+
+    // Enforce product page layout tier gate
+    const allowedLayouts = tierState.enabled ? tierState.allowedLayouts : [];
+    const effectiveLayout = allowedLayouts.includes((rawSettings as any).product_layout)
+      ? (rawSettings as any).product_layout
+      : (allowedLayouts[0] || 'classic');
+    tierFilteredSettings.product_layout = effectiveLayout;
 
     res.json({
       success: true,
@@ -133,9 +195,24 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
       });
     }
 
+    // Layout gate: validate requested product page layout
+    if (data.product_layout) {
+      if (!tierState.allowedLayouts.includes(data.product_layout)) {
+        return res.status(403).json({
+          success: false,
+          error: 'tier_restricted',
+          message: `Product page layout '${data.product_layout}' is not available on your current plan`,
+        });
+      }
+    }
+
     // Type gate: validate each feature toggle against tier capabilities
-    const filteredData: Record<string, boolean> = {};
+    const filteredData: Record<string, boolean | string> = {};
     for (const [key, value] of Object.entries(data)) {
+      if (key === 'product_layout') {
+        filteredData[key] = value;
+        continue;
+      }
       // Check product type gates
       const type = FEATURE_KEY_TO_TYPE[key];
       if (type) {
@@ -168,6 +245,21 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
           });
         }
         // If value is false, silently skip
+        continue;
+      }
+      // Check section feature gates
+      const sectionFlag = SECTION_FEATURE_KEYS[key];
+      if (sectionFlag) {
+        if (tierState[sectionFlag]) {
+          filteredData[key] = value;
+        } else if (value === true) {
+          return res.status(403).json({
+            success: false,
+            error: 'tier_restricted',
+            message: `Product section feature '${key}' is not available on your current plan`,
+            feature_key: key,
+          });
+        }
         continue;
       }
       // Other keys pass through
@@ -210,6 +302,18 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
         product_variant_enabled: settings.product_variant_enabled,
         product_gallery_enabled: settings.product_gallery_enabled,
         product_video_enabled: settings.product_video_enabled,
+        product_layout: (settings as any).product_layout || 'classic',
+        product_opt_recently_viewed: (settings as any).product_opt_recently_viewed ?? true,
+        product_opt_qr_codes: (settings as any).product_opt_qr_codes ?? true,
+        product_opt_recommended: (settings as any).product_opt_recommended ?? true,
+        product_opt_map_display: (settings as any).product_opt_map_display ?? true,
+        product_opt_location_display: (settings as any).product_opt_location_display ?? true,
+        product_opt_hours_display: (settings as any).product_opt_hours_display ?? true,
+        product_opt_enhanced_seo: (settings as any).product_opt_enhanced_seo ?? true,
+        product_opt_reviews: (settings as any).product_opt_reviews ?? true,
+        product_opt_fulfillment: (settings as any).product_opt_fulfillment ?? true,
+        product_opt_categories: (settings as any).product_opt_categories ?? true,
+        product_opt_location_availability: (settings as any).product_opt_location_availability ?? true,
       },
     });
   } catch (error) {
