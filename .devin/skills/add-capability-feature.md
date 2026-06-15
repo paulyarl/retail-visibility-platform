@@ -107,7 +107,18 @@ After adding to `features_list`, the feature is **not automatically available to
 
 4. **Update the frontend `CapabilityResolutionService`** to expose the new flag to React components.
 
-5. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
+5. **Add a merchant gate table column** if the feature is tenant-configurable:
+   ```sql
+   ALTER TABLE tenant_product_options_settings
+     ADD COLUMN IF NOT EXISTS product_opt_<feature> boolean DEFAULT true;
+   ```
+   Then update the Prisma schema to match:
+   ```prisma
+   product_opt_<feature> Boolean? @default(true)
+   ```
+   (For storefront features, use `tenant_storefront_options_settings` and prefix with `qr_`, `storefront_`, etc.)
+
+6. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
 
 ## Verification Queries
 
