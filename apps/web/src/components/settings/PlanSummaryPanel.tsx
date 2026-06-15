@@ -10,6 +10,7 @@ import {
   StorefrontState,
   FeaturedType,
   ProductType,
+  ProductLayoutType,
   GatewayType,
   BarcodeScanMode,
   IntegrationType,
@@ -24,6 +25,7 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
+  StorefrontOptLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
@@ -176,6 +178,18 @@ const STOREFRONT_OPT_GALLERY_LABELS: Record<StorefrontOptGalleryType, string> = 
 const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> = {
   enhanced_seo: 'Enhanced SEO',
   storefront_actions: 'CTA Buttons',
+};
+
+const STOREFRONT_OPT_LAYOUT_LABELS: Record<StorefrontOptLayoutType, string> = {
+  classic: 'Classic Layout',
+  editorial: 'Editorial Layout',
+  immersive: 'Immersive Layout',
+};
+
+const PRODUCT_LAYOUT_LABELS: Record<ProductLayoutType, string> = {
+  classic: 'Classic Layout',
+  editorial: 'Editorial Layout',
+  immersive: 'Immersive Layout',
 };
 
 const FAQ_MANAGEMENT_LABELS: Record<FaqManagementType, string> = {
@@ -411,6 +425,24 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     addPo(po.showsVariants, 'Variants', po.effectiveShowsVariants);
     addPo(po.showsGallery, 'Gallery', po.effectiveShowsGallery);
     addPo(po.showsVideo, 'Video', po.effectiveShowsVideo);
+    // Layouts
+    po.allowedLayouts.forEach(t => {
+      const label = PRODUCT_LAYOUT_LABELS[t] || t;
+      addPo(true, label, t === po.effectiveLayout);
+    });
+    // Product page section features
+    addPo(po.showsRecentlyViewed, 'Recently Viewed', po.effectiveShowsRecentlyViewed);
+    addPo(po.showsQRCodes, 'QR Codes', po.effectiveShowsQRCodes);
+    addPo(po.showsQRLogo, 'QR Logo', po.effectiveShowsQRLogo);
+    addPo(po.showsRecommended, 'Recommended', po.effectiveShowsRecommended);
+    addPo(po.showsMapDisplay, 'Map', po.effectiveShowsMapDisplay);
+    addPo(po.showsLocationDisplay, 'Location', po.effectiveShowsLocationDisplay);
+    addPo(po.showsHoursDisplay, 'Hours', po.effectiveShowsHoursDisplay);
+    addPo(po.showsEnhancedSEO, 'Enhanced SEO', po.effectiveShowsEnhancedSEO);
+    addPo(po.showsReviews, 'Reviews', po.effectiveShowsReviews);
+    addPo(po.showsFulfillment, 'Fulfillment', po.effectiveShowsFulfillment);
+    addPo(po.showsCategories, 'Categories', po.effectiveShowsCategories);
+    addPo(po.showsLocationAvailability, 'Availability', po.effectiveShowsLocationAvailability);
     summaries.push({
       key: 'product_options',
       label: CAPABILITY_DISPLAY.product_options.label,
@@ -528,6 +560,8 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
     so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
     so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
+    // Layouts
+    so.allowedLayouts.forEach(t => addSo(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? so.canUseLayoutClassic : t === 'editorial' ? so.canUseLayoutEditorial : so.canUseLayoutImmersive));
     summaries.push({
       key: 'storefront_options',
       label: CAPABILITY_DISPLAY.storefront_options.label,

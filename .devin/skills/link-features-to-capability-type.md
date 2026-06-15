@@ -130,6 +130,11 @@ Linking features to a capability type only makes them **available at the capabil
 
 4. **Add a merchant toggle** on the settings page if the feature should be configurable per-tenant.
 
+5. **Update the PlanSummaryPanel** (`@/components/settings/PlanSummaryPanel.tsx`) to surface the new features in the tenant dashboard plan summary:
+   - Add label maps for any new feature types / layouts.
+   - Update `resolveCapabilitySummaries` to list the new features under the correct capability block (e.g. `product_options`, `storefront_options`).
+   - If the feature uses an effective state (tier-allowed + merchant preference), add the effective flag to `CapabilityResolutionService` and reference it in the panel.
+
 ## Verification Queries
 
 ```sql
@@ -151,6 +156,24 @@ FROM tier_features_list tfl
 JOIN subscription_tiers_list stl ON stl.id = tfl.tier_id
 WHERE tfl.feature_key = 'product_opt_recently_viewed';
 ```
+
+## Sub-Feature Pattern (Granular Tier Gating)
+
+Some capabilities use a **group gate + sub-features** pattern for finer tier control.
+
+**Example — Product Options QR:**
+- `product_opt_qr_codes` — master gate: show QR code on product pages
+- `product_opt_qr_logo` — sub-feature: embed merchant logo inside the QR code
+
+This mirrors the storefront pattern (`storefront_opt_qr_enabled` → `qr_logo`, `qr_product`, etc.).
+
+When adding a sub-feature:
+1. Insert the new key into `features_list`.
+2. Link it to the capability type via `capability_features_list`.
+3. Enable it for tiers in `tier_features_list` (copy from the parent feature's tier assignments).
+4. Update the backend `*OptionsService` to resolve the sub-feature flag.
+5. Update the frontend `CapabilityResolutionService` to expose the sub-feature flag.
+6. Update the merchant settings route to gate the sub-feature toggle.
 
 ## Common Pitfalls
 

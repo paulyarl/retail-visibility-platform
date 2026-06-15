@@ -36,6 +36,7 @@ export interface ProductOptionsState {
   // Product page section group
   showsRecentlyViewed: boolean;
   showsQRCodes: boolean;
+  showsQRLogo: boolean;
   showsRecommended: boolean;
   showsMapDisplay: boolean;
   showsLocationDisplay: boolean;
@@ -172,6 +173,7 @@ class ProductOptionsService {
     // Product page section feature gates
     const showsRecentlyViewed = flexible || !!features.product_opt_recently_viewed;
     const showsQRCodes = flexible || !!features.product_opt_qr_codes;
+    const showsQRLogo = flexible || !!features.product_opt_qr_logo;
     const showsRecommended = flexible || !!features.product_opt_recommended;
     const showsMapDisplay = flexible || !!features.product_opt_map_display;
     const showsLocationDisplay = flexible || !!features.product_opt_location_display;
@@ -196,6 +198,7 @@ class ProductOptionsService {
       canUseLayoutImmersive: flexible || layoutImmersive,
       showsRecentlyViewed,
       showsQRCodes,
+      showsQRLogo,
       showsRecommended,
       showsMapDisplay,
       showsLocationDisplay,
@@ -235,6 +238,7 @@ class ProductOptionsService {
       canUseLayoutImmersive: false,
       showsRecentlyViewed: false,
       showsQRCodes: false,
+      showsQRLogo: false,
       showsRecommended: false,
       showsMapDisplay: false,
       showsLocationDisplay: false,
