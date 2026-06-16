@@ -479,9 +479,17 @@ export default function StorefrontImmersiveLayout({
       {!isProductsOnly && !storefrontStatus.shouldShowPanel && (businessDescription || showsContact || showsHours) && (
         <section className="bg-white dark:bg-neutral-950 py-8">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-            <button
+            <div
               onClick={() => setInfoExpanded(!infoExpanded)}
-              className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setInfoExpanded(!infoExpanded);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4 text-left">
                 {logoUrl && (
@@ -501,7 +509,7 @@ export default function StorefrontImmersiveLayout({
               <svg className={`w-5 h-5 text-neutral-400 transition-transform ${infoExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
-            </button>
+            </div>
 
             {infoExpanded && (
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
