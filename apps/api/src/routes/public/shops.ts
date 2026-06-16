@@ -234,7 +234,7 @@ router.get('/featured/sale', async (req, res) => {
 
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,
@@ -243,7 +243,7 @@ router.get('/featured/sale', async (req, res) => {
       type: 'sale',
       metadata: {
         mvRefreshedAt,
-        mvSource: 'mv_global_discovery',
+        mvSource: 'mv_storefront_discovery',
         cacheMaxAge: 900,
         expirationHandling: true
       }
@@ -279,7 +279,7 @@ router.get('/featured/seasonal', async (req, res) => {
 
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,
@@ -288,7 +288,7 @@ router.get('/featured/seasonal', async (req, res) => {
       type: 'seasonal',
       metadata: {
         mvRefreshedAt,
-        mvSource: 'mv_global_discovery',
+        mvSource: 'mv_storefront_discovery',
         cacheMaxAge: 900,
         expirationHandling: true
       }
@@ -324,7 +324,7 @@ router.get('/featured/staff', async (req, res) => {
 
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,
@@ -333,7 +333,7 @@ router.get('/featured/staff', async (req, res) => {
       type: 'staff_pick',
       metadata: {
         mvRefreshedAt,
-        mvSource: 'mv_global_discovery',
+        mvSource: 'mv_storefront_discovery',
         cacheMaxAge: 900
       }
     });
@@ -372,7 +372,7 @@ router.get('/featured/selection', async (req, res) => {
 
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,
@@ -381,7 +381,7 @@ router.get('/featured/selection', async (req, res) => {
       type: 'store_selection',
       metadata: {
         mvRefreshedAt,
-        mvSource: 'mv_global_discovery',
+        mvSource: 'mv_storefront_discovery',
         cacheMaxAge: 900
       }
     });
@@ -409,7 +409,7 @@ router.get('/trending-shops', async (req, res) => {
     }) as any[];
 
     res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery_aggregated');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery_aggregated');
 
     res.json({
       success: true,
@@ -417,7 +417,7 @@ router.get('/trending-shops', async (req, res) => {
       count: shops.length,
       type: 'trending_shops',
       metadata: {
-        mvSource: 'mv_global_discovery_aggregated',
+        mvSource: 'mv_storefront_discovery_aggregated',
         cacheMaxAge: 900,
         minimumProducts: 3,
         qualityMetrics: true

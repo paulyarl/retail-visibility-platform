@@ -65,24 +65,30 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     
     // Use mv_storefront_discovery (no is_published filter) so featured products
     // are visible on storefront regardless of directory publication status
+    // Use per-type LIMIT with window function to ensure each bucket gets products
     const query = `
-      WITH ${TIER_FEATURED_ACCESS_CTE}
-      SELECT 
-        mv.*
-      FROM mv_storefront_discovery mv
-      ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
-      ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
-      WHERE mv.tenant_id = $1
-        AND mv.featured_is_active = true
-        AND mv.item_status = 'active'
-        AND mv.visibility = 'public'
-        ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
-        ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
-      ORDER BY mv.featured_priority DESC, mv.featured_at DESC
-      LIMIT $2
+      WITH ${TIER_FEATURED_ACCESS_CTE},
+      ranked_products AS (
+        SELECT 
+          mv.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY mv.featured_type
+            ORDER BY mv.featured_priority DESC, mv.featured_at DESC
+          ) as type_rank
+        FROM mv_storefront_discovery mv
+        ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
+        ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
+        WHERE mv.tenant_id = $1
+          AND mv.featured_is_active = true
+          AND mv.item_status = 'active'
+          AND mv.visibility = 'public'
+          ${TIER_FEATURED_ACCESS_WHERE.replace(/mgd\./g, 'mv.')}
+          ${TENANT_PREFS_WHERE.replace(/mgd\./g, 'mv.')}
+      )
+      SELECT * FROM ranked_products WHERE type_rank <= $2
     `;
     
-    const result = await getDirectPool().query(query, [tenantId, limitNum * 2]); // Get more to account for duplicates
+    const result = await getDirectPool().query(query, [tenantId, limitNum]);
     
     // Divide products by featured_type for component props
     const buckets: Record<string, any[]> = {
@@ -175,7 +181,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
           daysUntilExpiration: product.days_until_expiration,
           isExpired: product.is_expired,
           isExpiringSoon: product.is_expiring_soon,
-          // Include all additional fields from mv_global_discovery
+          // Include all additional fields from mv_storefront_discovery
           marketingDescription: product.marketing_description,
           manufacturer: product.manufacturer,
           condition: product.condition,
@@ -298,6 +304,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
 
     res.json({
       success: true,
+      data: {
+        buckets: transformedBuckets,
+        bucketCounts,
+        totalCount,
+        shops: []
+      },
       items: allProducts,
       totalCount,
       bucketCounts
@@ -396,7 +408,7 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
       daysUntilExpiration: product.days_until_expiration,
       isExpired: product.is_expired,
       isExpiringSoon: product.is_expiring_soon,
-      // Include all additional fields from mv_global_discovery
+      // Include all additional fields from mv_storefront_discovery
       marketingDescription: product.marketing_description,
       manufacturer: product.manufacturer,
       condition: product.condition,

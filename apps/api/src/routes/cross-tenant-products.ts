@@ -25,7 +25,7 @@ router.get('/products/:productSlug', async (req: Request, res: Response) => {
       limit = 20 
     } = req.query;
 
-    // Query mv_global_discovery for all instances of this product
+    // Query mv_storefront_discovery for all instances of this product
     const products = await prisma.$queryRaw`
       SELECT 
         mgd.inventory_item_id,
@@ -64,7 +64,7 @@ router.get('/products/:productSlug', async (req: Request, res: Response) => {
           )
           ELSE NULL
         END as distance_km
-      FROM mv_global_discovery mgd
+      FROM mv_storefront_discovery mgd
       WHERE mgd.product_slug = ${productSlug}
         AND mgd.item_status = 'active'
         AND mgd.visibility = 'public'

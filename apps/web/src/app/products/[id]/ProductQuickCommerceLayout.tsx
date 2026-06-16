@@ -25,6 +25,7 @@ import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import ProductVariantSelector from '@/components/products/ProductVariantSelector';
 import { FeaturedTypeBadges } from '@/components/products/FeaturedTypeBadges';
+import { getFeaturedTypeDisplay } from '@/types/product-display';
 import { SafeImage } from '@/components/SafeImage';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
@@ -32,7 +33,10 @@ import ProductActions from '@/components/products/ProductActions';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
 import { Package, Download, Globe, ChevronLeft, ShoppingCart, Star, ChevronDown, MapPin, Phone, Clock } from 'lucide-react';
+import LastViewed from '@/components/directory/LastViewed';
+import TenantMapSection from '@/components/tenant/TenantMapSection';
 
 interface ProductQuickCommerceLayoutProps {
   product: any;
@@ -46,6 +50,7 @@ interface ProductQuickCommerceLayoutProps {
   slugType?: string;
   disableQRCode?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
+  productOptFlags?: ProductOptionFlags | null;
 }
 
 function QuickCommerceSkeleton() {
@@ -79,6 +84,7 @@ export default function ProductQuickCommerceLayout({
   slugType,
   disableQRCode,
   initialOptFlags,
+  productOptFlags,
 }: ProductQuickCommerceLayoutProps) {
   const {
     loading,
@@ -101,15 +107,13 @@ export default function ProductQuickCommerceLayout({
     effectiveGatewayType,
     commerceDisabled,
     isStorefrontEnabled,
-    isRetailStore,
-    isOnlineStore,
-    isServiceStore,
+    isRetailStore: hookIsRetailStore,
     optFlags,
-    showsLocation,
-    showsMap,
+    showsLocation: hookShowsLocation,
+    showsMap: hookShowsMap,
     showsHours,
     showsQRCodes,
-    showsLocationAvailability,
+    showsLocationAvailability: hookShowsLocationAvailability,
     showStatusPanel,
     effectiveTierPart,
     displayLogo,
@@ -131,6 +135,18 @@ export default function ProductQuickCommerceLayout({
     initialOptFlags,
     currentUrl,
   });
+
+  // Use server-provided productOptFlags directly to avoid hydration mismatches
+  // caused by client-side capability hooks returning undefined on initial render.
+  const showsLocation = productOptFlags?.showsLocationDisplay ?? hookShowsLocation ?? true;
+  const showsMap = productOptFlags?.showsMapDisplay ?? hookShowsMap ?? true;
+  const showsLocationAvailability = productOptFlags?.showsLocationAvailability ?? hookShowsLocationAvailability ?? true;
+  const showsRecentlyViewed = productOptFlags?.showsRecentlyViewed ?? true;
+  const showsCategories = productOptFlags?.showsCategories ?? true;
+
+  // Compute store type from tenant prop for stable SSR/client consistency
+  const isOnlineStore = tenant?.storeType === 'online' || tenant?.metadata?.store_type === 'online' || false;
+  const isRetailStore = !isOnlineStore && (tenant?.storeType === 'retail' || tenant?.metadata?.store_type === 'retail' || (hookIsRetailStore ?? true));
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -334,7 +350,7 @@ export default function ProductQuickCommerceLayout({
             {/* Featured badges */}
             {product.featuredTypes && product.featuredTypes.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                <FeaturedTypeBadges featuredTypes={product.featuredTypes} />
+                <FeaturedTypeBadges featuredTypes={getFeaturedTypeDisplay(product.featuredTypes)} />
               </div>
             )}
 
@@ -547,7 +563,7 @@ export default function ProductQuickCommerceLayout({
         </section>
 
         {/* STORE INFO ACCORDION */}
-        {showsLocation && !isOnlineStore && tenant && (
+        {showsLocation && !isOnlineStore && tenant && !showStatusPanel && (
           <section className="mb-6 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
             <details className="group">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
@@ -596,6 +612,24 @@ export default function ProductQuickCommerceLayout({
         {showStatusPanel && (
           <section className="mb-6">
             <StorefrontStatusPanel tenantId={product.tenantId} tenantInfo={tenant as any} />
+          </section>
+        )}
+
+        {/* MAP SECTION */}
+        {showsMap && tenant?.metadata?.location && (
+          <section className="mb-6 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+            <TenantMapSection
+              location={tenant.metadata.location}
+              className="h-48"
+            />
+          </section>
+        )}
+
+        {/* RECENTLY VIEWED */}
+        {showsRecentlyViewed && (
+          <section className="bg-white dark:bg-neutral-950 py-8 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-white mb-4">Recently Viewed</h2>
+            <LastViewed entityType="product" limit={4} />
           </section>
         )}
       </div>

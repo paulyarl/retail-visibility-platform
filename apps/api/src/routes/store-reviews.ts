@@ -193,7 +193,7 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
         mgd.product_metadata
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
-      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
+      LEFT JOIN mv_storefront_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
       ${whereClause}
       ${orderByClause}
       ${limitClause}
@@ -850,7 +850,7 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
         mgd.product_metadata
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
-      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
+      LEFT JOIN mv_storefront_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
       ${whereClause}
       ORDER BY sr.created_at ASC
       ${limitClause}
@@ -1604,7 +1604,7 @@ router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request
         END as product_url
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
-      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
+      LEFT JOIN mv_storefront_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
       ${whereClause}
       ${orderByClause}
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
@@ -1620,11 +1620,11 @@ router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request
    /*  console.log('[DEBUG] /reviews/approved raw result count:', reviewsResult.rows.length);
     console.log('[DEBUG] /reviews/approved first row product_id:', reviewsResult.rows[0]?.product_id); */
     
-    // Check if product exists in mv_global_discovery
+    // Check if product exists in mv_storefront_discovery
     if (reviewsResult.rows.length > 0 && reviewsResult.rows[0]?.product_id) {
       const productCheckQuery = `
         SELECT inventory_item_id, product_name, tenant_id 
-        FROM mv_global_discovery 
+        FROM mv_storefront_discovery 
         WHERE inventory_item_id = $1 AND tenant_id = $2
         LIMIT 1
       `;
@@ -1632,11 +1632,11 @@ router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request
         reviewsResult.rows[0].product_id, 
         tenantId
       ]);
-     /*  console.log('[DEBUG] Product exists in mv_global_discovery:', productCheckResult.rows.length > 0);
+     /*  console.log('[DEBUG] Product exists in mv_storefront_discovery:', productCheckResult.rows.length > 0);
       if (productCheckResult.rows.length > 0) {
         console.log('[DEBUG] Found product:', productCheckResult.rows[0]);
       } else {
-        console.log('[DEBUG] Product NOT found in mv_global_discovery for:', {
+        console.log('[DEBUG] Product NOT found in mv_storefront_discovery for:', {
           product_id: reviewsResult.rows[0].product_id,
           tenant_id: tenantId
         });

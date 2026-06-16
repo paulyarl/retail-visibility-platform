@@ -140,7 +140,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     const universalSku = slugRegistry.universal_sku || slugRegistry.original_sku || slug;
     // console.log(`[LocationAvailability] Found slug registry for ${slug}: product_slug=${productSlug}`);
 
-    // Query mv_global_discovery for availability across all tenants
+    // Query mv_storefront_discovery for availability across all tenants
     // This is the authoritative source for product availability
     const pool = require('../utils/db-pool').getDirectPool();
     
@@ -170,7 +170,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         store_review_count,
         item_status,
         visibility
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE product_slug = $1
         AND item_status = 'active'
         AND visibility = 'public'
@@ -347,7 +347,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
     const maxDist = parseInt(maxDistance);
     const maxRes = parseInt(maxResults);
 
-    // Query mv_global_discovery for availability
+    // Query mv_storefront_discovery for availability
     const pool = require('../utils/db-pool').getDirectPool();
     
     let locationQuery = `
@@ -374,7 +374,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
         tenant_longitude,
         store_average_rating,
         store_review_count
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE product_slug = $1
         AND item_status = 'active'
         AND visibility = 'public'

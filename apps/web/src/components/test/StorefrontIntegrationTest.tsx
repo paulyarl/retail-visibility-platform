@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { FeaturedProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
-import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
+import FeaturedProductsSection from '@/components/storefront/_archived/FeaturedProductsSection';
 
 interface TestResult {
   success: boolean;

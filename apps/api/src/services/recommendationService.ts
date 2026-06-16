@@ -19,7 +19,7 @@ export interface Recommendation {
   state?: string;
   distance?: number;
 
-  // Rich product data from mv_global_discovery
+  // Rich product data from mv_storefront_discovery
   productId?: string;
   productName?: string;
   productTitle?: string;
@@ -144,7 +144,7 @@ export async function getStoresViewedBySameUsers(
         mgd.tenant_category,
         osv.view_count as score
       FROM other_stores_viewed osv
-      JOIN mv_global_discovery mgd ON osv.entity_id::text = mgd.tenant_id::text
+      JOIN mv_storefront_discovery mgd ON osv.entity_id::text = mgd.tenant_id::text
       WHERE mgd.item_status = 'active'
         AND mgd.visibility = 'public'
     `;
@@ -159,7 +159,7 @@ export async function getStoresViewedBySameUsers(
       score: row.score,
       reason: 'Users who viewed this store also viewed this store',
 
-      // Rich store data from mv_global_discovery
+      // Rich store data from mv_storefront_discovery
       storeAverageRating: typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating,
       storeReviewCount: row.store_review_count,
       viewCount: row.view_count,
@@ -298,7 +298,7 @@ export async function getTrendingNearby(
   const pool = getDirectPool();
   
   try {
-    // Use mv_global_discovery for comprehensive store data
+    // Use mv_storefront_discovery for comprehensive store data
     const query = `
       SELECT 
         DISTINCT mgd.tenant_id,
@@ -324,7 +324,7 @@ export async function getTrendingNearby(
             COS(RADIANS(mgd.tenant_longitude) - RADIANS(${userLng})) + 
             SIN(RADIANS(${userLat})) * SIN(RADIANS(mgd.tenant_latitude))
           ) as distance` : 'NULL as distance'}
-      FROM mv_global_discovery mgd
+      FROM mv_storefront_discovery mgd
       WHERE mgd.item_status = 'active'
         AND mgd.visibility = 'public'
         AND mgd.trending_score > 0
@@ -368,7 +368,7 @@ export async function getTrendingNearby(
         score: finalScore,
         reason: `Trending nearby - ${row.view_count} views by ${row.unique_viewers} people${row.store_average_rating ? ` (${locationWeightedRating.toFixed(1)}⭐)` : ''}`,
 
-        // Rich store data from mv_global_discovery
+        // Rich store data from mv_storefront_discovery
         storeAverageRating: typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating,
         storeReviewCount: row.store_review_count,
         viewCount: row.view_count,
@@ -578,7 +578,7 @@ export async function getProductsViewedBySameUsers(
         mgd.tenant_state as state,
         opv.view_count as score
       FROM other_products_viewed opv
-      JOIN mv_global_discovery mgd ON opv.entity_id::text = mgd.inventory_item_id::text
+      JOIN mv_storefront_discovery mgd ON opv.entity_id::text = mgd.inventory_item_id::text
       WHERE mgd.item_status = 'active'
         AND mgd.visibility = 'public'
         AND mgd.has_active_payment_gateway = true
@@ -594,7 +594,7 @@ export async function getProductsViewedBySameUsers(
       score: row.score,
       reason: 'Users who viewed this product also viewed this',
 
-      // Rich product data from mv_global_discovery
+      // Rich product data from mv_storefront_discovery
       productId: row.product_id,
       productName: row.product_name,
       productTitle: row.product_title,
@@ -1072,7 +1072,7 @@ export async function getLastViewedItems(
             )
             FROM storefront_products_mv sp
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
-            LEFT JOIN mv_global_discovery mgd ON sp.tenant_id = mgd.tenant_id 
+            LEFT JOIN mv_storefront_discovery mgd ON sp.tenant_id = mgd.tenant_id 
              AND mgd.inventory_item_id = sp.id
             LEFT JOIN directory_category dc on dc.id = sp.tenant_category_id
             WHERE sp.id = rv.entity_id

@@ -92,6 +92,14 @@ export default function StorefrontImmersiveLayout({
     showsContact,
     showsSocialMedia,
     showsStorefrontActions,
+    showsReviews,
+    showsFulfillment,
+    showsLocationAvailability,
+    showsGallery,
+    showsVideo,
+    showsVariants,
+    showsQRCodes,
+    allowedFeaturedTypes,
     faqEnabled,
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
@@ -289,12 +297,12 @@ export default function StorefrontImmersiveLayout({
 
 
       {/* HERO STRIP */}
-      {heroProducts.length > 0 && (
+      {!isProductsOnly && heroProducts.length > 0 && (
         <section className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-800">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">Trending Now</h2>
-              <Link href={`/tenant/${tenantId}?featured=1`} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
+              <Link href={`/tenant/${tenantId}?featured=true&products_only=true`} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
             </div>
             <EnhancedProductDisplay
               products={heroProducts as any}
@@ -303,8 +311,9 @@ export default function StorefrontImmersiveLayout({
               displayMode="carousel"
               carouselItemsVisible={4}
               variant="grid"
-              showGallery={false}
-              showVariants={false}
+              showGallery={showsGallery}
+              showVariants={showsVariants}
+              allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
             />
           </div>
         </section>
@@ -314,7 +323,7 @@ export default function StorefrontImmersiveLayout({
       <div className="sticky top-[56px] md:top-[88px] z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
           <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-            {categoryChips.map((chip) => {
+            {showsCategoryProduct && categoryChips.map((chip) => {
               const isActive = (!activeCategorySlug && !chip.slug) || activeCategorySlug === chip.slug;
               return (
                 <button
@@ -360,6 +369,15 @@ export default function StorefrontImmersiveLayout({
 
       {/* PRODUCT GRID */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
+        {isProductsOnly && featured && (
+          <div className="flex items-center gap-3 mb-4">
+            <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+            <span className="text-neutral-300 dark:text-neutral-600">|</span>
+            <h1 className="text-lg font-semibold text-neutral-900 dark:text-white">
+              {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}
+            </h1>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
             {search ? `Results for "${search}"` : `${totalItems} product${totalItems !== 1 ? 's' : ''}`}
@@ -403,6 +421,7 @@ export default function StorefrontImmersiveLayout({
                     truncateTitle={40}
                     hasActivePaymentGateway={hasActivePaymentGateway}
                     defaultGatewayType={defaultGatewayType}
+                    allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
                     className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
                   />
                 ))}
@@ -421,6 +440,7 @@ export default function StorefrontImmersiveLayout({
                     showQuickView
                     hasActivePaymentGateway={hasActivePaymentGateway}
                     defaultGatewayType={defaultGatewayType}
+                    allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
                     className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
                   />
                 ))}
@@ -436,10 +456,10 @@ export default function StorefrontImmersiveLayout({
         )}
       </main>
 
-      <SectionDivider variant="gradient" />
+      {!isProductsOnly && <SectionDivider variant="gradient" />}
 
       {/* TABBED FEATURED SECTIONS */}
-      {featuredData && featuredData.buckets && featuredData.buckets.length > 0 && (
+      {!isProductsOnly && featuredData && featuredData.buckets && featuredData.buckets.length > 0 && (
         <section className="bg-neutral-50 dark:bg-neutral-900 py-10">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <FeaturedBucketsShowcase
@@ -448,20 +468,28 @@ export default function StorefrontImmersiveLayout({
               hasActivePaymentGateway={hasActivePaymentGateway}
               defaultGatewayType={defaultGatewayType}
               displayMode="tabbed"
+              allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
             />
           </div>
         </section>
       )}
-
-      <SectionDivider variant="spacer" />
+      {!isProductsOnly && <SectionDivider variant="spacer" />}
 
       {/* QUICK STORE INFO ROW */}
-      {!storefrontStatus.shouldShowPanel && (businessDescription || showsContact || showsHours) && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (businessDescription || showsContact || showsHours) && (
         <section className="bg-white dark:bg-neutral-950 py-8">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-            <button
+            <div
               onClick={() => setInfoExpanded(!infoExpanded)}
-              className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setInfoExpanded(!infoExpanded);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4 text-left">
                 {logoUrl && (
@@ -472,7 +500,7 @@ export default function StorefrontImmersiveLayout({
                 <div>
                   <h3 className="font-semibold text-sm text-neutral-900 dark:text-white">{businessName}</h3>
                   <div className="flex items-center gap-3 mt-1">
-                    <StoreRatingDisplay tenantId={tenantId} variant="inline" />
+                    {showsReviews && <StoreRatingDisplay tenantId={tenantId} variant="inline" />}
                     {showsHoursStatus && <HoursStatusBadge status={hoursStatus} size="sm" animate={showsAnimatedHours} />}
                     {contactInfo.address && <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-[200px]">{contactInfo.address}</span>}
                   </div>
@@ -481,7 +509,7 @@ export default function StorefrontImmersiveLayout({
               <svg className={`w-5 h-5 text-neutral-400 transition-transform ${infoExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
-            </button>
+            </div>
 
             {infoExpanded && (
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -525,11 +553,10 @@ export default function StorefrontImmersiveLayout({
           </div>
         </section>
       )}
-
-      <SectionDivider variant="spacer" />
+      {!isProductsOnly && <SectionDivider variant="spacer" />}
 
       {/* FAQ + INQUIRY SIDE BY SIDE */}
-      {faqEnabled && (
+      {!isProductsOnly && faqEnabled && (
         <section className="bg-white dark:bg-neutral-950 py-10">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -549,7 +576,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* RECOMMENDATIONS */}
-      {!storefrontStatus.shouldShowPanel && isRetailStore && showsRecommendStore && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && isRetailStore && showsRecommendStore && (
         <section className="bg-neutral-50 dark:bg-neutral-900 py-10" aria-label="Recommended stores">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-white mb-4">Recommended for You</h2>
@@ -559,7 +586,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* RECENTLY VIEWED */}
-      {!storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
         <section className="bg-white dark:bg-neutral-950 py-10" aria-label="Recently viewed">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-white mb-4">Recently Viewed</h2>
@@ -569,7 +596,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* COMPACT FOOTER */}
-      <StorefrontFooter
+      {!isProductsOnly && <StorefrontFooter
         tenantId={tenantId}
         businessName={businessName}
         businessDescription={businessDescription}
@@ -585,7 +612,7 @@ export default function StorefrontImmersiveLayout({
         optFlags={optFlags}
         currentUrl={currentUrl}
         variant="compact"
-      />
+      />}
     </div>
   );
 }

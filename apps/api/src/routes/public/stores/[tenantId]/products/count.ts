@@ -1,7 +1,7 @@
 /**
  * Store Product Count Endpoint
  * 
- * Returns the number of products for a store from mv_global view
+ * Returns the number of products for a store from mv_storefront_discovery view
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,10 +14,10 @@ export async function GET(
   try {
     const { tenantId } = params;
 
-    // Query mv_global for product count
+    // Query mv_storefront_discovery for product count
     const countQuery = `
       SELECT COUNT(DISTINCT inventory_item_id) as product_count
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'

@@ -137,7 +137,7 @@ export class FeaturedService {
       console.error('[FeaturedService] Primary query failed:', error);
 
       try {
-        // Fallback: Also use mv_global_discovery with direct pool
+        // Fallback: Also use mv_storefront_discovery with direct pool
         products = await this.getFeaturedProductsFallback(query, limit);
         console.log(`[FeaturedService] Fallback query successful, found ${products.length} products`);
       } catch (fallbackError) {
@@ -187,7 +187,7 @@ export class FeaturedService {
         dsl.address as tenant_address,
         dsl.latitude as tenant_latitude,
         dsl.longitude as tenant_longitude
-      FROM mv_global_discovery mv
+      FROM mv_storefront_discovery mv
       ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
       ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       JOIN tenants t ON t.id = mv.tenant_id
@@ -209,7 +209,7 @@ export class FeaturedService {
   }
 
   /**
-   * Fallback query using mv_global_discovery
+   * Fallback query using mv_storefront_discovery
    */
   private async getFeaturedProductsFallback(query: FeaturedProductQuery, limit: number): Promise<FeaturedProduct[]> {
     const { getDirectPool } = await import('../utils/db-pool');
@@ -220,7 +220,7 @@ export class FeaturedService {
       WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT
         mv.*
-      FROM mv_global_discovery mv
+      FROM mv_storefront_discovery mv
       ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
       ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = COALESCE($1, mv.tenant_id)

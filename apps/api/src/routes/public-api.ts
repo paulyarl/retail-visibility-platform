@@ -421,17 +421,17 @@ router.get('/stores/:identifier/profile', async (req, res) => {
         mv_refreshed_at,
         -- Get product count
         (SELECT COUNT(DISTINCT inventory_item_id)
-         FROM mv_global_discovery 
+         FROM mv_storefront_discovery 
          WHERE tenant_id = $1 
            AND item_status = 'active' 
            AND visibility = 'public') as product_count,
         -- Check if any products are featured
         (SELECT BOOL_OR(is_actively_featured)
-         FROM mv_global_discovery 
+         FROM mv_storefront_discovery 
          WHERE tenant_id = $1 
            AND item_status = 'active' 
            AND visibility = 'public') as has_featured_products
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
@@ -1325,7 +1325,7 @@ router.get('/shops/locations', async (req, res) => {
       data: locations,
       count: locations.length,
       metadata: {
-        source: 'mv_global_discovery',
+        source: 'mv_storefront_discovery',
         cacheTTL: 30 * 60 * 1000, // 30 minutes
         responseTime
       }
@@ -1376,7 +1376,7 @@ router.get('/shops/nearby', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache
     res.setHeader('X-Response-Time', responseTime.toString());
     res.setHeader('X-Service-Source', 'ShopService');
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,
@@ -1384,7 +1384,7 @@ router.get('/shops/nearby', async (req, res) => {
       count: shops.length,
       type: 'nearby_shops',
       metadata: {
-        source: 'mv_global_discovery',
+        source: 'mv_storefront_discovery',
         cacheTTL: 5 * 60 * 1000, // 5 minutes
         responseTime,
         searchLocation: {
@@ -1580,7 +1580,7 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
 
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 minutes
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
     res.setHeader('X-Service-Source', 'DiscoveryService');
 
     res.json({
@@ -1762,7 +1762,7 @@ router.get('/shops/:scope/:bucketType', async (req, res) => {
     
     res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 minutes
-    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-MV-Source', 'mv_storefront_discovery');
 
     res.json({
       success: true,

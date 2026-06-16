@@ -12,6 +12,7 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 // Capability data now passed as server-fetched props — eliminates client-side waterfall 
 import { Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
@@ -22,9 +23,7 @@ import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursColla
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
-// import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
 // import SmartProductCard from '@/components/products/SmartProductCard';
-// import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
 import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
 // import StorefrontActions from '@/components/products/StorefrontActions';
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
@@ -178,6 +177,15 @@ export default function StorefrontClientWrapper({
   };
   const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
 
+  // Featured options (capability-gated allowed types)
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const allowedFeaturedTypes = useMemo(() => {
+    if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
+      return featuredCap.data.effectiveTypes as string[];
+    }
+    return [];
+  }, [featuredCap.data]);
+
   // Memoize tenant info object to prevent infinite re-renders
   const tenantInfoForStatus = useMemo(() => ({
     id: tenantId,
@@ -237,6 +245,13 @@ export default function StorefrontClientWrapper({
   const showsContact = optFlags?.showContact ?? true;
   const showsSocialMedia = optFlags?.showSocialMedia ?? true;
   const showsStorefrontActions = optFlags?.showStorefrontActions ?? true;
+  const showsQRCodes = optFlags?.showQRCodes ?? true;
+  // Product-page concepts default to enabled on the storefront since there are
+  // no equivalent storefront option fields; product pages use ProductOptionFlags directly.
+  const showsReviews = true;
+  const showsFulfillment = true;
+  const showsGallery = true;
+  const showsVariants = true;
 
   // console.log(`----------------------------isRetailStore---------------------------------------: ${isRetailStore}`)
   // console.log(`optFlags: ${optFlags}`)
@@ -561,7 +576,7 @@ export default function StorefrontClientWrapper({
                 )}
 
                 {/* Social Links */}
-                {!storefrontStatus.shouldShowPanel && tenant.profileData?.social_links && (
+                {!storefrontStatus.shouldShowPanel && showsSocialMedia && tenant.profileData?.social_links && (
                   <div>
                     <div className="flex flex-wrap gap-3">
                       {(tenant.profileData.social_links.facebook
@@ -833,7 +848,7 @@ export default function StorefrontClientWrapper({
                     totalProducts={totalItems || 0}
                   />}
                   {/* QR Code - under categories */}
-                  <TenantQRCode
+                  {showsQRCodes && <TenantQRCode
                     url={currentUrl}
                     tenantId={tenantId}
                     label="Scan to Share"
@@ -843,18 +858,18 @@ export default function StorefrontClientWrapper({
                     className="mt-4"
                     pageType="storefront"
                     capabilityFlags={storefrontOptionFlags}
-                  />
+                  />}
                 </div>
 
                 {/* Mobile Category Dropdown */}
                 <div className="lg:hidden">
-                  <CategoryMobileDropdown
+                  {showsCategoryProduct && <CategoryMobileDropdown
                     tenantId={tenantId}
                     categories={categories}
                     totalProducts={totalItems || 0}
-                  />
+                  />}
                   {/* QR Code - under categories */}
-                  <TenantQRCode
+                  {showsQRCodes && <TenantQRCode
                     url={currentUrl}
                     tenantId={tenantId}
                     label="Scan to Share"
@@ -864,7 +879,7 @@ export default function StorefrontClientWrapper({
                     className="mt-4"
                     pageType="storefront"
                     capabilityFlags={storefrontOptionFlags}
-                  />
+                  />}
                 </div>
 
                 {/* Main Content Area */}
@@ -959,6 +974,7 @@ export default function StorefrontClientWrapper({
               tenantId={tenantId}
               hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
               defaultGatewayType={tenant.metadata?.defaultGatewayType}
+              allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
             />}
           </div>
         </div>
@@ -1039,7 +1055,7 @@ export default function StorefrontClientWrapper({
                     <TenantMapSection location={mapLocation} />
                   ) : !storefrontStatus.shouldShowPanel && showsMap && showsInteractiveMaps && isRetailStore && contactInfo.address ? (
                     <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
-                  ) : tenant && showsInteractiveMaps && (
+                  ) : tenant && showsMap && showsInteractiveMaps && (
                     <StorefrontMap
                       tenant={{
                         id: tenantId,
@@ -1065,7 +1081,7 @@ export default function StorefrontClientWrapper({
             </div>
           </div>
           {/* Fulfillment Options */}
-          {!storefrontStatus.shouldShowPanel && (
+          {!storefrontStatus.shouldShowPanel && showsFulfillment && (
             <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
           )}
         </div>
@@ -1073,7 +1089,7 @@ export default function StorefrontClientWrapper({
       {/* Store Ratings and Reviews */}
       {/* Gradient border line */}
       {/* Advanced Catalog Navigation */}
-      {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && isRetailStore && (
+      {!storefrontStatus.shouldShowPanel && showsCategoryProduct && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && isRetailStore && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <CollapsibleCatalogSidebar
             tenantId={tenantId}
@@ -1125,7 +1141,7 @@ export default function StorefrontClientWrapper({
         </div>
       )}
 
-      {!storefrontStatus.shouldShowPanel && (
+      {!storefrontStatus.shouldShowPanel && showsReviews && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">

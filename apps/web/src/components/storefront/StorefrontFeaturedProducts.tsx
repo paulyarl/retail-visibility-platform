@@ -347,9 +347,11 @@ interface FeaturedSectionWithProductsProps {
   maxProducts?: number;
   defaultGatewayType?: string;
   instanceId?: string;
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
-function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, defaultGatewayType, instanceId = 'default' }: FeaturedSectionWithProductsProps) {
+function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, defaultGatewayType, instanceId = 'default', allowedFeaturedTypes }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
   const contextPayment = useTenantPaymentOptional();
@@ -571,7 +573,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Featured system
                   featuredType: product.featuredType || type || undefined,
-                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
+                  featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
+                    .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
@@ -583,7 +586,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Legacy metadata
                   metadata: {
-                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : []))
+                    featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
+                      .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
                   }
                 }}
                 variant="featured"
@@ -739,7 +743,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Featured system
                   featuredType: product.featuredType || type || undefined,
-                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
+                  featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
+                    .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
@@ -751,7 +756,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 
                   // Legacy metadata
                   metadata: {
-                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : []))
+                    featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
+                      .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
                   }
                 }}
                 variant="list"
@@ -868,7 +874,8 @@ export default function StorefrontFeaturedProducts({
             isTrackable: product.isTrackable,
 
             // Featured Status
-            featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+            featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : []))
+              .filter((t: string) => allFeaturedTypes.length === 0 || allFeaturedTypes.includes(t)),
             featuredType: product.featuredType,
             featuredPriority: product.featuredPriority,
             featuredAt: product.featuredAt,
@@ -999,10 +1006,6 @@ export default function StorefrontFeaturedProducts({
     };
   }, [tenantId]);
 
-  if (loading || allProducts.length === 0) {
-    return null;
-  }
-
   // Get all unique featured types from the products, filtered by capability
   const allFeaturedTypes = useMemo(() => {
     const types = new Set<string>();
@@ -1014,13 +1017,27 @@ export default function StorefrontFeaturedProducts({
         product.featuredTypes.forEach(type => types.add(type));
       }
     });
+    console.log('[StorefrontFeaturedProducts] raw types from products:', Array.from(types));
+    console.log('[StorefrontFeaturedProducts] featuredOptionsState:', {
+      exists: !!featuredOptionsState,
+      enabled: featuredOptionsState?.enabled,
+      effectiveTypes: featuredOptionsState?.effectiveTypes,
+      allowedTypes: featuredOptionsState?.allowedTypes,
+    });
     // Filter out types not effectively enabled (tier allows AND merchant enabled)
     if (featuredOptionsState && featuredOptionsState.enabled) {
-      return Array.from(types).filter(type => featuredOptionsState.effectiveTypes.includes(type as any));
+      const filtered = Array.from(types).filter(type => featuredOptionsState.effectiveTypes.includes(type as any));
+      console.log('[StorefrontFeaturedProducts] allFeaturedTypes (filtered):', filtered);
+      return filtered;
     }
     // If capability not loaded or disabled, show all types (graceful fallback)
+    console.log('[StorefrontFeaturedProducts] allFeaturedTypes (FALLBACK - showing all):', Array.from(types));
     return Array.from(types);
   }, [allProducts, featuredOptionsState]);
+
+  if (loading || allProducts.length === 0) {
+    return null;
+  }
 
   // Filter products by type dynamically
   const productsByType = useMemo(() => {
@@ -1061,6 +1078,7 @@ export default function StorefrontFeaturedProducts({
             type={type}
             defaultGatewayType={defaultGatewayType}
             instanceId={instanceId}
+            allowedFeaturedTypes={allFeaturedTypes.length > 0 ? allFeaturedTypes : undefined}
             {...config}
             products={products}
             loading={false}

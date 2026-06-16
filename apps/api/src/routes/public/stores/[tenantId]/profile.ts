@@ -1,7 +1,7 @@
 /**
  * Public Store Endpoint
  * 
- * Returns rich store data from mv_global view
+ * Returns rich store data from mv_storefront_discovery view
  * Provides comprehensive store information for product pages
  */
 
@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { tenantId } = params;
 
-    // Query the global discovery view for store information
+    // Query the storefront discovery view for store information
     const storeQuery = `
       SELECT 
         tenant_id,
@@ -38,7 +38,7 @@ export async function GET(
         review_count,
         item_status,
         visibility
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'

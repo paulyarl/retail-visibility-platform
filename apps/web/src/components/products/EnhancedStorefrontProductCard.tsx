@@ -107,6 +107,8 @@ interface EnhancedStorefrontProductCardProps {
   className?: string;
   onImageClick?: (imageUrl: string) => void;
   onVariantClick?: (variant: any) => void;
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 export default function EnhancedStorefrontProductCard({
@@ -128,6 +130,7 @@ export default function EnhancedStorefrontProductCard({
   className = '',
   onImageClick,
   onVariantClick,
+  allowedFeaturedTypes,
 }: EnhancedStorefrontProductCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -392,7 +395,9 @@ export default function EnhancedStorefrontProductCard({
               )}
 
               {/* Featured Badges */}
-              {product.featuredTypes?.map((type) => (
+              {product.featuredTypes
+                ?.filter(type => !allowedFeaturedTypes || allowedFeaturedTypes.includes(type))
+                .map((type) => (
                 <Badge
                   key={type}
                   className={`absolute top-2 left-2 ${getFeaturedBadgeStyle(type)}`}
@@ -643,7 +648,9 @@ export default function EnhancedStorefrontProductCard({
               )}
 
               {/* Featured Badges */}
-              {product.featuredTypes?.map((type) => (
+              {product.featuredTypes
+                ?.filter(type => !allowedFeaturedTypes || allowedFeaturedTypes.includes(type))
+                .map((type) => (
                 <Badge
                   key={type}
                   className={`absolute top-2 left-2 ${getFeaturedBadgeStyle(type)}`}

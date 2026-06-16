@@ -757,6 +757,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
+                productOptFlags={productOptFlags}
               />
             </TenantPaymentProvider>
           </div>
@@ -950,6 +951,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               tenantId={product.tenantId}
               featuredTypes={merchantFilteredFeaturedTypes}
               groupedProducts={merchantFilteredGroupedProducts}
+              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
             />
           </div>
 

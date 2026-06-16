@@ -9,7 +9,7 @@ export interface ShopCategory {
 /**
  * Shop Categories Service - Singleton with caching
  * 
- * Provides shop categories data from mv_global_discovery with caching
+ * Provides shop categories data from mv_storefront_discovery with caching
  * Used for category dropdowns and filters in the shops interface
  * 
  * Features:
@@ -68,14 +68,14 @@ export default class ShopCategoriesService {
   }
 
   /**
-   * Fetch shop categories from mv_global_discovery
+   * Fetch shop categories from mv_storefront_discovery
    */
   private async fetchCategoriesFromDatabase(): Promise<ShopCategory[]> {
     const query = `
       SELECT 
         shop_category,
         COUNT(*) as count
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE shop_category IS NOT NULL
         AND shop_category != ''
         AND item_status = 'active'

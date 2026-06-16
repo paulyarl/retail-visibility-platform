@@ -50,11 +50,11 @@ export function getValidFeaturedTypes(): FeaturedType[] {
 }
 
 /**
- * Generate trending products based on mv_global_discovery metrics
+ * Generate trending products based on mv_storefront_discovery metrics
  */
 async function generateTrendingProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
-    // Use mv_global_discovery for better trending signals
+    // Use mv_storefront_discovery for better trending signals
     const trendingProducts = await prisma.$queryRaw`
       SELECT 
         inventory_item_id,
@@ -90,7 +90,7 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
         stock_status,
         created_at,
         updated_at
-      FROM mv_global_discovery 
+      FROM mv_storefront_discovery 
       WHERE tenant_id = ${tenantId}
         AND item_status = 'active'
         AND visibility = 'public'
@@ -145,11 +145,11 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
 }
 
 /**
- * Generate recommended products based on mv_global_discovery quality signals
+ * Generate recommended products based on mv_storefront_discovery quality signals
  */
 async function generateRecommendedProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
-    // Use mv_global_discovery for quality-based recommendations
+    // Use mv_storefront_discovery for quality-based recommendations
     const recommendedProducts = await prisma.$queryRaw`
       SELECT 
         inventory_item_id,
@@ -185,7 +185,7 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
         stock_status,
         created_at,
         updated_at
-      FROM mv_global_discovery 
+      FROM mv_storefront_discovery 
       WHERE tenant_id = ${tenantId}
         AND item_status = 'active'
         AND visibility = 'public'
@@ -248,11 +248,11 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
 }
 
 /**
- * Generate bestseller products based on mv_global_discovery sales metrics
+ * Generate bestseller products based on mv_storefront_discovery sales metrics
  */
 async function generateBestsellerProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
-    // Use mv_global_discovery for actual sales data
+    // Use mv_storefront_discovery for actual sales data
     const bestsellerProducts = await prisma.$queryRaw`
       SELECT 
         inventory_item_id,
@@ -286,7 +286,7 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
         stock_status,
         created_at,
         updated_at
-      FROM mv_global_discovery 
+      FROM mv_storefront_discovery 
       WHERE tenant_id = ${tenantId}
         AND item_status = 'active'
         AND visibility = 'public'
@@ -347,11 +347,11 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
 }
 
 /**
- * Generate random discovery products based on mv_global_discovery quality metrics
+ * Generate random discovery products based on mv_storefront_discovery quality metrics
  */
 async function generateRandomDiscoveryProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
-    // Use mv_global_discovery for quality-based random selection
+    // Use mv_storefront_discovery for quality-based random selection
     const qualityProducts = await prisma.$queryRaw`
       SELECT 
         inventory_item_id,
@@ -381,7 +381,7 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
         unique_viewers,
         created_at,
         updated_at
-      FROM mv_global_discovery 
+      FROM mv_storefront_discovery 
       WHERE tenant_id = ${tenantId}
         AND item_status = 'active'
         AND visibility = 'public'

@@ -24,6 +24,8 @@ interface ProductDisplayProps {
   displayMode?: 'grid' | 'carousel';
   /** Number of visible items in carousel mode (affects min-width) */
   carouselItemsVisible?: number;
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 export default function EnhancedProductDisplay({
@@ -45,6 +47,7 @@ export default function EnhancedProductDisplay({
   className = '',
   displayMode = 'grid',
   carouselItemsVisible = 4,
+  allowedFeaturedTypes,
 }: ProductDisplayProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -109,6 +112,7 @@ export default function EnhancedProductDisplay({
                 showVariants={showVariants}
                 maxGalleryImages={maxGalleryImages}
                 maxVariants={maxVariants}
+                allowedFeaturedTypes={allowedFeaturedTypes}
               />
             </div>
           ))}
@@ -138,6 +142,7 @@ export default function EnhancedProductDisplay({
           showVariants={showVariants}
           maxGalleryImages={maxGalleryImages}
           maxVariants={maxVariants}
+          allowedFeaturedTypes={allowedFeaturedTypes}
         />
       ))}
     </div>

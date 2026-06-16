@@ -37,9 +37,9 @@ export function FeaturedTypeBadges({
 
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
-      {visibleTypes.map((featuredType) => (
-        <Badge 
-          key={featuredType.type}
+      {visibleTypes.map((featuredType, index) => (
+        <Badge
+          key={`${featuredType.type}-${index}`}
           variant={featuredType.color as any}
           className={`${sizeClasses[size]}`}
         >

@@ -19,7 +19,6 @@ import LocationClosedBanner from '@/components/storefront/LocationClosedBanner';
 // import StorefrontActions from '@/components/products/StorefrontActions';
 // import { StorefrontRecommendations } from './StorefrontClient';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
-// import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
 // import { getCategoryUrl } from '@/utils/slug';
 // import StorefrontMap from '@/components/storefront/StorefrontMap';
 // import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
@@ -39,6 +38,7 @@ import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
 import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
 import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
 import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
@@ -108,6 +108,14 @@ interface Product {
   licenseType?: string;
   accessDurationDays?: number;
   downloadLimit?: number;
+  // Featured product fields
+  isFeatured?: boolean;
+  featuredType?: string | null;
+  featuredTypes?: string[];
+  featuredPriority?: number;
+  featuredAt?: string;
+  featuredExpiresAt?: string;
+  isFeaturedActive?: boolean;
 }
 
 interface Tenant {
@@ -350,7 +358,8 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       // Use the featured products API when filtering by featured type
       productsData = await storefrontSingletonService.getFeaturedProducts(idResolvedBySlug, {
         limit,
-        search
+        search,
+        featuredType: featured !== 'true' && featured !== '1' ? featured : undefined,
       });
       // console.log('[TenantPage] Featured products data:', productsData);
     } else {
@@ -384,7 +393,9 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       payment_gateway_type: p.defaultGatewayType ?? null, // From MV (camelCase from API)
       has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
       isActive: p.isActive ?? false,
-      isFeatured: p.isFeatured ?? false,
+      isFeatured: p.isFeatured ?? p.featured_is_active ?? false,
+      featuredType: p.featuredType ?? p.featured_type ?? null,
+      featuredTypes: p.featuredTypes ?? p.featured_type_array ?? (p.featuredType ? [p.featuredType] : []),
       isArchived: p.isArchived ?? false,
       isAvailable: p.isAvailable ?? false,
       isDeleted: p.isDeleted ?? false,
@@ -460,7 +471,15 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch CRM option flags:', e);
     }
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags };
+    // Fetch product option flags server-side (no client waterfall)
+    let productOptionFlags: ProductOptionFlags | null = null;
+    try {
+      productOptionFlags = await publicProductOptionsService.getProductOptionFlags(idResolvedBySlug);
+    } catch (e) {
+      console.error('Failed to fetch product option flags:', e);
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -530,7 +549,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Sto
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {

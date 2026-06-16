@@ -1041,7 +1041,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         ii.directory_category_id,
         ii.tenant_id,
         
-        -- Include payment gateway status from mv_global_discovery (most reliable source)
+        -- Include payment gateway status from mv_storefront_discovery (most reliable source)
         COALESCE(mgd.has_active_payment_gateway, false) as has_active_payment_gateway,
         mgd.default_gateway_type,
 
@@ -1080,7 +1080,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
         ) as relevance_score
 
       FROM inventory_items ii
-      LEFT JOIN mv_global_discovery mgd ON ii.id = mgd.inventory_item_id
+      LEFT JOIN mv_storefront_discovery mgd ON ii.id = mgd.inventory_item_id
       WHERE ii.id != $6  -- Exclude current product
         AND ii.item_status = 'active'
         AND ii.visibility = 'public'

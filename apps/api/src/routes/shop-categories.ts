@@ -5,7 +5,7 @@ const router = Router();
 
 /**
  * GET /api/shop-categories
- * Get all shop categories from mv_global_discovery
+ * Get all shop categories from mv_storefront_discovery
  * 
  * Features:
  * - UniversalSingleton caching (30 minutes)
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
       metadata: {
         cacheTTL: 30 * 60 * 1000, // 30 minutes
         responseTime,
-        source: 'mv_global_discovery'
+        source: 'mv_storefront_discovery'
       }
     });
 

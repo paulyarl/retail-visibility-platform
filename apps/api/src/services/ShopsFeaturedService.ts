@@ -34,7 +34,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
   
   /**
    * Get trending products for shops discovery (MV-OPTIMIZED with RICH DATA)
-   * Uses mv_global_discovery with trending scores and engagement metrics
+   * Uses mv_storefront_discovery with trending scores and engagement metrics
    */
   async getShopTrendingProducts(options: {
     tenantId?: string;
@@ -65,10 +65,10 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
         params.push(tenantId);
       }
 
-      // Query mv_global_discovery - simplified to SELECT *
+      // Query mv_storefront_discovery - simplified to SELECT *
       const query = `
         SELECT *
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE ${whereConditions.join(' AND ')}
         ORDER BY trending_score DESC, featured_priority DESC, featured_at DESC
         LIMIT $${params.length + 1}
@@ -78,7 +78,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
 
       const results = await this.prisma.$queryRawUnsafe(query, ...params) as ProductWithVariants[];
       
-      this.logger.info(`[SHOPS FEATURED] MV global discovery query returned ${results.length} products`);
+      this.logger.info(`[SHOPS FEATURED] MV storefront discovery query returned ${results.length} products`);
       
       // Transform products with computed variant fields
       const transformedResults = transformProductsWithVariants(results);
@@ -86,7 +86,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       return transformedResults;
 
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching from mv_global_discovery for trending products, falling back', {
+      this.logger.error('[SHOPS FEATURED] Error fetching from mv_storefront_discovery for trending products, falling back', {
         error: (error as Error).message
       } as any);
       
