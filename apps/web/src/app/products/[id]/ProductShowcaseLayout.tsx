@@ -167,6 +167,9 @@ export function ProductShowcaseLayout({
   // ---- Ref for StickyPurchaseBar ----
   const cartButtonRef = useRef<HTMLDivElement>(null);
 
+  // ---- Tenant metadata for display (needed for footer useMemo hooks) ----
+  const metadata = tenant.metadata as any;
+
   // ---- Lightbox image list ----
   const lightboxImages = useMemo(() => {
     if (product.imageGallery && product.imageGallery.length > 0) {
@@ -256,8 +259,6 @@ export function ProductShowcaseLayout({
   const categorySlug =
     product.tenantCategory?.slug || product.category?.slug || undefined;
 
-  // Tenant metadata for display
-  const metadata = tenant.metadata as any;
   const storeLogoUrl = metadata?.logo_url || displayLogo;
 
   // -----------------------------------------------------------------------
@@ -760,6 +761,7 @@ export function ProductShowcaseLayout({
         onSelectVariant={scrollToVariantSelector}
         cartButtonRef={cartButtonRef}
       />
+
     </div>
   );
 }

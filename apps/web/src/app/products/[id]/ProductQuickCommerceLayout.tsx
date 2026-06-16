@@ -148,6 +148,9 @@ export default function ProductQuickCommerceLayout({
   const isOnlineStore = tenant?.storeType === 'online' || tenant?.metadata?.store_type === 'online' || false;
   const isRetailStore = !isOnlineStore && (tenant?.storeType === 'retail' || tenant?.metadata?.store_type === 'retail' || (hookIsRetailStore ?? true));
 
+  // Tenant metadata for display (needed for footer useMemo hooks)
+  const metadata = tenant.metadata as any;
+
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const cartButtonRef = useRef<HTMLDivElement>(null);
@@ -168,6 +171,7 @@ export default function ProductQuickCommerceLayout({
     }
     return [];
   }, [product.imageGallery, product.imageUrl, product.name, safeFeatures.maxGalleryImages]);
+
 
   const handleGalleryImageClick = useCallback((index: number) => {
     setLightboxIndex(index);
@@ -229,7 +233,6 @@ export default function ProductQuickCommerceLayout({
   const categorySlug =
     product.tenantCategory?.slug || product.category?.slug || undefined;
 
-  const metadata = tenant.metadata as any;
   const storeLogoUrl = metadata?.logo_url || displayLogo;
 
   return (
@@ -653,6 +656,7 @@ export default function ProductQuickCommerceLayout({
         onSelectVariant={scrollToVariantSelector}
         cartButtonRef={cartButtonRef}
       />
+
     </div>
   );
 }
