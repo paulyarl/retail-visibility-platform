@@ -413,6 +413,8 @@ interface SmartProductCardProps {
   showQuickView?: boolean;      // "Quick View" eye icon on hover
   imageAspectRatio?: '1:1' | '4:3' | '3:4' | '16:9';  // Configurable aspect
   truncateTitle?: number;       // Max chars before ellipsis
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 export default function SmartProductCard({
@@ -437,6 +439,7 @@ export default function SmartProductCard({
   showQuickView = false,
   imageAspectRatio = '1:1',
   truncateTitle,
+  allowedFeaturedTypes,
 }: SmartProductCardProps) {
   // Debug: Log tenant info for directory featured products
   // if (variant === 'featured') {
@@ -549,7 +552,8 @@ export default function SmartProductCard({
 
   // Featured variant - Prominent styling for conversion optimization
   if (variant === 'featured') {
-    const featuredTypes = getFeaturedTypes(product);
+    const featuredTypes = getFeaturedTypes(product)
+      .filter(t => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t));
     const sortedTypes = sortBadgesByPriority(featuredTypes);
     const primaryType = sortedTypes[0]; // Use first (highest priority) for gradient border
     
@@ -1097,7 +1101,8 @@ export default function SmartProductCard({
                   )}
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const featuredTypes = getFeaturedTypes(product);
+                      const featuredTypes = getFeaturedTypes(product)
+                        .filter(t => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t));
                       const sortedTypes = sortBadgesByPriority(featuredTypes);
                       return sortedTypes.slice(0, 2).map((typeId) => (
                         <span key={typeId} className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full shadow-lg ${getStorefrontBadgeStyle(typeId)}`}>
@@ -1265,7 +1270,9 @@ export default function SmartProductCard({
         {/* Featured Type Icons Overlay */}
         {product.featuredTypes && product.featuredTypes.length > 0 && (
           <div className="absolute bottom-2 left-2 flex flex-col gap-1 z-10">
-            {product.featuredTypes.map((type, index) => (
+            {product.featuredTypes
+              .filter(t => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
+              .map((type, index) => (
               <FeaturedTypeIcon key={index} type={type} />
             ))}
           </div>

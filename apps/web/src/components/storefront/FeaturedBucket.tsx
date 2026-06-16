@@ -16,6 +16,8 @@ interface FeaturedBucketProps {
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
   commerceDisabled?: boolean;
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 /**
@@ -35,7 +37,8 @@ export default function FeaturedBucket({
   initialLimit = 3,
   hasActivePaymentGateway,
   defaultGatewayType,
-  commerceDisabled
+  commerceDisabled,
+  allowedFeaturedTypes,
 }: FeaturedBucketProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = initialLimit;
@@ -82,7 +85,7 @@ export default function FeaturedBucket({
         {/* View More Link */}
         {totalCount > productsPerPage && (
           <a
-            href={`/shops/${tenantId}/featured/${bucketType}`}
+            href={`/tenant/${tenantId}?featured=${bucketType}&products_only=true`}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
             View All →
@@ -113,10 +116,12 @@ export default function FeaturedBucket({
               has_active_payment_gateway: hasActivePaymentGateway,
               payment_gateway_type: defaultGatewayType,
               featuredType: product.featuredType || bucketType || undefined,
-              featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])),
+              featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])))
+                .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
             }}
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
+            allowedFeaturedTypes={allowedFeaturedTypes}
             variant="featured"
           />
         ))}

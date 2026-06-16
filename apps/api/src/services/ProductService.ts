@@ -192,7 +192,7 @@ export class ProductService {
     const sqlQuery = `
       SELECT DISTINCT
         mv.*
-      FROM mv_global_discovery mv
+      FROM mv_storefront_discovery mv
       WHERE mv.tenant_id = $1
         AND mv.featured_is_active = true
         AND mv.item_status = 'active'

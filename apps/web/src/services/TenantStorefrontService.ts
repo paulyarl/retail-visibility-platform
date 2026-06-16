@@ -202,6 +202,7 @@ class TenantStorefrontService extends TenantApiSingleton {
       limit?: number;
       search?: string;
       category?: string;
+      featuredType?: string;
     } = {}
   ): Promise<StorefrontProductsResponse> {
     if (!tenantId) {
@@ -209,7 +210,7 @@ class TenantStorefrontService extends TenantApiSingleton {
       return { items: [], count: 0 };
     }
 
-    const { limit = 10, search, category } = options;
+    const { limit = 10, search, category, featuredType } = options;
 
     try {
       // Build query parameters
@@ -219,8 +220,11 @@ class TenantStorefrontService extends TenantApiSingleton {
       if (category) queryParams.append('category', category);
 
       const queryString = queryParams.toString();
-      const endpoint = `/api/storefront/${tenantId}/featured${queryString ? `?${queryString}` : ''}`;
-      const cacheKey = `storefront-featured-${tenantId}-${queryString}`;
+      // Use type-specific endpoint when a featuredType is specified
+      const endpoint = featuredType
+        ? `/api/storefront/${tenantId}/featured-products/${featuredType}${queryString ? `?${queryString}` : ''}`
+        : `/api/storefront/${tenantId}/featured${queryString ? `?${queryString}` : ''}`;
+      const cacheKey = `storefront-featured-${tenantId}-${featuredType || 'all'}-${queryString}`;
 
       const result = await this.makeDefaultRequest<StorefrontProductsResponse>(
         endpoint,
@@ -234,7 +238,19 @@ class TenantStorefrontService extends TenantApiSingleton {
         return { items: [], count: 0 };
       }
 
-      return result.data || { items: [], count: 0 };
+      const data = result.data as any;
+      if (!data) return { items: [], count: 0 };
+
+      // Type-specific endpoint returns { bucketType, products, totalCount }
+      // All-buckets endpoint returns { items, totalCount, bucketCounts }
+      if (featuredType && data.products && Array.isArray(data.products)) {
+        return {
+          items: data.products as StorefrontProduct[],
+          count: data.totalCount || data.products.length,
+        };
+      }
+
+      return data.items ? data : { items: [], count: 0 };
     } catch (error) {
       console.error('[TenantStorefrontService] Failed to get featured products:', error);
       return { items: [], count: 0 };

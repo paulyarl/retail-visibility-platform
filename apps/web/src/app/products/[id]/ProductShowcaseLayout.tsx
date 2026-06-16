@@ -31,6 +31,7 @@ import { AddToCartButton } from '@/components/products/AddToCartButton';
 import ProductVariantSelector from '@/components/products/ProductVariantSelector';
 import ProductActions from '@/components/products/ProductActions';
 import { FeaturedTypeBadges } from '@/components/products/FeaturedTypeBadges';
+import { getFeaturedTypeDisplay } from '@/types/product-display';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { SafeImage } from '@/components/SafeImage';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
@@ -373,7 +374,7 @@ export function ProductShowcaseLayout({
             {/* Featured Type Badges */}
             {product.featuredTypes && product.featuredTypes.length > 0 && (
               <FeaturedTypeBadges
-                featuredTypes={product.featuredTypes}
+                featuredTypes={getFeaturedTypeDisplay(product.featuredTypes)}
               />
             )}
 

@@ -292,7 +292,7 @@ class FeaturedProductsSingletonService extends UniversalSingleton {
         orderBy.featured_at = 'desc';
       }
 
-      // Use mv_global_discovery for all cases since it has complete data including logos
+      // Use mv_storefront_discovery for all cases since it has complete data including logos
       let query = `
         SELECT 
           inventory_item_id as id,
@@ -311,7 +311,7 @@ class FeaturedProductsSingletonService extends UniversalSingleton {
           featured_type,
           featured_priority,
           featured_at
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE featured_is_active = true
       `;
       

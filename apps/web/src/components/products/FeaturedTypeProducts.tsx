@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import SmartProductCard from './SmartProductCard';
-import { Package, Calendar, DollarSign, Star, TrendingUp, Award, Zap, Flame, Crown, ThumbsUp, Sparkles } from 'lucide-react';
+import { FEATURED_TYPES } from '@/types/product-display';
 
 interface FeaturedTypeProduct {
   id: string;
@@ -35,82 +35,84 @@ interface FeaturedTypeProductsProps {
   featuredTypes: string[];
   showAllBuckets?: boolean; // If true, show all buckets with products, not just current product's types
   groupedProducts: Record<string, any[]>; // Pre-fetched and merchant-gate filtered from page root
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 // Featured type configuration - supports all featured types in the system
-const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: string; textColor: string; label: string; description: string }> = {
+const featuredTypeConfig: Record<string, { icon: string; bgColor: string; textColor: string; label: string; description: string }> = {
   store_selection: {
-    icon: <Star className="w-5 h-5" />,
+    icon: '⭐',
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-700',
     label: 'Featured Products',
     description: 'Hand-picked favorites from our collection'
   },
   new_arrival: {
-    icon: <Package className="w-5 h-5" />,
+    icon: '✨',
     bgColor: 'bg-green-50',
     textColor: 'text-green-700',
     label: 'New Arrivals',
     description: 'Fresh products just added to our store'
   },
   seasonal: {
-    icon: <Calendar className="w-5 h-5" />,
+    icon: '🗓️',
     bgColor: 'bg-orange-50',
     textColor: 'text-orange-700',
     label: 'Seasonal Specials',
     description: 'Perfect for this time of year'
   },
   sale: {
-    icon: <DollarSign className="w-5 h-5" />,
+    icon: '🏷️',
     bgColor: 'bg-red-50',
     textColor: 'text-red-700',
     label: 'Sale Items',
     description: 'Great deals on selected products'
   },
   staff_pick: {
-    icon: <ThumbsUp className="w-5 h-5" />,
+    icon: '👥',
     bgColor: 'bg-purple-50',
     textColor: 'text-purple-700',
     label: 'Staff Picks',
     description: 'Hand-picked favorites by our team'
   },
   bestseller: {
-    icon: <Award className="w-5 h-5" />,
+    icon: '🥇',
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-700',
     label: 'Bestsellers',
     description: 'Our most popular products'
   },
   clearance: {
-    icon: <Zap className="w-5 h-5" />,
+    icon: '🔥',
     bgColor: 'bg-pink-50',
     textColor: 'text-pink-700',
     label: 'Clearance',
     description: 'Last chance to grab these deals'
   },
   trending: {
-    icon: <TrendingUp className="w-5 h-5" />,
+    icon: '📈',
     bgColor: 'bg-cyan-50',
     textColor: 'text-cyan-700',
     label: 'Trending',
     description: 'Hot products everyone is viewing'
   },
   recommended: {
-    icon: <Sparkles className="w-5 h-5" />,
+    icon: '🏆',
     bgColor: 'bg-indigo-50',
     textColor: 'text-indigo-700',
     label: 'Recommended',
     description: 'Products we think you\'ll love'
   },
   featured: {
-    icon: <Flame className="w-5 h-5" />,
+    icon: '👑',
     bgColor: 'bg-rose-50',
     textColor: 'text-rose-700',
     label: 'Featured',
     description: 'Spotlight on special products'
   },
   premium: {
-    icon: <Crown className="w-5 h-5" />,
+    icon: '💎',
     bgColor: 'bg-violet-50',
     textColor: 'text-violet-700',
     label: 'Premium Selection',
@@ -118,15 +120,22 @@ const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: strin
   },
 };
 
-export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes, showAllBuckets = true, groupedProducts = {} }: FeaturedTypeProductsProps) {
+export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes, showAllBuckets = false, groupedProducts = {}, allowedFeaturedTypes }: FeaturedTypeProductsProps) {
+  const [activeTab, setActiveTab] = useState(0);
+
   const productsByType = useMemo(() => {
-    if (!featuredTypes || featuredTypes.length === 0) return {};
+    // By default (showAllBuckets=false), only show buckets matching the product's own featuredTypes.
+    // This means if Product A is "new_arrival" + "sale", only those pills appear.
+    // When showAllBuckets=true, show all store buckets regardless of product's types.
+    const availableTypes = showAllBuckets
+      ? Object.keys(groupedProducts || {})
+      : (featuredTypes || []);
+
+    if (availableTypes.length === 0) return {};
 
     const grouped: Record<string, FeaturedTypeProduct[]> = {};
 
-    const typesToProcess = showAllBuckets
-      ? Object.keys(groupedProducts || {}).filter(type => featuredTypes.includes(type))
-      : featuredTypes;
+    const typesToProcess = availableTypes;
 
     for (const type of typesToProcess) {
       if (groupedProducts[type] && groupedProducts[type].length > 0) {
@@ -166,79 +175,101 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
     return grouped;
   }, [currentProductId, tenantId, featuredTypes, showAllBuckets, groupedProducts]);
 
-  if (Object.keys(productsByType).length === 0) {
-    return null;
-  }
-
-  return (
-    <>
-      {Object.entries(productsByType).map(([type, products]) => {
-        // Get config or use fallback for unknown types
+  // Build ordered list of buckets with products
+  const bucketsWithProducts = useMemo(() => {
+    return Object.entries(productsByType)
+      .filter(([, products]) => products.length > 0)
+      .map(([type, products]) => {
         const config = featuredTypeConfig[type] || {
-          icon: <Star className="w-5 h-5" />,
+          icon: '⭐',
           bgColor: 'bg-gray-50',
           textColor: 'text-gray-700',
           label: type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
           description: `More ${type.replace(/_/g, ' ')} products`
         };
+        return { type, products, config, count: products.length };
+      });
+  }, [productsByType]);
 
-        if (products.length === 0) return null;
+  if (bucketsWithProducts.length === 0) {
+    return null;
+  }
 
-        return (
-          <div key={type} id={`featured-${type}`} className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8 scroll-mt-20">
-            <div className="flex items-center gap-3 mb-6">
-              <span className={`p-2 rounded-lg ${config.bgColor} ${config.textColor}`}>
-                {config.icon}
-              </span>
-              <div>
-                <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
-                  More {config.label}
-                </h2>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {config.description}
-                </p>
-              </div>
-            </div>
+  const activeBucket = bucketsWithProducts[activeTab] || bucketsWithProducts[0];
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {products.map((product) => (
-                <SmartProductCard
-                  key={product.id}
-                  tenantId={product.tenantId}
-                  defaultGatewayType={product.defaultGatewayType || undefined}
-                  product={{
-                    id: product.id,
-                    name: product.name,
-                    title: product.title,
-                    priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
-                    salePriceCents: product.salePriceCents,
-                    listPriceCents: product.listPriceCents,
-                    isOnSale: product.isOnSale,
-                    discountPercentage: product.discountPercentage,
-                    currency: product.currency,
-                    imageUrl: product.imageUrl,
-                    brand: product.brand,
-                    tenantId: product.tenantId,
-                    sku: product.sku || '',
-                    stock: product.stock,
-                    availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
-                    has_active_payment_gateway: product.hasActivePaymentGateway,
-                    payment_gateway_type: product.defaultGatewayType,
-                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])),
-                    featuredType: product.featuredType || type || undefined,
-                    categoryName: product.categoryName,
-                    categorySlug: product.categorySlug,
-                  }}
-                  variant="grid"
-                  showCategory={true}
-                  showDescription={true}
-                  buttonLayout="stacked"
-                />
-              ))}
-            </div>
+  return (
+    <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+      {/* Section header */}
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">
+          More from this store
+        </h2>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          {bucketsWithProducts.length} featured {bucketsWithProducts.length === 1 ? 'collection' : 'collections'} available
+        </p>
+      </div>
+
+      {/* Pill navigation bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {bucketsWithProducts.map((bucket, index) => (
+          <button
+            key={bucket.type}
+            onClick={() => setActiveTab(index)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              index === activeTab
+                ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+                : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <span>{bucket.config.icon}</span>
+            {bucket.config.label}
+            <span className="text-xs opacity-60">({bucket.count})</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Active bucket content */}
+      {activeBucket && (
+        <div id={`featured-${activeBucket.type}`} className="scroll-mt-20">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {activeBucket.products.map((product) => (
+              <SmartProductCard
+                key={product.id}
+                tenantId={product.tenantId}
+                defaultGatewayType={product.defaultGatewayType || undefined}
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  title: product.title,
+                  priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
+                  salePriceCents: product.salePriceCents,
+                  listPriceCents: product.listPriceCents,
+                  isOnSale: product.isOnSale,
+                  discountPercentage: product.discountPercentage,
+                  currency: product.currency,
+                  imageUrl: product.imageUrl,
+                  brand: product.brand,
+                  tenantId: product.tenantId,
+                  sku: product.sku || '',
+                  stock: product.stock,
+                  availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.defaultGatewayType,
+                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (activeBucket.type ? [activeBucket.type] : [])),
+                  featuredType: product.featuredType || activeBucket.type || undefined,
+                  categoryName: product.categoryName,
+                  categorySlug: product.categorySlug,
+                }}
+                variant="grid"
+                showCategory={true}
+                showDescription={true}
+                buttonLayout="stacked"
+                allowedFeaturedTypes={allowedFeaturedTypes}
+              />
+            ))}
           </div>
-        );
-      })}
-    </>
+        </div>
+      )}
+    </div>
   );
 }

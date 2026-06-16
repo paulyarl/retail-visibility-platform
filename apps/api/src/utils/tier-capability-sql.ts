@@ -62,7 +62,7 @@ export const TIER_FEATURED_ACCESS_CTE = `
 // JOIN + WHERE fragments (Tier Capability)
 // ====================
 
-/** LEFT JOIN clause for mv_global_discovery → tier_featured_access */
+/** LEFT JOIN clause for mv_storefront_discovery → tier_featured_access */
 export const TIER_FEATURED_ACCESS_JOIN = `LEFT JOIN tier_featured_access tfa ON tfa.tier_key = mgd.subscription_tier`;
 
 /**
@@ -114,7 +114,7 @@ export const TIER_FEATURED_ACCESS_WHERE = `
 // ====================
 
 /**
- * LEFT JOIN clause for mv_global_discovery → tenant_featured_options_settings.
+ * LEFT JOIN clause for mv_storefront_discovery → tenant_featured_options_settings.
  * Joins on tenant_id so each product row is checked against its owner's preferences.
  */
 export const TENANT_PREFS_JOIN = `LEFT JOIN tenant_featured_options_settings tfos ON tfos.tenant_id = mgd.tenant_id`;

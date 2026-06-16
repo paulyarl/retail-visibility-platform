@@ -224,6 +224,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     options: {
       limit?: number;
       search?: string;
+      featuredType?: string;
     } = {}
   ): Promise<{
     items: StorefrontProduct[];
@@ -239,8 +240,12 @@ class StorefrontSingletonService extends PublicApiSingleton {
       if (options.limit) queryParams.append('limit', options.limit.toString());
       if (options.search) queryParams.append('search', options.search);
 
-      const endpoint = `/api/storefront/${tenantId}/featured-products?${queryParams.toString()}`;
-      const cacheKey = `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`;
+      const queryString = queryParams.toString();
+      // Use type-specific endpoint when a featuredType is specified
+      const endpoint = options.featuredType
+        ? `/api/storefront/${tenantId}/featured-products/${options.featuredType}${queryString ? `?${queryString}` : ''}`
+        : `/api/storefront/${tenantId}/featured-products${queryString ? `?${queryString}` : ''}`;
+      const cacheKey = `featured-products-${tenantId}-${options.featuredType || 'all'}-${options.limit || 10}-${options.search || ''}`;
       
       // Clear old cache that doesn't have new fields (featuredTypes, hasActivePaymentGateway)
       const cached = this.cache.get(cacheKey);
@@ -252,16 +257,24 @@ class StorefrontSingletonService extends PublicApiSingleton {
         }
       }
       
-      const result = await this.makeDefaultRequest<{
-        items: StorefrontProduct[];
-        count?: number;
-      }>(endpoint, {}, cacheKey, this.cacheTTL, {
-        
+      const result = await this.makeDefaultRequest<any>(endpoint, {}, cacheKey, this.cacheTTL, {
         context:AppContext.PRODUCT,
         isolation: CacheIsolation.PRODUCT
       });
-      
-      return result.data || { items: [] };
+
+      const data = result.data;
+      if (!data) return { items: [] };
+
+      // Type-specific endpoint returns { bucketType, products, totalCount }
+      // All-buckets endpoint returns { items, count }
+      if (options.featuredType && data.products && Array.isArray(data.products)) {
+        return {
+          items: data.products as StorefrontProduct[],
+          count: data.totalCount || data.products.length,
+        };
+      }
+
+      return data.items ? data : { items: [] };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get featured products:', error);
       return { items: [] };
@@ -270,7 +283,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
 
   /**
    * Get featured products grouped by type for storefront display
-   * Uses the public /api/directory/featured-products endpoint
+   * Uses the /api/storefront/:tenantId/featured-products endpoint (mv_storefront_discovery)
    */
   async getFeaturedProductsByType(
     tenantId: string,
@@ -290,7 +303,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const endpoint = `/api/directory/featured-products?tenantId=${tenantId}&limit=${limit}`;
+      const endpoint = `/api/storefront/${tenantId}/featured-products?limit=${limit}`;
       const cacheKey = `featured-products-by-type-${tenantId}-${limit}`;
       
       // console.log('[StorefrontSingleton] Making request:', {

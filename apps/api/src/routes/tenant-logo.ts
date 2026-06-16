@@ -1,6 +1,6 @@
 /**
  * Tenant Logo API Route
- * Provides tenant logo URL from mv_global_discovery materialized view
+ * Provides tenant logo URL from mv_storefront_discovery materialized view
  */
 
 import { Router } from 'express';
@@ -10,7 +10,7 @@ const router = Router();
 
 /**
  * GET /api/public/tenant/:tenantId/logo
- * Get tenant logo URL from mv_global_discovery materialized view
+ * Get tenant logo URL from mv_storefront_discovery materialized view
  */
 router.get('/:tenantId/logo', async (req, res) => {
   try {
@@ -23,10 +23,10 @@ router.get('/:tenantId/logo', async (req, res) => {
       });
     }
 
-    // Use direct pool like ShopService does for mv_global_discovery queries
+    // Use direct pool like ShopService does for mv_storefront_discovery queries
     const pool = getDirectPool();
     const result = await pool.query(
-      'SELECT tenant_logo_url FROM mv_global_discovery WHERE tenant_id = $1 LIMIT 1',
+      'SELECT tenant_logo_url FROM mv_storefront_discovery WHERE tenant_id = $1 LIMIT 1',
       [tenantId]
     );
 

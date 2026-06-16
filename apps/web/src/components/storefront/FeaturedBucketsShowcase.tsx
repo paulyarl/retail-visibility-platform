@@ -22,6 +22,8 @@ interface FeaturedBucketsShowcaseProps {
   commerceDisabled?: boolean;
   /** 'stacked' (default) | 'carousel' | 'tabbed' */
   displayMode?: 'stacked' | 'carousel' | 'tabbed';
+  /** Only show badges for these featured types (gated types filtered out) */
+  allowedFeaturedTypes?: string[];
 }
 
 /**
@@ -42,6 +44,7 @@ export default function FeaturedBucketsShowcase({
   defaultGatewayType,
   commerceDisabled,
   displayMode = 'stacked',
+  allowedFeaturedTypes,
 }: FeaturedBucketsShowcaseProps) {
   const [activeTab, setActiveTab] = useState(0);
   if (!featuredData) {
@@ -224,6 +227,7 @@ export default function FeaturedBucketsShowcase({
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
           commerceDisabled={commerceDisabled}
+          allowedFeaturedTypes={allowedFeaturedTypes}
         />
       </div>
     );
@@ -248,7 +252,7 @@ export default function FeaturedBucketsShowcase({
               </div>
               {bucket.totalCount > 3 && (
                 <a
-                  href={`/shops/${tenantId}/featured/${bucket.bucketType}`}
+                  href={`/tenant/${tenantId}?featured=${bucket.bucketType}&products_only=true`}
                   className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                 >
                   View All →
@@ -278,6 +282,7 @@ export default function FeaturedBucketsShowcase({
                     hasActivePaymentGateway={hasActivePaymentGateway}
                     defaultGatewayType={defaultGatewayType}
                     commerceDisabled={commerceDisabled}
+                    allowedFeaturedTypes={allowedFeaturedTypes}
                   />
                 </div>
               ))}
@@ -305,6 +310,7 @@ export default function FeaturedBucketsShowcase({
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
           commerceDisabled={commerceDisabled}
+          allowedFeaturedTypes={allowedFeaturedTypes}
         />
       ))}
     </div>

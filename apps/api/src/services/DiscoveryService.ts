@@ -300,7 +300,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
       ORDER BY RANDOM()
       LIMIT $${params.length + 1}
@@ -482,7 +482,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
       ORDER BY average_rating DESC NULLS LAST, review_count DESC, created_at DESC
       LIMIT $${params.length + 1}
@@ -664,7 +664,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${params.length + 1}
@@ -847,7 +847,7 @@ export class DiscoveryService {
         archived_at,
         mv_refreshed_at,
         discount_percentage
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
         AND (sale_price_cents IS NOT NULL AND sale_price_cents < list_price_cents)
       ORDER BY discount_percentage DESC, created_at DESC
@@ -1034,7 +1034,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
       ORDER BY featured_priority DESC, created_at DESC
       LIMIT $${params.length + 1}
@@ -1216,7 +1216,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
         AND featured_type = 'staff_pick'
         AND featured_is_active = true
@@ -1400,7 +1400,7 @@ export class DiscoveryService {
         published_at,
         archived_at,
         mv_refreshed_at
-      FROM mv_global_discovery
+      FROM mv_storefront_discovery
       WHERE ${whereClause}
         AND featured_type = 'store_selection'
         AND featured_is_active = true

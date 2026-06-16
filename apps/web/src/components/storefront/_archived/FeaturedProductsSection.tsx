@@ -180,7 +180,7 @@ export default function FeaturedProductsSection({
       {featuredData.totalCount >= maxProducts && (
         <div className="text-center">
           <a
-            href={`/t/${tenantId}/featured/${showType || 'all'}`}
+            href={`/tenant/${tenantId}?featured=${showType || 'all'}&products_only=true`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors"
           >
             View All {getFeaturedBadge(showType || 'store_selection').text}

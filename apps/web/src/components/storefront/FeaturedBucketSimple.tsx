@@ -172,7 +172,7 @@ export default function FeaturedBucketSimple({
         {/* View More Link */}
         {validProducts.length > productsPerPage && (
           <a
-            href={`/shops/${tenantId}/featured/${bucketType}`}
+            href={`/tenant/${tenantId}?featured=${bucketType}&products_only=true`}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
             View All →

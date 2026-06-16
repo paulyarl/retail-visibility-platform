@@ -222,7 +222,7 @@ export class SingleProductService {
         }
       }) : null;
 
-    // Get featured types and slug fields from mv_global_discovery materialized view
+    // Get featured types and slug fields from mv_storefront_discovery materialized view
     let featuredTypes: string[] = [];
     let slugData: {
       product_slug?: string;
@@ -238,7 +238,7 @@ export class SingleProductService {
       const mvResult = await pool.query(
         `SELECT featured_type, product_slug, brand_normalized, category_normalized, 
                 slug_type, platform_tenant_count, platform_purchase_count, platform_total_stock
-         FROM mv_global_discovery 
+         FROM mv_storefront_discovery 
          WHERE inventory_item_id = $1 
            AND is_actively_featured = true`,
         [productId]
@@ -269,7 +269,7 @@ export class SingleProductService {
         const slugResult = await pool.query(
           `SELECT product_slug, brand_normalized, category_normalized, 
                   slug_type, platform_tenant_count, platform_purchase_count, platform_total_stock
-           FROM mv_global_discovery 
+           FROM mv_storefront_discovery 
            WHERE inventory_item_id = $1 
            LIMIT 1`,
           [productId]
@@ -631,7 +631,7 @@ export class SingleProductService {
     try {
       const pool = require('../utils/db-pool').getDirectPool();
       
-      // Query mv_global_discovery for product by slug
+      // Query mv_storefront_discovery for product by slug
       let query = `
         SELECT 
           inventory_item_id,
@@ -666,7 +666,7 @@ export class SingleProductService {
           features,
           specifications,
           enhanced_description
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE product_slug = $1
           AND item_status = 'active'
           AND visibility = 'public'

@@ -121,6 +121,14 @@ export default function StorefrontEditorialLayout({
     showsContact,
     showsSocialMedia,
     showsStorefrontActions,
+    showsReviews,
+    showsFulfillment,
+    showsLocationAvailability,
+    showsGallery,
+    showsVideo,
+    showsVariants,
+    showsQRCodes,
+    allowedFeaturedTypes,
     faqEnabled,
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
@@ -333,7 +341,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* HERO BANNER (full-width, 60vh)                                    */}
       {/* ================================================================= */}
-      <section
+      {!isProductsOnly && <section
         className="relative w-full min-h-[60vh] flex items-end overflow-hidden"
         aria-label={`${businessName} hero banner`}
       >
@@ -400,12 +408,12 @@ export default function StorefrontEditorialLayout({
             </div>
           )}
         </div>
-      </section>
+      </section>}
 
       {/* ================================================================= */}
       {/* FEATURED SPOTLIGHT (2-col asymmetric)                              */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && featuredData && featuredData.totalCount > 0 && spotlightProducts.length > 0 && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && featuredData && featuredData.totalCount > 0 && spotlightProducts.length > 0 && (
         <section className="bg-white dark:bg-neutral-900" aria-label="Featured spotlight">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">
@@ -596,6 +604,9 @@ export default function StorefrontEditorialLayout({
                 showFeaturedBadges={true}
                 initialPageSize={12}
                 showPageSizeControl={true}
+                showGallery={showsGallery}
+                showVariants={showsVariants}
+                allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
               />
             </TenantPaymentProvider>
 
@@ -634,9 +645,63 @@ export default function StorefrontEditorialLayout({
       )}
 
       {/* ================================================================= */}
+      {/* PRODUCTS-ONLY VIEW (when ?products_only=true)                     */}
+      {/* ================================================================= */}
+      {!storefrontStatus.shouldShowPanel && isProductsOnly && products.length > 0 && (
+        <section className="bg-neutral-50 dark:bg-neutral-950" aria-label="Products">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            {featured && (
+              <div className="flex items-center gap-3 mb-6">
+                <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+                <span className="text-neutral-300 dark:text-neutral-600">|</span>
+                <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
+                  {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}
+                </h1>
+              </div>
+            )}
+            <TenantPaymentProvider tenantId={tenantId}>
+              <EnhancedProductDisplay
+                products={products}
+                tenantId={tenantId}
+                tenantSlug={tenant.slug}
+                tenantLogo={tenant.metadata?.logo_url}
+                hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+                defaultGatewayType={tenant.metadata?.defaultGatewayType}
+                useSingletonData={true}
+                showFeaturedBadges={true}
+                initialPageSize={12}
+                showPageSizeControl={true}
+                showGallery={showsGallery}
+                showVariants={showsVariants}
+                allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
+              />
+            </TenantPaymentProvider>
+            {totalPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={totalItems || 0}
+                  pageSize={12}
+                  onPageChange={(page: number) => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('page', page.toString());
+                    if (search) params.set('search', search);
+                    if (category) params.set('category', category);
+                    if (featured) params.set('featured', featured);
+                    window.location.href = `${window.location.pathname}?${params.toString()}`;
+                  }}
+                  onPageSizeChange={() => {}}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================= */}
       {/* EDITORIAL STORY SECTION (full-width, bg-white)                    */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && (businessDescription || showsSocialMedia && socialLinks.length > 0) && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (businessDescription || showsSocialMedia && socialLinks.length > 0) && (
         <section className="bg-white dark:bg-neutral-900" aria-label="About the store">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -754,7 +819,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* FEATURED BUCKETS (horizontal scroll carousels)                     */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && featuredData && featuredData.totalCount > 0 && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && featuredData && featuredData.totalCount > 0 && (
         <section className="bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-200 dark:border-neutral-800" aria-label="Featured selections">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">
@@ -768,6 +833,7 @@ export default function StorefrontEditorialLayout({
               tenantId={tenantId}
               hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
               defaultGatewayType={tenant.metadata?.defaultGatewayType}
+              allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
             />
           </div>
         </section>
@@ -776,7 +842,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* STORE INFORMATION (3-col, bg-neutral-50)                           */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && (showsLocation || showsHours || showsContact) && isRetailStore && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (showsLocation || showsHours || showsContact) && isRetailStore && (
         <section
           id="hours-section"
           className="bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-200 dark:border-neutral-800"
@@ -911,9 +977,11 @@ export default function StorefrontEditorialLayout({
                   </div>
 
                   {/* Fulfillment options */}
+                  {showsFulfillment && (
                   <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-700">
                     <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -924,7 +992,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* SOCIAL PROOF (bg-white)                                            */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && showsReviews && (
         <section className="bg-white dark:bg-neutral-900" aria-label="Store reviews">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div id="reviews-section" />
@@ -938,7 +1006,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* FAQ ACCORDION (conditional, bg-neutral-50)                         */}
       {/* ================================================================= */}
-      {faqEnabled && tenantId && (
+      {!isProductsOnly && faqEnabled && tenantId && (
         <section className="bg-neutral-50 dark:bg-neutral-950" aria-label="Frequently asked questions">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="max-w-3xl mx-auto">
@@ -958,7 +1026,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* INQUIRY FORM (conditional, bg-white)                               */}
       {/* ================================================================= */}
-      {crmInquiryStorefrontEnabled && !storefrontStatus.shouldShowPanel && tenantId && (
+      {!isProductsOnly && crmInquiryStorefrontEnabled && !storefrontStatus.shouldShowPanel && tenantId && (
         <section className="bg-white dark:bg-neutral-900" aria-label="Send an inquiry">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="max-w-lg mx-auto">
@@ -988,7 +1056,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* RECOMMENDATIONS + RECENTLY VIEWED                                  */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && isRetailStore && showsRecommendStore && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && isRetailStore && showsRecommendStore && (
         <section className="bg-neutral-50 dark:bg-neutral-950" aria-label="Recommended stores">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <StorefrontRecommendations tenantId={tenantId} />
@@ -996,7 +1064,7 @@ export default function StorefrontEditorialLayout({
         </section>
       )}
 
-      {!storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && showsRecentlyViewed && (
         <section className="bg-white dark:bg-neutral-900" aria-label="Recently viewed">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <LastViewed />
@@ -1007,7 +1075,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* SHARED FOOTER                                                      */}
       {/* ================================================================= */}
-      <StorefrontFooter
+      {!isProductsOnly && <StorefrontFooter
         tenantId={tenantId}
         businessName={businessName}
         businessDescription={businessDescription}
@@ -1023,7 +1091,7 @@ export default function StorefrontEditorialLayout({
         optFlags={optFlags}
         currentUrl={currentUrl}
         variant="full"
-      />
+      />}
     </div>
   );
 }

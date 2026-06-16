@@ -175,7 +175,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
           daysUntilExpiration: product.days_until_expiration,
           isExpired: product.is_expired,
           isExpiringSoon: product.is_expiring_soon,
-          // Include all additional fields from mv_global_discovery
+          // Include all additional fields from mv_storefront_discovery
           marketingDescription: product.marketing_description,
           manufacturer: product.manufacturer,
           condition: product.condition,
@@ -298,6 +298,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
 
     res.json({
       success: true,
+      data: {
+        buckets: transformedBuckets,
+        bucketCounts,
+        totalCount,
+        shops: []
+      },
       items: allProducts,
       totalCount,
       bucketCounts
@@ -396,7 +402,7 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
       daysUntilExpiration: product.days_until_expiration,
       isExpired: product.is_expired,
       isExpiringSoon: product.is_expiring_soon,
-      // Include all additional fields from mv_global_discovery
+      // Include all additional fields from mv_storefront_discovery
       marketingDescription: product.marketing_description,
       manufacturer: product.manufacturer,
       condition: product.condition,

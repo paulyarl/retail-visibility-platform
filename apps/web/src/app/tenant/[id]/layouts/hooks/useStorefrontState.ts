@@ -20,6 +20,7 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -155,6 +156,7 @@ export function useStorefrontState({
     initialStorefrontOptionFlags ?? null,
   );
   const optFlags = storefrontOptionFlags;
+  // Storefront-only flag derivation (decoupled from product options)
   const showsHours = optFlags?.showHoursDisplay ?? true;
   const showsMap = optFlags?.showMapDisplay ?? true;
   const showsLocation = optFlags?.showLocationDisplay ?? true;
@@ -168,6 +170,35 @@ export function useStorefrontState({
   const showsContact = optFlags?.showContact ?? true;
   const showsSocialMedia = optFlags?.showSocialMedia ?? true;
   const showsStorefrontActions = optFlags?.showStorefrontActions ?? true;
+  // Product-option concepts default to enabled on the storefront since there are
+  // no equivalent storefront option fields; product pages use ProductOptionFlags directly.
+  const showsReviews = true;
+  const showsFulfillment = true;
+  const showsLocationAvailability = true;
+  const showsGallery = true;
+  const showsVideo = false;
+  const showsVariants = true;
+  const showsQRCodes = optFlags?.showQRCodes ?? true;
+
+  // ---- Featured options (capability-gated allowed types) ----
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const allowedFeaturedTypes = useMemo(() => {
+    // console.log('[useStorefrontState] featuredCap:', {
+    //   loading: featuredCap.loading,
+    //   error: featuredCap.error,
+    //   enabled: featuredCap.data?.enabled,
+    //   effectiveTypes: featuredCap.data?.effectiveTypes,
+    //   allowedTypes: featuredCap.data?.allowedTypes,
+    //   effectiveTenantTypes: featuredCap.data?.effectiveTenantTypes,
+    //   effectivePlatformTypes: featuredCap.data?.effectivePlatformTypes,
+    // });
+    if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
+      // console.log('[useStorefrontState] allowedFeaturedTypes resolved:', featuredCap.data.effectiveTypes);
+      return featuredCap.data.effectiveTypes as string[];
+    }
+    console.log('[useStorefrontState] allowedFeaturedTypes FALLBACK (empty = show all)');
+    return []; // empty = show all (graceful fallback)
+  }, [featuredCap.data]);
 
   // ---- FAQ flags ----
   const [faqFlags] = useState<PublicFaqOptionsFlags | null>(
@@ -325,6 +356,17 @@ export function useStorefrontState({
     showsContact,
     showsSocialMedia,
     showsStorefrontActions,
+    // Product option flags
+    showsReviews,
+    showsFulfillment,
+    showsLocationAvailability,
+    showsGallery,
+    showsVideo,
+    showsVariants,
+    showsQRCodes,
+
+    // Featured options
+    allowedFeaturedTypes,
 
     // FAQ
     faqFlags,

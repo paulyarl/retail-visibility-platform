@@ -6,6 +6,7 @@
  */
 
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
 import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
 import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 

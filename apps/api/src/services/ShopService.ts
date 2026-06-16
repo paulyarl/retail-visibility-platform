@@ -105,7 +105,7 @@ class ShopService extends UniversalSingleton {
 
   /**
    * Get shop by slug with caching
-   * Uses mv_global_discovery for optimized performance
+   * Uses mv_storefront_discovery for optimized performance
    */
   async getShopBySlug(slug: string): Promise<Shop | null> {
     const cacheKey = `shop:slug:v7:${slug}`; // New version to force refresh
@@ -113,7 +113,7 @@ class ShopService extends UniversalSingleton {
     this.logInfo(`Fetching shop by slug: ${slug}`);
 
     try {
-      // Use mv_global_discovery for optimized shop data retrieval
+      // Use mv_storefront_discovery for optimized shop data retrieval
       const query = `
         SELECT DISTINCT
           d.tenant_id,
@@ -132,7 +132,7 @@ class ShopService extends UniversalSingleton {
           d.tenant_latitude,
           d.tenant_longitude,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
-        FROM mv_global_discovery d
+        FROM mv_storefront_discovery d
         LEFT JOIN tenant_business_profiles_list bp ON d.tenant_id = bp.tenant_id
         WHERE d.tenant_slug = $1
           AND d.shop_category IS NOT NULL
@@ -188,7 +188,7 @@ class ShopService extends UniversalSingleton {
 
   /**
    * Get shop by tenant ID with caching
-   * Uses mv_global_discovery for optimized performance
+   * Uses mv_storefront_discovery for optimized performance
    */
   async getShopByTenantId(tenantId: string): Promise<Shop | null> {
     const cacheKey = `shop:tenantId:${tenantId}`;
@@ -203,7 +203,7 @@ class ShopService extends UniversalSingleton {
     this.logInfo(`Cache miss, fetching shop by tenantId: ${tenantId}`);
 
     try {
-      // Use mv_global_discovery for optimized shop data retrieval
+      // Use mv_storefront_discovery for optimized shop data retrieval
       const query = `
         SELECT DISTINCT
           d.tenant_id,
@@ -229,7 +229,7 @@ class ShopService extends UniversalSingleton {
           d.default_gateway_type,
           d.has_active_payment_gateway,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
-        FROM mv_global_discovery d
+        FROM mv_storefront_discovery d
         LEFT JOIN tenant_business_profiles_list bp ON d.tenant_id = bp.tenant_id
         WHERE d.tenant_id = $1
         GROUP BY 
@@ -307,7 +307,7 @@ class ShopService extends UniversalSingleton {
         SELECT 
           shop_category as primary_category,
           COUNT(DISTINCT tenant_id) as count
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE shop_category IS NOT NULL
           AND shop_category != ''
           AND item_status = 'active'
@@ -353,7 +353,7 @@ class ShopService extends UniversalSingleton {
           tenant_city as city,
           tenant_state as state,
           tenant_zip as zip
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE tenant_city IS NOT NULL
           AND tenant_state IS NOT NULL
           AND item_status = 'active'
@@ -420,7 +420,7 @@ class ShopService extends UniversalSingleton {
           (3959 * acos(cos(radians(${latitude})) * cos(radians(tenant_latitude)) * 
            cos(radians(tenant_longitude) - radians(${longitude})) + 
            sin(radians(${latitude})) * sin(radians(tenant_latitude)))) as distance
-        FROM mv_global_discovery
+        FROM mv_storefront_discovery
         WHERE tenant_latitude IS NOT NULL
           AND tenant_longitude IS NOT NULL
           AND item_status = 'active'
@@ -545,7 +545,7 @@ class ShopService extends UniversalSingleton {
           NULLIF(AVG(dsl.average_rating), 0) as rating_avg,
           MAX(CAST(dsl.review_count AS INTEGER)) as rating_count,
           COALESCE(ic.item_count, 0) as productCount
-        FROM mv_global_discovery dsl
+        FROM mv_storefront_discovery dsl
         LEFT JOIN directory_listings_list dl ON dsl.tenant_id = dl.tenant_id
         LEFT JOIN tenant_business_profiles_list bp ON dsl.tenant_id = bp.tenant_id
         LEFT JOIN (
