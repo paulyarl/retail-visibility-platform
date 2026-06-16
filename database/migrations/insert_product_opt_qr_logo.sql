@@ -35,15 +35,18 @@ WHERE ctl.key = 'product_options'
   );
 
 -- Enable for all tiers that already have product_opt_qr_codes
-INSERT INTO tier_features_list (tier_id, capability_type_id, feature_key, is_enabled, created_at, updated_at)
+INSERT INTO tier_features_list (id, tier_id, capability_type_id, feature_key, feature_name, is_enabled, created_at, updated_at)
 SELECT
+  gen_random_uuid()::text,
   tfl.tier_id,
   tfl.capability_type_id,
   'product_opt_qr_logo',
+  fl.name,
   true,
   NOW(),
   NOW()
 FROM tier_features_list tfl
+JOIN features_list fl ON fl.key = 'product_opt_qr_logo'
 WHERE tfl.feature_key = 'product_opt_qr_codes'
   AND tfl.is_enabled = true
   AND NOT EXISTS (
