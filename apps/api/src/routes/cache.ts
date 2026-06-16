@@ -7,6 +7,7 @@ const router = Router()
 // Materialized views that can be refreshed
 const REFRESHABLE_MVS = [
   'mv_global_discovery',
+  'mv_storefront_discovery',
   'mv_category_discovery',
   'mv_shop_discovery',
   'mv_trending_scores',

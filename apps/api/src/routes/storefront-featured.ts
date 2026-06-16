@@ -63,12 +63,13 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const showExpired = includeExpired === 'true';
     
-    // Tier-capability-aware query: only return featured types allowed by tenant's tier
+    // Use mv_storefront_discovery (no is_published filter) so featured products
+    // are visible on storefront regardless of directory publication status
     const query = `
       WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT 
         mv.*
-      FROM mv_global_discovery mv
+      FROM mv_storefront_discovery mv
       ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
       ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = $1
@@ -333,12 +334,13 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
       return res.status(400).json({ error: 'invalid_featured_type', validTypes: getValidFeaturedTypes() });
     }
     
-    // Tier-capability-aware query: only return featured types allowed by tenant's tier
+    // Use mv_storefront_discovery (no is_published filter) so featured products
+    // are visible on storefront regardless of directory publication status
     const query = `
       WITH ${TIER_FEATURED_ACCESS_CTE}
       SELECT DISTINCT 
         mv.*
-      FROM mv_global_discovery mv
+      FROM mv_storefront_discovery mv
       ${TIER_FEATURED_ACCESS_JOIN.replace(/mgd\./g, 'mv.')}
       ${TENANT_PREFS_JOIN.replace(/mgd\./g, 'mv.')}
       WHERE mv.tenant_id = $1

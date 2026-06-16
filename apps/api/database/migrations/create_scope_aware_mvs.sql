@@ -488,6 +488,435 @@ WHERE
   -- NOTE: No fp.is_active filter here - we want ALL products, not just featured ones
   -- Featured products will have fp.* fields populated, non-featured will have NULLs;
 
+-- 1b. STOREFRONT DISCOVERY MV (Same as global but WITHOUT directory is_published filter)
+-- This decouples storefront product visibility from directory publication status.
+-- Merchants should see their featured products on storefront even if directory is unpublished.
+CREATE MATERIALIZED VIEW mv_storefront_discovery AS
+SELECT 
+  -- Basic Product Information (from inventory_items)
+  ii.id as inventory_item_id,
+  ii.name as product_name,
+  ii.title as product_title,
+  ii.description as product_description,
+  ii.marketing_description,
+  ii.sku,
+  ii.brand,
+  ii.manufacturer,
+  ii.condition,
+  ii.gtin,
+  ii.mpn,
+  ii.stock,
+  ii.quantity,
+  ii.availability,
+  ii.item_status,
+  ii.visibility,
+  ii.custom_cta,
+  ii.social_links,
+  ii.custom_branding,
+  ii.custom_sections,
+  ii.landing_page_theme,
+  ii.image_url,
+  ii.image_gallery as image_urls,
+  ii.features,
+  ii.specifications,
+  ii.enhanced_description,
+  ii.video_url,
+  (ii.metadata->>'gallery_urls')::jsonb as gallery_urls,
+  (ii.metadata->>'thumbnail_url')::text as thumbnail_url,
+  (ii.metadata->>'featured_image_url')::text as featured_image_url,
+  
+  -- PRODUCT SLUG DATA (from product_slug_registry)
+  psr.product_slug,
+  psr.universal_sku,
+  psr.brand_normalized,
+  psr.category_normalized,
+  psr.slug_type,
+  psr.slug_prefix,
+  psr.original_sku,
+  
+  -- PLATFORM AGGREGATE METRICS (from product_slug_registry)
+  COALESCE(
+    (SELECT COUNT(DISTINCT psr2.tenant_id) 
+     FROM product_slug_registry psr2 
+     WHERE psr2.product_slug = psr.product_slug 
+       AND psr2.is_active = true),
+    1
+  ) as platform_tenant_count,
+  COALESCE(
+    (SELECT SUM(oi.quantity) 
+     FROM order_items oi 
+     JOIN orders o ON o.id = oi.order_id 
+     JOIN inventory_items ii2 ON ii2.id = oi.inventory_item_id 
+     WHERE ii2.product_slug = psr.product_slug
+       AND o.order_status IN ('paid', 'processing', 'shipped', 'delivered')
+       AND o.payment_status IN ('paid', 'partially_refunded')),
+    0
+  ) as platform_purchase_count,
+  COALESCE(
+    (SELECT SUM(ii2.stock) 
+     FROM inventory_items ii2 
+     WHERE ii2.product_slug = psr.product_slug
+       AND ii2.item_status = 'active'),
+    0
+  ) as platform_total_stock,
+  -- RICH PRICING DATA (from inventory_items)
+  ii.price_cents as list_price_cents,
+  ii.sale_price_cents,
+  COALESCE(ii.sale_price_cents, ii.price_cents) as current_price_cents,
+  CASE 
+    WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents > 0 
+    THEN (ii.sale_price_cents::numeric / 100.0)::numeric(10, 2)
+    WHEN ii.price_cents > 0 
+    THEN (ii.price_cents::numeric / 100.0)::numeric(10, 2)
+    ELSE 0::numeric
+  END as price,
+  CASE 
+    WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
+    THEN true 
+    ELSE false 
+  END as is_on_sale,
+  CASE 
+    WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
+    THEN ROUND(((ii.price_cents - ii.sale_price_cents)::numeric / ii.price_cents::numeric) * 100, 0)
+    ELSE 0 
+  END as discount_percentage,
+  ii.currency,
+  
+  -- VARIANT METADATA
+  ii.metadata as product_metadata,
+  (ii.metadata->>'variant_id')::text as variant_id,
+  (ii.metadata->>'variant_name')::text as variant_name,
+  (ii.metadata->>'variant_sku')::text as variant_sku,
+  (ii.metadata->>'variant_color')::text as variant_color,
+  (ii.metadata->>'variant_size')::text as variant_size,
+  (ii.metadata->>'variant_material')::text as variant_material,
+  (ii.metadata->>'variant_style')::text as variant_style,
+  (ii.metadata->>'variant_price_cents')::numeric as variant_price_cents,
+  (ii.metadata->>'variant_inventory_quantity')::numeric as variant_inventory_quantity,
+  
+  -- PRODUCT TYPE AND CLASSIFICATION
+  ii.product_type,
+  dc.name as product_category,
+  dc.slug as product_category_slug,
+  dc."googleCategoryId" as product_google_category_id,
+  dc."parentId" as product_parent_category_id,
+  (ii.product_type = 'digital') as is_digital_product,
+  (ii.product_type = 'physical') as is_physical_product,
+  (ii.product_type = 'service') as is_service,
+  ii.has_variants as is_variant,
+  (ii.metadata->>'is_bundle')::boolean as is_bundle,
+  (ii.metadata->>'is_customizable')::boolean as is_customizable,
+  (ii.metadata->>'is_trackable')::boolean as is_trackable,
+  (ii.metadata->>'is_taxable')::boolean as is_taxable,
+  (ii.metadata->>'is_shipping_required')::boolean as is_shipping_required,
+  
+  -- RICH METADATA
+  (ii.metadata->>'attributes')::jsonb as attributes,
+  (ii.metadata->>'custom_fields')::jsonb as custom_fields,
+  (ii.metadata->>'search_keywords')::jsonb as search_keywords,
+  ii.seo_title,
+  ii.seo_description,
+  to_jsonb(ii.seo_keywords) as seo_keywords,
+  to_jsonb(ii.tags) as tags,
+  (ii.metadata->>'weight')::numeric as weight,
+  (ii.metadata->>'dimensions')::text as dimensions,
+  
+  -- INVENTORY AND STOCK
+  ii.stock as inventory_quantity,
+  (ii.metadata->>'inventory_policy')::text as inventory_policy,
+  ii.track_inventory as inventory_tracking,
+  (ii.metadata->>'inventory_quantity_tracked')::boolean as inventory_quantity_tracked,
+  ii.allow_backorder,
+  (ii.metadata->>'backorder_quantity')::numeric as backorder_quantity,
+  ii.low_stock_threshold,
+  (ii.metadata->>'requires_shipping')::boolean as requires_shipping,
+  (ii.metadata->>'weight_unit')::text as weight_unit,
+  (ii.metadata->>'length')::numeric as length,
+  (ii.metadata->>'width')::numeric as width,
+  (ii.metadata->>'height')::numeric as height,
+  (ii.metadata->>'dimension_unit')::text as dimension_unit,
+  
+  -- FEATURED INFORMATION (from featured_products)
+  fp.featured_type,
+  (SELECT jsonb_agg(DISTINCT fp2.featured_type) 
+   FROM featured_products fp2 
+   WHERE fp2.inventory_item_id = ii.id 
+     AND fp2.tenant_id = t.id 
+     AND fp2.is_active = true
+  ) as featured_type_array,
+  fp.featured_priority,
+  fp.featured_at,
+  fp.featured_expires_at as featured_until,
+  fp.is_active as featured_is_active,
+  case
+    when fp.id is not null
+    and fp.is_active = true
+    and (
+      fp.featured_expires_at is null
+      or fp.featured_expires_at > now()
+    )
+    and (
+      fp.featured_at is null
+      or fp.featured_at <= now()
+    )
+    then true
+    else false
+  end as is_actively_featured,
+  null as featured_metadata,
+  
+  -- Product Category Search Helper
+  LOWER(dc.name) as product_category_name_lower,
+  
+  -- Category counts and validation
+  jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) as gbp_secondary_category_count,
+  CASE 
+    WHEN t.gbp_primary_category_id IS NOT NULL THEN 1
+    ELSE 0
+  END + jsonb_array_length(COALESCE(t.gbp_secondary_categories, '[]'::jsonb)) as gbp_total_category_count,
+  
+  -- Tenant Information
+  t.id as tenant_id,
+  t.name as tenant_name,
+  t.slug as tenant_slug,
+  t.subscription_tier,
+  t.gbp_primary_category_name as shop_category,
+  t.gbp_primary_category_id as shop_category_id,
+  t.gbp_primary_category_id as shop_google_category_id,
+  
+  -- Location Information
+  COALESCE(tbp.city, dsl.city) as tenant_city,
+  COALESCE(tbp.state, dsl.state) as tenant_state,
+  tbp.country_code as tenant_country,
+  tbp.postal_code as tenant_zip,
+  tbp.address_line1 as tenant_address,
+  COALESCE(tbp.latitude, dsl.latitude) as tenant_latitude,
+  COALESCE(tbp.longitude, dsl.longitude) as tenant_longitude,
+  (t.metadata->>'timezone')::text as timezone,
+  tbp.logo_url as tenant_logo_url,
+  
+  -- BUSINESS INFORMATION
+  (t.metadata->>'business_type')::text as business_type,
+  (t.metadata->>'business_category')::text as business_category,
+  (t.metadata->>'business_size')::text as business_size,
+  (t.metadata->>'established_year')::numeric as established_year,
+  
+  -- SALES AND ENGAGEMENT METRICS
+  COALESCE(
+    (SELECT COUNT(*) FROM user_behavior_simple ubs 
+     WHERE ubs.entity_type = 'product' 
+       AND ubs.entity_id = ii.id 
+       AND ubs.timestamp >= now() - interval '30 days'
+       AND ubs.page_type = 'product_page'
+    ), 0
+  ) as view_count,
+  COALESCE(
+    (SELECT COUNT(DISTINCT ubs.user_id) FROM user_behavior_simple ubs 
+     WHERE ubs.entity_type = 'product' 
+       AND ubs.entity_id = ii.id 
+       AND ubs.timestamp >= now() - interval '30 days'
+       AND ubs.page_type = 'product_page'
+       AND ubs.user_id IS NOT NULL
+    ), 0
+  ) as unique_viewers,
+  COALESCE(
+    (SELECT COUNT(*) FROM user_behavior_simple ubs 
+     WHERE ubs.entity_type = 'product' 
+       AND ubs.entity_id = ii.id 
+       AND ubs.timestamp >= now() - interval '30 days'
+       AND ubs.page_type = 'product_page'
+    ), 0
+  ) as engagement_count,
+  COALESCE(
+    (SELECT COUNT(DISTINCT oi.order_id) FROM order_items oi 
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.inventory_item_id = ii.id 
+       AND o.tenant_id = t.id
+       AND o.order_status IN ('paid', 'processing', 'shipped', 'delivered')
+       AND o.payment_status IN ('paid', 'partially_refunded')
+    ), 0
+  ) as conversion_count,
+  COALESCE(
+    (SELECT SUM(oi.subtotal_cents) FROM order_items oi 
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.inventory_item_id = ii.id 
+       AND o.tenant_id = t.id
+       AND o.order_status IN ('paid', 'processing', 'shipped', 'delivered')
+       AND o.payment_status IN ('paid', 'partially_refunded')
+    ), 0
+  ) as revenue_cents,
+  COALESCE(
+    (SELECT SUM(oi.quantity) FROM order_items oi 
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.inventory_item_id = ii.id 
+       AND o.tenant_id = t.id
+       AND o.order_status IN ('paid', 'processing', 'shipped', 'delivered')
+       AND o.payment_status IN ('paid', 'partially_refunded')
+    ), 0
+  ) as units_sold,
+  -- Product reviews/ratings
+  (ii.metadata->>'average_rating')::numeric as product_average_rating,
+  (ii.metadata->>'review_count')::numeric as product_review_count,
+  
+  -- Store reviews/ratings
+  COALESCE(
+    (SELECT AVG(sr.rating) 
+     FROM store_reviews sr 
+     WHERE sr.tenant_id = t.id AND sr.approval_status = 'approved'), 
+    0
+  )::numeric as store_average_rating,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.tenant_id = t.id AND sr.approval_status = 'approved'), 
+    0
+  )::numeric as store_review_count,
+  COALESCE(
+    (SELECT AVG(sr.rating) 
+     FROM store_reviews sr 
+     WHERE sr.tenant_id = t.id AND sr.approval_status = 'approved'), 
+    0
+  )::numeric as average_rating,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.tenant_id = t.id AND sr.approval_status = 'approved'), 
+    0
+  )::numeric as review_count,
+  
+  -- Product-specific review aggregations
+  COALESCE(
+    (SELECT AVG(sr.rating) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_rating_live,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_reviews_count_live,
+  COALESCE(
+    (SELECT SUM(sr.helpful_count) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_helpful_count_live,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_reviews_approved_live,
+  
+  (ii.metadata->>'wishlist_count')::numeric as wishlist_count,
+  (ii.metadata->>'share_count')::numeric as share_count,
+  
+  -- Computed Fields
+  CASE 
+    WHEN fp.featured_type = 'featured' THEN 1
+    WHEN fp.featured_type = 'new_arrival' THEN 2
+    WHEN fp.featured_type = 'staff_pick' THEN 3
+    WHEN fp.featured_type = 'seasonal' THEN 4
+    WHEN fp.featured_type = 'sale' THEN 5
+    WHEN fp.featured_type = 'clearance' THEN 6
+    WHEN fp.featured_type = 'store_selection' THEN 7
+    WHEN fp.featured_type = 'trending' THEN 8
+    WHEN fp.featured_type = 'recommended' THEN 9
+    WHEN fp.featured_type = 'bestseller' THEN 10
+    WHEN fp.featured_type = 'random_featured' THEN 11
+    ELSE 12
+  END as bucket_priority,
+  
+  -- Trending Score
+  GREATEST(
+    CASE WHEN fp.featured_at IS NOT NULL 
+      THEN GREATEST(0, 1 - (EXTRACT(EPOCH FROM (now() - fp.featured_at)) / (30 * 86400))) * 0.2
+      ELSE GREATEST(0, 1 - (EXTRACT(EPOCH FROM (now() - ii.created_at)) / (30 * 86400))) * 0.2
+    END,
+    COALESCE(fp.featured_priority, 0) * 0.01,
+    CASE WHEN ii.stock > 0 THEN 0.15 ELSE 0 END,
+    CASE WHEN ii.image_url IS NOT NULL THEN 0.10 ELSE 0 END,
+    CASE WHEN ii.sale_price_cents IS NOT NULL THEN 0.10 ELSE 0 END,
+    CASE WHEN (ii.metadata->>'average_rating')::numeric >= 4.0 THEN 0.10 ELSE 0 END,
+    0
+  ) as trending_score,
+  
+  -- Price Status
+  CASE 
+    WHEN ii.sale_price_cents IS NOT NULL 
+    AND ii.sale_price_cents < ii.price_cents THEN 'on_sale'
+    WHEN (ii.metadata->>'compare_at_price_cents')::numeric IS NOT NULL 
+    AND (ii.metadata->>'compare_at_price_cents')::numeric > ii.price_cents THEN 'discounted'
+    ELSE 'regular'
+  END as price_status,
+  
+  -- Stock Status
+  CASE 
+    WHEN ii.stock <= 0 THEN 'out_of_stock'
+    WHEN ii.stock <= ii.low_stock_threshold THEN 'low_stock'
+    ELSE 'in_stock'
+  END as stock_status,
+  
+  -- Additional computed flags
+  case when ii.image_url is not null then true else false end as has_image,
+  case when ii.image_gallery is not null and ii.image_gallery <> '{}'::text[] then true else false end as has_gallery,
+  case when ii.marketing_description is not null then true else false end as has_description,
+  case when ii.brand is not null then true else false end as has_brand,
+  case when ii.price_cents > 0 then true else false end as has_price,
+  case when ii.stock > 0 or ii.quantity > 0 then true else false end as in_stock,
+  case when exists (
+    select 1 from tenant_payment_gateways tpg 
+    where tpg.tenant_id = t.id and tpg.is_active = true
+    and (
+      tpg.gateway_type not in ('square', 'paypal')
+      or 
+      exists (
+        select 1 from oauth_tokens ot 
+        where ot.tenant_id = tpg.tenant_id 
+        and ot.gateway_type = tpg.gateway_type 
+        and ot.expires_at > now() - interval '24 hours'
+      )
+    )
+  ) then true else false end as has_active_payment_gateway,
+  COALESCE(
+    (select tpg.gateway_type from tenant_payment_gateways tpg where tpg.tenant_id = t.id and tpg.is_active = true and tpg.is_default = true limit 1),
+    (select tpg.gateway_type from tenant_payment_gateways tpg where tpg.tenant_id = t.id and tpg.is_active = true limit 1)
+  ) as default_gateway_type,
+  
+  -- Timestamps
+  ii.created_at,
+  ii.updated_at,
+  (ii.metadata->>'published_at')::timestamp as published_at,
+  (ii.metadata->>'archived_at')::timestamp as archived_at,
+  now() as mv_refreshed_at
+
+FROM tenants t
+LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = t.id
+LEFT JOIN tenant_business_profiles_list tbp ON tbp.tenant_id = t.id
+LEFT JOIN inventory_items ii ON ii.tenant_id = t.id
+LEFT JOIN directory_category dc ON dc.id = ii.directory_category_id AND dc."tenantId" = t.id
+LEFT JOIN product_slug_registry psr ON psr.product_slug = ii.product_slug AND psr.is_active = true
+LEFT JOIN featured_products fp ON fp.inventory_item_id = ii.id 
+  AND fp.tenant_id = t.id 
+  AND fp.is_active = true
+  AND (fp.featured_expires_at IS NULL OR fp.featured_expires_at > now())
+  AND (fp.featured_at IS NULL OR fp.featured_at <= now())
+WHERE
+  t.location_status = 'active'::location_status
+  -- NOTE: No dsl.is_published filter here - storefront should show products regardless of directory status
+  -- NOTE: No t.directory_visible filter here - storefront product visibility is independent of directory visibility
+  AND ii.item_status = 'active'::item_status
+  AND ii.visibility = 'public'::item_visibility;
+
 -- 2. CATEGORY-AWARE MV (Product + Shop Categories with RICH DATA - DIRECT FROM BASE TABLES)
 CREATE MATERIALIZED VIEW mv_category_discovery AS
 SELECT 
@@ -760,6 +1189,17 @@ CREATE INDEX idx_mv_global_discovery_featured_type ON mv_global_discovery(featur
 CREATE INDEX idx_mv_global_discovery_priority ON mv_global_discovery(featured_priority DESC, featured_at DESC);
 CREATE INDEX idx_mv_global_discovery_product_category ON mv_global_discovery(product_category);
 
+-- Storefront discovery indexes (same structure as global, for storefront use)
+-- Unique index on (tenant_id, inventory_item_id, featured_type) enables CONCURRENT refresh
+CREATE UNIQUE INDEX idx_mv_storefront_discovery_unique ON mv_storefront_discovery(tenant_id, inventory_item_id, featured_type);
+CREATE INDEX idx_mv_storefront_discovery_id ON mv_storefront_discovery(inventory_item_id);
+CREATE INDEX idx_mv_storefront_discovery_tenant ON mv_storefront_discovery(tenant_id);
+CREATE INDEX idx_mv_storefront_discovery_tenant_featured ON mv_storefront_discovery(tenant_id, featured_type);
+CREATE INDEX idx_mv_storefront_discovery_tenant_bucket ON mv_storefront_discovery(tenant_id, featured_type, featured_priority DESC);
+CREATE INDEX idx_mv_storefront_discovery_featured_type ON mv_storefront_discovery(featured_type);
+CREATE INDEX idx_mv_storefront_discovery_trending ON mv_storefront_discovery(trending_score DESC);
+CREATE INDEX idx_mv_storefront_discovery_product_category ON mv_storefront_discovery(product_category);
+
 -- Category discovery indexes
 CREATE INDEX idx_mv_category_discovery_product_category ON mv_category_discovery(product_category);
 CREATE INDEX idx_mv_category_discovery_gbp_category ON mv_category_discovery(gbp_primary_category_name_lower);
@@ -796,6 +1236,7 @@ CREATE INDEX idx_mv_random_discovery_products_priority ON mv_random_discovery_pr
 
 -- Refresh all materialized views to populate with initial data
 REFRESH MATERIALIZED VIEW mv_global_discovery;
+REFRESH MATERIALIZED VIEW mv_storefront_discovery;
 REFRESH MATERIALIZED VIEW mv_category_discovery;
 REFRESH MATERIALIZED VIEW mv_shop_discovery;
 REFRESH MATERIALIZED VIEW mv_trending_scores;
@@ -828,6 +1269,7 @@ BEGIN
   
   -- Refresh base MVs first
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_global_discovery;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_storefront_discovery;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_category_discovery;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_shop_discovery;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_trending_scores;
