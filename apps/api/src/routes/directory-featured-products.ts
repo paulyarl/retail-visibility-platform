@@ -139,7 +139,7 @@ router.get('/', async (req: Request, res: Response) => {
         product_metadata,
         has_active_payment_gateway,
         default_gateway_type
-      FROM mv_global_discovery mgd
+      FROM mv_storefront_discovery mgd
       ${TIER_FEATURED_ACCESS_JOIN}
       ${TENANT_PREFS_JOIN}
       WHERE featured_is_active = true
