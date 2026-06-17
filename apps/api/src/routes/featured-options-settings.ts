@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import FeaturedOptionsService, { FeaturedType } from '../services/FeaturedOptionsService';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -211,6 +212,8 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
       });
     }
 
+    invalidateEffectiveCapabilities(tenantId);
+
     res.json({
       success: true,
       settings: {
@@ -240,9 +243,13 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
 });
 
 // Public endpoint - Get featured options settings for storefront
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/featured-options', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/featured-options is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     // Resolve tier capabilities for tier-gate-aware merchant gate
     const featuredService = FeaturedOptionsService.getInstance();

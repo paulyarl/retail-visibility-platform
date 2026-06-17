@@ -162,8 +162,8 @@ const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
 };
 
 export default function StorefrontOptionsSettingsClient({ tenantId }: StorefrontOptionsSettingsClientProps) {
-  const storefrontCap = useStorefrontOptionsCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const storefrontCap = useStorefrontOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
 
   const [settings, setSettings] = useState<StorefrontOptionsSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);

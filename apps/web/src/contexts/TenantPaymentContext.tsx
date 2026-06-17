@@ -21,7 +21,7 @@ interface TenantPaymentProviderProps {
   children: ReactNode;
   // Server-fetched capability props (eliminates client-side waterfall)
   initialCommerceSettings?: { enabled?: boolean } | null;
-  initialPaymentGatewaySettings?: { gateway_enabled?: boolean } | null;
+  initialPaymentGatewaySettings?: { enabled?: boolean; gateway_enabled?: boolean } | null;
 }
 
 export function TenantPaymentProvider({ tenantId, children, initialCommerceSettings, initialPaymentGatewaySettings }: TenantPaymentProviderProps) {
@@ -36,7 +36,7 @@ export function TenantPaymentProvider({ tenantId, children, initialCommerceSetti
     loading: false,
   };
   const paymentCap = {
-    data: initialPaymentGatewaySettings ? { enabled: initialPaymentGatewaySettings.gateway_enabled ?? true } : undefined,
+    data: initialPaymentGatewaySettings ? { enabled: initialPaymentGatewaySettings.enabled ?? initialPaymentGatewaySettings.gateway_enabled ?? true } : undefined,
     loading: false,
   };
 

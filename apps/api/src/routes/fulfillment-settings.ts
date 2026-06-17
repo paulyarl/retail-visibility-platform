@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -90,9 +91,13 @@ router.get('/:tenantId/fulfillment-settings', authenticateToken, async (req, res
 });
 
 // Public endpoint - Get fulfillment settings for storefront/checkout
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/fulfillment-settings', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/fulfillment-settings is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     const settings = await prisma.tenant_fulfillment_settings.findUnique({
       where: { tenant_id: tenantId },
@@ -197,6 +202,8 @@ router.put('/:tenantId/fulfillment-settings', authenticateToken, async (req, res
         },
       });
     }
+
+    invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,

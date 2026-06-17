@@ -5,10 +5,10 @@
  * and the mapping between storefront layouts and product page layouts.
  */
 
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
-import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 
 // ---------------------------------------------------------------------------
 // Layout identifiers

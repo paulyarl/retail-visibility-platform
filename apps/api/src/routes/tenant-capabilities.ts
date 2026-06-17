@@ -13,6 +13,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router({ mergeParams: true });
 
@@ -313,6 +314,46 @@ router.get('/capabilities/tiers-by-capability', authenticateToken, async (req: R
   } catch (error) {
     console.error('[GET /api/tenants/capabilities/tiers-by-capability] Error:', error);
     res.status(500).json({ error: 'failed_to_list_tiers_by_capability' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/effective-capabilities
+ *
+ * Unified capabilities endpoint — returns a flat "effective capability manifest"
+ * with tier hard-gates + merchant soft-gates already resolved server-side.
+ *
+ * Query params:
+ *   ?detail=full  — includes raw `gates` section for settings/debug pages
+ */
+router.get('/:tenantId/effective-capabilities', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const detail = req.query.detail === 'full' ? 'full' : 'summary';
+
+    const result = await resolveEffectiveCapabilities(tenantId, { detail });
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
+    res.setHeader('Vary', 'Accept-Encoding, Accept-Language');
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[GET /effective-capabilities] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve effective capabilities',
+    });
   }
 });
 

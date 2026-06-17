@@ -1,0 +1,52 @@
+/**
+ * Effective Capabilities Types
+ *
+ * Re-exports from CapabilityResolutionService for convenience.
+ * New code should import from here instead of the service file.
+ */
+
+export type {
+  AllCapabilitiesState,
+  CommerceState,
+  PaymentGatewayState,
+  StorefrontState,
+  BarcodeScanState,
+  FulfillmentState,
+  ProductOptionsState,
+  FeaturedOptionsState,
+  IntegrationOptionsState,
+  QuickstartOptionsState,
+  StorefrontOptionsState,
+  FaqOptionsState,
+  CrmOptionsState,
+  CommercePaymentType,
+  GatewayType,
+  StorefrontType,
+  BarcodeScanMode,
+  ProductType,
+  ProductLayoutType,
+  FeaturedType,
+  IntegrationType,
+  QuickstartProductType,
+  QuickstartCategoryType,
+  QuickstartAIType,
+  StorefrontOptHoursType,
+  StorefrontOptCategoryType,
+  StorefrontOptRecommendType,
+  StorefrontOptInfoType,
+  StorefrontOptQRResolutionType,
+  StorefrontOptQRContentType,
+  StorefrontOptGalleryType,
+  StorefrontOptAdvancedType,
+  StorefrontOptLayoutType,
+  FaqManagementType,
+  FaqPreviewType,
+  FaqDisplayType,
+  FaqKnowledgeBaseType,
+  CrmInquiryType,
+  CrmContactType,
+  CrmTicketType,
+  CrmMessageType,
+  CrmCustomerTicketType,
+  CrmDashboardType,
+} from '@/services/CapabilityResolutionService';

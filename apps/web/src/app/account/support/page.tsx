@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import type { CrmTicket, CrmAlert } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -64,7 +65,7 @@ export default function CustomerSupportPage() {
           // Fetch CRM flags for each tenant to filter by customer ticket eligibility
           const flagsEntries = await Promise.all(
             uniqueTenants.map(async (t) => {
-              const flags = await publicCrmService.getCrmOptionsFlags(t.id);
+              const flags = await unifiedCapabilityService.getCrmOptionsFlags(t.id);
               return [t.id, flags] as [string, PublicCrmOptionsFlags | null];
             })
           );

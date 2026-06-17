@@ -79,8 +79,8 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   } = useTenantComplete(tenantId, true);
 
   const { profile, loading: profileLoading } = useUserProfile();
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
-  const { gates: merchantGates } = useMerchantGates(tenantId, { forTenant: true });
+  const allCaps = useAllCapabilities(tenantId);
+  const { gates: merchantGates } = useMerchantGates(tenantId);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [businessProfileLoading, setBusinessProfileLoading] = useState(true);
 

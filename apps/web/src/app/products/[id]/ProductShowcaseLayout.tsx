@@ -38,8 +38,8 @@ import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusP
 import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
 
 // Types
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
 // Icons
 import { Package, Download, Globe } from 'lucide-react';

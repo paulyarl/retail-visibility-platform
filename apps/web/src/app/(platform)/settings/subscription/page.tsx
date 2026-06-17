@@ -130,7 +130,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
 
   // Capability-aware resolution for all three capability types
-  const allCapabilities = useAllCapabilities(tenantId || null, { forTenant: true });
+  const allCapabilities = useAllCapabilities(tenantId || null);
 
   // Use dynamic tier system hook
   const { 

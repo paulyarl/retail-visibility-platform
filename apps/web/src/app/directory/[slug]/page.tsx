@@ -35,22 +35,23 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 // import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { StorefrontOptionFlags, PublicCrmOptionsFlags, type FeaturedOptionsState } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
-import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 
 // Merchant gate helper for client-side filtering
 function filterFeaturedProductsByMerchantPreferences(
   products: any[],
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): any[] {
+  const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return [];
   return products.filter(product => {
     const type = product.featuredType || 'store_selection';
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     return prefs[key] === true;
   });
 }
@@ -382,7 +383,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   // console.log(`[Directory] tenantInfo:`, tenantInfo);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
-  const [featuredOptionsSettings, setFeaturedOptionsSettings] = useState<FeaturedOptionsSettings | null>(null);
+  const [featuredOptionsState, setFeaturedOptionsState] = useState<FeaturedOptionsState | null>(null);
   const [faqFlags, setFaqFlags] = useState<PublicFaqOptionsFlags | null>(null);
   const [crmFlags, setCrmFlags] = useState<PublicCrmOptionsFlags | null>(null);
 
@@ -459,10 +460,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId),
-          publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId),
-          publicFaqService.getFaqOptionsFlags(data.listing.tenantId),
-          publicCrmService.getCrmOptionsFlags(data.listing.tenantId)
+          unifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
+          unifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId),
+          unifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId),
+          unifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -471,7 +472,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         setStorefrontCategories(categories);
         setActualProductCount(productCount);
         if (optionFlags) setOptFlags(optionFlags);
-        if (featuredPrefs) setFeaturedOptionsSettings(featuredPrefs);
+        if (featuredPrefs) setFeaturedOptionsState(featuredPrefs);
         if (faqOptionFlags) setFaqFlags(faqOptionFlags);
         if (crmOptionFlags) setCrmFlags(crmOptionFlags);
 
@@ -557,7 +558,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   });
 
   // Apply merchant gate filtering to featured products
-  const featuredProducts = filterFeaturedProductsByMerchantPreferences(dedupedFeaturedProducts, featuredOptionsSettings);
+  const featuredProducts = filterFeaturedProductsByMerchantPreferences(dedupedFeaturedProducts, featuredOptionsState);
 
   // Compute store status from business hours data
   const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;

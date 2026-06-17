@@ -66,7 +66,7 @@ export default function QuickStartPage() {
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
 
   // Capability-based quickstart state
-  const { data: quickstartState } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const { data: quickstartState } = useQuickstartOptionsCapability(tenantId);
   const hasFullQuickStart = quickstartState?.canUseAIWizard ?? false;
   const hasStaticQuickStart = quickstartState?.canUseWizard ?? false;
   const canUseAI = (quickstartState?.canUseOpenAI || quickstartState?.canUseGemini) ?? false;

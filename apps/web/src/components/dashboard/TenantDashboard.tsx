@@ -77,7 +77,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const canManageSettings = user ? canManageTenantSettings(user, tenantId) : false;
 
   // Capability-aware plan summary
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const allCaps = useAllCapabilities(tenantId);
 
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;

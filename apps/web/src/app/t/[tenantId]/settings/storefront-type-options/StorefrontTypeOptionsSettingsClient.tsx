@@ -68,8 +68,8 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
 }
 
 export default function StorefrontTypeOptionsSettingsClient({ tenantId }: StorefrontTypeOptionsSettingsClientProps) {
-  const storefrontCap = useStorefrontCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const storefrontCap = useStorefrontCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const resolvedState = storefrontCap.data;
   // Distinguish tier-gated from merchant-gated:
   // - enabled=true → fully enabled

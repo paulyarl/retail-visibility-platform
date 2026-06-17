@@ -31,13 +31,13 @@ import ProductCategorySidebar from '@/components/storefront/ProductCategorySideb
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
-import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
 
@@ -186,24 +186,26 @@ async function getFeaturedProductsByType(tenantId: string): Promise<{ counts: Re
 // Merchant gate helpers: filter by merchant preferences before passing to components
 function filterTypesByMerchantPreferences(
   types: string[],
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): string[] {
+  const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return [];
   return types.filter(type => {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     return prefs[key] === true;
   });
 }
 
 function filterBucketCountsByMerchantPreferences(
   counts: Record<string, number> | undefined,
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): Record<string, number> | undefined {
+  const prefs = state?.merchantPreferences;
   if (!counts) return undefined;
   if (!prefs || !prefs.featured_enabled) return {};
   const filtered: Record<string, number> = {};
   for (const [type, count] of Object.entries(counts)) {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     if (prefs[key] === true) {
       filtered[type] = count;
     }
@@ -213,12 +215,13 @@ function filterBucketCountsByMerchantPreferences(
 
 function filterGroupedProductsByMerchantPreferences(
   grouped: Record<string, any[]>,
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): Record<string, any[]> {
+  const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return {};
   const filtered: Record<string, any[]> = {};
   for (const [type, products] of Object.entries(grouped)) {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     if (prefs[key] === true) {
       filtered[type] = products;
     }
@@ -248,17 +251,34 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
+
+  // Basic metadata — always emitted
+  const basicDescription = product.description || `Buy ${product.title} from ${businessName}`;
+
+  if (!showEnhancedSEO) {
+    return {
+      title: `${product.title} - ${businessName}`,
+      description: basicDescription,
+      openGraph: {
+        title: product.title,
+        description: basicDescription,
+        images: product.images?.map(img => img.url) || [],
+        type: 'website',
+      },
+    };
+  }
+
+  // Enhanced metadata — gated behind merchant capability
   const businessDescription = tenantProfile?.business_description;
   const seoTags = tenantProfile?.seo_tags || [];
-
-  // Create enhanced description with business info
-  const baseDescription = product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`;
   const enhancedDescription = businessDescription
-    ? `${baseDescription}. ${businessDescription}`
-    : baseDescription;
+    ? `${basicDescription}. ${businessDescription}`
+    : basicDescription;
 
   // Create SEO schema
   const schema = {
@@ -323,20 +343,20 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const shopData = await getShopData(product.tenantId);
   const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
 
-  // Fetch merchant preferences and apply merchant gate filtering at page root
-  const featuredPrefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(product.tenantId);
-  const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredPrefs);
-  const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredPrefs);
-  const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredPrefs);
+  // Fetch featured options state and apply merchant gate filtering at page root
+  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId);
+  const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredState);
+  const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredState);
+  const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredState);
   // const tenantProfile2 = await getTenantProfile(product.tenantId);
   const tenantProfile = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
-  const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
-  const productOptFlags = await publicProductOptionsService.getProductOptionFlags(product.tenantId);
-  const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
-  const crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId);
+  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
+  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
   const platformSettings = await platformSettingsService.getPlatformSettings();
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
@@ -444,8 +464,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <>
       <ProductLikeProvider>
-        {/* SEO Meta Tags */}
-        {tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
+        {/* SEO Meta Tags — gated behind enhanced SEO capability */}
+        {optFlags?.showEnhancedSEO && tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
           <>
             {tenantProfile.directoryData.seo_keywords.map((tag: string, index: number) => (
               <meta key={index} name="keywords" content={tag} />
@@ -453,11 +473,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </>
         )}
 
-        {/* Structured Data */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
+        {/* Structured Data — gated behind enhanced SEO capability */}
+        {optFlags?.showEnhancedSEO && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          />
+        )}
 
         {/* Product View Tracking */}
         <ProductViewTracker

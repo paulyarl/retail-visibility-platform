@@ -17,9 +17,9 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 // ---------------------------------------------------------------------------

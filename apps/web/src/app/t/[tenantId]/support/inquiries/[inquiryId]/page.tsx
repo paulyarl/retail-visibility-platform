@@ -46,7 +46,7 @@ export default function TenantInquiryDetailPage() {
   const isClosed = inquiry?.status === 'closed';
 
   // Check FAQ KB capability for inquiry-to-FAQ feature
-  const faqCap = useFaqOptionsCapability(tenantId, { forTenant: true });
+  const faqCap = useFaqOptionsCapability(tenantId);
   const [merchantGateEnabled, setMerchantGateEnabled] = useState(false);
 
   useEffect(() => {

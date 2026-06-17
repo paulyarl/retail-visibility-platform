@@ -69,7 +69,7 @@ export default function FeaturedProductsSettings({
   const [merchantFeaturedEnabled, setMerchantFeaturedEnabled] = useState<boolean>(true);
 
   // Capability check for featured tier gating
-  const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
   const isFeaturedEnabled = featuredCap.data?.enabled ?? true;
   const allowedTypes = featuredCap.data?.allowedTypes ?? [];
   // console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved, 'isFeaturedEnabled', isFeaturedEnabled, 'allowedTypes', allowedTypes);

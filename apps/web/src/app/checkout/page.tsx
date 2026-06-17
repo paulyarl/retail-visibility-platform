@@ -22,7 +22,6 @@ import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { customerAuthService } from '@/services/CustomerAuthService';
-import { publicCommerceSettingsService } from '@/services/PublicCommerceSettingsService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
@@ -80,12 +79,7 @@ function CheckoutPageContent() {
     remainingBalanceCents: number;
     pickupDeadline: Date;
   } | null>(null);
-  // Actual deposit config from backend commerce settings (tenant → org → platform default)
-  const [commerceSettings, setCommerceSettings] = useState<{
-    deposit_percentage: number;
-    deposit_min_cents: number;
-    deposit_max_cents: number;
-  } | null>(null);
+  // Deposit config now comes from unified capability service (commerceCap.state.checkoutMode)
   // Tenant contact info for disabled checkout
   const [tenantContact, setTenantContact] = useState<{
     business_name: string;
@@ -402,34 +396,14 @@ function CheckoutPageContent() {
     fetchPlatformFee();
   }, []);
 
-  // Fetch actual deposit configuration from backend commerce settings
-  useEffect(() => {
-    const fetchCommerceSettings = async () => {
-      if (!tenantId) return;
-      try {
-        const settings = await publicCommerceSettingsService.getCommerceSettings(tenantId);
-        if (settings) {
-          setCommerceSettings({
-            deposit_percentage: settings.deposit_percentage ?? 15,
-            deposit_min_cents: settings.deposit_min_cents ?? 500,
-            deposit_max_cents: settings.deposit_max_cents ?? 5000,
-          });
-        }
-      } catch (error) {
-        console.warn('[Checkout] Failed to fetch commerce settings, using defaults:', error);
-      }
-    };
-
-    fetchCommerceSettings();
-  }, [tenantId]);
-
   // Calculate deposit for Tier 3 commitment — matches backend logic exactly
   useEffect(() => {
     if (checkoutMode === 'deposit' && total > 0) {
-      // Backend calculates deposit on total (including fees), using tenant's configured percentage
-      const percentage = commerceSettings?.deposit_percentage ?? 15;
-      const minDeposit = commerceSettings?.deposit_min_cents ?? 500;
-      const maxDeposit = commerceSettings?.deposit_max_cents ?? 5000;
+      // Deposit config comes from unified capability service
+      const checkoutCfg = commerceCap.data?.checkoutMode;
+      const percentage = checkoutCfg?.deposit_percentage ?? 15;
+      const minDeposit = checkoutCfg?.deposit_min_cents ?? 500;
+      const maxDeposit = checkoutCfg?.deposit_max_cents ?? 5000;
 
       // Calculate deposit amount (same formula as backend)
       let depositCents = Math.round(total * (percentage / 100));
@@ -466,7 +440,7 @@ function CheckoutPageContent() {
     } else {
       setDepositInfo(null);
     }
-  }, [checkoutMode, total, commerceSettings]);
+  }, [checkoutMode, total, commerceCap.data?.checkoutMode]);
 
   // Map cart items to payment form format
   const mappedCartItems = useMemo(() => cartItems.map(item => ({

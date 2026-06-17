@@ -36,7 +36,7 @@ export default function TenantScanPage() {
   const scanBadge = getFeatureBadgeWithPermission('barcode_scan', 'canEdit', 'scan products');
 
   // Capability-based barcode scan access (supersedes Flags env var control)
-  const barcodeCap = useBarcodeScanCapability(tenantId, { forTenant: true });
+  const barcodeCap = useBarcodeScanCapability(tenantId);
   const barcodeEnabled = barcodeCap.data?.enabled ?? null; // null = still loading
   const barcodeModes = barcodeCap.data?.effectiveModes ?? [];
   const usbAllowed = barcodeModes.includes('usb');

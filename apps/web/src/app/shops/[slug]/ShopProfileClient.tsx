@@ -58,8 +58,8 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { PublicTenantInfo } from '@/services/TenantPublicService';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge'; 
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 
 // Types

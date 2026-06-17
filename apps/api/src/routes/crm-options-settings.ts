@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import CrmOptionsService from '../services/CrmOptionsService';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -258,6 +259,8 @@ router.put('/:tenantId/crm-options', authenticateToken, async (req, res) => {
       });
     }
 
+    invalidateEffectiveCapabilities(tenantId);
+
     res.json({
       success: true,
       settings: {
@@ -291,9 +294,14 @@ router.put('/:tenantId/crm-options', authenticateToken, async (req, res) => {
 });
 
 // Public endpoint — Get CRM options settings for storefront
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/crm-options', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/crm-options is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
+
     const crmService = CrmOptionsService.getInstance();
     const tierState = await crmService.resolveCrmOptionsState(tenantId);
 

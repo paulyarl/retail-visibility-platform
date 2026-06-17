@@ -169,8 +169,8 @@ function getQuickActions(settings: IntegrationOptionsSettings, tenantId: string)
 }
 
 export default function IntegrationOptionsSettingsClient({ tenantId }: IntegrationOptionsSettingsClientProps) {
-  const integrationCap = useIntegrationOptionsCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const integrationCap = useIntegrationOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const isIntegrationExplicitlyDisabled = !!integrationCap.data?.features?.integration_disabled;
   const allowedTypes = integrationCap.data?.allowedTypes ?? Object.keys(INTEGRATION_TYPE_META) as IntegrationType[];
   const isFlexible = integrationCap.data?.isFlexible ?? false;

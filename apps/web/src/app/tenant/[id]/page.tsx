@@ -35,13 +35,12 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
-import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
-import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
-import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
-import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState } from '@/services/CapabilityResolutionService';
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
@@ -426,39 +425,39 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
     let storefrontOptionFlags: StorefrontOptionFlags | null = null;
     try {
-      storefrontOptionFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(idResolvedBySlug);
+      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch storefront option flags:', e);
     }
 
-    // Fetch commerce settings (merchant gate) — server-side to eliminate client waterfall
-    let commerceSettings: CommerceSettings | null = null;
+    // Fetch commerce state from unified capability service
+    let commerceSettings: CommerceState | null = null;
     try {
-      commerceSettings = await publicCommerceSettingsService.getCommerceSettings(idResolvedBySlug);
+      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch commerce settings:', e);
+      console.error('Failed to fetch commerce state:', e);
     }
 
-    // Fetch payment gateway settings (merchant gate) — server-side to eliminate client waterfall
-    let paymentGatewaySettings: PaymentGatewaySettings | null = null;
+    // Fetch payment gateway state from unified capability service
+    let paymentGatewaySettings: PaymentGatewayState | null = null;
     try {
-      paymentGatewaySettings = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(idResolvedBySlug);
+      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch payment gateway settings:', e);
+      console.error('Failed to fetch payment gateway state:', e);
     }
 
-    // Fetch storefront type settings (merchant gate) — server-side to eliminate client waterfall
-    let storefrontTypeSettings: StorefrontTypeResponse | null = null;
+    // Fetch storefront type state from unified capability service
+    let storefrontTypeSettings: StorefrontState | null = null;
     try {
-      storefrontTypeSettings = await publicStorefrontTypeService.getStorefrontTypeSettings(idResolvedBySlug);
+      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch storefront type settings:', e);
+      console.error('Failed to fetch storefront type state:', e);
     }
 
     // Fetch FAQ option flags server-side (no client waterfall)
     let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
     try {
-      faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(idResolvedBySlug);
+      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch FAQ option flags:', e);
     }
@@ -466,7 +465,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch CRM option flags server-side (no client waterfall)
     let crmOptionsFlags: PublicCrmOptionsFlags | null = null;
     try {
-      crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(idResolvedBySlug);
+      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch CRM option flags:', e);
     }
@@ -474,7 +473,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch product option flags server-side (no client waterfall)
     let productOptionFlags: ProductOptionFlags | null = null;
     try {
-      productOptionFlags = await publicProductOptionsService.getProductOptionFlags(idResolvedBySlug);
+      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch product option flags:', e);
     }
@@ -496,17 +495,59 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const { tenant } = data;
+  const { tenant, storefrontOptionFlags } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  const showEnhancedSEO = storefrontOptionFlags?.showEnhancedSEO ?? false;
+
+  // Basic metadata — always emitted
+  const basicMetadata: Metadata = {
+    title: `${businessName} - Store Catalog`,
+    description: `Browse products from ${businessName}.`,
+  };
+
+  if (!showEnhancedSEO) {
+    return basicMetadata;
+  }
+
+  // Enhanced metadata — gated behind merchant capability
+  const businessDescription = tenant.metadata?.business_description;
+  const seoTags = tenant.profileData?.seo_tags || tenant.directoryData?.seo_keywords || [];
+  const enhancedDescription = businessDescription
+    ? `Browse products from ${businessName}. ${businessDescription}`
+    : basicMetadata.description;
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name: businessName,
+    description: enhancedDescription,
+    image: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : undefined,
+    address: tenant.metadata?.address ? {
+      '@type': 'PostalAddress',
+      streetAddress: tenant.profileData?.address_line1,
+      addressLocality: tenant.profileData?.city,
+      addressRegion: tenant.profileData?.state,
+      postalCode: tenant.profileData?.postal_code,
+      addressCountry: tenant.profileData?.country_code,
+    } : undefined,
+    telephone: tenant.profileData?.phone_number,
+    email: tenant.profileData?.email,
+    url: tenant.website || tenant.metadata?.website,
+    keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
+  };
 
   return {
     title: `${businessName} - Store Catalog`,
-    description: `Browse products from ${businessName}. ${tenant.metadata?.address || ''}`,
+    description: enhancedDescription as string,
+    keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
     openGraph: {
       title: businessName,
       description: `Shop products from ${businessName} catalog`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',
+    },
+    other: {
+      'application/ld+json': JSON.stringify(schema),
     },
   };
 }

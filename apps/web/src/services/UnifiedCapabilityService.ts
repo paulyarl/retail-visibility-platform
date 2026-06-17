@@ -1,0 +1,829 @@
+/**
+ * Unified Capability Service
+ *
+ * Drop-in replacement for CapabilityResolutionService.
+ * Calls the unified backend endpoint once and maps the pre-resolved
+ * response into the existing typed state objects.
+ *
+ * No client-side resolution logic — just mapping.
+ */
+
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import {
+  AllCapabilitiesState,
+  CommerceState,
+  PaymentGatewayState,
+  StorefrontState,
+  BarcodeScanState,
+  FulfillmentState,
+  ProductOptionsState,
+  FeaturedOptionsState,
+  IntegrationOptionsState,
+  QuickstartOptionsState,
+  StorefrontOptionsState,
+  StorefrontOptionFlags,
+  toStorefrontOptionFlags,
+  FaqOptionsState,
+  PublicFaqOptionsFlags,
+  toPublicFaqOptionsFlags,
+  CrmOptionsState,
+  PublicCrmOptionsFlags,
+  toPublicCrmOptionsFlags,
+  CommercePaymentType,
+  GatewayType,
+  StorefrontType,
+  BarcodeScanMode,
+  ProductType,
+  ProductLayoutType,
+  FeaturedType,
+  IntegrationType,
+  QuickstartProductType,
+  QuickstartCategoryType,
+  QuickstartAIType,
+  StorefrontOptHoursType,
+  StorefrontOptCategoryType,
+  StorefrontOptRecommendType,
+  StorefrontOptInfoType,
+  StorefrontOptQRResolutionType,
+  StorefrontOptQRContentType,
+  StorefrontOptGalleryType,
+  StorefrontOptAdvancedType,
+  StorefrontOptLayoutType,
+  FaqManagementType,
+  FaqPreviewType,
+  FaqDisplayType,
+  FaqKnowledgeBaseType,
+  CrmInquiryType,
+  CrmContactType,
+  CrmTicketType,
+  CrmMessageType,
+  CrmCustomerTicketType,
+  CrmDashboardType,
+} from './CapabilityResolutionService';
+
+// ====================
+// BACKEND RESPONSE TYPES (snake_case)
+// ====================
+
+interface BackendEffectiveCapabilities {
+  tenant_id: string;
+  tier: { key: string; name: string; description: string };
+  effective: {
+    commerce: BackendEffectiveCommerce;
+    payment_gateway: BackendEffectivePaymentGateway;
+    storefront: BackendEffectiveStorefront;
+    fulfillment: BackendEffectiveFulfillment;
+    product_options: BackendEffectiveProductOptions;
+    featured: BackendEffectiveFeatured;
+    integrations: BackendEffectiveIntegrations;
+    quickstart: BackendEffectiveQuickstart;
+    storefront_options: BackendEffectiveStorefrontOptions;
+    faq: BackendEffectiveFaq;
+    crm: BackendEffectiveCrm;
+    barcode_scan: BackendEffectiveBarcodeScan;
+  };
+  gates?: {
+    tier_hard: Record<string, { capability_enabled: boolean; is_highlighted: boolean; features: Record<string, boolean> }>;
+    merchant_soft: Record<string, Record<string, boolean>>;
+    org_override?: Record<string, Record<string, boolean>>;
+  };
+  uncategorized_features: string[];
+}
+
+interface BackendEffectiveCommerce {
+  enabled: boolean;
+  cart_visible: boolean;
+  payment_type: CommercePaymentType;
+  effective_payment_type: CommercePaymentType;
+  effective_cart_visible: boolean;
+  checkout_available: boolean;
+  checkout_mode: { mode: 'deposit_only' | 'full_payment_only' | 'flexible' | 'disabled'; deposit_percentage?: number; deposit_min_cents?: number; deposit_max_cents?: number };
+  merchant_preferences: { deposit_enabled: boolean; full_payment_enabled: boolean };
+  is_flexible: boolean;
+}
+
+interface BackendEffectivePaymentGateway {
+  enabled: boolean;
+  allowed_gateways: GatewayType[];
+  effective_gateways: GatewayType[];
+  checkout_available: boolean;
+  merchant_preferences: { gateway_enabled: boolean; stripe_enabled: boolean; paypal_enabled: boolean; square_enabled: boolean; clover_enabled: boolean };
+  is_flexible: boolean;
+}
+
+interface BackendEffectiveStorefront {
+  enabled: boolean;
+  type: StorefrontType;
+  effective_type: StorefrontType;
+  is_flexible: boolean;
+  allowed_types: StorefrontType[];
+  has_merchant_selection: boolean;
+  merchant_preferences: { storefront_type_enabled: boolean; selected_storefront_type: StorefrontType };
+}
+
+interface BackendEffectiveBarcodeScan {
+  enabled: boolean;
+  allowed_modes: BarcodeScanMode[];
+  effective_modes: BarcodeScanMode[];
+  is_flexible: boolean;
+  scan_available: boolean;
+  effective_scan_available: boolean;
+  merchant_preferences: { barcode_scan_enabled: boolean; barcode_manual_enabled: boolean; barcode_usb_enabled: boolean; barcode_camera_enabled: boolean };
+}
+
+interface BackendEffectiveFulfillment {
+  enabled: boolean;
+  shows_pickup: boolean;
+  shows_delivery: boolean;
+  shows_shipping: boolean;
+  shows_service: boolean;
+  effective_shows_pickup: boolean;
+  effective_shows_delivery: boolean;
+  effective_shows_shipping: boolean;
+  merchant_preferences: { pickup_enabled: boolean; delivery_enabled: boolean; shipping_enabled: boolean };
+  is_flexible: boolean;
+  delivery_radius_miles: number | null;
+  delivery_fee_cents: number;
+  delivery_min_free_cents: number | null;
+  delivery_time_hours: number;
+  shipping_flat_rate_cents: number | null;
+  shipping_min_free_cents: number | null;
+  shipping_handling_days: number;
+  pickup_ready_time_minutes: number;
+  pickup_instructions: string | null;
+}
+
+interface BackendEffectiveProductOptions {
+  enabled: boolean;
+  allowed_types: ProductType[];
+  effective_types: ProductType[];
+  shows_variants: boolean;
+  shows_gallery: boolean;
+  shows_video: boolean;
+  effective_shows_variants: boolean;
+  effective_shows_gallery: boolean;
+  effective_shows_video: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: ProductLayoutType[];
+  effective_layout: ProductLayoutType;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  shows_recently_viewed: boolean;
+  shows_qr_codes: boolean;
+  shows_recommended: boolean;
+  shows_map_display: boolean;
+  shows_location_display: boolean;
+  shows_hours_display: boolean;
+  shows_enhanced_seo: boolean;
+  shows_reviews: boolean;
+  shows_fulfillment: boolean;
+  shows_categories: boolean;
+  shows_location_availability: boolean;
+  merchant_preferences: Record<string, any>;
+  is_flexible: boolean;
+}
+
+interface BackendEffectiveFeatured {
+  enabled: boolean;
+  tenant_enabled: boolean;
+  platform_enabled: boolean;
+  allowed_tenant_types: FeaturedType[];
+  allowed_platform_types: FeaturedType[];
+  allowed_types: FeaturedType[];
+  effective_tenant_types: FeaturedType[];
+  effective_platform_types: FeaturedType[];
+  effective_types: FeaturedType[];
+  featured_available: boolean;
+  effective_featured_available: boolean;
+  expiry_monitor_enabled: boolean;
+  merchant_preferences: Record<string, boolean>;
+  is_flexible: boolean;
+}
+
+interface BackendEffectiveIntegrations {
+  enabled: boolean;
+  pos_enabled: boolean;
+  google_enabled: boolean;
+  allowed_pos_types: IntegrationType[];
+  allowed_google_types: IntegrationType[];
+  allowed_types: IntegrationType[];
+  effective_pos_types: IntegrationType[];
+  effective_google_types: IntegrationType[];
+  effective_types: IntegrationType[];
+  integrations_available: boolean;
+  effective_integrations_available: boolean;
+  merchant_preferences: Record<string, boolean>;
+  is_flexible: boolean;
+}
+
+interface BackendEffectiveQuickstart {
+  enabled: boolean;
+  is_flexible: boolean;
+  product_enabled: boolean;
+  allowed_product_types: QuickstartProductType[];
+  category_enabled: boolean;
+  allowed_category_types: QuickstartCategoryType[];
+  ai_enabled: boolean;
+  allowed_ai_types: QuickstartAIType[];
+  can_use_wizard: boolean;
+  can_use_ai_wizard: boolean;
+  can_use_category_generator: boolean;
+  can_generate_images: boolean;
+  can_use_openai: boolean;
+  can_use_gemini: boolean;
+  can_use_hd_images: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  hours_enabled: boolean;
+  allowed_hours_types: StorefrontOptHoursType[];
+  category_enabled: boolean;
+  allowed_category_types: StorefrontOptCategoryType[];
+  recommend_enabled: boolean;
+  allowed_recommend_types: StorefrontOptRecommendType[];
+  recently_viewed_enabled: boolean;
+  info_enabled: boolean;
+  allowed_info_types: StorefrontOptInfoType[];
+  qr_enabled: boolean;
+  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
+  allowed_qr_content_types: StorefrontOptQRContentType[];
+  gallery_enabled: boolean;
+  allowed_gallery_types: StorefrontOptGalleryType[];
+  advanced_enabled: boolean;
+  allowed_advanced_types: StorefrontOptAdvancedType[];
+  layout_enabled: boolean;
+  allowed_layouts: StorefrontOptLayoutType[];
+  effective_layout: StorefrontOptLayoutType;
+  can_show_hours_display: boolean;
+  can_use_animated_hours: boolean;
+  can_show_hours_status: boolean;
+  can_show_map_display: boolean;
+  can_show_location_display: boolean;
+  can_use_category_store: boolean;
+  can_use_category_product: boolean;
+  can_use_recommend_store: boolean;
+  can_use_recommend_products: boolean;
+  can_use_recently_viewed: boolean;
+  can_use_social_media: boolean;
+  can_use_contact: boolean;
+  can_use_interactive_maps: boolean;
+  can_use_qr_codes: boolean;
+  can_use_enhanced_seo: boolean;
+  can_use_storefront_actions: boolean;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveFaq {
+  enabled: boolean;
+  storefront_enabled: boolean;
+  product_enabled: boolean;
+  templates_enabled: boolean;
+  management_enabled: boolean;
+  preview_enabled: boolean;
+  display_enabled: boolean;
+  kb_enabled: boolean;
+  allowed_management_types: FaqManagementType[];
+  allowed_preview_types: FaqPreviewType[];
+  allowed_display_types: FaqDisplayType[];
+  allowed_kb_types: FaqKnowledgeBaseType[];
+  is_flexible: boolean;
+  faq_available: boolean;
+}
+
+interface BackendEffectiveCrm {
+  enabled: boolean;
+  inquiry_product_enabled: boolean;
+  inquiry_storefront_enabled: boolean;
+  inquiry_directory_enabled: boolean;
+  contacts_enabled: boolean;
+  ticket_features_enabled: boolean;
+  message_features_enabled: boolean;
+  customer_tickets_enabled: boolean;
+  dashboard_enabled: boolean;
+  allowed_inquiry_types: CrmInquiryType[];
+  allowed_contact_types: CrmContactType[];
+  allowed_ticket_types: CrmTicketType[];
+  allowed_message_types: CrmMessageType[];
+  allowed_customer_ticket_types: CrmCustomerTicketType[];
+  allowed_dashboard_types: CrmDashboardType[];
+  is_flexible: boolean;
+  crm_available: boolean;
+}
+
+// ====================
+// MAPPERS (snake_case → camelCase)
+// ====================
+
+function mapCommerce(b: BackendEffectiveCommerce): CommerceState {
+  return {
+    enabled: b.enabled,
+    cartVisible: b.cart_visible,
+    paymentType: b.payment_type,
+    effectivePaymentType: b.effective_payment_type,
+    effectiveCartVisible: b.effective_cart_visible,
+    merchantPreferences: b.merchant_preferences,
+    checkoutMode: b.checkout_mode ?? {
+      mode: b.effective_payment_type === 'deposit' ? 'deposit_only'
+        : b.effective_payment_type === 'full' ? 'full_payment_only'
+        : b.effective_payment_type === 'both' ? 'flexible'
+        : 'disabled',
+    },
+    isFlexible: b.is_flexible,
+    features: {},
+  };
+}
+
+function mapPaymentGateway(b: BackendEffectivePaymentGateway): PaymentGatewayState {
+  return {
+    enabled: b.enabled,
+    allowedGateways: b.allowed_gateways,
+    effectiveGateways: b.effective_gateways,
+    merchantPreferences: b.merchant_preferences,
+    isFlexible: b.is_flexible,
+    checkoutAvailable: b.checkout_available,
+    features: {},
+  };
+}
+
+function mapStorefront(b: BackendEffectiveStorefront): StorefrontState {
+  return {
+    enabled: b.enabled,
+    type: b.type,
+    effectiveType: b.effective_type,
+    isFlexible: b.is_flexible,
+    allowedTypes: b.allowed_types,
+    hasMerchantSelection: b.has_merchant_selection,
+    merchantPreferences: b.merchant_preferences,
+    features: {},
+  };
+}
+
+function mapBarcodeScan(b: BackendEffectiveBarcodeScan): BarcodeScanState {
+  return {
+    enabled: b.enabled,
+    allowedModes: b.allowed_modes,
+    effectiveModes: b.effective_modes,
+    isFlexible: b.is_flexible,
+    scanAvailable: b.scan_available,
+    effectiveScanAvailable: b.effective_scan_available,
+    merchantPreferences: b.merchant_preferences,
+    features: {},
+  };
+}
+
+function mapFulfillment(b: BackendEffectiveFulfillment): FulfillmentState {
+  return {
+    enabled: b.enabled,
+    showsPickup: b.shows_pickup,
+    showsDelivery: b.shows_delivery,
+    showsShipping: b.shows_shipping,
+    showsService: b.shows_service,
+    effectiveShowsPickup: b.effective_shows_pickup,
+    effectiveShowsDelivery: b.effective_shows_delivery,
+    effectiveShowsShipping: b.effective_shows_shipping,
+    merchantPreferences: b.merchant_preferences,
+    isFlexible: b.is_flexible,
+    deliveryRadiusMiles: b.delivery_radius_miles,
+    deliveryFeeCents: b.delivery_fee_cents,
+    deliveryMinFreeCents: b.delivery_min_free_cents,
+    deliveryTimeHours: b.delivery_time_hours,
+    shippingFlatRateCents: b.shipping_flat_rate_cents,
+    shippingMinFreeCents: b.shipping_min_free_cents,
+    shippingHandlingDays: b.shipping_handling_days,
+    pickupReadyTimeMinutes: b.pickup_ready_time_minutes,
+    pickupInstructions: b.pickup_instructions,
+    features: {},
+  };
+}
+
+function mapProductOptions(b: BackendEffectiveProductOptions): ProductOptionsState {
+  return {
+    enabled: b.enabled,
+    allowedTypes: b.allowed_types,
+    effectiveTypes: b.effective_types,
+    showsVariants: b.shows_variants,
+    showsGallery: b.shows_gallery,
+    showsVideo: b.shows_video,
+    effectiveShowsVariants: b.effective_shows_variants,
+    effectiveShowsGallery: b.effective_shows_gallery,
+    effectiveShowsVideo: b.effective_shows_video,
+    layoutEnabled: b.layout_enabled,
+    allowedLayouts: b.allowed_layouts,
+    effectiveLayout: b.effective_layout,
+    canUseLayoutClassic: b.can_use_layout_classic,
+    canUseLayoutEditorial: b.can_use_layout_editorial,
+    canUseLayoutImmersive: b.can_use_layout_immersive,
+    showsRecentlyViewed: b.shows_recently_viewed,
+    showsQRCodes: b.shows_qr_codes,
+    showsQRLogo: b.merchant_preferences?.product_opt_qr_logo ?? true,
+    showsRecommended: b.shows_recommended,
+    showsMapDisplay: b.shows_map_display,
+    showsLocationDisplay: b.shows_location_display,
+    showsHoursDisplay: b.shows_hours_display,
+    showsEnhancedSEO: b.shows_enhanced_seo,
+    showsReviews: b.shows_reviews,
+    showsFulfillment: b.shows_fulfillment,
+    showsCategories: b.shows_categories,
+    showsLocationAvailability: b.shows_location_availability,
+    effectiveShowsRecentlyViewed: b.shows_recently_viewed,
+    effectiveShowsQRCodes: b.shows_qr_codes,
+    effectiveShowsQRLogo: b.merchant_preferences?.product_opt_qr_logo ?? true,
+    effectiveShowsRecommended: b.shows_recommended,
+    effectiveShowsMapDisplay: b.shows_map_display,
+    effectiveShowsLocationDisplay: b.shows_location_display,
+    effectiveShowsHoursDisplay: b.shows_hours_display,
+    effectiveShowsEnhancedSEO: b.shows_enhanced_seo,
+    effectiveShowsReviews: b.shows_reviews,
+    effectiveShowsFulfillment: b.shows_fulfillment,
+    effectiveShowsCategories: b.shows_categories,
+    effectiveShowsLocationAvailability: b.shows_location_availability,
+    merchantPreferences: b.merchant_preferences as any,
+    isFlexible: b.is_flexible,
+    features: {},
+  };
+}
+
+function mapFeatured(b: BackendEffectiveFeatured): FeaturedOptionsState {
+  return {
+    enabled: b.enabled,
+    tenantEnabled: b.tenant_enabled,
+    platformEnabled: b.platform_enabled,
+    allowedTenantTypes: b.allowed_tenant_types,
+    allowedPlatformTypes: b.allowed_platform_types,
+    allowedTypes: b.allowed_types,
+    effectiveTenantTypes: b.effective_tenant_types,
+    effectivePlatformTypes: b.effective_platform_types,
+    effectiveTypes: b.effective_types,
+    merchantPreferences: b.merchant_preferences as any,
+    isFlexible: b.is_flexible,
+    featuredAvailable: b.featured_available,
+    effectiveFeaturedAvailable: b.effective_featured_available,
+    expiryMonitorEnabled: b.expiry_monitor_enabled,
+    features: {},
+  };
+}
+
+function mapIntegrations(b: BackendEffectiveIntegrations): IntegrationOptionsState {
+  return {
+    enabled: b.enabled,
+    posEnabled: b.pos_enabled,
+    googleEnabled: b.google_enabled,
+    allowedPosTypes: b.allowed_pos_types,
+    allowedGoogleTypes: b.allowed_google_types,
+    allowedTypes: b.allowed_types,
+    effectivePosTypes: b.effective_pos_types,
+    effectiveGoogleTypes: b.effective_google_types,
+    effectiveTypes: b.effective_types,
+    merchantPreferences: b.merchant_preferences as any,
+    isFlexible: b.is_flexible,
+    integrationsAvailable: b.integrations_available,
+    effectiveIntegrationsAvailable: b.effective_integrations_available,
+    features: {},
+  };
+}
+
+function mapQuickstart(b: BackendEffectiveQuickstart): QuickstartOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    productEnabled: b.product_enabled,
+    allowedProductTypes: b.allowed_product_types,
+    categoryEnabled: b.category_enabled,
+    allowedCategoryTypes: b.allowed_category_types,
+    aiEnabled: b.ai_enabled,
+    allowedAITypes: b.allowed_ai_types,
+    canUseWizard: b.can_use_wizard,
+    canUseAIWizard: b.can_use_ai_wizard,
+    canUseCategoryGenerator: b.can_use_category_generator,
+    canGenerateImages: b.can_generate_images,
+    canUseOpenAI: b.can_use_openai,
+    canUseGemini: b.can_use_gemini,
+    canUseHDImages: b.can_use_hd_images,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    hoursEnabled: b.hours_enabled,
+    allowedHoursTypes: b.allowed_hours_types,
+    categoryEnabled: b.category_enabled,
+    allowedCategoryTypes: b.allowed_category_types,
+    recommendEnabled: b.recommend_enabled,
+    allowedRecommendTypes: b.allowed_recommend_types,
+    recentlyViewedEnabled: b.recently_viewed_enabled,
+    infoEnabled: b.info_enabled,
+    allowedInfoTypes: b.allowed_info_types,
+    qrEnabled: b.qr_enabled,
+    allowedQRResolutions: b.allowed_qr_resolutions,
+    allowedQRContentTypes: b.allowed_qr_content_types,
+    galleryEnabled: b.gallery_enabled,
+    allowedGalleryTypes: b.allowed_gallery_types,
+    advancedEnabled: b.advanced_enabled,
+    allowedAdvancedTypes: b.allowed_advanced_types,
+    layoutEnabled: b.layout_enabled,
+    allowedLayouts: b.allowed_layouts,
+    effectiveLayout: b.effective_layout,
+    canShowHoursDisplay: b.can_show_hours_display,
+    canUseAnimatedHours: b.can_use_animated_hours,
+    canShowHoursStatus: b.can_show_hours_status,
+    canShowMapDisplay: b.can_show_map_display,
+    canShowLocationDisplay: b.can_show_location_display,
+    canUseCategoryStore: b.can_use_category_store,
+    canUseCategoryProduct: b.can_use_category_product,
+    canUseRecommendStore: b.can_use_recommend_store,
+    canUseRecommendProducts: b.can_use_recommend_products,
+    canUseRecentlyViewed: b.can_use_recently_viewed,
+    canUseSocialMedia: b.can_use_social_media,
+    canUseContact: b.can_use_contact,
+    canUseInteractiveMaps: b.can_use_interactive_maps,
+    canUseQRCodes: b.can_use_qr_codes,
+    canUseEnhancedSEO: b.can_use_enhanced_seo,
+    canUseStorefrontActions: b.can_use_storefront_actions,
+    canUseLayoutClassic: b.can_use_layout_classic,
+    canUseLayoutEditorial: b.can_use_layout_editorial,
+    canUseLayoutImmersive: b.can_use_layout_immersive,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapFaq(b: BackendEffectiveFaq): FaqOptionsState {
+  return {
+    enabled: b.enabled,
+    storefrontEnabled: b.storefront_enabled,
+    productEnabled: b.product_enabled,
+    templatesEnabled: b.templates_enabled,
+    managementEnabled: b.management_enabled,
+    previewEnabled: b.preview_enabled,
+    displayEnabled: b.display_enabled,
+    kbEnabled: b.kb_enabled,
+    allowedManagementTypes: b.allowed_management_types,
+    allowedPreviewTypes: b.allowed_preview_types,
+    allowedDisplayTypes: b.allowed_display_types,
+    allowedKbTypes: b.allowed_kb_types,
+    isFlexible: b.is_flexible,
+    faqAvailable: b.faq_available,
+    features: {},
+  };
+}
+
+function mapCrm(b: BackendEffectiveCrm): CrmOptionsState {
+  return {
+    enabled: b.enabled,
+    inquiryProductEnabled: b.inquiry_product_enabled,
+    inquiryStorefrontEnabled: b.inquiry_storefront_enabled,
+    inquiryDirectoryEnabled: b.inquiry_directory_enabled,
+    contactsEnabled: b.contacts_enabled,
+    ticketFeaturesEnabled: b.ticket_features_enabled,
+    messageFeaturesEnabled: b.message_features_enabled,
+    customerTicketsEnabled: b.customer_tickets_enabled,
+    dashboardEnabled: b.dashboard_enabled,
+    allowedInquiryTypes: b.allowed_inquiry_types,
+    allowedContactTypes: b.allowed_contact_types,
+    allowedTicketTypes: b.allowed_ticket_types,
+    allowedMessageTypes: b.allowed_message_types,
+    allowedCustomerTicketTypes: b.allowed_customer_ticket_types,
+    allowedDashboardTypes: b.allowed_dashboard_types,
+    isFlexible: b.is_flexible,
+    crmAvailable: b.crm_available,
+    features: {},
+  };
+}
+
+function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
+  return {
+    tierKey: b.tier.key,
+    tierName: b.tier.name,
+    tierDescription: b.tier.description,
+    commerce: mapCommerce(b.effective.commerce),
+    paymentGateway: mapPaymentGateway(b.effective.payment_gateway),
+    storefront: mapStorefront(b.effective.storefront),
+    barcodeScan: mapBarcodeScan(b.effective.barcode_scan),
+    fulfillment: mapFulfillment(b.effective.fulfillment),
+    productOptions: mapProductOptions(b.effective.product_options),
+    featuredOptions: mapFeatured(b.effective.featured),
+    integrationOptions: mapIntegrations(b.effective.integrations),
+    quickstartOptions: mapQuickstart(b.effective.quickstart),
+    storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
+    faqOptions: mapFaq(b.effective.faq),
+    crmOptions: mapCrm(b.effective.crm),
+    uncategorizedFeatures: b.uncategorized_features,
+  };
+}
+
+// ====================
+// SERVICE
+// ====================
+
+class UnifiedCapabilityService extends PublicApiSingleton {
+  private static instance: UnifiedCapabilityService;
+  private capCache = new Map<string, { data: AllCapabilitiesState; expiry: number }>();
+  private inFlight = new Map<string, Promise<BackendEffectiveCapabilities | null>>();
+  private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+  private constructor() {
+    super('unified-capability-service', { ttl: 15 * 60 * 1000 });
+  }
+
+  static getInstance(): UnifiedCapabilityService {
+    if (!UnifiedCapabilityService.instance) {
+      UnifiedCapabilityService.instance = new UnifiedCapabilityService();
+    }
+    return UnifiedCapabilityService.instance;
+  }
+
+  getServiceCachePatterns(): string[] {
+    return ['unified-capabilities'];
+  }
+
+  async invalidateServiceCaches(_customerId?: string): Promise<void> {
+    this.capCache.clear();
+    for (const pattern of this.getServiceCachePatterns()) {
+      await this.invalidateCache(pattern);
+    }
+  }
+
+  private async fetchEffective(tenantId: string): Promise<BackendEffectiveCapabilities | null> {
+    const cachekey = `unified-caps-${tenantId}`;
+
+    // Deduplicate concurrent in-flight requests for the same tenant
+    if (this.inFlight.has(cachekey)) {
+      return this.inFlight.get(cachekey)!;
+    }
+
+    const promise = (async (): Promise<BackendEffectiveCapabilities | null> => {
+      try {
+        const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
+        console.log(`[UnifiedCapabilityService] Fetching capabilities for tenant ${tenantId} with cache key ${cachekey}`);
+        const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
+          endpoint,
+          {},
+          cachekey,
+          this.CACHE_TTL
+        );
+        if (!result.success) {
+          console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+          return null;
+        }
+        return result.data?.data || null;
+      } catch (error) {
+        console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
+        return null;
+      } finally {
+        this.inFlight.delete(cachekey);
+      }
+    })();
+
+    this.inFlight.set(cachekey, promise);
+    return promise;
+  }
+
+  async getAllCapabilities(tenantId: string): Promise<AllCapabilitiesState> {
+    const cached = this.capCache.get(tenantId);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
+
+    const raw = await this.fetchEffective(tenantId);
+    if (!raw) {
+      throw new Error(`[UnifiedCapabilityService] Unable to resolve capabilities for tenant: ${tenantId}`);
+    }
+
+    const mapped = mapAll(raw);
+    this.capCache.set(tenantId, { data: mapped, expiry: Date.now() + this.CACHE_TTL });
+    return mapped;
+  }
+
+  async getCommerceState(tenantId: string): Promise<CommerceState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.commerce;
+  }
+
+  async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.paymentGateway;
+  }
+
+  async getStorefrontState(tenantId: string): Promise<StorefrontState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.storefront;
+  }
+
+  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.barcodeScan;
+  }
+
+  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.fulfillment;
+  }
+
+  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.productOptions;
+  }
+
+  /** Alias for backward compatibility with old PublicProductOptionsService */
+  async getProductOptionFlags(tenantId: string): Promise<ProductOptionsState> {
+    return this.getProductOptionsState(tenantId);
+  }
+
+  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.featuredOptions;
+  }
+
+  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.integrationOptions;
+  }
+
+  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.quickstartOptions;
+  }
+
+  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.storefrontOptions;
+  }
+
+  /** Compatibility alias for old PublicStorefrontOptionsService */
+  async getStorefrontOptionFlags(tenantId: string): Promise<StorefrontOptionFlags> {
+    const state = await this.getStorefrontOptionsState(tenantId);
+    return toStorefrontOptionFlags(state);
+  }
+
+  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.faqOptions;
+  }
+
+  /** Compatibility alias for old PublicFaqService */
+  async getFaqOptionsFlags(tenantId: string): Promise<PublicFaqOptionsFlags> {
+    const state = await this.getFaqOptionsState(tenantId);
+    return toPublicFaqOptionsFlags(state);
+  }
+
+  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.crmOptions;
+  }
+
+  /** Compatibility alias for old PublicCrmService */
+  async getCrmOptionsFlags(tenantId: string): Promise<PublicCrmOptionsFlags> {
+    const state = await this.getCrmOptionsState(tenantId);
+    return toPublicCrmOptionsFlags(state);
+  }
+
+  async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
+    const capType = getCapabilityTypeForFeature(featureKey);
+    if (!capType) return null;
+
+    const all = await this.getAllCapabilities(tenantId);
+    const capGroup = (all as any)[capType] as { features: Record<string, boolean> } | undefined;
+    if (!capGroup) return false;
+
+    return !!capGroup.features[featureKey];
+  }
+
+}
+
+// Lightweight feature prefix mapper (mirrors CapabilityResolutionService)
+const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
+  commerce_: 'commerce',
+  payment_gateway_: 'paymentGateway',
+  storefront_: 'storefront',
+  barcode_: 'barcodeScan',
+  fulfillment_: 'fulfillment',
+  product_: 'productOptions',
+  featured_: 'featuredOptions',
+  integration_: 'integrationOptions',
+  quickstart_: 'quickstartOptions',
+  storefront_opt_: 'storefrontOptions',
+  faq_: 'faqOptions',
+  crm_: 'crmOptions',
+  chatbot_: 'chatbotOptions',
+};
+
+function getCapabilityTypeForFeature(featureKey: string): string | null {
+  for (const [prefix, capType] of Object.entries(CAPABILITY_FEATURE_PREFIXES)) {
+    if (featureKey.startsWith(prefix)) return capType;
+  }
+  return null;
+}
+
+export const unifiedCapabilityService = UnifiedCapabilityService.getInstance();
+export default UnifiedCapabilityService;

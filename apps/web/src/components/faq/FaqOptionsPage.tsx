@@ -136,7 +136,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 ];
 
 export default function FaqOptionsPage({ tenantId }: FaqOptionsPageProps) {
-  const { data: faqCap } = useFaqOptionsCapability(tenantId, { forTenant: true });
+  const { data: faqCap } = useFaqOptionsCapability(tenantId);
   const tierState = faqCap;
 
   const [settings, setSettings] = useState<FaqOptionsSettings>(DEFAULT_SETTINGS);

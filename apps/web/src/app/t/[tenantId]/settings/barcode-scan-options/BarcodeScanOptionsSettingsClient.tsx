@@ -69,8 +69,8 @@ function getQuickActions(settings: BarcodeScanSettings, tenantId: string): Quick
 
 export default function BarcodeScanOptionsSettingsClient({ tenantId }: BarcodeScanOptionsSettingsClientProps) {
   // Barcode scan capability-driven content control
-  const barcodeCap = useBarcodeScanCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const barcodeCap = useBarcodeScanCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const isBarcodeEnabled = barcodeCap.data?.enabled ?? true;
   const allowedModes = barcodeCap.data?.allowedModes ?? ['scan', 'manual', 'usb', 'camera'];
   const isFlexible = barcodeCap.data?.isFlexible ?? false;

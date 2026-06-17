@@ -1,24 +1,12 @@
 /**
- * Capability Resolution Service
- * 
- * Fetches and resolves tenant tier capabilities from the backend,
- * providing typed domain-specific state for commerce, payment gateways,
- * and storefront types.
- * 
- * Extends CustomerApiSingleton for public/customer-facing pages.
- * A parallel TenantApiSingleton variant is available via
- * TenantCapabilityResolutionService for tenant dashboard pages.
+ * Capability Resolution Functions & Types
+ *
+ * Pure resolution logic that converts raw capability feature maps
+ * into typed domain-specific state objects.
+ *
+ * Previously included CapabilityResolutionService and TenantCapabilityResolutionService
+ * classes — both removed in favor of UnifiedCapabilityService.
  */
-
-import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
-import { tenantInfoService } from '@/services/TenantInfoService';
-import { publicPaymentGatewaySettingsService } from '@/services/PublicPaymentGatewaySettingsService';
-import { publicStorefrontTypeService } from '@/services/PublicStorefrontTypeService';
-import { publicCommerceSettingsService } from '@/services/PublicCommerceSettingsService';
-import { publicFulfillmentService } from '@/services/PublicFulfillmentService';
-import { publicFeaturedOptionsService } from '@/services/PublicFeaturedOptionsService';
-import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 
 // ====================
@@ -43,6 +31,13 @@ export interface CapabilityGroup {
 
 export type CommercePaymentType = 'full' | 'deposit' | 'both' | 'none';
 
+export interface CheckoutModeConfig {
+  mode: 'deposit_only' | 'full_payment_only' | 'flexible' | 'disabled';
+  deposit_percentage?: number;
+  deposit_min_cents?: number;
+  deposit_max_cents?: number;
+}
+
 export interface CommerceState {
   enabled: boolean;
   cartVisible: boolean;
@@ -56,6 +51,8 @@ export interface CommerceState {
     deposit_enabled: boolean;
     full_payment_enabled: boolean;
   };
+  /** Resolved checkout mode with deposit configuration from backend */
+  checkoutMode: CheckoutModeConfig;
   isFlexible: boolean;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -157,6 +154,18 @@ export interface FulfillmentState {
     shipping_enabled: boolean;
   };
   isFlexible: boolean;
+  /** Delivery configuration from merchant settings */
+  deliveryRadiusMiles: number | null;
+  deliveryFeeCents: number;
+  deliveryMinFreeCents: number | null;
+  deliveryTimeHours: number;
+  /** Shipping configuration from merchant settings */
+  shippingFlatRateCents: number | null;
+  shippingMinFreeCents: number | null;
+  shippingHandlingDays: number;
+  /** Pickup configuration from merchant settings */
+  pickupReadyTimeMinutes: number;
+  pickupInstructions: string | null;
   /** Raw feature map from backend */
   features: Record<string, boolean>;
 }
@@ -306,6 +315,9 @@ export interface ProductOptionsState {
   features: Record<string, boolean>;
 }
 
+/** Alias for backward compatibility with old PublicProductOptionsService */
+export type ProductOptionFlags = ProductOptionsState;
+
 // --- Integration Options ---
 
 export type IntegrationType =
@@ -398,6 +410,7 @@ export interface StorefrontOptionsState {
   // Layout group
   layoutEnabled: boolean;
   allowedLayouts: StorefrontOptLayoutType[];
+  effectiveLayout: StorefrontOptLayoutType;
   // Convenience flags
   canShowHoursDisplay: boolean;
   canUseAnimatedHours: boolean;
@@ -454,6 +467,65 @@ export interface StorefrontOptionsState {
   features: Record<string, boolean>;
 }
 
+/** Compatibility shape for old PublicStorefrontOptionsService consumers */
+export interface StorefrontOptionFlags {
+  showHoursDisplay: boolean;
+  showAnimatedHours: boolean;
+  showHoursStatus: boolean;
+  showMapDisplay: boolean;
+  showLocationDisplay: boolean;
+  showCategoryStore: boolean;
+  showCategoryProduct: boolean;
+  showRecommendStore: boolean;
+  showRecommendProducts: boolean;
+  showRecentlyViewed: boolean;
+  showSocialMedia: boolean;
+  showContact: boolean;
+  showInteractiveMaps: boolean;
+  showQRCodes: boolean;
+  showQRProduct: boolean;
+  showQRStore: boolean;
+  showQRLogo: boolean;
+  showQRDirectory: boolean;
+  qrResolution: string;
+  qrResolutions: string[];
+  galleryLimit: number;
+  showEnhancedSEO: boolean;
+  showStorefrontActions: boolean;
+  storefrontLayout?: 'classic' | 'editorial' | 'immersive';
+}
+
+/** Convert unified StorefrontOptionsState → old StorefrontOptionFlags shape */
+export function toStorefrontOptionFlags(state: StorefrontOptionsState): StorefrontOptionFlags {
+  const p = state.merchantPreferences;
+  return {
+    showHoursDisplay: state.canShowHoursDisplay,
+    showAnimatedHours: state.canUseAnimatedHours,
+    showHoursStatus: state.canShowHoursStatus,
+    showMapDisplay: state.canShowMapDisplay,
+    showLocationDisplay: state.canShowLocationDisplay,
+    showCategoryStore: state.canUseCategoryStore,
+    showCategoryProduct: state.canUseCategoryProduct,
+    showRecommendStore: state.canUseRecommendStore,
+    showRecommendProducts: state.canUseRecommendProducts,
+    showRecentlyViewed: state.canUseRecentlyViewed,
+    showSocialMedia: state.canUseSocialMedia,
+    showContact: state.canUseContact,
+    showInteractiveMaps: state.canUseInteractiveMaps,
+    showQRCodes: state.canUseQRCodes,
+    showQRProduct: p?.qr_product ?? true,
+    showQRStore: p?.qr_store ?? true,
+    showQRLogo: p?.qr_logo ?? true,
+    showQRDirectory: p?.qr_directory ?? true,
+    qrResolution: p?.default_qr_resolution ?? '512',
+    qrResolutions: state.allowedQRResolutions,
+    galleryLimit: p?.default_gallery_limit ?? 5,
+    showEnhancedSEO: state.canUseEnhancedSEO,
+    showStorefrontActions: state.canUseStorefrontActions,
+    storefrontLayout: p?.storefront_layout ?? 'classic',
+  };
+}
+
 // --- FAQ Options ---
 
 export type FaqManagementType =
@@ -504,6 +576,27 @@ export interface FaqOptionsState {
   features: Record<string, boolean>;
 }
 
+/** Compatibility shape for old PublicFaqService consumers */
+export interface PublicFaqOptionsFlags {
+  faq_enabled: boolean;
+  faq_display_storefront_accordion: boolean;
+  faq_display_product_accordion: boolean;
+  faq_display_feedback: boolean;
+  faq_display_bot_handoff: boolean;
+}
+
+/** Convert unified FaqOptionsState → old PublicFaqOptionsFlags shape */
+export function toPublicFaqOptionsFlags(state: FaqOptionsState): PublicFaqOptionsFlags {
+  const display = state.allowedDisplayTypes || [];
+  return {
+    faq_enabled: state.enabled,
+    faq_display_storefront_accordion: display.includes('faq_display_storefront_accordion'),
+    faq_display_product_accordion: display.includes('faq_display_product_accordion'),
+    faq_display_feedback: display.includes('faq_display_feedback'),
+    faq_display_bot_handoff: display.includes('faq_display_bot_handoff'),
+  };
+}
+
 // --- CRM Options ---
 
 export type CrmInquiryType =
@@ -540,6 +633,26 @@ export interface CrmOptionsState {
   isFlexible: boolean;
   crmAvailable: boolean;
   features: Record<string, boolean>;
+}
+
+/** Compatibility shape for old PublicCrmService consumers */
+export interface PublicCrmOptionsFlags {
+  crm_enabled: boolean;
+  crm_inquiry_product_enabled: boolean;
+  crm_inquiry_storefront_enabled: boolean;
+  crm_inquiry_directory_enabled: boolean;
+  crm_customer_tickets: boolean;
+}
+
+/** Convert unified CrmOptionsState → old PublicCrmOptionsFlags shape */
+export function toPublicCrmOptionsFlags(state: CrmOptionsState): PublicCrmOptionsFlags {
+  return {
+    crm_enabled: state.enabled,
+    crm_inquiry_product_enabled: state.inquiryProductEnabled,
+    crm_inquiry_storefront_enabled: state.inquiryStorefrontEnabled,
+    crm_inquiry_directory_enabled: state.inquiryDirectoryEnabled,
+    crm_customer_tickets: state.customerTicketsEnabled,
+  };
 }
 
 // --- Quickstart Options ---
@@ -703,6 +816,17 @@ export function resolveCommerceState(
 
   const effectiveCartVisible = enabled && !disabled && effectivePaymentType !== 'none';
 
+  // Build checkout mode (deposit config unavailable at pure resolution layer;
+  // UnifiedCapabilityService.mapCommerce fills it from backend response)
+  const checkoutMode: CheckoutModeConfig =
+    effectivePaymentType === 'deposit'
+      ? { mode: 'deposit_only' }
+      : effectivePaymentType === 'full'
+        ? { mode: 'full_payment_only' }
+        : effectivePaymentType === 'both'
+          ? { mode: 'flexible' }
+          : { mode: 'disabled' };
+
   return {
     enabled: enabled && !disabled,
     cartVisible,
@@ -710,6 +834,7 @@ export function resolveCommerceState(
     effectivePaymentType,
     effectiveCartVisible,
     merchantPreferences: prefs,
+    checkoutMode,
     isFlexible: bothOptions,
     features,
   };
@@ -871,6 +996,15 @@ export function resolveFulfillmentState(
     effectiveShowsShipping,
     merchantPreferences: prefs,
     isFlexible: flexible,
+    deliveryRadiusMiles: null,
+    deliveryFeeCents: 0,
+    deliveryMinFreeCents: null,
+    deliveryTimeHours: 24,
+    shippingFlatRateCents: null,
+    shippingMinFreeCents: null,
+    shippingHandlingDays: 1,
+    pickupReadyTimeMinutes: 30,
+    pickupInstructions: null,
     features,
   };
 }
@@ -1665,6 +1799,9 @@ export function resolveStorefrontOptionsState(
     allowedAdvancedTypes,
     layoutEnabled: mainOn && (layoutEnabled || allowedLayouts.length > 0),
     allowedLayouts,
+    effectiveLayout: effectiveLayouts.includes(prefs.storefront_layout as StorefrontOptLayoutType)
+      ? (prefs.storefront_layout as StorefrontOptLayoutType)
+      : (effectiveLayouts[0] || 'classic'),
     canShowHoursDisplay: mainOn && effectiveHoursDisplay,
     canUseAnimatedHours: mainOn && effectiveHoursTypes.includes('hours_animated'),
     canShowHoursStatus: mainOn && effectiveHoursTypes.includes('hours_status'),
@@ -1998,669 +2135,5 @@ export function resolveCrmOptionsState(
   };
 }
 
-// ====================
-// CUSTOMER-FACING SERVICE (CustomerApiSingleton)
-// ====================
-
-class CapabilityResolutionService extends CustomerApiSingleton {
-  private static instance: CapabilityResolutionService;
-  private capCache = new Map<string, { data: AllCapabilitiesState; expiry: number }>();
-  private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-
-  private constructor() {
-    super('capability-resolution-service', { ttl: 15 * 60 * 1000 });
-  }
-
-  static getInstance(): CapabilityResolutionService {
-    if (!CapabilityResolutionService.instance) {
-      CapabilityResolutionService.instance = new CapabilityResolutionService();
-    }
-    return CapabilityResolutionService.instance;
-  }
-
-  getServiceCachePatterns(): string[] {
-    return ['tenant-capabilities'];
-  }
-
-  async invalidateServiceCaches(customerId?: string): Promise<void> {
-    this.capCache.clear();
-    for (const pattern of this.getServiceCachePatterns()) {
-      await this.invalidateCache(pattern);
-    }
-  }
-
-  /**
-   * Fetch and resolve all capabilities for a tenant
-   */
-  async getAllCapabilities(tenantId: string): Promise<AllCapabilitiesState> {
-    // Check in-memory cache
-    const cached = this.capCache.get(tenantId);
-    if (cached && cached.expiry > Date.now()) {
-      return cached.data;
-    }
-
-    const response = await this.makeDefaultRequest<TenantCapabilitiesResponse>(
-      `/api/tenants/${tenantId}/capabilities`,
-      { method: 'GET' },
-      `tenant-capabilities-${tenantId}`,
-      this.CACHE_TTL,
-      {
-        context: AppContext.SHOP,
-        isolation: CacheIsolation.SHOP,
-      }
-    );
-
-    const data = response?.data || response;
-
-    const result = this.resolveAll(tenantId, data as TenantCapabilitiesResponse);
-
-    // Cache in memory
-    this.capCache.set(tenantId, { data: result, expiry: Date.now() + this.CACHE_TTL });
-
-    return result;
-  }
-
-  /**
-   * Get commerce state for a tenant, merging tier capability with merchant preferences
-   */
-  async getCommerceState(tenantId: string): Promise<CommerceState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.commerce;
-
-    try {
-      const prefs = await publicCommerceSettingsService.getCommerceSettings(tenantId);
-      if (prefs) {
-        return resolveCommerceState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch commerce merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get payment gateway state for a tenant, merging tier capability with merchant preferences
-   */
-  async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.paymentGateway;
-
-    // Fetch merchant preferences and re-resolve with them
-    try {
-
-      const prefs = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(tenantId);
-      if (prefs) {
-        return resolvePaymentGatewayState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get storefront state for a tenant, merging tier capability with merchant preferences
-   */
-  async getStorefrontState(tenantId: string): Promise<StorefrontState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.storefront;
-
-    try {
-
-      const prefs = await publicStorefrontTypeService.getStorefrontTypeState(tenantId);
-      if (prefs) {
-        return resolveStorefrontState(tierState.features, prefs);
-      }
-    } catch (e) {
-      console.warn('[CapabilityResolutionService] Failed to fetch storefront type settings, falling back to tier state:', e);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get barcode scan state for a tenant, merging tier capability with merchant preferences
-   */
-  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.barcodeScan;
-
-    try {
-
-      const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
-      if (prefs) {
-        return resolveBarcodeScanState(tierState.features, prefs);
-      }
-    } catch (e) {
-      console.warn('[CapabilityResolutionService] Failed to fetch barcode scan settings, falling back to tier state:', e);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get fulfillment state for a tenant, merging tier capability with merchant preferences
-   */
-  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.fulfillment;
-
-    try {
-
-      const prefs = await publicFulfillmentService.getFulfillmentSettings(tenantId);
-      if (prefs) {
-        return resolveFulfillmentState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch fulfillment merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get product options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.productOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveProductOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch product options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get featured options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.featuredOptions;
-
-    try {
-
-      const prefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveFeaturedOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch featured options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get integration options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.integrationOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveIntegrationState(tierState.features, prefs, tierState.enabled);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get quickstart options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.quickstartOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveQuickstartOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch quickstart options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get storefront options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.storefrontOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveStorefrontOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[CapabilityResolutionService] Failed to fetch storefront options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Check a specific feature key against capability data.
-   * If the feature belongs to a capability type, use the capability's features.
-   * Returns null if the feature doesn't belong to any capability type (uncategorized).
-   */
-  async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
-    const capType = getCapabilityTypeForFeature(featureKey);
-    if (!capType) return null; // Not a capability-gated feature
-
-    const all = await this.getAllCapabilities(tenantId);
-    const capGroup = (all as any)[capType] as { features: Record<string, boolean> } | undefined;
-    if (!capGroup) return false;
-
-    return !!capGroup.features[featureKey];
-  }
-
-  /**
-   * Resolve raw API response into typed state
-   */
-  private resolveAll(tenantId: string, data: TenantCapabilitiesResponse): AllCapabilitiesState {
-    const commerceFeatures = data.capabilities?.commerce_types?.features || {};
-    const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
-    const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
-    const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
-    const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
-    const productOptionsFeatures = data.capabilities?.product_options?.features || {};
-    const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
-    const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
-    const integrationCapabilityEnabled = data.capabilities?.integration_options?.capability_enabled ?? undefined;
-    const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
-    const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
-    const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
-    const crmFeatures = data.capabilities?.crm_options?.features || {};
-    const crmCapabilityEnabled = data.capabilities?.crm_options?.capability_enabled ?? undefined;
-
-    return {
-      tierKey: data.tier_key,
-      tierName: data.tier_name || data.tier_key,
-      tierDescription: data.tier_description || '',
-      commerce: resolveCommerceState(commerceFeatures),
-      paymentGateway: resolvePaymentGatewayState(paymentFeatures),
-      storefront: resolveStorefrontState(storefrontFeatures),
-      barcodeScan: resolveBarcodeScanState(barcodeFeatures),
-      fulfillment: resolveFulfillmentState(fulfillmentFeatures),
-      productOptions: resolveProductOptionsState(productOptionsFeatures),
-      featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
-      integrationOptions: resolveIntegrationState(integrationOptionsFeatures, undefined, integrationCapabilityEnabled),
-      quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
-      storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
-      faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
-      crmOptions: resolveCrmOptionsState(crmFeatures, crmCapabilityEnabled),
-      uncategorizedFeatures: data.uncategorized_features || [],
-    };
-  }
-
-  /**
-   * Get FAQ options state for a tenant
-   */
-  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    return all.faqOptions;
-  }
-
-  /**
-   * Get CRM options state for a tenant
-   */
-  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    return all.crmOptions;
-  }
-}
-
-// ====================
-// TENANT-FACING SERVICE (TenantApiSingleton)
-// ====================
-
-class TenantCapabilityResolutionService extends TenantApiSingleton {
-  private static instance: TenantCapabilityResolutionService;
-  private capCache = new Map<string, { data: AllCapabilitiesState; expiry: number }>();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes (shorter for dashboard)
-
-  private constructor() {
-    super('tenant-capability-resolution-service', { ttl: 5 * 60 * 1000 });
-  }
-
-  static getInstance(): TenantCapabilityResolutionService {
-    if (!TenantCapabilityResolutionService.instance) {
-      TenantCapabilityResolutionService.instance = new TenantCapabilityResolutionService();
-    }
-    return TenantCapabilityResolutionService.instance;
-  }
-
-  getServiceCachePatterns(): string[] {
-    return ['tenant-capabilities-dashboard'];
-  }
-
-  async invalidateServiceCaches(tenantId?: string): Promise<void> {
-    if (tenantId) {
-      this.capCache.delete(tenantId);
-    } else {
-      this.capCache.clear();
-    }
-    for (const pattern of this.getServiceCachePatterns()) {
-      await this.invalidateCache(pattern);
-    }
-  }
-
-  /**
-   * Fetch and resolve all capabilities for a tenant (tenant-authenticated)
-   */
-  async getAllCapabilities(tenantId: string): Promise<AllCapabilitiesState> {
-    const cached = this.capCache.get(tenantId);
-    if (cached && cached.expiry > Date.now()) {
-      return cached.data;
-    }
-
-    this.setCurrentTenant(tenantId);
-
-    const response = await this.makeDefaultRequest<TenantCapabilitiesResponse>(
-      `/api/tenants/${tenantId}/capabilities`,
-      { method: 'GET' },
-      `tenant-capabilities-dashboard-${tenantId}`,
-      this.CACHE_TTL,
-      {
-        context: AppContext.TENANT,
-        isolation: CacheIsolation.TENANT,
-      }
-    );
-
-    const data = response?.data || response;
-
-    const result = this.resolveAll(tenantId, data as TenantCapabilitiesResponse);
-    this.capCache.set(tenantId, { data: result, expiry: Date.now() + this.CACHE_TTL });
-
-    return result;
-  }
-
-  async getCommerceState(tenantId: string): Promise<CommerceState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.commerce;
-
-    try {
-
-      const prefs = await tenantInfoService.getCommerceSettings(tenantId);
-      if (prefs) {
-        return resolveCommerceState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch commerce merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.paymentGateway;
-
-    // Fetch merchant preferences and re-resolve with them
-    try {
-
-      const prefs = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(tenantId);
-      if (prefs) {
-        return resolvePaymentGatewayState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[PublicPaymentGatewaySettingsService] Failed to fetch merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  async getStorefrontState(tenantId: string): Promise<StorefrontState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.storefront;
-
-    try {
-
-      const prefs = await publicStorefrontTypeService.getStorefrontTypeState(tenantId);
-      if (prefs) {
-        return resolveStorefrontState(tierState.features, prefs);
-      }
-    } catch (e) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch storefront type settings, falling back to tier state:', e);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get barcode scan state for a tenant, merging tier capability with merchant preferences
-   */
-  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.barcodeScan;
-
-    try {
-
-      const prefs = await tenantInfoService.getBarcodeScanSettings(tenantId);
-      if (prefs) {
-        return resolveBarcodeScanState(tierState.features, prefs);
-      }
-    } catch (e) {
-      console.warn('[CapabilityResolutionService] Failed to fetch barcode scan settings, falling back to tier state:', e);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get fulfillment state for a tenant, merging tier capability with merchant preferences
-   */
-  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.fulfillment;
-
-    try {
-
-      const prefs = await publicFulfillmentService.getFulfillmentSettings(tenantId);
-      if (prefs) {
-        return resolveFulfillmentState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch fulfillment merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get product options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.productOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getProductOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveProductOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch product options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get featured options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.featuredOptions;
-
-    try {
-
-      const prefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveFeaturedOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch featured options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get integration options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.integrationOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getIntegrationOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveIntegrationState(tierState.features, prefs, tierState.enabled);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch integration options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get quickstart options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.quickstartOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getQuickstartOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveQuickstartOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch quickstart options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get storefront options state for a tenant, merging tier capability with merchant preferences
-   */
-  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    const tierState = all.storefrontOptions;
-
-    try {
-
-      const prefs = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
-      if (prefs) {
-        return resolveStorefrontOptionsState(tierState.features, prefs);
-      }
-    } catch (err) {
-      console.warn('[TenantCapabilityResolutionService] Failed to fetch storefront options merchant preferences, using tier-only state:', err);
-    }
-
-    return tierState;
-  }
-
-  /**
-   * Get FAQ options state for a tenant
-   */
-  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    return all.faqOptions;
-  }
-
-  /**
-   * Get CRM options state for a tenant
-   */
-  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
-    return all.crmOptions;
-  }
-
-  /**
-   * Check a specific feature key against capability data.
-   * If the feature belongs to a capability type, use the capability's features.
-   * Returns null if the feature doesn't belong to any capability type (uncategorized).
-   */
-  async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
-    const capType = getCapabilityTypeForFeature(featureKey);
-    if (!capType) return null;
-
-    const all = await this.getAllCapabilities(tenantId);
-    const capGroup = (all as any)[capType] as { features: Record<string, boolean> } | undefined;
-    if (!capGroup) return false;
-
-    return !!capGroup.features[featureKey];
-  }
-
-  private resolveAll(tenantId: string, data: TenantCapabilitiesResponse): AllCapabilitiesState {
-    const commerceFeatures = data.capabilities?.commerce_types?.features || {};
-    const paymentFeatures = data.capabilities?.payment_gateway_options?.features || {};
-    const storefrontFeatures = data.capabilities?.storefront_types?.features || {};
-    const barcodeFeatures = data.capabilities?.barcode_scan_options?.features || {};
-    const fulfillmentFeatures = data.capabilities?.fulfillment_options?.features || {};
-    const productOptionsFeatures = data.capabilities?.product_options?.features || {};
-    const featuredOptionsFeatures = data.capabilities?.featured_options?.features || {};
-    const integrationOptionsFeatures = data.capabilities?.integration_options?.features || {};
-    const integrationCapabilityEnabled = data.capabilities?.integration_options?.capability_enabled ?? undefined;
-    const quickstartOptionsFeatures = data.capabilities?.quickstart_options?.features || {};
-    const storefrontOptionsFeatures = data.capabilities?.storefront_options?.features || {};
-    const faqOptionsFeatures = data.capabilities?.faq_options?.features || {};
-    const crmFeatures = data.capabilities?.crm_options?.features || {};
-    const crmCapabilityEnabled = data.capabilities?.crm_options?.capability_enabled ?? undefined;
-
-    return {
-      tierKey: data.tier_key,
-      tierName: data.tier_name || data.tier_key,
-      tierDescription: data.tier_description || '',
-      commerce: resolveCommerceState(commerceFeatures),
-      paymentGateway: resolvePaymentGatewayState(paymentFeatures),
-      storefront: resolveStorefrontState(storefrontFeatures),
-      barcodeScan: resolveBarcodeScanState(barcodeFeatures),
-      fulfillment: resolveFulfillmentState(fulfillmentFeatures),
-      productOptions: resolveProductOptionsState(productOptionsFeatures),
-      featuredOptions: resolveFeaturedOptionsState(featuredOptionsFeatures),
-      integrationOptions: resolveIntegrationState(integrationOptionsFeatures, undefined, integrationCapabilityEnabled),
-      quickstartOptions: resolveQuickstartOptionsState(quickstartOptionsFeatures),
-      storefrontOptions: resolveStorefrontOptionsState(storefrontOptionsFeatures),
-      faqOptions: resolveFaqOptionsState(faqOptionsFeatures),
-      crmOptions: resolveCrmOptionsState(crmFeatures, crmCapabilityEnabled),
-      uncategorizedFeatures: data.uncategorized_features || [],
-    };
-  }
-}
-
-// ====================
-// EXPORTS
-// ====================
-
-export { CapabilityResolutionService, TenantCapabilityResolutionService };
-export default CapabilityResolutionService;
+// End of capability resolution functions — no classes remain.
+// UnifiedCapabilityService is the single service entry-point now.

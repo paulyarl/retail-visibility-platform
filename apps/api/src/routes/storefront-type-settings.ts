@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import StorefrontTypeService, { StorefrontType } from '../services/StorefrontTypeService';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -151,6 +152,8 @@ router.put('/:tenantId/storefront-type', authenticateToken, async (req, res) => 
       });
     }
 
+    invalidateEffectiveCapabilities(tenantId);
+
     res.json({
       success: true,
       settings: {
@@ -190,9 +193,13 @@ router.get('/:tenantId/storefront-type/capability', authenticateToken, async (re
 });
 
 // Public endpoint - Get storefront type settings for storefront display
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/storefront-type', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/storefront-type is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     // Resolve tier capabilities for tier-gate-aware merchant gate
     const storefrontService = StorefrontTypeService.getInstance();
@@ -245,9 +252,14 @@ router.get('/public/tenant/:tenantId/storefront-type', async (req, res) => {
 });
 
 // Public endpoint - Get storefront type capability state for storefront display
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/storefront-type/capability', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/storefront-type/capability is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
+
     const storefrontService = StorefrontTypeService.getInstance();
     const state = await storefrontService.resolveStorefrontTypeState(tenantId);
 

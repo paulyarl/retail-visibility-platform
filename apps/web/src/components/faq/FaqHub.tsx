@@ -102,7 +102,7 @@ export default function FaqHub({ tenantId }: FaqHubProps) {
 
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
-  const { data: faqCap, loading: capLoading } = useFaqOptionsCapability(tenantId, { forTenant: true });
+  const { data: faqCap, loading: capLoading } = useFaqOptionsCapability(tenantId);
 
   // Merchant gate settings (tier-filtered merchant preferences)
   const [merchantSettings, setMerchantSettings] = useState<Record<string, boolean>>({});

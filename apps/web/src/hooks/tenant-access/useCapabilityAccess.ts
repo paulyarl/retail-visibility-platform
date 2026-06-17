@@ -16,10 +16,9 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { faqService } from '@/services/FaqService';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 
 import {
-  CapabilityResolutionService,
-  TenantCapabilityResolutionService,
   CommerceState,
   PaymentGatewayState,
   StorefrontState,
@@ -62,14 +61,12 @@ export interface CapabilityHookState<T> {
 // ====================
 
 /**
- * Select the appropriate service based on context.
- * Customer pages (storefront, checkout) → CapabilityResolutionService
- * Tenant dashboard pages → TenantCapabilityResolutionService
+ * All capability resolution now goes through UnifiedCapabilityService.
+ * Previously selected between TenantCapabilityResolutionService (dashboard)
+ * and CapabilityResolutionService (public) — both unified now.
  */
-function getService(forTenant: boolean) {
-  return forTenant
-    ? TenantCapabilityResolutionService.getInstance()
-    : CapabilityResolutionService.getInstance();
+function getService(_forTenant: boolean) {
+  return unifiedCapabilityService;
 }
 
 // ====================

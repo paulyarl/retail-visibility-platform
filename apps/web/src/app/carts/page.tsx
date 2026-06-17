@@ -82,9 +82,8 @@ export default function MultiCartPage() {
       const tenantInfoData: Record<string, TenantInfo> = {};
       const commerceData: Record<string, { enabled: boolean; cartVisible: boolean }> = {};
 
-      // Lazy-load the service to avoid circular import issues
-      const { CapabilityResolutionService } = await import('@/services/CapabilityResolutionService');
-      const capService = CapabilityResolutionService.getInstance();
+      // Use unified capability service (replaces CapabilityResolutionService)
+      const { unifiedCapabilityService } = await import('@/services/UnifiedCapabilityService');
 
       for (const tenantId of tenantIds) {
         try {
@@ -92,7 +91,7 @@ export default function MultiCartPage() {
           const [gateways, profile, commerceState] = await Promise.all([
             publicTenantInfoService.getPaymentGateways(tenantId),
             publicTenantInfoService.getTenantProfile(tenantId).catch(() => null),
-            capService.getCommerceState(tenantId).catch(() => null)
+            unifiedCapabilityService.getCommerceState(tenantId).catch(() => null)
           ]);
 
           gatewayData[tenantId] = gateways.filter((g: Gateway) => g.is_active);

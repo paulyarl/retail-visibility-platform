@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@mantine/core';
-import { MapPin, Truck, Package, Clock, DollarSign } from 'lucide-react';
-import { publicFulfillmentService, type FulfillmentSettings } from '@/services/PublicFulfillmentService';
+import { MapPin, Truck, Package, Clock } from 'lucide-react';
+import { type FulfillmentState } from '@/services/CapabilityResolutionService';
 import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 export type FulfillmentMethod = 'pickup' | 'delivery' | 'shipping';
@@ -23,78 +23,64 @@ export default function FulfillmentMethodForm({
 }: FulfillmentMethodFormProps) {
   // Fulfillment capability-driven content control (effective = tier allows AND merchant enabled)
   const fulfillmentCap = useFulfillmentCapability(tenantId);
-  const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
-  const showsPickup = fulfillmentCap.data?.effectiveShowsPickup ?? fulfillmentCap.data?.showsPickup ?? true;
-  const showsDelivery = fulfillmentCap.data?.effectiveShowsDelivery ?? fulfillmentCap.data?.showsDelivery ?? true;
-  const showsShipping = fulfillmentCap.data?.effectiveShowsShipping ?? fulfillmentCap.data?.showsShipping ?? true;
+  const settings = fulfillmentCap.data;
+  const isFulfillmentEnabled = settings?.enabled ?? true;
+  const showsPickup = settings?.effectiveShowsPickup ?? settings?.showsPickup ?? true;
+  const showsDelivery = settings?.effectiveShowsDelivery ?? settings?.showsDelivery ?? true;
+  const showsShipping = settings?.effectiveShowsShipping ?? settings?.showsShipping ?? true;
 
   const [selectedMethod, setSelectedMethod] = useState<FulfillmentMethod | null>(initialMethod || null);
-  const [settings, setSettings] = useState<FulfillmentSettings | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchSettings();
-  }, [tenantId]);
-
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-
-      const settings = await publicFulfillmentService.getFulfillmentSettings(tenantId);
-
-      if (settings) {
-        setSettings(settings);
-
-        // Auto-select first available method if none selected
-        if (!selectedMethod) {
-          if (settings.pickup_enabled) {
-            setSelectedMethod('pickup');
-          } else if (settings.delivery_enabled) {
-            setSelectedMethod('delivery');
-          } else if (settings.shipping_enabled) {
-            setSelectedMethod('shipping');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching fulfillment settings:', error);
-    } finally {
-      setLoading(false);
+  // Auto-select first available method on initial load
+  if (!selectedMethod && settings) {
+    const mp = settings.merchantPreferences;
+    if (mp.pickup_enabled) {
+      // Defer to avoid render-phase setState
+      setTimeout(() => setSelectedMethod('pickup'), 0);
+    } else if (mp.delivery_enabled) {
+      setTimeout(() => setSelectedMethod('delivery'), 0);
+    } else if (mp.shipping_enabled) {
+      setTimeout(() => setSelectedMethod('shipping'), 0);
     }
-  };
+  }
 
+  // Fee calculations from unified FulfillmentState
   const getDeliveryFee = (): number => {
     if (!settings) return 0;
-    return publicFulfillmentService.calculateDeliveryFee(settings, subtotal); // subtotal is already in cents
+    if (!settings.merchantPreferences.delivery_enabled) return 0;
+    if (settings.deliveryMinFreeCents && subtotal >= settings.deliveryMinFreeCents) {
+      return 0;
+    }
+    return settings.deliveryFeeCents;
   };
 
   const getShippingFee = (): number => {
     if (!settings) return 0;
-    return publicFulfillmentService.calculateShippingFee(settings, subtotal); // subtotal is already in cents
+    if (!settings.merchantPreferences.shipping_enabled) return 0;
+    if (settings.shippingMinFreeCents && subtotal >= settings.shippingMinFreeCents) {
+      return 0;
+    }
+    return settings.shippingFlatRateCents || 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!selectedMethod) return;
-
     let fee = 0;
-    if (selectedMethod === 'delivery') {
-      fee = getDeliveryFee();
-    } else if (selectedMethod === 'shipping') {
-      fee = getShippingFee();
-    }
-
+    if (selectedMethod === 'delivery') fee = getDeliveryFee();
+    else if (selectedMethod === 'shipping') fee = getShippingFee();
     onSubmit(selectedMethod, fee);
   };
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   const formatTime = (minutes: number) => {
-    return publicFulfillmentService['formatTime'](minutes); // Access private method via service
+    if (minutes < 60) return `${minutes} minutes`;
+    const hours = Math.floor(minutes / 60);
+    return hours === 1 ? '1 hour' : `${hours} hours`;
   };
 
-  if (loading) {
+  if (fulfillmentCap.loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -112,8 +98,8 @@ export default function FulfillmentMethodForm({
 
   const deliveryFee = getDeliveryFee();
   const shippingFee = getShippingFee();
-  const qualifiesForFreeDelivery = settings.delivery_min_free_cents && subtotal >= settings.delivery_min_free_cents;
-  const qualifiesForFreeShipping = settings.shipping_min_free_cents && subtotal >= settings.shipping_min_free_cents;
+  const qualifiesForFreeDelivery = settings.deliveryMinFreeCents && subtotal >= settings.deliveryMinFreeCents;
+  const qualifiesForFreeShipping = settings.shippingMinFreeCents && subtotal >= settings.shippingMinFreeCents;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,7 +108,7 @@ export default function FulfillmentMethodForm({
       </p>
 
       {/* Pickup Option */}
-      {settings.pickup_enabled && showsPickup && (
+      {settings.merchantPreferences.pickup_enabled && showsPickup && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'pickup'
             ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
@@ -149,10 +135,10 @@ export default function FulfillmentMethodForm({
               <div className="text-sm text-neutral-600 space-y-1">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>Ready in {formatTime(settings.pickup_ready_time_minutes)}</span>
+                  <span>Ready in {formatTime(settings.pickupReadyTimeMinutes)}</span>
                 </div>
-                {settings.pickup_instructions && (
-                  <p className="mt-2 text-xs">{settings.pickup_instructions}</p>
+                {settings.pickupInstructions && (
+                  <p className="mt-2 text-xs">{settings.pickupInstructions}</p>
                 )}
               </div>
             </div>
@@ -161,7 +147,7 @@ export default function FulfillmentMethodForm({
       )}
 
       {/* Delivery Option */}
-      {settings.delivery_enabled && showsDelivery && (
+      {settings.merchantPreferences.delivery_enabled && showsDelivery && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'delivery'
             ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
@@ -192,22 +178,22 @@ export default function FulfillmentMethodForm({
               <div className="text-sm text-neutral-600 space-y-1">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>Delivered within {settings.delivery_time_hours} hours</span>
+                  <span>Delivered within {settings.deliveryTimeHours} hours</span>
                 </div>
-                {settings.delivery_radius_miles && (
+                {settings.deliveryRadiusMiles && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    <span>Within {settings.delivery_radius_miles} miles</span>
+                    <span>Within {settings.deliveryRadiusMiles} miles</span>
                   </div>
                 )}
                 {qualifiesForFreeDelivery && (
                   <p className="text-green-600 text-xs mt-1">
-                    🎉 Congratulations! Your order is over {formatCurrency(settings.delivery_min_free_cents!)}! You qualify for free delivery!
+                    🎉 Congratulations! Your order is over {formatCurrency(settings.deliveryMinFreeCents!)}! You qualify for free delivery!
                   </p>
                 )}
-                {!qualifiesForFreeDelivery && settings.delivery_min_free_cents && (
+                {!qualifiesForFreeDelivery && settings.deliveryMinFreeCents && (
                   <p className="text-xs mt-1">
-                    Free delivery on orders over {formatCurrency(settings.delivery_min_free_cents)}
+                    Free delivery on orders over {formatCurrency(settings.deliveryMinFreeCents)}
                   </p>
                 )}
               </div>
@@ -217,7 +203,7 @@ export default function FulfillmentMethodForm({
       )}
 
       {/* Shipping Option */}
-      {settings.shipping_enabled && showsShipping && (
+      {settings.merchantPreferences.shipping_enabled && showsShipping && (
         <label
           className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedMethod === 'shipping'
             ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
@@ -249,16 +235,16 @@ export default function FulfillmentMethodForm({
                   <span>Estimated 3-5 business days</span>
                 </div>
                 <p className="text-xs">
-                  Ships in {settings.shipping_handling_days} business {settings.shipping_handling_days === 1 ? 'day' : 'days'}
+                  Ships in {settings.shippingHandlingDays} business {settings.shippingHandlingDays === 1 ? 'day' : 'days'}
                 </p>
                 {qualifiesForFreeShipping && (
                   <p className="text-green-600 text-xs mt-1">
-                    🎉 Congratulations! Your order is over {formatCurrency(settings.shipping_min_free_cents!)}! You qualify for free shipping!
+                    🎉 Congratulations! Your order is over {formatCurrency(settings.shippingMinFreeCents!)}! You qualify for free shipping!
                   </p>
                 )}
-                {!qualifiesForFreeShipping && settings.shipping_min_free_cents && (
+                {!qualifiesForFreeShipping && settings.shippingMinFreeCents && (
                   <p className="text-xs mt-1">
-                    Free shipping on orders over {formatCurrency(settings.shipping_min_free_cents)}
+                    Free shipping on orders over {formatCurrency(settings.shippingMinFreeCents)}
                   </p>
                 )}
               </div>

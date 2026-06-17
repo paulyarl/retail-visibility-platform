@@ -92,8 +92,8 @@ function getQuickActions(settings: QuickstartOptionsSettings, tenantId: string):
 }
 
 export default function QuickstartOptionsSettingsClient({ tenantId }: QuickstartOptionsSettingsClientProps) {
-  const quickstartCap = useQuickstartOptionsCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const quickstartCap = useQuickstartOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
 
   // Tier-level gates: what the plan allows (not effective/merged state)
   // Settings page must show toggles for everything the tier permits so merchant can control them
