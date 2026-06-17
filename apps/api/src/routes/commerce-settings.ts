@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
 import { getTenantCommerceCapabilities } from '../utils/commerce-capabilities';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -68,9 +69,13 @@ router.get('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
 });
 
 // Public endpoint - Get commerce settings for storefront/checkout
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/commerce-settings', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/commerce-settings is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     // Get tenant commerce capabilities (respects tier features)
     const capabilities = await getTenantCommerceCapabilities(tenantId);
@@ -127,6 +132,8 @@ router.put('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
         ...settings,
       },
     });
+
+    invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,

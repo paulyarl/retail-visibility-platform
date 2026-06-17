@@ -3319,9 +3319,14 @@ router.use('/tenants', tenantsRoutes);
 // STOREFRONT OPTIONS - Public resolved flags
 // ====================
 
+// Public endpoint - Get storefront options for storefront display
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /api/public/tenant/${tenantId}/storefront-options is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     // Get merchant preferences
     const settings = await prisma.tenant_storefront_options_settings.findUnique({
@@ -3600,9 +3605,15 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
 // PRODUCT OPTIONS - Public resolved flags
 // ====================
 
+// Public endpoint - Get product options for storefront
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/tenant/:tenantId/product-options', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /api/public/tenant/${tenantId}/product-options is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
+
     const productService = ProductOptionsService.getInstance();
     const tierState = await productService.resolveProductOptionsState(tenantId);
 

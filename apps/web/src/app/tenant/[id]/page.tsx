@@ -35,10 +35,12 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
-import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { type ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
 import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
 import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
@@ -426,7 +428,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
     let storefrontOptionFlags: StorefrontOptionFlags | null = null;
     try {
-      storefrontOptionFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(idResolvedBySlug);
+      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch storefront option flags:', e);
     }
@@ -458,7 +460,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch FAQ option flags server-side (no client waterfall)
     let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
     try {
-      faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(idResolvedBySlug);
+      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch FAQ option flags:', e);
     }
@@ -466,7 +468,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch CRM option flags server-side (no client waterfall)
     let crmOptionsFlags: PublicCrmOptionsFlags | null = null;
     try {
-      crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(idResolvedBySlug);
+      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch CRM option flags:', e);
     }
@@ -474,7 +476,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch product option flags server-side (no client waterfall)
     let productOptionFlags: ProductOptionFlags | null = null;
     try {
-      productOptionFlags = await publicProductOptionsService.getProductOptionFlags(idResolvedBySlug);
+      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug);
     } catch (e) {
       console.error('Failed to fetch product option flags:', e);
     }

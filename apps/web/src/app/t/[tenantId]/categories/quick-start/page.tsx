@@ -196,7 +196,7 @@ export default function CategoryQuickStartPage() {
   const { canAccess, getFeatureBadgeWithPermission } = useTenantTier(tenantId);
 
   // Capability-based quickstart state
-  const { data: quickstartState, loading: capabilityLoading } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const { data: quickstartState, loading: capabilityLoading } = useQuickstartOptionsCapability(tenantId);
   const hasCategoryQuickStart = quickstartState?.canUseCategoryGenerator ?? false;
 
   const [selectedType, setSelectedType] = useState<BusinessType | null>(null);

@@ -1,0 +1,123 @@
+/**
+ * CRM Options Resolver
+ *
+ * Resolves effective CRM options state from tier features.
+ */
+
+import type { EffectiveCrm } from './types';
+
+export type CrmInquiryType =
+  | 'crm_inquiry_product_enabled' | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_enabled' | 'crm_inquiry_anonymous'
+  | 'crm_inquiry_customer' | 'crm_inquiry_assignment' | 'crm_inquiry_auto_response';
+
+export type CrmContactType = 'crm_contact_management' | 'crm_contact_import' | 'crm_contact_sync';
+export type CrmTicketType = 'crm_ticket_priority' | 'crm_ticket_assignment' | 'crm_ticket_templates' | 'crm_ticket_escalation';
+export type CrmMessageType = 'crm_message_rich_text' | 'crm_message_attachments' | 'crm_message_templates';
+export type CrmCustomerTicketType = 'crm_customer_tickets';
+export type CrmDashboardType = 'crm_dashboard_analytics' | 'crm_requests_hub';
+
+export function resolveCrmOptions(
+  features: Record<string, boolean>,
+  capabilityEnabled?: boolean
+): EffectiveCrm {
+  const cleanFeatures: Record<string, boolean> = {};
+  for (const [key, val] of Object.entries(features)) {
+    cleanFeatures[key.trim()] = val;
+  }
+  const feat = cleanFeatures;
+
+  const enabled = capabilityEnabled ?? !!feat.crm_enabled;
+  const disabled = !!feat.crm_disabled;
+  const flexible = !!feat.crm_flexible;
+
+  const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
+  const inquiryStorefrontEnabled = flexible || !!feat.crm_inquiry_storefront_enabled;
+  const inquiryDirectoryEnabled = flexible || !!feat.crm_inquiry_directory_enabled;
+
+  const contactsEnabled = flexible || !!feat.crm_contact_management;
+  const ticketFeaturesEnabled = flexible || (!!feat.crm_ticket_priority || !!feat.crm_ticket_assignment || !!feat.crm_ticket_templates || !!feat.crm_ticket_escalation);
+  const messageFeaturesEnabled = flexible || (!!feat.crm_message_rich_text || !!feat.crm_message_attachments || !!feat.crm_message_templates);
+  const customerTicketsEnabled = flexible || !!feat.crm_customer_tickets;
+  const dashboardEnabled = flexible || (!!feat.crm_dashboard_analytics || !!feat.crm_requests_hub);
+
+  const allowedInquiry: CrmInquiryType[] = [];
+  if (flexible) {
+    allowedInquiry.push(
+      'crm_inquiry_product_enabled', 'crm_inquiry_storefront_enabled',
+      'crm_inquiry_directory_enabled', 'crm_inquiry_anonymous',
+      'crm_inquiry_customer', 'crm_inquiry_assignment', 'crm_inquiry_auto_response'
+    );
+  } else {
+    if (feat.crm_inquiry_product_enabled) allowedInquiry.push('crm_inquiry_product_enabled');
+    if (feat.crm_inquiry_storefront_enabled) allowedInquiry.push('crm_inquiry_storefront_enabled');
+    if (feat.crm_inquiry_directory_enabled) allowedInquiry.push('crm_inquiry_directory_enabled');
+    if (feat.crm_inquiry_anonymous) allowedInquiry.push('crm_inquiry_anonymous');
+    if (feat.crm_inquiry_customer) allowedInquiry.push('crm_inquiry_customer');
+    if (feat.crm_inquiry_assignment) allowedInquiry.push('crm_inquiry_assignment');
+    if (feat.crm_inquiry_auto_response) allowedInquiry.push('crm_inquiry_auto_response');
+  }
+
+  const allowedContact: CrmContactType[] = [];
+  if (flexible) {
+    allowedContact.push('crm_contact_management', 'crm_contact_import', 'crm_contact_sync');
+  } else {
+    if (feat.crm_contact_management) allowedContact.push('crm_contact_management');
+    if (feat.crm_contact_import) allowedContact.push('crm_contact_import');
+    if (feat.crm_contact_sync) allowedContact.push('crm_contact_sync');
+  }
+
+  const allowedTicket: CrmTicketType[] = [];
+  if (flexible) {
+    allowedTicket.push('crm_ticket_priority', 'crm_ticket_assignment', 'crm_ticket_templates', 'crm_ticket_escalation');
+  } else {
+    if (feat.crm_ticket_priority) allowedTicket.push('crm_ticket_priority');
+    if (feat.crm_ticket_assignment) allowedTicket.push('crm_ticket_assignment');
+    if (feat.crm_ticket_templates) allowedTicket.push('crm_ticket_templates');
+    if (feat.crm_ticket_escalation) allowedTicket.push('crm_ticket_escalation');
+  }
+
+  const allowedMessage: CrmMessageType[] = [];
+  if (flexible) {
+    allowedMessage.push('crm_message_rich_text', 'crm_message_attachments', 'crm_message_templates');
+  } else {
+    if (feat.crm_message_rich_text) allowedMessage.push('crm_message_rich_text');
+    if (feat.crm_message_attachments) allowedMessage.push('crm_message_attachments');
+    if (feat.crm_message_templates) allowedMessage.push('crm_message_templates');
+  }
+
+  const allowedCustomerTicket: CrmCustomerTicketType[] = [];
+  if (flexible || feat.crm_customer_tickets) {
+    allowedCustomerTicket.push('crm_customer_tickets');
+  }
+
+  const allowedDashboard: CrmDashboardType[] = [];
+  if (flexible) {
+    allowedDashboard.push('crm_dashboard_analytics', 'crm_requests_hub');
+  } else {
+    if (feat.crm_dashboard_analytics) allowedDashboard.push('crm_dashboard_analytics');
+    if (feat.crm_requests_hub) allowedDashboard.push('crm_requests_hub');
+  }
+
+  const allTypes = [...allowedInquiry, ...allowedContact, ...allowedTicket, ...allowedMessage, ...allowedCustomerTicket, ...allowedDashboard];
+
+  return {
+    enabled: enabled && !disabled,
+    inquiry_product_enabled: enabled && !disabled && inquiryProductEnabled,
+    inquiry_storefront_enabled: enabled && !disabled && inquiryStorefrontEnabled,
+    inquiry_directory_enabled: enabled && !disabled && inquiryDirectoryEnabled,
+    contacts_enabled: enabled && !disabled && contactsEnabled,
+    ticket_features_enabled: enabled && !disabled && ticketFeaturesEnabled,
+    message_features_enabled: enabled && !disabled && messageFeaturesEnabled,
+    customer_tickets_enabled: enabled && !disabled && customerTicketsEnabled,
+    dashboard_enabled: enabled && !disabled && dashboardEnabled,
+    allowed_inquiry_types: allowedInquiry,
+    allowed_contact_types: allowedContact,
+    allowed_ticket_types: allowedTicket,
+    allowed_message_types: allowedMessage,
+    allowed_customer_ticket_types: allowedCustomerTicket,
+    allowed_dashboard_types: allowedDashboard,
+    is_flexible: flexible,
+    crm_available: enabled && !disabled && allTypes.length > 0,
+  };
+}

@@ -22,8 +22,8 @@ import {
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
 // ---------------------------------------------------------------------------
 // Types

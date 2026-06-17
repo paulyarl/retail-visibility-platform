@@ -477,3 +477,56 @@ Next GET /effective-capabilities
 - `apps/web/src/services/PublicFeaturedOptionsService.ts`
 - `apps/web/src/hooks/useCapabilityGate.ts` (or redirect to new hook)
 - `apps/web/src/hooks/usePublicCapabilities.ts`
+
+---
+
+## Appendix: Updated Skill Document — Adding a New Capability (Post-Unification)
+
+The `.devin/skills/add-capability-feature.md` skill document must be updated to reflect the unified resolver architecture. The old flow required touching both frontend `CapabilityResolutionService` and backend `*OptionsService`. The new flow centralizes resolution in the backend resolver layer.
+
+### Updated Post-Insert Checklist (replace steps 3–4 in skill doc)
+
+After adding to `features_list`, linking to a capability type, and enabling for tiers, follow these unified steps:
+
+1. **Create/update the backend resolver** in `apps/api/src/services/resolvers/{Domain}Resolver.ts`:
+   - Accept `(features: Record<string,boolean>, merchantPrefs: {Domain}MerchantSettings | null)`.
+   - Map tier feature keys → `allowed_*` arrays.
+   - Apply merchant soft toggles → `effective_*` arrays / booleans.
+   - Return an `Effective{Domain}` object (add the interface to `resolvers/types.ts`).
+   - Follow the pattern of existing resolvers (e.g. `PaymentGatewayResolver.ts`, `ProductOptionsResolver.ts`).
+
+2. **Export the resolver** from `apps/api/src/services/resolvers/index.ts`.
+
+3. **Wire into the orchestrator** in `EffectiveCapabilityResolver.ts`:
+   - Add the new settings table to `fetchMerchantSettings()` (use `safeQuery` for graceful degradation).
+   - Add the new resolver to the `Promise.all` dispatch block.
+   - Include the resolved state in the final `EffectiveCapabilities` return object.
+
+4. **Update the unified endpoint response** — no extra route needed; `GET /api/tenants/:tenantId/effective-capabilities` automatically surfaces the new domain under `effective.{domain}`.
+
+5. **Add cache invalidation** in the settings PUT handler for the new domain:
+   - After a successful Prisma update, call `invalidateEffectiveCapabilities(tenantId)`.
+
+6. **Add a unit test** in `apps/api/src/services/resolvers/resolvers.test.ts`:
+   - Test disabled state when tier has no matching features.
+   - Test enabled state when tier allows + merchant enables.
+   - Test merchant override (tier allows but merchant disables).
+
+7. **Update the frontend** — instead of touching `CapabilityResolutionService`, update `UnifiedCapabilityService` to map the new `effective.{domain}` field into the typed state object consumed by React components.
+
+### What to Remove from the Skill Document
+
+- Remove references to `CapabilityResolutionService` frontend resolution logic.
+- Remove the requirement to update individual `Public*Service.ts` files.
+- Clarify that merchant preference tables still exist per-domain, but resolution now happens server-side in the resolver.
+
+### Verification (New)
+
+After adding a new capability:
+
+```bash
+pnpm checkapi          # must pass
+pnpm test -- --run     # resolver tests must pass
+curl http://localhost:3001/api/tenants/:tenantId/effective-capabilities \
+  | jq '.data.effective.<new_domain>'   # must return resolved state
+```

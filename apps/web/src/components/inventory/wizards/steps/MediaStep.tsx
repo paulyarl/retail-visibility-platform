@@ -147,7 +147,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
   const tenantId = params.tenantId as string;
 
   // Product options capability gating for gallery and video
-  const productOptionsCap = useProductOptionsCapability(tenantId || null, { forTenant: true });
+  const productOptionsCap = useProductOptionsCapability(tenantId || null);
   const showsGallery = productOptionsCap.data?.showsGallery ?? true;
   const showsVideo = productOptionsCap.data?.showsVideo ?? true;
 

@@ -32,8 +32,8 @@ import { LocationAvailabilitySection } from '@/components/products/LocationAvail
 import ProductActions from '@/components/products/ProductActions';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { Package, Download, Globe, ChevronLeft, ShoppingCart, Star, ChevronDown, MapPin, Phone, Clock } from 'lucide-react';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 

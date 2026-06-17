@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 
 export interface PublicFaqOptionsState {
   flags: PublicFaqOptionsFlags | null;
@@ -31,7 +32,7 @@ export function usePublicFaqOptions(tenantId: string | null): PublicFaqOptionsSt
     setLoading(true);
     setError(null);
     try {
-      const result = await publicFaqService.getFaqOptionsFlags(tenantId);
+      const result = await unifiedCapabilityService.getFaqOptionsFlags(tenantId);
       setFlags(result);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch FAQ options');

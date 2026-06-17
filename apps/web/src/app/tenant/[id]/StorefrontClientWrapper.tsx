@@ -49,9 +49,9 @@ import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPa
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 

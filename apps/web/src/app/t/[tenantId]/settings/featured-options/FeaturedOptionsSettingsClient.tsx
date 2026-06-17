@@ -98,8 +98,8 @@ function getQuickActions(settings: FeaturedOptionsSettings, tenantId: string): Q
 
 export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOptionsSettingsClientProps) {
   // Capability-driven content control
-  const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const isFeaturedEnabled = featuredCap.data?.enabled ?? true;
   const allowedTenantTypes = featuredCap.data?.allowedTenantTypes ?? TENANT_FEATURED_TYPES;
   const allowedPlatformTypes = featuredCap.data?.allowedPlatformTypes ?? [];

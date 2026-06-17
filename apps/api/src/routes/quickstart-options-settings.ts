@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -120,6 +121,8 @@ router.put('/:tenantId/quickstart-options', authenticateToken, async (req, res) 
         },
       });
     }
+
+    invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,

@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import StorefrontOptionsService from '../services/StorefrontOptionsService';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -224,6 +225,8 @@ router.put('/:tenantId/storefront-options', authenticateToken, async (req, res) 
         },
       });
     }
+
+    invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,

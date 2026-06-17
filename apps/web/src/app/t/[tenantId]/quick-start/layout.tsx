@@ -27,7 +27,7 @@ interface TierWithCapability {
 export default function QuickStartLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const tenantId = params.tenantId as string;
-  const { data: quickstartState, loading } = useQuickstartOptionsCapability(tenantId, { forTenant: true });
+  const { data: quickstartState, loading } = useQuickstartOptionsCapability(tenantId);
   const [tiersWithQuickstart, setTiersWithQuickstart] = useState<TierWithCapability[] | null>(null);
 
   const router = useRouter();

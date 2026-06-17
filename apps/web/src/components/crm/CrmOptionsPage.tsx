@@ -178,7 +178,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 ];
 
 export default function CrmOptionsPage({ tenantId }: CrmOptionsPageProps) {
-  const { data: crmCap } = useCrmOptionsCapability(tenantId, { forTenant: true });
+  const { data: crmCap } = useCrmOptionsCapability(tenantId);
   const tierState = crmCap;
 
   const [settings, setSettings] = useState<CrmOptionsSettings>(DEFAULT_SETTINGS);

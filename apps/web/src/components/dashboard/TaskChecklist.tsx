@@ -45,7 +45,7 @@ export default function TaskChecklist({
   hasLogo = false,
   canManageFaq = false,
 }: TaskChecklistProps) {
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const allCaps = useAllCapabilities(tenantId);
 
   const tasks: TaskItem[] = useMemo(() => {
     const caps = allCaps.data;

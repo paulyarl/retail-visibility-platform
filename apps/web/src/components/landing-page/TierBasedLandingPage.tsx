@@ -28,7 +28,7 @@ import QRCode from 'qrcode';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { useCommerceCapability, usePaymentGatewayCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';

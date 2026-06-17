@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -60,7 +61,7 @@ export function TenantQRCode({
           storefrontService.getPublicTier(tenantId),
           capabilityFlags
             ? Promise.resolve(capabilityFlags)
-            : publicStorefrontOptionsService.getStorefrontOptionFlags(tenantId),
+            : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
         ]);
 
         // Set capability flags if not provided as prop

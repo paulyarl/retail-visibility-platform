@@ -292,7 +292,7 @@ export default function ProductFeaturingPage() {
   const [expirationDate, setExpirationDate] = useState('');
 
   // Capability check for featured type tier gating
-  const featuredCap = useFeaturedOptionsCapability(tenantId, { forTenant: true });
+  const featuredCap = useFeaturedOptionsCapability(tenantId);
   const isFeaturedTypeAllowed = featuredCap.data?.allowedTypes?.includes('featured') ?? true;
 
   // Use singleton for featured (pay-to-play promotional) data

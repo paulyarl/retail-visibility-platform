@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import ProductOptionsService, { ProductType } from '../services/ProductOptionsService';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -295,6 +296,8 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
         },
       });
     }
+
+    invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,

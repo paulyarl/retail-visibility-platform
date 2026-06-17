@@ -1,0 +1,531 @@
+/**
+ * Effective Capability Resolver — Types
+ *
+ * Shared types for the unified capabilities resolution system.
+ * These mirror the frontend CapabilityResolutionService interfaces
+ * but are server-native and omit client-only fields.
+ */
+
+// ====================
+// CORE
+// ====================
+
+export interface TierInfo {
+  key: string;
+  name: string;
+  description: string;
+}
+
+export interface CapabilityGroup {
+  capability_enabled: boolean;
+  is_highlighted: boolean;
+  features: Record<string, boolean>;
+}
+
+export interface RawCapabilitiesInput {
+  tier_key: string;
+  tier_name: string;
+  tier_description: string;
+  capabilities: Record<string, CapabilityGroup>;
+  uncategorized_features: string[];
+}
+
+// ====================
+// MERCHANT SETTINGS (flat union of all settings tables)
+// ====================
+
+export interface MerchantSettingsBundle {
+  commerce: CommerceMerchantSettings | null;
+  paymentGateway: PaymentGatewayMerchantSettings | null;
+  storefrontType: StorefrontTypeMerchantSettings | null;
+  fulfillment: FulfillmentMerchantSettings | null;
+  productOptions: ProductOptionsMerchantSettings | null;
+  featuredOptions: FeaturedOptionsMerchantSettings | null;
+  integrationOptions: IntegrationOptionsMerchantSettings | null;
+  quickstartOptions: QuickstartOptionsMerchantSettings | null;
+  storefrontOptions: StorefrontOptionsMerchantSettings | null;
+  faqOptions: FaqOptionsMerchantSettings | null;
+  crmOptions: CrmOptionsMerchantSettings | null;
+  barcodeScan: BarcodeScanMerchantSettings | null;
+}
+
+export interface CommerceMerchantSettings {
+  deposit_enabled?: boolean | null;
+  full_payment_enabled?: boolean | null;
+  deposit_percentage?: number | null;
+  deposit_min_cents?: number | null;
+  deposit_max_cents?: number | null;
+  auto_confirm_orders?: boolean | null;
+  order_confirmation_minutes?: number | null;
+  show_payment_options?: boolean | null;
+  require_payment_upfront?: boolean | null;
+  allow_payment_on_pickup?: boolean | null;
+  notify_on_payment?: boolean | null;
+  notify_on_deposit?: boolean | null;
+  notify_on_fulfillment?: boolean | null;
+}
+
+export interface PaymentGatewayMerchantSettings {
+  gateway_enabled?: boolean | null;
+  stripe_enabled?: boolean | null;
+  paypal_enabled?: boolean | null;
+  square_enabled?: boolean | null;
+  clover_enabled?: boolean | null;
+}
+
+export interface StorefrontTypeMerchantSettings {
+  storefront_type_enabled?: boolean | null;
+  selected_storefront_type?: string | null;
+}
+
+export interface FulfillmentMerchantSettings {
+  pickup_enabled?: boolean | null;
+  pickup_instructions?: string | null;
+  pickup_ready_time_minutes?: number | null;
+  delivery_enabled?: boolean | null;
+  delivery_radius_miles?: number | null;
+  delivery_fee_cents?: number | null;
+  delivery_min_free_cents?: number | null;
+  delivery_time_hours?: number | null;
+  shipping_enabled?: boolean | null;
+  shipping_flat_rate_cents?: number | null;
+  shipping_min_free_cents?: number | null;
+  shipping_handling_days?: number | null;
+}
+
+export interface ProductOptionsMerchantSettings {
+  product_physical_enabled?: boolean | null;
+  product_digital_enabled?: boolean | null;
+  product_hybrid_enabled?: boolean | null;
+  product_service_enabled?: boolean | null;
+  product_variant_enabled?: boolean | null;
+  product_gallery_enabled?: boolean | null;
+  product_video_enabled?: boolean | null;
+  product_layout?: string | null;
+  product_opt_recently_viewed?: boolean | null;
+  product_opt_qr_codes?: boolean | null;
+  product_opt_recommended?: boolean | null;
+  product_opt_map_display?: boolean | null;
+  product_opt_location_display?: boolean | null;
+  product_opt_hours_display?: boolean | null;
+  product_opt_enhanced_seo?: boolean | null;
+  product_opt_reviews?: boolean | null;
+  product_opt_fulfillment?: boolean | null;
+  product_opt_categories?: boolean | null;
+  product_opt_location_availability?: boolean | null;
+}
+
+export interface FeaturedOptionsMerchantSettings {
+  featured_enabled?: boolean | null;
+  featured_store_selection?: boolean | null;
+  featured_new_arrival?: boolean | null;
+  featured_seasonal?: boolean | null;
+  featured_sale?: boolean | null;
+  featured_staff_pick?: boolean | null;
+  featured_clearance?: boolean | null;
+  featured_featured?: boolean | null;
+  featured_bestseller?: boolean | null;
+  featured_trending?: boolean | null;
+  featured_recommended?: boolean | null;
+  featured_random_featured?: boolean | null;
+  featured_expiry_monitor?: boolean | null;
+}
+
+export interface IntegrationOptionsMerchantSettings {
+  integration_enabled?: boolean | null;
+  integration_clover?: boolean | null;
+  integration_square?: boolean | null;
+  integration_gbp?: boolean | null;
+  integration_google_shopping?: boolean | null;
+  integration_google_merchant_center?: boolean | null;
+  integration_gmc_sync?: boolean | null;
+}
+
+export interface QuickstartOptionsMerchantSettings {
+  quickstart_enabled?: boolean | null;
+  quickstart_wizard?: boolean | null;
+  quickstart_image_gen?: boolean | null;
+  quickstart_category_generator?: boolean | null;
+  quickstart_wizard_ai?: boolean | null;
+  quickstart_ai_openai?: boolean | null;
+  quickstart_ai_gemini?: boolean | null;
+  quickstart_image_hd?: boolean | null;
+  default_text_model?: string | null;
+  default_image_model?: string | null;
+  default_image_quality?: string | null;
+}
+
+export interface StorefrontOptionsMerchantSettings {
+  storefront_opt_enabled?: boolean | null;
+  hours_display?: boolean | null;
+  hours_animated?: boolean | null;
+  hours_status?: boolean | null;
+  map_display?: boolean | null;
+  location_display?: boolean | null;
+  category_store?: boolean | null;
+  category_product?: boolean | null;
+  recommend_store?: boolean | null;
+  recommend_products?: boolean | null;
+  recently_viewed?: boolean | null;
+  storefront_social_media?: boolean | null;
+  storefront_contact?: boolean | null;
+  interactive_maps?: boolean | null;
+  qr_codes_512?: boolean | null;
+  qr_codes_1024?: boolean | null;
+  qr_codes_2048?: boolean | null;
+  qr_product?: boolean | null;
+  qr_store?: boolean | null;
+  qr_logo?: boolean | null;
+  qr_directory?: boolean | null;
+  image_gallery_5?: boolean | null;
+  image_gallery_10?: boolean | null;
+  image_gallery_15?: boolean | null;
+  enhanced_seo?: boolean | null;
+  storefront_actions?: boolean | null;
+  storefront_layout?: string | null;
+  default_qr_resolution?: string | null;
+  default_gallery_limit?: number | null;
+}
+
+export interface FaqOptionsMerchantSettings {
+  faq_enabled?: boolean | null;
+}
+
+export interface CrmOptionsMerchantSettings {
+  crm_enabled?: boolean | null;
+}
+
+export interface BarcodeScanMerchantSettings {
+  barcode_scan_enabled?: boolean | null;
+  barcode_manual_enabled?: boolean | null;
+  barcode_usb_enabled?: boolean | null;
+  barcode_camera_enabled?: boolean | null;
+  default_scan_mode?: string | null;
+}
+
+// ====================
+// EFFECTIVE (RESOLVED) STATE
+// ====================
+
+export type CommercePaymentType = 'full' | 'deposit' | 'both' | 'none';
+
+export interface EffectiveCommerce {
+  enabled: boolean;
+  cart_visible: boolean;
+  payment_type: CommercePaymentType;
+  effective_payment_type: CommercePaymentType;
+  effective_cart_visible: boolean;
+  checkout_available: boolean;
+  checkout_mode: { mode: 'deposit_only' | 'full_payment_only' | 'flexible' | 'disabled'; deposit_percentage?: number; deposit_min_cents?: number; deposit_max_cents?: number };
+  /** Merchant preference state preserved for settings pages */
+  merchant_preferences: { deposit_enabled: boolean; full_payment_enabled: boolean };
+  is_flexible: boolean;
+}
+
+export type GatewayType = 'stripe' | 'paypal' | 'square' | 'clover';
+
+export interface EffectivePaymentGateway {
+  enabled: boolean;
+  allowed_gateways: GatewayType[];
+  effective_gateways: GatewayType[];
+  checkout_available: boolean;
+  merchant_preferences: { gateway_enabled: boolean; stripe_enabled: boolean; paypal_enabled: boolean; square_enabled: boolean; clover_enabled: boolean };
+  is_flexible: boolean;
+}
+
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'both' | 'none';
+
+export interface EffectiveStorefront {
+  enabled: boolean;
+  type: StorefrontTypeValue;
+  effective_type: StorefrontTypeValue;
+  is_flexible: boolean;
+  allowed_types: StorefrontTypeValue[];
+  has_merchant_selection: boolean;
+  merchant_preferences: { storefront_type_enabled: boolean; selected_storefront_type: StorefrontTypeValue };
+}
+
+export type BarcodeScanMode = 'scan' | 'manual' | 'usb' | 'camera' | 'none';
+
+export interface EffectiveBarcodeScan {
+  enabled: boolean;
+  allowed_modes: BarcodeScanMode[];
+  effective_modes: BarcodeScanMode[];
+  is_flexible: boolean;
+  scan_available: boolean;
+  effective_scan_available: boolean;
+  merchant_preferences: { barcode_scan_enabled: boolean; barcode_manual_enabled: boolean; barcode_usb_enabled: boolean; barcode_camera_enabled: boolean };
+}
+
+export interface EffectiveFulfillment {
+  enabled: boolean;
+  shows_pickup: boolean;
+  shows_delivery: boolean;
+  shows_shipping: boolean;
+  shows_service: boolean;
+  effective_shows_pickup: boolean;
+  effective_shows_delivery: boolean;
+  effective_shows_shipping: boolean;
+  merchant_preferences: { pickup_enabled: boolean; delivery_enabled: boolean; shipping_enabled: boolean };
+  is_flexible: boolean;
+  /** Delivery configuration from merchant settings */
+  delivery_radius_miles: number | null;
+  delivery_fee_cents: number;
+  delivery_min_free_cents: number | null;
+  delivery_time_hours: number;
+  /** Shipping configuration from merchant settings */
+  shipping_flat_rate_cents: number | null;
+  shipping_min_free_cents: number | null;
+  shipping_handling_days: number;
+  /** Pickup configuration from merchant settings */
+  pickup_ready_time_minutes: number;
+  pickup_instructions: string | null;
+}
+
+export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
+export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
+
+export interface EffectiveProductOptions {
+  enabled: boolean;
+  allowed_types: ProductType[];
+  effective_types: ProductType[];
+  shows_variants: boolean;
+  shows_gallery: boolean;
+  shows_video: boolean;
+  effective_shows_variants: boolean;
+  effective_shows_gallery: boolean;
+  effective_shows_video: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: ProductLayoutType[];
+  effective_layout: ProductLayoutType;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  shows_recently_viewed: boolean;
+  shows_qr_codes: boolean;
+  shows_recommended: boolean;
+  shows_map_display: boolean;
+  shows_location_display: boolean;
+  shows_hours_display: boolean;
+  shows_enhanced_seo: boolean;
+  shows_reviews: boolean;
+  shows_fulfillment: boolean;
+  shows_categories: boolean;
+  shows_location_availability: boolean;
+  merchant_preferences: Record<string, any>;
+  is_flexible: boolean;
+}
+
+export type FeaturedType =
+  | 'store_selection' | 'new_arrival' | 'seasonal' | 'sale'
+  | 'staff_pick' | 'clearance' | 'featured'
+  | 'bestseller' | 'trending' | 'recommended' | 'random_featured';
+
+export interface EffectiveFeatured {
+  enabled: boolean;
+  tenant_enabled: boolean;
+  platform_enabled: boolean;
+  allowed_tenant_types: FeaturedType[];
+  allowed_platform_types: FeaturedType[];
+  allowed_types: FeaturedType[];
+  effective_tenant_types: FeaturedType[];
+  effective_platform_types: FeaturedType[];
+  effective_types: FeaturedType[];
+  featured_available: boolean;
+  effective_featured_available: boolean;
+  expiry_monitor_enabled: boolean;
+  merchant_preferences: Record<string, boolean>;
+  is_flexible: boolean;
+}
+
+export type IntegrationType =
+  | 'clover' | 'square' | 'gbp'
+  | 'google_shopping' | 'google_merchant_center' | 'gmc_sync'
+  | 'propagation_gbp';
+
+export interface EffectiveIntegrations {
+  enabled: boolean;
+  pos_enabled: boolean;
+  google_enabled: boolean;
+  allowed_pos_types: IntegrationType[];
+  allowed_google_types: IntegrationType[];
+  allowed_types: IntegrationType[];
+  effective_pos_types: IntegrationType[];
+  effective_google_types: IntegrationType[];
+  effective_types: IntegrationType[];
+  integrations_available: boolean;
+  effective_integrations_available: boolean;
+  merchant_preferences: Record<string, boolean>;
+  is_flexible: boolean;
+}
+
+export type QuickstartProductType = 'wizard' | 'image_gen';
+export type QuickstartCategoryType = 'category_generator';
+export type QuickstartAIType = 'ai_openai' | 'ai_gemini' | 'wizard_ai' | 'image_hd';
+
+export interface EffectiveQuickstart {
+  enabled: boolean;
+  is_flexible: boolean;
+  product_enabled: boolean;
+  allowed_product_types: QuickstartProductType[];
+  category_enabled: boolean;
+  allowed_category_types: QuickstartCategoryType[];
+  ai_enabled: boolean;
+  allowed_ai_types: QuickstartAIType[];
+  can_use_wizard: boolean;
+  can_use_ai_wizard: boolean;
+  can_use_category_generator: boolean;
+  can_generate_images: boolean;
+  can_use_openai: boolean;
+  can_use_gemini: boolean;
+  can_use_hd_images: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
+export type StorefrontOptCategoryType = 'category_store' | 'category_product';
+export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
+export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
+export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
+export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
+export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
+export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
+export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
+
+export interface EffectiveStorefrontOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  hours_enabled: boolean;
+  allowed_hours_types: StorefrontOptHoursType[];
+  category_enabled: boolean;
+  allowed_category_types: StorefrontOptCategoryType[];
+  recommend_enabled: boolean;
+  allowed_recommend_types: StorefrontOptRecommendType[];
+  recently_viewed_enabled: boolean;
+  info_enabled: boolean;
+  allowed_info_types: StorefrontOptInfoType[];
+  qr_enabled: boolean;
+  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
+  allowed_qr_content_types: StorefrontOptQRContentType[];
+  gallery_enabled: boolean;
+  allowed_gallery_types: StorefrontOptGalleryType[];
+  advanced_enabled: boolean;
+  allowed_advanced_types: StorefrontOptAdvancedType[];
+  layout_enabled: boolean;
+  allowed_layouts: StorefrontOptLayoutType[];
+  effective_layout: StorefrontOptLayoutType;
+  can_show_hours_display: boolean;
+  can_use_animated_hours: boolean;
+  can_show_hours_status: boolean;
+  can_show_map_display: boolean;
+  can_show_location_display: boolean;
+  can_use_category_store: boolean;
+  can_use_category_product: boolean;
+  can_use_recommend_store: boolean;
+  can_use_recommend_products: boolean;
+  can_use_recently_viewed: boolean;
+  can_use_social_media: boolean;
+  can_use_contact: boolean;
+  can_use_interactive_maps: boolean;
+  can_use_qr_codes: boolean;
+  can_use_enhanced_seo: boolean;
+  can_use_storefront_actions: boolean;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+export type FaqManagementType =
+  | 'faq_management_hub' | 'faq_management_templates' | 'faq_management_import'
+  | 'faq_management_wizard_inline' | 'faq_management_bulk_actions'
+  | 'faq_management_reorder' | 'faq_management_search';
+
+export type FaqPreviewType =
+  | 'faq_preview_bot' | 'faq_preview_gap_report' | 'faq_preview_auto_suggest';
+
+export type FaqDisplayType =
+  | 'faq_display_storefront_accordion' | 'faq_display_product_accordion'
+  | 'faq_display_search_overlay' | 'faq_display_feedback'
+  | 'faq_display_bot_handoff' | 'faq_display_markdown' | 'faq_display_deep_link';
+
+export type FaqKnowledgeBaseType =
+  | 'faq_kb_static_lookup' | 'faq_kb_rag_retrieval' | 'faq_kb_product_scoped'
+  | 'faq_kb_auto_sync' | 'faq_kb_coverage_metrics';
+
+export interface EffectiveFaq {
+  enabled: boolean;
+  storefront_enabled: boolean;
+  product_enabled: boolean;
+  templates_enabled: boolean;
+  management_enabled: boolean;
+  preview_enabled: boolean;
+  display_enabled: boolean;
+  kb_enabled: boolean;
+  allowed_management_types: FaqManagementType[];
+  allowed_preview_types: FaqPreviewType[];
+  allowed_display_types: FaqDisplayType[];
+  allowed_kb_types: FaqKnowledgeBaseType[];
+  is_flexible: boolean;
+  faq_available: boolean;
+}
+
+export type CrmInquiryType =
+  | 'crm_inquiry_product_enabled' | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_enabled' | 'crm_inquiry_anonymous'
+  | 'crm_inquiry_customer' | 'crm_inquiry_assignment' | 'crm_inquiry_auto_response';
+
+export type CrmContactType = 'crm_contact_management' | 'crm_contact_import' | 'crm_contact_sync';
+export type CrmTicketType = 'crm_ticket_priority' | 'crm_ticket_assignment' | 'crm_ticket_templates' | 'crm_ticket_escalation';
+export type CrmMessageType = 'crm_message_rich_text' | 'crm_message_attachments' | 'crm_message_templates';
+export type CrmCustomerTicketType = 'crm_customer_tickets';
+export type CrmDashboardType = 'crm_dashboard_analytics' | 'crm_requests_hub';
+
+export interface EffectiveCrm {
+  enabled: boolean;
+  inquiry_product_enabled: boolean;
+  inquiry_storefront_enabled: boolean;
+  inquiry_directory_enabled: boolean;
+  contacts_enabled: boolean;
+  ticket_features_enabled: boolean;
+  message_features_enabled: boolean;
+  customer_tickets_enabled: boolean;
+  dashboard_enabled: boolean;
+  allowed_inquiry_types: CrmInquiryType[];
+  allowed_contact_types: CrmContactType[];
+  allowed_ticket_types: CrmTicketType[];
+  allowed_message_types: CrmMessageType[];
+  allowed_customer_ticket_types: CrmCustomerTicketType[];
+  allowed_dashboard_types: CrmDashboardType[];
+  is_flexible: boolean;
+  crm_available: boolean;
+}
+
+// ====================
+// TOP-LEVEL RESPONSE
+// ====================
+
+export interface EffectiveCapabilities {
+  tenant_id: string;
+  tier: TierInfo;
+  effective: {
+    commerce: EffectiveCommerce;
+    payment_gateway: EffectivePaymentGateway;
+    storefront: EffectiveStorefront;
+    fulfillment: EffectiveFulfillment;
+    product_options: EffectiveProductOptions;
+    featured: EffectiveFeatured;
+    integrations: EffectiveIntegrations;
+    quickstart: EffectiveQuickstart;
+    storefront_options: EffectiveStorefrontOptions;
+    faq: EffectiveFaq;
+    crm: EffectiveCrm;
+    barcode_scan: EffectiveBarcodeScan;
+  };
+  gates?: {
+    tier_hard: Record<string, CapabilityGroup>;
+    merchant_soft: Record<string, Record<string, boolean>>;
+    org_override?: Record<string, Record<string, boolean>>;
+  };
+  uncategorized_features: string[];
+}

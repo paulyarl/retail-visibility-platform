@@ -73,8 +73,8 @@ function getQuickActions(settings: ProductOptionsSettings, tenantId: string): Qu
 
 export default function ProductOptionsSettingsClient({ tenantId }: ProductOptionsSettingsClientProps) {
   // Product options capability-driven content control
-  const productOptionsCap = useProductOptionsCapability(tenantId, { forTenant: true });
-  const allCaps = useAllCapabilities(tenantId, { forTenant: true });
+  const productOptionsCap = useProductOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const isProductOptionsEnabled = productOptionsCap.data?.enabled ?? true;
   const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
   const showsVariants = productOptionsCap.data?.showsVariants ?? true;

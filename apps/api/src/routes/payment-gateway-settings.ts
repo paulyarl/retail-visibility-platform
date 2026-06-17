@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -163,6 +164,8 @@ router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
       });
     }
 
+    invalidateEffectiveCapabilities(tenantId);
+
     res.json({
       success: true,
       settings: {
@@ -184,9 +187,13 @@ router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
 });
 
 // Public endpoint - Get payment gateway settings for storefront/checkout
+// DEPRECATED: Use GET /api/tenants/:tenantId/effective-capabilities instead
 router.get('/public/tenant/:tenantId/payment-gateway-settings', async (req, res) => {
   try {
     const { tenantId } = req.params;
+    console.warn(`[DEPRECATION] GET /public/tenant/${tenantId}/payment-gateway-settings is deprecated. Use /api/tenants/${tenantId}/effective-capabilities instead.`);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString());
 
     const settings = await prisma.tenant_payment_gateway_settings.findUnique({
       where: { tenant_id: tenantId },

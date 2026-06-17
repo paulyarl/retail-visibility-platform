@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import ProductBusinessInfoCollapsible from './ProductBusinessInfoCollapsible';
 
 interface ProductBusinessInfoWrapperProps {

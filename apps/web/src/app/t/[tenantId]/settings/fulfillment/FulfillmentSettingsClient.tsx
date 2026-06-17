@@ -33,7 +33,7 @@ interface FulfillmentSettingsClientProps {
 
 export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSettingsClientProps) {
   // Fulfillment capability-driven content control
-  const fulfillmentCap = useFulfillmentCapability(tenantId, { forTenant: true });
+  const fulfillmentCap = useFulfillmentCapability(tenantId);
   const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
   const showsPickup = fulfillmentCap.data?.showsPickup ?? true;
   const showsDelivery = fulfillmentCap.data?.showsDelivery ?? true;

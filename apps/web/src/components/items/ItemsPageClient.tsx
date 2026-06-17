@@ -457,7 +457,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   };
 
   // Product options capability gating
-  const productOptionsCap = useProductOptionsCapability(tenantId, { forTenant: true });
+  const productOptionsCap = useProductOptionsCapability(tenantId);
   const isProductEnabled = productOptionsCap.data?.enabled ?? true;
 
   const handleCreateClick = () => {

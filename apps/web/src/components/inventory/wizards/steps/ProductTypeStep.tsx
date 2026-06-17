@@ -86,7 +86,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const variantImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Product options capability gating (effective = tier allows AND merchant enabled)
-  const productOptionsCap = useProductOptionsCapability(tenantId || null, { forTenant: true });
+  const productOptionsCap = useProductOptionsCapability(tenantId || null);
   const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
   const effectiveTypes = productOptionsCap.data?.effectiveTypes ?? allowedTypes;
   const showsVariants = productOptionsCap.data?.effectiveShowsVariants ?? productOptionsCap.data?.showsVariants ?? true;

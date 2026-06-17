@@ -56,7 +56,7 @@ export default function IntegrationsPage() {
   const error = cloverError || squareError;
 
   // Check integration capability (new unified system) — only block when explicitly disabled
-  const integrationCap = useIntegrationOptionsCapability(tenantId, { forTenant: true });
+  const integrationCap = useIntegrationOptionsCapability(tenantId);
   const isIntegrationExplicitlyDisabled = !!integrationCap.data?.features?.integration_disabled;
 
   // Check tier access for viewing

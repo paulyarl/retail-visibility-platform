@@ -20,7 +20,7 @@ export default function ScanLayout({ children }: { children: React.ReactNode }) 
   
   // Use hooks for dynamic tier data and capability-based access
   const { tier, loading: tierLoading } = useTenantAccess(tenantId);
-  const barcodeCap = useBarcodeScanCapability(tenantId, { forTenant: true });
+  const barcodeCap = useBarcodeScanCapability(tenantId);
 
   const loading = tierLoading || barcodeCap.loading;
 

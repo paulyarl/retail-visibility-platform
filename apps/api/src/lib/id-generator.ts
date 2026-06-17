@@ -173,6 +173,17 @@ export function generateTierId(): string {
 }
 
 /**
+ * Generates correlation IDs for request tracing
+ * Format: corr-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, tenant-traceable for unified capability resolver logs
+ */
+export function generateCorrelationId(tenantId?: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  const tenantKey = tenantId ? generateTenantKey(tenantId) : 'GLBL';
+  return `corr-${tenantKey}-${nanoid()}`;
+}
+
+/**
  * Generates short tier change IDs
  * Format: sess-abc123 (12 chars)
  */

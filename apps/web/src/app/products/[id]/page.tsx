@@ -31,12 +31,13 @@ import ProductCategorySidebar from '@/components/storefront/ProductCategorySideb
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicProductOptionsService, ProductOptionFlags } from '@/services/PublicProductOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { StorefrontOptionFlags, type ProductOptionFlags } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
@@ -248,7 +249,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
-  const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   // console.log(`tenantProfile: `, tenantProfile);
@@ -350,10 +351,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
-  const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
-  const productOptFlags = await publicProductOptionsService.getProductOptionFlags(product.tenantId);
-  const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
-  const crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId);
+  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
+  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
   const platformSettings = await platformSettingsService.getPlatformSettings();
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);

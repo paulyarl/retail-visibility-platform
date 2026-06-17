@@ -35,9 +35,10 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 // import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { publicStorefrontOptionsService, StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
-import { publicFaqService, PublicFaqOptionsFlags } from '@/services/PublicFaqService';
-import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { StorefrontOptionFlags, PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
+import { publicFaqService } from '@/services/PublicFaqService';
+import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
@@ -459,10 +460,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          publicStorefrontOptionsService.getStorefrontOptionFlags(data.listing.tenantId),
+          unifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
           publicFeaturedOptionsService.getFeaturedOptionsSettings(data.listing.tenantId),
-          publicFaqService.getFaqOptionsFlags(data.listing.tenantId),
-          publicCrmService.getCrmOptionsFlags(data.listing.tenantId)
+          unifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId),
+          unifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);

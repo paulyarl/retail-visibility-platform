@@ -27,14 +27,6 @@ export interface PublicFaqCategory {
   display_order: number;
 }
 
-export interface PublicFaqOptionsFlags {
-  faq_enabled: boolean;
-  faq_display_storefront_accordion: boolean;
-  faq_display_product_accordion: boolean;
-  faq_display_feedback: boolean;
-  faq_display_bot_handoff: boolean;
-}
-
 export interface FaqSuggestion {
   id: string;
   question: string;
@@ -124,25 +116,6 @@ class PublicFaqService extends PublicApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data?.success) throw new Error(result.data?.error || 'Failed to load FAQ categories');
     return result.data.data || [];
-  }
-
-  // ====================
-  // FAQ Options (public capability flags)
-  // ====================
-
-  async getFaqOptionsFlags(tenantId: string): Promise<PublicFaqOptionsFlags | null> {
-    try {
-      const result = await this.makeDefaultRequest<{ success: boolean; settings: PublicFaqOptionsFlags }>(
-        `/api/public/tenant/${tenantId}/faq-options`,
-        { method: 'GET' },
-        `public-faq-options-${tenantId}`,
-        this.cacheTTL
-      );
-      if (!result.success) return null;
-      return result.data?.settings || null;
-    } catch {
-      return null;
-    }
   }
 
   // ====================
