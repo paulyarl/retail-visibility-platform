@@ -496,17 +496,59 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const { tenant } = data;
+  const { tenant, storefrontOptionFlags } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  const showEnhancedSEO = storefrontOptionFlags?.showEnhancedSEO ?? false;
+
+  // Basic metadata — always emitted
+  const basicMetadata: Metadata = {
+    title: `${businessName} - Store Catalog`,
+    description: `Browse products from ${businessName}.`,
+  };
+
+  if (!showEnhancedSEO) {
+    return basicMetadata;
+  }
+
+  // Enhanced metadata — gated behind merchant capability
+  const businessDescription = tenant.metadata?.business_description;
+  const seoTags = tenant.profileData?.seo_tags || tenant.directoryData?.seo_keywords || [];
+  const enhancedDescription = businessDescription
+    ? `Browse products from ${businessName}. ${businessDescription}`
+    : basicMetadata.description;
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name: businessName,
+    description: enhancedDescription,
+    image: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : undefined,
+    address: tenant.metadata?.address ? {
+      '@type': 'PostalAddress',
+      streetAddress: tenant.profileData?.address_line1,
+      addressLocality: tenant.profileData?.city,
+      addressRegion: tenant.profileData?.state,
+      postalCode: tenant.profileData?.postal_code,
+      addressCountry: tenant.profileData?.country_code,
+    } : undefined,
+    telephone: tenant.profileData?.phone_number,
+    email: tenant.profileData?.email,
+    url: tenant.website || tenant.metadata?.website,
+    keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
+  };
 
   return {
     title: `${businessName} - Store Catalog`,
-    description: `Browse products from ${businessName}. ${tenant.metadata?.address || ''}`,
+    description: enhancedDescription as string,
+    keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
     openGraph: {
       title: businessName,
       description: `Shop products from ${businessName} catalog`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',
+    },
+    other: {
+      'application/ld+json': JSON.stringify(schema),
     },
   };
 }

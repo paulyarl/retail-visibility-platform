@@ -248,17 +248,34 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
+  const optFlags = await publicStorefrontOptionsService.getStorefrontOptionFlags(product.tenantId);
+  const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
+
+  // Basic metadata — always emitted
+  const basicDescription = product.description || `Buy ${product.title} from ${businessName}`;
+
+  if (!showEnhancedSEO) {
+    return {
+      title: `${product.title} - ${businessName}`,
+      description: basicDescription,
+      openGraph: {
+        title: product.title,
+        description: basicDescription,
+        images: product.images?.map(img => img.url) || [],
+        type: 'website',
+      },
+    };
+  }
+
+  // Enhanced metadata — gated behind merchant capability
   const businessDescription = tenantProfile?.business_description;
   const seoTags = tenantProfile?.seo_tags || [];
-
-  // Create enhanced description with business info
-  const baseDescription = product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`;
   const enhancedDescription = businessDescription
-    ? `${baseDescription}. ${businessDescription}`
-    : baseDescription;
+    ? `${basicDescription}. ${businessDescription}`
+    : basicDescription;
 
   // Create SEO schema
   const schema = {
@@ -444,8 +461,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <>
       <ProductLikeProvider>
-        {/* SEO Meta Tags */}
-        {tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
+        {/* SEO Meta Tags — gated behind enhanced SEO capability */}
+        {optFlags?.showEnhancedSEO && tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
           <>
             {tenantProfile.directoryData.seo_keywords.map((tag: string, index: number) => (
               <meta key={index} name="keywords" content={tag} />
@@ -453,11 +470,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </>
         )}
 
-        {/* Structured Data */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
+        {/* Structured Data — gated behind enhanced SEO capability */}
+        {optFlags?.showEnhancedSEO && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          />
+        )}
 
         {/* Product View Tracking */}
         <ProductViewTracker
