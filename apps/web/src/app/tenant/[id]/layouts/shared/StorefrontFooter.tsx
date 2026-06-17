@@ -95,7 +95,7 @@ export default function StorefrontFooter({
   // Compact variant (2-col) for Immersive layout
   if (variant === 'compact') {
     return (
-      <footer className={`bg-neutral-900 dark:bg-neutral-950 text-white ${className}`}>
+      <footer className={`bg-neutral-900 text-white dark:bg-neutral-950 dark:text-white mt-8 ${className}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
             {/* Col 1: Store info + links */}
@@ -115,25 +115,25 @@ export default function StorefrontFooter({
                 <span className="font-semibold text-white">{businessName}</span>
               </div>
               {businessDescription && (
-                <p className="text-neutral-400 text-sm line-clamp-2 mb-3">{businessDescription}</p>
+                <p className="text-neutral-300 dark:text-neutral-400 text-sm line-clamp-2 mb-3">{businessDescription}</p>
               )}
               <ul className="space-y-1 text-sm">
                 {directoryPublished && tenantSlug && isRetailStore && (
                   <>
                     <li>
-                      <Link href={`/directory/${tenantSlug}`} className="text-neutral-400 hover:text-white transition-colors">
+                      <Link href={`/directory/${tenantSlug}`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                         Directory
                       </Link>
                     </li>
                     <li>
-                      <Link href={`/shops/${tenantSlug}`} className="text-neutral-400 hover:text-white transition-colors">
+                      <Link href={`/shops/${tenantSlug}`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                         Shop
                       </Link>
                     </li>
                   </>
                 )}
                 <li>
-                  <Link href="/directory" className="text-neutral-400 hover:text-white transition-colors">
+                  <Link href="/directory" className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                     Browse Directory
                   </Link>
                 </li>
@@ -142,18 +142,18 @@ export default function StorefrontFooter({
 
             {/* Col 2: Contact + policies */}
             <div className="flex flex-col items-start sm:items-end">
-              <div className="text-sm text-neutral-400 space-y-1 text-right">
-                {contactInfo?.address && <p>{contactInfo.address}</p>}
+              <div className="text-sm text-white space-y-1 text-right">
+                {contactInfo?.address && <p className="text-neutral-300">{contactInfo.address}</p>}
                 {contactInfo?.phone && (
                   <p>
-                    <a href={`tel:${contactInfo.phone}`} className="hover:text-white transition-colors">
+                    <a href={`tel:${contactInfo.phone}`} className="text-white hover:text-neutral-300 transition-colors">
                       {contactInfo.phone}
                     </a>
                   </p>
                 )}
                 {contactInfo?.email && (
                   <p>
-                    <a href={`mailto:${contactInfo.email}`} className="hover:text-white transition-colors">
+                    <a href={`mailto:${contactInfo.email}`} className="text-white hover:text-neutral-300 transition-colors">
                       {contactInfo.email}
                     </a>
                   </p>
@@ -167,7 +167,7 @@ export default function StorefrontFooter({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-neutral-500 hover:text-white transition-colors"
+                      className="text-neutral-400 dark:text-neutral-500 hover:text-white transition-colors"
                       aria-label={link.platform}
                     >
                       {socialIconMap[link.icon] || (
@@ -184,7 +184,7 @@ export default function StorefrontFooter({
 
           {/* Platform branding */}
           {!removeBranding && (
-            <div className="mt-6 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-500">
+            <div className="mt-6 pt-6 border-t border-neutral-700 dark:border-neutral-800 text-center text-xs text-neutral-400 dark:text-neutral-500">
               <Link href="/" title={platformName} className="no-underline">
                 <div className="flex items-center justify-center gap-2">
                   <span>Powered by</span>

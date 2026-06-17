@@ -35,7 +35,6 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
 import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
 import { Package, Download, Globe, ChevronLeft, ShoppingCart, Star, ChevronDown, MapPin, Phone, Clock } from 'lucide-react';
-import LastViewed from '@/components/directory/LastViewed';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 
 interface ProductQuickCommerceLayoutProps {
@@ -134,6 +133,7 @@ export default function ProductQuickCommerceLayout({
     tenant,
     initialOptFlags,
     currentUrl,
+    productOptFlags,
   });
 
   // Use server-provided productOptFlags directly to avoid hydration mismatches
@@ -141,12 +141,14 @@ export default function ProductQuickCommerceLayout({
   const showsLocation = productOptFlags?.showsLocationDisplay ?? hookShowsLocation ?? true;
   const showsMap = productOptFlags?.showsMapDisplay ?? hookShowsMap ?? true;
   const showsLocationAvailability = productOptFlags?.showsLocationAvailability ?? hookShowsLocationAvailability ?? true;
-  const showsRecentlyViewed = productOptFlags?.showsRecentlyViewed ?? true;
   const showsCategories = productOptFlags?.showsCategories ?? true;
 
   // Compute store type from tenant prop for stable SSR/client consistency
   const isOnlineStore = tenant?.storeType === 'online' || tenant?.metadata?.store_type === 'online' || false;
   const isRetailStore = !isOnlineStore && (tenant?.storeType === 'retail' || tenant?.metadata?.store_type === 'retail' || (hookIsRetailStore ?? true));
+
+  // Tenant metadata for display
+  const metadata = tenant.metadata as any;
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -168,6 +170,7 @@ export default function ProductQuickCommerceLayout({
     }
     return [];
   }, [product.imageGallery, product.imageUrl, product.name, safeFeatures.maxGalleryImages]);
+
 
   const handleGalleryImageClick = useCallback((index: number) => {
     setLightboxIndex(index);
@@ -229,7 +232,6 @@ export default function ProductQuickCommerceLayout({
   const categorySlug =
     product.tenantCategory?.slug || product.category?.slug || undefined;
 
-  const metadata = tenant.metadata as any;
   const storeLogoUrl = metadata?.logo_url || displayLogo;
 
   return (
@@ -625,13 +627,6 @@ export default function ProductQuickCommerceLayout({
           </section>
         )}
 
-        {/* RECENTLY VIEWED */}
-        {showsRecentlyViewed && (
-          <section className="bg-white dark:bg-neutral-950 py-8 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6">
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-white mb-4">Recently Viewed</h2>
-            <LastViewed entityType="product" limit={4} />
-          </section>
-        )}
       </div>
 
       {/* LIGHTBOX */}
@@ -653,6 +648,7 @@ export default function ProductQuickCommerceLayout({
         onSelectVariant={scrollToVariantSelector}
         cartButtonRef={cartButtonRef}
       />
+
     </div>
   );
 }

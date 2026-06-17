@@ -15,7 +15,6 @@ import LastViewed from '@/components/directory/LastViewed';
 // import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
-import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoWrapper from '@/components/products/ProductBusinessInfoWrapper';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
@@ -39,6 +38,8 @@ import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { publicCrmService, PublicCrmOptionsFlags } from '@/services/PublicCrmService';
 import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -336,6 +337,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const productOptFlags = await publicProductOptionsService.getProductOptionFlags(product.tenantId);
   const faqOptionsFlags = await publicFaqService.getFaqOptionsFlags(product.tenantId);
   const crmOptionsFlags = await publicCrmService.getCrmOptionsFlags(product.tenantId);
+  const platformSettings = await platformSettingsService.getPlatformSettings();
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
@@ -679,6 +681,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
+                productOptFlags={productOptFlags}
               />
             </TenantPaymentProvider>
           </div>
@@ -908,8 +911,29 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         {/* Business Description - Merchant Branding - Full Width */}
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
 
-          {/* Business Information - Contact Us - Full Width */}
+          {/* Featured Type Products - Full Width */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <FeaturedTypeProducts
+              currentProductId={product.id}
+              tenantId={product.tenantId}
+              featuredTypes={merchantFilteredFeaturedTypes}
+              groupedProducts={merchantFilteredGroupedProducts}
+              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
+            />
+          </div>
 
+          {/* Available Nearby - Cross-Tenant Product Discovery */}
+          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+              <AvailableNearby
+                productSlug={product.productSlug}
+                currentTenantId={product.tenantId}
+                className="w-full max-w-md mx-auto"
+              />
+            </div>
+          )}
+
+          {/* Business Information - Contact Us - Full Width */}
           {product.productType != 'digital' ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <ProductBusinessInfoWrapper
@@ -940,29 +964,6 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
                 Download link will be available after successful checkout.
               </p>
-            </div>
-          )}
-
-          {/* Featured Type Products - Full Width */}
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <FeaturedTypeProducts
-              currentProductId={product.id}
-              tenantId={product.tenantId}
-              featuredTypes={merchantFilteredFeaturedTypes}
-              groupedProducts={merchantFilteredGroupedProducts}
-              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
-            />
-          </div>
-
-          {/* Available Nearby - Cross-Tenant Product Discovery */}
-          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-              <AvailableNearby
-                productSlug={product.productSlug}
-                currentTenantId={product.tenantId}
-                className="w-full max-w-md mx-auto"
-              />
             </div>
           )}
 
@@ -1038,8 +1039,46 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           />}
         </div>
 
-        {/* Platform Branding Footer */}
-        <PoweredByFooter />
+        {/* Storefront Footer (includes platform branding) */}
+        <StorefrontFooter
+          tenantId={product.tenantId}
+          businessName={tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
+          businessDescription={tenantProfile?.profileData?.business_description || tenantProfile?.profileData?.businessDescription || ''}
+          logoUrl={tenantProfile?.profileData?.logo_url || null}
+          platformSettings={platformSettings}
+          features={null}
+          directoryPublished={tenantProfile?.hasDirectory || false}
+          tenantSlug={product.tenant?.slug || ''}
+          isRetailStore={tenantProfile?.metadata?.store_type !== 'online'}
+          contactInfo={{
+            address: tenantProfile?.profileData
+              ? [
+                  tenantProfile.profileData.address_line1,
+                  tenantProfile.profileData.city,
+                  tenantProfile.profileData.state,
+                  tenantProfile.profileData.postal_code,
+                ].filter(Boolean).join(', ') || null
+              : null,
+            phone: tenantProfile?.profileData?.phone_number || null,
+            email: tenantProfile?.profileData?.email || null,
+            website: tenantProfile?.profileData?.website || null,
+          }}
+          socialLinks={((): { platform: string; url: string; icon: string }[] => {
+            const links: { platform: string; url: string; icon: string }[] = [];
+            const meta = tenantProfile?.metadata || {};
+            if (meta.instagram) links.push({ platform: 'Instagram', url: meta.instagram, icon: 'instagram' });
+            if (meta.facebook) links.push({ platform: 'Facebook', url: meta.facebook, icon: 'facebook' });
+            if (meta.twitter || meta.x) links.push({ platform: 'X', url: meta.twitter || meta.x, icon: 'x' });
+            if (meta.tiktok) links.push({ platform: 'TikTok', url: meta.tiktok, icon: 'tiktok' });
+            if (meta.linkedin) links.push({ platform: 'LinkedIn', url: meta.linkedin, icon: 'linkedin' });
+            if (meta.youtube) links.push({ platform: 'YouTube', url: meta.youtube, icon: 'youtube' });
+            return links;
+          })()}
+          showsSocialMedia={!!(tenantProfile?.metadata?.instagram || tenantProfile?.metadata?.facebook || tenantProfile?.metadata?.twitter || tenantProfile?.metadata?.x || tenantProfile?.metadata?.tiktok || tenantProfile?.metadata?.linkedin || tenantProfile?.metadata?.youtube)}
+          optFlags={optFlags}
+          currentUrl={currentUrl}
+          variant={productLayout === 'quick-commerce' ? 'compact' : 'full'}
+        />
       </ProductLikeProvider>
     </>
   );

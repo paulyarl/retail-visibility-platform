@@ -23,6 +23,7 @@ import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +88,7 @@ export interface UseProductDetailStateProps {
   tenant: ProductDetailHookTenant;
   initialOptFlags?: StorefrontOptionFlags | null;
   currentUrl?: string;
+  productOptFlags?: ProductOptionFlags | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +154,7 @@ export function useProductDetailState({
   tenant,
   initialOptFlags,
   currentUrl,
+  productOptFlags: serverProductOptFlags,
 }: UseProductDetailStateProps) {
   // ---- Platform settings ----
   const { settings: platformSettings } = usePlatformSettings();
@@ -215,8 +218,11 @@ export function useProductDetailState({
   );
 
   // ---- Product option flags (decoupled from storefront) ----
-  const productOptionsCap = useProductOptionsCapability(product.tenantId);
-  const productOptState = productOptionsCap.data;
+  // Use server-provided flags on public pages to avoid calling private APIs
+  const productOptionsCap = useProductOptionsCapability(
+    serverProductOptFlags ? null : product.tenantId
+  );
+  const productOptState = serverProductOptFlags ?? productOptionsCap.data;
 
   const showsLocation = productOptState?.showsLocationDisplay ?? optFlags?.showLocationDisplay ?? true;
   const showsMap = productOptState?.showsMapDisplay ?? optFlags?.showMapDisplay ?? true;

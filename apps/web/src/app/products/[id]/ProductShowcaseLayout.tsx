@@ -39,6 +39,7 @@ import { LocationAvailabilitySection } from '@/components/products/LocationAvail
 
 // Types
 import { StorefrontOptionFlags } from '@/services/PublicStorefrontOptionsService';
+import { ProductOptionFlags } from '@/services/PublicProductOptionsService';
 
 // Icons
 import { Package, Download, Globe } from 'lucide-react';
@@ -59,6 +60,7 @@ interface ProductShowcaseLayoutProps {
   slugType?: string;
   disableQRCode?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
+  productOptFlags?: ProductOptionFlags | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,7 @@ export function ProductShowcaseLayout({
   slugType,
   disableQRCode,
   initialOptFlags,
+  productOptFlags,
 }: ProductShowcaseLayoutProps) {
   // ---- All business logic from the shared hook ----
   const {
@@ -158,6 +161,7 @@ export function ProductShowcaseLayout({
     tenant,
     initialOptFlags,
     currentUrl,
+    productOptFlags,
   });
 
   // ---- Local UI state ----
@@ -166,6 +170,9 @@ export function ProductShowcaseLayout({
 
   // ---- Ref for StickyPurchaseBar ----
   const cartButtonRef = useRef<HTMLDivElement>(null);
+
+  // ---- Tenant metadata for display ----
+  const metadata = tenant.metadata as any;
 
   // ---- Lightbox image list ----
   const lightboxImages = useMemo(() => {
@@ -256,8 +263,6 @@ export function ProductShowcaseLayout({
   const categorySlug =
     product.tenantCategory?.slug || product.category?.slug || undefined;
 
-  // Tenant metadata for display
-  const metadata = tenant.metadata as any;
   const storeLogoUrl = metadata?.logo_url || displayLogo;
 
   // -----------------------------------------------------------------------
@@ -760,6 +765,7 @@ export function ProductShowcaseLayout({
         onSelectVariant={scrollToVariantSelector}
         cartButtonRef={cartButtonRef}
       />
+
     </div>
   );
 }
