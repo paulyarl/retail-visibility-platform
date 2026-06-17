@@ -416,10 +416,51 @@ Next GET /effective-capabilities
 ## Dependencies
 
 - No database migrations required (reads existing tables)
-- Redis must be available in production (already used by `OverrideCacheService`, `UniversalSingleton`)
 - No new npm packages required
+- **Cache:** In-memory LRU per worker (60s TTL). Redis was considered but not implemented; the two-tier cache (backend 60s + frontend `PublicApiSingleton` 15min) proved sufficient in practice.
 
 ---
+
+## Lessons Learned (Post-Implementation)
+
+### 1. Raw Settings Dump Is an Anti-Pattern
+An early attempt to expose the entire raw `merchant_preferences` blob on each effective state was reverted. It bloats the payload and leaks internal schema details to the frontend. **Correct approach:** selectively expose only the non-boolean config values that components actually need (e.g. `delivery_fee_cents`, `pickup_ready_time_minutes`, `effective_layout`). Boolean toggles are already readable from `merchantPreferences` on the effective state.
+
+### 2. The `effective_*` Single-Value Pattern
+For choice-based configuration (layouts, types, payment modes), components need a single resolved value — not just `allowed_*` + raw merchant preference separately. Example:
+- Backend: `effective_layout: StorefrontOptLayoutType` (computed from `allowed_layouts` ∩ `merchant_prefs.storefront_layout` with fallback)
+- Frontend: `effectiveLayout: StorefrontOptLayoutType` (mapped directly, no client-side logic)
+
+This pattern should be applied to any new choice-based capability domain.
+
+### 3. Feature-Map Guards Break After Unification
+Many components guarded rendering with `Object.keys(X.features).length > 0`. After unification, `features` is always `{}` (it's a legacy compatibility field). **Fix:** use `X.enabled` instead. This was the root cause of the `PlanSummaryPanel` bug where no capabilities rendered.
+
+### 4. `CapabilityResolutionService.ts` Is a Type Source, Not Just Dead Code
+The resolution class in `CapabilityResolutionService.ts` is obsolete, but its exported interfaces (`AllCapabilitiesState`, `CommerceState`, `FulfillmentState`, etc.) are still imported by `UnifiedCapabilityService.ts`, hooks, and pages. **Do not delete the file** until all types have been extracted to a dedicated types module.
+
+### 5. Two-Tier Cache, Not Redis
+The backend resolver uses a **60-second in-memory LRU cache** (per worker). A Redis layer was never added. The frontend `PublicApiSingleton` adds a second **15-minute cache** at the `UnifiedCapabilityService` level. In practice this means:
+- First storefront hit: ~1.8s (backend cache miss, does single DB round-trip)
+- Subsequent hits for 15 min: served from frontend singleton cache (zero network)
+- After frontend TTL: one lightweight HTTP round-trip served from backend memory cache (<20ms)
+
+### 6. Subscription Metadata Stays Separate
+The unified endpoint intentionally does **not** include subscription status, trial dates, or grace periods. `/api/tenants/:tenantId/tier/public` remains the canonical source for that data. This is by design — subscription lifecycle and capability resolution are separate concerns.
+
+### 7. Cross-Context Coupling: `TenantPaymentProvider`
+Commerce and payment gateway state flow into `TenantPaymentProvider` via `initialCommerceSettings` and `initialPaymentGatewaySettings`. When migrating from legacy `CommerceSettings` / `PaymentGatewaySettings` shapes to unified `CommerceState` / `PaymentGatewayState`, the provider's prop types must be updated to accept the unified shape (e.g. `enabled` at top level, not just `gateway_enabled`).
+
+### 8. Featured Options Need Merchant Preferences for Client-Side Filtering
+The unified `FeaturedOptionsState` includes `merchantPreferences` with per-type toggles (`featured_store_selection`, `featured_sale`, etc.). Directory and product pages use these toggles to filter featured products client-side after fetching them from the catalog API. The unified endpoint does not pre-filter products — it only surfaces the gate flags.
+
+### 9. Frontend Fallback Logic Still Exists
+Some computed fields have fallback logic in the frontend mapper that the backend resolver doesn't replicate:
+- `CommerceState.checkoutMode`: frontend `mapCommerce` derives a default `{ mode }` object from `effective_payment_type` when the backend doesn't send an explicit `checkout_mode`.
+Keep these mappers minimal — they should be mapping, not resolving.
+
+### 10. Cache Invalidation Already Wired
+All existing settings PUT handlers (commerce, payment gateway, fulfillment, product options, featured options, storefront options, FAQ, CRM, barcode scan, integration, quickstart) already call `invalidateEffectiveCapabilities(tenantId)` after a successful Prisma update. No additional backend wiring is needed for new capability domains as long as the pattern is followed.
 
 ## Success Metrics
 

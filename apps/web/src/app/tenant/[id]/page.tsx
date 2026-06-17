@@ -40,10 +40,7 @@ import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
-import { type ProductOptionFlags } from '@/services/CapabilityResolutionService';
-import { publicCommerceSettingsService, CommerceSettings } from '@/services/PublicCommerceSettingsService';
-import { publicPaymentGatewaySettingsService, PaymentGatewaySettings } from '@/services/PublicPaymentGatewaySettingsService';
-import { publicStorefrontTypeService, StorefrontTypeResponse } from '@/services/PublicStorefrontTypeService';
+import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState } from '@/services/CapabilityResolutionService';
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
@@ -433,28 +430,28 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch storefront option flags:', e);
     }
 
-    // Fetch commerce settings (merchant gate) — server-side to eliminate client waterfall
-    let commerceSettings: CommerceSettings | null = null;
+    // Fetch commerce state from unified capability service
+    let commerceSettings: CommerceState | null = null;
     try {
-      commerceSettings = await publicCommerceSettingsService.getCommerceSettings(idResolvedBySlug);
+      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch commerce settings:', e);
+      console.error('Failed to fetch commerce state:', e);
     }
 
-    // Fetch payment gateway settings (merchant gate) — server-side to eliminate client waterfall
-    let paymentGatewaySettings: PaymentGatewaySettings | null = null;
+    // Fetch payment gateway state from unified capability service
+    let paymentGatewaySettings: PaymentGatewayState | null = null;
     try {
-      paymentGatewaySettings = await publicPaymentGatewaySettingsService.getPaymentGatewaySettings(idResolvedBySlug);
+      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch payment gateway settings:', e);
+      console.error('Failed to fetch payment gateway state:', e);
     }
 
-    // Fetch storefront type settings (merchant gate) — server-side to eliminate client waterfall
-    let storefrontTypeSettings: StorefrontTypeResponse | null = null;
+    // Fetch storefront type state from unified capability service
+    let storefrontTypeSettings: StorefrontState | null = null;
     try {
-      storefrontTypeSettings = await publicStorefrontTypeService.getStorefrontTypeSettings(idResolvedBySlug);
+      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch storefront type settings:', e);
+      console.error('Failed to fetch storefront type state:', e);
     }
 
     // Fetch FAQ option flags server-side (no client waterfall)

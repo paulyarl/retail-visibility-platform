@@ -32,13 +32,12 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
-import { StorefrontOptionFlags, type ProductOptionFlags } from '@/services/CapabilityResolutionService';
+import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
-import { publicFeaturedOptionsService, FeaturedOptionsSettings } from '@/services/PublicFeaturedOptionsService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
 
@@ -187,24 +186,26 @@ async function getFeaturedProductsByType(tenantId: string): Promise<{ counts: Re
 // Merchant gate helpers: filter by merchant preferences before passing to components
 function filterTypesByMerchantPreferences(
   types: string[],
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): string[] {
+  const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return [];
   return types.filter(type => {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     return prefs[key] === true;
   });
 }
 
 function filterBucketCountsByMerchantPreferences(
   counts: Record<string, number> | undefined,
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): Record<string, number> | undefined {
+  const prefs = state?.merchantPreferences;
   if (!counts) return undefined;
   if (!prefs || !prefs.featured_enabled) return {};
   const filtered: Record<string, number> = {};
   for (const [type, count] of Object.entries(counts)) {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     if (prefs[key] === true) {
       filtered[type] = count;
     }
@@ -214,12 +215,13 @@ function filterBucketCountsByMerchantPreferences(
 
 function filterGroupedProductsByMerchantPreferences(
   grouped: Record<string, any[]>,
-  prefs: FeaturedOptionsSettings | null
+  state: FeaturedOptionsState | null
 ): Record<string, any[]> {
+  const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return {};
   const filtered: Record<string, any[]> = {};
   for (const [type, products] of Object.entries(grouped)) {
-    const key = `featured_${type}` as keyof FeaturedOptionsSettings;
+    const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
     if (prefs[key] === true) {
       filtered[type] = products;
     }
@@ -341,11 +343,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const shopData = await getShopData(product.tenantId);
   const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
 
-  // Fetch merchant preferences and apply merchant gate filtering at page root
-  const featuredPrefs = await publicFeaturedOptionsService.getFeaturedOptionsSettings(product.tenantId);
-  const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredPrefs);
-  const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredPrefs);
-  const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredPrefs);
+  // Fetch featured options state and apply merchant gate filtering at page root
+  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId);
+  const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredState);
+  const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredState);
+  const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredState);
   // const tenantProfile2 = await getTenantProfile(product.tenantId);
   const tenantProfile = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);

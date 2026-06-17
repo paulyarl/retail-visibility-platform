@@ -274,7 +274,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Commerce — expand group labels into individual features like Featured Options
   const c = caps.commerce;
-  if (Object.keys(c.features).length > 0) {
+  if (c.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     // Expand payment type group into constituent features
@@ -318,7 +318,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Payment Gateway
   const pg = caps.paymentGateway;
-  if (Object.keys(pg.features).length > 0) {
+  if (pg.enabled) {
     const pgStatuses: FeatureItem[] = pg.allowedGateways.map(g => ({
       label: GATEWAY_LABELS[g] || g,
       status: pg.effectiveGateways.includes(g) ? 'enabled' : 'merchant-gated',
@@ -338,7 +338,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Storefront — expand group labels into individual features like Featured Options
   const sf = caps.storefront;
-  if (Object.keys(sf.features).length > 0) {
+  if (sf.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     const tierTypes = sf.allowedTypes.length > 0 ? sf.allowedTypes : (sf.type !== 'none' ? [sf.type] : []);
@@ -366,7 +366,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Barcode
   const bc = caps.barcodeScan;
-  if (Object.keys(bc.features).length > 0) {
+  if (bc.enabled) {
     const bcStatuses: FeatureItem[] = bc.allowedModes.filter(m => m !== 'none').map(m => ({
       label: BARCODE_MODE_LABELS[m] || m,
       status: bc.effectiveModes.includes(m) ? 'enabled' : 'merchant-gated',
@@ -386,7 +386,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Fulfillment
   const fl = caps.fulfillment;
-  if (Object.keys(fl.features).length > 0) {
+  if (fl.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     const addFl = (tier: boolean, label: string, eff: boolean) => {
@@ -411,7 +411,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Product Options
   const po = caps.productOptions;
-  if (Object.keys(po.features).length > 0) {
+  if (po.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     po.allowedTypes.forEach(t => {
@@ -458,7 +458,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Featured Options
   const fo = caps.featuredOptions;
-  if (Object.keys(fo.features).length > 0) {
+  if (fo.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     fo.allowedTenantTypes.forEach(t => {
@@ -486,7 +486,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Integration Options — list individual types grouped by POS/Google like Featured Options groups
   const io = caps.integrationOptions;
-  if (Object.keys(io.features).length > 0) {
+  if (io.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     io.allowedPosTypes.forEach(t => {
@@ -517,7 +517,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // FAQ Options
   const faq = caps.faqOptions;
-  if (Object.keys(faq.features).length > 0) {
+  if (faq.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     const addFaq = (label: string, enabled: boolean) => {
@@ -545,7 +545,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Storefront Options — list groups and features
   const so = caps.storefrontOptions;
-  if (Object.keys(so.features).length > 0) {
+  if (so.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
@@ -577,7 +577,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // Quickstart Options — list product, category, and AI types
   const qo = caps.quickstartOptions;
-  if (Object.keys(qo.features).length > 0) {
+  if (qo.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     qo.allowedProductTypes.forEach(t => {
@@ -619,7 +619,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
 
   // CRM Options
   const crm = caps.crmOptions;
-  if (Object.keys(crm.features).length > 0) {
+  if (crm.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     if (crm.allowedInquiryTypes.length > 0) {

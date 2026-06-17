@@ -78,7 +78,7 @@ await prisma.features_list.create({
 - **snake_case**: `product_opt_qr_codes`, not `productOptQrCodes`
 - **Key = noun / state = boolean**: key name describes what the feature is; the consuming code resolves it to an `enabled` boolean.
 
-## Post-Insert Checklist
+## Post-Insert Checklist (Unified Resolver Architecture)
 
 After adding to `features_list`, the feature is **not automatically available to any tier or merchant**. You must wire it up:
 
@@ -96,18 +96,14 @@ After adding to `features_list`, the feature is **not automatically available to
    ```sql
    INSERT INTO tier_features_list (tier_id, feature_key, capability_type_id, is_enabled)
    VALUES (
-     (SELECT id FROM subscription_tiers_list WHERE tier_key = 'discovery'),
+     (SELECT id FROM subscription_tiers_list WHERE key = 'discovery'),
      'product_opt_recently_viewed',
      (SELECT id FROM capability_type_list WHERE key = 'product_options'),
      true
    );
    ```
 
-3. **Update the backend `*OptionsService`** to resolve the new feature key into a state flag.
-
-4. **Update the frontend `CapabilityResolutionService`** to expose the new flag to React components.
-
-5. **Add a merchant gate table column** if the feature is tenant-configurable:
+3. **Add a merchant gate table column** if the feature is tenant-configurable:
    ```sql
    ALTER TABLE tenant_product_options_settings
      ADD COLUMN IF NOT EXISTS product_opt_<feature> boolean DEFAULT true;
@@ -118,7 +114,30 @@ After adding to `features_list`, the feature is **not automatically available to
    ```
    (For storefront features, use `tenant_storefront_options_settings` and prefix with `qr_`, `storefront_`, etc.)
 
-6. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
+4. **Update the backend resolver** in `apps/api/src/services/resolvers/{Domain}Resolver.ts`:
+   - Map the new feature key to an `allowed_*` array or boolean in the resolver output.
+   - If merchant-configurable, read the new column from `merchantBundle.{domain}` and apply it to compute `effective_*` values.
+   - **Choice-based config (layouts, types, modes):** compute an `effective_*` single value from `allowed_*` ∩ `merchant_prefs.*` with fallback. Do not expose raw merchant preference as the resolved value.
+   - **Non-boolean config (fees, timings, limits):** selectively add the needed scalar fields to the resolver output. Do not dump the entire raw merchant settings blob.
+
+5. **Wire into the orchestrator** in `apps/api/src/services/EffectiveCapabilityResolver.ts`:
+   - Ensure `fetchMerchantSettings()` fetches the correct settings table (already covered if you used an existing table).
+   - Add the new resolver to the `Promise.all` dispatch block if it is a new domain.
+   - Include the resolved state in the final `EffectiveCapabilities` return object.
+
+6. **Add cache invalidation** in the settings PUT handler for the domain:
+   ```ts
+   import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+   // after successful prisma update:
+   invalidateEffectiveCapabilities(tenantId);
+   ```
+
+7. **Update the frontend mapper** in `apps/web/src/services/UnifiedCapabilityService.ts`:
+   - Add the new field to the `BackendEffective{Domain}` interface.
+   - Map it in the `map{Domain}` function.
+   - If a new domain entirely, add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` (types only) and `mapAll` in `UnifiedCapabilityService.ts`.
+
+8. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
 
 ## Verification Queries
 
@@ -142,8 +161,51 @@ JOIN features_list fl ON fl.id = cfl.feature_id
 WHERE fl.key = '<feature_key>';
 ```
 
+## Verification (Unified Endpoint)
+
+After completing the checklist, confirm the resolved state is available from the single source of truth:
+
+```bash
+# Public endpoint (no auth)
+curl -s "http://localhost:3001/api/tenants/<tenantId>/effective-capabilities" \
+  | jq '.data.effective.<domain>.<new_field>'
+
+# Example: verify a new product option
+curl -s "http://localhost:3001/api/tenants/tid-xxx/effective-capabilities" \
+  | jq '.data.effective.product_options.recently_viewed_enabled'
+
+# Full detail (includes merchant preferences)
+curl -s "http://localhost:3001/api/tenants/<tenantId>/effective-capabilities?detail=full" \
+  | jq '.data.gates.tier_hard.<domain>'
+```
+
+Also run type checks:
+```bash
+pnpm checkapi   # backend types
+pnpm checkweb   # frontend types
+```
+
+## Unified Architecture Notes
+
+### The `effective_*` Single-Value Pattern
+For choice-based features (layouts, storefront types, payment modes), the backend resolver must compute a single resolved value, not just expose `allowed_*` and raw merchant preference separately:
+
+- `allowed_layouts: ['classic', 'immersive']` (tier hard gate)
+- `merchant_prefs.storefront_layout: 'immersive'` (merchant choice)
+- **Output:** `effective_layout: 'immersive'` (computed by resolver)
+
+The frontend `UnifiedCapabilityService` maps `effective_layout` directly into `StorefrontOptionsState.effectiveLayout`. No client-side logic.
+
+### Avoid Raw Settings Dumps
+Do not return the entire raw `merchant_preferences` blob in the effective state. It bloats the payload and leaks internal schema. Expose only the scalar values the frontend actually needs (e.g. `delivery_fee_cents`, `pickup_ready_time_minutes`). Boolean toggles are readable from `merchantPreferences` on the effective state object.
+
+### Feature-Map Guards Are Obsolete
+After unification, `features` on every state object is always `{}` (legacy compatibility). Do not guard UI rendering with `Object.keys(X.features).length > 0`. Use `X.enabled` instead.
+
 ## Common Pitfalls
 
 - **Do not assume `category` is required** — the schema allows `NULL` and the Admin UI does not send it.
 - **Do not forget tier_features_list** — a feature in `features_list` alone is invisible to tenants until a tier row enables it.
-- **Do not forget the frontend resolver** — the feature may be enabled in the DB but still unavailable to React if `CapabilityResolutionService` doesn't map the key.
+- **Do not forget the backend resolver** — the feature may be enabled in the DB but still unavailable to the frontend if the domain resolver in `apps/api/src/services/resolvers/` doesn't map the key into `allowed_*` / `effective_*`.
+- **Do not forget cache invalidation** — after adding a merchant gate column and its settings PUT handler, ensure the handler calls `invalidateEffectiveCapabilities(tenantId)` or the unified endpoint will serve stale data for up to 60 seconds.
+- **Do not duplicate resolution logic in the frontend** — `CapabilityResolutionService.ts` is obsolete. All resolution belongs in the backend resolver. The frontend `UnifiedCapabilityService` only maps.

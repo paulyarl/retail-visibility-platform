@@ -629,6 +629,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
 class UnifiedCapabilityService extends PublicApiSingleton {
   private static instance: UnifiedCapabilityService;
   private capCache = new Map<string, { data: AllCapabilitiesState; expiry: number }>();
+  private inFlight = new Map<string, Promise<BackendEffectiveCapabilities | null>>();
   private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
   private constructor() {
@@ -654,22 +655,38 @@ class UnifiedCapabilityService extends PublicApiSingleton {
   }
 
   private async fetchEffective(tenantId: string): Promise<BackendEffectiveCapabilities | null> {
-    try {
-      const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
-        `/api/tenants/${tenantId}/effective-capabilities`,
-        {},
-        `unified-caps-${tenantId}`,
-        this.CACHE_TTL
-      );
-      if (!result.success) {
-        console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
-        return null;
-      }
-      return result.data?.data || null;
-    } catch (error) {
-      console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
-      return null;
+    const cachekey = `unified-caps-${tenantId}`;
+
+    // Deduplicate concurrent in-flight requests for the same tenant
+    if (this.inFlight.has(cachekey)) {
+      return this.inFlight.get(cachekey)!;
     }
+
+    const promise = (async (): Promise<BackendEffectiveCapabilities | null> => {
+      try {
+        const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
+        console.log(`[UnifiedCapabilityService] Fetching capabilities for tenant ${tenantId} with cache key ${cachekey}`);
+        const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
+          endpoint,
+          {},
+          cachekey,
+          this.CACHE_TTL
+        );
+        if (!result.success) {
+          console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+          return null;
+        }
+        return result.data?.data || null;
+      } catch (error) {
+        console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
+        return null;
+      } finally {
+        this.inFlight.delete(cachekey);
+      }
+    })();
+
+    this.inFlight.set(cachekey, promise);
+    return promise;
   }
 
   async getAllCapabilities(tenantId: string): Promise<AllCapabilitiesState> {
