@@ -15,7 +15,6 @@ import LastViewed from '@/components/directory/LastViewed';
 // import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
-import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoWrapper from '@/components/products/ProductBusinessInfoWrapper';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
@@ -682,6 +681,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
+                productOptFlags={productOptFlags}
               />
             </TenantPaymentProvider>
           </div>
@@ -911,8 +911,29 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         {/* Business Description - Merchant Branding - Full Width */}
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
 
-          {/* Business Information - Contact Us - Full Width */}
+          {/* Featured Type Products - Full Width */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <FeaturedTypeProducts
+              currentProductId={product.id}
+              tenantId={product.tenantId}
+              featuredTypes={merchantFilteredFeaturedTypes}
+              groupedProducts={merchantFilteredGroupedProducts}
+              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
+            />
+          </div>
 
+          {/* Available Nearby - Cross-Tenant Product Discovery */}
+          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+              <AvailableNearby
+                productSlug={product.productSlug}
+                currentTenantId={product.tenantId}
+                className="w-full max-w-md mx-auto"
+              />
+            </div>
+          )}
+
+          {/* Business Information - Contact Us - Full Width */}
           {product.productType != 'digital' ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <ProductBusinessInfoWrapper
@@ -943,29 +964,6 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
                 Download link will be available after successful checkout.
               </p>
-            </div>
-          )}
-
-          {/* Featured Type Products - Full Width */}
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <FeaturedTypeProducts
-              currentProductId={product.id}
-              tenantId={product.tenantId}
-              featuredTypes={merchantFilteredFeaturedTypes}
-              groupedProducts={merchantFilteredGroupedProducts}
-              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
-            />
-          </div>
-
-          {/* Available Nearby - Cross-Tenant Product Discovery */}
-          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-              <AvailableNearby
-                productSlug={product.productSlug}
-                currentTenantId={product.tenantId}
-                className="w-full max-w-md mx-auto"
-              />
             </div>
           )}
 
@@ -1030,7 +1028,18 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
 
         </ProductPageStatusWrapper>
 
-        {/* Storefront Footer */}
+        {/* Recently Viewed Products */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {productOptFlags?.showsRecentlyViewed !== false && <LastViewed
+            title="Recently Viewed Products"
+            entityType="product"
+            limit={4}
+            showEmptyState={false}
+            currentProductId={product.id}
+          />}
+        </div>
+
+        {/* Storefront Footer (includes platform branding) */}
         <StorefrontFooter
           tenantId={product.tenantId}
           businessName={tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
@@ -1042,7 +1051,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           tenantSlug={product.tenant?.slug || ''}
           isRetailStore={tenantProfile?.metadata?.store_type !== 'online'}
           contactInfo={{
-            address: tenantProfile?.profileData?.address_line1 || null,
+            address: tenantProfile?.profileData
+              ? [
+                  tenantProfile.profileData.address_line1,
+                  tenantProfile.profileData.city,
+                  tenantProfile.profileData.state,
+                  tenantProfile.profileData.postal_code,
+                ].filter(Boolean).join(', ') || null
+              : null,
             phone: tenantProfile?.profileData?.phone_number || null,
             email: tenantProfile?.profileData?.email || null,
             website: tenantProfile?.profileData?.website || null,
@@ -1063,20 +1079,6 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           currentUrl={currentUrl}
           variant={productLayout === 'quick-commerce' ? 'compact' : 'full'}
         />
-
-        {/* Recently Viewed Products */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {productOptFlags?.showsRecentlyViewed !== false && <LastViewed
-            title="Recently Viewed Products"
-            entityType="product"
-            limit={4}
-            showEmptyState={false}
-            currentProductId={product.id}
-          />}
-        </div>
-
-        {/* Platform Branding Footer */}
-        <PoweredByFooter />
       </ProductLikeProvider>
     </>
   );
