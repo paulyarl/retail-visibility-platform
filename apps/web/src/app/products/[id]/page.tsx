@@ -32,7 +32,7 @@ import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdo
 import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
-import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState } from '@/services/CapabilityResolutionService';
+import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState, type FeaturedType } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
@@ -190,9 +190,10 @@ function filterTypesByMerchantPreferences(
 ): string[] {
   const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return [];
+  const effectiveSet = new Set(state?.effectiveTypes || []);
   return types.filter(type => {
     const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
-    return prefs[key] === true;
+    return prefs[key] === true && effectiveSet.has(type as FeaturedType);
   });
 }
 
@@ -203,10 +204,11 @@ function filterBucketCountsByMerchantPreferences(
   const prefs = state?.merchantPreferences;
   if (!counts) return undefined;
   if (!prefs || !prefs.featured_enabled) return {};
+  const effectiveSet = new Set(state?.effectiveTypes || []);
   const filtered: Record<string, number> = {};
   for (const [type, count] of Object.entries(counts)) {
     const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
-    if (prefs[key] === true) {
+    if (prefs[key] === true && effectiveSet.has(type as FeaturedType)) {
       filtered[type] = count;
     }
   }
@@ -219,10 +221,11 @@ function filterGroupedProductsByMerchantPreferences(
 ): Record<string, any[]> {
   const prefs = state?.merchantPreferences;
   if (!prefs || !prefs.featured_enabled) return {};
+  const effectiveSet = new Set(state?.effectiveTypes || []);
   const filtered: Record<string, any[]> = {};
   for (const [type, products] of Object.entries(grouped)) {
     const key = `featured_${type}` as keyof FeaturedOptionsState['merchantPreferences'];
-    if (prefs[key] === true) {
+    if (prefs[key] === true && effectiveSet.has(type as FeaturedType)) {
       filtered[type] = products;
     }
   }

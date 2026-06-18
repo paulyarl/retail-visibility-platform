@@ -18,7 +18,6 @@ export function resolveQuickstartOptions(
   merchantPrefs: QuickstartOptionsMerchantSettings | null
 ): EffectiveQuickstart {
   const enabled = !!features.quickstart_enabled;
-  const disabled = !!features.quickstart_disabled;
   const flexible = !!features.quickstart_flexible;
 
   const productEnabled = flexible || !!features.quickstart_product_enabled;
@@ -64,26 +63,26 @@ export function resolveQuickstartOptions(
     default_image_quality: merchantPrefs?.default_image_quality || 'standard',
   };
 
-  const canUseWizard = enabled && !disabled && allowedProductTypes.includes('wizard') && prefs.quickstart_wizard;
-  const canGenerateImages = enabled && !disabled && allowedProductTypes.includes('image_gen') && prefs.quickstart_image_gen;
+  const canUseWizard = enabled && allowedProductTypes.includes('wizard') && prefs.quickstart_wizard;
+  const canGenerateImages = enabled && allowedProductTypes.includes('image_gen') && prefs.quickstart_image_gen;
   const canUseAIWizard = canUseWizard && allowedAITypes.includes('wizard_ai') && prefs.quickstart_wizard_ai;
 
   return {
-    enabled: enabled && !disabled,
+    enabled: enabled,
     is_flexible: flexible,
-    product_enabled: enabled && !disabled && productEnabled,
+    product_enabled: enabled && productEnabled,
     allowed_product_types: allowedProductTypes,
-    category_enabled: enabled && !disabled && categoryEnabled,
+    category_enabled: enabled && categoryEnabled,
     allowed_category_types: allowedCategoryTypes,
-    ai_enabled: enabled && !disabled && aiEnabled,
+    ai_enabled: enabled && aiEnabled,
     allowed_ai_types: allowedAITypes,
     can_use_wizard: canUseWizard,
     can_use_ai_wizard: canUseAIWizard,
-    can_use_category_generator: enabled && !disabled && allowedCategoryTypes.includes('category_generator') && prefs.quickstart_category_generator,
+    can_use_category_generator: enabled && allowedCategoryTypes.includes('category_generator') && prefs.quickstart_category_generator,
     can_generate_images: canGenerateImages,
-    can_use_openai: enabled && !disabled && allowedAITypes.includes('ai_openai') && prefs.quickstart_ai_openai,
-    can_use_gemini: enabled && !disabled && allowedAITypes.includes('ai_gemini') && prefs.quickstart_ai_gemini,
-    can_use_hd_images: enabled && !disabled && allowedAITypes.includes('image_hd') && prefs.quickstart_image_hd,
+    can_use_openai: enabled && allowedAITypes.includes('ai_openai') && prefs.quickstart_ai_openai,
+    can_use_gemini: enabled && allowedAITypes.includes('ai_gemini') && prefs.quickstart_ai_gemini,
+    can_use_hd_images: enabled && allowedAITypes.includes('image_hd') && prefs.quickstart_image_hd,
     merchant_preferences: prefs,
   };
 }

@@ -30,6 +30,7 @@ import {
   FaqPreviewType,
   FaqDisplayType,
   FaqKnowledgeBaseType,
+  DirectoryEntryLayoutKey,
 } from '@/services/CapabilityResolutionService';
 import { getFeaturedTypeMeta } from '@/utils/featuredOptions';
 
@@ -226,6 +227,13 @@ const FAQ_KB_LABELS: Record<FaqKnowledgeBaseType, string> = {
   faq_kb_coverage_metrics: 'Coverage',
 };
 
+const DIRECTORY_ENTRY_LAYOUT_LABELS: Record<DirectoryEntryLayoutKey, string> = {
+  classic: 'Classic Layout',
+  editorial: 'Editorial Layout',
+  immersive: 'Immersive Layout',
+  premium: 'Premium Layout',
+};
+
 // --- Capability display config ---
 
 const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settingsPath?: string }> = {
@@ -241,6 +249,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
+  directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -614,6 +623,41 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'quickstart_options',
       settingsPath: CAPABILITY_DISPLAY.quickstart_options.settingsPath ?? null,
+    });
+  }
+
+  // Directory Entry
+  const de = caps.directoryEntryOptions;
+  if (de.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    de.allowedLayouts.forEach(t => {
+      const label = DIRECTORY_ENTRY_LAYOUT_LABELS[t];
+      if (label) {
+        specifics.push(label);
+        statuses.push({ label, status: de.effectiveLayout === t ? 'enabled' : 'merchant-gated' });
+      }
+    });
+    const addDe = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    addDe('Hours', de.hoursEnabled, de.hoursEnabled);
+    addDe('Map', de.mapEnabled, de.mapEnabled);
+    addDe('Contact', de.contactEnabled, de.contactEnabled);
+    addDe('Gallery', de.galleryEnabled, de.galleryEnabled);
+    addDe('QR', de.qrEnabled, de.qrEnabled);
+    addDe('Social', de.socialEnabled, de.socialEnabled);
+    addDe('SEO', de.seoEnabled, de.seoEnabled);
+    summaries.push({
+      key: 'directory_entry',
+      label: CAPABILITY_DISPLAY.directory_entry.label,
+      icon: CAPABILITY_DISPLAY.directory_entry.icon,
+      enabled: de.enabled,
+      merchantGated: merchantGates?.['directory_entry'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'directory_entry',
+      settingsPath: CAPABILITY_DISPLAY.directory_entry.settingsPath ?? null,
     });
   }
 

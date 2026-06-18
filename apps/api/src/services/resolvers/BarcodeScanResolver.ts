@@ -17,7 +17,6 @@ export function resolveBarcodeScan(
 ): EffectiveBarcodeScan {
   const enabled = !!features.barcode_enabled;
   const flexible = !!features.barcode_flexible;
-  const disabled = !!features.barcode_disabled;
 
   const allowedModes: BarcodeScanMode[] = [];
   if (features.barcode_scan) allowedModes.push('scan');
@@ -49,12 +48,12 @@ export function resolveBarcodeScan(
   });
 
   return {
-    enabled: enabled && !disabled,
-    allowed_modes: disabled ? [] : uniqueModes,
-    effective_modes: disabled ? [] : effectiveModes,
+    enabled,
+    allowed_modes: uniqueModes,
+    effective_modes: effectiveModes,
     is_flexible: flexible,
-    scan_available: enabled && !disabled && uniqueModes.length > 0,
-    effective_scan_available: enabled && !disabled && effectiveModes.length > 0,
+    scan_available: enabled && uniqueModes.length > 0,
+    effective_scan_available: enabled && effectiveModes.length > 0,
     merchant_preferences: prefs,
   };
 }

@@ -5,6 +5,7 @@
  */
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { unifiedCapabilityService } from '../UnifiedCapabilityService';
 import type {
   CrmTenantCrmStats, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
   CrmTicket, CreateTicketInput, UpdateTicketInput,
@@ -302,6 +303,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
     await this.invalidateCache(`crm-options-${tenantId}`);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
     return result.data.settings;
   }
 }

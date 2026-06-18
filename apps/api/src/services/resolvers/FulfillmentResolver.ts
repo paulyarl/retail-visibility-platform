@@ -14,7 +14,6 @@ export function resolveFulfillment(
   merchantPrefs: FulfillmentMerchantSettings | null
 ): EffectiveFulfillment {
   const enabled = !!features.fulfillment_enabled;
-  const disabled = !!features.fulfillment_disabled;
   const flexible = !!features.fulfillment_flexible;
   const pickup = !!features.fulfillment_pickup;
   const delivery = !!features.fulfillment_delivery;
@@ -33,7 +32,7 @@ export function resolveFulfillment(
   };
 
   return {
-    enabled: enabled && !disabled,
+    enabled,
     shows_pickup: showsPickup,
     shows_delivery: showsDelivery,
     shows_shipping: showsShipping,

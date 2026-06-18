@@ -124,9 +124,11 @@ describe('ProductOptionsResolver', () => {
 });
 
 describe('FeaturedOptionsResolver', () => {
-  it('returns disabled when tier has no featured features', () => {
+  it('returns enabled and all types when tier has no featured config (fail-open)', () => {
     const result = resolveFeaturedOptions({}, null);
-    expect(result.enabled).toBe(false);
+    expect(result.enabled).toBe(true);
+    expect(result.allowed_types).toContain('store_selection');
+    expect(result.allowed_types).toContain('bestseller');
   });
 
   it('exposes tenant types when tier allows them', () => {

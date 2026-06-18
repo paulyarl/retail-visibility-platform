@@ -3330,7 +3330,7 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
 
     // Get merchant preferences
     const settings = await prisma.tenant_storefront_options_settings.findUnique({
-      where: { tenant_id: tenantId },
+      where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'storefront' } },
     });
 
     const prefs = settings || DEFAULT_SETTINGS;

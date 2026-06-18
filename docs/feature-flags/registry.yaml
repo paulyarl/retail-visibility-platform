@@ -125,7 +125,87 @@ flags:
     metrics:
       - map_card_view_rate
       - privacy_mode_toggle_rate
-    documentation: /docs/features/map-card.md
+
+  # Directory Entry Layout System
+  - key: FF_DIRECTORY_ENTRY_LAYOUT
+    owner: ux_team
+    created: 2026-06-17
+    expires: 2026-12-17
+    status: active
+    default: true
+    pilot: true
+    production: true
+    description: "Enables switchable directory entry page layouts (classic, editorial, immersive, premium)"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies: []
+    metrics:
+      - layout_switch_rate
+      - layout_preview_usage
+    documentation: /docs/features/directory-entry-layout.md
+
+  - key: FF_DIRECTORY_ENTRY_LAYOUT_EDITORIAL
+    owner: ux_team
+    created: 2026-06-17
+    expires: 2026-12-17
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables editorial layout variant for directory entry pages"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies:
+      - FF_DIRECTORY_ENTRY_LAYOUT
+    metrics:
+      - editorial_layout_adoption
+    documentation: /docs/features/directory-entry-layout.md
+
+  - key: FF_DIRECTORY_ENTRY_LAYOUT_IMMERSIVE
+    owner: ux_team
+    created: 2026-06-17
+    expires: 2026-12-17
+    status: active
+    default: false
+    pilot: true
+    production: true
+    description: "Enables immersive layout variant for directory entry pages"
+    rollout_percentage: 100
+    environments:
+      staging: true
+      pilot: true
+      production: true
+    dependencies:
+      - FF_DIRECTORY_ENTRY_LAYOUT
+    metrics:
+      - immersive_layout_adoption
+    documentation: /docs/features/directory-entry-layout.md
+
+  - key: FF_DIRECTORY_ENTRY_LAYOUT_PREMIUM
+    owner: ux_team
+    created: 2026-06-17
+    expires: 2026-12-17
+    status: active
+    default: false
+    pilot: false
+    production: false
+    description: "Enables premium layout variant for directory entry pages (hard-gated)"
+    rollout_percentage: 0
+    environments:
+      staging: true
+      pilot: false
+      production: false
+    dependencies:
+      - FF_DIRECTORY_ENTRY_LAYOUT
+    metrics:
+      - premium_layout_request_rate
+    documentation: /docs/features/directory-entry-layout.md
   
   # SWIS Preview
   - key: FF_SWIS_PREVIEW

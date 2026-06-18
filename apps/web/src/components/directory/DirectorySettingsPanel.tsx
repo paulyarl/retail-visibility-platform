@@ -7,6 +7,9 @@ import DirectoryListingPreview from './DirectoryListingPreview';
 import DirectoryStatusBadge from './DirectoryStatusBadge';
 import DirectoryPhotoGallery from './DirectoryPhotoGallery';
 import { Button } from '@mantine/core';
+import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
+import type { DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -22,6 +25,10 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   const [keywordInput, setKeywordInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [directoryEntryLayout, setDirectoryEntryLayout] = useState<DirectoryEntryLayoutKey>('classic');
+  const [allowedLayouts, setAllowedLayouts] = useState<DirectoryEntryLayoutKey[]>(['classic']);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  const [layoutSaveMessage, setLayoutSaveMessage] = useState('');
 
   // Sync form state with listing data
   useEffect(() => {
@@ -32,6 +39,23 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       setSecondaryCategories(listing.secondaryCategories || []);
     }
   }, [listing]);
+
+  // Fetch directory entry options for layout gating
+  useEffect(() => {
+    if (!tenantId) return;
+    unifiedCapabilityService.getDirectoryEntryOptionsState(tenantId)
+      .then((opts) => {
+        if (opts?.effectiveLayout) {
+          setDirectoryEntryLayout(opts.effectiveLayout);
+        }
+        if (opts?.allowedLayouts?.length) {
+          setAllowedLayouts(opts.allowedLayouts);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching directory entry options:', err);
+      });
+  }, [tenantId]);
 
   const handleSave = async () => {
     try {
@@ -122,6 +146,24 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     }
   };
 
+  const handleSaveLayout = async () => {
+    try {
+      setLayoutSaving(true);
+      setLayoutSaveMessage('');
+      
+      await tenantDirectoryManagementService.updateDirectoryEntryOptions(tenantId, {
+        directory_entry_layout: directoryEntryLayout,
+      });
+      
+      setLayoutSaveMessage('Layout saved successfully!');
+      setTimeout(() => setLayoutSaveMessage(''), 3000);
+    } catch (err: any) {
+      setLayoutSaveMessage(err?.message || 'Failed to save layout');
+    } finally {
+      setLayoutSaving(false);
+    }
+  };
+
   const handleAddKeyword = () => {
     const keyword = keywordInput.trim();
     if (keyword && !seoKeywords.includes(keyword) && seoKeywords.length < 10) {
@@ -203,6 +245,58 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               onPrimaryChange={setPrimaryCategory}
               onSecondaryChange={setSecondaryCategories}
             />
+          </div>
+
+          {/* Directory Entry Layout */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Directory Page Layout
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Choose how your directory listing page appears to visitors.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {(['classic', 'editorial', 'immersive', 'premium'] as DirectoryEntryLayoutKey[]).map((layout) => {
+                const isAllowed = allowedLayouts.includes(layout);
+                const isSelected = directoryEntryLayout === layout;
+                const label = layout.charAt(0).toUpperCase() + layout.slice(1);
+                return (
+                  <button
+                    key={layout}
+                    type="button"
+                    disabled={!isAllowed}
+                    onClick={() => setDirectoryEntryLayout(layout)}
+                    className={`p-3 rounded-lg border text-left transition-colors ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                        : isAllowed
+                        ? 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        : 'border-gray-100 dark:border-gray-700 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="block font-medium text-sm">{label}</span>
+                    {!isAllowed && (
+                      <span className="block text-xs text-gray-400 mt-1">Upgrade to unlock</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handleSaveLayout}
+                disabled={layoutSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {layoutSaving ? 'Saving...' : 'Save Layout'}
+              </button>
+              {layoutSaveMessage && (
+                <span className={`text-sm ${layoutSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                  {layoutSaveMessage}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* SEO Description */}

@@ -24,6 +24,7 @@ import {
   resolveIntegrationOptions,
   resolveQuickstartOptions,
   resolveStorefrontOptions,
+  resolveDirectoryEntryOptions,
   resolveFaqOptions,
   resolveCrmOptions,
 } from './resolvers';
@@ -156,6 +157,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.storefront_options?.features || {},
       merchantBundle.storefrontOptions
     ),
+    resolveDirectoryEntryOptions(
+      rawCaps.capabilities.storefront_options?.features || {},
+      merchantBundle.directoryEntry
+    ),
     resolveFaqOptions(
       rawCaps.capabilities.faq_options?.features || {}
     ),
@@ -179,8 +184,9 @@ export async function resolveEffectiveCapabilities(
       integrations: effective[7],
       quickstart: effective[8],
       storefront_options: effective[9],
-      faq: effective[10],
-      crm: effective[11],
+      directory_entry: effective[10],
+      faq: effective[11],
+      crm: effective[12],
     },
     uncategorized_features: rawCaps.uncategorized_features,
   };
@@ -320,6 +326,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     integrationOptions,
     quickstartOptions,
     storefrontOptions,
+    directoryEntry,
     faqOptions,
     crmOptions,
     barcodeScan,
@@ -332,7 +339,8 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_featured_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_integration_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_quickstart_options_settings.findUnique({ where: { tenant_id: tenantId } })),
-    safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'storefront' } } })),
+    safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -348,6 +356,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     integrationOptions: integrationOptions as any,
     quickstartOptions: quickstartOptions as any,
     storefrontOptions: storefrontOptions as any,
+    directoryEntry: directoryEntry as any,
     faqOptions: faqOptions as any,
     crmOptions: crmOptions as any,
     barcodeScan: barcodeScan as any,
