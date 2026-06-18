@@ -743,7 +743,7 @@ class UnifiedCapabilityService extends PublicApiSingleton {
           console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
           return null;
         }
-        console.log(`[UnifiedCapabilityService] Fetching capabilities - ${JSON.stringify(result.data?.data)}`);
+        // console.log(`[UnifiedCapabilityService] Fetching capabilities - ${JSON.stringify(result.data?.data)}`);
         return result.data?.data || null;
       } catch (error) {
         console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
