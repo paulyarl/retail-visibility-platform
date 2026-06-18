@@ -340,6 +340,14 @@ export interface DirectoryEntryOptionsState {
   qrEnabled: boolean;
   socialEnabled: boolean;
   seoEnabled: boolean;
+  // Tier-gated availability (for UI disable states)
+  canShowHours: boolean;
+  canShowMap: boolean;
+  canShowContact: boolean;
+  canShowGallery: boolean;
+  canShowQr: boolean;
+  canShowSocial: boolean;
+  canShowSeo: boolean;
   merchantPreferences: {
     directory_entry_opt_enabled: boolean;
     directory_entry_layout: DirectoryEntryLayoutKey;

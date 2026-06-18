@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { getTierFeatures } from '../services/TierService';
 
 const router = Router();
 
@@ -154,8 +155,16 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
 
     // Enforce tier gate for layout selection
     if (data.directory_entry_layout) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { subscription_tier: true },
+      });
+      const tierKey = tenant?.subscription_tier || 'starter';
+      const tierFeatureKeys = await getTierFeatures(tierKey);
+      const tierFeatures = Object.fromEntries(tierFeatureKeys.map((k) => [k, true]));
+
       const tierState = await resolveDirectoryEntryOptions(
-        {},
+        tierFeatures,
         { storefront_opt_enabled: true, directory_entry_layout: data.directory_entry_layout } as any
       );
       if (!tierState.enabled || !tierState.allowed_layouts.includes(data.directory_entry_layout)) {
