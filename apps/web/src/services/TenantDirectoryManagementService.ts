@@ -297,6 +297,29 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   }
 
   /**
+   * Get directory entry options settings (raw merchant toggles + layout)
+   */
+  async getDirectoryEntryOptions(tenantId: string): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${tenantId}/directory-entry-options`,
+      {},
+      `directory-entry-options-${tenantId}`,
+      this.cacheTTL
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to get directory entry options:', result.error);
+      return null;
+    }
+
+    return result.data?.settings || null;
+  }
+
+  /**
    * Update directory entry options settings (layout, section toggles)
    */
   async updateDirectoryEntryOptions(tenantId: string, options: any): Promise<any> {

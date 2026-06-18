@@ -404,6 +404,14 @@ export interface EffectiveDirectoryEntryOptions {
   qr_enabled: boolean;
   social_enabled: boolean;
   seo_enabled: boolean;
+  // Tier-gated availability (separate from merchant-gated effective state)
+  can_show_hours: boolean;
+  can_show_map: boolean;
+  can_show_contact: boolean;
+  can_show_gallery: boolean;
+  can_show_qr: boolean;
+  can_show_social: boolean;
+  can_show_seo: boolean;
   merchant_preferences: Record<string, any>;
 }
 

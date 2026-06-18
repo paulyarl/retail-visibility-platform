@@ -317,6 +317,13 @@ interface BackendEffectiveDirectoryEntry {
   qr_enabled: boolean;
   social_enabled: boolean;
   seo_enabled: boolean;
+  can_show_hours: boolean;
+  can_show_map: boolean;
+  can_show_contact: boolean;
+  can_show_gallery: boolean;
+  can_show_qr: boolean;
+  can_show_social: boolean;
+  can_show_seo: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -599,6 +606,13 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     qrEnabled: b.qr_enabled,
     socialEnabled: b.social_enabled,
     seoEnabled: b.seo_enabled,
+    canShowHours: b.can_show_hours,
+    canShowMap: b.can_show_map,
+    canShowContact: b.can_show_contact,
+    canShowGallery: b.can_show_gallery,
+    canShowQr: b.can_show_qr,
+    canShowSocial: b.can_show_social,
+    canShowSeo: b.can_show_seo,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };
@@ -729,6 +743,7 @@ class UnifiedCapabilityService extends PublicApiSingleton {
           console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
           return null;
         }
+        console.log(`[UnifiedCapabilityService] Fetching capabilities - ${JSON.stringify(result.data?.data)}`);
         return result.data?.data || null;
       } catch (error) {
         console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);

@@ -10,6 +10,12 @@ import { Button } from '@mantine/core';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import type { DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
+import LayoutPreviewCarousel from './LayoutPreviewCarousel';
+import {
+  DIRECTORY_ENTRY_LAYOUT_META,
+  DIRECTORY_ENTRY_LAYOUT_ORDER,
+  getLayoutPreviewSlides,
+} from '@/utils/directoryEntryLayouts';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -29,6 +35,10 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   const [allowedLayouts, setAllowedLayouts] = useState<DirectoryEntryLayoutKey[]>(['classic']);
   const [layoutSaving, setLayoutSaving] = useState(false);
   const [layoutSaveMessage, setLayoutSaveMessage] = useState('');
+  const [capState, setCapState] = useState<any>(null);
+  const [rawSettings, setRawSettings] = useState<Record<string, any>>({});
+  const [sectionSaving, setSectionSaving] = useState(false);
+  const [sectionSaveMessage, setSectionSaveMessage] = useState('');
 
   // Sync form state with listing data
   useEffect(() => {
@@ -51,10 +61,21 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         if (opts?.allowedLayouts?.length) {
           setAllowedLayouts(opts.allowedLayouts);
         }
+        setCapState(opts);
       })
       .catch((err) => {
         console.error('Error fetching directory entry options:', err);
       });
+  }, [tenantId]);
+
+  // Fetch raw merchant settings for section toggles
+  useEffect(() => {
+    if (!tenantId) return;
+    tenantDirectoryManagementService.getDirectoryEntryOptions(tenantId)
+      .then((settings) => {
+        if (settings) setRawSettings(settings);
+      })
+      .catch((err) => console.error('Error fetching directory entry raw settings:', err));
   }, [tenantId]);
 
   const handleSave = async () => {
@@ -154,6 +175,9 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       await tenantDirectoryManagementService.updateDirectoryEntryOptions(tenantId, {
         directory_entry_layout: directoryEntryLayout,
       });
+
+      // Invalidate frontend capability cache so public endpoints pick up changes
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       
       setLayoutSaveMessage('Layout saved successfully!');
       setTimeout(() => setLayoutSaveMessage(''), 3000);
@@ -174,6 +198,70 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
 
   const handleRemoveKeyword = (keyword: string) => {
     setSeoKeywords(seoKeywords.filter(k => k !== keyword));
+  };
+
+  const toggleRaw = (key: string, value: boolean) => {
+    setRawSettings((prev: any) => ({ ...prev, [key]: value }));
+  };
+
+  const isGalleryOn = !!(rawSettings.image_gallery_5 || rawSettings.image_gallery_10 || rawSettings.image_gallery_15);
+  const isQrOn = !!(rawSettings.qr_product || rawSettings.qr_store || rawSettings.qr_logo || rawSettings.qr_directory);
+
+  const setGallery = (v: boolean) => {
+    setRawSettings((prev: any) => ({
+      ...prev,
+      image_gallery_5: v,
+      image_gallery_10: false,
+      image_gallery_15: false,
+    }));
+  };
+
+  const setQr = (v: boolean) => {
+    setRawSettings((prev: any) => ({
+      ...prev,
+      qr_codes_512: false,
+      qr_codes_1024: v,
+      qr_codes_2048: false,
+      qr_product: v,
+      qr_store: v,
+      qr_logo: false,
+      qr_directory: false,
+    }));
+  };
+
+  const handleSaveSections = async () => {
+    try {
+      setSectionSaving(true);
+      setSectionSaveMessage('');
+
+      await tenantDirectoryManagementService.updateDirectoryEntryOptions(tenantId, {
+        hours_display: rawSettings.hours_display,
+        map_display: rawSettings.map_display,
+        storefront_contact: rawSettings.storefront_contact,
+        storefront_social_media: rawSettings.storefront_social_media,
+        enhanced_seo: rawSettings.enhanced_seo,
+        image_gallery_5: rawSettings.image_gallery_5,
+        image_gallery_10: rawSettings.image_gallery_10,
+        image_gallery_15: rawSettings.image_gallery_15,
+        qr_codes_512: rawSettings.qr_codes_512,
+        qr_codes_1024: rawSettings.qr_codes_1024,
+        qr_codes_2048: rawSettings.qr_codes_2048,
+        qr_product: rawSettings.qr_product,
+        qr_store: rawSettings.qr_store,
+        qr_logo: rawSettings.qr_logo,
+        qr_directory: rawSettings.qr_directory,
+      });
+
+      // Invalidate frontend capability cache so public endpoints pick up changes
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+
+      setSectionSaveMessage('Sections saved successfully!');
+      setTimeout(() => setSectionSaveMessage(''), 3000);
+    } catch (err: any) {
+      setSectionSaveMessage(err?.message || 'Failed to save sections');
+    } finally {
+      setSectionSaving(false);
+    }
   };
 
   if (loading) {
@@ -255,30 +343,66 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Choose how your directory listing page appears to visitors.
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              {(['classic', 'editorial', 'immersive', 'premium'] as DirectoryEntryLayoutKey[]).map((layout) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {DIRECTORY_ENTRY_LAYOUT_ORDER.map((layout) => {
+                const meta = DIRECTORY_ENTRY_LAYOUT_META[layout];
                 const isAllowed = allowedLayouts.includes(layout);
                 const isSelected = directoryEntryLayout === layout;
-                const label = layout.charAt(0).toUpperCase() + layout.slice(1);
                 return (
-                  <button
+                  <div
                     key={layout}
-                    type="button"
-                    disabled={!isAllowed}
-                    onClick={() => setDirectoryEntryLayout(layout)}
-                    className={`p-3 rounded-lg border text-left transition-colors ${
+                    className={`relative rounded-xl border transition-all ${
                       isSelected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                        ? 'border-blue-500 ring-2 ring-blue-500/40'
                         : isAllowed
                         ? 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                        : 'border-gray-100 dark:border-gray-700 opacity-50 cursor-not-allowed'
+                        : 'border-gray-100 dark:border-gray-700 opacity-60'
                     }`}
                   >
-                    <span className="block font-medium text-sm">{label}</span>
-                    {!isAllowed && (
-                      <span className="block text-xs text-gray-400 mt-1">Upgrade to unlock</span>
+                    <button
+                      type="button"
+                      disabled={!isAllowed}
+                      onClick={() => setDirectoryEntryLayout(layout)}
+                      aria-pressed={isSelected}
+                      aria-label={`Select ${meta.label} layout`}
+                      className={`block w-full text-left ${isAllowed ? '' : 'cursor-not-allowed'}`}
+                    >
+                      {/* 4:3 preview carousel */}
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-gray-100 dark:bg-gray-700">
+                        <LayoutPreviewCarousel slides={getLayoutPreviewSlides(layout, meta.label)} icon={meta.icon} />
+                        {isSelected && (
+                          <span className="absolute right-2 top-2 z-10 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                          {meta.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                          {meta.description}
+                        </span>
+                        {!isAllowed && (
+                          <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            {meta.isPremium ? 'Upgrade for Premium' : 'Not included in your plan'}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Live preview link (only when allowed and we have a slug) */}
+                    {isAllowed && listing?.slug && (
+                      <a
+                        href={`/directory/${listing.slug}?layout_preview=${layout}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                      >
+                        Preview in new tab →
+                      </a>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -517,6 +641,152 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               Preview
             </h3>
             <DirectoryListingPreview listing={listing} />
+          </div>
+
+          {/* Directory Sections — capability-gated toggles */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Directory Sections
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Choose which sections appear on your directory listing
+            </p>
+            <div className="space-y-3">
+              {/* Hours */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Hours</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Business hours display</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowHours ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!rawSettings.hours_display}
+                    disabled={!capState?.canShowHours}
+                    onChange={(e) => toggleRaw('hours_display', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* Map */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Map</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Interactive location map</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!rawSettings.map_display}
+                    disabled={!capState?.canShowMap}
+                    onChange={(e) => toggleRaw('map_display', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* Contact */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Contact Info</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Phone, email, address</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowContact ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!rawSettings.storefront_contact}
+                    disabled={!capState?.canShowContact}
+                    onChange={(e) => toggleRaw('storefront_contact', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* Gallery */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Photo Gallery</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Showcase photos on directory page</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowGallery ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={isGalleryOn}
+                    disabled={!capState?.canShowGallery}
+                    onChange={(e) => setGallery(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* QR */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">QR Codes</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Link to store and products</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowQr ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={isQrOn}
+                    disabled={!capState?.canShowQr}
+                    onChange={(e) => setQr(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* Social */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Social Media</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Links to social profiles</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowSocial ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!rawSettings.storefront_social_media}
+                    disabled={!capState?.canShowSocial}
+                    onChange={(e) => toggleRaw('storefront_social_media', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              {/* SEO */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">SEO</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Search engine optimization</p>
+                </div>
+                <label className={`relative inline-flex items-center ${!capState?.canShowSeo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!rawSettings.enhanced_seo}
+                    disabled={!capState?.canShowSeo}
+                    onChange={(e) => toggleRaw('enhanced_seo', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={handleSaveSections}
+                disabled={sectionSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {sectionSaving ? 'Saving...' : 'Save Sections'}
+              </button>
+              {sectionSaveMessage && (
+                <span className={`text-sm ${sectionSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                  {sectionSaveMessage}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Public Link */}

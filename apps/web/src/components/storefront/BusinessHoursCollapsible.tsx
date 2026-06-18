@@ -9,12 +9,35 @@ interface BusinessHoursCollapsibleProps {
   isRetailStore?: boolean;
 }
 
+function formatTime(time24: string): string {
+  if (!time24) return "";
+  const [h, m] = time24.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  const mmStr = m.toString().padStart(2, "0");
+  return `${hour12}:${mmStr} ${period}`;
+}
+
+function getTimezoneLabel(timezone?: string): string {
+  if (!timezone) return "";
+  try {
+    const tzAbbrev = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'short'
+    }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+    return tzAbbrev || timezone;
+  } catch (e) {
+    return timezone;
+  }
+}
 
 export default function BusinessHoursCollapsible({
   businessHours,
   isRetailStore = true
 }: BusinessHoursCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Changed to true for open by default
+  const tz = businessHours?.timezone;
+  const tzLabel = getTimezoneLabel(tz);
 
   if (!businessHours) return null;
 
@@ -47,10 +70,11 @@ export default function BusinessHoursCollapsible({
             <div className="grid grid-cols-1 gap-3">
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                 const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
+                const dayAbbr = day.slice(0, 3);
 
                 // Check if we have periods format (multiple periods per day)
                 const hasPeriodsFormat = businessHours?.periods && Array.isArray(businessHours.periods);
-                let displayText = '';
+                let timeSlots: { open: string; close: string }[] = [];
                 let hasHours = false;
 
                 if (hasPeriodsFormat) {
@@ -59,89 +83,56 @@ export default function BusinessHoursCollapsible({
                   const dayPeriods = businessHours.periods.filter((p: any) => p.day === dayUpper);
                   hasHours = dayPeriods.length > 0;
                   if (hasHours) {
-                    displayText = dayPeriods
-                      .map((period: any) => {
-                        const formatTime = (time24: string): string => {
-                          if (!time24) return "";
-                          const [h, m] = time24.split(":").map(Number);
-                          const period = h >= 12 ? "PM" : "AM";
-                          const hour12 = h % 12 || 12;
-                          const mmStr = m.toString().padStart(2, "0");
-                          
-                          // Add timezone abbreviation if timezone is available
-                          if (businessHours?.timezone) {
-                            try {
-                              const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
-                                timeZone: businessHours.timezone, 
-                                timeZoneName: 'short' 
-                              }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
-                              return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
-                            } catch (e) {
-                              // Fallback to timezone string if abbreviation fails
-                              return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
-                            }
-                          }
-                          
-                          return `${hour12}:${mmStr} ${period}`;
-                        };
-                        return `${formatTime(period.open)} - ${formatTime(period.close)}`;
-                      })
-                      .join(', ');
+                    timeSlots = dayPeriods.map((period: any) => ({
+                      open: formatTime(period.open),
+                      close: formatTime(period.close),
+                    }));
                   }
                 } else {
                   // Old format: single period per day
                   const dayHours = businessHours?.[day];
                   hasHours = !!dayHours;
                   if (hasHours) {
-                    const formatTime = (time24: string): string => {
-                      if (!time24) return "";
-                      const [h, m] = time24.split(":").map(Number);
-                      const period = h >= 12 ? "PM" : "AM";
-                      const hour12 = h % 12 || 12;
-                      const mmStr = m.toString().padStart(2, "0");
-                      
-                      // Add timezone abbreviation if timezone is available
-                      if (businessHours?.timezone) {
-                        try {
-                          const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
-                            timeZone: businessHours.timezone, 
-                            timeZoneName: 'short' 
-                          }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
-                          return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
-                        } catch (e) {
-                          // Fallback to timezone string if abbreviation fails
-                          return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
-                        }
-                      }
-                      
-                      return `${hour12}:${mmStr} ${period}`;
-                    };
-                    displayText = `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`;
+                    timeSlots = [{
+                      open: formatTime(dayHours.open),
+                      close: formatTime(dayHours.close),
+                    }];
                   }
                 }
 
                 return (
                   <div
                     key={day}
-                    className={`flex items-center justify-between p-4 rounded-lg border ${
+                    className={`flex items-start justify-between p-4 rounded-lg border gap-4 ${
                       isToday
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                         : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className={`font-semibold text-base ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'} min-w-[80px]`}>
-                        {day}
+                      <span className={`font-semibold text-sm ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'} min-w-[40px]`}>
+                        {dayAbbr}
                       </span>
                       {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium whitespace-nowrap">Today</span>}
                     </div>
-                    <div className={`font-medium flex-shrink-0 ml-2 ${
+                    <div className={`font-medium flex-shrink-0 text-right text-sm ${
                       isToday
                         ? 'text-blue-700 dark:text-blue-300'
                         : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
                     }`}>
                       {hasHours ? (
-                        <span className="whitespace-nowrap">{displayText}</span>
+                        <div className="flex flex-col gap-1">
+                          {timeSlots.map((slot, idx) => (
+                            <div key={idx} className="flex flex-col items-end">
+                              <span>{slot.open}</span>
+                              <span className="text-neutral-400 dark:text-neutral-500 leading-none">—</span>
+                              <span>{slot.close}</span>
+                            </div>
+                          ))}
+                          {tzLabel && (
+                            <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{tzLabel}</span>
+                          )}
+                        </div>
                       ) : (
                         <span>Closed</span>
                       )}
