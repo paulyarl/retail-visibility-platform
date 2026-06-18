@@ -169,6 +169,7 @@ import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
 import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
+import directoryEntryOptionsSettingsRoutes from './routes/directory-entry-options-settings';
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import crmOptionsSettingsRoutes from './routes/crm-options-settings';
@@ -7499,6 +7500,10 @@ console.log('✅ Quickstart options settings routes mounted at /api/tenants/:ten
 /* ------------------------------ storefront options settings ------------------------------ */
 app.use('/api/tenants', storefrontOptionsSettingsRoutes);
 console.log('✅ Storefront options settings routes mounted at /api/tenants/:tenantId/storefront-options');
+
+/* ------------------------------ directory entry options settings ------------------------------ */
+app.use('/api/tenants', directoryEntryOptionsSettingsRoutes);
+console.log('✅ Directory entry options settings routes mounted at /api/tenants/:tenantId/directory-entry-options');
 
 /* ------------------------------ storefront type settings ------------------------------ */
 app.use('/api/tenants', storefrontTypeSettingsRoutes);

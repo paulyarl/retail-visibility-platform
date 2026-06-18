@@ -352,7 +352,7 @@ export default function ProductQuickCommerceLayout({
             {/* Featured badges */}
             {product.featuredTypes && product.featuredTypes.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                <FeaturedTypeBadges featuredTypes={getFeaturedTypeDisplay(product.featuredTypes)} />
+                <FeaturedTypeBadges featuredTypes={getFeaturedTypeDisplay(product.featuredTypes)} clickable showAll />
               </div>
             )}
 

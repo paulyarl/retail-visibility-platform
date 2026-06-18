@@ -380,6 +380,8 @@ export function ProductShowcaseLayout({
             {product.featuredTypes && product.featuredTypes.length > 0 && (
               <FeaturedTypeBadges
                 featuredTypes={getFeaturedTypeDisplay(product.featuredTypes)}
+                clickable
+                showAll
               />
             )}
 

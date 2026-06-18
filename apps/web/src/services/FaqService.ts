@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { unifiedCapabilityService } from './UnifiedCapabilityService';
 
 export interface FaqItem {
   id: string;
@@ -342,6 +343,7 @@ class FaqService extends TenantApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data?.success) throw new Error(result.data?.error || 'Failed to update FAQ options');
     await this.invalidateServiceCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
     return result.data.settings;
   }
 }

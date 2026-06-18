@@ -183,17 +183,7 @@ export function useStorefrontState({
   // ---- Featured options (capability-gated allowed types) ----
   const featuredCap = useFeaturedOptionsCapability(tenantId);
   const allowedFeaturedTypes = useMemo(() => {
-    // console.log('[useStorefrontState] featuredCap:', {
-    //   loading: featuredCap.loading,
-    //   error: featuredCap.error,
-    //   enabled: featuredCap.data?.enabled,
-    //   effectiveTypes: featuredCap.data?.effectiveTypes,
-    //   allowedTypes: featuredCap.data?.allowedTypes,
-    //   effectiveTenantTypes: featuredCap.data?.effectiveTenantTypes,
-    //   effectivePlatformTypes: featuredCap.data?.effectivePlatformTypes,
-    // });
     if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
-      // console.log('[useStorefrontState] allowedFeaturedTypes resolved:', featuredCap.data.effectiveTypes);
       return featuredCap.data.effectiveTypes as string[];
     }
     console.log('[useStorefrontState] allowedFeaturedTypes FALLBACK (empty = show all)');

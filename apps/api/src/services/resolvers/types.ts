@@ -44,6 +44,7 @@ export interface MerchantSettingsBundle {
   integrationOptions: IntegrationOptionsMerchantSettings | null;
   quickstartOptions: QuickstartOptionsMerchantSettings | null;
   storefrontOptions: StorefrontOptionsMerchantSettings | null;
+  directoryEntry: StorefrontOptionsMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
   barcodeScan: BarcodeScanMerchantSettings | null;
@@ -183,9 +184,12 @@ export interface StorefrontOptionsMerchantSettings {
   enhanced_seo?: boolean | null;
   storefront_actions?: boolean | null;
   storefront_layout?: string | null;
+  directory_entry_layout?: string | null;
   default_qr_resolution?: string | null;
   default_gallery_limit?: number | null;
 }
+
+export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
 
 export interface FaqOptionsMerchantSettings {
   faq_enabled?: boolean | null;
@@ -382,6 +386,27 @@ export interface EffectiveQuickstart {
   merchant_preferences: Record<string, any>;
 }
 
+export interface EffectiveDirectoryEntryOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: DirectoryEntryLayoutType[];
+  effective_layout: DirectoryEntryLayoutType;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  can_use_layout_premium: boolean;
+  // Section effective flags
+  hours_enabled: boolean;
+  map_enabled: boolean;
+  contact_enabled: boolean;
+  gallery_enabled: boolean;
+  qr_enabled: boolean;
+  social_enabled: boolean;
+  seo_enabled: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
 export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
 export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
@@ -518,6 +543,7 @@ export interface EffectiveCapabilities {
     integrations: EffectiveIntegrations;
     quickstart: EffectiveQuickstart;
     storefront_options: EffectiveStorefrontOptions;
+    directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;
     barcode_scan: EffectiveBarcodeScan;

@@ -11,6 +11,7 @@ import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { BusinessProfile, normalizePhoneInput } from '../lib/validation/businessProfile';
 import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
+import { unifiedCapabilityService } from './UnifiedCapabilityService';
 
 export interface Tenant {
   id: string;
@@ -1807,6 +1808,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }
@@ -1849,6 +1851,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }
@@ -1890,6 +1893,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }
@@ -1931,6 +1935,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }
@@ -2013,6 +2018,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }
@@ -2053,6 +2059,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
 
     return result.data?.settings || null;
   }

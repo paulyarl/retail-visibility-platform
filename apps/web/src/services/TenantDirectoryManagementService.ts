@@ -295,6 +295,31 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     console.error('[TenantDirectoryManagement] Failed to delete directory photo:', result.error);
     return null;
   }
+
+  /**
+   * Update directory entry options settings (layout, section toggles)
+   */
+  async updateDirectoryEntryOptions(tenantId: string, options: any): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${tenantId}/directory-entry-options`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(options),
+      },
+      `directory-entry-options-update-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to update directory entry options:', result.error);
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update directory entry options');
+    }
+
+    return result.data;
+  }
 }
 
 // Export singleton instance

@@ -48,6 +48,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { useStorefrontState } from './layouts/hooks/useStorefrontState';
 import { StorefrontLayoutProps } from './layouts/types';
 import StorefrontFooter from './layouts/shared/StorefrontFooter';
+import { Button } from '@mantine/core';
 
 // ---------------------------------------------------------------------------
 // Layout B – Modern Editorial
@@ -282,30 +283,34 @@ export default function StorefrontEditorialLayout({
             {/* Search icon + Cart icon (right) */}
             <div className="flex items-center gap-3">
               {/* Search icon — scrolls to collection */}
-              <button
+              <Button
                 onClick={scrollToCollection}
+                size='lg' 
+                variant='gradient'
                 className="p-2 rounded-full text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                 aria-label="Search products"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-              </button>
+              </Button>
 
               {/* Cart icon */}
               {cartTotalItems > 0 && (
-                <button
+                <Button
                   onClick={handleViewCart}
+                  size='lg'
+                  variant='gradient'
                   className="relative p-2 rounded-full text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                   aria-label={`View cart with ${cartTotalItems} items`}
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-10 h-10" fill="none" viewBox="0 0 48 48" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4z" />
                   </svg>
                   <span className="absolute -top-0.5 -right-0.5 bg-primary-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                     {cartTotalItems > 99 ? '99+' : cartTotalItems}
                   </span>
-                </button>
+                </Button>
               )}
 
               {/* Directory actions */}

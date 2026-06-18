@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Rocket,
   Users,
+  MapPin,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 
@@ -136,6 +137,21 @@ export default function CapabilityShowcase({
     const faq = cap.faqOptions;
     const faqTier = faq?.enabled ?? false;
     const faqMerchantGated = false;
+
+    // --- Directory Entry ---
+    const de = cap.directoryEntryOptions;
+    const deTier = de?.enabled ?? false;
+    const deMerchantGated = deTier && (
+      (de?.allowedLayouts.length ?? 0) > 0 && de?.effectiveLayout === 'classic' && de?.merchantPreferences?.directory_entry_layout !== 'classic'
+    );
+    const deDetailParts: string[] = [];
+    if (de?.hoursEnabled) deDetailParts.push('Hours');
+    if (de?.mapEnabled) deDetailParts.push('Map');
+    if (de?.contactEnabled) deDetailParts.push('Contact');
+    if (de?.galleryEnabled) deDetailParts.push('Gallery');
+    if (de?.qrEnabled) deDetailParts.push('QR');
+    if (de?.socialEnabled) deDetailParts.push('Social');
+    if (de?.seoEnabled) deDetailParts.push('SEO');
 
     // --- CRM Options ---
     const crm = cap.crmOptions;
@@ -268,6 +284,17 @@ export default function CapabilityShowcase({
           ].filter(Boolean).join(', ') || 'Basic'} FAQs`
           : "Not available",
         settingsLink: `/t/${tenantId}/faq/options`,
+      },
+      {
+        key: "directoryEntry",
+        label: "Directory Entry",
+        icon: <MapPin className="w-4 h-4" />,
+        enabled: deTier && (de?.allowedLayouts.length ?? 0) > 0,
+        status: getStatus(deTier, deMerchantGated),
+        detail: deTier
+          ? `${de?.effectiveLayout ?? 'classic'} layout${deDetailParts.length > 0 ? ` · ${deDetailParts.join(', ')}` : ''}`
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/directory`,
       },
       {
         key: "crmOptions",

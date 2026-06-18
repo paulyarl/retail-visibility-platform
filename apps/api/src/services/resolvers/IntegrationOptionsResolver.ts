@@ -22,7 +22,6 @@ export function resolveIntegrationOptions(
   capabilityEnabled?: boolean
 ): EffectiveIntegrations {
   const enabled = capabilityEnabled ?? !!features.integration_enabled;
-  const disabled = !!features.integration_disabled;
   const flexible = !!features.integration_flexible;
 
   const posTypes: IntegrationType[] = ['clover', 'square'];
@@ -54,17 +53,17 @@ export function resolveIntegrationOptions(
   const effectiveGoogleTypes = allowedGoogleTypes.filter((t) => prefs[`integration_${t}` as keyof typeof prefs] !== false);
 
   return {
-    enabled: enabled && !disabled,
-    pos_enabled: enabled && !disabled && allowedPosTypes.length > 0,
-    google_enabled: enabled && !disabled && allowedGoogleTypes.length > 0,
+    enabled,
+    pos_enabled: enabled && allowedPosTypes.length > 0,
+    google_enabled: enabled && allowedGoogleTypes.length > 0,
     allowed_pos_types: allowedPosTypes,
     allowed_google_types: allowedGoogleTypes,
     allowed_types: [...allowedPosTypes, ...allowedGoogleTypes],
     effective_pos_types: effectivePosTypes,
     effective_google_types: effectiveGoogleTypes,
     effective_types: [...effectivePosTypes, ...effectiveGoogleTypes],
-    integrations_available: enabled && !disabled && (allowedPosTypes.length + allowedGoogleTypes.length) > 0,
-    effective_integrations_available: enabled && !disabled && (effectivePosTypes.length + effectiveGoogleTypes.length) > 0,
+    integrations_available: enabled && (allowedPosTypes.length + allowedGoogleTypes.length) > 0,
+    effective_integrations_available: enabled && (effectivePosTypes.length + effectiveGoogleTypes.length) > 0,
     merchant_preferences: prefs,
     is_flexible: flexible,
   };

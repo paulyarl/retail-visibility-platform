@@ -19,8 +19,12 @@ export function resolveFeaturedOptions(
   merchantPrefs: FeaturedOptionsMerchantSettings | null
 ): EffectiveFeatured {
   const enabled = !!features.featured_enabled;
-  const disabled = !!features.featured_disabled;
   const flexible = !!features.featured_flexible;
+
+  // Fail-open: when no tier config exists at all, allow all types.
+  // This matches the SQL gate behavior in tier-capability-sql.ts where
+  // tfa.tier_key IS_NULL skips all capability gating.
+  const hasAnyFeaturedConfig = Object.keys(features).some(k => k.startsWith('featured_'));
 
   const tenantControlled: FeaturedType[] = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured'];
   const platformControlled: FeaturedType[] = ['bestseller', 'trending', 'recommended', 'random_featured'];
@@ -28,12 +32,12 @@ export function resolveFeaturedOptions(
   const allowedTenantTypes: FeaturedType[] = [];
   const allowedPlatformTypes: FeaturedType[] = [];
 
-  if (flexible || enabled) {
+  if (!hasAnyFeaturedConfig || flexible || enabled) {
     for (const t of tenantControlled) {
-      if (flexible || features[`featured_${t}`]) allowedTenantTypes.push(t);
+      if (!hasAnyFeaturedConfig || flexible || features[`featured_${t}`]) allowedTenantTypes.push(t);
     }
     for (const t of platformControlled) {
-      if (flexible || features[`featured_${t}`]) allowedPlatformTypes.push(t);
+      if (!hasAnyFeaturedConfig || flexible || features[`featured_${t}`]) allowedPlatformTypes.push(t);
     }
   }
 
@@ -56,18 +60,21 @@ export function resolveFeaturedOptions(
   const effectiveTenantTypes = allowedTenantTypes.filter((t) => prefs[`featured_${t}` as keyof typeof prefs] !== false);
   const effectivePlatformTypes = allowedPlatformTypes.filter((t) => prefs[`featured_${t}` as keyof typeof prefs] !== false);
 
+  // Fail-open: unconfigured tiers are treated as enabled to match SQL gate behavior
+  const isEnabled = !hasAnyFeaturedConfig || enabled;
+
   return {
-    enabled: enabled && !disabled,
-    tenant_enabled: enabled && !disabled && allowedTenantTypes.length > 0,
-    platform_enabled: enabled && !disabled && allowedPlatformTypes.length > 0,
+    enabled: isEnabled,
+    tenant_enabled: isEnabled && allowedTenantTypes.length > 0,
+    platform_enabled: isEnabled && allowedPlatformTypes.length > 0,
     allowed_tenant_types: allowedTenantTypes,
     allowed_platform_types: allowedPlatformTypes,
     allowed_types: [...allowedTenantTypes, ...allowedPlatformTypes],
     effective_tenant_types: effectiveTenantTypes,
     effective_platform_types: effectivePlatformTypes,
     effective_types: [...effectiveTenantTypes, ...effectivePlatformTypes],
-    featured_available: enabled && !disabled && (allowedTenantTypes.length + allowedPlatformTypes.length) > 0,
-    effective_featured_available: enabled && !disabled && (effectiveTenantTypes.length + effectivePlatformTypes.length) > 0,
+    featured_available: isEnabled && (allowedTenantTypes.length + allowedPlatformTypes.length) > 0,
+    effective_featured_available: isEnabled && (effectiveTenantTypes.length + effectivePlatformTypes.length) > 0,
     expiry_monitor_enabled: !!features.featured_expiry_monitor,
     merchant_preferences: prefs,
     is_flexible: flexible,

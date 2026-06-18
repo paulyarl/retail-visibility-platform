@@ -17,7 +17,6 @@ export function resolveProductOptions(
   merchantPrefs: ProductOptionsMerchantSettings | null
 ): EffectiveProductOptions {
   const enabled = !!features.product_enabled;
-  const disabled = !!features.product_disabled;
   const flexible = !!features.product_flexible;
 
   const allowedTypes: ProductType[] = [];
@@ -81,7 +80,7 @@ export function resolveProductOptions(
     : allowedLayouts[0] || 'classic';
 
   return {
-    enabled: enabled && !disabled,
+    enabled,
     allowed_types: uniqueAllowedTypes,
     effective_types: effectiveTypes,
     shows_variants: showsVariants,

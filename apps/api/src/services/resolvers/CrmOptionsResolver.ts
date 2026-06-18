@@ -28,7 +28,6 @@ export function resolveCrmOptions(
   const feat = cleanFeatures;
 
   const enabled = capabilityEnabled ?? !!feat.crm_enabled;
-  const disabled = !!feat.crm_disabled;
   const flexible = !!feat.crm_flexible;
 
   const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
@@ -102,15 +101,15 @@ export function resolveCrmOptions(
   const allTypes = [...allowedInquiry, ...allowedContact, ...allowedTicket, ...allowedMessage, ...allowedCustomerTicket, ...allowedDashboard];
 
   return {
-    enabled: enabled && !disabled,
-    inquiry_product_enabled: enabled && !disabled && inquiryProductEnabled,
-    inquiry_storefront_enabled: enabled && !disabled && inquiryStorefrontEnabled,
-    inquiry_directory_enabled: enabled && !disabled && inquiryDirectoryEnabled,
-    contacts_enabled: enabled && !disabled && contactsEnabled,
-    ticket_features_enabled: enabled && !disabled && ticketFeaturesEnabled,
-    message_features_enabled: enabled && !disabled && messageFeaturesEnabled,
-    customer_tickets_enabled: enabled && !disabled && customerTicketsEnabled,
-    dashboard_enabled: enabled && !disabled && dashboardEnabled,
+    enabled,
+    inquiry_product_enabled: enabled && inquiryProductEnabled,
+    inquiry_storefront_enabled: enabled && inquiryStorefrontEnabled,
+    inquiry_directory_enabled: enabled && inquiryDirectoryEnabled,
+    contacts_enabled: enabled && contactsEnabled,
+    ticket_features_enabled: enabled && ticketFeaturesEnabled,
+    message_features_enabled: enabled && messageFeaturesEnabled,
+    customer_tickets_enabled: enabled && customerTicketsEnabled,
+    dashboard_enabled: enabled && dashboardEnabled,
     allowed_inquiry_types: allowedInquiry,
     allowed_contact_types: allowedContact,
     allowed_ticket_types: allowedTicket,
@@ -118,6 +117,6 @@ export function resolveCrmOptions(
     allowed_customer_ticket_types: allowedCustomerTicket,
     allowed_dashboard_types: allowedDashboard,
     is_flexible: flexible,
-    crm_available: enabled && !disabled && allTypes.length > 0,
+    crm_available: enabled && allTypes.length > 0,
   };
 }

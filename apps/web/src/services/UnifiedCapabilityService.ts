@@ -23,6 +23,8 @@ import {
   StorefrontOptionsState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
+  DirectoryEntryOptionsState,
+  DirectoryEntryLayoutKey,
   FaqOptionsState,
   PublicFaqOptionsFlags,
   toPublicFaqOptionsFlags,
@@ -79,6 +81,7 @@ interface BackendEffectiveCapabilities {
     quickstart: BackendEffectiveQuickstart;
     storefront_options: BackendEffectiveStorefrontOptions;
     faq: BackendEffectiveFaq;
+    directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
     barcode_scan: BackendEffectiveBarcodeScan;
   };
@@ -295,6 +298,26 @@ interface BackendEffectiveFaq {
   allowed_kb_types: FaqKnowledgeBaseType[];
   is_flexible: boolean;
   faq_available: boolean;
+}
+
+interface BackendEffectiveDirectoryEntry {
+  enabled: boolean;
+  is_flexible: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: string[];
+  effective_layout: string;
+  can_use_layout_classic: boolean;
+  can_use_layout_editorial: boolean;
+  can_use_layout_immersive: boolean;
+  can_use_layout_premium: boolean;
+  hours_enabled: boolean;
+  map_enabled: boolean;
+  contact_enabled: boolean;
+  gallery_enabled: boolean;
+  qr_enabled: boolean;
+  social_enabled: boolean;
+  seo_enabled: boolean;
+  merchant_preferences: Record<string, any>;
 }
 
 interface BackendEffectiveCrm {
@@ -558,6 +581,29 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
   };
 }
 
+function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    layoutEnabled: b.layout_enabled,
+    allowedLayouts: b.allowed_layouts as DirectoryEntryLayoutKey[],
+    effectiveLayout: (b.effective_layout as DirectoryEntryLayoutKey) || 'classic',
+    canUseLayoutClassic: b.can_use_layout_classic,
+    canUseLayoutEditorial: b.can_use_layout_editorial,
+    canUseLayoutImmersive: b.can_use_layout_immersive,
+    canUseLayoutPremium: b.can_use_layout_premium,
+    hoursEnabled: b.hours_enabled,
+    mapEnabled: b.map_enabled,
+    contactEnabled: b.contact_enabled,
+    galleryEnabled: b.gallery_enabled,
+    qrEnabled: b.qr_enabled,
+    socialEnabled: b.social_enabled,
+    seoEnabled: b.seo_enabled,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
 function mapFaq(b: BackendEffectiveFaq): FaqOptionsState {
   return {
     enabled: b.enabled,
@@ -616,6 +662,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     integrationOptions: mapIntegrations(b.effective.integrations),
     quickstartOptions: mapQuickstart(b.effective.quickstart),
     storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
+    directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
     uncategorizedFeatures: b.uncategorized_features,
@@ -652,6 +699,12 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     for (const pattern of this.getServiceCachePatterns()) {
       await this.invalidateCache(pattern);
     }
+  }
+
+  /** Invalidate cached capabilities for a single tenant (call after merchant gate changes) */
+  async invalidateTenantCapabilities(tenantId: string): Promise<void> {
+    this.capCache.delete(tenantId);
+    await this.invalidateCache(`unified-caps-${tenantId}`);
   }
 
   private async fetchEffective(tenantId: string): Promise<BackendEffectiveCapabilities | null> {
@@ -760,6 +813,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     return all.storefrontOptions;
   }
 
+  async getDirectoryEntryOptionsState(tenantId: string): Promise<DirectoryEntryOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.directoryEntryOptions;
+  }
+
   /** Compatibility alias for old PublicStorefrontOptionsService */
   async getStorefrontOptionFlags(tenantId: string): Promise<StorefrontOptionFlags> {
     const state = await this.getStorefrontOptionsState(tenantId);
@@ -813,6 +871,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   integration_: 'integrationOptions',
   quickstart_: 'quickstartOptions',
   storefront_opt_: 'storefrontOptions',
+  directory_entry_: 'directoryEntryOptions',
   faq_: 'faqOptions',
   crm_: 'crmOptions',
   chatbot_: 'chatbotOptions',

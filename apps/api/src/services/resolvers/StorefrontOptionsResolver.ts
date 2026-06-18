@@ -24,58 +24,45 @@ export function resolveStorefrontOptions(
   merchantPrefs: StorefrontOptionsMerchantSettings | null
 ): EffectiveStorefrontOptions {
   const enabled = !!features.storefront_opt_enabled;
-  const disabled = !!features.storefront_opt_disabled;
   const flexible = !!features.storefront_opt_flexible;
-  const mainOn = enabled && !disabled;
+  const mainOn = enabled;
 
   // Hours
   const hoursGroupEnabled = !!features.storefront_opt_hours_enabled;
-  const hoursGroupDisabled = !!features.storefront_opt_hours_disabled;
-  const hoursEnabled = hoursGroupEnabled && !hoursGroupDisabled;
-  const hoursUntouched = !hoursGroupEnabled && !hoursGroupDisabled;
   const allowedHoursTypes: StorefrontOptHoursType[] = [];
-  if (flexible || hoursEnabled) {
+  if (flexible || hoursGroupEnabled) {
     allowedHoursTypes.push('hours_animated', 'hours_status');
-  } else if (hoursUntouched) {
+  } else {
     if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
     if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
   }
 
   // Category
   const categoryGroupEnabled = !!features.storefront_opt_category_enabled;
-  const categoryGroupDisabled = !!features.storefront_opt_category_disabled;
-  const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
-  const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
   const allowedCategoryTypes: StorefrontOptCategoryType[] = [];
-  if (flexible || categoryEnabled) {
+  if (flexible || categoryGroupEnabled) {
     allowedCategoryTypes.push('category_store', 'category_product');
-  } else if (categoryUntouched) {
+  } else {
     if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
     if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
   }
 
   // Recommend
   const recommendGroupEnabled = !!features.storefront_opt_recommend_enabled;
-  const recommendGroupDisabled = !!features.storefront_opt_recommend_disabled;
-  const recommendEnabled = recommendGroupEnabled && !recommendGroupDisabled;
-  const recommendUntouched = !recommendGroupEnabled && !recommendGroupDisabled;
   const allowedRecommendTypes: StorefrontOptRecommendType[] = [];
-  if (flexible || recommendEnabled) {
+  if (flexible || recommendGroupEnabled) {
     allowedRecommendTypes.push('recommend_store', 'recommend_products');
-  } else if (recommendUntouched) {
+  } else {
     if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
     if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
   }
 
   // Info
   const infoGroupEnabled = !!features.storefront_opt_info_enabled;
-  const infoGroupDisabled = !!features.storefront_opt_info_disabled;
-  const infoEnabled = infoGroupEnabled && !infoGroupDisabled;
-  const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
   const allowedInfoTypes: StorefrontOptInfoType[] = [];
-  if (flexible || infoEnabled) {
+  if (flexible || infoGroupEnabled) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
-  } else if (infoUntouched) {
+  } else {
     if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
     if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
     if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
@@ -83,15 +70,12 @@ export function resolveStorefrontOptions(
 
   // QR
   const qrGroupEnabled = !!features.storefront_opt_qr_enabled;
-  const qrGroupDisabled = !!features.storefront_opt_qr_disabled;
-  const qrEnabled = qrGroupEnabled && !qrGroupDisabled;
-  const qrUntouched = !qrGroupEnabled && !qrGroupDisabled;
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
-  if (flexible || qrEnabled) {
+  if (flexible || qrGroupEnabled) {
     allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
     allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
-  } else if (qrUntouched) {
+  } else {
     if (features.storefront_opt_qr_codes_512) allowedQRResolutions.push('qr_codes_512');
     if (features.storefront_opt_qr_codes_1024) allowedQRResolutions.push('qr_codes_1024');
     if (features.storefront_opt_qr_codes_2048) allowedQRResolutions.push('qr_codes_2048');
@@ -103,13 +87,10 @@ export function resolveStorefrontOptions(
 
   // Gallery
   const galleryGroupEnabled = !!features.storefront_opt_gallery_enabled;
-  const galleryGroupDisabled = !!features.storefront_opt_gallery_disabled;
-  const galleryEnabled = galleryGroupEnabled && !galleryGroupDisabled;
-  const galleryUntouched = !galleryGroupEnabled && !galleryGroupDisabled;
   const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
-  if (flexible || galleryEnabled) {
+  if (flexible || galleryGroupEnabled) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
-  } else if (galleryUntouched) {
+  } else {
     if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
     if (features.storefront_opt_image_gallery_10) allowedGalleryTypes.push('image_gallery_10');
     if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
@@ -117,26 +98,20 @@ export function resolveStorefrontOptions(
 
   // Advanced
   const advancedGroupEnabled = !!features.storefront_opt_advanced_enabled;
-  const advancedGroupDisabled = !!features.storefront_opt_advanced_disabled;
-  const advancedEnabled = advancedGroupEnabled && !advancedGroupDisabled;
-  const advancedUntouched = !advancedGroupEnabled && !advancedGroupDisabled;
   const allowedAdvancedTypes: StorefrontOptAdvancedType[] = [];
-  if (flexible || advancedEnabled) {
+  if (flexible || advancedGroupEnabled) {
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
-  } else if (advancedUntouched) {
+  } else {
     if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
     if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
   }
 
   // Layout
   const layoutGroupEnabled = !!features.storefront_opt_layout_enabled;
-  const layoutGroupDisabled = !!features.storefront_opt_layout_disabled;
-  const layoutEnabled = layoutGroupEnabled && !layoutGroupDisabled;
-  const layoutUntouched = !layoutGroupEnabled && !layoutGroupDisabled;
   const allowedLayouts: StorefrontOptLayoutType[] = [];
-  if (flexible || layoutEnabled) {
+  if (flexible || layoutGroupEnabled) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else if (layoutUntouched) {
+  } else {
     if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
     if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
     if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
@@ -197,23 +172,23 @@ export function resolveStorefrontOptions(
   return {
     enabled: mainOn,
     is_flexible: flexible,
-    hours_enabled: mainOn && (hoursEnabled || allowedHoursTypes.length > 0),
+    hours_enabled: mainOn && (hoursGroupEnabled || allowedHoursTypes.length > 0),
     allowed_hours_types: allowedHoursTypes,
-    category_enabled: mainOn && (categoryEnabled || allowedCategoryTypes.length > 0),
+    category_enabled: mainOn && (categoryGroupEnabled || allowedCategoryTypes.length > 0),
     allowed_category_types: allowedCategoryTypes,
-    recommend_enabled: mainOn && (recommendEnabled || allowedRecommendTypes.length > 0),
+    recommend_enabled: mainOn && (recommendGroupEnabled || allowedRecommendTypes.length > 0),
     allowed_recommend_types: allowedRecommendTypes,
     recently_viewed_enabled: mainOn && recentlyViewedTierAllowed,
-    info_enabled: mainOn && (infoEnabled || allowedInfoTypes.length > 0),
+    info_enabled: mainOn && (infoGroupEnabled || allowedInfoTypes.length > 0),
     allowed_info_types: allowedInfoTypes,
-    qr_enabled: mainOn && (qrEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
+    qr_enabled: mainOn && (qrGroupEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
     allowed_qr_resolutions: allowedQRResolutions,
     allowed_qr_content_types: allowedQRContentTypes,
-    gallery_enabled: mainOn && (galleryEnabled || allowedGalleryTypes.length > 0),
+    gallery_enabled: mainOn && (galleryGroupEnabled || allowedGalleryTypes.length > 0),
     allowed_gallery_types: allowedGalleryTypes,
-    advanced_enabled: mainOn && (advancedEnabled || allowedAdvancedTypes.length > 0),
+    advanced_enabled: mainOn && (advancedGroupEnabled || allowedAdvancedTypes.length > 0),
     allowed_advanced_types: allowedAdvancedTypes,
-    layout_enabled: mainOn && (layoutEnabled || allowedLayouts.length > 0),
+    layout_enabled: mainOn && (layoutGroupEnabled || allowedLayouts.length > 0),
     allowed_layouts: allowedLayouts,
     effective_layout: effectiveLayout,
     can_show_hours_display: mainOn && hoursDisplayTierAllowed && prefs.hours_display,

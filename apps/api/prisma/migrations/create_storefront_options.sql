@@ -89,6 +89,7 @@ CREATE TRIGGER trigger_storefront_options_settings_updated_at
 ALTER TABLE tenant_storefront_options_settings ENABLE ROW LEVEL SECURITY;
 
 -- RLS policy: tenants can only see their own row
+DROP POLICY IF EXISTS tenant_storefront_options_isolation ON tenant_storefront_options_settings;
 CREATE POLICY tenant_storefront_options_isolation ON tenant_storefront_options_settings
   USING (tenant_id = current_setting('app.current_tenant_id', true));
 
@@ -116,14 +117,12 @@ VALUES (
 -- Main gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_enabled',  'Storefront Options Enabled',  'Main gate — enables storefront options capability',      'storefront_options', true, 1),
-  (gen_random_uuid()::text, 'storefront_opt_disabled', 'Storefront Options Disabled', 'Hard disable — overrides enabled',                        'storefront_options', true, 2),
   (gen_random_uuid()::text, 'storefront_opt_flexible', 'Storefront Options Flexible', 'Flexible tier — unlocks all feature gates',                'storefront_options', true, 3)
 ON CONFLICT (key) DO NOTHING;
 
 -- Store Hours group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_hours_enabled',  'Hours Group Enabled',  'Enables all hours feature types',   'storefront_options', true, 10),
-  (gen_random_uuid()::text, 'storefront_opt_hours_disabled', 'Hours Group Disabled', 'Disables hours feature group',      'storefront_options', true, 11),
   (gen_random_uuid()::text, 'storefront_opt_hours_animated', 'Animated Hours',        'Animated store hours display',      'storefront_options', true, 12),
   (gen_random_uuid()::text, 'storefront_opt_hours_status',   'Hours Status',          'Open/closed status indicator',      'storefront_options', true, 13)
 ON CONFLICT (key) DO NOTHING;
@@ -131,7 +130,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Category Display group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_category_enabled',  'Category Group Enabled',  'Enables all category feature types',  'storefront_options', true, 20),
-  (gen_random_uuid()::text, 'storefront_opt_category_disabled', 'Category Group Disabled', 'Disables category feature group',     'storefront_options', true, 21),
   (gen_random_uuid()::text, 'storefront_opt_category_store',    'Store Categories',        'Category navigation on storefront',  'storefront_options', true, 22),
   (gen_random_uuid()::text, 'storefront_opt_category_product',  'Product Categories',       'Category badges on product cards',   'storefront_options', true, 23)
 ON CONFLICT (key) DO NOTHING;
@@ -139,7 +137,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Recommendation Display group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_recommend_enabled',  'Recommend Group Enabled',  'Enables all recommendation types',     'storefront_options', true, 30),
-  (gen_random_uuid()::text, 'storefront_opt_recommend_disabled', 'Recommend Group Disabled', 'Disables recommendation feature group', 'storefront_options', true, 31),
   (gen_random_uuid()::text, 'storefront_opt_recommend_store',    'Store Recommendations',    'Recommended stores section',            'storefront_options', true, 32),
   (gen_random_uuid()::text, 'storefront_opt_recommend_products', 'Product Recommendations',  'Recommended products section',         'storefront_options', true, 33)
 ON CONFLICT (key) DO NOTHING;
@@ -152,7 +149,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Store Information group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_info_enabled',            'Info Group Enabled',  'Enables all store info types',       'storefront_options', true, 50),
-  (gen_random_uuid()::text, 'storefront_opt_info_disabled',           'Info Group Disabled', 'Disables store info feature group',   'storefront_options', true, 51),
   (gen_random_uuid()::text, 'storefront_opt_storefront_social_media', 'Social Media Links',  'Social media links on storefront',    'storefront_options', true, 52),
   (gen_random_uuid()::text, 'storefront_opt_storefront_contact',      'Contact Info',        'Contact information on storefront',  'storefront_options', true, 53),
   (gen_random_uuid()::text, 'storefront_opt_interactive_maps',         'Interactive Maps',    'Embedded interactive map',            'storefront_options', true, 54)
@@ -161,7 +157,6 @@ ON CONFLICT (key) DO NOTHING;
 -- QR Code Display group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_qr_enabled',    'QR Group Enabled',      'Enables all QR feature types',       'storefront_options', true, 60),
-  (gen_random_uuid()::text, 'storefront_opt_qr_disabled',   'QR Group Disabled',       'Disables QR feature group',           'storefront_options', true, 61),
   (gen_random_uuid()::text, 'storefront_opt_qr_codes_512',  'QR 512px Resolution',    'Standard 512px QR codes',             'storefront_options', true, 62),
   (gen_random_uuid()::text, 'storefront_opt_qr_codes_1024', 'QR 1024px Resolution',   'High 1024px QR codes',                'storefront_options', true, 63),
   (gen_random_uuid()::text, 'storefront_opt_qr_codes_2048', 'QR 2048px Resolution',  'HD 2048px QR codes for print',        'storefront_options', true, 64),
@@ -174,7 +169,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Gallery Display group gates (radio)
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_gallery_enabled',  'Gallery Group Enabled',  'Enables gallery feature type selection', 'storefront_options', true, 70),
-  (gen_random_uuid()::text, 'storefront_opt_gallery_disabled', 'Gallery Group Disabled', 'Disables gallery feature group',          'storefront_options', true, 71),
   (gen_random_uuid()::text, 'storefront_opt_image_gallery_5',  '5 Image Gallery',       'Gallery limit of 5 images',              'storefront_options', true, 72),
   (gen_random_uuid()::text, 'storefront_opt_image_gallery_10', '10 Image Gallery',      'Gallery limit of 10 images',             'storefront_options', true, 73),
   (gen_random_uuid()::text, 'storefront_opt_image_gallery_15', '15 Image Gallery',     'Gallery limit of 15 images',              'storefront_options', true, 74)
@@ -183,7 +177,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Advanced group gates
 INSERT INTO features_list (id, key, name, description, category, is_active, sort_order) VALUES
   (gen_random_uuid()::text, 'storefront_opt_advanced_enabled',    'Advanced Group Enabled',  'Enables all advanced feature types',    'storefront_options', true, 80),
-  (gen_random_uuid()::text, 'storefront_opt_advanced_disabled',   'Advanced Group Disabled', 'Disables advanced feature group',       'storefront_options', true, 81),
   (gen_random_uuid()::text, 'storefront_opt_enhanced_seo',        'Enhanced SEO',           'Advanced SEO controls and metadata',    'storefront_options', true, 82),
   (gen_random_uuid()::text, 'storefront_opt_storefront_actions',  'Storefront Actions',     'Custom call-to-action buttons',         'storefront_options', true, 83)
 ON CONFLICT (key) DO NOTHING;

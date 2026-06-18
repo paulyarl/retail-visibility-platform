@@ -318,6 +318,35 @@ export interface ProductOptionsState {
 /** Alias for backward compatibility with old PublicProductOptionsService */
 export type ProductOptionFlags = ProductOptionsState;
 
+// --- Directory Entry Options ---
+
+export type DirectoryEntryLayoutKey = 'classic' | 'editorial' | 'immersive' | 'premium';
+
+export interface DirectoryEntryOptionsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  layoutEnabled: boolean;
+  allowedLayouts: DirectoryEntryLayoutKey[];
+  effectiveLayout: DirectoryEntryLayoutKey;
+  canUseLayoutClassic: boolean;
+  canUseLayoutEditorial: boolean;
+  canUseLayoutImmersive: boolean;
+  canUseLayoutPremium: boolean;
+  // Section effective flags
+  hoursEnabled: boolean;
+  mapEnabled: boolean;
+  contactEnabled: boolean;
+  galleryEnabled: boolean;
+  qrEnabled: boolean;
+  socialEnabled: boolean;
+  seoEnabled: boolean;
+  merchantPreferences: {
+    directory_entry_opt_enabled: boolean;
+    directory_entry_layout: DirectoryEntryLayoutKey;
+  };
+  features: Record<string, boolean>;
+}
+
 // --- Integration Options ---
 
 export type IntegrationType =
@@ -725,6 +754,7 @@ export interface AllCapabilitiesState {
   integrationOptions: IntegrationOptionsState;
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
+  directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
   uncategorizedFeatures: string[];
@@ -745,6 +775,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   integration_: 'integration_options',
   quickstart_: 'quickstart_options',
   storefront_opt_: 'storefront_options',
+  directory_entry_: 'directory_entry_options',
   faq_: 'faq_options',
   crm_: 'crm_options',
   chatbot_: 'chatbot_options',
@@ -1205,6 +1236,10 @@ export function resolveFeaturedOptionsState(
   const platformGroupEnabled = !!features.featured_platform_enabled;
   const platformGroupDisabled = !!features.featured_platform_disabled;
 
+  // Fail-open: when no tier config exists at all, allow all types.
+  // This matches the SQL gate behavior in tier-capability-sql.ts.
+  const hasAnyFeaturedConfig = Object.keys(features).some(k => k.startsWith('featured_'));
+
   // Three states per group: enabled → all types, untouched → individual features, disabled → none
   const tenantEnabled = tenantGroupEnabled && !tenantGroupDisabled;
   const tenantUntouched = !tenantGroupEnabled && !tenantGroupDisabled;
@@ -1213,8 +1248,8 @@ export function resolveFeaturedOptionsState(
 
   // Tenant-controlled types
   const allowedTenantTypes: FeaturedType[] = [];
-  if (flexible || tenantEnabled) {
-    // Group enabled or flexible → all tenant types
+  if (!hasAnyFeaturedConfig || flexible || tenantEnabled) {
+    // Group enabled or flexible or unconfigured → all tenant types
     allowedTenantTypes.push('store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured');
   } else if (tenantUntouched) {
     // Group untouched → only explicitly listed features
@@ -1230,8 +1265,8 @@ export function resolveFeaturedOptionsState(
 
   // Platform-controlled types
   const allowedPlatformTypes: FeaturedType[] = [];
-  if (flexible || platformEnabled) {
-    // Group enabled or flexible → all platform types
+  if (!hasAnyFeaturedConfig || flexible || platformEnabled) {
+    // Group enabled or flexible or unconfigured → all platform types
     allowedPlatformTypes.push('bestseller', 'trending', 'recommended', 'random_featured');
   } else if (platformUntouched) {
     // Group untouched → only explicitly listed features
@@ -1285,8 +1320,11 @@ export function resolveFeaturedOptionsState(
     : [];
   const effectiveTypes = [...effectiveTenantTypes, ...effectivePlatformTypes];
 
+  // Fail-open: unconfigured tiers are treated as enabled
+  const isEnabled = !hasAnyFeaturedConfig || (enabled && !disabled);
+
   return {
-    enabled: enabled && !disabled,
+    enabled: isEnabled,
     tenantEnabled,
     platformEnabled,
     allowedTenantTypes,
@@ -1297,8 +1335,8 @@ export function resolveFeaturedOptionsState(
     effectiveTypes,
     merchantPreferences: prefs,
     isFlexible: flexible,
-    featuredAvailable: enabled && !disabled && allTypes.length > 0,
-    effectiveFeaturedAvailable: enabled && !disabled && effectiveTypes.length > 0,
+    featuredAvailable: isEnabled && allTypes.length > 0,
+    effectiveFeaturedAvailable: isEnabled && effectiveTypes.length > 0,
     expiryMonitorEnabled: !!features.featured_expiry_monitor,
     features,
   };

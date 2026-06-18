@@ -169,6 +169,10 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
             <a
               key={index}
               href={`#featured-${type}`}
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.hash = `featured-${type}`;
+              }}
               className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgColor} ${config.textColor} ${isProductType ? 'ring-2 ring-offset-1 ring-current font-semibold' : 'opacity-70'} hover:opacity-100 transition-opacity cursor-pointer no-underline`}
               title={`Jump to ${config.label} products`}
             >
@@ -207,6 +211,10 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
           <a
             key={index}
             href={`#featured-${type}`}
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.hash = `featured-${type}`;
+            }}
             className={`group relative inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bgColor} ${config.textColor} hover:opacity-80 transition-opacity cursor-pointer no-underline`}
           >
             {config.icon}
@@ -1380,7 +1388,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
         {/* Featured Type Badges - Prominent display below hero */}
         {product.featuredTypes && product.featuredTypes.length > 0 && (
-          <FeaturedTypeBadges featuredTypes={product.featuredTypes} bucketCounts={product.bucketCounts} />
+          <FeaturedTypeBadges featuredTypes={product.featuredTypes} />
         )}
 
         {/* Product Actions - Share, Print, Like */}

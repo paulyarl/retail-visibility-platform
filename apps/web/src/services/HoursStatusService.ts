@@ -34,8 +34,11 @@ class HoursStatusService extends PublicApiSingleton {
   // Hours status cache
   private hoursStatus = new Map<string, StoreStatus>();
 
+  // In-flight promise deduplication cache (prevents waterfall requests)
+  private inFlightPromises = new Map<string, Promise<StoreStatus | null>>();
+
   // TTL constants for different data types
-  private readonly HOURS_STATUS_TTL = 10 * 60 * 1000; // 10 minutes for hours status (changes throughout the day)
+  private readonly HOURS_STATUS_TTL = 15 * 60 * 1000; // 15 minutes for hours status (changes throughout the day)
 
   private constructor() {
     super('hours-status-service');
@@ -50,35 +53,55 @@ class HoursStatusService extends PublicApiSingleton {
 
   /**
    * Get business hours status for a specific tenant
+   * Deduplicates concurrent requests for the same tenantId (promise caching)
    */
   async getStoreStatus(tenantId: string): Promise<StoreStatus | null> {
     if (!tenantId) {
       return null;
     }
 
-    const cacheKey = `hours-status-v2-${tenantId}`; // v2 for timezone enhancement
-    
-    const response = await this.makeDefaultRequest<StoreStatus>(
-      `/api/public/tenant/${tenantId}/business-hours/status`,
-      {},
-      cacheKey,
-      this.HOURS_STATUS_TTL
-    );
-
-    if (!response.success || !response.data) {
-      console.error('[HoursStatusService] Failed to get store status:', response.error);
-      return null;
+    // Return existing in-flight promise to prevent waterfall requests
+    const existingPromise = this.inFlightPromises.get(tenantId);
+    if (existingPromise) {
+      return existingPromise;
     }
 
-    // The API returns { success, data: { isOpen, status, label } }
-    // makeDefaultRequest wraps it as { success, data: { success, data: {...} } }
-    // So response.data is the API response, and we need response.data.data for the actual status
-    const statusData: StoreStatus = (response.data as any).data || response.data;
-    
-    // Store in local cache for quick access
-    this.hoursStatus.set(tenantId, statusData);
-    
-    return statusData;
+    const cacheKey = `hours-status-v2-${tenantId}`; // v2 for timezone enhancement
+
+    const promise = (async (): Promise<StoreStatus | null> => {
+      try {
+        const response = await this.makeDefaultRequest<StoreStatus>(
+          `/api/public/tenant/${tenantId}/business-hours/status`,
+          {},
+          cacheKey,
+          this.HOURS_STATUS_TTL
+        );
+
+        if (!response.success || !response.data) {
+          console.error('[HoursStatusService] Failed to get store status:', response.error);
+          return null;
+        }
+
+        // The API returns { success, data: { isOpen, status, label } }
+        // makeDefaultRequest wraps it as { success, data: { success, data: {...} } }
+        // So response.data is the API response, and we need response.data.data for the actual status
+        const statusData: StoreStatus = (response.data as any).data || response.data;
+
+        // Store in local cache for quick access
+        this.hoursStatus.set(tenantId, statusData);
+
+        return statusData;
+      } catch (error) {
+        console.error('[HoursStatusService] Error fetching store status:', error);
+        return null;
+      } finally {
+        // Clean up in-flight promise once settled
+        this.inFlightPromises.delete(tenantId);
+      }
+    })();
+
+    this.inFlightPromises.set(tenantId, promise);
+    return promise;
   }
 
   /**

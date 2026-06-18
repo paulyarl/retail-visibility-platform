@@ -9,6 +9,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage, RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
+import { unifiedCapabilityService } from './UnifiedCapabilityService';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface PaymentGateway {
@@ -1809,6 +1810,7 @@ class TenantInfoService extends TenantApiSingleton {
         return null;
       }
 
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings ?? null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to update payment gateway settings:', error);
@@ -2013,6 +2015,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success) return null;
       await this.invalidateCachePattern(`tenant-storefront-options-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to update storefront options settings:', error);
@@ -2036,6 +2039,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success) return null;
       await this.invalidateCachePattern(`tenant-quickstart-options-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to update quickstart options settings:', error);

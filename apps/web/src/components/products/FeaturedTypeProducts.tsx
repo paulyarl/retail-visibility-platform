@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import SmartProductCard from './SmartProductCard';
 import { FEATURED_TYPES } from '@/types/product-display';
 
@@ -191,14 +191,37 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
       });
   }, [productsByType]);
 
+  // Sync active tab with URL hash (#featured-<type>) so pills can deep-link to buckets
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#featured-')) {
+        const type = hash.replace('#featured-', '');
+        const index = bucketsWithProducts.findIndex(b => b.type === type);
+        if (index !== -1) {
+          setActiveTab(index);
+        }
+        // Scroll to the stable top-of-section anchor so we never jump past the featured list
+        const topAnchor = document.getElementById('featured-products');
+        if (topAnchor) {
+          topAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [bucketsWithProducts]);
+
   if (bucketsWithProducts.length === 0) {
     return null;
   }
 
-  const activeBucket = bucketsWithProducts[activeTab] || bucketsWithProducts[0];
+  const activeTabIndex = activeTab < bucketsWithProducts.length ? activeTab : 0;
 
   return (
-    <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+    <div id="featured-products" className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8 scroll-mt-20">
       {/* Section header */}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">
@@ -229,47 +252,49 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
       </div>
 
       {/* Active bucket content */}
-      {activeBucket && (
-        <div id={`featured-${activeBucket.type}`} className="scroll-mt-20">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {activeBucket.products.map((product) => (
-              <SmartProductCard
-                key={product.id}
-                tenantId={product.tenantId}
-                defaultGatewayType={product.defaultGatewayType || undefined}
-                product={{
-                  id: product.id,
-                  name: product.name,
-                  title: product.title,
-                  priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
-                  salePriceCents: product.salePriceCents,
-                  listPriceCents: product.listPriceCents,
-                  isOnSale: product.isOnSale,
-                  discountPercentage: product.discountPercentage,
-                  currency: product.currency,
-                  imageUrl: product.imageUrl,
-                  brand: product.brand,
-                  tenantId: product.tenantId,
-                  sku: product.sku || '',
-                  stock: product.stock,
+      {bucketsWithProducts.map((bucket, index) => (
+        <div key={bucket.type}>
+          {index === activeTabIndex && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {bucket.products.map((product) => (
+                <SmartProductCard
+                  key={product.id}
+                  tenantId={product.tenantId}
+                  defaultGatewayType={product.defaultGatewayType || undefined}
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    title: product.title,
+                    priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
+                    salePriceCents: product.salePriceCents,
+                    listPriceCents: product.listPriceCents,
+                    isOnSale: product.isOnSale,
+                    discountPercentage: product.discountPercentage,
+                    currency: product.currency,
+                    imageUrl: product.imageUrl,
+                    brand: product.brand,
+                    tenantId: product.tenantId,
+                    sku: product.sku || '',
+                    stock: product.stock,
                   availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.defaultGatewayType,
-                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (activeBucket.type ? [activeBucket.type] : [])),
-                  featuredType: product.featuredType || activeBucket.type || undefined,
-                  categoryName: product.categoryName,
-                  categorySlug: product.categorySlug,
-                }}
-                variant="grid"
-                showCategory={true}
-                showDescription={true}
-                buttonLayout="stacked"
-                allowedFeaturedTypes={allowedFeaturedTypes}
-              />
-            ))}
-          </div>
+                    has_active_payment_gateway: product.hasActivePaymentGateway,
+                    payment_gateway_type: product.defaultGatewayType,
+                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucket.type ? [bucket.type] : [])),
+                    featuredType: product.featuredType || bucket.type || undefined,
+                    categoryName: product.categoryName,
+                    categorySlug: product.categorySlug,
+                  }}
+                  variant="grid"
+                  showCategory={true}
+                  showDescription={true}
+                  buttonLayout="stacked"
+                  allowedFeaturedTypes={allowedFeaturedTypes}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
