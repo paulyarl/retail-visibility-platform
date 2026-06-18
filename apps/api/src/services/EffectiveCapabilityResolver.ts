@@ -158,7 +158,7 @@ export async function resolveEffectiveCapabilities(
       merchantBundle.storefrontOptions
     ),
     resolveDirectoryEntryOptions(
-      rawCaps.capabilities.storefront_options?.features || {},
+      rawCaps.capabilities.directory_entry?.features || {},
       merchantBundle.directoryEntry
     ),
     resolveFaqOptions(
