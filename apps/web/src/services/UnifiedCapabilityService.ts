@@ -732,7 +732,7 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     const promise = (async (): Promise<BackendEffectiveCapabilities | null> => {
       try {
         const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
-        console.log(`[UnifiedCapabilityService] Fetching capabilities for tenant ${tenantId} with cache key ${cachekey}`);
+        // console.log(`[UnifiedCapabilityService] Fetching capabilities for tenant ${tenantId} with cache key ${cachekey}`);
         const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
           endpoint,
           {},
