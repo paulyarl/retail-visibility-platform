@@ -58,9 +58,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.917.0",
     "@google/genai": "^1.0.0",
-    "@platform/feature-definitions": "workspace:*",
     "@google/generative-ai": "^0.24.1",
+    "@huggingface/transformers": "^4.2.0",
     "@paypal/paypal-server-sdk": "^2.1.0",
+    "@platform/feature-definitions": "workspace:*",
     "@prisma/client": "^6.17.1",
     "@railway/cli": "^0.3.1",
     "@sendgrid/mail": "^8.1.4",

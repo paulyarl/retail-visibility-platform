@@ -103,7 +103,27 @@ After adding to `features_list`, the feature is **not automatically available to
    );
    ```
 
-3. **Add a merchant gate table column** if the feature is tenant-configurable:
+3. **Add a merchant gate storage table column** if the feature is tenant-configurable:
+
+   Each capability domain has a dedicated `tenant_*_options_settings` table for merchant preferences. Use the correct table for your domain:
+
+   | Capability Type Key | Merchant Gate Table | Prisma Model |
+   |---|---|---|
+   | `commerce_types` | `tenant_commerce_settings` | `tenant_commerce_settings` |
+   | `payment_gateway_options` | `tenant_payment_gateway_settings` | `tenant_payment_gateway_settings` |
+   | `storefront_types` | `tenant_storefront_type_settings` | `tenant_storefront_type_settings` |
+   | `fulfillment_options` | `tenant_fulfillment_settings` | `tenant_fulfillment_settings` |
+   | `barcode_scan_options` | `tenant_barcode_scan_settings` | `tenant_barcode_scan_settings` |
+   | `product_options` | `tenant_product_options_settings` | `tenant_product_options_settings` |
+   | `featured_options` | `tenant_featured_options_settings` | `tenant_featured_options_settings` |
+   | `integration_options` | `tenant_integration_settings` | `tenant_integration_settings` |
+   | `quickstart_options` | `tenant_quickstart_options_settings` | `tenant_quickstart_options_settings` |
+   | `storefront_options` | `tenant_storefront_options_settings` | `tenant_storefront_options_settings` |
+   | `directory_entry` | `tenant_storefront_options_settings` (page_type = 'directory_entry') | `tenant_storefront_options_settings` |
+   | `faq_options` | `tenant_faq_options_settings` | `tenant_faq_options_settings` |
+   | `crm_options` | `tenant_crm_options_settings` | `tenant_crm_options_settings` |
+   | `chatbot_options` | `tenant_chatbot_options_settings` | `tenant_chatbot_options_settings` |
+
    ```sql
    ALTER TABLE tenant_product_options_settings
      ADD COLUMN IF NOT EXISTS product_opt_<feature> boolean DEFAULT true;
@@ -112,7 +132,7 @@ After adding to `features_list`, the feature is **not automatically available to
    ```prisma
    product_opt_<feature> Boolean? @default(true)
    ```
-   (For storefront features, use `tenant_storefront_options_settings` and prefix with `qr_`, `storefront_`, etc.)
+   Run `pnpm prisma db pull && pnpm prisma generate` in `apps/api/` to sync the Prisma client after schema changes.
 
 4. **Update the backend resolver** in `apps/api/src/services/resolvers/{Domain}Resolver.ts`:
    - Map the new feature key to an `allowed_*` array or boolean in the resolver output.
@@ -138,6 +158,11 @@ After adding to `features_list`, the feature is **not automatically available to
    - If a new domain entirely, add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` (types only) and `mapAll` in `UnifiedCapabilityService.ts`.
 
 8. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
+
+9. **Update the PlanSummaryPanel** in `apps/web/src/components/settings/PlanSummaryPanel.tsx`:
+   - Add the capability type key to the `CAPABILITY_DISPLAY` map with a label, icon, and `settingsPath`.
+   - Add a summary block in `resolveCapabilitySummaries()` that reads from the mapped state (e.g. `caps.chatbotOptions`) and pushes feature labels + statuses.
+   - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 7).
 
 ## Verification Queries
 
@@ -209,3 +234,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the backend resolver** — the feature may be enabled in the DB but still unavailable to the frontend if the domain resolver in `apps/api/src/services/resolvers/` doesn't map the key into `allowed_*` / `effective_*`.
 - **Do not forget cache invalidation** — after adding a merchant gate column and its settings PUT handler, ensure the handler calls `invalidateEffectiveCapabilities(tenantId)` or the unified endpoint will serve stale data for up to 60 seconds.
 - **Do not duplicate resolution logic in the frontend** — `CapabilityResolutionService.ts` is obsolete. All resolution belongs in the backend resolver. The frontend `UnifiedCapabilityService` only maps.
+- **Do not forget the PlanSummaryPanel** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear in the tenant's plan summary card, even though it works functionally.

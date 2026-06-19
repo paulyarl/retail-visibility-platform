@@ -1376,13 +1376,19 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // Build URL based on target
     switch (target) {
       case RequestTarget.API:
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ||
+                       process.env.NEXT_PUBLIC_API_URL ||
+                       process.env.API_BASE_URL ||
+                       process.env.API_URL ||
+                       '';
         return `${apiUrl}${url}`;
 
       case RequestTarget.WEB:
-        const webUrl = process.env.NEXT_PUBLIC_WEB_URL ||
-                     process.env.FRONTEND_URL ||
+        const webUrl = process.env.NEXT_PUBLIC_APP_ORIGIN ||
+                     process.env.NEXTAUTH_URL ||
                      process.env.WEB_URL ||
+                     process.env.NEXT_PUBLIC_WEB_URL ||
+                     process.env.FRONTEND_URL ||
                      'http://localhost:3000';
         return `${webUrl}${url}`;
 
@@ -1392,7 +1398,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
       default:
         // Fallback to API
-        const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL ||
+                            process.env.NEXT_PUBLIC_API_URL ||
+                            process.env.API_BASE_URL ||
+                            process.env.API_URL ||
+                            '';
         return `${fallbackUrl}${url}`;
     }
   }

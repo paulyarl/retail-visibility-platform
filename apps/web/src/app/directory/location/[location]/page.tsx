@@ -36,7 +36,7 @@ function formatLocation(city: string, state: string): string {
 }
 
 async function getLocationListings(city: string, state: string, page: number = 1) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
   const limit = 12;
   
   try {

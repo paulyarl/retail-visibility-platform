@@ -27,6 +27,7 @@ import {
   resolveDirectoryEntryOptions,
   resolveFaqOptions,
   resolveCrmOptions,
+  resolveChatbotOptions,
 } from './resolvers';
 import type {
   EffectiveCapabilities,
@@ -168,6 +169,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.crm_options?.features || {},
       rawCaps.capabilities.crm_options?.capability_enabled
     ),
+    resolveChatbotOptions(
+      rawCaps.capabilities.chatbot_options?.features || {},
+      rawCaps.capabilities.chatbot_options?.capability_enabled
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -187,6 +192,7 @@ export async function resolveEffectiveCapabilities(
       directory_entry: effective[10],
       faq: effective[11],
       crm: effective[12],
+      chatbot: effective[13],
     },
     uncategorized_features: rawCaps.uncategorized_features,
   };
@@ -329,6 +335,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     directoryEntry,
     faqOptions,
     crmOptions,
+    chatbotOptions,
     barcodeScan,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -343,6 +350,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
@@ -359,6 +367,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     directoryEntry: directoryEntry as any,
     faqOptions: faqOptions as any,
     crmOptions: crmOptions as any,
+    chatbotOptions: chatbotOptions as any,
     barcodeScan: barcodeScan as any,
   };
 }

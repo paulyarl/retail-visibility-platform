@@ -150,6 +150,7 @@ The settings page component should:
 | `payment_gateway` | `PaymentGatewayResolver.ts` | `payment-gateway-settings.ts` | `mapPaymentGateway` |
 | `fulfillment` | `FulfillmentResolver.ts` | `fulfillment-settings.ts` | `mapFulfillment` |
 | `barcode_scan` | `BarcodeScanResolver.ts` | `barcode-scan-settings.ts` | `mapBarcodeScan` |
+| `chatbot_options` | `ChatbotOptionsResolver.ts` | `chatbot-options-settings.ts` | `mapChatbot` |
 
 All resolution happens in the backend resolver. The frontend `UnifiedCapabilityService` only maps.
 

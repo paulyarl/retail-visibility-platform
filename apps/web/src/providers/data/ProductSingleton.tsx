@@ -134,7 +134,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = `products:${JSON.stringify(filters)}`;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       let url = `${apiUrl}/api/products`;
       
       // Build query string from filters
@@ -181,7 +181,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = `product:${productId}:${tenantId || 'default'}`;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       let url = `${apiUrl}/api/products/${productId}`;
       
       if (tenantId) {
@@ -216,7 +216,7 @@ class ProductSingleton extends PublicApiSingleton {
     
     try {
       // OPTIMIZED: Single global MV query instead of multiple store calls + enrichment
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       let url = `${apiUrl}/api/directory/random-featured-global?limit=${limit}`;
       
       if (location) {
@@ -259,7 +259,7 @@ class ProductSingleton extends PublicApiSingleton {
     try {
       console.log('[ProductSingleton] Using legacy fallback method');
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       let url = `${apiUrl}/api/directory/random-featured`;
       
       if (location) {
@@ -302,7 +302,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = 'product-categories';
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const response = await this.makeDefaultRequest<any>(
         `${apiUrl}/api/products/categories`,
         {},
@@ -352,7 +352,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = `trending:${limit}`;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const response = await this.makeDefaultRequest<any>(
         `${apiUrl}/api/products/trending?limit=${limit}`,
         {},
@@ -373,7 +373,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = `new-arrivals:${limit}`;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const response = await this.makeDefaultRequest<any>(
         `${apiUrl}/api/products/new-arrivals?limit=${limit}`,
         {},
@@ -394,7 +394,7 @@ class ProductSingleton extends PublicApiSingleton {
     const cacheKey = `on-sale:${limit}`;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const response = await this.makeDefaultRequest<any>(
         `${apiUrl}/api/products/on-sale?limit=${limit}`,
         {},

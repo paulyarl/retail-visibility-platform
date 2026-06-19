@@ -692,6 +692,42 @@ export function toPublicCrmOptionsFlags(state: CrmOptionsState): PublicCrmOption
   };
 }
 
+// --- Chatbot Options ---
+
+export type ChatbotResponseEngineType =
+  | 'chatbot_static_lookup' | 'chatbot_shared_dynamic'
+  | 'chatbot_lora_finetuned' | 'chatbot_dedicated';
+
+export type ChatbotSkillType =
+  | 'chatbot_skill_product_search' | 'chatbot_skill_inventory'
+  | 'chatbot_skill_order_tracking' | 'chatbot_skill_store_hours'
+  | 'chatbot_skill_cross_merchant';
+
+export type ChatbotKnowledgeBaseType =
+  | 'chatbot_kb_static_faq' | 'chatbot_kb_rag_retrieval'
+  | 'chatbot_kb_product_scoped' | 'chatbot_kb_gap_report'
+  | 'chatbot_kb_auto_sync';
+
+export type ChatbotWidgetType =
+  | 'chatbot_widget_embed' | 'chatbot_widget_custom_theme'
+  | 'chatbot_widget_skill_cards' | 'chatbot_widget_after_hours';
+
+export interface ChatbotOptionsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  staticEnabled: boolean;
+  dynamicEnabled: boolean;
+  skillsEnabled: boolean;
+  kbEnabled: boolean;
+  widgetEnabled: boolean;
+  allowedResponseEngines: ChatbotResponseEngineType[];
+  allowedSkillTypes: ChatbotSkillType[];
+  allowedKbTypes: ChatbotKnowledgeBaseType[];
+  allowedWidgetTypes: ChatbotWidgetType[];
+  chatbotAvailable: boolean;
+  features: Record<string, boolean>;
+}
+
 // --- Quickstart Options ---
 
 export type QuickstartProductType = 'wizard' | 'image_gen';
@@ -765,6 +801,7 @@ export interface AllCapabilitiesState {
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
+  chatbotOptions: ChatbotOptionsState;
   uncategorizedFeatures: string[];
 }
 
