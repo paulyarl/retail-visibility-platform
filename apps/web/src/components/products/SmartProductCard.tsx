@@ -503,8 +503,8 @@ export default function SmartProductCard({
       return;
     }
 
-    // Skip if MV data is available
-    if (product.has_active_payment_gateway !== undefined) {
+    // Skip if MV data confirms gateway exists (trust positive, verify negative — MV may be stale)
+    if (product.has_active_payment_gateway === true) {
       return;
     }
 
@@ -640,6 +640,7 @@ export default function SmartProductCard({
                     width={24}
                     height={24}
                     className="w-6 h-6 rounded-lg object-cover"
+                    style={{ width: 'auto', height: 'auto' }}
                     sizes="24px"
                   />
                 ) : (
@@ -792,11 +793,6 @@ export default function SmartProductCard({
 
             {/* Purchase UI - Prominent */}
             {(() => {
-             /*  console.log('[SmartProductCard] Featured variant render check:', {
-                productId: product.id,
-                effectiveCanPurchase,
-                hasVariants: product.has_variants
-              }); */
               return (effectiveCanPurchase || commerceDisabled) && (
                 <div className="mt-4">
                   {(product.has_variants === true && !commerceDisabled) ? (
@@ -841,7 +837,7 @@ export default function SmartProductCard({
                 alt={displayTitle}
                 fill
                 className="object-cover rounded"
-                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                sizes="64px"
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
@@ -920,6 +916,7 @@ export default function SmartProductCard({
                     width={16}
                     height={16}
                     className="w-4 h-4 rounded object-cover"
+                    style={{ width: 'auto', height: 'auto' }}
                   />
                 ) : (
                   <div className="w-4 h-4 bg-neutral-200 dark:bg-neutral-600 rounded flex items-center justify-center">
@@ -1129,6 +1126,7 @@ export default function SmartProductCard({
                         width={20}
                         height={20}
                         className="w-5 h-5 rounded-lg object-cover"
+                        style={{ width: 'auto', height: 'auto' }}
                       />
                     ) : (
                       <div className="w-5 h-5 bg-neutral-200 dark:bg-neutral-600 rounded-lg flex items-center justify-center">

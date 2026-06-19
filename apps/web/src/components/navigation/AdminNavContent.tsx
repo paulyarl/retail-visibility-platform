@@ -263,6 +263,7 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Listings',          href: '/settings/admin/directory/listings' },
       { label: 'Featured',          href: '/settings/admin/directory/featured' },
       { label: 'Featured Products', href: '/settings/admin/featured-products' },
+      { label: 'Appearance',        href: '/settings/admin/directory/appearance' },
     ],
   },
   {

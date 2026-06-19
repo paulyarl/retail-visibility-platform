@@ -20,7 +20,8 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     return [
       'tenant-directory-management*',
       'directory-listings*',
-      'directory-operations*'
+      'directory-operations*',
+      'directory-entry-options*'
     ];
   }
 
@@ -31,6 +32,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     await this.invalidateCachePattern('tenant-directory-management*');
     await this.invalidateCachePattern('directory-listings*');
     await this.invalidateCachePattern('directory-operations*');
+    await this.invalidateCachePattern('directory-entry-options*');
   }
 
   private constructor() {

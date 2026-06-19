@@ -56,20 +56,6 @@ export default function RandomFeaturedProducts() {
     localStorage.setItem('random-featured-view-mode', mode);
   };
 
-  // Log singleton metrics for debugging
-  useEffect(() => {
-    /* console.log('RandomFeaturedProducts: Products loaded:', products.length);
-    console.log('RandomFeaturedProducts: Store info check:', products.map(p => ({
-      productId: p.id,
-      tenantId: p.tenantId,
-      hasStoreInfo: !!p.storeInfo,
-      storeName: p.storeInfo?.storeName,
-      storeLogo: p.storeInfo?.storeLogo,
-      storeCity: p.storeInfo?.storeCity,
-      storeState: p.storeInfo?.storeState
-    }))); */
-  }, [products]);
-
   let randomListPrice = null;
   let randomSalesPrice = null;
   // console.log(`RandomFeaturedProducts: randomListPrice: ${randomListPrice}, randomSalesPrice: ${randomSalesPrice}`);
@@ -227,6 +213,7 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
                   categoryName: product.category?.name,
                   categorySlug: product.category?.slug,
@@ -237,7 +224,8 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
-                defaultGatewayType={product.defaultGatewayType}
+                hasActivePaymentGateway={product.hasActivePaymentGateway}
+                defaultGatewayType={product.defaultGatewayType || undefined}
                 tenantName={product.storeName}
                 tenantLogo={product.storeLogo}
                 tenantCity={product.storeCity}
@@ -287,6 +275,7 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
                   categoryName: product.category?.name,
                   categorySlug: product.category?.slug,
@@ -297,7 +286,8 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
-                defaultGatewayType={product.defaultGatewayType}
+                hasActivePaymentGateway={product.hasActivePaymentGateway}
+                defaultGatewayType={product.defaultGatewayType || undefined}
                 tenantName={product.storeName}
                 tenantLogo={product.storeLogo}
                 tenantCity={product.storeCity}

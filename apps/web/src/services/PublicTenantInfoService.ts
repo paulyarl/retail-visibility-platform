@@ -297,7 +297,8 @@ class PublicTenantInfoService extends PublicApiSingleton {
       // console.log(`[PublicTenantInfoService] getPaymentGatewayStatus response:`, response);
       
       if (response?.success && response.data) {
-        const { gateways } = response.data;
+        // Trust the API's direct fields — the backend already validates gateway status
+        const { hasActivePaymentGateway, defaultGatewayType, gateways } = response.data;
         
         // If no gateways, return false immediately
         if (!gateways || gateways.length === 0) {
@@ -307,74 +308,9 @@ class PublicTenantInfoService extends PublicApiSingleton {
           };
         }
 
-        // Find the default/active gateway
-        const activeGateway = gateways.find((g: any) => g.isActive && (g.isDefault || g.is_default));
-        if (!activeGateway) {
-          return {
-            hasActiveGateway: false,
-            defaultGatewayType: undefined
-          };
-        }
-
-        // For OAuth-based gateways, verify OAuth completion
-        if (activeGateway.gatewayType === 'square') {
-          try {
-            const oauthResponse = await this.makeDefaultRequest<{
-              connected: boolean;
-              isExpired?: boolean;
-            }>(
-              `/public/tenant/${tenantId}/oauth-status/square`,
-              {},
-              `oauth-status-${tenantId}-square`,
-              300 // 5 minute cache for OAuth status
-            );
-
-            if (!oauthResponse?.success || !oauthResponse.data?.connected || oauthResponse.data?.isExpired) {
-              // console.log(`[PublicTenantInfoService] Square OAuth not completed or expired for tenant: ${tenantId}`);
-              return {
-                hasActiveGateway: false,
-                defaultGatewayType: undefined
-              };
-            }
-          } catch (oauthError) {
-            console.warn(`[PublicTenantInfoService] Failed to check Square OAuth status for tenant: ${tenantId}`, oauthError);
-            return {
-              hasActiveGateway: false,
-              defaultGatewayType: undefined
-            };
-          }
-        } else if (activeGateway.gatewayType === 'paypal') {
-          try {
-            const oauthResponse = await this.makeDefaultRequest<{
-              connected: boolean;
-              isExpired?: boolean;
-            }>(
-              `/public/tenant/${tenantId}/oauth-status/paypal`,
-              {},
-              `oauth-status-${tenantId}-paypal`,
-              300 // 5 minute cache for OAuth status
-            );
-
-            // For PayPal: trust is_active flag from database
-            // PayPal tokens can be auto-refreshed, so expired tokens are okay
-            // Only fail if there's no OAuth record at all (never connected)
-            if (!oauthResponse?.success || oauthResponse.data?.connected === undefined) {
-              return {
-                hasActiveGateway: false,
-                defaultGatewayType: undefined
-              };
-            }
-            // If we have any OAuth record (even expired), trust the is_active flag
-            // The checkout process will handle token refresh if needed
-          } catch (oauthError) {
-            // Don't fail on OAuth check error - trust the is_active flag
-          }
-        }
-
-        // For other gateways (Stripe with direct API keys, PayPal), trust the is_active flag
         return {
-          hasActiveGateway: true,
-          defaultGatewayType: activeGateway.gatewayType
+          hasActiveGateway: !!hasActivePaymentGateway,
+          defaultGatewayType: defaultGatewayType || undefined
         };
       }
 

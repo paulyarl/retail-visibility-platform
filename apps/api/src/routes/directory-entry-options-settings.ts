@@ -75,8 +75,16 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
     });
 
     // Resolve tier-gated layout options
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subscription_tier: true },
+    });
+    const tierKey = tenant?.subscription_tier || 'starter';
+    const tierFeatureKeys = await getTierFeatures(tierKey);
+    const tierFeatures = Object.fromEntries(tierFeatureKeys.map((k) => [k, true]));
+
     const tierState = await resolveDirectoryEntryOptions(
-      {},
+      tierFeatures,
       settings || null
     );
     const allowedLayouts = tierState.enabled ? tierState.allowed_layouts : [];
