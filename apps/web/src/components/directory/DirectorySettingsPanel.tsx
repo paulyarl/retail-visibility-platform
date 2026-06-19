@@ -178,6 +178,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
 
       // Invalidate frontend capability cache so public endpoints pick up changes
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      await tenantDirectoryManagementService.invalidateCache(`directory-entry-options-${tenantId}`);
       
       setLayoutSaveMessage('Layout saved successfully!');
       setTimeout(() => setLayoutSaveMessage(''), 3000);
@@ -254,6 +255,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
 
       // Invalidate frontend capability cache so public endpoints pick up changes
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      await tenantDirectoryManagementService.invalidateCache(`directory-entry-options-${tenantId}`);
 
       setSectionSaveMessage('Sections saved successfully!');
       setTimeout(() => setSectionSaveMessage(''), 3000);

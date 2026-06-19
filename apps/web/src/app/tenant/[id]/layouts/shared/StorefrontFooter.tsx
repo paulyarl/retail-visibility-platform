@@ -103,7 +103,7 @@ export default function StorefrontFooter({
               <div className="flex items-center gap-3 mb-3">
                 {logoUrl ? (
                   <div className="relative w-8 h-8">
-                    <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" />
+                    <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="32px" />
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
@@ -220,7 +220,7 @@ export default function StorefrontFooter({
             <div className="flex items-center gap-3 mb-4">
               {logoUrl ? (
                 <div className="relative w-10 h-10">
-                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" />
+                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="40px" />
                 </div>
               ) : (
                 <div className="w-10 h-10 rounded bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">

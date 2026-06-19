@@ -675,6 +675,7 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                 width={64}
                 height={64}
                 className="w-full h-full object-cover"
+                style={{ width: 'auto', height: 'auto' }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

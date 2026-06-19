@@ -375,6 +375,7 @@ export default function StorefrontClientWrapper({
                       alt={businessName}
                       fill
                       className="object-contain rounded-lg shadow-sm"
+                      sizes="56px"
                     />
                   </div>
                 ) : (
@@ -654,6 +655,7 @@ export default function StorefrontClientWrapper({
                         alt={`${businessName} logo`}
                         fill
                         className="object-contain p-8"
+                        sizes="(max-width: 768px) 100vw, 50vw"
                       />
                     </div>
                   ) : (

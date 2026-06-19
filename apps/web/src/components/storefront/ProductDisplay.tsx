@@ -109,6 +109,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                     alt={product.title}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform"
+                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
@@ -308,6 +309,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 alt={productsWithPhotos[currentProductIndex].title}
                 fill
                 className="object-contain transition-transform duration-300 group-hover:scale-110"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
               {/* Stock Badge */}
               {productsWithPhotos[currentProductIndex].availability === 'out_of_stock' && (
@@ -392,6 +394,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                   alt={productsWithPhotos[currentProductIndex].title}
                   fill
                   className="object-contain"
+                  sizes="100vw"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>

@@ -3862,4 +3862,141 @@ router.post('/inquiries', async (req, res) => {
   }
 });
 
+// ====================
+// HELP DESK SUPPORT (anonymous → platform admin)
+// ====================
+
+const HelpDeskSchema = z.object({
+  subject: z.string().min(2, 'Subject is required').max(200),
+  body: z.string().max(2000).optional(),
+  sender_name: z.string().max(100).optional(),
+  sender_email: z.string().email().optional(),
+  sender_phone: z.string().max(50).optional(),
+  captcha_answer: z.string().min(1, 'CAPTCHA verification required'),
+  captcha_seed: z.string().min(1, 'CAPTCHA seed required'),
+  website_hp: z.string().max(0).optional(),
+});
+
+const PLATFORM_TENANT_ID = 'platform';
+
+/**
+ * POST /api/public/help-desk
+ * Submit a Help Desk Support inquiry to platform admin — no auth required.
+ * Protected by client-side math CAPTCHA + honeypot (same as tenant inquiries).
+ * Creates a crm_inquiries record with tenant_id = 'platform' and source = 'help_desk_support'.
+ */
+router.post('/help-desk', async (req, res) => {
+  const { optionalCustomerAuth } = await import('../middleware/auth');
+  await optionalCustomerAuth(req, res, () => {});
+
+  try {
+    const parse = HelpDeskSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'validation_error',
+        details: parse.error.flatten().fieldErrors,
+      });
+    }
+
+    const { subject, body, sender_name, sender_email, sender_phone, captcha_answer, captcha_seed, website_hp } = parse.data;
+
+    // Honeypot check
+    if (website_hp !== undefined && website_hp !== '') {
+      return res.json({ success: true, data: { id: 'hp-rejected' } });
+    }
+
+    // Verify math CAPTCHA
+    try {
+      const [a, b] = captcha_seed.split(',').map(Number);
+      if (isNaN(a) || isNaN(b) || Number(captcha_answer) !== a + b) {
+        return res.status(400).json({
+          success: false,
+          error: 'captcha_failed',
+          message: 'CAPTCHA verification failed. Please try again.',
+        });
+      }
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'captcha_failed',
+        message: 'CAPTCHA verification failed. Please try again.',
+      });
+    }
+
+    // Verify platform tenant exists (auto-create if missing)
+    let platformTenant = await prisma.tenants.findUnique({
+      where: { id: PLATFORM_TENANT_ID },
+      select: { id: true },
+    });
+    if (!platformTenant) {
+      platformTenant = await prisma.tenants.create({
+        data: {
+          id: PLATFORM_TENANT_ID,
+          name: 'VisibleShelf Platform',
+          subscription_tier: 'enterprise',
+          subscription_status: 'active',
+          slug: 'platform-help-desk',
+          directory_visible: false,
+        },
+      });
+      console.log('[Help Desk] Auto-created platform system tenant');
+    }
+
+    // Determine source and optional customer link
+    let customerId: string | undefined;
+    let source = 'help_desk_support';
+
+    if (req.customer?.id) {
+      customerId = req.customer.id;
+      source = 'help_desk_support_customer';
+    }
+
+    const { CrmInquiryService } = await import('../services/CrmInquiryService');
+    const inquiryService = CrmInquiryService.getInstance();
+
+    const finalSenderName = sender_name || (req.customer?.first_name && req.customer?.last_name
+      ? `${req.customer.first_name} ${req.customer.last_name}`
+      : req.customer?.first_name || req.customer?.email?.split('@')[0] || undefined);
+    const finalSenderEmail = sender_email || req.customer?.email || undefined;
+    const finalSenderPhone = sender_phone || req.customer?.phone || undefined;
+
+    const inquiry = await inquiryService.create({
+      tenant_id: PLATFORM_TENANT_ID,
+      subject,
+      body: body || undefined,
+      customer_id: customerId,
+      source,
+      sender_name: finalSenderName,
+      sender_email: finalSenderEmail,
+      sender_phone: finalSenderPhone,
+      contact_id: undefined,
+    });
+
+    // Log activity
+    try {
+      await prisma.crm_activities.create({
+        data: {
+          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          tenant_id: PLATFORM_TENANT_ID,
+          actor_id: finalSenderEmail || 'anonymous',
+          actor_name: finalSenderName || 'Anonymous',
+          activity_type: 'inquiry_created',
+          content: `Help Desk inquiry: ${subject}`,
+          is_internal: false,
+        },
+      });
+    } catch (actErr) {
+      console.error('[Help Desk] Activity log error (non-critical):', actErr);
+    }
+
+    console.log(`[Help Desk] Created inquiry ${inquiry.id} for platform admin from ${finalSenderEmail || 'anonymous'}`);
+
+    res.status(201).json({ success: true, data: inquiry });
+  } catch (error) {
+    console.error('[Help Desk] Error creating inquiry:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit help desk inquiry' });
+  }
+});
+
 export default router;

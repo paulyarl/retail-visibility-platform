@@ -99,6 +99,11 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
               name: true,
             },
           },
+          tenant_business_profiles_list: {
+            select: {
+              logo_url: true,
+            },
+          },
           _count: {
             select: {
               inventory_items: true,
@@ -134,6 +139,11 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
                 select: {
                   id: true,
                   name: true,
+                },
+              },
+              tenant_business_profiles_list: {
+                select: {
+                  logo_url: true,
                 },
               },
               _count: {
@@ -183,6 +193,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
         graceEndsAt: tenant.grace_ends_at,
         createdAt: tenant.created_at,
         locationStatus: (tenant as any).location_status,
+        tenantLogo: (tenant as any).tenant_business_profiles_list?.logo_url || null,
         // hasPublishedDirectory: hasPublishedDirectory,
         organization: (tenant as any).organizations_list ? {
           id: (tenant as any).organizations_list.id,

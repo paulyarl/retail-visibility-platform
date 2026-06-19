@@ -234,7 +234,7 @@ export default function StorefrontEditorialLayout({
             <div className="flex items-center gap-3">
               {logoUrl ? (
                 <div className="relative w-10 h-10">
-                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" />
+                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="40px" />
                 </div>
               ) : (
                 <div className="w-10 h-10 rounded bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center">
@@ -266,7 +266,7 @@ export default function StorefrontEditorialLayout({
             <div className="flex items-center gap-3 min-w-0">
               {logoUrl ? (
                 <div className="relative w-9 h-9 flex-shrink-0">
-                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" />
+                  <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="36px" />
                 </div>
               ) : (
                 <div className="w-9 h-9 rounded bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center flex-shrink-0">
@@ -483,7 +483,7 @@ export default function StorefrontEditorialLayout({
                 {spotlightProducts.slice(1, 3).map((product: any, idx: number) => (
                   <div
                     key={product.id || idx}
-                    className="relative h-48 md:h-auto md:flex-1 rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 group"
+                    className="relative h-48 md:h-auto md:flex-1 md:min-h-[220px] rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 group"
                   >
                     {product.imageUrl || product.image_url ? (
                       <Image
