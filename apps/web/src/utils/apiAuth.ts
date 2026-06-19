@@ -121,7 +121,7 @@ export async function authenticatedFetch(
   accessToken: string | null,
   options: RequestInit = {}
 ): Promise<Response> {
-  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+  const apiBaseUrl = process.env.API_BASE_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '';
   const url = `${apiBaseUrl}${endpoint}`;
   
   const headers = {

@@ -5,19 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { MessageSquare, Send, Loader2, ThumbsUp, ThumbsDown, HelpCircle, AlertTriangle, PlusCircle } from 'lucide-react';
-import { faqService, FaqItem } from '@/services/FaqService';
+import { MessageSquare, Send, Loader2, HelpCircle, AlertTriangle, PlusCircle } from 'lucide-react';
 
-interface MatchResult {
-  faq: FaqItem;
-  score: number;
-  method: 'keyword' | 'exact';
+interface PreviewResult {
+  reply: string;
+  responseType: string;
+  matchedFaqId: string | null;
 }
 
 interface ChatMessage {
   role: 'user' | 'bot';
   content: string;
-  matches?: MatchResult[];
+  result?: PreviewResult;
   noMatch?: boolean;
 }
 
@@ -38,55 +37,33 @@ export default function FaqBotPreview({ tenantId }: FaqBotPreviewProps) {
     setLoading(true);
 
     try {
-      // Static keyword match for Free tier
-      const faqs = await faqService.listFAQs(tenantId, { scope: 'storefront', status: 'active' });
-      const query = question.toLowerCase();
-      const words = query.split(/\s+/).filter((w) => w.length > 2);
+      const resp = await fetch('/api/public/bot/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, message: question, pageContext: 'storefront' }),
+      });
 
-      const scored: MatchResult[] = faqs
-        .map((faq) => {
-          const qLower = faq.question.toLowerCase();
-          const aLower = faq.answer.toLowerCase();
-          let score = 0;
-          let exactMatch = false;
+      if (!resp.ok) throw new Error('Preview request failed');
+      const data = await resp.json();
 
-          // Exact substring match
-          if (qLower.includes(query) || aLower.includes(query)) {
-            score = 1.0;
-            exactMatch = true;
-          } else {
-            // Keyword match
-            let matched = 0;
-            for (const word of words) {
-              if (qLower.includes(word)) matched += 2; // question match worth more
-              else if (aLower.includes(word)) matched += 1;
-              else if (faq.tags?.some((t) => t.toLowerCase().includes(word))) matched += 1;
-            }
-            score = words.length > 0 ? matched / (words.length * 2) : 0;
-          }
+      if (!data.success) {
+        throw new Error(data.message || 'Preview failed');
+      }
 
-          return {
-            faq,
-            score,
-            method: exactMatch ? 'exact' : 'keyword',
-          } as MatchResult;
-        })
-        .filter((m) => m.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
+      const result: PreviewResult = {
+        reply: data.reply,
+        responseType: data.responseType,
+        matchedFaqId: data.matchedFaqId,
+      };
 
-      const topMatch = scored[0];
-      const isNoMatch = !topMatch || topMatch.score < 0.2;
-      const botContent = isNoMatch
-        ? "I couldn't find a matching FAQ for that question."
-        : topMatch.faq.answer;
+      const isNoMatch = result.responseType === 'fallback';
 
       setMessages((prev) => [
         ...prev,
         {
           role: 'bot',
-          content: botContent,
-          matches: scored,
+          content: result.reply,
+          result,
           noMatch: isNoMatch,
         },
       ]);
@@ -165,53 +142,39 @@ export default function FaqBotPreview({ tenantId }: FaqBotPreviewProps) {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-green-600" />
-            Matched Results
+            Match Results
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto">
-          {messages.filter((m) => m.role === 'bot' && m.matches).length === 0 ? (
+          {messages.filter((m) => m.role === 'bot' && m.result).length === 0 ? (
             <div className="text-center text-neutral-400 py-12">
-              <p className="text-sm">Matches will appear here after you ask a question</p>
+              <p className="text-sm">Match results will appear here after you ask a question</p>
             </div>
           ) : (
             messages
-              .filter((m) => m.role === 'bot' && m.matches)
+              .filter((m) => m.role === 'bot' && m.result)
               .slice(-1)[0]
-              ?.matches?.map((match, i) => {
-                const pct = match.score * 100;
-                const confidence = pct >= 70 ? 'high' : pct >= 40 ? 'medium' : 'low';
-                const colorMap = {
-                  high: { border: 'border-green-200', bg: 'bg-green-50', badge: 'border-green-300 text-green-700', dot: 'bg-green-500', label: 'High' },
-                  medium: { border: 'border-amber-200', bg: 'bg-amber-50', badge: 'border-amber-300 text-amber-700', dot: 'bg-amber-500', label: 'Medium' },
-                  low: { border: 'border-red-200', bg: 'bg-red-50', badge: 'border-red-300 text-red-700', dot: 'bg-red-500', label: 'Low' },
-                };
-                const c = colorMap[confidence];
-                return (
-                <div
-                  key={i}
-                  className={`p-4 rounded-lg border mb-3 ${c.border} ${c.bg}`}
-                >
+              ?.result && (
+                <div className={`p-4 rounded-lg border mb-3 ${
+                  messages.slice(-1)[0]?.noMatch
+                    ? 'border-amber-200 bg-amber-50'
+                    : 'border-green-200 bg-green-50'
+                }`}>
                   <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className={c.badge}>
-                      #{i + 1} Match
+                    <Badge variant="outline" className="text-xs">
+                      {messages.slice(-1)[0]?.result?.responseType || 'unknown'}
                     </Badge>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {match.method}
+                    {messages.slice(-1)[0]?.result?.matchedFaqId && (
+                      <Badge variant="outline" className="text-xs text-green-700 border-green-300">
+                        FAQ Matched
                       </Badge>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-                        <span className={`text-xs font-medium ${c.badge.split(' ')[1]}`}>{c.label}</span>
-                      </div>
-                      <span className="text-sm font-medium text-neutral-700">
-                        {pct.toFixed(0)}%
-                      </span>
-                    </div>
+                    )}
                   </div>
-                  <p className="text-sm font-medium text-neutral-900 mb-1">{match.faq.question}</p>
-                  <p className="text-xs text-neutral-500 line-clamp-2">{match.faq.answer}</p>
+                  <p className="text-sm font-medium text-neutral-900 mb-1">
+                    {messages.slice(-1)[0]?.result?.reply}
+                  </p>
                 </div>
-              );})
+              )
           )}
         </CardContent>
       </Card>

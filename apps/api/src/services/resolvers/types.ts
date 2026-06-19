@@ -47,6 +47,7 @@ export interface MerchantSettingsBundle {
   directoryEntry: StorefrontOptionsMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
+  chatbotOptions: ChatbotOptionsMerchantSettings | null;
   barcodeScan: BarcodeScanMerchantSettings | null;
 }
 
@@ -197,6 +198,18 @@ export interface FaqOptionsMerchantSettings {
 
 export interface CrmOptionsMerchantSettings {
   crm_enabled?: boolean | null;
+}
+
+export interface ChatbotOptionsMerchantSettings {
+  chatbot_enabled?: boolean | null;
+  chatbot_static_enabled?: boolean | null;
+  chatbot_dynamic_enabled?: boolean | null;
+  chatbot_skills_enabled?: boolean | null;
+  chatbot_kb_enabled?: boolean | null;
+  chatbot_widget_enabled?: boolean | null;
+  chatbot_widget_custom_theme?: boolean | null;
+  chatbot_widget_skill_cards?: boolean | null;
+  chatbot_widget_after_hours?: boolean | null;
 }
 
 export interface BarcodeScanMerchantSettings {
@@ -534,6 +547,39 @@ export interface EffectiveCrm {
   crm_available: boolean;
 }
 
+export type ChatbotResponseEngineType =
+  | 'chatbot_static_lookup' | 'chatbot_shared_dynamic'
+  | 'chatbot_lora_finetuned' | 'chatbot_dedicated';
+
+export type ChatbotSkillType =
+  | 'chatbot_skill_product_search' | 'chatbot_skill_inventory'
+  | 'chatbot_skill_order_tracking' | 'chatbot_skill_store_hours'
+  | 'chatbot_skill_cross_merchant';
+
+export type ChatbotKnowledgeBaseType =
+  | 'chatbot_kb_static_faq' | 'chatbot_kb_rag_retrieval'
+  | 'chatbot_kb_product_scoped' | 'chatbot_kb_gap_report'
+  | 'chatbot_kb_auto_sync';
+
+export type ChatbotWidgetType =
+  | 'chatbot_widget_embed' | 'chatbot_widget_custom_theme'
+  | 'chatbot_widget_skill_cards' | 'chatbot_widget_after_hours';
+
+export interface EffectiveChatbot {
+  enabled: boolean;
+  static_enabled: boolean;
+  dynamic_enabled: boolean;
+  skills_enabled: boolean;
+  kb_enabled: boolean;
+  widget_enabled: boolean;
+  allowed_response_engines: ChatbotResponseEngineType[];
+  allowed_skill_types: ChatbotSkillType[];
+  allowed_kb_types: ChatbotKnowledgeBaseType[];
+  allowed_widget_types: ChatbotWidgetType[];
+  is_flexible: boolean;
+  chatbot_available: boolean;
+}
+
 // ====================
 // TOP-LEVEL RESPONSE
 // ====================
@@ -554,6 +600,7 @@ export interface EffectiveCapabilities {
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;
+    chatbot: EffectiveChatbot;
     barcode_scan: EffectiveBarcodeScan;
   };
   gates?: {

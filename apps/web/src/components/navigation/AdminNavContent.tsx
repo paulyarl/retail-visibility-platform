@@ -314,6 +314,20 @@ const buildAdminNavItems = (): NavItem[] => [
     ],
   },
   {
+    label: 'Bot Platform',
+    icon: <Icon.Shield />,
+    href: '/settings/admin/bot',
+    prefetch: false,
+    children: [
+      { label: 'Dashboard',  href: '/settings/admin/bot' },
+      { label: 'Guardrails', href: '/settings/admin/bot/guardrails' },
+      { label: 'Intents',    href: '/settings/admin/bot/intents' },
+      { label: 'Skills',     href: '/settings/admin/bot/skills' },
+      { label: 'Knowledge',  href: '/settings/admin/bot/knowledge' },
+      { label: 'Tenants',    href: '/settings/admin/bot/tenants' },
+    ],
+  },
+  {
     label: 'Navigation Control',
     href: '/settings/admin/navigation',
     icon: <Icon.Navigation />,

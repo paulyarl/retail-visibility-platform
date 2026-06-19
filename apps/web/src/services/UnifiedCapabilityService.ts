@@ -61,6 +61,11 @@ import {
   CrmMessageType,
   CrmCustomerTicketType,
   CrmDashboardType,
+  ChatbotOptionsState,
+  ChatbotResponseEngineType,
+  ChatbotSkillType,
+  ChatbotKnowledgeBaseType,
+  ChatbotWidgetType,
 } from './CapabilityResolutionService';
 
 // ====================
@@ -83,6 +88,7 @@ interface BackendEffectiveCapabilities {
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
+    chatbot: BackendEffectiveChatbot;
     barcode_scan: BackendEffectiveBarcodeScan;
   };
   gates?: {
@@ -347,9 +353,20 @@ interface BackendEffectiveCrm {
   crm_available: boolean;
 }
 
-// ====================
-// MAPPERS (snake_case → camelCase)
-// ====================
+interface BackendEffectiveChatbot {
+  enabled: boolean;
+  static_enabled: boolean;
+  dynamic_enabled: boolean;
+  skills_enabled: boolean;
+  kb_enabled: boolean;
+  widget_enabled: boolean;
+  allowed_response_engines: ChatbotResponseEngineType[];
+  allowed_skill_types: ChatbotSkillType[];
+  allowed_kb_types: ChatbotKnowledgeBaseType[];
+  allowed_widget_types: ChatbotWidgetType[];
+  is_flexible: boolean;
+  chatbot_available: boolean;
+}
 
 function mapCommerce(b: BackendEffectiveCommerce): CommerceState {
   return {
@@ -661,6 +678,24 @@ function mapCrm(b: BackendEffectiveCrm): CrmOptionsState {
   };
 }
 
+function mapChatbot(b: BackendEffectiveChatbot): ChatbotOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    staticEnabled: b.static_enabled,
+    dynamicEnabled: b.dynamic_enabled,
+    skillsEnabled: b.skills_enabled,
+    kbEnabled: b.kb_enabled,
+    widgetEnabled: b.widget_enabled,
+    allowedResponseEngines: b.allowed_response_engines,
+    allowedSkillTypes: b.allowed_skill_types,
+    allowedKbTypes: b.allowed_kb_types,
+    allowedWidgetTypes: b.allowed_widget_types,
+    chatbotAvailable: b.chatbot_available,
+    features: {},
+  };
+}
+
 function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
@@ -679,6 +714,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
+    chatbotOptions: mapChatbot(b.effective.chatbot),
     uncategorizedFeatures: b.uncategorized_features,
   };
 }
@@ -859,6 +895,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
   async getCrmOptionsFlags(tenantId: string): Promise<PublicCrmOptionsFlags> {
     const state = await this.getCrmOptionsState(tenantId);
     return toPublicCrmOptionsFlags(state);
+  }
+
+  async getChatbotOptionsState(tenantId: string): Promise<ChatbotOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.chatbotOptions;
   }
 
   async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {

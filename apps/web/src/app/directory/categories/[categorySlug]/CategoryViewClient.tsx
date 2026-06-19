@@ -124,7 +124,7 @@ export default function CategoryViewClient({
       setError(null);
 
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
         
         // Decode URL-encoded slug (e.g., health-%26-beauty -> health-&-beauty)
         const decodedSlug = decodeURIComponent(categorySlug);

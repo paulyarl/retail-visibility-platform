@@ -173,6 +173,9 @@ import directoryEntryOptionsSettingsRoutes from './routes/directory-entry-option
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import crmOptionsSettingsRoutes from './routes/crm-options-settings';
+import chatbotOptionsSettingsRoutes from './routes/chatbot-options-settings';
+import botPublicRoutes from './routes/bot-public';
+import botMerchantRoutes from './routes/bot-merchant';
 import barcodeScanSettingsRoutes from './routes/barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from './routes/payment-gateway-settings';
@@ -7493,6 +7496,19 @@ app.use('/api/tenants', crmOptionsSettingsRoutes);
 app.use('/api', crmOptionsSettingsRoutes);
 console.log('✅ CRM options settings routes mounted at /api/tenants/:tenantId/crm-options and /api/public/tenant/:tenantId/crm-options');
 
+/* ------------------------------ chatbot options settings ------------------------------ */
+app.use('/api/tenants', chatbotOptionsSettingsRoutes);
+app.use('/api', chatbotOptionsSettingsRoutes);
+console.log('✅ Chatbot options settings routes mounted at /api/tenants/:tenantId/chatbot-options and /api/public/tenant/:tenantId/chatbot-options');
+
+/* ------------------------------ bot public routes ------------------------------ */
+app.use('/api/public/bot', botPublicRoutes);
+console.log('✅ Bot public routes mounted at /api/public/bot/*');
+
+/* ------------------------------ bot merchant routes ------------------------------ */
+app.use('/api/tenants/:tenantId/bot', authenticateToken, botMerchantRoutes);
+console.log('✅ Bot merchant routes mounted at /api/tenants/:tenantId/bot/*');
+
 /* ------------------------------ quickstart options settings ------------------------------ */
 app.use('/api/tenants', quickstartOptionsSettingsRoutes);
 console.log('✅ Quickstart options settings routes mounted at /api/tenants/:tenantId/quickstart-options');
@@ -8002,6 +8018,15 @@ if (process.env.NODE_ENV !== "test") {
         console.log('⭐ Featured products expiry monitor started (daily at midnight)');
       } catch (err) {
         console.error('⚠️ Failed to start featured products expiry monitor:', err);
+      }
+
+      // Start bot product embedding sync (every 12 hours)
+      try {
+        const { startBotProductEmbeddingSync } = await import('./jobs/bot-product-embedding-sync');
+        startBotProductEmbeddingSync();
+        console.log('🤖 Bot product embedding sync started (every 12 hours)');
+      } catch (err) {
+        console.error('⚠️ Failed to start bot product embedding sync:', err);
       }
     });
 

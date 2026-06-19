@@ -12,6 +12,7 @@ allowBuilds:
   core-js: false
   es5-ext: false
   esbuild: false
+  onnxruntime-node: true
   prisma: false
   protobufjs: false
   sharp: false

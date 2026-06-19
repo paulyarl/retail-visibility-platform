@@ -32,6 +32,7 @@ import capabilitiesRoutes from '../admin/capabilities';
 import tierCapabilitiesRoutes from '../admin/tier-capabilities';
 import adminTiersRoutes from '../admin/admin-tiers';
 import crmAdminRoutes from '../crm/admin/crm-admin';
+import botPlatformRoutes from '../admin/bot-platform';
 
 /**
  * Mount admin routes
@@ -88,6 +89,9 @@ export function mountAdminRoutes(app: Express) {
   
   // CRM admin routes
   app.use('/api/admin/crm', authenticateToken, crmAdminRoutes);
+
+  // Bot platform admin routes
+  app.use('/api/admin/bot', authenticateToken, botPlatformRoutes);
 
   // Platform settings - mount LAST to avoid conflicts with generic /api/admin routes
   console.log('🔧 Mounting platform settings route...');

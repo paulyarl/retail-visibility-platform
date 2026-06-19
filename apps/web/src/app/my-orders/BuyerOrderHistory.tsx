@@ -310,7 +310,7 @@ export default function BuyerOrderHistory() {
   };
 
   const handleDownload = (accessToken: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
     window.open(`${apiUrl}/api/download/${accessToken}`, '_blank');
   };
 

@@ -250,6 +250,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
+  chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/settings/bot' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -700,6 +701,44 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'crm_options',
       settingsPath: CAPABILITY_DISPLAY.crm_options.settingsPath ?? null,
+    });
+  }
+
+  // Chatbot Options
+  const bot = caps.chatbotOptions;
+  if (bot.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (bot.staticEnabled) {
+      specifics.push('Static FAQ');
+      statuses.push({ label: 'Static FAQ', status: 'enabled' });
+    }
+    if (bot.dynamicEnabled) {
+      specifics.push('Dynamic AI');
+      statuses.push({ label: 'Dynamic AI', status: 'enabled' });
+    }
+    if (bot.skillsEnabled) {
+      specifics.push('Skills');
+      statuses.push({ label: 'Skills', status: 'enabled' });
+    }
+    if (bot.kbEnabled) {
+      specifics.push('Knowledge Base');
+      statuses.push({ label: 'Knowledge Base', status: 'enabled' });
+    }
+    if (bot.widgetEnabled) {
+      specifics.push('Widget');
+      statuses.push({ label: 'Widget', status: 'enabled' });
+    }
+    summaries.push({
+      key: 'chatbot_options',
+      label: CAPABILITY_DISPLAY.chatbot_options.label,
+      icon: CAPABILITY_DISPLAY.chatbot_options.icon,
+      enabled: bot.enabled,
+      merchantGated: merchantGates?.['chatbot_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'chatbot_options',
+      settingsPath: CAPABILITY_DISPLAY.chatbot_options.settingsPath ?? null,
     });
   }
 
