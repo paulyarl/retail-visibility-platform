@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, Badge, Spinner, Button, Modal, Input, Select, Textarea } from '@/components/ui';
 import { botPlatformAdminService, type BotIntent } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 export default function BotIntentsPage() {
   const [intents, setIntents] = useState<BotIntent[]>([]);
@@ -104,15 +105,17 @@ export default function BotIntentsPage() {
   const categories = [...new Set(intents.map((i) => i.category))].sort();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Bot Intents</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage intent classification rules</p>
-        </div>
-        <Button onClick={openCreate}>Add Intent</Button>
-      </div>
-
+    <AdminBotPageShell
+      title="Bot Intents"
+      subtitle="Manage intent classification rules"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot', href: '/settings/admin/bot' },
+        { label: 'Intents' },
+      ]}
+      actions={<Button onClick={openCreate}>Add Intent</Button>}
+    >
       {categories.map((cat) => (
         <Card key={cat}>
           <CardContent>
@@ -210,6 +213,6 @@ export default function BotIntentsPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </AdminBotPageShell>
   );
 }

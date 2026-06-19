@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, Badge, Spinner, Button, Input } from '@/components/ui';
 import { botPlatformAdminService, type BotTenantSummary } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 export default function BotTenantsPage() {
   const [tenants, setTenants] = useState<BotTenantSummary[]>([]);
@@ -44,12 +45,16 @@ export default function BotTenantsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bot Tenants</h1>
-        <p className="text-sm text-neutral-500 mt-1">All tenants with chatbot configurations</p>
-      </div>
-
+    <AdminBotPageShell
+      title="Bot Tenants"
+      subtitle="All tenants with chatbot configurations"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot', href: '/settings/admin/bot' },
+        { label: 'Tenants' },
+      ]}
+    >
       <form onSubmit={handleSearch} className="flex gap-2">
         <Input
           value={search}
@@ -118,6 +123,6 @@ export default function BotTenantsPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminBotPageShell>
   );
 }

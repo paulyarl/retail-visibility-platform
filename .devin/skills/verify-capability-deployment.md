@@ -134,6 +134,21 @@ The settings page component should:
 - [ ] Use `isTierAllowed(key)` pattern for per-feature tier gating
 - [ ] Call `handleSave` which persists merchant preferences via the PUT endpoint
 
+### 8. Check Frontend Dashboard Surfaces
+
+Two components on the tenant dashboard display capability status. A capability missing from either will not be visible to merchants on the dashboard even if it works functionally.
+
+**CapabilityShowcase** (`apps/web/src/components/dashboard/CapabilityShowcase.tsx`):
+- [ ] The capability has a row in the `rows` array inside the `useMemo` block
+- [ ] The row reads from `cap.<domain>Options` (e.g. `cap.chatbotOptions`)
+- [ ] `label`, `icon`, `detail`, and `settingsLink` are provided
+- [ ] The row appears in the "Your Capabilities" card on the tenant dashboard
+
+**PlanSummaryPanel** (`apps/web/src/components/settings/PlanSummaryPanel.tsx`):
+- [ ] The capability type key is in the `CAPABILITY_DISPLAY` map
+- [ ] A summary block exists in `resolveCapabilitySummaries()` that reads from the mapped state
+- [ ] The capability appears in the plan summary card
+
 ## Capability Type Key → Resolver Mapping
 
 | Capability Type Key | Backend Resolver | Settings Route | Frontend Mapper |

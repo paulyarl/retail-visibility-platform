@@ -55,6 +55,7 @@ import TierHeroIllustration from "./TierHeroIllustration";
 import CapabilityShowcase from "./CapabilityShowcase";
 import { useAllCapabilities, useMerchantGates } from "@/hooks/tenant-access/useCapabilityAccess";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
+import BotTenantWidget from '@/components/bot/BotTenantWidget';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -434,14 +435,18 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h3 className="font-semibold text-gray-900">Help Desk</h3>
+                  <h3 className="font-semibold text-gray-900">Help Desk &amp; Bot</h3>
                 </div>
-                {/* CRM Support Widget */}
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-md">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CRM Support Widget */}
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                     <CrmTenantWidget tenantId={tenantId} />
                   </div>
-                </motion.div>
+                  {/* Bot Widget */}
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <BotTenantWidget tenantId={tenantId} />
+                  </div>
+                </div>
               </div>
             </motion.div>
             {/* Capabilities */}

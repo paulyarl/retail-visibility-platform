@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import BotTenantWidget from '@/components/bot/BotTenantWidget';
+import BotSetupGuide from '@/components/bot/BotSetupGuide';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface BotDashboardPageProps {
@@ -16,17 +16,6 @@ export default function BotDashboardPage({ tenantId }: BotDashboardPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bot Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Monitor and manage your chatbot</p>
-        </div>
-        <Link href={`/t/${tenantId}/bot/config`}>
-          <Button variant="outline" size="sm">Configure</Button>
-        </Link>
-      </div>
-
       {/* Free tier notice */}
       {chatbotCaps && chatbotCaps.enabled && !chatbotCaps.dynamicEnabled && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
@@ -42,6 +31,9 @@ export default function BotDashboardPage({ tenantId }: BotDashboardPageProps) {
           </Link>
         </div>
       )}
+
+      {/* Getting Started Guide for new merchants */}
+      <BotSetupGuide tenantId={tenantId} />
 
       {/* Main Widget */}
       <Card>

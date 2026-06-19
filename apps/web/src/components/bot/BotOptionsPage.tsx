@@ -162,11 +162,7 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Chatbot Options</h1>
-          <p className="text-sm text-gray-500 mt-1">Toggle chatbot features available on your plan</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>

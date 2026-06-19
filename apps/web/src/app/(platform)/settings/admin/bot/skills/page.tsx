@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal, Input, Select, Textarea } from '@/components/ui';
 import { botPlatformAdminService, type BotSkill } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 const STATUS_VARIANT: Record<string, any> = {
   active: 'success',
@@ -124,15 +125,17 @@ export default function BotSkillsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Bot Skills</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage the skill registry available to chatbots</p>
-        </div>
-        <Button onClick={openCreate}>Add Skill</Button>
-      </div>
-
+    <AdminBotPageShell
+      title="Bot Skills"
+      subtitle="Manage the skill registry available to chatbots"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot', href: '/settings/admin/bot' },
+        { label: 'Skills' },
+      ]}
+      actions={<Button onClick={openCreate}>Add Skill</Button>}
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {skills.map((skill) => (
           <Card key={skill.id}>
@@ -258,6 +261,6 @@ export default function BotSkillsPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </AdminBotPageShell>
   );
 }
