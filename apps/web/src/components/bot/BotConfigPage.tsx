@@ -100,11 +100,7 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bot Configuration</h1>
-          <p className="text-sm text-gray-500 mt-1">Customize your chatbot&apos;s behavior and appearance</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>

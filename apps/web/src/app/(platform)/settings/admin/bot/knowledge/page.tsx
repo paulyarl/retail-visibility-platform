@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Select, Modal } from '@/components/ui';
 import { botPlatformAdminService, type BotKnowledgeStatus } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 export default function BotKnowledgePage() {
   const [tenants, setTenants] = useState<BotKnowledgeStatus[]>([]);
@@ -54,12 +55,16 @@ export default function BotKnowledgePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Knowledge Base</h1>
-        <p className="text-sm text-neutral-500 mt-1">FAQ and product embedding status across all tenants</p>
-      </div>
-
+    <AdminBotPageShell
+      title="Knowledge Base"
+      subtitle="FAQ and product embedding status across all tenants"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot', href: '/settings/admin/bot' },
+        { label: 'Knowledge' },
+      ]}
+    >
       <Card>
         <CardContent>
           {tenants.length === 0 ? (
@@ -146,6 +151,6 @@ export default function BotKnowledgePage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </AdminBotPageShell>
   );
 }

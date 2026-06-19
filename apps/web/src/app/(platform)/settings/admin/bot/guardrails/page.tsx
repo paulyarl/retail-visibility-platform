@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal, Input, Select } from '@/components/ui';
 import { botPlatformAdminService, type BotGuardrailRule } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 const SEVERITY_COLORS: Record<string, any> = {
   low: 'default',
@@ -108,15 +109,17 @@ export default function BotGuardrailsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Bot Guardrails</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage content moderation and safety rules</p>
-        </div>
-        <Button onClick={openCreate}>Add Rule</Button>
-      </div>
-
+    <AdminBotPageShell
+      title="Bot Guardrails"
+      subtitle="Manage content moderation and safety rules"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot', href: '/settings/admin/bot' },
+        { label: 'Guardrails' },
+      ]}
+      actions={<Button onClick={openCreate}>Add Rule</Button>}
+    >
       <Card>
         <CardContent>
           {rules.length === 0 ? (
@@ -224,6 +227,6 @@ export default function BotGuardrailsPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </AdminBotPageShell>
   );
 }

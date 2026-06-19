@@ -20,6 +20,7 @@ import {
   Rocket,
   Users,
   MapPin,
+  Bot,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 
@@ -164,6 +165,17 @@ export default function CapabilityShowcase({
     if (crm?.customerTicketsEnabled) crmDetailParts.push('Customer Portal');
     if (crm?.dashboardEnabled) crmDetailParts.push('Dashboard');
 
+    // --- Chatbot Options ---
+    const cb = cap.chatbotOptions;
+    const cbTier = cb?.chatbotAvailable ?? false;
+    const cbMerchantGated = false;
+    const cbDetailParts: string[] = [];
+    if (cb?.staticEnabled) cbDetailParts.push('Static FAQ');
+    if (cb?.dynamicEnabled) cbDetailParts.push('Dynamic AI');
+    if (cb?.skillsEnabled) cbDetailParts.push('Skills');
+    if (cb?.kbEnabled) cbDetailParts.push('Knowledge Base');
+    if (cb?.widgetEnabled) cbDetailParts.push('Widget');
+
     return [
       {
         key: "commerce",
@@ -306,6 +318,17 @@ export default function CapabilityShowcase({
           ? (crmDetailParts.length > 0 ? crmDetailParts.join(', ') : 'Support Hub')
           : "Not available",
         settingsLink: `/t/${tenantId}/support`,
+      },
+      {
+        key: "chatbotOptions",
+        label: "Chatbot",
+        icon: <Bot className="w-4 h-4" />,
+        enabled: cbTier,
+        status: getStatus(cbTier, cbMerchantGated),
+        detail: cbTier
+          ? (cbDetailParts.length > 0 ? cbDetailParts.join(', ') : 'AI Assistant')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/bot/options`,
       },
     ];
   }, [capabilities, tenantId]);

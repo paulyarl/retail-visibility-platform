@@ -68,11 +68,6 @@ export default function BotSkillsPage({ tenantId }: BotSkillsPageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bot Skills</h1>
-        <p className="text-sm text-gray-500 mt-1">Enable and configure chatbot skills</p>
-      </div>
-
       {chatbotCaps && !chatbotCaps.skillsEnabled && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
           <div>

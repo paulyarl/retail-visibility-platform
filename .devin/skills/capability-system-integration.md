@@ -196,6 +196,15 @@ This ensures the unified endpoint serves fresh data on the next request.
 - `CapabilityShowcase` component renders capability cards on the dashboard
 - `useAllCapabilities` hook provides the full capability state from `UnifiedCapabilityService`
 
+**CapabilityShowcase**: `apps/web/src/components/dashboard/CapabilityShowcase.tsx`
+
+- The "Your Capabilities" card on the tenant dashboard — each capability appears as a row with icon, status badge, detail text, and a link to its settings page
+- Add a row to the `rows` array in the `useMemo` block for the new capability:
+  - Extract state from `cap.<domain>Options` (e.g. `cap.chatbotOptions`)
+  - Compute `tier` (is the capability available at the tier level?) and `merchantGated` (is it partially disabled by merchant prefs?)
+  - Provide `label`, `icon` (from lucide-react), `detail` (list active sub-features or "Not available"), and `settingsLink`
+- A capability missing from this array will not appear on the dashboard even if it works functionally
+
 ## Key Patterns
 
 ### Backend Resolvers
@@ -260,6 +269,152 @@ This ensures the job respects both the tier gate AND the merchant's toggle prefe
 | Quickstart | `QuickstartOptionsResolver.ts` | `tenant_quickstart_options_settings` | `quickstart-options-settings.ts` | `mapQuickstart` |
 | FAQ | `FaqOptionsResolver.ts` | `tenant_faq_options_settings` | `faq-options-settings.ts` | `mapFaqOptions` |
 | CRM | `CrmOptionsResolver.ts` | `tenant_crm_options_settings` | `crm-options-settings.ts` | `mapCrmOptions` |
+| Chatbot | `ChatbotOptionsResolver.ts` | `tenant_chatbot_options_settings` | `chatbot-options-settings.ts` | `mapChatbot` |
 | Barcode Scan | `BarcodeScanResolver.ts` | `tenant_barcode_scan_settings` | `barcode-scan-options-settings.ts` | `mapBarcodeScan` |
 
 All backend resolvers are pure functions called by `EffectiveCapabilityResolver.ts`. The frontend `UnifiedCapabilityService` maps their output. The old `*OptionsService` classes are deprecated.
+
+## Advanced Patterns from the Chatbot Integration
+
+The chatbot capability introduced several patterns that future capabilities should follow, especially complex domains with sub-categories, flexible-tier organizations, and public-facing APIs.
+
+### Flexible-Tier Pattern (`*_flexible` feature key)
+
+Organization tiers (`chain_starter`, `chain_professional`, `organization`) get a `*_flexible` feature key (e.g., `chatbot_flexible`) instead of individual feature flags. When `flexible` is true, the resolver unlocks all sub-types without checking each individually:
+
+```ts
+// In ChatbotOptionsResolver.ts
+const flexible = !!feat.chatbot_flexible;
+const staticEnabled = flexible || !!feat.chatbot_static_enabled;
+const dynamicEnabled = flexible || !!feat.chatbot_dynamic_enabled;
+
+// Allowed arrays: flexible unlocks everything
+if (flexible) {
+  allowedResponseEngines.push('chatbot_static_lookup', 'chatbot_shared_dynamic', 'chatbot_lora_finetuned', 'chatbot_dedicated');
+} else {
+  if (feat.chatbot_static_lookup) allowedResponseEngines.push('chatbot_static_lookup');
+  // ... per-feature gating
+}
+```
+
+This pattern is used by CRM, FAQ, and Chatbot. Any new capability that needs org-tier full access should define a `<domain>_flexible` feature key and follow the same pattern.
+
+### Sub-Category Allowed Arrays
+
+Complex capabilities group their features into sub-categories with `allowed_*` arrays. The chatbot has four:
+
+- `allowed_response_engines` — static lookup, shared dynamic, LoRA fine-tuned, dedicated
+- `allowed_skill_types` — product search, inventory, order tracking, store hours, cross-merchant
+- `allowed_kb_types` — static FAQ, RAG retrieval, product-scoped, gap report, auto-sync
+- `allowed_widget_types` — embed, custom theme, skill cards, after hours
+
+The resolver builds these from individual feature flags (or unlocks all when `flexible`). The route layer's `TIER_GATE_MAP` then maps merchant toggles to these arrays for enforcement.
+
+### TIER_GATE_MAP in Route Layer
+
+The settings route uses a `TIER_GATE_MAP` to validate merchant PUT requests against multiple possible tier feature keys. This handles cases where a merchant toggle maps to more than one tier feature:
+
+```ts
+// In chatbot-options-settings.ts
+const TIER_GATE_MAP: Record<string, string[]> = {
+  chatbot_static_enabled: ['chatbot_static_enabled', 'chatbot_static_lookup', 'chatbot_flexible'],
+  chatbot_dynamic_enabled: ['chatbot_dynamic_enabled', 'chatbot_shared_dynamic', 'chatbot_flexible'],
+  chatbot_widget_custom_theme: ['chatbot_widget_custom_theme', 'chatbot_flexible'],
+  // ...
+};
+
+// PUT handler: check if any gate feature is enabled
+const isAllowed = tierState.is_flexible || gateFeatures.some(gk =>
+  (caps.effective.chatbot as any)[gk] ||
+  tierState.allowed_response_engines.includes(gk as any) ||
+  tierState.allowed_skill_types.includes(gk as any) ||
+  tierState.allowed_kb_types.includes(gk as any) ||
+  tierState.allowed_widget_types.includes(gk as any)
+);
+```
+
+This pattern should be used when a merchant toggle could be unlocked by either a broad category flag, a specific sub-type flag, or the flexible override.
+
+### Public API Routes (Unauthenticated)
+
+The chatbot introduced public-facing API routes that bypass `authenticateToken` middleware. These are mounted separately from the authenticated settings routes:
+
+```ts
+// In src/index.ts (not in mounts/*.ts)
+app.use('/api/tenants', chatbotOptionsSettingsRoutes);  // includes public/tenant/:tenantId/* endpoint
+app.use('/api', chatbotOptionsSettingsRoutes);          // dual mount for /api/public/tenant/* path
+app.use('/api/public/bot', botPublicRoutes);            // fully public bot widget API
+app.use('/api/tenants/:tenantId/bot', authenticateToken, botMerchantRoutes); // authenticated merchant API
+```
+
+Key rules for public routes:
+- **Never expose merchant preferences or internal config** — the public endpoint returns only a minimal subset (e.g., `chatbot_enabled`, `chatbot_static_enabled`, `chatbot_widget_enabled`)
+- **Always check capability via `resolveEffectiveCapabilities()`** before serving — the tier gate is the security boundary
+- **Set deprecation headers** on legacy public endpoints that are superseded by the unified endpoint
+- **Rate limit** public endpoints (the bot uses in-memory per-session rate limiting)
+
+### Service Layer Beyond Settings
+
+The chatbot demonstrates that a capability domain can have extensive backend services beyond just settings CRUD. The chatbot has 11 services in `apps/api/src/services/`:
+
+| Service | Purpose |
+|---------|---------|
+| `BotConfigurationService` | Per-tenant bot config (name, tone, greeting, widget appearance) |
+| `BotConversationService` | Session management, 24h expiry, message storage, archival, GDPR erase |
+| `BotStaticResponseService` | Free-tier FAQ keyword matching (exact → Jaccard similarity → fallback) |
+| `BotDynamicResponseService` | GPT-powered responses with RAG context + multi-turn history |
+| `BotGuardrailService` | Rule-based safety filtering (banned phrases, PII, moderation, competitor) |
+| `BertGuardrailService` | BERT toxicity detection (Transformers.js, falls back to rule-based) |
+| `BotIntentService` | Keyword-based intent detection with Jaccard similarity |
+| `BertIntentService` | BERT zero-shot intent classification (Transformers.js, falls back to keyword) |
+| `BotSkillService` | Skill execution with tier/capability/status gating |
+| `BotRagService` | FAQ/product chunking, OpenAI embeddings, pgvector similarity search |
+| `BotCrmIntegrationService` | Escalation from bot conversations to CRM support tickets |
+| `BotBusinessHoursService` | After-hours detection from `business_hours_list` |
+| `BotProductCatalogService` | Product search via `mv_storefront_discovery` materialized view |
+
+These services use the capability resolver for tier gating at runtime:
+```ts
+const caps = await resolveEffectiveCapabilities(tenantId);
+if (!caps?.effective.chatbot.enabled) return res.status(403).json({ error: 'capability_disabled' });
+const useDynamic = caps.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable();
+```
+
+### Frontend Service Pattern (Tenant-Scoped vs Public)
+
+The chatbot introduced two frontend service singletons:
+
+- **`BotService`** (extends `TenantApiSingleton`) — authenticated merchant dashboard operations (config CRUD, conversation list, skills, analytics)
+- **`PublicBotService`** (extends `PublicApiSingleton`) — unauthenticated widget operations (fetch config, start conversation, send message, submit feedback)
+
+Use this dual-service pattern when a capability has both merchant-facing admin UI and customer-facing public touchpoints.
+
+### Embeddable Widget (Shadow DOM)
+
+The chatbot ships an embeddable widget as static assets in `apps/web/public/bot-widget/`. Key patterns:
+
+- **Shadow DOM** encapsulation to avoid CSS/JS conflicts with the host page
+- **`data-tenant-id`** auto-init from script attributes (no build step required for merchants)
+- **localStorage session resume** with 24h TTL matching the backend session expiry
+- **Progressive enhancement**: widget fetches config first, only renders if `status === 'active'`
+- **Capability-gated rendering**: the widget calls `/api/public/bot/config` which checks `resolveEffectiveCapabilities` server-side
+
+### Prisma Schema for Complex Capabilities
+
+The chatbot added 10 Prisma models beyond the settings table. When a capability needs persistent storage:
+
+1. Add models to `schema.prisma` with proper foreign keys to `tenants`
+2. Use `@db.Uuid` for IDs with `@default(dbgenerated("gen_random_uuid()"))`
+3. Add `@@index` for query-critical columns
+4. For vector columns (pgvector), use `Unsupported("vector")?` — Prisma can't natively handle vector types, so use `$queryRaw` for vector operations
+5. Run `prisma db pull` after migrations to sync the schema
+
+### Migration Conflict Resolution
+
+When merging feature branches that add Prisma models, merge conflicts in `schema.prisma` are common. The resolution pattern:
+
+1. Keep both sides' additions (enums, models)
+2. Ensure each enum/model has its own closing brace
+3. Remove all `<<<<<<< HEAD`, `=======`, `>>>>>>> branch` markers
+4. Run `pnpm prisma db pull` to verify the schema is valid
+5. If `db pull` brings in DB-side changes, review them before committing

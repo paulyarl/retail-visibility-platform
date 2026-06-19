@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import SetTenantId from '@/components/client/SetTenantId';
 import BotDashboardPage from '@/components/bot/BotDashboardPage';
+import TenantBotPageShell from '@/components/bot/TenantBotPageShell';
 
 export const metadata: Metadata = {
   title: 'Bot Dashboard',
@@ -22,7 +23,17 @@ export default async function BotDashboard({ params }: PageProps) {
   return (
     <>
       <SetTenantId tenantId={tenantId} />
-      <BotDashboardPage tenantId={tenantId} />
+      <TenantBotPageShell
+        tenantId={tenantId}
+        title="Bot Dashboard"
+        subtitle="Monitor and manage your chatbot"
+        breadcrumbs={[
+          { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },
+          { label: 'Bot' },
+        ]}
+      >
+        <BotDashboardPage tenantId={tenantId} />
+      </TenantBotPageShell>
     </>
   );
 }

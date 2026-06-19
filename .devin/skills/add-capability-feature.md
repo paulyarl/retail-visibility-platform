@@ -164,6 +164,12 @@ After adding to `features_list`, the feature is **not automatically available to
    - Add a summary block in `resolveCapabilitySummaries()` that reads from the mapped state (e.g. `caps.chatbotOptions`) and pushes feature labels + statuses.
    - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 7).
 
+10. **Update the CapabilityShowcase** in `apps/web/src/components/dashboard/CapabilityShowcase.tsx`:
+    - Add a row to the `rows` array in the `useMemo` block for the new capability.
+    - Extract the state from `cap.<domain>Options` and compute `tier` / `merchantGated` status.
+    - Provide a `label`, `icon` (from lucide-react), `detail` string (list active sub-features or "Not available"), and `settingsLink` (e.g. `/t/${tenantId}/bot/options`).
+    - This is the "Your Capabilities" card on the tenant dashboard — a capability missing from this array will not appear on the dashboard even if it works functionally.
+
 ## Verification Queries
 
 ```sql
@@ -235,3 +241,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget cache invalidation** — after adding a merchant gate column and its settings PUT handler, ensure the handler calls `invalidateEffectiveCapabilities(tenantId)` or the unified endpoint will serve stale data for up to 60 seconds.
 - **Do not duplicate resolution logic in the frontend** — `CapabilityResolutionService.ts` is obsolete. All resolution belongs in the backend resolver. The frontend `UnifiedCapabilityService` only maps.
 - **Do not forget the PlanSummaryPanel** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear in the tenant's plan summary card, even though it works functionally.
+- **Do not forget the CapabilityShowcase** — a capability missing from the `rows` array in `CapabilityShowcase.tsx` will not appear in the "Your Capabilities" card on the tenant dashboard, even though it works functionally.

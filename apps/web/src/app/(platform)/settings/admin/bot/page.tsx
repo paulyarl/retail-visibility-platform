@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { botPlatformAdminService, type BotDashboardStats } from '@/services/bot/BotPlatformAdminService';
+import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 
 export default function BotDashboardPage() {
   const [stats, setStats] = useState<BotDashboardStats | null>(null);
@@ -42,12 +43,15 @@ export default function BotDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bot Platform Dashboard</h1>
-        <p className="text-sm text-neutral-500 mt-1">Global chatbot overview and health</p>
-      </div>
-
+    <AdminBotPageShell
+      title="Bot Platform Dashboard"
+      subtitle="Global chatbot overview and health"
+      breadcrumbs={[
+        { label: 'Settings', href: '/settings' },
+        { label: 'Admin', href: '/settings/admin' },
+        { label: 'Bot' },
+      ]}
+    >
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Active Bots" value={stats?.activeConfigs ?? 0} href="/settings/admin/bot/tenants" color="green" />
@@ -119,7 +123,7 @@ export default function BotDashboardPage() {
           Knowledge Base
         </Link>
       </div>
-    </div>
+    </AdminBotPageShell>
   );
 }
 
