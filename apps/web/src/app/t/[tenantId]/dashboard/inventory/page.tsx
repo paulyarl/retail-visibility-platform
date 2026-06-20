@@ -20,13 +20,14 @@ import { CachedTenantService } from '@/lib/cache/cached-tenant-service';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 
 interface InventoryDashboardPageProps {
-  params: {
+  params: Promise<{
     tenantId: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: InventoryDashboardPageProps): Promise<Metadata> {
-  const tenant = await CachedTenantService.getTenantInfo(params.tenantId);
+  const { tenantId } = await params;
+  const tenant = await CachedTenantService.getTenantInfo(tenantId);
   
   if (!tenant) {
     return {
@@ -42,8 +43,9 @@ export async function generateMetadata({ params }: InventoryDashboardPageProps):
 }
 
 export default async function InventoryDashboardPage({ params }: InventoryDashboardPageProps) {
+  const { tenantId } = await params;
   // Verify tenant exists
-  const tenant = await CachedTenantService.getTenantInfo(params.tenantId);
+  const tenant = await CachedTenantService.getTenantInfo(tenantId);
   
   if (!tenant) {
     notFound();
@@ -52,7 +54,7 @@ export default async function InventoryDashboardPage({ params }: InventoryDashbo
   return (
     <div className="container mx-auto px-4 py-6">
       <Suspense fallback={<InventoryDashboardSkeleton />}>
-        <InventoryDashboardWrapper tenantId={params.tenantId} tenant={tenant} />
+        <InventoryDashboardWrapper tenantId={tenantId} tenant={tenant} />
       </Suspense>
     </div>
   );

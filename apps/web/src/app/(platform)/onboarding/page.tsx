@@ -218,7 +218,7 @@ function OnboardingContent() {
                   width={400}
                   height={60}
                   className="max-h-8 w-auto object-contain mx-auto mb-6"
-                  onError={(e) => {
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                     console.error('[SignupWizard] Logo failed to load:', settings.logoUrl);
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';

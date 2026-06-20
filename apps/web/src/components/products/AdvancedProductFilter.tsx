@@ -322,7 +322,7 @@ const AdvancedProductFilter: React.FC<AdvancedProductFilterProps> = ({
                   </Button>
 
                   {/* Category Options */}
-                  <Collapse in={expandedCategories[category.id]}>
+                  <Collapse expanded={expandedCategories[category.id]}>
                     <Stack gap="md">
                       {category.options.map(option => (
                         <div key={option.id} className="space-y-2">

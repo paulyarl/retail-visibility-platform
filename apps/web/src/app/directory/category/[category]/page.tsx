@@ -7,12 +7,12 @@ import { BreadcrumbStructuredData } from '@/components/directory/StructuredData'
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface CategoryPageProps {
-  params: {
+  params: Promise<{
     category: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     page?: string;
-  };
+  }>;
 }
 
 // Category display names and descriptions
@@ -111,7 +111,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { category } = await params;
-  const page = Number(searchParams.page) || 1;
+  const sp = await searchParams;
+  const page = Number(sp.page) || 1;
   
   const categoryInfo = CATEGORY_INFO[category.toLowerCase()];
 

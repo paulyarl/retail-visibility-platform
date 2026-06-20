@@ -7,12 +7,12 @@ import { BreadcrumbStructuredData } from '@/components/directory/StructuredData'
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface LocationPageProps {
-  params: {
+  params: Promise<{
     location: string; // Format: "city-state" e.g., "brooklyn-ny"
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     page?: string;
-  };
+  }>;
 }
 
 // Parse location slug into city and state
@@ -99,7 +99,8 @@ export async function generateMetadata({ params }: LocationPageProps): Promise<M
 
 export default async function LocationPage({ params, searchParams }: LocationPageProps) {
   const { location } = await params;
-  const page = Number(searchParams.page) || 1;
+  const sp = await searchParams;
+  const page = Number(sp.page) || 1;
   
   const parsed = parseLocation(location);
 
