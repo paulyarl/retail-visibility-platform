@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  next-themes@0.4.6: 5aa5fac59f934f5d48b0063171452ac9395ad6299ca6c077d36294599d692c54
+
 importers:
 
   .:
@@ -46,13 +49,13 @@ importers:
         version: 4.24.14(next@16.2.9(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       next-themes:
         specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 0.4.6(patch_hash=5aa5fac59f934f5d48b0063171452ac9395ad6299ca6c077d36294599d692c54)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-hook-form:
         specifier: ^7.79.0
         version: 7.79.0(react@19.2.7)
       require-in-the-middle:
         specifier: ^8.0.1
-        version: 8.0.1
+        version: 8.0.1(supports-color@5.5.0)
       square:
         specifier: ^44.2.0
         version: 44.2.0
@@ -441,7 +444,7 @@ importers:
         version: 5.6.0(@babel/core@7.29.7)(@types/babel__core@7.20.5)(lightningcss@1.32.0)(next@16.2.9(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(supports-color@5.5.0)(webpack@5.104.1(lightningcss@1.32.0))
       next-themes:
         specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 0.4.6(patch_hash=5aa5fac59f934f5d48b0063171452ac9395ad6299ca6c077d36294599d692c54)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       pako:
         specifier: ^2.1.0
         version: 2.1.0
@@ -14045,7 +14048,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.207.0
       import-in-the-middle: 2.0.6
-      require-in-the-middle: 8.0.1
+      require-in-the-middle: 8.0.1(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -14054,7 +14057,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.211.0
       import-in-the-middle: 2.0.6
-      require-in-the-middle: 8.0.1
+      require-in-the-middle: 8.0.1(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -14063,7 +14066,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/api-logs': 0.214.0
       import-in-the-middle: 3.1.0
-      require-in-the-middle: 8.0.1
+      require-in-the-middle: 8.0.1(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -21110,7 +21113,7 @@ snapshots:
       - uglify-js
       - webpack
 
-  next-themes@0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next-themes@0.4.6(patch_hash=5aa5fac59f934f5d48b0063171452ac9395ad6299ca6c077d36294599d692c54)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
@@ -22014,7 +22017,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  require-in-the-middle@8.0.1:
+  require-in-the-middle@8.0.1(supports-color@5.5.0):
     dependencies:
       debug: 4.4.3(supports-color@5.5.0)
       module-details-from-path: 1.0.4

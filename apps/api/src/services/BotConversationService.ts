@@ -276,22 +276,36 @@ export class BotConversationService {
     resolvedByFallback: number;
     avgRating: number | null;
   }> {
-    const [total, active, faqResolved, skillResolved, fallbackResolved, positiveFeedback, totalFeedback] = await Promise.all([
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, status: 'active' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'faq' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'skill' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'fallback' } }),
-      prisma.bot_conversation_feedback.count({ where: { rating: 'positive' } }),
-      prisma.bot_conversation_feedback.count(),
+    const [convStats, feedbackStats] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+          COUNT(*) FILTER (WHERE resolved_by = 'faq')::int AS faq_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'skill')::int AS skill_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'fallback')::int AS fallback_resolved
+        FROM bot_conversations
+        WHERE tenant_id = ${tenantId}
+      `,
+      prisma.$queryRaw`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE rating = 'positive')::int AS positive
+        FROM bot_conversation_feedback
+      `,
     ]);
 
+    const conv = (convStats as any[])[0];
+    const fb = (feedbackStats as any[])[0];
+    const totalFeedback = fb?.total ?? 0;
+    const positiveFeedback = fb?.positive ?? 0;
+
     return {
-      totalConversations: total,
-      activeConversations: active,
-      resolvedByFaq: faqResolved,
-      resolvedBySkill: skillResolved,
-      resolvedByFallback: fallbackResolved,
+      totalConversations: conv?.total ?? 0,
+      activeConversations: conv?.active ?? 0,
+      resolvedByFaq: conv?.faq_resolved ?? 0,
+      resolvedBySkill: conv?.skill_resolved ?? 0,
+      resolvedByFallback: conv?.fallback_resolved ?? 0,
       avgRating: totalFeedback > 0 ? positiveFeedback / totalFeedback : null,
     };
   }

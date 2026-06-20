@@ -204,17 +204,26 @@ class BotRagService {
    * Includes name, description, features, tags, and badges for rich search.
    */
   private chunkProduct(product: any): { text: string; index: number }[] {
+    const parsePgArray = (val: any): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      const s = String(val).replace(/^\{|\}$/g, '');
+      return s ? s.split(',').map((v: string) => v.trim()) : [];
+    };
+
+    const features = parsePgArray(product.features);
+    const tags = parsePgArray(product.tags);
+    const badges = parsePgArray(product.featured_type_array);
+
     const parts = [
       `Product: ${product.product_name}`,
       product.brand ? `Brand: ${product.brand}` : '',
       product.product_category ? `Category: ${product.product_category}` : '',
       product.product_description ? `Description: ${product.product_description}` : '',
       product.marketing_description ? `Marketing: ${product.marketing_description}` : '',
-      product.features && product.features.length > 0 ? `Features: ${product.features.join(', ')}` : '',
-      product.tags && product.tags.length > 0 ? `Tags: ${product.tags.join(', ')}` : '',
-      product.featured_type_array && product.featured_type_array.length > 0
-        ? `Badges: ${product.featured_type_array.join(', ')}`
-        : '',
+      features.length > 0 ? `Features: ${features.join(', ')}` : '',
+      tags.length > 0 ? `Tags: ${tags.join(', ')}` : '',
+      badges.length > 0 ? `Badges: ${badges.join(', ')}` : '',
       product.sku ? `SKU: ${product.sku}` : '',
     ].filter(Boolean);
 
@@ -242,25 +251,26 @@ class BotRagService {
    * Called by merchant catalog webhooks or periodic refresh jobs.
    */
   async refreshProductEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
-    const products = await prisma.$queryRaw<any[]>`
-      SELECT
-        inventory_item_id as product_id,
-        product_name,
-        product_description,
-        marketing_description,
-        brand,
-        product_category,
-        sku,
-        features,
-        tags,
-        featured_type_array,
-        product_slug
+    const products = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT
+        inventory_item_id::text as product_id,
+        product_name::text as product_name,
+        COALESCE(product_description::text, '') as product_description,
+        COALESCE(marketing_description::text, '') as marketing_description,
+        COALESCE(brand::text, '') as brand,
+        COALESCE(product_category::text, '') as product_category,
+        COALESCE(sku::text, '') as sku,
+        COALESCE(features::text, '') as features,
+        COALESCE(tags::text, '') as tags,
+        COALESCE(featured_type_array::text, '') as featured_type_array,
+        COALESCE(product_slug::text, '') as product_slug
       FROM mv_storefront_discovery
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
-        AND stock_status IN ('in_stock', 'low_stock')
-    `;
+        AND stock_status IN ('in_stock', 'low_stock')`,
+      tenantId
+    );
 
     if (products.length === 0) {
       await prisma.$executeRaw`DELETE FROM bot_product_embeddings WHERE tenant_id = ${tenantId}`;

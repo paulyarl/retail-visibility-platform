@@ -47,6 +47,7 @@ import {
   DirectoryEntryImmersiveLayout,
   DirectoryEntryPremiumLayout,
 } from './layouts';
+import PublicBotWidget from '@/components/bot/PublicBotWidget';
 
 // Merchant gate helper for client-side filtering
 function filterFeaturedProductsByMerchantPreferences(
@@ -647,14 +648,50 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
   switch (effectiveLayout) {
     case 'editorial':
-      return <DirectoryEntryEditorialLayout {...layoutProps} />;
+      return (
+        <>
+          <DirectoryEntryEditorialLayout {...layoutProps} />
+          <PublicBotWidget
+            tenantId={listing.tenantId}
+            pageContext="directory"
+            hasActivePaymentGateway={paymentGatewayStatus?.hasActiveGateway ?? false}
+          />
+        </>
+      );
     case 'immersive':
-      return <DirectoryEntryImmersiveLayout {...layoutProps} />;
+      return (
+        <>
+          <DirectoryEntryImmersiveLayout {...layoutProps} />
+          <PublicBotWidget
+            tenantId={listing.tenantId}
+            pageContext="directory"
+            hasActivePaymentGateway={paymentGatewayStatus?.hasActiveGateway ?? false}
+          />
+        </>
+      );
     case 'premium':
-      return <DirectoryEntryPremiumLayout {...layoutProps} />;
+      return (
+        <>
+          <DirectoryEntryPremiumLayout {...layoutProps} />
+          <PublicBotWidget
+            tenantId={listing.tenantId}
+            pageContext="directory"
+            hasActivePaymentGateway={paymentGatewayStatus?.hasActiveGateway ?? false}
+          />
+        </>
+      );
     case 'classic':
     default:
-      return <DirectoryEntryClassicLayout {...layoutProps} />;
+      return (
+        <>
+          <DirectoryEntryClassicLayout {...layoutProps} />
+          <PublicBotWidget
+            tenantId={listing.tenantId}
+            pageContext="directory"
+            hasActivePaymentGateway={paymentGatewayStatus?.hasActiveGateway ?? false}
+          />
+        </>
+      );
   }
 
   /* === OLD JSX REMOVED === */

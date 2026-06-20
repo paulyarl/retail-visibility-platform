@@ -440,10 +440,24 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* CRM Support Widget */}
                   <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Support</span>
+                      <Link href={`/t/${tenantId}/support`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors">
+                        All tickets
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
                     <CrmTenantWidget tenantId={tenantId} />
                   </div>
                   {/* Bot Widget */}
                   <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Chatbot</span>
+                      <Link href={`/t/${tenantId}/bot`} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                        Bot dashboard
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
                     <BotTenantWidget tenantId={tenantId} />
                   </div>
                 </div>

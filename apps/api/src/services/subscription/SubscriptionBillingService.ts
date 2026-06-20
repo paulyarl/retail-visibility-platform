@@ -808,7 +808,7 @@ export class SubscriptionBillingService {
           // Payment requires action (3D Secure, etc.)
           // Return client secret for frontend to handle
           const paymentIntent = await this.stripe.paymentIntents.retrieve(
-            invoice.payment_intent as string
+            (invoice as any).payment_intent as string
           );
           
           return {

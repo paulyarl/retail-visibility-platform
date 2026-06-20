@@ -24,6 +24,8 @@ export const basePrisma = globalForPrisma.basePrisma ?? new PrismaClient({
       url: getDatabaseUrl(),
     },
   },
+  // Limit connections for Supabase pooler compatibility
+  // pool_timeout is passed via the connection URL query param, not PrismaClientOptions
 });
 
 // Store in global for hot reload reuse
@@ -34,8 +36,8 @@ if (process.env.NODE_ENV !== 'production') {
 // Enhanced retry logic for production reliability
 async function withRetry<T>(
   operation: () => Promise<T>,
-  maxRetries = 5, // Increased for production
-  initialDelayMs = 200 // Longer initial delay
+  maxRetries = process.env.NODE_ENV === 'development' ? 2 : 3,
+  initialDelayMs = 100
 ): Promise<T> {
   let lastError: Error | undefined;
   
@@ -158,12 +160,12 @@ export async function validateAndRecoverConnection(): Promise<boolean> {
   }
 }
 
-// Periodic connection validation (run every 5 minutes in development)
+// Periodic connection validation (run every 10 minutes in development)
 if (process.env.NODE_ENV === 'development') {
   setInterval(async () => {
     const isHealthy = await validateAndRecoverConnection();
     if (!isHealthy) {
       console.warn('[Database Health] Periodic check failed - connection may be unstable');
     }
-  }, 5 * 60 * 1000); // 5 minutes
+  }, 10 * 60 * 1000); // 10 minutes
 }

@@ -34,6 +34,7 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 // import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
+import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
@@ -851,6 +852,11 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           />
         )}
       </TenantPaymentProvider>
+      <PublicBotWidget
+        tenantId={resolvedTenantId || tenant.id || id}
+        pageContext="storefront"
+        hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway ?? false}
+      />
     </ProductSingletonProvider>
   );
 }
