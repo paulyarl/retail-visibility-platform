@@ -20,10 +20,10 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
 
 interface ItemDetailPageProps {
-  params: {
+  params: Promise<{
     tenantId: string;
     itemId: string;
-  };
+  }>;
 }
 
 interface EnrichedItem extends ItemType {

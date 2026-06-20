@@ -93,6 +93,214 @@ model barcode_lookup_log {
   @@index([tenant_id, created_at])
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_configurations {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String   @unique @db.VarChar(255)
+  bot_name              String   @default("Store Assistant") @db.VarChar(100)
+  tone                  String   @default("friendly") @db.VarChar(20)
+  response_length       String   @default("balanced") @db.VarChar(20)
+  fallback_message      String   @default("I'm not sure about that. Let me connect you with support.")
+  greeting              String   @default("Hi! How can I help you today?")
+  widget_position       String   @default("bottom-right") @db.VarChar(20)
+  widget_color          String   @default("#3b82f6") @db.VarChar(7)
+  widget_offset_x       Int      @default(24)
+  widget_offset_y       Int      @default(24)
+  widget_font           String   @default("system-ui") @db.VarChar(50)
+  widget_avatar_url     String?  @db.VarChar(500)
+  auto_open             Boolean  @default(false)
+  auto_open_delay       Int      @default(0)
+  after_hours_enabled   Boolean  @default(false)
+  after_hours_message   String?
+  business_hours_source String   @default("business_profile") @db.VarChar(20)
+  pre_chat_enabled      Boolean  @default(false)
+  pre_chat_email        Boolean  @default(true)
+  pre_chat_phone        Boolean  @default(false)
+  pre_chat_order        Boolean  @default(false)
+  status                String   @default("active") @db.VarChar(20)
+  escalation_enabled    Boolean  @default(false)
+  escalation_message    String?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+  tenants               tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_conversation_feedback {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id        String            @db.Uuid
+  conversation_id   String            @db.Uuid
+  rating            String            @db.VarChar(10)
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  bot_conversations bot_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversation_id], map: "idx_bot_conversation_feedback_conversation_id")
+  @@index([message_id], map: "idx_bot_conversation_feedback_message_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_conversations {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                 String                      @db.VarChar(255)
+  session_id                String                      @db.VarChar(255)
+  customer_email            String?                     @db.VarChar(255)
+  customer_phone            String?                     @db.VarChar(50)
+  source                    String                      @default("widget") @db.VarChar(20)
+  status                    String                      @default("active") @db.VarChar(20)
+  resolved_by               String?                     @db.VarChar(20)
+  page_context              String?                     @db.VarChar(100)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  closed_at                 DateTime?                   @db.Timestamptz(6)
+  bot_conversation_feedback bot_conversation_feedback[]
+  tenants                   tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bot_messages              bot_messages[]
+
+  @@index([session_id], map: "idx_bot_conversations_session_id")
+  @@index([status], map: "idx_bot_conversations_status")
+  @@index([tenant_id, created_at], map: "idx_bot_conversations_tenant_created")
+  @@index([tenant_id, status], map: "idx_bot_conversations_tenant_status")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_faq_embeddings {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String                 @db.VarChar(255)
+  faq_id      String                 @db.Uuid
+  chunk_text  String
+  chunk_index Int                    @default(0)
+  embedding   Unsupported("vector")?
+  model       String                 @default("text-embedding-3-small") @db.VarChar(100)
+  created_at  DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime               @default(now()) @db.Timestamptz(6)
+  faqs        faqs                   @relation(fields: [faq_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_faq_embeddings_faq")
+  tenants     tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_faq_embeddings_tenant")
+
+  @@index([faq_id], map: "idx_bot_faq_embeddings_faq")
+  @@index([tenant_id], map: "idx_bot_faq_embeddings_tenant")
+  @@index([tenant_id, faq_id], map: "idx_bot_faq_embeddings_tenant_faq")
+  @@index([embedding], map: "idx_bot_faq_embeddings_vector")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_guardrail_rules {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String?  @db.VarChar(255)
+  rule_type         String   @db.VarChar(50)
+  pattern           String   @db.VarChar(500)
+  action            String   @default("block") @db.VarChar(20)
+  replacement       String?  @db.VarChar(255)
+  response_template String?
+  severity          String   @default("medium") @db.VarChar(20)
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([rule_type], map: "idx_bot_guardrail_rules_rule_type")
+  @@index([tenant_id, is_active], map: "idx_bot_guardrail_rules_tenant_active")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_intents {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String   @unique @db.VarChar(50)
+  category             String   @db.VarChar(50)
+  description          String?
+  examples             String[] @default([]) @db.VarChar(255)
+  confidence_threshold Float    @default(0.85)
+  mapped_skill         String?  @db.VarChar(50)
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([category], map: "idx_bot_intents_category")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_messages {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id   String            @db.Uuid
+  role              String            @db.VarChar(20)
+  content           String
+  intent            String?           @db.VarChar(50)
+  confidence        Float?
+  matched_faq_id    String?           @db.Uuid
+  response_type     String            @default("static") @db.VarChar(20)
+  guardrail_result  String?           @db.VarChar(20)
+  skill_name        String?           @db.VarChar(50)
+  metadata          Json?
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  bot_conversations bot_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversation_id, created_at], map: "idx_bot_messages_conversation_created")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_product_embeddings {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String                 @db.VarChar(255)
+  product_id      String                 @db.VarChar(255)
+  chunk_text      String
+  chunk_index     Int                    @default(0)
+  embedding       Unsupported("vector")?
+  model           String                 @default("text-embedding-3-small") @db.VarChar(100)
+  created_at      DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime               @default(now()) @db.Timestamptz(6)
+  inventory_items inventory_items        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_product_embeddings_inventory_item")
+  tenants         tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_product_embeddings_tenant")
+
+  @@index([product_id], map: "idx_bot_product_embeddings_product")
+  @@index([tenant_id], map: "idx_bot_product_embeddings_tenant")
+  @@index([tenant_id, product_id], map: "idx_bot_product_embeddings_tenant_product")
+  @@index([embedding], map: "idx_bot_product_embeddings_vector")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_skill_configurations {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String     @db.VarChar(255)
+  skill_id   String     @db.Uuid
+  enabled    Boolean    @default(false)
+  config     Json?
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at DateTime   @default(now()) @db.Timestamptz(6)
+  bot_skills bot_skills @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, skill_id])
+  @@index([tenant_id], map: "idx_bot_skill_configurations_tenant_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bot_skills {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String                     @unique @db.VarChar(50)
+  version                  String                     @default("1.0.0") @db.VarChar(10)
+  description              String?
+  endpoint                 String                     @db.VarChar(255)
+  required_capabilities    String[]                   @default([]) @db.VarChar(50)
+  tier_gates               String[]                   @default([]) @db.VarChar(20)
+  capability_gates         String[]                   @default([]) @db.VarChar(50)
+  tenant_status_gates      String[]                   @default([]) @db.VarChar(20)
+  featured_aware           Boolean                    @default(false)
+  refresh_cadence_minutes  Int                        @default(15)
+  status                   String                     @default("active") @db.VarChar(20)
+  skill_card_schema        Json?
+  default_config           Json?
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  bot_skill_configurations bot_skill_configurations[]
+}
+
 model business_hours_list {
   id             String    @id
   tenant_id      String    @unique
@@ -3409,6 +3617,27 @@ model tenant_business_profiles_list {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_chatbot_options_settings {
+  id                          String    @id @db.VarChar(255)
+  tenant_id                   String    @unique @db.VarChar(255)
+  chatbot_enabled             Boolean?  @default(true)
+  chatbot_static_enabled      Boolean?  @default(true)
+  chatbot_dynamic_enabled     Boolean?  @default(false)
+  chatbot_skills_enabled      Boolean?  @default(false)
+  chatbot_kb_enabled          Boolean?  @default(false)
+  chatbot_widget_enabled      Boolean?  @default(true)
+  chatbot_widget_custom_theme Boolean?  @default(false)
+  chatbot_widget_skill_cards  Boolean?  @default(false)
+  chatbot_widget_after_hours  Boolean?  @default(false)
+  created_at                  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_chatbot_options_tenant")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_commerce_settings {
   id                         String    @id
   tenant_id                  String    @unique
@@ -3495,194 +3724,6 @@ model tenant_faq_options_settings {
   tenants                          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_faq_options_settings_tenant")
 
   @@index([tenant_id], map: "idx_faq_options_tenant")
-}
-
-model bot_configurations {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id             String   @unique @db.VarChar(255)
-  bot_name              String   @default("Store Assistant") @db.VarChar(100)
-  tone                  String   @default("friendly") @db.VarChar(20)
-  response_length       String   @default("balanced") @db.VarChar(20)
-  fallback_message      String   @default("I'm not sure about that. Let me connect you with support.")
-  greeting              String   @default("Hi! How can I help you today?")
-  widget_position       String   @default("bottom-right") @db.VarChar(20)
-  widget_color          String   @default("#3b82f6") @db.VarChar(7)
-  widget_offset_x       Int      @default(24)
-  widget_offset_y       Int      @default(24)
-  widget_font           String   @default("system-ui") @db.VarChar(50)
-  widget_avatar_url     String?  @db.VarChar(500)
-  auto_open             Boolean  @default(false)
-  auto_open_delay       Int      @default(0)
-  after_hours_enabled   Boolean  @default(false)
-  after_hours_message   String?
-  business_hours_source String   @default("business_profile") @db.VarChar(20)
-  pre_chat_enabled      Boolean  @default(false)
-  pre_chat_email        Boolean  @default(true)
-  pre_chat_phone        Boolean  @default(false)
-  pre_chat_order        Boolean  @default(false)
-  status                String   @default("active") @db.VarChar(20)
-  escalation_enabled    Boolean  @default(false)
-  escalation_message    String?
-  created_at            DateTime @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime @default(now()) @db.Timestamptz(6)
-  tenants               tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-model bot_conversations {
-  id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id      String                      @db.VarChar(255)
-  session_id     String                      @db.VarChar(255)
-  customer_email String?                     @db.VarChar(255)
-  customer_phone String?                     @db.VarChar(50)
-  source         String                      @default("widget") @db.VarChar(20)
-  status         String                      @default("active") @db.VarChar(20)
-  resolved_by    String?                     @db.VarChar(20)
-  page_context   String?                     @db.VarChar(100)
-  created_at     DateTime                    @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime                    @default(now()) @db.Timestamptz(6)
-  closed_at      DateTime?                   @db.Timestamptz(6)
-  feedback       bot_conversation_feedback[]
-  tenants        tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  messages       bot_messages[]
-
-  @@index([session_id], map: "idx_bot_conversations_session_id")
-  @@index([status], map: "idx_bot_conversations_status")
-  @@index([tenant_id, created_at], map: "idx_bot_conversations_tenant_created")
-  @@index([tenant_id, status], map: "idx_bot_conversations_tenant_status")
-}
-
-model bot_messages {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  conversation_id  String            @db.Uuid
-  role             String            @db.VarChar(20)
-  content          String
-  intent           String?           @db.VarChar(50)
-  confidence       Float?
-  matched_faq_id   String?           @db.Uuid
-  response_type    String            @default("static") @db.VarChar(20)
-  guardrail_result String?           @db.VarChar(20)
-  skill_name       String?           @db.VarChar(50)
-  metadata         Json?
-  created_at       DateTime          @default(now()) @db.Timestamptz(6)
-  conversation     bot_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([conversation_id, created_at], map: "idx_bot_messages_conversation_created")
-}
-
-model bot_conversation_feedback {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  message_id      String            @db.Uuid
-  conversation_id String            @db.Uuid
-  rating          String            @db.VarChar(10)
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  conversation    bot_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([conversation_id], map: "idx_bot_conversation_feedback_conversation_id")
-  @@index([message_id], map: "idx_bot_conversation_feedback_message_id")
-}
-
-model bot_guardrail_rules {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id         String?  @db.VarChar(255)
-  rule_type         String   @db.VarChar(50)
-  pattern           String   @db.VarChar(500)
-  action            String   @default("block") @db.VarChar(20)
-  replacement       String?  @db.VarChar(255)
-  response_template String?
-  severity          String   @default("medium") @db.VarChar(20)
-  is_active         Boolean  @default(true)
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime @default(now()) @db.Timestamptz(6)
-
-  @@index([rule_type], map: "idx_bot_guardrail_rules_rule_type")
-  @@index([tenant_id, is_active], map: "idx_bot_guardrail_rules_tenant_active")
-}
-
-model bot_intents {
-  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                 String   @unique @db.VarChar(50)
-  category             String   @db.VarChar(50)
-  description          String?
-  examples             String[] @default([]) @db.VarChar(255)
-  confidence_threshold Float    @default(0.85)
-  mapped_skill         String?  @db.VarChar(50)
-  is_active            Boolean  @default(true)
-  created_at           DateTime @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime @default(now()) @db.Timestamptz(6)
-
-  @@index([category], map: "idx_bot_intents_category")
-}
-
-model bot_skills {
-  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                     String                     @unique @db.VarChar(50)
-  version                  String                     @default("1.0.0") @db.VarChar(10)
-  description              String?
-  endpoint                 String                     @db.VarChar(255)
-  required_capabilities    String[]                   @default([]) @db.VarChar(50)
-  tier_gates               String[]                   @default([]) @db.VarChar(20)
-  capability_gates         String[]                   @default([]) @db.VarChar(50)
-  tenant_status_gates      String[]                   @default([]) @db.VarChar(20)
-  featured_aware           Boolean                    @default(false)
-  refresh_cadence_minutes  Int                        @default(15)
-  status                   String                     @default("active") @db.VarChar(20)
-  skill_card_schema        Json?
-  default_config           Json?
-  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
-  bot_skill_configurations bot_skill_configurations[]
-}
-
-model bot_skill_configurations {
-  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id  String     @db.VarChar(255)
-  skill_id   String     @db.Uuid
-  enabled    Boolean    @default(false)
-  config     Json?
-  created_at DateTime   @default(now()) @db.Timestamptz(6)
-  updated_at DateTime   @default(now()) @db.Timestamptz(6)
-  skill      bot_skills @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@unique([tenant_id, skill_id])
-  @@index([tenant_id], map: "idx_bot_skill_configurations_tenant_id")
-}
-
-model tenant_chatbot_options_settings {
-  id                          String    @id @db.VarChar(255)
-  tenant_id                   String    @unique @db.VarChar(255)
-  chatbot_enabled             Boolean?  @default(true)
-  chatbot_static_enabled      Boolean?  @default(true)
-  chatbot_dynamic_enabled     Boolean?  @default(false)
-  chatbot_skills_enabled      Boolean?  @default(false)
-  chatbot_kb_enabled          Boolean?  @default(false)
-  chatbot_widget_enabled      Boolean?  @default(true)
-  chatbot_widget_custom_theme Boolean?  @default(false)
-  chatbot_widget_skill_cards  Boolean?  @default(false)
-  chatbot_widget_after_hours  Boolean?  @default(false)
-  created_at                  DateTime? @default(now()) @db.Timestamp(6)
-  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
-  tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_chatbot_options_settings_tenant")
-
-  @@index([tenant_id], map: "idx_chatbot_options_tenant")
-}
-
-model bot_faq_embeddings {
-  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id   String                 @db.VarChar(255)
-  faq_id      String                 @db.Uuid
-  chunk_text  String
-  chunk_index Int                    @default(0)
-  embedding   Unsupported("vector")?
-  model       String                 @default("text-embedding-3-small") @db.VarChar(100)
-  created_at  DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime               @default(now()) @db.Timestamptz(6)
-  faqs        faqs                   @relation(fields: [faq_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_faq_embeddings_faq")
-  tenants     tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_faq_embeddings_tenant")
-
-  @@index([tenant_id], map: "idx_bot_faq_embeddings_tenant")
-  @@index([faq_id], map: "idx_bot_faq_embeddings_faq")
-  @@index([tenant_id, faq_id], map: "idx_bot_faq_embeddings_tenant_faq")
-  @@index([embedding], map: "idx_bot_faq_embeddings_vector")
 }
 
 model tenant_feature_flags_list {
@@ -4444,27 +4485,6 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
-}
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model bot_product_embeddings {
-  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id       String                 @db.VarChar(255)
-  product_id      String                 @db.VarChar(255)
-  chunk_text      String
-  chunk_index     Int                    @default(0)
-  embedding       Unsupported("vector")?
-  model           String                 @default("text-embedding-3-small") @db.VarChar(100)
-  created_at      DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime               @default(now()) @db.Timestamptz(6)
-  inventory_items inventory_items        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_product_embeddings_inventory_item")
-  tenants         tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_product_embeddings_tenant")
-
-  @@index([product_id], map: "idx_bot_product_embeddings_product")
-  @@index([tenant_id], map: "idx_bot_product_embeddings_tenant")
-  @@index([tenant_id, product_id], map: "idx_bot_product_embeddings_tenant_product")
-  @@index([embedding], map: "idx_bot_product_embeddings_vector")
 }
 
 enum LocationStatus {

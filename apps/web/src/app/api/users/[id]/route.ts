@@ -3,16 +3,14 @@ import { adminUsersService } from '@/services/AdminUsersService';
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
+    const { id } = await params;
     
     // Get all users and find the specific one (service doesn't have individual get method)
     const users = await adminUsersService.getUsers();
-    const user = users.find(u => u.id === resolvedParams.id);
+    const user = users.find(u => u.id === id);
     
     if (!user) {
       return NextResponse.json({ 
@@ -36,16 +34,14 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
+    const { id } = await params;
     const body = await req.json();
     
     // Update user using service with automatic cache invalidation
-    const updatedUser = await adminUsersService.updateUser(resolvedParams.id, body);
+    const updatedUser = await adminUsersService.updateUser(id, body);
     
     if (!updatedUser) {
       return NextResponse.json({ 
@@ -69,15 +65,13 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
+    const { id } = await params;
     
     // Delete user using service with automatic cache invalidation
-    const success = await adminUsersService.deleteUser(resolvedParams.id);
+    const success = await adminUsersService.deleteUser(id);
     
     if (!success) {
       return NextResponse.json({ 

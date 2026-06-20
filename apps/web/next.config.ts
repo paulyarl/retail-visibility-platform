@@ -4,11 +4,13 @@ import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
 
-const withPWA = withPWAInit({
+const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT);
+const isPwaEnabled = process.env.NODE_ENV !== "development" && process.env.VERCEL_ENV !== "production";
+
+const withPWA = isPwaEnabled ? withPWAInit({
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/.*\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
@@ -57,7 +59,7 @@ const withPWA = withPWAInit({
       },
     },
   ],
-});
+}) : (cfg: any) => cfg;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -67,24 +69,17 @@ const nextConfig: NextConfig = {
   // Disable source maps in production to fix 404 errors
   productionBrowserSourceMaps: false,
 
-  // Disable all static optimization and prerendering
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
-    // Disable static optimization completely
-    disableOptimizedLoading: true,
+    // Enable Turbopack filesystem cache for builds (for future switch from --webpack)
+    turbopackFileSystemCacheForBuild: true,
   },
 
-  // Configure Turbopack root directory to silence warning
+  // Configure Turbopack root directory to silence multiple-lockfile warning
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },
 
-  // Force all pages to be dynamic - remove static generation entirely
-  generateBuildId: async () => {
-    return 'build-' + Date.now()
-  },
-
-  // Prevent any static generation
   trailingSlash: false,
   poweredByHeader: false,
 
@@ -224,5 +219,6 @@ const sentryWebpackPluginOptions = {
 
 
 // Make sure adding Sentry options is the last code to run before exporting
-// First wrap with PWA, then with Sentry
-export default withSentryConfig(withPWA(nextConfig), sentryWebpackPluginOptions);
+// First wrap with PWA, then with Sentry (only if configured)
+const wrapped = withPWA(nextConfig);
+export default isSentryEnabled ? withSentryConfig(wrapped, sentryWebpackPluginOptions) : wrapped;

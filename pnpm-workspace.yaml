@@ -3,6 +3,7 @@ packages:
   - packages/*
 
 allowBuilds:
+  '@google/genai': true
   '@newrelic/fn-inspect': false
   '@newrelic/native-metrics': false
   '@prisma/client': false
@@ -16,6 +17,7 @@ allowBuilds:
   prisma: false
   protobufjs: false
   sharp: false
+  stripe-cli: false
   unrs-resolver: false
 
 ignoredBuiltDependencies:

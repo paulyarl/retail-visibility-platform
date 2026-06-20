@@ -3,15 +3,10 @@ import { tenantUserService } from '@/services/TenantUserService';
 
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ id: string; userId: string }> | { id: string; userId: string } }
+  { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
-    
-    const tenantId = resolvedParams.id;
-    const userId = resolvedParams.userId;
+    const { id: tenantId, userId } = await params;
     const body = await req.json();
     
     if (!tenantId || !userId) {
@@ -50,15 +45,10 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ id: string; userId: string }> | { id: string; userId: string } }
+  { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
-    
-    const tenantId = resolvedParams.id;
-    const userId = resolvedParams.userId;
+    const { id: tenantId, userId } = await params;
     
     if (!tenantId || !userId) {
       return NextResponse.json({ 

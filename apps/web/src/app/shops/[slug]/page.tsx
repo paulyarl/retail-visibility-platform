@@ -9,7 +9,7 @@ import { Suspense } from 'react';
 import { Store, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ShopProfileClient from './ShopProfileClient';
-import { shopsService } from '@/services/ShopsService';
+import { getShopBySlug, type ShopData, type ShopResponse } from './getShopBySlug';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
@@ -17,45 +17,6 @@ import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
-
-// Types
-interface ShopData {
-  id: string;
-  name: string;
-  slug: string;
-  business_name?: string;
-  imageUrl?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  location?: string;
-  phone?: string;
-  email?: string;
-  website?: string;
-  social_links?: any;
-  default_gateway_type?: string;
-  has_active_payment_gateway?: boolean;
-  rating?: number;
-  rating_count?: number;
-  productCount: number;
-  is_published: boolean;
-  primary_category?: string;
-  created_at: string;
-}
-
-interface Shop {
-  success: boolean;
-  data: ShopData;
-}
-
-interface ShopResponse {
-  success: boolean;
-  data: {
-    success: boolean;
-    data: ShopData;
-  };
-}
 
 interface ShopProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -66,32 +27,6 @@ interface ShopProfilePageProps {
     featured?: string;
     view?: string;
   }>;
-}
-
-// Shop data fetching function using singleton service
-export async function getShopBySlug(identifier: string): Promise<ShopResponse | null> {
-  try {
-    // Use shopsService singleton for caching and optimization benefits
-    // console.log('[getShopBySlug] Fetching shop for identifier:', identifier);
-    const shop = await shopsService.getShopByIdentifier(identifier);
-    // console.log('[getShopBySlug] Shop:', shop);
-    
-    if (!shop) {
-      return null;
-    }
-    
-    // Wrap the shop data in the expected triple-nested ShopResponse structure
-    return {
-      success: true,
-      data: {
-        success: true,
-        data: shop as unknown as ShopData
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching shop:', error);
-    return null;
-  }
 }
 
 // Loading skeleton component

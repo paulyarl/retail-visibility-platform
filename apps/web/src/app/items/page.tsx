@@ -5,12 +5,9 @@ export const dynamic = "force-dynamic";
 export default async function ItemsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tenantId?: string }> | { tenantId?: string };
+  searchParams?: Promise<{ tenantId?: string }>;
 }) {
-  // Handle both async and sync searchParams (Next.js 15 compatibility)
-  const resolvedParams = searchParams && typeof searchParams === 'object' && 'then' in searchParams 
-    ? await searchParams 
-    : searchParams;
+  const resolvedParams = await searchParams;
   const tenantId = resolvedParams?.tenantId;
   if (!tenantId) {
     // Redirect to tenants page if no tenant selected

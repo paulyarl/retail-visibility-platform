@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { tenantDirectoryService, TenantDirectoryStatus } from '@/services/TenantDirectorySingletonService';
 
 interface DirectoryTenantPageProps {
-  params: {
+  params: Promise<{
     tenantId: string;
-  };
+  }>;
 }
 
 async function getTenantDirectoryStatus(tenantId: string): Promise<TenantDirectoryStatus | null> {
@@ -18,7 +18,7 @@ async function getTenantDirectoryStatus(tenantId: string): Promise<TenantDirecto
 }
 
 export default async function DirectoryTenantPage({ params }: DirectoryTenantPageProps) {
-  const { tenantId } = params;
+  const { tenantId } = await params;
 
   const status = await getTenantDirectoryStatus(tenantId);
 

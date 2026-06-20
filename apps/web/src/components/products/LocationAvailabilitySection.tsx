@@ -270,7 +270,7 @@ export function LocationAvailabilitySection({
         </ActionIcon>
       </Group>
 
-      <Collapse in={expanded}>
+      <Collapse expanded={expanded}>
         <Stack gap="xs">
           {availability?.nearestAvailable && availability?.nearestAvailable.tenantId !== preferredTenantId && (
             <Alert color="green" variant="light" icon={<IconCheck size={16} />}>

@@ -3,14 +3,10 @@ import { tenantUserService } from '@/services/TenantUserService';
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
-    
-    const tenantId = resolvedParams.id;
+    const { id: tenantId } = await params;
     
     if (!tenantId) {
       return NextResponse.json({ 
@@ -41,14 +37,10 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = params && typeof params === 'object' && 'then' in params 
-      ? await params 
-      : params;
-    
-    const tenantId = resolvedParams.id;
+    const { id: tenantId } = await params;
     const body = await req.json();
     
     if (!tenantId) {

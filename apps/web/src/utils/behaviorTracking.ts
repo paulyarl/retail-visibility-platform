@@ -9,7 +9,7 @@
  */
 
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { openStreetMapService } from '@/services/OpenStreetMapService';
 import { externalApiService } from '@/services/ExternalApiService';

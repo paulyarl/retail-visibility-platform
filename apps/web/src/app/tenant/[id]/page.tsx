@@ -188,20 +188,6 @@ interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string }>;
 }
 
-interface StorefrontDetailPageProps extends PageProps {
-  tenant?: Tenant;
-  products?: Product[];
-  categories?: Category[];
-  totalProducts?: number;
-  currentPage?: number;
-  totalPages?: number;
-  hasMore?: boolean;
-  businessHours?: any;
-  platformSettings?: PlatformSettings;
-  slug?: string;
-}
-
-
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
     // console.log(`[getTenantWithProducts] Resolving tenant ID for slug: ${tenantId}`);
@@ -552,7 +538,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function TenantStorefrontPage({ params, searchParams }: StorefrontDetailPageProps) {
+export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   // console.log(`[TenantStorefrontPage] id:`, id);
   const { page: pageParam, search, category, products_only, featured, view } = await searchParams;

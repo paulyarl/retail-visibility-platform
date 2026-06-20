@@ -276,7 +276,7 @@ export function CheckoutLocationPicker({
               {showAllLocations ? 'Hide other locations' : `Show ${uniqueLocations.length - 1} other locations`}
             </Button>
 
-            <Collapse in={showAllLocations}>
+            <Collapse expanded={showAllLocations}>
               <Stack gap="xs">
                 {uniqueLocations
                   .filter(loc => loc.tenantId !== nearestLocation?.tenantId)
