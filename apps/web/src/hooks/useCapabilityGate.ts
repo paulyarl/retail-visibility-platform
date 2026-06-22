@@ -8,11 +8,11 @@
 import { useMemo } from 'react';
 import { useTenantTier } from './useTenantTier';
 import { usePlatformUser } from '@/lib/auth/platform-admin';
-import { 
+import {
   CapabilityGateEngine,
   type CapabilityGateResult,
   type FeatureGateContext
-} from '../../../../packages/feature-definitions/dist';
+} from '@/lib/capability-gate';
 
 /**
  * Hook for checking capability access

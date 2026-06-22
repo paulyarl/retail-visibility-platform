@@ -23,7 +23,7 @@ export interface CapabilityData {
 export async function GET(request: NextRequest) {
   try {
     // Import CapabilityGatingService dynamically to avoid SSR issues
-    const { CapabilityGatingService } = await import('@platform/feature-definitions');
+    const { CapabilityGatingService } = await import('@/lib/capability-gating-service');
     
     // Get all tiers and their capabilities
     const tiers = ['discovery', 'storefront', 'professional', 'enterprise'];

@@ -1,27 +1,15 @@
-/**
- * Capability-Based Gate Engine
- * 
- * Extends the feature gate system to handle sophisticated capability gating
- * based on tier progression and operational sophistication.
- */
+export interface FeatureGateContext {
+  tier?: {
+    key: string;
+    name: string;
+  };
+  userRole?: string;
+  platformUser?: {
+    canBypassAll?: boolean;
+    canBypassRole?: boolean;
+  };
+}
 
-import { FEATURE_OPERATIONS } from './operations/feature-operations';
-import { TIER_DEFINITIONS } from './definitions/tier-hierarchies';
-import type { FeatureGateContext } from './types';
-
-// Tier levels for capability comparison
-const TIER_LEVELS = {
-  'discovery': 1,
-  'starter': 2,
-  'storefront': 3,
-  'commitment': 4,
-  'ecommerce': 4,
-  'professional': 5,
-  'omnichannel': 5,
-  'enterprise': 6
-} as const;
-
-// Capability types
 export interface Capability {
   name: string;
   enabled: boolean;
@@ -45,21 +33,24 @@ export interface CapabilityGateResult {
   };
 }
 
-// TODO: Migrate to database-driven capabilities
-// Should pull from:
-// - tier_features table (tier_id, feature_key, capability_type, enabled, restrictions)
-// - features table (feature_key, feature_name, description, category)
-// - public_tiers table for anonymous access
+const TIER_LEVELS = {
+  'discovery': 1,
+  'starter': 2,
+  'storefront': 3,
+  'commitment': 4,
+  'ecommerce': 4,
+  'professional': 5,
+  'omnichannel': 5,
+  'enterprise': 6
+} as const;
 
-// Capability definitions by tier - TEMPORARY until database integration
 const CAPABILITY_DEFINITIONS = {
-  // Product Type Capabilities - Using explicit naming convention
   'product_types': {
     discovery: {
       name: 'Product Types',
       enabled: true,
       level: 1,
-      features: ['physical_product'], // Explicit naming
+      features: ['physical_product'],
       restrictions: {
         allowedTypes: ['physical_product'],
         maxItems: 10
@@ -69,7 +60,7 @@ const CAPABILITY_DEFINITIONS = {
       name: 'Product Types',
       enabled: true,
       level: 3,
-      features: ['physical_product', 'digital_product'], // Explicit naming
+      features: ['physical_product', 'digital_product'],
       restrictions: {
         allowedTypes: ['physical_product', 'digital_product'],
         maxItems: 100
@@ -79,15 +70,13 @@ const CAPABILITY_DEFINITIONS = {
       name: 'Product Types',
       enabled: true,
       level: 5,
-      features: ['physical_product', 'digital_product', 'hybrid_product', 'custom_product'], // Explicit naming
+      features: ['physical_product', 'digital_product', 'hybrid_product', 'custom_product'],
       restrictions: {
         allowedTypes: ['physical_product', 'digital_product', 'hybrid_product', 'custom_product'],
         maxItems: 1000
       }
     }
   },
-
-  // Creation Method Capabilities
   'creation_methods': {
     discovery: {
       name: 'Creation Methods',
@@ -119,8 +108,6 @@ const CAPABILITY_DEFINITIONS = {
       }
     }
   },
-
-  // Featured Product Capabilities
   'featured_products': {
     discovery: {
       name: 'Featured Products',
@@ -153,8 +140,6 @@ const CAPABILITY_DEFINITIONS = {
       }
     }
   },
-
-  // Content Creation Capabilities
   'content_creation': {
     discovery: {
       name: 'Content Creation',
@@ -186,8 +171,6 @@ const CAPABILITY_DEFINITIONS = {
       }
     }
   },
-
-  // Order Tracking Capabilities
   'order_tracking': {
     commitment: {
       name: 'Order Tracking',
@@ -204,8 +187,6 @@ const CAPABILITY_DEFINITIONS = {
       restrictions: {}
     }
   },
-
-  // Payment Method Capabilities
   'payment_methods': {
     commitment: {
       name: 'Payment Methods',
@@ -240,9 +221,6 @@ const CAPABILITY_DEFINITIONS = {
 };
 
 export class CapabilityGateEngine {
-  /**
-   * Check capability access for a specific operation and capability type
-   */
   static checkCapabilityAccess(
     operation: string,
     capabilityType: string,
@@ -250,8 +228,7 @@ export class CapabilityGateEngine {
   ): CapabilityGateResult {
     const currentTier = context.tier?.key || 'discovery';
     const currentLevel = TIER_LEVELS[currentTier as keyof typeof TIER_LEVELS] || 1;
-    
-    // Get capability definition for this tier
+
     const capabilityDef = CAPABILITY_DEFINITIONS[capabilityType as keyof typeof CAPABILITY_DEFINITIONS];
     if (!capabilityDef) {
       return {
@@ -263,9 +240,8 @@ export class CapabilityGateEngine {
       };
     }
 
-    // Find the highest capability level available at or below current tier
-    let availableCapability = null;
-    let requiredTier = null;
+    let availableCapability: any = null;
+    let requiredTier: string | null = null;
 
     const tierKeys = Object.keys(capabilityDef) as Array<keyof typeof capabilityDef>;
     for (const tierKey of tierKeys) {
@@ -293,13 +269,12 @@ export class CapabilityGateEngine {
       };
     }
 
-    // Build capabilities object
     const capabilities: Record<string, Capability> = {
       [capabilityType]: {
         name: availableCapability.name,
         enabled: availableCapability.enabled,
         level: availableCapability.level,
-        maxLimit: (availableCapability.restrictions as any)?.maxItems,
+        maxLimit: availableCapability.restrictions?.maxItems,
         features: availableCapability.features
       }
     };
@@ -311,24 +286,20 @@ export class CapabilityGateEngine {
     };
   }
 
-  /**
-   * Get all capabilities for the current tier
-   */
   static getAllCapabilities(context: FeatureGateContext): Record<string, Capability> {
     const currentTier = context.tier?.key || 'discovery';
     const currentLevel = TIER_LEVELS[currentTier as keyof typeof TIER_LEVELS] || 1;
-    
+
     const allCapabilities: Record<string, Capability> = {};
 
     for (const [capabilityType, capabilityDef] of Object.entries(CAPABILITY_DEFINITIONS)) {
-      // Find the highest capability level available at or below current tier
-      let availableCapability = null;
+      let availableCapability: any = null;
 
       const tierKeys = Object.keys(capabilityDef) as Array<string>;
       for (const tierKey of tierKeys) {
         const tierLevel = TIER_LEVELS[tierKey as keyof typeof TIER_LEVELS] || 0;
         if (tierLevel <= currentLevel) {
-          availableCapability = capabilityDef[tierKey as keyof typeof capabilityDef];
+          availableCapability = (capabilityDef as any)[tierKey];
         }
       }
 
@@ -337,7 +308,7 @@ export class CapabilityGateEngine {
           name: availableCapability.name,
           enabled: availableCapability.enabled,
           level: availableCapability.level,
-          maxLimit: (availableCapability.restrictions as any)?.maxItems,
+          maxLimit: availableCapability.restrictions?.maxItems,
           features: availableCapability.features
         };
       }
@@ -346,9 +317,6 @@ export class CapabilityGateEngine {
     return allCapabilities;
   }
 
-  /**
-   * Check if a specific capability feature is available
-   */
   static hasCapabilityFeature(
     capabilityType: string,
     feature: string,
@@ -359,20 +327,16 @@ export class CapabilityGateEngine {
     return capability?.features.includes(feature) || false;
   }
 
-  /**
-   * Get upgrade path for a capability
-   */
   static getUpgradePath(
     capabilityType: string,
     context: FeatureGateContext
   ): { currentTier: string; requiredTier: string; capabilities: string[] } | null {
     const currentTier = context.tier?.key || 'discovery';
     const currentLevel = TIER_LEVELS[currentTier as keyof typeof TIER_LEVELS] || 1;
-    
+
     const capabilityDef = CAPABILITY_DEFINITIONS[capabilityType as keyof typeof CAPABILITY_DEFINITIONS];
     if (!capabilityDef) return null;
 
-    // Find the next tier that provides this capability
     for (const tierKey of Object.keys(capabilityDef)) {
       const tierLevel = TIER_LEVELS[tierKey as keyof typeof TIER_LEVELS] || 0;
       if (tierLevel > currentLevel) {

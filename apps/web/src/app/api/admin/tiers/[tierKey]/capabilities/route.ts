@@ -35,7 +35,7 @@ export async function GET(
     const { tierKey } = await params;
     
     // Import CapabilityGatingService dynamically to avoid SSR issues
-    const { CapabilityGatingService } = await import('@platform/feature-definitions');
+    const { CapabilityGatingService } = await import('@/lib/capability-gating-service');
     
     // Get real capability data for the specific tier
     const capabilityResult = await CapabilityGatingService.checkProductTypeCapability(tierKey);
