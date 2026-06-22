@@ -6,6 +6,7 @@ import { Paper, NavLink, Group, Text, Divider, Box } from '@mantine/core';
 
 const NAV_ITEMS = [
   { href: '/bot', label: 'Dashboard', emoji: '📊' },
+  { href: '/bot/conversations', label: 'Conversations', emoji: '💬' },
   { href: '/bot/config', label: 'Config', emoji: '⚙️' },
   { href: '/bot/options', label: 'Options', emoji: '🔧' },
   { href: '/bot/skills', label: 'Skills', emoji: '⚡' },

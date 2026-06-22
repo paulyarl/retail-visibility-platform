@@ -40,6 +40,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
+import PublicBotWidget from '@/components/bot/PublicBotWidget';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -1105,6 +1106,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           variant={productLayout === 'quick-commerce' ? 'compact' : 'full'}
         />
       </ProductLikeProvider>
+      <PublicBotWidget
+        tenantId={product.tenantId}
+        pageContext="product"
+        hasActivePaymentGateway={tenant?.metadata?.hasActivePaymentGateway ?? false}
+      />
     </>
   );
 }

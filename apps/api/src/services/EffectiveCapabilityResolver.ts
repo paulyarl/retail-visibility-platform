@@ -28,6 +28,7 @@ import {
   resolveFaqOptions,
   resolveCrmOptions,
   resolveChatbotOptions,
+  resolveOrgOptions,
 } from './resolvers';
 import type {
   EffectiveCapabilities,
@@ -173,6 +174,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.chatbot_options?.features || {},
       rawCaps.capabilities.chatbot_options?.capability_enabled
     ),
+    resolveOrgOptions(
+      rawCaps.capabilities.organization_options?.features || {},
+      rawCaps.capabilities.organization_options?.capability_enabled
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -193,8 +198,10 @@ export async function resolveEffectiveCapabilities(
       faq: effective[11],
       crm: effective[12],
       chatbot: effective[13],
+      org_options: effective[14],
     },
     uncategorized_features: rawCaps.uncategorized_features,
+    purchased_feature_keys: rawCaps.purchased_feature_keys || [],
   };
 
   // 6. Attach raw gates for authenticated / detail=full requests
@@ -271,7 +278,7 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     });
   }
 
-  // Merge features: most-permissive-wins
+  // Merge features: most-permissive-wins (org-tier + tenant-tier)
   const mergedFeatures = new Map<string, { feature_key: string; is_enabled: boolean; is_highlighted: boolean; capability_type_list: any }>();
   for (const tf of tierFeatures) {
     const existing = mergedFeatures.get(tf.feature_key);
@@ -285,6 +292,53 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
         is_highlighted: tf.is_highlighted ?? false,
         capability_type_list: tf.capability_type_list,
       });
+    }
+  }
+
+  // Merge purchased features (BSaaS — à la carte feature purchases)
+  // Active and past_due (grace period) purchases override tier gates with most-permissive-wins
+  const purchases = await prisma.tenant_feature_purchases.findMany({
+    where: {
+      tenant_id: tenantId,
+      status: { in: ['active', 'past_due', 'trial'] },
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { feature_key: true },
+  });
+
+  if (purchases.length > 0) {
+    // Resolve capability_type for purchased features that may not be in any tier
+    const purchaseFeatureKeys = purchases.map(p => p.feature_key);
+    const purchaseFeatures = await prisma.features_list.findMany({
+      where: { key: { in: purchaseFeatureKeys } },
+      select: { id: true, key: true },
+    });
+    const featureIdToKey = new Map(purchaseFeatures.map(f => [f.id, f.key]));
+
+    const capLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: [...featureIdToKey.keys()] } },
+      include: { capability_type_list: { select: { key: true, name: true, category: true } } },
+    });
+
+    const featureKeyToCapType = new Map<string, any>();
+    for (const link of capLinks) {
+      const fKey = featureIdToKey.get(link.feature_id);
+      if (fKey) featureKeyToCapType.set(fKey, link.capability_type_list);
+    }
+
+    for (const purchase of purchases) {
+      const existing = mergedFeatures.get(purchase.feature_key);
+      if (existing) {
+        existing.is_enabled = true; // purchased = always enabled
+      } else {
+        const capType = featureKeyToCapType.get(purchase.feature_key) || null;
+        mergedFeatures.set(purchase.feature_key, {
+          feature_key: purchase.feature_key,
+          is_enabled: true,
+          is_highlighted: false,
+          capability_type_list: capType,
+        });
+      }
     }
   }
 
@@ -314,6 +368,7 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     tier_description: effectiveTier?.description || '',
     capabilities,
     uncategorized_features: uncategorizedFeatures,
+    purchased_feature_keys: purchases.length > 0 ? purchases.map(p => p.feature_key) : [],
   };
 }
 

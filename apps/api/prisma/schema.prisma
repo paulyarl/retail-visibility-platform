@@ -301,6 +301,25 @@ model bot_skills {
   bot_skill_configurations bot_skill_configurations[]
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bsaas_catalog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feature_key    String   @unique(map: "bsaas_catalog_feature_key_unique")
+  marketing_name String?
+  description    String?
+  price_cents    Int
+  billing_cycle  String   @default("monthly") @db.VarChar(20)
+  trial_days     Int      @default(0)
+  is_active      Boolean  @default(true)
+  sort_order     Int      @default(0)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([is_active, sort_order], map: "idx_bsaas_catalog_active")
+  @@index([feature_key], map: "idx_bsaas_catalog_feature_key")
+}
+
 model business_hours_list {
   id             String    @id
   tenant_id      String    @unique
@@ -603,6 +622,23 @@ model crm_request_reads {
 
   @@unique([user_id, request_id, request_type], map: "idx_crm_request_reads_unique")
   @@index([user_id, read_at], map: "idx_crm_request_reads_user_read")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_user_read_states {
+  id           String    @id
+  user_id      String    @db.VarChar(255)
+  tenant_id    String    @db.VarChar(255)
+  scope        String    @db.VarChar(50)
+  last_read_at DateTime  @default(now()) @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_user_read_states_tenant")
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_user_read_states_user")
+
+  @@unique([user_id, tenant_id, scope], map: "idx_crm_user_read_states_unique")
+  @@index([user_id, tenant_id], map: "idx_crm_user_read_states_user_tenant")
+  @@index([tenant_id, scope], map: "idx_crm_user_read_states_tenant_scope")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -2766,33 +2802,40 @@ model platform_revenue_transactions {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model platform_settings_list {
-  id                       Int      @id @default(1)
-  platform_name            String?
-  platform_description     String?
-  logo_url                 String?
-  favicon_url              String?
-  created_at               DateTime @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime @db.Timestamptz(6)
-  rate_limiting_enabled    Boolean? @default(true)
-  theme_preset             String?  @default("default") @db.VarChar(255)
-  theme_colors             Json?
-  theme_font_family        String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif") @db.VarChar(255)
-  theme_border_radius      String?  @default("md") @db.VarChar(50)
-  theme_button_size        String?  @default("sm") @db.VarChar(50)
-  theme_spacing            Int?     @default(16)
-  contact_email            String?  @db.VarChar(255)
-  contact_phone            String?  @db.VarChar(50)
-  contact_address          String?
-  contact_website          String?  @db.VarChar(500)
-  social_facebook          String?  @db.VarChar(500)
-  social_twitter           String?  @db.VarChar(500)
-  social_instagram         String?  @db.VarChar(500)
-  social_linkedin          String?  @db.VarChar(500)
-  social_youtube           String?  @db.VarChar(500)
-  banner_url               String?  @db.VarChar(500)
-  minimum_payment_amount   Int?     @default(200)
-  minimum_payment_currency String?  @default("USD") @db.VarChar(3)
-  minimum_payment_display  String?  @default("$2.00") @db.VarChar(20)
+  id                         Int      @id @default(1)
+  platform_name              String?
+  platform_description       String?
+  logo_url                   String?
+  favicon_url                String?
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @db.Timestamptz(6)
+  rate_limiting_enabled      Boolean? @default(true)
+  theme_preset               String?  @default("default") @db.VarChar(255)
+  theme_colors               Json?
+  theme_font_family          String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif") @db.VarChar(255)
+  theme_border_radius        String?  @default("md") @db.VarChar(50)
+  theme_button_size          String?  @default("sm") @db.VarChar(50)
+  theme_spacing              Int?     @default(16)
+  contact_email              String?  @db.VarChar(255)
+  contact_phone              String?  @db.VarChar(50)
+  contact_address            String?
+  contact_website            String?  @db.VarChar(500)
+  social_facebook            String?  @db.VarChar(500)
+  social_twitter             String?  @db.VarChar(500)
+  social_instagram           String?  @db.VarChar(500)
+  social_linkedin            String?  @db.VarChar(500)
+  social_youtube             String?  @db.VarChar(500)
+  banner_url                 String?  @db.VarChar(500)
+  minimum_payment_amount     Int?     @default(200)
+  minimum_payment_currency   String?  @default("USD") @db.VarChar(3)
+  minimum_payment_display    String?  @default("$2.00") @db.VarChar(20)
+  bot_ai_enabled             Boolean? @default(true)
+  bot_embedding_sync_enabled Boolean? @default(true)
+  bot_embedding_model        String?  @default("text-embedding-3-small") @db.VarChar(50)
+  bot_chat_model             String?  @default("gpt-4o-mini") @db.VarChar(50)
+  bot_sync_interval_hours    Int?     @default(12)
+  bot_embedding_provider     String?  @default("openai") @db.VarChar(20)
+  bot_chat_provider          String?  @default("openai") @db.VarChar(20)
 }
 
 model product_performances {
@@ -3579,6 +3622,26 @@ model tenant_barcode_scan_settings {
   @@index([tenant_id], map: "idx_barcode_scan_tenant")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_bot_embed_licenses {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.VarChar(255)
+  embed_key       String    @unique @default(dbgenerated("(gen_random_uuid())::text"))
+  allowed_domains String[]  @default([])
+  status          String    @default("active") @db.VarChar(20)
+  source          String    @default("tier") @db.VarChar(50)
+  expires_at      DateTime? @db.Timestamptz(6)
+  metadata        Json?
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  tenants         tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bot_embed_licenses_tenant")
+
+  @@index([embed_key], map: "idx_tbel_embed_key")
+  @@index([tenant_id], map: "idx_tbel_tenant_id")
+  @@index([tenant_id, status], map: "idx_tbel_tenant_status")
+}
+
 model tenant_business_profiles_list {
   tenant_id                  String                    @id @unique
   business_name              String
@@ -3751,6 +3814,26 @@ model tenant_feature_overrides_list {
   tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@unique([tenant_id, feature])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_feature_purchases {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String    @db.VarChar(255)
+  feature_key  String
+  source       String    @default("bsaas") @db.VarChar(50)
+  status       String    @default("active") @db.VarChar(20)
+  purchased_at DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at   DateTime? @db.Timestamptz(6)
+  metadata     Json?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_feature_purchases_tenant")
+
+  @@unique([tenant_id, feature_key], map: "tfp_unique_tenant_feature")
+  @@index([feature_key], map: "idx_tfp_feature_key")
+  @@index([tenant_id, status], map: "idx_tfp_tenant_status")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -4109,6 +4192,7 @@ model tenants {
   crm_inquiries                                                                          crm_inquiries[]
   crm_support_tickets                                                                    crm_support_tickets[]
   crm_tasks                                                                              crm_tasks[]
+  crm_user_read_states                                                                   crm_user_read_states[]
   customer_tenant_relationships                                                          customer_tenant_relationships[]
   digital_access_grants                                                                  digital_access_grants[]
   digital_download_pages                                                                 digital_download_pages[]
@@ -4161,12 +4245,14 @@ model tenants {
   subscription_invoices                                                                  subscription_invoices[]
   sync_jobs                                                                              sync_jobs[]
   tenant_barcode_scan_settings                                                           tenant_barcode_scan_settings?
+  tenant_bot_embed_licenses                                                              tenant_bot_embed_licenses[]
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_chatbot_options_settings                                                        tenant_chatbot_options_settings?
   tenant_commerce_settings                                                               tenant_commerce_settings?
   tenant_crm_options_settings                                                            tenant_crm_options_settings?
   tenant_faq_options_settings                                                            tenant_faq_options_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
+  tenant_feature_purchases                                                               tenant_feature_purchases[]
   tenant_featured_options_settings                                                       tenant_featured_options_settings?
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
   tenant_integration_settings                                                            tenant_integration_settings?
@@ -4438,37 +4524,38 @@ model user_tenants {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model users {
-  id                       String                   @id
-  email                    String                   @unique
-  password_hash            String
-  first_name               String?
-  last_name                String?
-  role                     user_role                @default(USER)
-  email_verified           Boolean                  @default(false)
-  email_verification_token String?
-  password_reset_token     String?
-  password_reset_expires   DateTime?
-  last_login               DateTime?
-  is_active                Boolean                  @default(true)
-  created_at               DateTime                 @default(now())
-  updated_at               DateTime
-  mfa_enabled              Boolean?                 @default(false)
-  mfa_secret               String?
-  mfa_backup_codes         String[]
-  mfa_method               String?                  @db.VarChar(50)
-  mfa_verified_at          DateTime?                @db.Timestamp(6)
-  onboarding_completed     Boolean                  @default(false)
-  onboarding_step          String?                  @db.VarChar(50)
-  onboarding_data          Json?
-  auth0_id                 String?                  @unique @db.VarChar(255)
-  business_name            String?                  @db.VarChar(255)
-  business_type            String?                  @db.VarChar(100)
-  phone                    String?                  @db.VarChar(50)
-  picture                  String?                  @db.VarChar(500)
-  digital_download_pages   digital_download_pages[]
-  user_preferences         user_preferences[]
-  user_sessions_list       user_sessions_list[]
-  user_tenants             user_tenants[]
+  id                                                          String                             @id
+  email                                                       String                             @unique
+  password_hash                                               String
+  first_name                                                  String?
+  last_name                                                   String?
+  role                                                        user_role                          @default(USER)
+  email_verified                                              Boolean                            @default(false)
+  email_verification_token                                    String?
+  password_reset_token                                        String?
+  password_reset_expires                                      DateTime?
+  last_login                                                  DateTime?
+  is_active                                                   Boolean                            @default(true)
+  created_at                                                  DateTime                           @default(now())
+  updated_at                                                  DateTime
+  mfa_enabled                                                 Boolean?                           @default(false)
+  mfa_secret                                                  String?
+  mfa_backup_codes                                            String[]
+  mfa_method                                                  String?                            @db.VarChar(50)
+  mfa_verified_at                                             DateTime?                          @db.Timestamp(6)
+  onboarding_completed                                        Boolean                            @default(false)
+  onboarding_step                                             String?                            @db.VarChar(50)
+  onboarding_data                                             Json?
+  auth0_id                                                    String?                            @unique @db.VarChar(255)
+  business_name                                               String?                            @db.VarChar(255)
+  business_type                                               String?                            @db.VarChar(100)
+  phone                                                       String?                            @db.VarChar(50)
+  picture                                                     String?                            @db.VarChar(500)
+  crm_user_read_states                                        crm_user_read_states[]
+  digital_download_pages                                      digital_download_pages[]
+  user_preferences                                            user_preferences[]
+  user_sessions_list                                          user_sessions_list[]
+  user_tenants                                                user_tenants[]
 }
 
 model webhook_events {
@@ -4493,6 +4580,53 @@ enum LocationStatus {
   inactive
   closed
   archived
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model navigation_links_backup {
+  id                  String?
+  label               String?
+  href                String?
+  icon                String?
+  badge               String?
+  badge_variant       String?
+  targets             String[]
+  sort_order          Int?
+  is_enabled          Boolean?
+  is_divider_before   Boolean?
+  required_permission String?
+  required_group      String?
+  required_role       String?
+  created_at          DateTime? @db.Timestamptz(6)
+  updated_at          DateTime? @db.Timestamptz(6)
+  created_by          String?
+  metadata            Json?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model navigation_links_backup_phase2 {
+  id                  String?
+  label               String?
+  href                String?
+  icon                String?
+  badge               String?
+  badge_variant       String?
+  targets             String[]
+  sort_order          Int?
+  is_enabled          Boolean?
+  is_divider_before   Boolean?
+  required_permission String?
+  required_group      String?
+  required_role       String?
+  created_at          DateTime? @db.Timestamptz(6)
+  updated_at          DateTime? @db.Timestamptz(6)
+  created_by          String?
+  metadata            Json?
+
+  @@ignore
 }
 
 enum action {

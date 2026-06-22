@@ -11,7 +11,6 @@ import { NavItemRow, type NavItem } from '@/components/navigation/NavItemRow';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavLinks } from '@/hooks/useNavLinks';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
-import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
 
 // Types are imported from NavItemRow component
@@ -88,6 +87,11 @@ const Icon = {
   Platform: () => (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  CreditCard: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ),
   ChevronRight: ({ className }: { className?: string }) => (
@@ -233,12 +237,12 @@ function buildTenantNav(
 ): NavItemWithRBAC[] {
   return [
     {
-      label: 'Dashboard',
+      label: 'My Dashboard',
       href: `/t/${currentTenantId}/dashboard`,
       icon: <Icon.Dashboard />,
     },
     {
-      label: 'Inventory',
+      label: 'My Inventory',
       href: `/t/${currentTenantId}/items`,
       icon: <Icon.Inventory />,
       children: [
@@ -252,7 +256,7 @@ function buildTenantNav(
       ],
     },
     {
-      label: 'Orders',
+      label: 'Customer Portal',
       href: `/t/${currentTenantId}/orders`,
       icon: <Icon.Orders />,
       requiredGroup: 'IS_TENANT_MANAGER',
@@ -263,7 +267,7 @@ function buildTenantNav(
       ],
     },
     {
-      label: 'Directory & Storefront',
+      label: 'My Storefront',
       href: `/t/${currentTenantId}/settings/directory`,
       icon: <Icon.Directory />,
       children: [
@@ -295,19 +299,19 @@ function buildTenantNav(
       children: [
         { label: 'Dashboard', href: `/t/${currentTenantId}/bot` },
         { label: 'Configuration', href: `/t/${currentTenantId}/bot/config` },
-        { label: 'Skills', href: `/t/${currentTenantId}/bot/skills` },
         { label: 'Analytics', href: `/t/${currentTenantId}/bot/analytics` },
-        { label: 'Widget Setup', href: `/t/${currentTenantId}/bot/widget` },
-        { label: 'Chatbot Options', href: `/t/${currentTenantId}/bot/options` },
+        { label: 'Skills', href: `/t/${currentTenantId}/bot/skills` },
+        { label: 'Knowledge', href: `/t/${currentTenantId}/bot/knowledge` },
+        { label: 'Widget', href: `/t/${currentTenantId}/bot/widget` },
       ],
     },
     {
-      label: 'Integrations',
+      label: 'My Integrations',
       href: `/t/${currentTenantId}/settings/integrations`,
       icon: <Icon.Integrations />,
       requiredGroup: 'IS_TENANT_ADMIN',
       children: [
-        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integration-options` },
+        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integrations/options` },
         { label: 'Google Merchant Center', href: `/t/${currentTenantId}/settings/integrations/google` },
         { label: 'Feed Validation', href: `/t/${currentTenantId}/feed-validation` },
         { label: 'Clover POS', href: `/t/${currentTenantId}/settings/integrations/clover` },
@@ -315,7 +319,18 @@ function buildTenantNav(
       ],
     },
     {
-      label: 'Settings',
+      label: 'My Subscription',
+      href: `/t/${currentTenantId}/settings/subscription`,
+      icon: <Icon.CreditCard />,
+      requiredGroup: 'IS_TENANT_MANAGER',
+      children: [
+        { label: 'Subscription', href: `/t/${currentTenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
+        { label: 'Tier Features', href: `/t/${currentTenantId}/settings/tier-features` },
+        { label: 'Feature Store', href: `/t/${currentTenantId}/settings/feature-store` },
+      ],
+    },
+    {
+      label: 'My Settings',
       href: `/t/${currentTenantId}/settings`,
       icon: <Icon.Settings />,
       requiredGroup: 'IS_TENANT_MANAGER',
@@ -324,7 +339,6 @@ function buildTenantNav(
         { label: 'Team Members', href: `/t/${currentTenantId}/settings/users`, requiredPermission: 'CAN_MANAGE_TENANT_USERS' },
         { label: 'Appearance', href: `/t/${currentTenantId}/settings/appearance` },
         { label: 'Language & Region', href: `/t/${currentTenantId}/settings/language` },
-        { label: 'Subscription', href: `/t/${currentTenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
         { label: 'Digital Downloads', href: `/t/${currentTenantId}/settings/digital-downloads` },
         { label: 'Onboarding', href: `/t/${currentTenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
         { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization` },
@@ -577,23 +591,6 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const pathname = usePathname();
   const { filterNavItems } = useRBAC();
   const { user } = useAuth();
-  
-  // Use centralized tenant context - this ensures sidebar aligns with current context
-  const [currentTenantId, setCurrentTenantId] = useState<string | null>(tenantId);
-  
-  useEffect(() => {
-    // Check tenant context every second to stay in sync
-    const checkContext = () => {
-      const context = clientTenantContextManager.getTenantContext();
-      if (context.tenantId && context.tenantId !== currentTenantId) {
-        setCurrentTenantId(context.tenantId);
-      }
-    };
-    
-    checkContext();
-    const interval = setInterval(checkContext, 1000);
-    return () => clearInterval(interval);
-  }, [currentTenantId]);
   const { tenantLinks } = useNavLinks();
 
   // Stabilize user.tenants to prevent infinite re-renders
@@ -808,7 +805,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
 
         {/* Tenant Scope Header - Desktop only, mobile uses top bar */}
         <div className="hidden md:block">
-          <TenantScopeHeader tenantId={currentTenantId || tenantId} />
+          <TenantScopeHeader tenantId={tenantId} />
         </div>
 
         {/* Page content */}

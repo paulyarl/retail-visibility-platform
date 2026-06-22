@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePathname } from 'next/navigation';
 import { navigationLinksService, NavLink, NavTemplateParser } from '@/services/NavigationLinksService';
 import { ReactNode } from 'react';
 
@@ -224,17 +225,33 @@ interface UseNavLinksResult {
 
 export function useNavLinks(): UseNavLinksResult {
   const { isAuthenticated } = useAuth();
+  const pathname = usePathname();
   const [links, setLinks]   = useState<ProcessedNavLink[]>(_cache || []); // Ensure array initialization
   const [loading, setLoading] = useState<boolean>(!_cache);
   const [error, setError]   = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  
+  // Check if we're on a tenant-scoped or admin page (not public pages)
+  const isTenantOrAdminPage = Boolean(
+    pathname?.startsWith('/t/') || 
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/settings') ||
+    pathname?.startsWith('/tenants') ||
+    pathname?.startsWith('/onboarding')
+  );
+  
   // console.log(`useNavLinks - isAuthenticated:`, isAuthenticated);
   // console.log(`useNavLinks - _cache:`, _cache);
   // console.log(`useNavLinks - links:`, links);
 
   const load = useCallback(() => {
-    // Only fetch if authenticated
-    if (!isAuthenticated) {
+    // Only fetch if authenticated and on a tenant/admin page
+    if (!isAuthenticated || !isTenantOrAdminPage) {
       setLoading(false);
+      return;
+    }
+    // Skip if we already have data loaded (prevents re-fetch on auth state changes)
+    if (hasLoadedRef.current && links.length > 0) {
       return;
     }
     setLoading(true);
@@ -243,17 +260,22 @@ export function useNavLinks(): UseNavLinksResult {
       .then(data => {
         setLinks(data);
         setLoading(false);
+        hasLoadedRef.current = true;
       })
       .catch(err => {
         console.error('[useNavLinks]', err);
         setError(err.message);
         setLoading(false);
       });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isTenantOrAdminPage, links.length]);
 
   useEffect(() => {
+    // Skip entirely if not authenticated or not on tenant/admin page
+    if (!isAuthenticated || !isTenantOrAdminPage) {
+      return;
+    }
     load();
-  }, [load]);
+  }, [load, isAuthenticated, isTenantOrAdminPage]);
 
   // Ensure links is always an array
   const linksArray = Array.isArray(links) ? links : [];

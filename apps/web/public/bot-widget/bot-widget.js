@@ -3,10 +3,12 @@
  *
  * Usage:
  *   <script src="/bot-widget/bot-widget.js" data-tenant-id="tid-xxx" defer></script>
+ *   <script src="https://platform.com/bot-widget/bot-widget.js" data-embed-key="ek-xxx" defer></script>
  *
  * Or programmatically:
  *   <script>
  *     BotWidget.init({ tenantId: 'tid-xxx', pageContext: 'storefront' });
+ *     BotWidget.init({ embedKey: 'ek-xxx', pageContext: 'storefront' });
  *   </script>
  *
  * Features:
@@ -40,6 +42,7 @@
 
   var state = {
     tenantId: null,
+    embedKey: null,
     pageContext: null,
     config: null,
     sessionId: null,
@@ -113,9 +116,26 @@
     return (window.location.origin || '');
   }
 
+  function authHeaders() {
+    var headers = { 'Content-Type': 'application/json' };
+    if (state.embedKey) {
+      headers['x-embed-key'] = state.embedKey;
+    }
+    return headers;
+  }
+
+  function tenantParam() {
+    if (state.embedKey) {
+      return 'embedKey=' + encodeURIComponent(state.embedKey);
+    }
+    return 'tenantId=' + encodeURIComponent(state.tenantId);
+  }
+
   async function fetchWidgetConfig(tenantId) {
-    var url = apiBase() + '/api/public/bot/config?tenantId=' + encodeURIComponent(tenantId);
-    var resp = await fetch(url);
+    var url = apiBase() + '/api/public/bot/config?' + tenantParam();
+    var resp = await fetch(url, {
+      headers: state.embedKey ? { 'x-embed-key': state.embedKey } : {},
+    });
     if (!resp.ok) return null;
     var json = await resp.json();
     return json.success && json.config ? json.config : null;
@@ -123,15 +143,20 @@
 
   async function startConversation(tenantId, opts) {
     var url = apiBase() + '/api/public/bot/conversations';
+    var body = {
+      customerEmail: opts.email || undefined,
+      customerPhone: opts.phone || undefined,
+      pageContext: state.pageContext,
+    };
+    if (state.embedKey) {
+      body.embedKey = state.embedKey;
+    } else {
+      body.tenantId = tenantId;
+    }
     var resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: tenantId,
-        customerEmail: opts.email || undefined,
-        customerPhone: opts.phone || undefined,
-        pageContext: state.pageContext,
-      }),
+      headers: authHeaders(),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error('Failed to start conversation');
     var json = await resp.json();
@@ -144,7 +169,7 @@
     var url = apiBase() + '/api/public/bot/conversations/' + sessionId + '/messages';
     var resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ message: message }),
     });
     if (!resp.ok) throw new Error('Failed to send message');
@@ -158,7 +183,7 @@
     try {
       await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ messageId: messageId, rating: rating }),
       });
     } catch (e) {}
@@ -175,6 +200,17 @@
     var color = config ? (config.widgetColor || '#4F46E5') : '#4F46E5';
     var font = config ? (config.widgetFont || 'system-ui, sans-serif') : 'system-ui, sans-serif';
 
+    function getContrastColor(hex) {
+      var c = hex.replace('#', '');
+      if (c.length < 6) return '#ffffff';
+      var r = parseInt(c.slice(0, 2), 16) / 255;
+      var g = parseInt(c.slice(2, 4), 16) / 255;
+      var b = parseInt(c.slice(4, 6), 16) / 255;
+      var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      return lum > 0.55 ? '#111111' : '#ffffff';
+    }
+    var textColor = getContrastColor(color);
+
     var posStyle = '';
     if (pos === 'bottom-right') posStyle = 'bottom:' + offsetY + 'px;right:' + offsetX + 'px;';
     else if (pos === 'bottom-left') posStyle = 'bottom:' + offsetY + 'px;left:' + offsetX + 'px;';
@@ -190,8 +226,8 @@
         box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:transform 0.2s,box-shadow 0.2s;\
       }\
       .bw-toggle:hover { transform:scale(1.05);box-shadow:0 6px 16px rgba(0,0,0,0.2); }\
-      .bw-toggle svg { width:28px;height:28px;fill:#fff; }\
-      .bw-toggle-close svg { fill:#fff; }\
+      .bw-toggle svg { width:28px;height:28px;fill:' + textColor + '; }\
+      .bw-toggle-close svg { fill:' + textColor + '; }\
       .bw-panel {\
         position:absolute;' + (pos.indexOf('bottom') >= 0 ? 'bottom:70px;' : 'top:70px;') + '\
         ' + (pos.indexOf('right') >= 0 ? 'right:0;' : 'left:0;') + '\
@@ -202,7 +238,7 @@
       .bw-panel.open { display:flex;animation:bwFadeIn 0.2s ease; }\
       @keyframes bwFadeIn { from { opacity:0;transform:translateY(10px); } to { opacity:1;transform:translateY(0); } }\
       .bw-header {\
-        background:' + color + ';color:#fff;padding:14px 18px;display:flex;align-items:center;\
+        background:' + color + ';color:' + textColor + ';padding:14px 18px;display:flex;align-items:center;\
         justify-content:space-between;flex-shrink:0;\
       }\
       .bw-header-info { display:flex;align-items:center;gap:10px; }\
@@ -214,12 +250,12 @@
       .bw-header-text { display:flex;flex-direction:column; }\
       .bw-bot-name { font-size:15px;font-weight:600; }\
       .bw-status { font-size:11px;opacity:0.85; }\
-      .bw-close { background:none;border:none;color:#fff;cursor:pointer;padding:4px;opacity:0.8; }\
+      .bw-close { background:none;border:none;color:' + textColor + ';cursor:pointer;padding:4px;opacity:0.8; }\
       .bw-close:hover { opacity:1; }\
-      .bw-close svg { width:20px;height:20px;fill:#fff; }\
+      .bw-close svg { width:20px;height:20px;fill:' + textColor + '; }\
       .bw-messages { flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f7f7f8; }\
       .bw-msg { max-width:80%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.4;word-wrap:break-word; }\
-      .bw-msg-user { align-self:flex-end;background:' + color + ';color:#fff;border-bottom-right-radius:4px; }\
+      .bw-msg-user { align-self:flex-end;background:' + color + '1A;border:1px solid ' + color + '40;color:' + color + ';border-bottom-right-radius:4px; }\
       .bw-msg-bot { align-self:flex-start;background:#fff;color:#1a1a1a;border-bottom-left-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,0.08); }\
       .bw-msg-time { font-size:10px;opacity:0.5;margin-top:4px; }\
       .bw-msg-fallback { font-style:italic;opacity:0.7; }\
@@ -258,7 +294,7 @@
       }\
       .bw-input:focus { border-color:' + color + '; }\
       .bw-btn {\
-        padding:10px 16px;background:' + color + ';color:#fff;border:none;border-radius:8px;\
+        padding:10px 16px;background:' + color + ';color:' + textColor + ';border:none;border-radius:8px;\
         font-size:14px;font-family:inherit;cursor:pointer;transition:opacity 0.2s;\
       }\
       .bw-btn:hover { opacity:0.9; }\
@@ -276,7 +312,7 @@
       }\
       .bw-send-btn:hover { opacity:0.9; }\
       .bw-send-btn:disabled { opacity:0.4;cursor:not-allowed; }\
-      .bw-send-btn svg { width:20px;height:20px;fill:#fff; }\
+      .bw-send-btn svg { width:20px;height:20px;fill:' + textColor + '; }\
       .bw-greeting { text-align:center;font-size:13px;color:#888;padding:8px; }\
       @media (max-width: 480px) {\
         .bw-panel { width:calc(100vw - 20px);height:calc(100vh - 90px);' + posStyle + ' }\
@@ -307,11 +343,12 @@
 
   BotWidget.prototype.init = function (opts) {
     var self = this;
-    state.tenantId = opts.tenantId || (document.currentScript && document.currentScript.getAttribute('data-tenant-id'));
+    state.tenantId = opts.tenantId || (document.currentScript && document.currentScript.getAttribute('data-tenant-id')) || null;
+    state.embedKey = opts.embedKey || (document.currentScript && document.currentScript.getAttribute('data-embed-key')) || null;
     state.pageContext = opts.pageContext || (document.currentScript && document.currentScript.getAttribute('data-page-context')) || null;
 
-    if (!state.tenantId) {
-      console.warn('[BotWidget] No tenantId provided');
+    if (!state.tenantId && !state.embedKey) {
+      console.warn('[BotWidget] No tenantId or embedKey provided');
       return;
     }
 
@@ -382,10 +419,11 @@
     // Header
     var header = document.createElement('div');
     header.className = 'bw-header';
-    var avatarStyle = config.widgetAvatarUrl ? 'background-image:url(' + config.widgetAvatarUrl + ')' : '';
+    var avatarUrl = config.widgetAvatarUrl || config.platformLogoUrl;
+    var avatarStyle = avatarUrl ? 'background-image:url(' + avatarUrl + ')' : '';
     header.innerHTML = '\
       <div class="bw-header-info">\
-        <div class="bw-avatar" style="' + avatarStyle + '">' + (config.widgetAvatarUrl ? '' : '🤖') + '</div>\
+        <div class="bw-avatar" style="' + avatarStyle + '">' + (avatarUrl ? '' : '🤖') + '</div>\
         <div class="bw-header-text">\
           <div class="bw-bot-name">' + escapeHtml(config.botName || 'Assistant') + '</div>\
           <div class="bw-status">' + (state.online ? (state.afterHours ? 'After Hours' : 'Online') : 'Offline') + '</div>\
@@ -767,9 +805,10 @@
 
   if (currentScript) {
     var tenantId = currentScript.getAttribute('data-tenant-id');
-    if (tenantId) {
+    var embedKey = currentScript.getAttribute('data-embed-key');
+    if (tenantId || embedKey) {
       var pageContext = currentScript.getAttribute('data-page-context');
-      widget.init({ tenantId: tenantId, pageContext: pageContext });
+      widget.init({ tenantId: tenantId, embedKey: embedKey, pageContext: pageContext });
     }
   }
 })();

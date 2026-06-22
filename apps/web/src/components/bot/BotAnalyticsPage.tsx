@@ -14,6 +14,10 @@ interface BotAnalyticsPageProps {
 
 interface AnalyticsData {
   totalConversations?: number;
+  activeConversations?: number;
+  escalatedConversations?: number;
+  closedConversations?: number;
+  archivedConversations?: number;
   totalMessages?: number;
   avgRating?: number | null;
   resolutionBreakdown?: { faq: number; skill: number; fallback: number };
@@ -68,6 +72,14 @@ export default function BotAnalyticsPage({ tenantId }: BotAnalyticsPageProps) {
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Conversations" value={analytics?.totalConversations ?? 0} icon="💬" />
+        <StatCard label="Active" value={analytics?.activeConversations ?? 0} icon="🟢" />
+        <StatCard label="Escalated" value={analytics?.escalatedConversations ?? 0} icon="⚠️" />
+        <StatCard label="Closed" value={analytics?.closedConversations ?? 0} icon="✅" />
+      </div>
+
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Archived" value={analytics?.archivedConversations ?? 0} icon="📦" />
         <StatCard label="Total Messages" value={analytics?.totalMessages ?? 0} icon="📨" />
         <StatCard
           label="Avg Rating"

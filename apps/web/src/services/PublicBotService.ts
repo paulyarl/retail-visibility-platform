@@ -21,6 +21,7 @@ export interface PublicBotConfig {
   widgetOffsetY: number;
   widgetFont: string;
   widgetAvatarUrl: string | null;
+  platformLogoUrl: string | null;
   afterHoursEnabled: boolean;
   afterHoursMessage: string | null;
   preChatEnabled: boolean;
@@ -47,6 +48,14 @@ export interface StartConversationResult {
   greeting: string;
 }
 
+export interface SteeringChannel {
+  type: 'customer_ticket' | 'anonymous_inquiry' | 'help_desk';
+  label: string;
+  enabled: boolean;
+  actionUrl: string;
+  description: string;
+}
+
 export interface SendMessageResult {
   reply: string;
   responseType: string;
@@ -55,6 +64,7 @@ export interface SendMessageResult {
   skillName?: string | null;
   guardrailResult: string;
   messageId: string;
+  channels?: SteeringChannel[];
 }
 
 export interface SkillResult {
@@ -76,6 +86,7 @@ interface ApiEnvelope<T> {
   skillName?: string;
   guardrailResult?: string;
   messageId?: string;
+  channels?: SteeringChannel[];
   data?: any;
   cardSchema?: any;
   error?: string;
@@ -155,6 +166,7 @@ class PublicBotService extends PublicApiSingleton {
       skillName: result.data.skillName,
       guardrailResult: result.data.guardrailResult || 'pass',
       messageId: result.data.messageId!,
+      channels: result.data.channels,
     };
   }
 

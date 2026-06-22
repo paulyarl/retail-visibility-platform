@@ -44,7 +44,7 @@ export interface ProductRequest {
   googleCategoryId?: string;
   count: number;
   requireImages?: boolean; // Only return products with images
-  textModel?: 'openai' | 'google'; // AI model for text generation
+  textModel?: 'openai' | 'google' | 'anthropic' | 'mistral'; // AI model for text generation
   tenantId?: string; // For tenant-specific caching
 }
 
@@ -250,7 +250,7 @@ class ProductCacheSingletonService extends UniversalSingleton {
         businessType,
         categoryName,
         count,
-        textModel as 'openai' | 'google'
+        textModel as 'openai' | 'google' | 'anthropic' | 'mistral'
       );
       
       this.logInfo(`AI generated ${generatedProducts.length} products for ${businessType} > ${categoryName}`);

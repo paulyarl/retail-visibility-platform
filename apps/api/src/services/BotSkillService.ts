@@ -8,6 +8,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
+import BotPlatformGuideService from './BotPlatformGuideService';
 
 export interface SkillResult {
   skillName: string;
@@ -202,6 +203,19 @@ export class BotSkillService {
     }
 
     logger.info('[BotSkillService] Executing skill', undefined, { tenantId, skillName });
+
+    // Platform guide skill — built-in, reads effective capabilities
+    if (skillName === 'platform_guide') {
+      const surface = (params?.pageContext === 'dashboard' ? 'dashboard' : 'storefront') as 'dashboard' | 'storefront';
+      const guideService = BotPlatformGuideService.getInstance();
+      const { cardSchema, data } = await guideService.buildSkillCard(tenantId, surface);
+      return {
+        skillName,
+        success: true,
+        data,
+        cardSchema,
+      };
+    }
 
     // Phase 1A: Return skill card schema for the widget to render
     // Actual endpoint execution will be implemented in Phase 1B

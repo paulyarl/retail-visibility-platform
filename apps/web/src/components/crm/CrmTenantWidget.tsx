@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
-import { tenantUserService, User } from '@/services/TenantUserService';
+import { tenantUserService } from '@/services/TenantUserService';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
@@ -67,141 +68,166 @@ interface CrmTenantWidgetProps {
 
 export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
   const { user } = useAuth();
-  const [tickets, setTickets] = useState<CrmTicket[]>([]);
-  const [tasks, setTasks] = useState<CrmTask[]>([]);
-  const [activities, setActivities] = useState<CrmActivity[]>([]);
-  const [inquiries, setInquiries] = useState<CrmInquiry[]>([]);
-  const [alerts, setAlerts] = useState<CrmAlert[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [openTicketCount, setOpenTicketCount] = useState(0);
-  const [pendingTaskCount, setPendingTaskCount] = useState(0);
-  const [openInquiryCount, setOpenInquiryCount] = useState(0);
-  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [tenantUsers, setTenantUsers] = useState<User[]>([]);
+  const queryClient = useQueryClient();
   const [crmDisabled, setCrmDisabled] = useState(false);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Activity read tracking
-  const activityReadKey = `crm-widget-activity-last-read-${tenantId || 'global'}-${user?.id || 'anon'}`;
-  const [lastReadActivityAt, setLastReadActivityAt] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(activityReadKey);
-  });
-
-  function markActivitiesRead() {
-    const now = new Date().toISOString();
-    localStorage.setItem(activityReadKey, now);
-    setLastReadActivityAt(now);
-  }
-
   const prevUnreadRef = useRef<number>(0);
   const prevTicketIdsRef = useRef<Set<string>>(new Set());
   const prevTaskIdsRef = useRef<Set<string>>(new Set());
   const prevAlertIdsRef = useRef<Set<string>>(new Set());
+  const migratedRef = useRef(false);
+  const initialLoadDoneRef = useRef(false);
 
-  const loadData = useCallback(async () => {
-    try {
-      if (tenantId) {
-        const users = await tenantUserService.getTenantUsers(tenantId);
-        setTenantUsers(users ?? []);
-      }
-      const stats = await crmTenantCrmService.getStats();
-      if (!stats) return;
-
-      const newTickets = (stats.open_tickets ?? []).slice(0, 3);
-      const newTasks = (stats.pending_tasks ?? []).slice(0, 2);
-      const newActivities = (stats.recent_activities ?? []).filter(a => !a.is_internal).slice(0, 5);
-      const newInquiries = (stats.open_inquiries ?? []).slice(0, 3);
-      const newAlerts = (stats.recent_alerts ?? []).slice(0, 3);
-      const newUnread = stats.unread_count ?? 0;
-      const newOpenTicketCount = stats.open_ticket_count ?? 0;
-      const newPendingTaskCount = stats.pending_task_count ?? 0;
-      const newOpenInquiryCount = stats.open_inquiry_count ?? 0;
-      const newUnreadAlertCount = stats.unread_alert_count ?? 0;
-
-      // Detect new items for toast notifications (skip on first load)
-      if (!loading) {
-        const prevTicketIds = prevTicketIdsRef.current;
-        const prevTaskIds = prevTaskIdsRef.current;
-        const prevAlertIds = prevAlertIdsRef.current;
-        const prevUnread = prevUnreadRef.current;
-
-        const newTicketItems = newTickets.filter(t => !prevTicketIds.has(t.id));
-        const newTaskItems = newTasks.filter(t => !prevTaskIds.has(t.id));
-        const newAlertItems = newAlerts.filter(a => !prevAlertIds.has(a.id));
-
-        if (newUnread > prevUnread) {
-          const delta = newUnread - prevUnread;
-          if (newAlertItems.length > 0) {
-            toast({
-              title: newAlertItems[0].title,
-              description: newAlertItems[0].body || 'New alert',
-              variant: newAlertItems[0].type === 'warning' ? 'warning' : 'info',
-            });
-          } else if (newTicketItems.length > 0) {
-            toast({
-              title: 'New Support Ticket',
-              description: newTicketItems[0].title,
-              variant: 'info',
-            });
-          }
-          if (newTaskItems.length > 0) {
-            toast({
-              title: 'New Task Assigned',
-              description: newTaskItems[0].title,
-              variant: 'warning',
-            });
-          }
-          if (newAlertItems.length === 0 && newTicketItems.length === 0 && newTaskItems.length === 0 && delta > 0) {
-            toast({
-              title: `${delta} New CRM Item${delta > 1 ? 's' : ''}`,
-              description: 'Check your support inbox for updates',
-              variant: 'info',
-            });
-          }
+  // One-time migration: push legacy localStorage activity read state to backend
+  useEffect(() => {
+    if (typeof window === 'undefined' || !tenantId || !user?.id || migratedRef.current) return;
+    migratedRef.current = true;
+    const legacyKey = `crm-widget-activity-last-read-${tenantId || 'global'}-${user.id}`;
+    const legacyValue = localStorage.getItem(legacyKey);
+    if (legacyValue) {
+      try {
+        const parsedDate = new Date(legacyValue);
+        if (!isNaN(parsedDate.getTime())) {
+          crmTenantCrmService.setReadState('activity_feed', legacyValue);
         }
+        localStorage.removeItem(legacyKey);
+      } catch (err) {
+        console.error('[CRM Tenant Widget] Legacy read state migration failed:', err);
       }
+    }
+    const legacyPrefix = 'crm-widget-activity-last-read-';
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(legacyPrefix) && key !== legacyKey) {
+        localStorage.removeItem(key);
+      }
+    }
+  }, [tenantId, user?.id]);
 
-      // Update refs for next diff
-      prevUnreadRef.current = newUnread;
-      prevTicketIdsRef.current = new Set(newTickets.map(t => t.id));
-      prevTaskIdsRef.current = new Set(newTasks.map(t => t.id));
-      prevAlertIdsRef.current = new Set(newAlerts.map(a => a.id));
+  const { data: stats, isLoading: loading, error: statsError } = useQuery({
+    queryKey: ['crm', 'stats', tenantId],
+    queryFn: async () => {
+      const data = await crmTenantCrmService.getStats();
+      if (!data) throw new Error('No stats');
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 30 * 1000,
+    retry: 0,
+    throwOnError: false,
+  });
 
-      setTickets(newTickets);
-      setTasks(newTasks);
-      setActivities(newActivities);
-      setInquiries(newInquiries);
-      setAlerts(newAlerts);
-      const unreadActivityCount = newActivities.filter(
-        (a) => !lastReadActivityAt || new Date(a.created_at).getTime() > new Date(lastReadActivityAt).getTime()
-      ).length;
-
-      setUnreadCount(newUnread + unreadActivityCount);
-      setOpenTicketCount(newOpenTicketCount);
-      setPendingTaskCount(newPendingTaskCount);
-      setOpenInquiryCount(newOpenInquiryCount);
-      setUnreadAlertCount(newUnreadAlertCount);
-    } catch (err: any) {
-      console.error('[CRM Tenant Widget] Load error:', err);
-      const msg = err?.message || '';
+  useEffect(() => {
+    if (statsError) {
+      const msg = (statsError as any)?.message || '';
       if (msg.includes('merchant_gate_disabled') || msg.includes('CRM is disabled')) {
         setCrmDisabled(true);
       }
-    } finally {
-      setLoading(false);
     }
-  }, [loading, tenantId]);
+  }, [statsError]);
 
+  const { data: tenantUsers } = useQuery({
+    queryKey: ['tenant', 'users', tenantId],
+    queryFn: () => tenantUserService.getTenantUsers(tenantId!),
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    retry: 0,
+  });
+
+  // Derive display data from query result
+  const tickets = (stats?.open_tickets ?? []).slice(0, 3) as CrmTicket[];
+  const tasks = (stats?.pending_tasks ?? []).slice(0, 2) as CrmTask[];
+  const activities = (stats?.recent_activities ?? []).filter((a: any) => !a.is_internal).slice(0, 5) as CrmActivity[];
+  const inquiries = (stats?.open_inquiries ?? []).slice(0, 3) as CrmInquiry[];
+  const alerts = (stats?.recent_alerts ?? []).slice(0, 3) as CrmAlert[];
+  const unreadCount = stats?.unread_count ?? 0;
+  const openTicketCount = stats?.open_ticket_count ?? 0;
+  const pendingTaskCount = stats?.pending_task_count ?? 0;
+  const openInquiryCount = stats?.open_inquiry_count ?? 0;
+  const unreadAlertCount = stats?.unread_alert_count ?? 0;
+  const lastReadActivityAt = stats?.last_read_activity_at ?? null;
+  const lastReadAlertAt = stats?.last_read_alert_at ?? null;
+  const users = tenantUsers ?? [];
+
+  // Toast notifications on new items (skip first load)
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, [loadData]);
+    if (!stats || !initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
+      return;
+    }
+
+    const newUnread = stats.unread_count ?? 0;
+    const newTickets = (stats.open_tickets ?? []).slice(0, 3) as CrmTicket[];
+    const newTasks = (stats.pending_tasks ?? []).slice(0, 2) as CrmTask[];
+    const newAlerts = (stats.recent_alerts ?? []).slice(0, 3) as CrmAlert[];
+
+    const prevTicketIds = prevTicketIdsRef.current;
+    const prevTaskIds = prevTaskIdsRef.current;
+    const prevAlertIds = prevAlertIdsRef.current;
+    const prevUnread = prevUnreadRef.current;
+
+    const newTicketItems = newTickets.filter(t => !prevTicketIds.has(t.id));
+    const newTaskItems = newTasks.filter(t => !prevTaskIds.has(t.id));
+    const newAlertItems = newAlerts.filter(a => !prevAlertIds.has(a.id));
+
+    if (newUnread > prevUnread) {
+      const delta = newUnread - prevUnread;
+      if (newAlertItems.length > 0) {
+        toast({
+          title: newAlertItems[0].title,
+          description: newAlertItems[0].body || 'New alert',
+          variant: newAlertItems[0].type === 'warning' ? 'warning' : 'info',
+        });
+      } else if (newTicketItems.length > 0) {
+        toast({
+          title: 'New Support Ticket',
+          description: newTicketItems[0].title,
+          variant: 'info',
+        });
+      }
+      if (newTaskItems.length > 0) {
+        toast({
+          title: 'New Task Assigned',
+          description: newTaskItems[0].title,
+          variant: 'warning',
+        });
+      }
+      if (newAlertItems.length === 0 && newTicketItems.length === 0 && newTaskItems.length === 0 && delta > 0) {
+        toast({
+          title: `${delta} New CRM Item${delta > 1 ? 's' : ''}`,
+          description: 'Check your support inbox for updates',
+          variant: 'info',
+        });
+      }
+    }
+
+    prevUnreadRef.current = newUnread;
+    prevTicketIdsRef.current = new Set(newTickets.map(t => t.id));
+    prevTaskIdsRef.current = new Set(newTasks.map(t => t.id));
+    prevAlertIdsRef.current = new Set(newAlerts.map(a => a.id));
+  }, [stats]);
+
+  async function markActivitiesRead() {
+    try {
+      await crmTenantCrmService.setReadState('activity_feed');
+      await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
+    } catch (err) {
+      console.error('[CRM Tenant Widget] Mark activities read error:', err);
+    }
+  }
+
+  async function markAlertsRead() {
+    try {
+      await crmTenantCrmService.setReadState('alert_feed');
+      await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
+    } catch (err) {
+      console.error('[CRM Tenant Widget] Mark alerts read error:', err);
+    }
+  }
 
   async function handleCreateTicket() {
     if (!newTitle.trim()) return;
@@ -214,7 +240,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       setShowNewTicket(false);
       setNewTitle('');
       setNewDescription('');
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
       toast({ title: 'Ticket Created', description: 'Your support ticket has been submitted', variant: 'success' });
     } catch (err) {
       console.error('[CRM Tenant Widget] Create ticket error:', err);
@@ -224,7 +250,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
     }
   }
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -346,14 +372,30 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Alerts</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Alerts</p>
+            {(() => {
+              const unreadAlertCountHeader = alerts.filter(
+                (a) => !lastReadAlertAt || new Date(a.created_at).getTime() > new Date(lastReadAlertAt).getTime()
+              ).length;
+              return unreadAlertCountHeader > 0 ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); markAlertsRead(); }}
+                  className="text-[10px] text-green-600 hover:text-green-800 dark:text-green-400 font-medium"
+                >
+                  Mark read
+                </button>
+              ) : null;
+            })()}
+          </div>
           {alerts.map(alert => {
             const config = ALERT_CONFIG[alert.type] || ALERT_CONFIG.info;
+            const isUnreadAlert = !lastReadAlertAt || new Date(alert.created_at).getTime() > new Date(lastReadAlertAt).getTime();
             return (
               <Link
                 key={alert.id}
                 href={tenantId ? `/t/${tenantId}/support` : `/support`}
-                className={`flex items-start gap-2.5 py-2 px-2.5 -mx-2 rounded-lg border ${config.border} ${config.bg} hover:opacity-90 transition-opacity`}
+                className={`flex items-start gap-2.5 py-2 px-2.5 -mx-2 rounded-lg border ${config.border} ${config.bg} hover:opacity-90 transition-opacity ${isUnreadAlert ? 'ring-1 ring-orange-200' : ''}`}
               >
                 <span className="text-sm flex-shrink-0 mt-0.5">{alert.icon || config.icon}</span>
                 <div className="flex-1 min-w-0">
@@ -363,7 +405,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
                   )}
                   <p className="text-[10px] text-neutral-400 mt-1">{relativeTime(alert.created_at)}</p>
                 </div>
-                {!alert.is_read && (
+                {isUnreadAlert && (
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-1.5 animate-pulse" />
                 )}
               </Link>
@@ -378,7 +420,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
           <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Open Tickets</p>
           {tickets.map(t => {
             const assignedName = t.assigned_to
-              ? tenantUsers.find(u => u.id === t.assigned_to)?.name || t.assigned_to
+              ? users.find(u => u.id === t.assigned_to)?.name || t.assigned_to
               : null;
             const lastActivity = activities
               .filter(a => a.ticket_id === t.id)
@@ -457,7 +499,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
           {activities.map(a => {
             const isUnread = !lastReadActivityAt || new Date(a.created_at).getTime() > new Date(lastReadActivityAt).getTime();
             const config = ACTIVITY_CONFIG[a.activity_type] || { icon: '📋', color: 'text-neutral-600', bg: 'bg-neutral-50' };
-            const actorUser = tenantUsers.find(u => u.id === a.actor_id);
+            const actorUser = users.find(u => u.id === a.actor_id);
             const currentUserName = user?.firstName || user?.lastName
               ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
               : null;

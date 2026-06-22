@@ -33,6 +33,11 @@ import tierCapabilitiesRoutes from '../admin/tier-capabilities';
 import adminTiersRoutes from '../admin/admin-tiers';
 import crmAdminRoutes from '../crm/admin/crm-admin';
 import botPlatformRoutes from '../admin/bot-platform';
+import featurePurchasesRoutes from '../admin/feature-purchases';
+import botEmbedLicensesRoutes from '../admin/bot-embed-licenses';
+import bsaasCatalogRoutes from '../admin/bsaas-catalog';
+import bsaasAnalyticsRoutes from '../admin/bsaas-analytics';
+import bsaasPromotionsRoutes from '../admin/bsaas-promotions';
 
 /**
  * Mount admin routes
@@ -92,6 +97,21 @@ export function mountAdminRoutes(app: Express) {
 
   // Bot platform admin routes
   app.use('/api/admin/bot', authenticateToken, botPlatformRoutes);
+
+  // Feature purchases admin routes (BSaaS)
+  app.use('/api/admin/feature-purchases', authenticateToken, featurePurchasesRoutes);
+
+  // Bot embed licenses admin routes
+  app.use('/api/admin/bot-embed-licenses', authenticateToken, botEmbedLicensesRoutes);
+
+  // BSaaS catalog admin routes
+  app.use('/api/admin/bsaas-catalog', authenticateToken, bsaasCatalogRoutes);
+
+  // BSaaS analytics admin routes (read-only)
+  app.use('/api/admin/bsaas-analytics', authenticateToken, bsaasAnalyticsRoutes);
+
+  // BSaaS promotions admin routes (Stripe coupons + promotion codes)
+  app.use('/api/admin/bsaas-promotions', authenticateToken, bsaasPromotionsRoutes);
 
   // Platform settings - mount LAST to avoid conflicts with generic /api/admin routes
   console.log('🔧 Mounting platform settings route...');

@@ -8,6 +8,8 @@
  * GET    /api/public/bot/config?tenantId=            — Fetch widget config
  * GET    /api/public/bot/skills/:skillName            — Execute skill
  * GET    /api/public/bot/products/search              — Search tenant product catalog
+ * GET    /api/public/bot/crm/ticket-status             — Look up support tickets (CRM assistant skill)
+ * POST   /api/public/bot/crm/create-ticket             — Create support ticket from chat (CRM assistant skill)
  * POST   /api/public/bot/conversations/:sessionId/feedback — Submit feedback
  */
 
@@ -22,10 +24,13 @@ import BotSkillService from '../services/BotSkillService';
 import BotCrmIntegrationService from '../services/BotCrmIntegrationService';
 import BotBusinessHoursService from '../services/BotBusinessHoursService';
 import BotDynamicResponseService from '../services/BotDynamicResponseService';
+import BotChannelSteeringService from '../services/BotChannelSteeringService';
 import BotBertGuardrailService from '../services/BotBertGuardrailService';
 import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
+import BotCrmAssistantService from '../services/BotCrmAssistantService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 
 const router = Router();
 const configService = BotConfigurationService.getInstance();
@@ -37,6 +42,8 @@ const skillService = BotSkillService.getInstance();
 const crmIntegrationService = BotCrmIntegrationService.getInstance();
 const businessHoursService = BotBusinessHoursService.getInstance();
 const dynamicResponseService = BotDynamicResponseService.getInstance();
+const channelSteeringService = BotChannelSteeringService.getInstance();
+const crmAssistantService = BotCrmAssistantService.getInstance();
 const bertGuardrailService = BotBertGuardrailService.getInstance();
 const bertIntentService = BotBertIntentService.getInstance();
 const productCatalogService = BotProductCatalogService.getInstance();
@@ -58,12 +65,70 @@ function checkRateLimit(sessionId: string): boolean {
   return true;
 }
 
+// Handshake layer — lightweight conversational responses for greetings, gratitude, farewells
+// Prevents these from falling through to the fallback/steering path unnecessarily.
+const GREETING_PATTERNS = [
+  /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening)|what'?s\s+up)\b/i,
+];
+const GRATITUDE_PATTERNS = [
+  /^(thanks|thank\s+you|thx|ty|appreciate\s+(it|that)|cheers)\b/i,
+];
+const FAREWELL_PATTERNS = [
+  /^(bye|goodbye|see\s+you|cya|later|take\s+care|have\s+a\s+(good|great|nice)\s+(day|one)|peace)\b/i,
+];
+
+function getHandshakeResponse(message: string, config: { botName: string; tone: string; greeting: string }): string | null {
+  const trimmed = message.trim();
+
+  for (const pattern of GREETING_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      const name = config.botName || 'Assistant';
+      if (config.tone === 'playful') {
+        return `Hey there! I'm ${name}. What can I help you with today?`;
+      }
+      if (config.tone === 'professional') {
+        return `Hello. I'm ${name}, your shopping assistant. How may I help you today?`;
+      }
+      return `Hi! I'm ${name}. How can I help you today?`;
+    }
+  }
+
+  for (const pattern of GRATITUDE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      if (config.tone === 'playful') {
+        return `You're welcome! Anything else I can help with?`;
+      }
+      if (config.tone === 'professional') {
+        return `You're welcome. Is there anything else I can assist you with?`;
+      }
+      return `You're welcome! Is there anything else I can help you with?`;
+    }
+  }
+
+  for (const pattern of FAREWELL_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      if (config.tone === 'playful') {
+        return `Take care! Come back anytime.`;
+      }
+      if (config.tone === 'professional') {
+        return `Goodbye. Feel free to reach out whenever you need assistance.`;
+      }
+      return `Goodbye! Feel free to come back anytime you have questions.`;
+    }
+  }
+
+  return null;
+}
+
 // Validation schemas
 const startConversationSchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  embedKey: z.string().min(1).optional(),
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().max(50).optional(),
   pageContext: z.string().max(100).optional(),
+}).refine(data => data.tenantId || data.embedKey, {
+  message: 'Either tenantId or embedKey is required',
 });
 
 const sendMessageSchema = z.object({
@@ -75,12 +140,12 @@ const feedbackSchema = z.object({
   rating: z.enum(['positive', 'negative']),
 });
 
-// GET /api/public/bot/config?tenantId=
-router.get('/config', async (req, res) => {
+// GET /api/public/bot/config?tenantId=&embedKey=
+router.get('/config', resolveEmbedKey, async (req, res) => {
   try {
-    const { tenantId } = req.query;
-    if (!tenantId || typeof tenantId !== 'string') {
-      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId query parameter is required' });
+    const tenantId = getTenantIdFromRequest(req, res);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
     const caps = await resolveEffectiveCapabilities(tenantId);
@@ -97,14 +162,18 @@ router.get('/config', async (req, res) => {
 });
 
 // POST /api/public/bot/conversations
-router.post('/conversations', async (req, res) => {
+router.post('/conversations', resolveEmbedKey, async (req, res) => {
   try {
     const validation = startConversationSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
     }
 
-    const { tenantId, customerEmail, customerPhone, pageContext } = validation.data;
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+    const { customerEmail, customerPhone, pageContext } = validation.data;
     const caps = await resolveEffectiveCapabilities(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
@@ -246,9 +315,33 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       }
     }
 
+    // 3.5. Handshake layer — catch greetings, gratitude, farewells before fallback
+    const handshakeReply = getHandshakeResponse(guardrailResult.modifiedMessage, config);
+    if (handshakeReply) {
+      const botMsg = await conversationService.appendMessage({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: handshakeReply,
+        intent: 'handshake',
+        confidence: 1,
+        responseType: 'handshake',
+        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+      });
+
+      return res.json({
+        success: true,
+        reply: handshakeReply,
+        responseType: 'handshake',
+        matchedFaqId: null,
+        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+        messageId: botMsg.id,
+      });
+    }
+
     // 4. Tier Router: dynamic (GPT + RAG) vs static (FAQ keyword match)
     const caps = await resolveEffectiveCapabilities(conversation.tenantId);
-    const useDynamic = caps?.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable();
+    const platformAiEnabled = await dynamicResponseService.isPlatformAiEnabled();
+    const useDynamic = caps?.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable() && platformAiEnabled;
 
     if (useDynamic) {
       // BERT-enhanced guardrail check (in addition to rule-based)
@@ -304,9 +397,9 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         metadata: { ragChunksUsed: dynamicResult.ragChunksUsed },
       });
 
-      // Escalation: if fallback and escalation enabled
+      // Escalation: if bot couldn't answer (fallback or channel_steering) and escalation enabled
       let escalated = false;
-      if (dynamicResult.responseType === 'fallback' && config.escalationEnabled) {
+      if ((dynamicResult.responseType === 'fallback' || dynamicResult.responseType === 'channel_steering') && config.escalationEnabled) {
         try {
           const alreadyEscalated = await crmIntegrationService.isEscalated(conversation.id);
           if (!alreadyEscalated) {
@@ -317,7 +410,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
               customerEmail: conversation.customerEmail,
               customerPhone: conversation.customerPhone,
               reason: 'Bot could not answer customer question',
-              summary: `Customer asked: "${message}" — bot responded with fallback message.`,
+              summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
             });
             escalated = true;
           }
@@ -334,6 +427,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
         messageId: botMsg.id,
         escalated,
+        channels: dynamicResult.channels,
       });
     }
 
@@ -344,15 +438,29 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       conversation.pageContext || undefined
     );
 
+    let finalReply = staticResult.reply;
+    let finalResponseType: string = staticResult.responseType;
+    let finalChannels: any[] | undefined;
+
+    // If static FAQ has no match, steer to available human channels instead of
+    // repeating a static fallback message.
+    if (staticResult.responseType === 'fallback') {
+      const steering = await channelSteeringService.steer(conversation.tenantId, config.botName);
+      finalReply = steering.reply;
+      finalResponseType = 'channel_steering';
+      finalChannels = steering.channels;
+    }
+
     const botMsg = await conversationService.appendMessage({
       conversationId: conversation.id,
       role: 'assistant',
-      content: staticResult.reply,
+      content: finalReply,
       intent: intentResult.intent || undefined,
       confidence: intentResult.confidence,
       matchedFaqId: staticResult.matchedFaqId || undefined,
-      responseType: staticResult.responseType,
+      responseType: finalResponseType,
       guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+      metadata: finalChannels ? { channels: finalChannels } : undefined,
     });
 
     // 5. Escalation: if fallback and escalation enabled, create CRM ticket
@@ -368,7 +476,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
             customerEmail: conversation.customerEmail,
             customerPhone: conversation.customerPhone,
             reason: 'Bot could not answer customer question',
-            summary: `Customer asked: "${message}" — bot responded with fallback message.`,
+            summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
           });
           escalated = true;
         }
@@ -379,12 +487,13 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
 
     res.json({
       success: true,
-      reply: staticResult.reply,
-      responseType: staticResult.responseType,
+      reply: finalReply,
+      responseType: finalResponseType,
       matchedFaqId: staticResult.matchedFaqId,
       guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
       messageId: botMsg.id,
       escalated,
+      channels: finalChannels,
     });
   } catch (error) {
     console.error('Error processing message:', error);
@@ -392,14 +501,15 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
   }
 });
 
-// GET /api/public/bot/skills/:skillName?tenantId=
-router.get('/skills/:skillName', async (req, res) => {
+// GET /api/public/bot/skills/:skillName?tenantId=&embedKey=
+router.get('/skills/:skillName', resolveEmbedKey, async (req, res) => {
   try {
     const { skillName } = req.params;
-    const { tenantId, ...params } = req.query;
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { tenantId: _omit, embedKey: _omit2, ...params } = req.query;
 
-    if (!tenantId || typeof tenantId !== 'string') {
-      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId query parameter is required' });
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
     const result = await skillService.executeSkill(tenantId, skillName, params);
@@ -414,13 +524,16 @@ router.get('/skills/:skillName', async (req, res) => {
 // Exposes a curated subset of the storefront product catalog to the bot.
 // Requires chatbot capability to be enabled for the tenant.
 const productSearchSchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  embedKey: z.string().min(1).optional(),
   query: z.string().min(1).max(200),
   badge: z.enum(['featured', 'new_arrival', 'staff_pick', 'seasonal', 'sale', 'clearance', 'store_selection', 'trending', 'recommended', 'bestseller', 'random_featured']).optional(),
   limit: z.coerce.number().min(1).max(20).default(5),
+}).refine(data => data.tenantId || data.embedKey, {
+  message: 'Either tenantId or embedKey is required',
 });
 
-router.get('/products/search', async (req, res) => {
+router.get('/products/search', resolveEmbedKey, async (req, res) => {
   try {
     const validation = productSearchSchema.safeParse(req.query);
     if (!validation.success) {
@@ -432,7 +545,11 @@ router.get('/products/search', async (req, res) => {
       });
     }
 
-    const { tenantId, query, badge, limit } = validation.data;
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+    const { query, badge, limit } = validation.data;
 
     const caps = await resolveEffectiveCapabilities(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
@@ -481,11 +598,12 @@ router.get('/products/search', async (req, res) => {
 
 // POST /api/public/bot/preview — Preview bot response (for FAQ bot preview component)
 // Returns a static FAQ match without creating a conversation
-router.post('/preview', async (req, res) => {
+router.post('/preview', resolveEmbedKey, async (req, res) => {
   try {
-    const { tenantId, message, pageContext } = req.body || {};
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { message, pageContext } = req.body || {};
     if (!tenantId || !message) {
-      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId and message are required' });
+      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and message are required' });
     }
 
     const caps = await resolveEffectiveCapabilities(tenantId);
@@ -526,6 +644,80 @@ router.post('/conversations/:sessionId/feedback', async (req, res) => {
   } catch (error) {
     console.error('Error submitting feedback:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit feedback' });
+  }
+});
+
+// ====================
+// CRM Assistant Skill Endpoints
+// ====================
+
+// GET /api/public/bot/crm/ticket-status?tenantId=&customerEmail=
+router.get('/crm/ticket-status', resolveEmbedKey, async (req, res) => {
+  try {
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { customerEmail } = req.query;
+    if (!tenantId || !customerEmail) {
+      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and customerEmail are required' });
+    }
+
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
+    }
+    if (!caps.effective.chatbot.allowed_skill_types.includes('chatbot_skill_crm_assistant' as any)) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'CRM assistant skill is not available for this tier' });
+    }
+
+    const tickets = await crmAssistantService.lookupTickets(tenantId, customerEmail as string);
+    res.json({ success: true, data: tickets });
+  } catch (error) {
+    console.error('Error looking up tickets:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to look up tickets' });
+  }
+});
+
+// POST /api/public/bot/crm/create-ticket
+const createTicketSchema = z.object({
+  tenantId: z.string().optional(),
+  embedKey: z.string().optional(),
+  conversationId: z.string(),
+  sessionId: z.string(),
+  customerEmail: z.string().optional(),
+  issueSummary: z.string().min(5).max(500),
+});
+
+router.post('/crm/create-ticket', resolveEmbedKey, async (req, res) => {
+  try {
+    const validation = createTicketSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
+    }
+
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
+    }
+    if (!caps.effective.chatbot.allowed_skill_types.includes('chatbot_skill_crm_assistant' as any)) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'CRM assistant skill is not available for this tier' });
+    }
+
+    const { conversationId, sessionId, customerEmail, issueSummary } = validation.data;
+    const ticket = await crmAssistantService.createTicket(
+      tenantId,
+      conversationId,
+      sessionId,
+      customerEmail || null,
+      issueSummary
+    );
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to create ticket' });
   }
 });
 

@@ -5,6 +5,10 @@
  * knowledge base embeddings, and viewing global bot dashboard stats.
  * Auth: authenticateToken (mounted externally)
  *
+ * GET    /api/admin/bot/settings          — Get bot AI control settings
+ * PUT    /api/admin/bot/settings          — Update bot AI control settings
+ * POST   /api/admin/bot/sync-now          — Trigger manual embedding sync
+ * GET    /api/admin/bot/sync-estimate     — Estimate sync cost (products, tokens, $)
  * GET    /api/admin/bot/dashboard          — Global bot dashboard stats
  * GET    /api/admin/bot/guardrails         — List all guardrail rules
  * POST   /api/admin/bot/guardrails         — Create guardrail rule
@@ -31,6 +35,186 @@ import { audit } from '../../audit';
 
 const router = Router({ mergeParams: true });
 const ragService = BotRagService.getInstance();
+
+// ====================
+// AI Controls — platform-level enable/disable for bot AI features
+// ====================
+
+router.get('/settings', async (_req: Request, res: Response) => {
+  try {
+    const settings = await prisma.platform_settings_list.findFirst();
+    res.json({
+      success: true,
+      data: {
+        botAiEnabled: settings?.bot_ai_enabled ?? true,
+        botEmbeddingSyncEnabled: settings?.bot_embedding_sync_enabled ?? true,
+        botEmbeddingModel: settings?.bot_embedding_model ?? 'text-embedding-3-small',
+        botChatModel: settings?.bot_chat_model ?? 'gpt-4o-mini',
+        botSyncIntervalHours: settings?.bot_sync_interval_hours ?? 12,
+        botEmbeddingProvider: settings?.bot_embedding_provider ?? 'openai',
+        botChatProvider: settings?.bot_chat_provider ?? 'openai',
+      },
+    });
+  } catch (error) {
+    console.error('[BotPlatformAdmin] Error fetching bot settings:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch bot settings' });
+  }
+});
+
+const botSettingsSchema = z.object({
+  botAiEnabled: z.boolean(),
+  botEmbeddingSyncEnabled: z.boolean(),
+  botEmbeddingModel: z.string().min(1).max(50).default('text-embedding-3-small'),
+  botChatModel: z.string().min(1).max(50).default('gpt-4o-mini'),
+  botSyncIntervalHours: z.number().int().min(0).max(168).default(12),
+  botEmbeddingProvider: z.enum(['openai', 'anthropic', 'google', 'mistral']).default('openai'),
+  botChatProvider: z.enum(['openai', 'anthropic', 'google', 'mistral']).default('openai'),
+});
+
+router.put('/settings', async (req: Request, res: Response) => {
+  try {
+    const validation = botSettingsSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', message: 'Invalid bot settings', details: validation.error.issues });
+    }
+
+    const { botAiEnabled, botEmbeddingSyncEnabled, botEmbeddingModel, botChatModel, botSyncIntervalHours, botEmbeddingProvider, botChatProvider } = validation.data;
+
+    // Upsert platform settings (single row, id=1)
+    const settings = await prisma.platform_settings_list.upsert({
+      where: { id: 1 },
+      update: {
+        bot_ai_enabled: botAiEnabled,
+        bot_embedding_sync_enabled: botEmbeddingSyncEnabled,
+        bot_embedding_model: botEmbeddingModel,
+        bot_chat_model: botChatModel,
+        bot_sync_interval_hours: botSyncIntervalHours,
+        bot_embedding_provider: botEmbeddingProvider,
+        bot_chat_provider: botChatProvider,
+      },
+      create: {
+        id: 1,
+        bot_ai_enabled: botAiEnabled,
+        bot_embedding_sync_enabled: botEmbeddingSyncEnabled,
+        bot_embedding_model: botEmbeddingModel,
+        bot_chat_model: botChatModel,
+        bot_sync_interval_hours: botSyncIntervalHours,
+        bot_embedding_provider: botEmbeddingProvider,
+        bot_chat_provider: botChatProvider,
+        updated_at: new Date(),
+      },
+    });
+
+    // Start/stop embedding sync job based on setting
+    try {
+      if (botEmbeddingSyncEnabled && botAiEnabled) {
+        const { startBotProductEmbeddingSync, stopBotProductEmbeddingSync } = await import('../../jobs/bot-product-embedding-sync');
+        stopBotProductEmbeddingSync();
+        await startBotProductEmbeddingSync();
+        console.log('[BotPlatformAdmin] Embedding sync job started (admin toggle)');
+      } else {
+        const { stopBotProductEmbeddingSync } = await import('../../jobs/bot-product-embedding-sync');
+        stopBotProductEmbeddingSync();
+        console.log('[BotPlatformAdmin] Embedding sync job stopped (admin toggle)');
+      }
+    } catch (jobErr) {
+      console.error('[BotPlatformAdmin] Error toggling embedding sync job:', jobErr);
+    }
+
+    await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_settings', botAiEnabled, botEmbeddingSyncEnabled, botEmbeddingModel, botChatModel, botSyncIntervalHours, botEmbeddingProvider, botChatProvider } });
+
+    // Invalidate provider factory cache so new provider/model takes effect
+    try {
+      const aiProviderFactory = await import('../../services/ai-providers');
+      aiProviderFactory.default.invalidateCache();
+    } catch { /* factory may not be loaded yet */ }
+
+    res.json({
+      success: true,
+      data: {
+        botAiEnabled: settings.bot_ai_enabled ?? true,
+        botEmbeddingSyncEnabled: settings.bot_embedding_sync_enabled ?? true,
+        botEmbeddingModel: settings.bot_embedding_model ?? 'text-embedding-3-small',
+        botChatModel: settings.bot_chat_model ?? 'gpt-4o-mini',
+        botSyncIntervalHours: settings.bot_sync_interval_hours ?? 12,
+        botEmbeddingProvider: settings.bot_embedding_provider ?? 'openai',
+        botChatProvider: settings.bot_chat_provider ?? 'openai',
+      },
+    });
+  } catch (error) {
+    console.error('[BotPlatformAdmin] Error updating bot settings:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update bot settings' });
+  }
+});
+
+// ====================
+// Manual Sync Trigger + Cost Estimation
+// ====================
+
+router.post('/sync-now', async (req: Request, res: Response) => {
+  try {
+    const { triggerManualProductEmbeddingSync } = await import('../../jobs/bot-product-embedding-sync');
+    console.log('[BotPlatformAdmin] Manual sync triggered by admin');
+    const result = await triggerManualProductEmbeddingSync();
+    await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_sync', action: 'manual_trigger', ...result } });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[BotPlatformAdmin] Error triggering manual sync:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to trigger sync' });
+  }
+});
+
+router.get('/sync-estimate', async (_req: Request, res: Response) => {
+  try {
+    const configs = await prisma.bot_configurations.findMany({
+      where: { status: 'active' },
+      select: { tenant_id: true },
+    });
+    const tenantIds = configs.map((c: any) => c.tenant_id);
+
+    let totalProducts = 0;
+    let totalChunks = 0;
+    const pool = require('../../utils/db-pool').getDirectPool();
+
+    for (const tenantId of tenantIds) {
+      const result = await pool.query(
+        `SELECT count(*)::int as cnt FROM mv_storefront_discovery
+         WHERE tenant_id = $1 AND item_status = 'active' AND visibility = 'public'
+         AND stock_status IN ('in_stock', 'low_stock')`,
+        [tenantId]
+      );
+      const productCount = result.rows[0]?.cnt || 0;
+      totalProducts += productCount;
+      // Estimate ~2 chunks per product (500-char chunks with overlap)
+      totalChunks += productCount * 2;
+    }
+
+    // Cost estimates (approximate OpenAI pricing per 1M tokens)
+    // text-embedding-3-small: $0.02/1M tokens, text-embedding-3-large: $0.13/1M tokens
+    // Each chunk ~500 chars ~125 tokens
+    const settings = await prisma.platform_settings_list.findFirst();
+    const embeddingModel = settings?.bot_embedding_model ?? 'text-embedding-3-small';
+    const tokensPerChunk = 125;
+    const totalTokens = totalChunks * tokensPerChunk;
+    const costPer1M = embeddingModel === 'text-embedding-3-large' ? 0.13 : 0.02;
+    const estimatedCost = (totalTokens / 1_000_000) * costPer1M;
+
+    res.json({
+      success: true,
+      data: {
+        tenantCount: tenantIds.length,
+        totalProducts,
+        estimatedChunks: totalChunks,
+        estimatedTokens: totalTokens,
+        estimatedCostUsd: Math.round(estimatedCost * 10000) / 10000,
+        embeddingModel,
+      },
+    });
+  } catch (error) {
+    console.error('[BotPlatformAdmin] Error estimating sync cost:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to estimate sync cost' });
+  }
+});
 
 // ====================
 // Dashboard Stats

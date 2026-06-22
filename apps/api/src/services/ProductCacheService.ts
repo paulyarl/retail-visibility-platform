@@ -50,7 +50,7 @@ export interface ProductRequest {
   googleCategoryId?: string;
   count: number;
   requireImages?: boolean; // NEW: Only return products with images
-  textModel?: 'openai' | 'google'; // NEW: AI model for text generation
+  textModel?: 'openai' | 'google' | 'anthropic' | 'mistral'; // NEW: AI model for text generation
 }
 
 export interface GeneratedProduct {
@@ -243,7 +243,7 @@ export class ProductCacheService {
     businessType: string,
     categoryName: string,
     count: number,
-    textModel?: 'openai' | 'google'
+    textModel?: 'openai' | 'google' | 'anthropic' | 'mistral'
   ): Promise<GeneratedProduct[]> {
     try {
       // Use the multi-provider service with optional provider override

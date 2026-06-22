@@ -62,7 +62,7 @@ export default function AdminQuickStartProductsPage() {
   const [categoriesCreated, setCategoriesCreated] = useState(0);
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
-  const [textModel, setTextModel] = useState<'openai' | 'google'>('openai');
+  const [textModel, setTextModel] = useState<'openai' | 'google' | 'anthropic' | 'mistral'>('openai');
   const [imageModel, setImageModel] = useState<'openai' | 'google'>('openai');
 
   useEffect(() => { loadTenants(); }, []);

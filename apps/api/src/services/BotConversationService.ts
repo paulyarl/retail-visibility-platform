@@ -6,8 +6,9 @@
  */
 
 import { prisma } from '../prisma';
+import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
-import { randomUUID } from 'crypto';
+import { generateBotConversationSessionId } from '../lib/id-generator';
 
 const SESSION_TTL_HOURS = 24;
 const SESSION_TTL_MS = SESSION_TTL_HOURS * 60 * 60 * 1000;
@@ -93,7 +94,7 @@ export class BotConversationService {
     pageContext?: string;
     source?: string;
   }): Promise<{ conversation: BotConversation; greeting: string }> {
-    const sessionId = randomUUID();
+    const sessionId = generateBotConversationSessionId(params.tenantId);
     const now = new Date();
 
     const config = await prisma.bot_configurations.findUnique({
@@ -217,6 +218,17 @@ export class BotConversationService {
     });
   }
 
+  async updateStatus(conversationId: string, status: 'active' | 'closed' | 'archived'): Promise<BotConversation> {
+    const data: any = { status, updated_at: new Date() };
+    if (status === 'closed') data.closed_at = new Date();
+    if (status === 'active') data.closed_at = null;
+    const updated = await prisma.bot_conversations.update({
+      where: { id: conversationId },
+      data,
+    });
+    return toConversation(updated);
+  }
+
   async archiveExpiredConversations(tenantId: string): Promise<number> {
     const cutoff = new Date(Date.now() - SESSION_TTL_MS);
     const result = await prisma.bot_conversations.updateMany({
@@ -271,27 +283,52 @@ export class BotConversationService {
   async getDashboardStats(tenantId: string): Promise<{
     totalConversations: number;
     activeConversations: number;
+    escalatedConversations: number;
+    closedConversations: number;
+    archivedConversations: number;
     resolvedByFaq: number;
     resolvedBySkill: number;
     resolvedByFallback: number;
     avgRating: number | null;
   }> {
-    const [total, active, faqResolved, skillResolved, fallbackResolved, positiveFeedback, totalFeedback] = await Promise.all([
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, status: 'active' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'faq' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'skill' } }),
-      prisma.bot_conversations.count({ where: { tenant_id: tenantId, resolved_by: 'fallback' } }),
-      prisma.bot_conversation_feedback.count({ where: { rating: 'positive' } }),
-      prisma.bot_conversation_feedback.count(),
+    const pool = getDirectPool();
+    const [convStats, feedbackStats] = await Promise.all([
+      pool.query(
+        `SELECT
+          COUNT(*)::text AS total,
+          COUNT(*) FILTER (WHERE status = 'active')::text AS active,
+          COUNT(*) FILTER (WHERE status = 'escalated')::text AS escalated,
+          COUNT(*) FILTER (WHERE status = 'closed')::text AS closed,
+          COUNT(*) FILTER (WHERE status = 'archived')::text AS archived,
+          COUNT(*) FILTER (WHERE resolved_by = 'faq')::text AS faq_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'skill')::text AS skill_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'fallback')::text AS fallback_resolved
+        FROM bot_conversations
+        WHERE tenant_id = $1`,
+        [tenantId]
+      ),
+      pool.query(
+        `SELECT
+          COUNT(*)::text AS total,
+          COUNT(*) FILTER (WHERE rating = 'positive')::text AS positive
+        FROM bot_conversation_feedback`
+      ),
     ]);
 
+    const conv = convStats.rows[0];
+    const fb = feedbackStats.rows[0];
+    const totalFeedback = parseInt(fb?.total ?? '0', 10);
+    const positiveFeedback = parseInt(fb?.positive ?? '0', 10);
+
     return {
-      totalConversations: total,
-      activeConversations: active,
-      resolvedByFaq: faqResolved,
-      resolvedBySkill: skillResolved,
-      resolvedByFallback: fallbackResolved,
+      totalConversations: parseInt(conv?.total ?? '0', 10),
+      activeConversations: parseInt(conv?.active ?? '0', 10),
+      escalatedConversations: parseInt(conv?.escalated ?? '0', 10),
+      closedConversations: parseInt(conv?.closed ?? '0', 10),
+      archivedConversations: parseInt(conv?.archived ?? '0', 10),
+      resolvedByFaq: parseInt(conv?.faq_resolved ?? '0', 10),
+      resolvedBySkill: parseInt(conv?.skill_resolved ?? '0', 10),
+      resolvedByFallback: parseInt(conv?.fallback_resolved ?? '0', 10),
       avgRating: totalFeedback > 0 ? positiveFeedback / totalFeedback : null,
     };
   }

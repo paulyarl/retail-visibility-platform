@@ -127,6 +127,18 @@ export class BotConfigurationService {
 
   async getPublicConfig(tenantId: string) {
     const config = await this.getOrCreate(tenantId);
+
+    // Load platform logo as default avatar fallback
+    let platformLogoUrl: string | null = null;
+    try {
+      const platformSettings = await prisma.platform_settings_list.findUnique({
+        where: { id: 1 },
+      });
+      platformLogoUrl = platformSettings?.logo_url || null;
+    } catch {
+      // Non-critical fallback
+    }
+
     return {
       botName: config.botName,
       greeting: config.greeting,
@@ -136,6 +148,7 @@ export class BotConfigurationService {
       widgetOffsetY: config.widgetOffsetY,
       widgetFont: config.widgetFont,
       widgetAvatarUrl: config.widgetAvatarUrl,
+      platformLogoUrl,
       afterHoursEnabled: config.afterHoursEnabled,
       afterHoursMessage: config.afterHoursMessage,
       preChatEnabled: config.preChatEnabled,

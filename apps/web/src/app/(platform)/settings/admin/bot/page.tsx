@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { botPlatformAdminService, type BotDashboardStats } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import BotAiControls from '@/components/bot/BotAiControls';
 
 export default function BotDashboardPage() {
   const [stats, setStats] = useState<BotDashboardStats | null>(null);
@@ -63,6 +64,9 @@ export default function BotDashboardPage() {
         <StatCard label="Active Guardrails" value={stats?.activeGuardrailRules ?? 0} href="/settings/admin/bot/guardrails" color="red" />
         <StatCard label="Total Intents" value={stats?.totalIntents ?? 0} href="/settings/admin/bot/intents" color="amber" />
       </div>
+
+      {/* AI Controls */}
+      <BotAiControls />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Resolution breakdown */}

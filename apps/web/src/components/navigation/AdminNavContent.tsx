@@ -167,6 +167,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 18V9a6 6 0 0112 0v9M3 18a2 2 0 002 2h1a2 2 0 002-2v-2a2 2 0 00-2-2H3v4zm15-2a2 2 0 002 2h1a2 2 0 002-2v-2a2 2 0 00-2-2h-3v2z" />
     </svg>
   ),
+  CreditCard: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+  ),
 };
 
 // ─── Nav definition (only real pages) ────────────────────────────────────────
@@ -190,44 +195,49 @@ const buildAdminNavItems = (): NavItem[] => [
   },
   {
     label: 'Tenants',
-    icon: <Icon.Building />,
+    icon: <Icon.Admin />,
     href: '/settings/admin/tenants',
     prefetch: false,
     children: [
       { label: 'All Tenants',       href: '/settings/admin/tenants' },
-      { label: 'Tenant Limits',    href: '/settings/admin/limits' },
+      { label: 'Organizations',     href: '/settings/admin/organizations' },
+      { label: 'Feature Overrides', href: '/settings/admin/feature-overrides' },
+      { label: 'Alert Ticker',      href: '/settings/admin/ticker' },
+      { label: 'Capability Center', href: '/settings/admin/capabilities' },
     ],
   },
   {
-    label: 'Capacity',
-    icon: <Icon.Chart />,
-    href: '/settings/admin/capacity/overview',
-    prefetch: false,
-    children: [
-      { label: 'Overview',         href: '/settings/admin/capacity/overview' },
-      { label: 'Location Limits', href: '/settings/admin/capacity/location-limits' },
-      { label: 'Alerts',          href: '/settings/admin/capacity/alerts' },
-    ],
-  },
-  {
-    label: 'Quick Start',
-    icon: <Icon.Star />,
-    prefetch: false,
-    children: [
-      { label: 'Seed Categories', href: '/settings/admin/quick-start/categories' },
-      { label: 'Seed Products',   href: '/settings/admin/quick-start/products' },
-    ],
-  },
-  {
-    label: 'Subscriptions',
+    label: 'Subscriptions & Plans',
     icon: <Icon.Chart />,
     href: '/settings/admin/tier-system',
     prefetch: false,
     children: [
-      { label: 'Tier Management',  href: '/settings/admin/tier-system' },
-      { label: 'Subscription Mgmt', href: '/settings/admin/tiers' },
-      { label: 'Billing Mgmt',      href: '/settings/admin/billing' },
-      { label: 'Email Logs',        href: '/settings/admin/notification-logs' },
+      { label: 'Tier Management',      href: '/settings/admin/tier-system' },
+      { label: 'Tenant Subscription',  href: '/settings/admin/tiers' },
+      { label: 'Capability Management', href: '/settings/admin/capabilities' },
+    ],
+  },
+  {
+    label: 'Payments & Billing',
+    icon: <Icon.CreditCard />,
+    href: '/settings/admin/billing',
+    prefetch: false,
+    children: [
+      { label: 'Billing Dashboard',  href: '/settings/admin/billing' },
+      { label: 'Manual Billing',     href: '/settings/admin/billing/manual-billing' },
+      { label: 'Platform Revenue',   href: '/settings/admin/bsaas-analytics' },
+      { label: 'Payment Settings',   href: '/settings/admin/payment' },
+    ],
+  },
+  {
+    label: 'Platform Capacity',
+    icon: <Icon.Chart />,
+    href: '/settings/admin/capacity/overview',
+    prefetch: false,
+    children: [
+      { label: 'Capacity Center',      href: '/settings/admin/capacity/overview' },
+      { label: 'Limits Configuration', href: '/settings/admin/capacity/location-limits' },
+      { label: 'Alerts',               href: '/settings/admin/capacity/alerts' },
     ],
   },
   {
@@ -236,22 +246,10 @@ const buildAdminNavItems = (): NavItem[] => [
     href: '/settings/admin/categories',
     prefetch: false,
     children: [
-      { label: 'Categories Quick Start',  href: '/settings/admin/quick-start/categories' },
       { label: 'Product Categories',  href: '/settings/admin/categories' },
       { label: 'Platform Categories', href: '/settings/admin/platform-categories' },
+      { label: 'Featured Products',   href: '/settings/admin/featured-products' },
       { label: 'Enrichment',          href: '/settings/admin/enrichment' },
-    ],
-  },
-  {
-    label: 'Inventory',
-    icon: <Icon.Cube />,
-    href: '/settings/admin/inventory-dashboard',
-    prefetch: false,
-    children: [
-      { label: 'Dashboard',          href: '/settings/admin/inventory-dashboard' },
-      { label: 'Transfers',          href: '/settings/admin/inventory' },
-      { label: 'Universal Catalog',  href: '/settings/admin/catalog' },
-      { label: 'Slug Registry',      href: '/settings/admin/slug-registry' },
     ],
   },
   {
@@ -260,57 +258,32 @@ const buildAdminNavItems = (): NavItem[] => [
     href: '/settings/admin/directory/listings',
     prefetch: false,
     children: [
-      { label: 'Listings',          href: '/settings/admin/directory/listings' },
-      { label: 'Featured',          href: '/settings/admin/directory/featured' },
-      { label: 'Featured Products', href: '/settings/admin/featured-products' },
-      { label: 'Appearance',        href: '/settings/admin/directory/appearance' },
+      { label: 'Listings',             href: '/settings/admin/directory/listings' },
+      { label: 'Featured',             href: '/settings/admin/directory/featured' },
+      { label: 'Directory Appearance', href: '/settings/admin/directory/appearance' },
     ],
   },
   {
-    label: 'Content',
+    label: 'Platform Inventory',
+    icon: <Icon.Cube />,
+    href: '/settings/admin/inventory-dashboard',
+    prefetch: false,
+    children: [
+      { label: 'Inventory Dashboard',       href: '/settings/admin/inventory-dashboard' },
+      { label: 'Inventory Transfers',       href: '/settings/admin/inventory' },
+      { label: 'Universal Product Catalog', href: '/settings/admin/catalog' },
+      { label: 'Slug Registry',             href: '/settings/admin/slug-registry' },
+    ],
+  },
+  {
+    label: 'Content & Analytics',
     icon: <Icon.Navigation />,
     href: '/settings/admin/reviews',
     prefetch: false,
     children: [
-      { label: 'Reviews',   href: '/settings/admin/reviews' },
-      { label: 'Analytics', href: '/settings/admin/analytics' },
-    ],
-  },
-  {
-    label: 'Security & Platform',
-    icon: <Icon.Shield />,
-    href: '/settings/admin/security',
-    prefetch: false,
-    children: [
-      { label: 'Security',          href: '/settings/admin/security' },
-      { label: 'Platform Settings', href: '/settings/admin/platform' },
-      { label: 'Sentry',          href: '/settings/admin/sentry' },
-      { label: 'Feature Overrides', href: '/settings/admin/feature-overrides' },
-      { label: 'Subdomain Mgmt',    href: '/settings/admin/subdomain' },
-      { label: 'Ticker',            href: '/settings/admin/ticker' },
-    ],
-  },
-  {
-    label: 'Analytics',
-    icon: <Icon.Chart />,
-    href: '/settings/admin/scan-metrics',
-    prefetch: false,
-    children: [
-      { label: 'Scan Metrics', href: '/settings/admin/scan-metrics' },
-    ],
-  },
-  {
-    label: 'CRM',
-    icon: <Icon.Headset />,
-    href: '/settings/admin/crm',
-    prefetch: false,
-    requiredPermission: 'CAN_VIEW_CRM',
-    children: [
-      { label: 'Dashboard', href: '/settings/admin/crm' },
-      { label: 'Requests Hub', href: '/settings/admin/crm/requests' },
-      { label: 'Tenants', href: '/settings/admin/crm/tenants' },
-      { label: 'Tickets', href: '/settings/admin/crm/tickets' },
-      { label: 'Tasks', href: '/settings/admin/crm/tasks' },
+      { label: 'Reviews',             href: '/settings/admin/reviews' },
+      { label: 'Analytics',           href: '/settings/admin/analytics' },
+      { label: 'Scan Metrics',        href: '/settings/admin/scan-metrics' },
     ],
   },
   {
@@ -328,13 +301,51 @@ const buildAdminNavItems = (): NavItem[] => [
     ],
   },
   {
-    label: 'Navigation Control',
-    href: '/settings/admin/navigation',
-    icon: <Icon.Navigation />,
-    badge: 'Admin',
-    badgeVariant: 'warning',
-    dividerBefore: true,
+    label: 'CRM Hub',
+    icon: <Icon.Headset />,
+    href: '/settings/admin/crm',
     prefetch: false,
+    requiredPermission: 'CAN_VIEW_CRM',
+    children: [
+      { label: 'Dashboard',     href: '/settings/admin/crm' },
+      { label: 'Requests Hub',  href: '/settings/admin/crm/requests' },
+      { label: 'Tenants',       href: '/settings/admin/crm/tenants' },
+      { label: 'Tickets',       href: '/settings/admin/crm/tickets' },
+      { label: 'Tasks',         href: '/settings/admin/crm/tasks' },
+    ],
+  },
+  {
+    label: 'Logs & Audit',
+    icon: <Icon.Chart />,
+    href: '/settings/admin/notification-logs',
+    prefetch: false,
+    dividerBefore: true,
+    children: [
+      { label: 'Notification Logs', href: '/settings/admin/notification-logs' },
+      { label: 'Sentry Monitoring', href: '/settings/admin/sentry' },
+    ],
+  },
+  {
+    label: 'Security & Platform',
+    icon: <Icon.Shield />,
+    href: '/settings/admin/security',
+    prefetch: false,
+    children: [
+      { label: 'Platform Settings',   href: '/settings/admin/platform' },
+      { label: 'Subdomain Mgmt',      href: '/settings/admin/subdomain' },
+      { label: 'Security',            href: '/settings/admin/security' },
+      { label: 'Navigation Control',  href: '/settings/admin/navigation' },
+    ],
+  },
+  {
+    label: 'Help & Onboarding',
+    icon: <Icon.Headset />,
+    href: '/settings/admin/quick-start/categories',
+    prefetch: false,
+    children: [
+      { label: 'Seed Categories',      href: '/settings/admin/quick-start/categories' },
+      { label: 'Seed Products',        href: '/settings/admin/quick-start/products' },
+    ],
   },
   {
     label: 'Account Settings',

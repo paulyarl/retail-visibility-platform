@@ -8,6 +8,8 @@ import { tenantInfoService } from '@/services/TenantInfoService';
 import { auth0 } from '@/lib/auth0';
 
 export default async function TenantPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
+  const timestamp = new Date().toISOString();
+  console.log(`[dashboard/layout] render start at ${timestamp}`);
   // Get Auth0 session for authentication (wrapped in try/catch for robustness)
   let session = null;
   try {
@@ -17,6 +19,7 @@ export default async function TenantPageLayout({ children, params }: { children:
     session = null;
   }
   const isAuthenticated = !!session?.user;
+  console.log(`[dashboard/layout] isAuthenticated=${isAuthenticated} at ${timestamp}`);
 
   const resolvedParams = (params && typeof params === 'object' && 'then' in (params as any))
     ? await (params as Promise<{ tenantId: string }>)
@@ -29,6 +32,7 @@ export default async function TenantPageLayout({ children, params }: { children:
   // After successful login the user is returned to the tenant dashboard.
   if (!isAuthenticated) {
     const returnPath = `/t/${tenantId}/dashboard`;
+    console.log(`[dashboard/layout] redirecting to login, returnPath=${returnPath}`);
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnPath)}`);
   }
 
@@ -61,6 +65,7 @@ export default async function TenantPageLayout({ children, params }: { children:
   //   isAuthenticated
   // });
 
+  console.log(`[dashboard/layout] rendering children tenantId=${tenantId}`);
   return (
     <>
       {/* Persist last visited tenant route for restore-after-login UX */}

@@ -27,7 +27,13 @@ export type BillingNotificationType =
   | 'trial_started'
   | 'trial_converted'
   | 'trial_payment_failed'
-  | 'trial_expired';
+  | 'trial_expired'
+  | 'bsaas_purchase_success'
+  | 'bsaas_renewal_success'
+  | 'bsaas_renewal_failed'
+  | 'bsaas_grace_period_warning'
+  | 'bsaas_trial_started'
+  | 'bsaas_purchase_cancelled';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -216,6 +222,54 @@ class BillingNotificationService {
           subject: `Plan Updated - ${businessName}`,
           html: this.buildTierChangedHtml(ownerName, businessName, data),
           text: this.buildTierChangedText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_purchase_success':
+        return {
+          to: toEmail,
+          subject: `Feature Purchased - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasPurchaseSuccessHtml(ownerName, businessName, data),
+          text: this.buildBsaasPurchaseSuccessText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_renewal_success':
+        return {
+          to: toEmail,
+          subject: `Feature Renewed - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasRenewalSuccessHtml(ownerName, businessName, data),
+          text: this.buildBsaasRenewalSuccessText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_renewal_failed':
+        return {
+          to: toEmail,
+          subject: `Payment Failed: Feature Renewal - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasRenewalFailedHtml(ownerName, businessName, data),
+          text: this.buildBsaasRenewalFailedText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_purchase_cancelled':
+        return {
+          to: toEmail,
+          subject: `Feature Cancelled - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasCancelledHtml(ownerName, businessName, data),
+          text: this.buildBsaasCancelledText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_grace_period_warning':
+        return {
+          to: toEmail,
+          subject: `Action Required: Payment Retry in ${data.gracePeriodDaysRemaining} days - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasGracePeriodHtml(ownerName, businessName, data),
+          text: this.buildBsaasGracePeriodText(ownerName, businessName, data),
+        };
+
+      case 'bsaas_trial_started':
+        return {
+          to: toEmail,
+          subject: `Free Trial Started - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
+          html: this.buildBsaasTrialStartedHtml(ownerName, businessName, data),
+          text: this.buildBsaasTrialStartedText(ownerName, businessName, data),
         };
 
       default:
@@ -719,6 +773,50 @@ Your new plan is now active.`;
           priority: 'high',
         };
 
+      case 'bsaas_purchase_success':
+        return {
+          title: `Feature purchased: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Tenant "${tenantName}" purchased the "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" feature for $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'}).\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          priority: 'low',
+        };
+
+      case 'bsaas_renewal_success':
+        return {
+          title: `Feature renewed: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was renewed for tenant "${tenantName}". Charged $${((data.amount || 0) / 100).toFixed(2)}.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          priority: 'low',
+        };
+
+      case 'bsaas_renewal_failed':
+        return {
+          title: `Feature renewal payment failed: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Payment failed for renewal of feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" for tenant "${tenantName}". The feature has been suspended. Reason: ${data.reason || 'Payment declined'}.\n\nBilling settings: ${billingUrl}`,
+          priority: 'high',
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        };
+
+      case 'bsaas_purchase_cancelled':
+        return {
+          title: `Feature cancelled: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was cancelled for tenant "${tenantName}". The feature will remain active until the current billing period ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          priority: 'medium',
+        };
+
+      case 'bsaas_grace_period_warning':
+        return {
+          title: `Feature renewal grace period: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Payment failed for renewal of feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" for tenant "${tenantName}". The feature is in a ${data.gracePeriodDaysRemaining || 7}-day grace period. Reason: ${data.reason || 'Payment declined'}.\n\nBilling settings: ${billingUrl}`,
+          priority: 'high',
+          dueDate: new Date(Date.now() + (data.gracePeriodDaysRemaining || 7) * 24 * 60 * 60 * 1000),
+        };
+
+      case 'bsaas_trial_started':
+        return {
+          title: `Feature trial started: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
+          description: `Tenant "${tenantName}" started a ${data.metadata?.trialDays || 0}-day free trial for feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}". No charge until trial ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          priority: 'low',
+        };
+
       default:
         return {
           title: `Subscription event: ${data.type} — ${tenantName}`,
@@ -848,6 +946,42 @@ Your new plan is now active.`;
           body: `Your trial for ${tenantName} has expired. Upgrade to a paid plan to continue using all features.`,
           icon: '⌛',
         };
+      case 'bsaas_purchase_success':
+        return {
+          title: 'Feature purchased',
+          body: `You purchased "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" for ${tenantName}. It is now active.`,
+          icon: '⚡',
+        };
+      case 'bsaas_renewal_success':
+        return {
+          title: 'Feature renewed',
+          body: `Your feature "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" for ${tenantName} was renewed successfully.`,
+          icon: '✅',
+        };
+      case 'bsaas_renewal_failed':
+        return {
+          title: 'Feature renewal payment failed',
+          body: `We could not process payment for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. The feature has been suspended. Please update your payment method.`,
+          icon: '⚠️',
+        };
+      case 'bsaas_purchase_cancelled':
+        return {
+          title: 'Feature cancelled',
+          body: `You cancelled "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" for ${tenantName}. It will remain active until the current billing period ends.`,
+          icon: '❌',
+        };
+      case 'bsaas_grace_period_warning':
+        return {
+          title: 'Feature renewal payment failed — grace period active',
+          body: `We could not process payment for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. You have ${data.gracePeriodDaysRemaining || 7} days to update your payment method before the feature is suspended.`,
+          icon: '⏰',
+        };
+      case 'bsaas_trial_started':
+        return {
+          title: 'Free trial started',
+          body: `You started a ${data.metadata?.trialDays || 0}-day free trial for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. No charge until the trial ends.`,
+          icon: '🎁',
+        };
       default:
         return {
           title: 'Subscription update',
@@ -855,6 +989,200 @@ Your new plan is now active.`;
           icon: '📋',
         };
     }
+  }
+
+  // Email templates - BSaaS Purchase Success
+  private buildBsaasPurchaseSuccessHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Feature Purchased</h2>
+        <p>Hi ${name},</p>
+        <p>You've successfully purchased <strong>${featureName}</strong> for <strong>${business}</strong>.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Feature:</strong> ${featureName}</p>
+          <p style="margin: 8px 0 0;"><strong>Price:</strong> $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})</p>
+        </div>
+        <p>The feature is now active and ready to use.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/feature-store" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Features</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildBsaasPurchaseSuccessText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `Hi ${name},
+
+You've successfully purchased ${featureName} for ${business}.
+
+Feature: ${featureName}
+Price: $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})
+
+The feature is now active and ready to use.
+
+Manage your features at: ${process.env.WEB_URL}/settings/feature-store`;
+  }
+
+  // Email templates - BSaaS Renewal Success
+  private buildBsaasRenewalSuccessHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Feature Renewed</h2>
+        <p>Hi ${name},</p>
+        <p>Your feature <strong>${featureName}</strong> for <strong>${business}</strong> has been renewed successfully.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Feature:</strong> ${featureName}</p>
+          <p style="margin: 8px 0 0;"><strong>Amount:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your feature remains active.</p>
+      </div>
+    `;
+  }
+
+  private buildBsaasRenewalSuccessText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `Hi ${name},
+
+Your feature ${featureName} for ${business} has been renewed successfully.
+
+Feature: ${featureName}
+Amount: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your feature remains active.`;
+  }
+
+  // Email templates - BSaaS Renewal Failed
+  private buildBsaasRenewalFailedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Feature Renewal Payment Failed</h2>
+        <p>Hi ${name},</p>
+        <p>We were unable to process payment for <strong>${featureName}</strong> on <strong>${business}</strong>.</p>
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Reason:</strong> ${data.reason || 'Payment method declined'}</p>
+        </div>
+        <p>The feature has been <strong>suspended</strong>. Please update your payment method to restore access.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildBsaasRenewalFailedText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `Hi ${name},
+
+We were unable to process payment for ${featureName} on ${business}.
+
+Reason: ${data.reason || 'Payment method declined'}
+
+The feature has been suspended. Please update your payment method to restore access.
+
+Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
+  }
+
+  // Email templates - BSaaS Purchase Cancelled
+  private buildBsaasCancelledHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Feature Cancelled</h2>
+        <p>Hi ${name},</p>
+        <p>You've cancelled <strong>${featureName}</strong> for <strong>${business}</strong>.</p>
+        <p>The feature will remain active until the end of the current billing period, then will be deactivated.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/feature-store" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Browse Features</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildBsaasCancelledText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    return `Hi ${name},
+
+You've cancelled ${featureName} for ${business}.
+
+The feature will remain active until the end of the current billing period, then will be deactivated.
+
+Browse features at: ${process.env.WEB_URL}/settings/feature-store`;
+  }
+
+  // Email templates - BSaaS Grace Period Warning
+  private buildBsaasGracePeriodHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    const daysLeft = data.gracePeriodDaysRemaining || 7;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Payment Retry Needed</h2>
+        <p>Hi ${name},</p>
+        <p>We were unable to process payment for <strong>${featureName}</strong> on <strong>${business}</strong>.</p>
+        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fde68a;">
+          <p style="margin: 0;"><strong>Feature:</strong> ${featureName}</p>
+          <p style="margin: 8px 0 0;"><strong>Grace period:</strong> ${daysLeft} days remaining</p>
+          <p style="margin: 8px 0 0;"><strong>Reason:</strong> ${data.reason || 'Payment declined'}</p>
+        </div>
+        <p>The feature is still active, but will be <strong>suspended in ${daysLeft} days</strong> if payment is not updated.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildBsaasGracePeriodText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    const daysLeft = data.gracePeriodDaysRemaining || 7;
+    return `Hi ${name},
+
+We were unable to process payment for ${featureName} on ${business}.
+
+The feature is still active, but will be suspended in ${daysLeft} days if payment is not updated.
+
+Reason: ${data.reason || 'Payment declined'}
+
+Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
+  }
+
+  // Email templates - BSaaS Trial Started
+  private buildBsaasTrialStartedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    const trialDays = data.metadata?.trialDays || 0;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Free Trial Started</h2>
+        <p>Hi ${name},</p>
+        <p>You've started a <strong>${trialDays}-day free trial</strong> of <strong>${featureName}</strong> for <strong>${business}</strong>.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Feature:</strong> ${featureName}</p>
+          <p style="margin: 8px 0 0;"><strong>Trial length:</strong> ${trialDays} days</p>
+          <p style="margin: 8px 0 0;"><strong>Price after trial:</strong> $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})</p>
+        </div>
+        <p>The feature is now active. You won't be charged until the trial ends. Add a payment method to ensure uninterrupted service after the trial.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Add Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildBsaasTrialStartedText(name: string, business: string, data: BillingNotificationData): string {
+    const featureName = data.metadata?.featureName || data.metadata?.featureKey || 'Feature';
+    const trialDays = data.metadata?.trialDays || 0;
+    return `Hi ${name},
+
+You've started a ${trialDays}-day free trial of ${featureName} for ${business}.
+
+The feature is now active. You won't be charged until the trial ends.
+
+Price after trial: $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})
+
+Add a payment method at: ${process.env.WEB_URL}/settings/subscription`;
   }
 
   private buildPaymentMethodAddedText(name: string, business: string, data: BillingNotificationData): string {

@@ -57,6 +57,7 @@ export interface PlatformSettings {
 
 class PlatformSettingsSingletonService extends PublicApiSingleton {
   private static instance: PlatformSettingsSingletonService;
+  private inflightSettings: Promise<PlatformSettings> | null = null;
 
   private constructor() {
     super('platform-settings-service');
@@ -76,6 +77,11 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
    * Uses the /api/platform-settings endpoint
    */
   async getPlatformSettings(): Promise<PlatformSettings> {
+    if (this.inflightSettings) {
+      return this.inflightSettings;
+    }
+
+    this.inflightSettings = (async (): Promise<PlatformSettings> => {
     try {
       const result = await this.makeDefaultRequest<PlatformSettings>(
         '/api/platform-settings',
@@ -166,6 +172,11 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         socialSnapchat: '',
       };
     }
+    })().finally(() => {
+      this.inflightSettings = null;
+    });
+
+    return this.inflightSettings;
   }
 
   /**

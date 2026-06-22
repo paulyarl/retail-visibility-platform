@@ -701,7 +701,8 @@ export type ChatbotResponseEngineType =
 export type ChatbotSkillType =
   | 'chatbot_skill_product_search' | 'chatbot_skill_inventory'
   | 'chatbot_skill_order_tracking' | 'chatbot_skill_store_hours'
-  | 'chatbot_skill_cross_merchant';
+  | 'chatbot_skill_cross_merchant'
+  | 'chatbot_skill_crm_assistant';
 
 export type ChatbotKnowledgeBaseType =
   | 'chatbot_kb_static_faq' | 'chatbot_kb_rag_retrieval'

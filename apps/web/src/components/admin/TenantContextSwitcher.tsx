@@ -12,6 +12,28 @@ interface TenantContextSwitcherProps {
   showWarning?: boolean;
 }
 
+const AVATAR_COLORS = [
+  '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b',
+  '#f43f5e', '#06b6d4', '#6366f1', '#14b8a6',
+  '#d946ef', '#f97316',
+];
+
+function getTenantColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getTenantInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 export function TenantContextSwitcher({ 
   onTenantChange, 
   showWarning = true 
@@ -157,7 +179,18 @@ export function TenantContextSwitcher({
           value={currentTenant || ''}
           onChange={(value) => value && handleTenantSwitch(value)}
           disabled={switching || loading}
-          leftSection={loading ? <Loader size={16} /> : <IconBuildingStore size={16} />}
+          leftSection={
+            loading ? <Loader size={16} /> :
+            currentTenant ? (
+              <span
+                className="h-5 w-5 rounded-full inline-flex items-center justify-center text-white font-semibold text-[10px] flex-shrink-0"
+                style={{ backgroundColor: getTenantColor(currentTenant) }}
+                aria-hidden="true"
+              >
+                {getTenantInitials(getCurrentTenantName())}
+              </span>
+            ) : <IconBuildingStore size={16} />
+          }
           description={`Role: ${getCurrentTenantRole()}`}
         />
 

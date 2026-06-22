@@ -6,9 +6,11 @@
  */
 
 import { prisma } from '../prisma';
+import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import aiProviderFactory from './ai-providers';
 
-const EMBEDDING_MODEL = 'text-embedding-3-small';
+const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIM = 1536;
 const CHUNK_SIZE = 500; // characters per chunk
 const CHUNK_OVERLAP = 50; // overlap between chunks
@@ -24,24 +26,35 @@ export interface ProductRagResult {
 
 class BotRagService {
   private static instance: BotRagService;
-  private openai: any = null;
+  private embeddingModelCache: string | null = null;
+  private embeddingModelCacheTime: number = 0;
+  private static readonly MODEL_CACHE_TTL = 60_000; // 60 seconds
 
-  private constructor() {
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const OpenAI = require('openai').default;
-        this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      } catch (e) {
-        logger.warn('[BotRagService] Failed to init OpenAI', undefined, { error: String(e) });
-      }
-    }
-  }
+  private constructor() {}
 
   static getInstance(): BotRagService {
     if (!BotRagService.instance) {
       BotRagService.instance = new BotRagService();
     }
     return BotRagService.instance;
+  }
+
+  /**
+   * Get the configured embedding model from platform settings (cached).
+   */
+  async getEmbeddingModel(): Promise<string> {
+    const now = Date.now();
+    if (this.embeddingModelCache !== null && (now - this.embeddingModelCacheTime) < BotRagService.MODEL_CACHE_TTL) {
+      return this.embeddingModelCache;
+    }
+    try {
+      const settings = await prisma.platform_settings_list.findFirst();
+      this.embeddingModelCache = settings?.bot_embedding_model ?? DEFAULT_EMBEDDING_MODEL;
+      this.embeddingModelCacheTime = now;
+      return this.embeddingModelCache!;
+    } catch {
+      return DEFAULT_EMBEDDING_MODEL;
+    }
   }
 
   /**
@@ -69,19 +82,11 @@ class BotRagService {
   }
 
   /**
-   * Generate embeddings for a list of texts using OpenAI.
+   * Generate embeddings for a list of texts using the configured AI provider.
    */
   private async generateEmbeddings(texts: string[]): Promise<number[][]> {
-    if (!this.openai) {
-      throw new Error('OpenAI not initialized — set OPENAI_API_KEY');
-    }
-
-    const response = await this.openai.embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: texts,
-    });
-
-    return response.data.map((d: any) => d.embedding);
+    const result = await aiProviderFactory.generateEmbeddings({ inputs: texts });
+    return result.embeddings;
   }
 
   /**
@@ -102,15 +107,18 @@ class BotRagService {
       select: { id: true, question: true, answer: true },
     });
 
+    const pool = getDirectPool();
+
     if (faqs.length === 0) {
       // Clean up any stale embeddings
-      await prisma.$executeRaw`DELETE FROM bot_faq_embeddings WHERE tenant_id = ${tenantId}`;
+      await pool.query('DELETE FROM bot_faq_embeddings WHERE tenant_id = $1', [tenantId]);
       return { processed: 0, chunks: 0 };
     }
 
     // Delete existing embeddings for this tenant
-    await prisma.$executeRaw`DELETE FROM bot_faq_embeddings WHERE tenant_id = ${tenantId}`;
+    await pool.query('DELETE FROM bot_faq_embeddings WHERE tenant_id = $1', [tenantId]);
 
+    const embeddingModel = await this.getEmbeddingModel();
     let totalChunks = 0;
 
     // Process in batches of 100 FAQs to avoid API limits
@@ -137,10 +145,11 @@ class BotRagService {
         const embedding = embeddings[j];
         const embeddingStr = `[${embedding.join(',')}]`;
 
-        await prisma.$executeRaw`
-          INSERT INTO bot_faq_embeddings (tenant_id, faq_id, chunk_text, chunk_index, embedding, model)
-          VALUES (${tenantId}, ${chunk.faqId}::uuid, ${chunk.text}, ${chunk.index}, ${embeddingStr}::vector, ${EMBEDDING_MODEL})
-        `;
+        await pool.query(
+          `INSERT INTO bot_faq_embeddings (tenant_id, faq_id, chunk_text, chunk_index, embedding, model)
+           VALUES ($1, $2::uuid, $3, $4, $5::vector, $6)`,
+          [tenantId, chunk.faqId, chunk.text, chunk.index, embeddingStr, embeddingModel]
+        );
       }
 
       totalChunks += allChunks.length;
@@ -162,20 +171,22 @@ class BotRagService {
     const queryEmbedding = await this.generateQueryEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-    const results = await prisma.$queryRaw<any[]>`
-      SELECT
+    const pool = getDirectPool();
+    const results = (await pool.query(
+      `SELECT
         e.faq_id,
         f.question,
         e.chunk_text,
-        1 - (e.embedding <=> ${embeddingStr}::vector) as score
+        (1 - (e.embedding <=> $1::vector))::text as score
       FROM bot_faq_embeddings e
       JOIN faqs f ON f.id = e.faq_id
-      WHERE e.tenant_id = ${tenantId}
+      WHERE e.tenant_id = $2
         AND f.is_published = true
         AND e.embedding IS NOT NULL
-      ORDER BY e.embedding <=> ${embeddingStr}::vector
-      LIMIT ${topK}
-    `;
+      ORDER BY e.embedding <=> $1::vector
+      LIMIT $3`,
+      [embeddingStr, tenantId, topK]
+    )).rows;
 
     const chunks = results
       .filter((r: any) => parseFloat(r.score) >= SIMILARITY_THRESHOLD)
@@ -193,10 +204,12 @@ class BotRagService {
    * Check if FAQ embeddings exist for a tenant.
    */
   async hasEmbeddings(tenantId: string): Promise<boolean> {
-    const result = await prisma.$queryRaw<any[]>`
-      SELECT COUNT(*) as cnt FROM bot_faq_embeddings WHERE tenant_id = ${tenantId}
-    `;
-    return parseInt(result[0]?.cnt || '0') > 0;
+    const pool = getDirectPool();
+    const result = await pool.query(
+      'SELECT COUNT(*)::text as cnt FROM bot_faq_embeddings WHERE tenant_id = $1',
+      [tenantId]
+    );
+    return parseInt(result.rows[0]?.cnt || '0', 10) > 0;
   }
 
   /**
@@ -204,17 +217,26 @@ class BotRagService {
    * Includes name, description, features, tags, and badges for rich search.
    */
   private chunkProduct(product: any): { text: string; index: number }[] {
+    const parsePgArray = (val: any): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      const s = String(val).replace(/^\{|\}$/g, '');
+      return s ? s.split(',').map((v: string) => v.trim()) : [];
+    };
+
+    const features = parsePgArray(product.features);
+    const tags = parsePgArray(product.tags);
+    const badges = parsePgArray(product.featured_type_array);
+
     const parts = [
       `Product: ${product.product_name}`,
       product.brand ? `Brand: ${product.brand}` : '',
       product.product_category ? `Category: ${product.product_category}` : '',
       product.product_description ? `Description: ${product.product_description}` : '',
       product.marketing_description ? `Marketing: ${product.marketing_description}` : '',
-      product.features && product.features.length > 0 ? `Features: ${product.features.join(', ')}` : '',
-      product.tags && product.tags.length > 0 ? `Tags: ${product.tags.join(', ')}` : '',
-      product.featured_type_array && product.featured_type_array.length > 0
-        ? `Badges: ${product.featured_type_array.join(', ')}`
-        : '',
+      features.length > 0 ? `Features: ${features.join(', ')}` : '',
+      tags.length > 0 ? `Tags: ${tags.join(', ')}` : '',
+      badges.length > 0 ? `Badges: ${badges.join(', ')}` : '',
       product.sku ? `SKU: ${product.sku}` : '',
     ].filter(Boolean);
 
@@ -242,34 +264,38 @@ class BotRagService {
    * Called by merchant catalog webhooks or periodic refresh jobs.
    */
   async refreshProductEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
-    const products = await prisma.$queryRaw<any[]>`
-      SELECT
-        inventory_item_id as product_id,
-        product_name,
-        product_description,
-        marketing_description,
-        brand,
-        product_category,
-        sku,
-        features,
-        tags,
-        featured_type_array,
-        product_slug
+    const pool = getDirectPool();
+    const productsResult = await pool.query(
+      `SELECT
+        inventory_item_id::text as product_id,
+        product_name::text as product_name,
+        COALESCE(product_description::text, '') as product_description,
+        COALESCE(marketing_description::text, '') as marketing_description,
+        COALESCE(brand::text, '') as brand,
+        COALESCE(product_category::text, '') as product_category,
+        COALESCE(sku::text, '') as sku,
+        COALESCE(features::text, '') as features,
+        COALESCE(tags::text, '') as tags,
+        COALESCE(featured_type_array::text, '') as featured_type_array,
+        COALESCE(product_slug::text, '') as product_slug
       FROM mv_storefront_discovery
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
-        AND stock_status IN ('in_stock', 'low_stock')
-    `;
+        AND stock_status IN ('in_stock', 'low_stock')`,
+      [tenantId]
+    );
+    const products = productsResult.rows;
 
     if (products.length === 0) {
-      await prisma.$executeRaw`DELETE FROM bot_product_embeddings WHERE tenant_id = ${tenantId}`;
+      await pool.query('DELETE FROM bot_product_embeddings WHERE tenant_id = $1', [tenantId]);
       return { processed: 0, chunks: 0 };
     }
 
     // Delete existing product embeddings for this tenant
-    await prisma.$executeRaw`DELETE FROM bot_product_embeddings WHERE tenant_id = ${tenantId}`;
+    await pool.query('DELETE FROM bot_product_embeddings WHERE tenant_id = $1', [tenantId]);
 
+    const embeddingModel = await this.getEmbeddingModel();
     let totalChunks = 0;
     const batchSize = 100;
 
@@ -293,10 +319,11 @@ class BotRagService {
         const embedding = embeddings[j];
         const embeddingStr = `[${embedding.join(',')}]`;
 
-        await prisma.$executeRaw`
-          INSERT INTO bot_product_embeddings (tenant_id, product_id, chunk_text, chunk_index, embedding, model)
-          VALUES (${tenantId}, ${chunk.productId}, ${chunk.text}, ${chunk.index}, ${embeddingStr}::vector, ${EMBEDDING_MODEL})
-        `;
+        await pool.query(
+          `INSERT INTO bot_product_embeddings (tenant_id, product_id, chunk_text, chunk_index, embedding, model)
+           VALUES ($1, $2, $3, $4, $5::vector, $6)`,
+          [tenantId, chunk.productId, chunk.text, chunk.index, embeddingStr, embeddingModel]
+        );
       }
 
       totalChunks += allChunks.length;
@@ -318,20 +345,22 @@ class BotRagService {
     const queryEmbedding = await this.generateQueryEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-    const results = await prisma.$queryRaw<any[]>`
-      SELECT
+    const pool = getDirectPool();
+    const results = (await pool.query(
+      `SELECT
         e.product_id,
         ii.name as product_name,
         e.chunk_text,
-        1 - (e.embedding <=> ${embeddingStr}::vector) as score
+        (1 - (e.embedding <=> $1::vector))::text as score
       FROM bot_product_embeddings e
       JOIN inventory_items ii ON ii.id = e.product_id
-      WHERE e.tenant_id = ${tenantId}
+      WHERE e.tenant_id = $2
         AND ii.item_status = 'active'
         AND e.embedding IS NOT NULL
-      ORDER BY e.embedding <=> ${embeddingStr}::vector
-      LIMIT ${topK}
-    `;
+      ORDER BY e.embedding <=> $1::vector
+      LIMIT $3`,
+      [embeddingStr, tenantId, topK]
+    )).rows;
 
     const chunks = results
       .filter((r: any) => parseFloat(r.score) >= SIMILARITY_THRESHOLD)
@@ -349,10 +378,12 @@ class BotRagService {
    * Check if product embeddings exist for a tenant.
    */
   async hasProductEmbeddings(tenantId: string): Promise<boolean> {
-    const result = await prisma.$queryRaw<any[]>`
-      SELECT COUNT(*) as cnt FROM bot_product_embeddings WHERE tenant_id = ${tenantId}
-    `;
-    return parseInt(result[0]?.cnt || '0') > 0;
+    const pool = getDirectPool();
+    const result = await pool.query(
+      `SELECT COUNT(*)::text as cnt FROM bot_product_embeddings WHERE tenant_id = $1`,
+      [tenantId]
+    );
+    return parseInt(result.rows[0]?.cnt || '0', 10) > 0;
   }
 }
 

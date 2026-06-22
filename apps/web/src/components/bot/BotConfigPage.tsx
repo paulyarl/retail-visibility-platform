@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,9 +10,13 @@ import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
+import { ColorInput as MantineColorInput, Slider as MantineSlider, Select as MantineSelect, Stack, Text } from '@mantine/core';
 import { toast } from '@/hooks/use-toast';
 import { botService, type BotConfig, type UpdateBotConfigInput } from '@/services/BotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { getContrastColor } from '@/lib/color-utils';
 
 interface BotConfigPageProps {
   tenantId: string;
@@ -22,7 +27,9 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState<UpdateBotConfigInput>({});
+  const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
 
   const fetchConfig = useCallback(async () => {
     setLoading(true);
@@ -63,6 +70,21 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await platformSettingsService.getPlatformSettings();
+        if (!cancelled && settings?.logoUrl) {
+          setPlatformLogoUrl(settings.logoUrl);
+        }
+      } catch {
+        // Non-critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -168,28 +190,186 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
             </div>
             <div>
               <Label htmlFor="widgetColor">Widget Color</Label>
-              <div className="flex items-center gap-2">
-                <Input type="color" id="widgetColor" value={form.widgetColor || '#4F46E5'} onChange={e => setForm({ ...form, widgetColor: e.target.value })} className="w-16 h-10 p-1" />
-                <Input value={form.widgetColor || ''} onChange={e => setForm({ ...form, widgetColor: e.target.value })} className="flex-1" />
-              </div>
+              <MantineColorInput
+                id="widgetColor"
+                value={form.widgetColor || '#4F46E5'}
+                onChange={(value) => setForm({ ...form, widgetColor: value })}
+                placeholder="Pick widget color"
+                size="sm"
+                className="mt-1"
+              />
             </div>
             <div>
               <Label htmlFor="widgetOffsetX">Offset X (px)</Label>
-              <Input type="number" id="widgetOffsetX" value={form.widgetOffsetX ?? 20} onChange={e => setForm({ ...form, widgetOffsetX: parseInt(e.target.value) || 0 })} />
+              <Stack gap={4} className="mt-2">
+                <MantineSlider
+                  id="widgetOffsetX"
+                  value={form.widgetOffsetX ?? 20}
+                  onChange={(value) => setForm({ ...form, widgetOffsetX: value })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  label={(value) => `${value}px`}
+                  size="sm"
+                  color="indigo"
+                />
+                <Text size="xs" c="dimmed">{form.widgetOffsetX ?? 20}px from {(form.widgetPosition || 'bottom-right').includes('right') ? 'right' : 'left'} edge</Text>
+              </Stack>
             </div>
             <div>
               <Label htmlFor="widgetOffsetY">Offset Y (px)</Label>
-              <Input type="number" id="widgetOffsetY" value={form.widgetOffsetY ?? 20} onChange={e => setForm({ ...form, widgetOffsetY: parseInt(e.target.value) || 0 })} />
+              <Stack gap={4} className="mt-2">
+                <MantineSlider
+                  id="widgetOffsetY"
+                  value={form.widgetOffsetY ?? 20}
+                  onChange={(value) => setForm({ ...form, widgetOffsetY: value })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  label={(value) => `${value}px`}
+                  size="sm"
+                  color="indigo"
+                />
+                <Text size="xs" c="dimmed">{form.widgetOffsetY ?? 20}px from {(form.widgetPosition || 'bottom-right').includes('bottom') ? 'bottom' : 'top'} edge</Text>
+              </Stack>
             </div>
             <div>
               <Label htmlFor="widgetFont">Font Family</Label>
-              <Input id="widgetFont" value={form.widgetFont || ''} onChange={e => setForm({ ...form, widgetFont: e.target.value })} placeholder="system-ui, sans-serif" />
+              <MantineSelect
+                id="widgetFont"
+                value={form.widgetFont || 'system-ui, sans-serif'}
+                onChange={(value) => setForm({ ...form, widgetFont: value || undefined })}
+                placeholder="Select font family"
+                size="sm"
+                className="mt-1"
+                data={[
+                  { value: 'system-ui, sans-serif', label: 'System UI (Default)' },
+                  { value: "'Inter', sans-serif", label: 'Inter' },
+                  { value: "'Roboto', sans-serif", label: 'Roboto' },
+                  { value: "'Open Sans', sans-serif", label: 'Open Sans' },
+                  { value: "'Lato', sans-serif", label: 'Lato' },
+                  { value: "'Montserrat', sans-serif", label: 'Montserrat' },
+                  { value: "'Poppins', sans-serif", label: 'Poppins' },
+                  { value: "'Nunito', sans-serif", label: 'Nunito' },
+                  { value: "'Playfair Display', serif", label: 'Playfair Display (Serif)' },
+                  { value: "'Merriweather', serif", label: 'Merriweather (Serif)' },
+                  { value: "'Lora', serif", label: 'Lora (Serif)' },
+                  { value: "'Source Code Pro', monospace", label: 'Source Code Pro (Mono)' },
+                  { value: "'Fira Code', monospace", label: 'Fira Code (Mono)' },
+                  { value: 'Georgia, serif', label: 'Georgia (Serif)' },
+                  { value: "'Courier New', monospace", label: 'Courier New (Mono)' },
+                ]}
+              />
             </div>
             <div>
-              <Label htmlFor="widgetAvatarUrl">Avatar URL (optional)</Label>
-              <Input id="widgetAvatarUrl" value={form.widgetAvatarUrl || ''} onChange={e => setForm({ ...form, widgetAvatarUrl: e.target.value })} placeholder="https://..." />
+              <Label htmlFor="widgetAvatarUrl">Bot Avatar</Label>
+              <div className="mt-2 space-y-3">
+                {(form.widgetAvatarUrl || config?.widgetAvatarUrl || platformLogoUrl) && (
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden border border-neutral-200 dark:border-neutral-700 shrink-0">
+                      <Image
+                        src={form.widgetAvatarUrl || config?.widgetAvatarUrl || platformLogoUrl || ''}
+                        alt="Bot avatar"
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    </div>
+                    {(form.widgetAvatarUrl || config?.widgetAvatarUrl) ? (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, widgetAvatarUrl: null })}
+                        className="text-sm text-red-500 hover:text-red-600"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <span className="text-sm text-neutral-500 dark:text-neutral-400">Default: platform logo</span>
+                    )}
+                  </div>
+                )}
+                <input
+                  id="widgetAvatarUrl"
+                  type="file"
+                  accept={getAcceptString(ImageUploadPresets.avatar.allowedTypes!)}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingAvatar(true);
+                    try {
+                      const result = await uploadImage(file, ImageUploadPresets.avatar);
+                      if (result.error) {
+                        toast({ title: result.error.message, variant: 'destructive' });
+                        return;
+                      }
+                      const url = await botService.uploadAvatar(tenantId, result.dataUrl, result.contentType);
+                      setForm({ ...form, widgetAvatarUrl: url });
+                      setConfig(prev => prev ? { ...prev, widgetAvatarUrl: url } : prev);
+                      toast({ title: 'Avatar uploaded successfully' });
+                    } catch (err: any) {
+                      toast({ title: err?.message || 'Failed to upload avatar', variant: 'destructive' });
+                    } finally {
+                      setUploadingAvatar(false);
+                    }
+                  }}
+                  disabled={uploadingAvatar}
+                  className="block w-full text-sm text-neutral-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-primary-50 file:text-primary-700
+                    hover:file:bg-primary-100
+                    dark:file:bg-primary-900/20 dark:file:text-primary-400
+                    dark:hover:file:bg-primary-900/30
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Recommended: Square image, 200x200px to 400x400px. Max 2MB. If not set, the platform logo is used as default.
+                </p>
+                {uploadingAvatar && (
+                  <p className="text-sm text-primary-600 dark:text-primary-400">Uploading...</p>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Font & Greeting Preview */}
+          <div className="mt-2 rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 text-sm font-medium shrink-0" style={{ background: form.widgetColor || '#4F46E5', color: getContrastColor(form.widgetColor || '#4F46E5') }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-base shrink-0">{form.botName?.charAt(0) || 'A'}</div>
+                <span className="truncate">{form.botName || 'Assistant'}</span>
+              </div>
+              <div className="flex items-center gap-1.5" title={form.status || 'active'}>
+                {form.status === 'paused' ? (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 5h2v14H9zm4 0h2v14h-2z" /></svg>
+                ) : form.status === 'disabled' ? (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" /></svg>
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1.5 14.5l-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4-7 7z" /></svg>
+                )}
+                <span className="text-xs capitalize">{form.status || 'active'}</span>
+              </div>
+            </div>
+            <div className="px-4 py-3 bg-neutral-50 dark:bg-neutral-800" style={{ fontFamily: form.widgetFont || 'system-ui, sans-serif' }}>
+              <div className="max-w-[85%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm">
+                <p className="whitespace-pre-line">{form.greeting || 'Hi! How can I help you today?'}</p>
+              </div>
+              <div className="flex justify-end mt-2">
+                <div
+                  className="max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm"
+                  style={{
+                    background: (form.widgetColor || '#4F46E5') + '1A',
+                    border: `1px solid ${(form.widgetColor || '#4F46E5')}40`,
+                    color: form.widgetColor || '#4F46E5',
+                  }}
+                >
+                  <p>When do you close?</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Switch id="autoOpen" checked={form.autoOpen || false} onCheckedChange={v => setForm({ ...form, autoOpen: v })} />

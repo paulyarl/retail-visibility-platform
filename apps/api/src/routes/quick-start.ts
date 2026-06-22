@@ -114,7 +114,7 @@ const quickStartSchema = z.object({
   createAsDrafts: z.boolean().optional().default(true),
   generateImages: z.boolean().optional().default(false), // NEW: Generate AI images
   imageQuality: z.enum(['standard', 'hd']).optional().default('standard'), // NEW: Image quality
-  textModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for text/product generation
+  textModel: z.enum(['openai', 'google', 'anthropic', 'mistral']).optional().default('openai'), // NEW: AI model for text/product generation
   imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
 });
 

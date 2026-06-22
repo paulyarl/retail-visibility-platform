@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
+import { getContrastColor } from '@/lib/color-utils';
 import type { CrmTicket, CrmTicketMessage } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -128,12 +129,18 @@ export default function CustomerTicketDetailPage() {
       {/* Message thread */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Conversation</h2>
-        {messages.map(m => (
+        {messages.map(m => {
+          const isCustomer = m.author_type === 'customer';
+          const accentColor = '#F59E0B';
+          return (
           <div
             key={m.id}
-            className={`rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 ${
-              m.author_type === 'customer' ? 'ml-8 bg-amber-50/50 dark:bg-amber-900/10' : 'mr-8'
-            }`}
+            className={`rounded-lg p-4 ${isCustomer ? 'ml-8' : 'mr-8 border border-neutral-200 dark:border-neutral-700'}`}
+            style={isCustomer ? {
+              background: accentColor + '1A',
+              border: `1px solid ${accentColor}40`,
+              color: accentColor,
+            } : undefined}
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-medium">{m.author_name}</span>
@@ -141,7 +148,8 @@ export default function CustomerTicketDetailPage() {
             </div>
             <p className="text-sm whitespace-pre-wrap">{m.content}</p>
           </div>
-        ))}
+          );
+        })}
         {messages.length === 0 && (
           <p className="text-sm text-neutral-400 text-center py-4">No messages yet</p>
         )}

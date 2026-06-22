@@ -43,10 +43,11 @@ export const getDirectPool = (): Pool => {
   url.searchParams.delete('sslmode'); // Remove sslmode, we set it via ssl option
   const cleanConnectionString = url.toString();
 
-  // Get connection limits from URL params or use higher defaults for better performance
-  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '50'); // Increased from 20
-  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '60') * 1000; // Increased from 30s
-  const connectionTimeout = parseInt(url.searchParams.get('connection_timeout') || '10') * 1000; // Reduced from 30s for faster failover
+  // Get connection limits from URL params or use defaults
+  // Keep conservative defaults for Supabase pooler compatibility
+  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '20');
+  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '30') * 1000;
+  const connectionTimeout = parseInt(url.searchParams.get('connection_timeout') || '10') * 1000;
 
   directPool = new Pool({
     connectionString: cleanConnectionString,
@@ -55,7 +56,7 @@ export const getDirectPool = (): Pool => {
       checkServerIdentity: () => undefined
     } : false,
     max: connectionLimit,
-    min: 10, // Increased from 2 to keep more connections ready
+    min: 2,
     idleTimeoutMillis: poolTimeout,
     connectionTimeoutMillis: connectionTimeout,
     allowExitOnIdle: true,

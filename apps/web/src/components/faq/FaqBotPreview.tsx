@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { MessageSquare, Send, Loader2, HelpCircle, AlertTriangle, PlusCircle } from 'lucide-react';
+import { getContrastColor } from '@/lib/color-utils';
 
 interface PreviewResult {
   reply: string;
@@ -100,11 +101,16 @@ export default function FaqBotPreview({ tenantId }: FaqBotPreviewProps) {
                 key={i}
                 className={`p-3 rounded-lg text-sm ${
                   msg.role === 'user'
-                    ? 'bg-blue-50 text-blue-900 ml-8'
+                    ? 'ml-8'
                     : msg.noMatch
                     ? 'bg-amber-50 text-amber-900 mr-8 border border-amber-200'
                     : 'bg-neutral-50 text-neutral-800 mr-8'
                 }`}
+                style={msg.role === 'user' ? {
+                  background: '#3B82F6' + '1A',
+                  border: '1px solid #3B82F640',
+                  color: '#3B82F6',
+                } : undefined}
               >
                 {msg.content}
                 {msg.noMatch && (

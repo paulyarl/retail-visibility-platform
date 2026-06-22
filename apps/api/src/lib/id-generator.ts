@@ -944,6 +944,16 @@ export function generateCrmRequestReadId(): string {
 }
 
 /**
+ * Generate CRM user read state ID
+ * Format: crmurs-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmUserReadStateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmurs-${nanoid()}`;
+}
+
+/**
  * Generate CRM Alert ID
  * Format: crmalt-{tenantKey}-{nanoid} (20 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -951,6 +961,28 @@ export function generateCrmRequestReadId(): string {
 export function generateCrmAlertId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `crmalt-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate bot conversation session ID
+ * Format: botconv-{tenantKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateBotConversationSessionId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `botconv-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate bot embed key for external site licensing
+ * Format: ek-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ * The tenant key prefix allows visual identification of which tenant
+ * owns the key without a database lookup
+ */
+export function generateEmbedKey(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `ek-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**

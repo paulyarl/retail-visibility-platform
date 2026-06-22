@@ -106,7 +106,7 @@ export default function QuickStartPage() {
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
   // Default to first available AI model based on capability
-  const [textModel, setTextModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
+  const [textModel, setTextModel] = useState<'openai' | 'google' | 'anthropic' | 'mistral'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
   const [imageModel, setImageModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
   
   // Check if any Google model is selected (for warning display)

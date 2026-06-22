@@ -46,7 +46,7 @@ export class PlatformFeeInvoiceService {
 
     // TODO: Decrypt the secret key
     this.stripe = new Stripe(config.stripe_platform_secret_key_encrypted, {
-      apiVersion: '2025-02-24.acacia',
+      apiVersion: '2026-05-27.dahlia',
     });
 
     return this.stripe;

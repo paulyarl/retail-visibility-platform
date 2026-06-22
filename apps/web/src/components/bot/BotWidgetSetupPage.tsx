@@ -15,8 +15,11 @@ interface BotWidgetSetupPageProps {
 export default function BotWidgetSetupPage({ tenantId }: BotWidgetSetupPageProps) {
   const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
   const [copied, setCopied] = useState(false);
+  const [copiedExternal, setCopiedExternal] = useState(false);
 
-  const embedScript = `<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/bot-widget/bot-widget.js" data-tenant-id="${tenantId}" data-page-context="storefront" defer></script>`;
+  const platformOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://your-platform.com';
+  const embedScript = `<script src="${platformOrigin}/bot-widget/bot-widget.js" data-tenant-id="${tenantId}" data-page-context="storefront" defer></script>`;
+  const externalEmbedScript = `<script src="${platformOrigin}/bot-widget/bot-widget.js" data-embed-key="YOUR_EMBED_KEY" data-page-context="storefront" defer></script>`;
 
   const handleCopy = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -25,6 +28,16 @@ export default function BotWidgetSetupPage({ tenantId }: BotWidgetSetupPageProps
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const handleCopyExternal = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(externalEmbedScript);
+      setCopiedExternal(true);
+      setTimeout(() => setCopiedExternal(false), 2000);
+    }
+  };
+
+  const hasExternalEmbed = chatbotCaps?.features?.chatbot_external_embed === true;
 
   if (chatbotCaps && !chatbotCaps.enabled) {
     return (
@@ -64,10 +77,54 @@ export default function BotWidgetSetupPage({ tenantId }: BotWidgetSetupPageProps
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-gray-700">Configuration Options</h4>
             <ul className="text-sm text-gray-600 space-y-1 pl-4">
-              <li><code className="bg-gray-100 px-1 rounded">data-tenant-id</code> — Your tenant ID (required)</li>
+              <li><code className="bg-gray-100 px-1 rounded">data-tenant-id</code> — Your tenant ID (for platform storefront embed)</li>
+              <li><code className="bg-gray-100 px-1 rounded">data-embed-key</code> — Your embed key (for external site embed)</li>
               <li><code className="bg-gray-100 px-1 rounded">data-page-context</code> — Page context: <code>storefront</code>, <code>product</code>, <code>category</code> (optional)</li>
             </ul>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* External Embed */}
+      <Card>
+        <CardHeader>
+          <CardTitle>External Site Embed</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasExternalEmbed ? (
+            <>
+              <p className="text-sm text-gray-600">
+                Embed the bot widget on external websites (WordPress, custom sites). Use your embed key instead of tenant ID:
+              </p>
+              <div className="relative">
+                <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto">
+                  <code>{externalEmbedScript}</code>
+                </pre>
+                <Button
+                  size="sm"
+                  className="absolute top-2 right-2"
+                  variant="secondary"
+                  onClick={handleCopyExternal}
+                >
+                  {copiedExternal ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                <strong>Note:</strong> Replace <code className="bg-blue-100 px-1 rounded">YOUR_EMBED_KEY</code> with your actual embed key.
+                The embed key validates the requesting domain against your allowed domains list.
+                Contact platform support to obtain your embed key and configure allowed domains.
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 mb-3">
+                External embedding allows you to place the bot widget on external websites like WordPress.
+              </p>
+              <Link href={`/t/${tenantId}/settings/subscription`} className="text-sm text-indigo-600 hover:underline">
+                Upgrade to Professional+ or purchase this feature →
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 

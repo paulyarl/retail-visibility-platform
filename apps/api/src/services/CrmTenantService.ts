@@ -4,6 +4,7 @@
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import CrmContactService from './CrmContactService';
+import CrmUserReadStateService, { CRM_READ_STATE_SCOPES } from './CrmUserReadStateService';
 
 export class CrmTenantService extends BaseService {
   private static instance: CrmTenantService;
@@ -215,9 +216,12 @@ export class CrmTenantService extends BaseService {
 
   /**
    * Get CRM dashboard stats for a tenant (tenant-scoped view)
+   * When userId is provided, the activity feed unread count is computed from the user's persistent read state.
    */
-  async getTenantCrmStats(tenantId: string) {
-    const [openTickets, pendingTasks, recentActivities, openInquiries, recentAlerts, openTicketCount, pendingTaskCount, openInquiryCount, unreadAlertCount] = await Promise.all([
+  async getTenantCrmStats(tenantId: string, userId?: string) {
+    const readStateService = CrmUserReadStateService.getInstance();
+
+    const [openTickets, pendingTasks, recentActivities, openInquiries, recentAlerts, openTicketCount, pendingTaskCount, openInquiryCount, lastActivityReadAt, lastAlertReadAt] = await Promise.all([
       prisma.crm_support_tickets.findMany({
         where: { tenant_id: tenantId, status: { in: ['open', 'in_progress', 'waiting'] } },
         orderBy: { priority: 'desc' },
@@ -257,10 +261,41 @@ export class CrmTenantService extends BaseService {
       prisma.crm_inquiries.count({
         where: { tenant_id: tenantId, status: { in: ['open', 'new', 'in_progress'] } },
       }),
-      prisma.crm_alerts.count({
-        where: { tenant_id: tenantId, is_read: false, is_dismissed: false },
-      }),
+      userId
+        ? prisma.crm_user_read_states.findUnique({
+            where: {
+              user_id_tenant_id_scope: {
+                user_id: userId,
+                tenant_id: tenantId,
+                scope: 'activity_feed',
+              },
+            },
+            select: { last_read_at: true },
+          })
+        : Promise.resolve(null),
+      userId
+        ? readStateService.getLastReadAt(userId, tenantId, CRM_READ_STATE_SCOPES.ALERT_FEED)
+        : Promise.resolve(null),
     ]);
+
+    const unreadActivityCount = userId
+      ? recentActivities.filter(a => {
+          const activityTime = a.created_at?.getTime() ?? 0;
+          return !lastActivityReadAt || activityTime > lastActivityReadAt.last_read_at.getTime();
+        }).length
+      : recentActivities.length;
+
+    const unreadAlertCount = userId
+      ? await prisma.crm_alerts.count({
+          where: {
+            tenant_id: tenantId,
+            is_dismissed: false,
+            created_at: { gt: lastAlertReadAt ?? new Date(0) },
+          },
+        })
+      : await prisma.crm_alerts.count({
+          where: { tenant_id: tenantId, is_read: false, is_dismissed: false },
+        });
 
     return {
       open_tickets: openTickets,
@@ -268,11 +303,14 @@ export class CrmTenantService extends BaseService {
       recent_activities: recentActivities,
       open_inquiries: openInquiries,
       recent_alerts: recentAlerts,
-      unread_count: openTicketCount + pendingTaskCount + openInquiryCount + unreadAlertCount,
+      unread_count: openTicketCount + pendingTaskCount + openInquiryCount + unreadAlertCount + unreadActivityCount,
       open_ticket_count: openTicketCount,
       pending_task_count: pendingTaskCount,
       open_inquiry_count: openInquiryCount,
       unread_alert_count: unreadAlertCount,
+      unread_activity_count: unreadActivityCount,
+      last_read_activity_at: lastActivityReadAt?.last_read_at?.toISOString() ?? null,
+      last_read_alert_at: lastAlertReadAt?.toISOString() ?? null,
     };
   }
 }
