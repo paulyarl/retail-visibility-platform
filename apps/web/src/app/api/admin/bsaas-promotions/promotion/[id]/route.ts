@@ -7,15 +7,16 @@ import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const authResult = await requirePlatformAdmin(request);
     if (authResult instanceof NextResponse) return authResult;
 
     const { accessToken } = authResult;
     const response = await authenticatedFetch(
-      `/api/admin/bsaas-promotions/promotion/${params.id}`,
+      `/api/admin/bsaas-promotions/promotion/${id}`,
       accessToken,
       { method: 'DELETE' }
     );
