@@ -19,6 +19,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/role-validation';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
+import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { audit } from '../audit';
 
@@ -183,7 +184,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     const purchases = await prisma.tenant_feature_purchases.findMany({
       where: {
         tenant_id: tenantId,
-        status: { in: ['active', 'suspended'] },
+        status: { in: ['active', 'past_due', 'trial', 'suspended'] },
       },
       select: {
         id: true,
@@ -261,7 +262,8 @@ router.get('/feature-purchases', async (req: Request, res: Response) => {
 
 const purchaseSchema = z.object({
   featureKey: z.string().min(1),
-  paymentMethodId: z.string().min(1),
+  paymentMethodId: z.string().optional(),
+  promotionCode: z.string().optional(),
   tenantId: z.string().optional(),
 });
 
@@ -278,7 +280,7 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Tenant ID is required' });
     }
 
-    const { featureKey, paymentMethodId } = validation.data;
+    const { featureKey, paymentMethodId, promotionCode } = validation.data;
 
     // 1. Verify feature exists and is in the BSaaS catalog
     const feature = await prisma.features_list.findUnique({
@@ -295,12 +297,16 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
 
     const priceCents = catalogEntry.price_cents;
     const billingCycle = catalogEntry.billing_cycle;
+    const trialDays = catalogEntry.trial_days || 0;
 
     // 2. Check for existing active purchase
     const existing = await prisma.tenant_feature_purchases.findUnique({
       where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
     });
-    if (existing && existing.status === 'active') {
+    if (existing && ['active', 'past_due', 'trial'].includes(existing.status)) {
+      if (existing.status === 'trial') {
+        return res.status(409).json({ success: false, error: 'trial_active', message: 'This feature is currently in a trial period for your tenant' });
+      }
       return res.status(409).json({ success: false, error: 'already_active', message: 'This feature is already active for your tenant' });
     }
 
@@ -323,13 +329,133 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       });
     }
 
-    // 3. Charge via Stripe using existing billing service
+    // 3. Trial branch: if trial_days > 0, create trial purchase without charging
+    if (trialDays > 0 && billingCycle !== 'one_time') {
+      const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+
+      const purchase = await prisma.tenant_feature_purchases.upsert({
+        where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+        update: {
+          source: 'bsaas',
+          status: 'trial',
+          expires_at: trialExpiresAt,
+          metadata: {
+            price_cents: priceCents,
+            billing_cycle: billingCycle,
+            trial_days: trialDays,
+            trial_started_at: new Date().toISOString(),
+            payment_method_id: paymentMethodId || null,
+          },
+          updated_at: new Date(),
+        },
+        create: {
+          tenant_id: tenantId,
+          feature_key: featureKey,
+          source: 'bsaas',
+          status: 'trial',
+          expires_at: trialExpiresAt,
+          metadata: {
+            price_cents: priceCents,
+            billing_cycle: billingCycle,
+            trial_days: trialDays,
+            trial_started_at: new Date().toISOString(),
+            payment_method_id: paymentMethodId || null,
+          },
+        },
+      });
+
+      invalidateEffectiveCapabilities(tenantId);
+
+      await audit({
+        tenantId,
+        actor: (req as any).user?.id || null,
+        action: 'feature_purchase.trial_start',
+        payload: {
+          id: purchase.id,
+          entity_type: 'other',
+          feature_key: featureKey,
+          trial_days: trialDays,
+          expires_at: trialExpiresAt.toISOString(),
+        },
+      });
+
+      const notificationService = getBillingNotificationService();
+      notificationService.sendNotification({
+        tenantId,
+        type: 'bsaas_trial_started',
+        amount: priceCents,
+        billingCycle: billingCycle as 'monthly' | 'annual',
+        metadata: { featureKey, featureName: feature.name, trialDays },
+      }).catch(err => console.error('[BSaaS] Failed to send trial notification:', err));
+
+      return res.json({
+        success: true,
+        data: {
+          purchase_id: purchase.id,
+          feature_key: featureKey,
+          status: 'trial',
+          price_cents: priceCents,
+          billing_cycle: billingCycle,
+          trial_days: trialDays,
+          expires_at: trialExpiresAt,
+        },
+      });
+    }
+
+    // 4. Normal purchase: charge via Stripe using existing billing service
+    if (!paymentMethodId) {
+      return res.status(400).json({ success: false, error: 'payment_required', message: 'Payment method is required for non-trial purchases' });
+    }
+
+    // 4a. Validate promotion code and calculate discount
+    let chargedAmount = priceCents;
+    let promotionCodeId: string | null = null;
+    let discountCents = 0;
+    let couponId: string | null = null;
+
+    if (promotionCode) {
+      try {
+        const stripeKey = process.env.STRIPE_SECRET_KEY;
+        if (!stripeKey) {
+          return res.status(503).json({ success: false, error: 'stripe_not_configured', message: 'Promo codes require Stripe' });
+        }
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' as any });
+
+        const promoCodes = await stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 });
+        if (promoCodes.data.length === 0) {
+          return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Invalid or expired promotion code' });
+        }
+
+        const promo = promoCodes.data[0];
+        if (promo.max_redemptions && promo.times_redeemed >= promo.max_redemptions) {
+          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has reached its usage limit' });
+        }
+        if (promo.expires_at && promo.expires_at * 1000 < Date.now()) {
+          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has expired' });
+        }
+
+        promotionCodeId = promo.id;
+        const coupon = await stripe.coupons.retrieve((promo as any).coupon);
+        couponId = coupon.id;
+
+        if (coupon.percent_off) {
+          discountCents = Math.round(priceCents * coupon.percent_off / 100);
+        } else if (coupon.amount_off) {
+          discountCents = Math.min(coupon.amount_off, priceCents);
+        }
+        chargedAmount = Math.max(0, priceCents - discountCents);
+      } catch (err: any) {
+        return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Failed to validate promotion code' });
+      }
+    }
+
     const billingService = getSubscriptionBillingService();
     const chargeResult = await billingService.chargePaymentMethod(
       tenantId,
       paymentMethodId,
-      priceCents,
-      `BSaaS: ${feature.name}`
+      chargedAmount,
+      `BSaaS: ${feature.name}${promotionCode ? ` (promo: ${promotionCode})` : ''}`
     );
 
     if (!chargeResult.success) {
@@ -353,7 +479,15 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
           price_cents: priceCents,
           billing_cycle: billingCycle,
           transaction_id: chargeResult.transactionId,
+          payment_method_id: paymentMethodId,
           purchased_at: new Date().toISOString(),
+          ...(promotionCodeId && {
+            promotion_code: promotionCode,
+            promotion_code_id: promotionCodeId,
+            coupon_id: couponId,
+            discount_cents: discountCents,
+            charged_amount: chargedAmount,
+          }),
         },
         updated_at: new Date(),
       },
@@ -367,7 +501,15 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
           price_cents: priceCents,
           billing_cycle: billingCycle,
           transaction_id: chargeResult.transactionId,
+          payment_method_id: paymentMethodId,
           purchased_at: new Date().toISOString(),
+          ...(promotionCodeId && {
+            promotion_code: promotionCode,
+            promotion_code_id: promotionCodeId,
+            coupon_id: couponId,
+            discount_cents: discountCents,
+            charged_amount: chargedAmount,
+          }),
         },
       },
     });
@@ -389,6 +531,16 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
         transaction_id: chargeResult.transactionId,
       },
     });
+
+    // 7. Send notification (email + CRM alert + CRM task)
+    const notificationService = getBillingNotificationService();
+    notificationService.sendNotification({
+      tenantId,
+      type: 'bsaas_purchase_success',
+      amount: priceCents,
+      billingCycle: billingCycle as 'monthly' | 'annual',
+      metadata: { featureKey, featureName: feature.name },
+    }).catch(err => console.error('[BSaaS] Failed to send purchase notification:', err));
 
     res.json({
       success: true,
@@ -459,6 +611,14 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
         previous_status: purchase.status,
       },
     });
+
+    // Send cancellation notification (email + CRM alert + CRM task)
+    const notificationService = getBillingNotificationService();
+    notificationService.sendNotification({
+      tenantId,
+      type: 'bsaas_purchase_cancelled',
+      metadata: { featureKey: purchase.feature_key },
+    }).catch(err => console.error('[BSaaS] Failed to send cancel notification:', err));
 
     res.json({
       success: true,

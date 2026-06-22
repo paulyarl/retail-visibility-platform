@@ -122,7 +122,7 @@ export default function PlatformSettings() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           ),
-          href: '/settings/limits',
+          href: '/settings/admin/limits',
           color: 'bg-purple-500',
         },
       ],
@@ -132,27 +132,15 @@ export default function PlatformSettings() {
       description: 'Manage platform users and permissions',
       cards: [
         {
-          title: 'Test User Management',
-          description: 'Create and manage platform users for testing',
-          icon: (
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-          ),
-          href: '/admin/users',
-          color: 'bg-blue-500',
-          accessOptions: { roles: ['admin', 'platform_staff'] },
-        },
-        {
-          title: 'Platform User Maintenance',
-          description: 'View users, roles, and permissions (Support: read-only)',
+          title: 'User Management',
+          description: 'Create and manage platform users, roles, and permissions',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           ),
           href: '/settings/admin/users',
-          color: 'bg-orange-500',
+          color: 'bg-blue-500',
           accessOptions: { roles: ['admin', 'platform_staff'] },
         },
       ],

@@ -124,9 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Always bypass cache to ensure fresh auth state
-      // This is critical after Auth0 login redirects back to the app
-      const sessionInfo = await securitySingletonService.getSessionInfo(true);
+      // Use cache for normal fetches; only bypass on explicit forceRefresh (e.g., after login redirect)
+      const sessionInfo = await securitySingletonService.getSessionInfo(forceRefresh);
 
       if (sessionInfo.isAuthenticated && sessionInfo.user) {
         // Transform service user to context format

@@ -15,18 +15,20 @@ import BotConversationService from './BotConversationService';
 import BotProductCatalogService from './BotProductCatalogService';
 import BotPlatformGuideService from './BotPlatformGuideService';
 import BotCrmAssistantService from './BotCrmAssistantService';
+import BotChannelSteeringService, { type SteeringChannel } from './BotChannelSteeringService';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';
 import type { PlatformContextSurface } from './BotPlatformGuideService';
 
 export interface DynamicResponseResult {
   reply: string;
-  responseType: 'dynamic' | 'fallback';
+  responseType: 'dynamic' | 'fallback' | 'channel_steering';
   matchedFaqId: string | null;
   confidence: number;
   ragChunksUsed: number;
   productContextUsed: boolean;
   crmContextUsed: boolean;
+  channels?: SteeringChannel[];
 }
 
 const PRODUCT_KEYWORDS = [
@@ -92,6 +94,7 @@ class BotDynamicResponseService {
   private chatModelCache: string | null = null;
   private chatModelCacheTime: number = 0;
   private static readonly PLATFORM_AI_CACHE_TTL = 30_000; // 30 seconds
+  private channelSteeringService = BotChannelSteeringService.getInstance();
 
   private constructor() {}
 
@@ -264,7 +267,21 @@ class BotDynamicResponseService {
         temperature: config.tone === 'playful' ? 0.8 : config.tone === 'professional' ? 0.3 : 0.5,
       });
 
-      const reply = result.content.trim() || config.fallbackMessage;
+      const reply = result.content.trim();
+      if (!reply) {
+        // Empty AI response -> steer to available human channels
+        const steering = await this.channelSteeringService.steer(tenantId, config.botName);
+        return {
+          reply: steering.reply,
+          responseType: 'channel_steering',
+          matchedFaqId: null,
+          confidence: 0,
+          ragChunksUsed: 0,
+          productContextUsed: false,
+          crmContextUsed: false,
+          channels: steering.channels,
+        };
+      }
 
       return {
         reply,
@@ -280,14 +297,17 @@ class BotDynamicResponseService {
         error: gptError instanceof Error ? gptError.message : String(gptError),
       });
 
+      // AI provider error -> steer to available human channels
+      const steering = await this.channelSteeringService.steer(tenantId, config.botName);
       return {
-        reply: config.fallbackMessage,
-        responseType: 'fallback',
+        reply: steering.reply,
+        responseType: 'channel_steering',
         matchedFaqId: null,
         confidence: 0,
         ragChunksUsed: 0,
         productContextUsed: false,
         crmContextUsed: false,
+        channels: steering.channels,
       };
     }
   }

@@ -5,6 +5,8 @@
  * PUT    /api/tenants/:tenantId/bot/config           — Update bot configuration
  * GET    /api/tenants/:tenantId/bot/conversations    — List conversations (paginated)
  * GET    /api/tenants/:tenantId/bot/conversations/:id — Get conversation with messages
+ * PUT    /api/tenants/:tenantId/bot/conversations/:id/status — Update conversation status
+ * POST   /api/tenants/:tenantId/bot/conversations/:id/escalate — Convert to CRM ticket
  * GET    /api/tenants/:tenantId/bot/skills            — List skills with tenant config
  * PUT    /api/tenants/:tenantId/bot/skills/:skillId   — Update skill config
  * GET    /api/tenants/:tenantId/bot/dashboard         — Dashboard stats
@@ -28,6 +30,7 @@ import BotStaticResponseService from '../services/BotStaticResponseService';
 import BotGuardrailService from '../services/BotGuardrailService';
 import BotPlatformGuideService from '../services/BotPlatformGuideService';
 import BotIntentService from '../services/BotIntentService';
+import BotCrmIntegrationService from '../services/BotCrmIntegrationService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router({ mergeParams: true });
@@ -162,6 +165,71 @@ router.get('/conversations/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching conversation:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch conversation' });
+  }
+});
+
+// PUT /api/tenants/:tenantId/bot/conversations/:id/status — Update conversation status
+router.put('/conversations/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, id } = req.params;
+    const { status } = req.body || {};
+
+    if (!['active', 'closed', 'archived'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'invalid_status', message: 'Status must be active, closed, or archived' });
+    }
+
+    // Verify conversation belongs to tenant
+    const { prisma } = await import('../prisma');
+    const conv = await prisma.bot_conversations.findUnique({ where: { id } });
+    if (!conv || conv.tenant_id !== tenantId) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Conversation not found' });
+    }
+
+    const updated = await conversationService.updateStatus(id, status);
+    res.json({ success: true, conversation: updated });
+  } catch (error) {
+    console.error('Error updating conversation status:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update conversation status' });
+  }
+});
+
+// POST /api/tenants/:tenantId/bot/conversations/:id/escalate — Convert conversation to CRM support ticket
+router.post('/conversations/:id/escalate', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, id } = req.params;
+    const { reason, summary } = req.body || {};
+
+    if (!reason || typeof reason !== 'string') {
+      return res.status(400).json({ success: false, error: 'missing_reason', message: 'reason is required' });
+    }
+
+    // Verify conversation belongs to tenant
+    const { prisma } = await import('../prisma');
+    const conv = await prisma.bot_conversations.findUnique({ where: { id } });
+    if (!conv || conv.tenant_id !== tenantId) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Conversation not found' });
+    }
+
+    // Check if already escalated
+    const alreadyEscalated = await BotCrmIntegrationService.getInstance().isEscalated(id);
+    if (alreadyEscalated) {
+      return res.status(409).json({ success: false, error: 'already_escalated', message: 'Conversation has already been escalated to a support ticket' });
+    }
+
+    const result = await BotCrmIntegrationService.getInstance().escalateToTicket({
+      tenantId,
+      conversationId: id,
+      sessionId: conv.session_id,
+      customerEmail: conv.customer_email,
+      customerPhone: conv.customer_phone,
+      reason,
+      summary: summary || 'Manually escalated by merchant from conversation detail view',
+    });
+
+    res.json({ success: true, ticketId: result.ticketId, ticketTitle: result.ticketTitle });
+  } catch (error) {
+    console.error('Error escalating conversation:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to escalate conversation' });
   }
 });
 

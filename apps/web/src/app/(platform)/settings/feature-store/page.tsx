@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
-import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle } from '@tabler/icons-react';
+import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag } from '@tabler/icons-react';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem } from '@/services/BsaasPurchaseService';
@@ -25,6 +25,7 @@ export default function FeatureStorePage() {
   const [purchaseTarget, setPurchaseTarget] = useState<BsaasCatalogItem | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -78,6 +79,7 @@ export default function FeatureStorePage() {
 
     setPurchaseTarget(item);
     setSelectedPaymentMethodId(defaultMethod.id);
+    setPromoCode('');
     setShowConfirm(true);
     setError(null);
   };
@@ -91,7 +93,8 @@ export default function FeatureStorePage() {
 
       const result = await bsaasPurchaseService.purchaseFeature(
         purchaseTarget.key,
-        selectedPaymentMethodId
+        selectedPaymentMethodId,
+        promoCode.trim() || undefined
       );
 
       if (result.success) {
@@ -289,6 +292,24 @@ export default function FeatureStorePage() {
                     ))}
                   </Stack>
                 )}
+              </div>
+
+              <div>
+                <Text size="sm" fw={500} mb="xs">Promo Code (optional)</Text>
+                <div className="flex items-center gap-sm">
+                  <div className="flex items-center flex-1">
+                    <span className="inline-flex items-center justify-center px-3 h-38 bg-neutral-100 border border-r-0 border-neutral-200 rounded-l-md text-neutral-500">
+                      <IconTag size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="Enter promo code"
+                      className="flex-1 h-38 px-3 border border-neutral-200 rounded-r-md text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <Group justify="flex-end">

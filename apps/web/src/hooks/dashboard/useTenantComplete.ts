@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useMemo, useCallback } from 'react';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService } from '@/services/TenantManagementService';
@@ -164,26 +164,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     throwOnError: false,
   });
 
-  // Secondary query - tier data (deferred)
-  const { data: tierData, isLoading: tierLoading } = useQuery({
-    queryKey: ['tenant', 'tier', tenantId],
-    queryFn: async () => {
-      if (!tenantId) throw new Error('Tenant ID is required');
-      try {
-        return tenantInfoService.getTenantTier(tenantId);
-      } catch (error) {
-        console.warn('[useTenantComplete] Tier fetch failed, returning null:', error);
-        return null; // Return null on error instead of throwing
-      }
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
-    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData, // Only if primary succeeded
-    retry: 0, // No retry for secondary
-    throwOnError: false,
-  });
-
-  // Fetch public profile for location data (city, state, country)
+    // Fetch public profile for location data (city, state, country)
   const { data: publicProfileData } = useQuery({
     queryKey: ['tenant', 'public-profile', tenantId],
     queryFn: async () => {
@@ -200,64 +181,86 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     retry: 0,
   });
 
-  // Secondary query - usage data (deferred)
-  const { data: usageData, isLoading: usageLoading } = useQuery({
-    queryKey: ['tenant', 'usage', tenantId],
-    queryFn: async () => {
-      if (!tenantId) throw new Error('Tenant ID is required');
-      try {
-        return tenantManagementService.getTenantUsage(tenantId);
-      } catch (error) {
-        console.warn('[useTenantComplete] Usage fetch failed, returning null:', error);
-        return null;
-      }
-    },
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
-    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
-    retry: 0,
-    throwOnError: false,
+  // Batch secondary queries so their loading state updates happen in one React commit
+  const organizationId = tenantData?.tenant?.organization_id;
+  const secondaryQueries = useQueries({
+    queries: [
+      {
+        queryKey: ['tenant', 'tier', tenantId],
+        queryFn: async () => {
+          if (!tenantId) throw new Error('Tenant ID is required');
+          try {
+            return tenantInfoService.getTenantTier(tenantId);
+          } catch (error) {
+            console.warn('[useTenantComplete] Tier fetch failed, returning null:', error);
+            return null;
+          }
+        },
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
+        retry: 0,
+        throwOnError: false,
+      },
+      {
+        queryKey: ['tenant', 'usage', tenantId],
+        queryFn: async () => {
+          if (!tenantId) throw new Error('Tenant ID is required');
+          try {
+            return tenantManagementService.getTenantUsage(tenantId);
+          } catch (error) {
+            console.warn('[useTenantComplete] Usage fetch failed, returning null:', error);
+            return null;
+          }
+        },
+        staleTime: 30 * 1000,
+        gcTime: 2 * 60 * 1000,
+        enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
+        retry: 0,
+        throwOnError: false,
+      },
+      {
+        queryKey: ['tenant', 'organization', tenantId, organizationId],
+        queryFn: async () => {
+          if (!tenantId || !organizationId) return null;
+          try {
+            const result = await tenantInfoService.getOrganization(tenantId);
+            return result?.data || null;
+          } catch (error) {
+            console.warn('[useTenantComplete] Organization fetch failed, returning null:', error);
+            return null;
+          }
+        },
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        enabled: loadSecondary && !!tenantId && !!authUser && !!organizationId,
+        retry: 0,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+        refetchOnReconnect: false,
+      },
+    ],
   });
 
-  // Organization query - fetch organization with tenants
-  const organizationId = tenantData?.tenant?.organization_id;
-  const { data: organizationData, isLoading: organizationLoading } = useQuery({
-    queryKey: ['tenant', 'organization', tenantId, organizationId],
-    queryFn: async () => {
-      if (!tenantId || !organizationId) return null;
-      try {
-        // Use tenantInfoService which handles auth properly
-        const result = await tenantInfoService.getOrganization(tenantId);
-        return result?.data || null;
-      } catch (error) {
-        console.warn('[useTenantComplete] Organization fetch failed, returning null:', error);
-        return null;
-      }
-    },
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-    enabled: loadSecondary && !!tenantId && !!authUser && !!organizationId,
-    retry: 0,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-  });
+  const tierData = secondaryQueries[0]?.data ?? null;
+  const usageData = secondaryQueries[1]?.data ?? null;
+  const organizationData = secondaryQueries[2]?.data ?? null;
+  const secondaryLoading = secondaryQueries.some(q => q.isLoading);
 
   // Combined loading state
-  const isLoading = tenantLoading || (loadSecondary && (tierLoading || usageLoading || organizationLoading));
+  const isLoading = tenantLoading || (loadSecondary && secondaryLoading);
   
   // Clear cache function for debugging
-  const clearCacheAndRefresh = async () => {
-    // console.log('[useTenantComplete] Refreshing data...');
+  const clearCacheAndRefresh = useCallback(async () => {
     await refetchTenant();
-  };
+  }, [refetchTenant]);
 
   // Build tenant from primary query
   // The API returns data.profile (not data.tenant) from /complete endpoint
   const rawProfile = (tenantData as any)?.profile || tenantData?.tenant;
   const businessProfile = tenantData?.businessProfile;
   
-  const tenant = rawProfile ? {
+  const tenant = useMemo(() => rawProfile ? {
     id: rawProfile.id || tenantId!,
     name: rawProfile.name || 'Unknown',
     organizationId: rawProfile.organization_id || rawProfile.organizationId || null,
@@ -288,7 +291,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     state: publicProfileData?.address?.state || businessProfile?.state || rawProfile.state || null,
     countryCode: publicProfileData?.country_code || businessProfile?.country_code || rawProfile.country_code || rawProfile.countryCode || null,
     bannerUrl: publicProfileData?.banner || businessProfile?.banner || rawProfile.banner || null,
-  } : null;
+  } : null, [rawProfile, businessProfile, publicProfileData, usageData, tenantId]);
 
   // Build resolved tier from secondary query
   const rawTier = tierData;
@@ -296,7 +299,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   // console.log('[useTenantComplete] Raw usage data:', rawUsage);
 
   // Transform usage data to expected format
-  const usage: TenantUsage | null = rawUsage ? {
+  const usage: TenantUsage | null = useMemo(() => rawUsage ? {
     products: (rawUsage as any).data?.usage?.activeItems || (rawUsage as any).data?.usage?.totalItems || (rawUsage as any).currentItems || (rawUsage as any).items || 0,
     locations: (rawUsage as any).data?.usage?.locations || 0,
     users: (rawUsage as any).data?.usage?.users || 0,
@@ -306,7 +309,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     activeItems: (rawUsage as any).data?.usage?.activeItems || (rawUsage as any).data?.usage?.totalItems || (rawUsage as any).currentItems || (rawUsage as any).items || 0,
     categories: (rawUsage as any).data?.usage?.categories || 0,
     orders: (rawUsage as any).data?.usage?.orders || 0
-  } : null;
+  } : null, [rawUsage]);
   // console.log('[useTenantComplete] Transformed usage data:', usage);
 
   // Build resolved tier from secondary query data
@@ -389,81 +392,85 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   const queryError = null; // Error handling per-query would need individual error states
 
   // Helper functions (copied from useTenantTier for backward compatibility)
-  const hasTierFeature = (featureId: string): boolean => {
+  const hasTierFeature = useCallback((featureId: string): boolean => {
     if (!tier) return false;
     return hasFeature(tier, featureId);
-  };
+  }, [tier]);
 
-  const getTierFeatures = (category: TierFeature['category']): TierFeature[] => {
+  const getTierFeatures = useCallback((category: TierFeature['category']): TierFeature[] => {
     if (!tier) return [];
     return getFeaturesByCategory(tier, category);
-  };
+  }, [tier]);
 
-  const checkLimitReached = (limitType: keyof TenantUsage): boolean => {
+  const checkLimitReached = useCallback((limitType: keyof TenantUsage): boolean => {
     if (!tier || !usage) return false;
     const limitKey = `max${limitType.charAt(0).toUpperCase()}${limitType.slice(1)}` as keyof typeof tier.effective.limits;
     return isLimitReached(tier, limitKey, usage[limitType]);
-  };
+  }, [tier, usage]);
 
-  const getUsagePercent = (limitType: keyof TenantUsage): number => {
+  const getUsagePercent = useCallback((limitType: keyof TenantUsage): number => {
     if (!tier || !usage) return 0;
     const limitKey = `max${limitType.charAt(0).toUpperCase()}${limitType.slice(1)}` as keyof typeof tier.effective.limits;
     return getUsagePercentage(tier, limitKey, usage[limitType]);
-  };
+  }, [tier, usage]);
 
-  const getBadge = (featureId: string): TierBadge | null => {
-    // Simplified badge logic - in production you'd want the full feature mapping
+  const getBadge = useCallback((featureId: string): TierBadge | null => {
     if (!tier || hasTierFeature(featureId)) return null;
-
     return {
       text: 'UPGRADE',
       tooltip: 'Upgrade to access this feature',
       colorClass: 'bg-gray-600'
     };
-  };
+  }, [tier, hasTierFeature]);
 
-  // Permission checking functions (simplified for this example)
-  const canAccess = (featureId: string, permissionType: PermissionType): boolean => {
-    return hasTierFeature(featureId); // Simplified - no role-based checks in this version
-  };
+  const canAccess = useCallback((featureId: string, permissionType: PermissionType): boolean => {
+    return hasTierFeature(featureId);
+  }, [hasTierFeature]);
 
-  const getAccessDeniedReason = (featureId: string, permissionType: PermissionType, actionLabel?: string): string | null => {
+  const getAccessDeniedReason = useCallback((featureId: string, permissionType: PermissionType, actionLabel?: string): string | null => {
     if (canAccess(featureId, permissionType)) return null;
     return 'This feature is not included in your subscription tier';
-  };
+  }, [canAccess]);
 
-  const getFeatureBadgeWithPermission = (featureId: string, permissionType: PermissionType, actionLabel?: string): TierBadge | null => {
+  const getFeatureBadgeWithPermission = useCallback((featureId: string, permissionType: PermissionType, actionLabel?: string): TierBadge | null => {
     if (canAccess(featureId, permissionType)) return null;
     return getBadge(featureId);
-  };
+  }, [canAccess, getBadge]);
 
-  return {
-    tenant,
-    tier,
-    usage,
-    organizationTenants: organizationData?.tenants?.map((t: any) => ({
+  const organizationTenants = useMemo(() =>
+    organizationData?.tenants?.map((t: any) => ({
       id: t.id,
       name: t.name,
       subscription_status: t.subscription_status,
       subscription_tier: t.subscription_tier,
     })) || [],
+    [organizationData]
+  );
+
+  return useMemo(() => ({
+    tenant,
+    tier,
+    usage,
+    organizationTenants,
     loading,
-    isLoading: loading, // Alias for backward compatibility
+    isLoading: loading,
     error: queryError,
     refresh: clearCacheAndRefresh,
 
-    // Level 1: Legacy tier-only checks
     hasFeature: hasTierFeature,
     getFeaturesByCategory: getTierFeatures,
     isLimitReached: checkLimitReached,
     getUsagePercentage: getUsagePercent,
     getFeatureBadge: getBadge,
 
-    // Level 2: Multi-level permission checks
     canAccess,
     getAccessDeniedReason,
     getFeatureBadgeWithPermission,
-  };
+  }), [
+    tenant, tier, usage, organizationTenants, loading, queryError,
+    clearCacheAndRefresh, hasTierFeature, getTierFeatures, checkLimitReached,
+    getUsagePercent, getBadge, canAccess, getAccessDeniedReason, getFeatureBadgeWithPermission,
+  ]);
 }
 
 // Helper functions (simplified versions for this consolidated hook)

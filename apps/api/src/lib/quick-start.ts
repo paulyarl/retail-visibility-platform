@@ -669,7 +669,7 @@ export interface QuickStartOptions {
   createAsDrafts?: boolean;
   generateImages?: boolean; // NEW: Generate AI images for products
   imageQuality?: 'standard' | 'hd'; // NEW: Image quality
-  textModel?: 'openai' | 'google'; // NEW: AI model for text/product generation
+  textModel?: 'openai' | 'google' | 'anthropic' | 'mistral'; // NEW: AI model for text/product generation
   imageModel?: 'openai' | 'google'; // NEW: AI model for image generation
 }
 

@@ -4,6 +4,7 @@ import TenantAuthGate from "@/components/tenant/TenantAuthGate";
 
 export default async function TenantScopedDashboard({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
+  console.log(`[dashboard/page] render tenantId=${tenantId}`);
 
   return (
     <>

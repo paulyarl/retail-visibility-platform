@@ -33,7 +33,7 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
               <div className="flex flex-col items-center">
                 <div
                   className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors',
+                    'flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-colors flex-shrink-0',
                     {
                       'bg-primary border-primary text-primary-foreground': isCompleted || isCurrent,
                       'bg-background border-gray-300 text-gray-400': isUpcoming,
@@ -41,21 +41,21 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
                   )}
                 >
                   {isCompleted ? (
-                    <Check className="w-5 h-5" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                   ) : (
-                    <span className="text-sm font-semibold">{index + 1}</span>
+                    <span className="text-xs sm:text-sm font-semibold">{index + 1}</span>
                   )}
                 </div>
-                <div className="mt-2 text-center">
+                <div className="mt-1.5 sm:mt-2 text-center">
                   <p
-                    className={cn('text-sm font-medium', {
+                    className={cn('text-xs sm:text-sm font-medium', {
                       'text-primary': isCurrent || isCompleted,
                       'text-gray-500': isUpcoming,
                     })}
                   >
                     {step.name}
                   </p>
-                  <p className="text-xs text-gray-500">{step.description}</p>
+                  <p className="hidden sm:block text-xs text-gray-500">{step.description}</p>
                 </div>
               </div>
 
@@ -63,7 +63,7 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
               {index < steps.length - 1 && (
                 <div
                   className={cn(
-                    'flex-1 h-0.5 mx-4 transition-colors',
+                    'flex-1 h-0.5 mx-2 sm:mx-4 transition-colors min-w-0',
                     {
                       'bg-primary': isCompleted,
                       'bg-gray-300': !isCompleted,

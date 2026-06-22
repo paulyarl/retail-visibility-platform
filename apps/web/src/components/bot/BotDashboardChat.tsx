@@ -153,11 +153,16 @@ export default function BotDashboardChat({ tenantId }: BotDashboardChatProps) {
                 <div
                   className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-indigo-600 text-white'
+                      ? 'rounded-br-sm'
                       : msg.responseType === 'fallback'
-                      ? 'bg-gray-100 text-gray-600'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-gray-100 text-gray-600 rounded-bl-sm'
+                      : 'bg-gray-100 text-gray-900 rounded-bl-sm'
                   }`}
+                  style={msg.role === 'user' ? {
+                    background: '#4F46E5' + '1A',
+                    border: '1px solid #4F46E540',
+                    color: '#4F46E5',
+                  } : undefined}
                 >
                   {msg.content}
 

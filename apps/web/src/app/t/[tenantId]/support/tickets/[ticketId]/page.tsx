@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/comp
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getContrastColor } from '@/lib/color-utils';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 
@@ -386,14 +387,24 @@ export default function TenantTicketDetailPage() {
       {/* Conversation */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Conversation</h3>
-        {messages.map(m => (
+        {messages.map(m => {
+          const isInternal = m.is_internal;
+          const isCustomer = m.author_type === 'customer';
+          const accentColor = isCustomer ? '#3B82F6' : '#F59E0B';
+          const useTintedBubble = !isInternal;
+          return (
           <div
             key={m.id}
-            className={`rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 ${
-              m.author_type === 'customer' ? 'bg-blue-50/50 dark:bg-blue-900/10' :
-              m.is_internal ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border-dashed' :
-              'bg-neutral-50/50 dark:bg-neutral-800/50'
+            className={`rounded-lg p-4 ${
+              isInternal
+                ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border border-dashed border-yellow-200 dark:border-yellow-800'
+                : isCustomer ? 'ml-8' : 'mr-8 border border-neutral-200 dark:border-neutral-700'
             }`}
+            style={useTintedBubble ? {
+              background: accentColor + '1A',
+              border: `1px solid ${accentColor}40`,
+              color: accentColor,
+            } : undefined}
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-medium">{m.author_type === 'tenant' ? (tenantUsers.find(u => u.id === m.author_id)?.name || m.author_name) : m.author_name}</span>
@@ -404,14 +415,15 @@ export default function TenantTicketDetailPage() {
               }`}>
                 {m.author_type}
               </span>
-              {m.is_internal && (
+              {isInternal && (
                 <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-700">Internal</span>
               )}
               <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
             </div>
             <p className="text-sm whitespace-pre-wrap">{m.content}</p>
           </div>
-        ))}
+          );
+        })}
         {messages.length === 0 && (
           <p className="text-sm text-neutral-400 text-center py-4">No messages yet</p>
         )}

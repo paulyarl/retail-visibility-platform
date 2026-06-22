@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { Card, Button } from '@mantine/core';
@@ -9,11 +8,8 @@ import { Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
-import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
-import { hoursStatusService } from '@/services/HoursStatusService';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformPublicService } from '@/services/PlatformPublicService';
@@ -22,9 +18,7 @@ import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
-import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
-import { Badge as MantineBadge } from '@mantine/core';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
@@ -56,16 +50,14 @@ export default function PlatformHomePage() {
     );
   }
 
-  return <Home embedded />;
+  return <Home />;
 }
 
-function Home({ embedded = false }: { embedded?: boolean } = {}) {
-  const { settings } = usePlatformSettings();
-  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
-  const router = useRouter();
+function Home() {
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   // Use consolidated platform dashboard hook
-  const { data: platformData, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
+  const { loading } = usePlatformComplete({ isAuthenticated });
 
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -76,8 +68,6 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const [hoursInfo, setHoursInfo] = useState<{ hasHours: boolean; today?: string } | null>(null);
   const [tenantData, setTenantData] = useState<{ name: string; logoUrl?: string; bannerUrl?: string } | null>(null);
   const [showcaseMode, setShowcaseMode] = useState<ShowcaseMode>('tabs');
-  // console.log(`showcaseMode: ${showcaseMode}`);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [platformStats, setPlatformStats] = useState({
     activeRetailers: 0,
     activeRetailersFormatted: '0',
@@ -97,13 +87,12 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   // Extract stats from platform stats state (after it's loaded)
   const stats = useMemo(() => ({
     total: platformStats.productsListed || 0,
-    active: Math.floor(platformStats.productsListed * 0.9) || 0, // Estimate active items
+    active: platformStats.productsListed || 0,
     syncIssues: 0, // Platform doesn't have sync issues
     locations: platformStats.activeRetailers || 0,
     isChain: false, // Platform view shows all tenants
     organizationName: null, // Platform view
   }), [platformStats.productsListed, platformStats.activeRetailers]);
-  //console.log('Platform stats:', stats);
   const selectedTenantId = null; // Platform view doesn't have selected tenant
 
   // Fetch platform stats for all users (public and authenticated)
@@ -273,100 +262,6 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
-      {!embedded && (
-        <header className="bg-white border-b border-neutral-200">
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              {settings?.logoUrl ? (
-                <Link href="/">
-                  <Image
-                    src={settings.logoUrl}
-                    alt={settings.platformName || 'Platform Logo'}
-                    width={150}
-                    height={40}
-                    className="object-contain cursor-pointer"
-                    loading="eager"
-                    priority
-                  />
-                </Link>
-              ) : (
-                <Link href="/">
-                  <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
-                    {settings?.platformName || 'Visible Shelf'}
-                  </h1>
-                </Link>
-              )}
-
-              {/* Desktop Navigation */}
-              <div className="hidden sm:flex items-center gap-2 md:gap-3">
-                {isAuthenticated && selectedTenantId && (
-                  <SubscriptionUsageBadge variant="compact" tenantId={selectedTenantId} />
-                )}
-                <Link href="/settings">
-                  <Button variant="ghost" size="sm">Settings</Button>
-                </Link>
-                {isAuthenticated ? (
-                  <Button
-                    variant='gradient' style={{ color: 'white' }}
-                    size="sm"
-                    onClick={async () => {
-                      await logout();
-                    }}
-                  >
-                    Sign Out
-                  </Button>
-                ) : (
-                  <a href="/auth/login">
-                    <Button variant='gradient' style={{ color: 'white' }} size="md">Sign In</Button>
-                  </a>
-                )}
-              </div>
-
-              {/* Mobile Menu Button */}
-              <button
-                className="sm:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label="Toggle menu"
-              >
-                <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {mobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  )}
-                </svg>
-              </button>
-            </div>
-
-            {/* Mobile Menu Dropdown */}
-            {mobileMenuOpen && (
-              <div className="sm:hidden mt-4 pb-2 space-y-2 border-t border-neutral-200 pt-4">
-                <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full justify-start" size="md">Settings</Button>
-                </Link>
-                {isAuthenticated ? (
-                  <Button
-                    variant='gradient' style={{ color: 'white' }}
-                    className="w-full"
-                    size="md"
-                    onClick={async () => {
-                      setMobileMenuOpen(false);
-                      await logout();
-                    }}
-                  >
-                    Sign Out
-                  </Button>
-                ) : (
-                  <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant='gradient' style={{ color: 'white' }} className="w-full" size="md">Sign In</Button>
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-        </header>
-      )}
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
         {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
@@ -519,84 +414,6 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </div>
               </AnimatedCard>
             </div>
-
-            {/* Additional badges for authenticated users */}
-            {isAuthenticated && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6">
-                <AnimatedCard delay={0.4} className="p-4 sm:p-5 md:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Total Users</p>
-                      <motion.p
-                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
-                        initial={{ scale: 0.5 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.6, type: "spring" }}
-                      >
-                        {platformStats.totalUsers?.toLocaleString() || '0'}
-                      </motion.p>
-                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">registered users</p>
-                    </div>
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                </AnimatedCard>
-
-                <AnimatedCard delay={0.5} className="p-4 sm:p-5 md:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Users</p>
-                      <motion.p
-                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
-                        initial={{ scale: 0.5 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.7, type: "spring" }}
-                      >
-                        {platformStats.activeUsers?.toLocaleString() || '0'}
-                      </motion.p>
-                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">currently active</p>
-                    </div>
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                </AnimatedCard>
-
-                <AnimatedCard delay={0.6} className="p-4 sm:p-5 md:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-neutral-600">System Health</p>
-                      <motion.p
-                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
-                        initial={{ scale: 0.5 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.8, type: "spring" }}
-                      >
-                        {(platformStats.systemHealth as any)?.database === 'healthy' &&
-                          (platformStats.systemHealth as any)?.cache === 'healthy' &&
-                          (platformStats.systemHealth as any)?.api === 'healthy' ? 'Healthy' : 'Issues'}
-                      </motion.p>
-                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">system status</p>
-                    </div>
-                    <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${(platformStats.systemHealth as any)?.database === 'healthy' &&
-                      (platformStats.systemHealth as any)?.cache === 'healthy' &&
-                      (platformStats.systemHealth as any)?.api === 'healthy'
-                      ? 'bg-success'
-                      : 'bg-warning'
-                      }`}>
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                  </div>
-                </AnimatedCard>
-              </div>
-            )}
 
             {/* Mission Statement - For visitors */}
             <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">

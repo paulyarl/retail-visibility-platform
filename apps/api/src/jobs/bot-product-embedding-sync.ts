@@ -8,7 +8,7 @@ import { prisma } from '../prisma';
 import BotRagService from '../services/BotRagService';
 
 const DEFAULT_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
-const STARTUP_DELAY_MS = 60_000; // 1 minute after server start
+const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes after server start (avoids firing on nodemon restarts)
 let syncIntervalId: NodeJS.Timeout | null = null;
 
 /**
@@ -81,16 +81,28 @@ async function runScheduledSync(): Promise<void> {
     let totalChunks = 0;
     let failed = 0;
 
+    let quotaExceeded = false;
+
     for (const tenantId of tenantIds) {
+      if (quotaExceeded) {
+        console.log(`[BotProductEmbeddingSync] Skipping tenant ${tenantId} - OpenAI quota exceeded`);
+        failed++;
+        continue;
+      }
+
       try {
         const result = await ragService.refreshProductEmbeddings(tenantId);
         tenantsProcessed++;
         totalProducts += result.processed;
         totalChunks += result.chunks;
         console.log(`[BotProductEmbeddingSync] Tenant ${tenantId}: ${result.processed} products, ${result.chunks} chunks`);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`[BotProductEmbeddingSync] Error refreshing tenant ${tenantId}:`, error);
         failed++;
+        if (error?.code === 'insufficient_quota' || error?.status === 429) {
+          console.log('[BotProductEmbeddingSync] OpenAI quota exceeded, skipping remaining tenants');
+          quotaExceeded = true;
+        }
       }
 
       // Small delay between tenants to avoid OpenAI rate limits
@@ -111,6 +123,11 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled product embedding sync job.
  */
 export async function startBotProductEmbeddingSync(): Promise<void> {
+  if (process.env.DISABLE_BOT_EMBEDDING_SYNC === 'true') {
+    console.log('[BotProductEmbeddingSync] Disabled via DISABLE_BOT_EMBEDDING_SYNC env var');
+    return;
+  }
+
   if (syncIntervalId) {
     console.log('[BotProductEmbeddingSync] Already running');
     return;

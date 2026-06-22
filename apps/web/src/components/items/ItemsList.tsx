@@ -100,13 +100,25 @@ export default function ItemsList({
               
               {/* Image - Primary photo - Clickable */}
               <div className="relative flex-shrink-0">
-                <div 
+                <div
                   className="cursor-pointer hover:opacity-90 transition-opacity"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     if (bulkMode && onToggleSelection) {
                       onToggleSelection(item.id);
                     } else {
                       tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (bulkMode && onToggleSelection) {
+                        onToggleSelection(item.id);
+                      } else {
+                        tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                      }
                     }
                   }}
                   title={bulkMode ? "Click to select" : "View item details"}
@@ -143,9 +155,17 @@ export default function ItemsList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 
+                    <h3
                       className="text-base sm:text-lg font-bold text-neutral-900 mb-0.5 sm:mb-1 truncate cursor-pointer hover:text-primary-600 transition-colors"
                       onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                       title="View item details"
                     >
                       {item.name}
@@ -400,11 +420,7 @@ export default function ItemsList({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  if (confirm(`Move "${item.name}" to trash?`)) {
-                    onDelete(item);
-                  }
-                }}
+                onClick={() => onDelete(item)}
                 className="text-error hover:text-error"
                 title="Move to trash (can be permanently deleted later)"
               >
@@ -432,11 +448,7 @@ export default function ItemsList({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => {
-                    if (confirm(`Permanently delete "${item.name}"? This cannot be undone.`)) {
-                      onPurge(item);
-                    }
-                  }}
+                  onClick={() => onPurge(item)}
                   className="text-error hover:text-error"
                   title="Permanently delete this item"
                 >

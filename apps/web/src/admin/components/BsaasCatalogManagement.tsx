@@ -25,7 +25,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/Dialog';
-import { AlertCircle, Plus, Pencil, Trash2, ShoppingCart } from 'lucide-react';
+import { AlertCircle, Plus, Pencil, Trash2, ShoppingCart, Gift } from 'lucide-react';
+import ComplimentaryAccessForm from './ComplimentaryAccessForm';
 
 export default function BsaasCatalogManagement() {
   const [entries, setEntries] = useState<BsaasCatalogEntry[]>([]);
@@ -37,6 +38,7 @@ export default function BsaasCatalogManagement() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BsaasCatalogEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BsaasCatalogEntry | null>(null);
+  const [showGrantDialog, setShowGrantDialog] = useState(false);
 
   const [formData, setFormData] = useState<BsaasCatalogInput>({
     feature_key: '',
@@ -179,10 +181,16 @@ export default function BsaasCatalogManagement() {
             Manage purchasable à la carte features, pricing, and availability.
           </p>
         </div>
-        <Button onClick={handleAdd} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Feature
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowGrantDialog(true)} className="gap-2">
+            <Gift className="w-4 h-4" />
+            Grant Access
+          </Button>
+          <Button onClick={handleAdd} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add Feature
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -384,6 +392,12 @@ export default function BsaasCatalogManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Complimentary Access Dialog */}
+      <ComplimentaryAccessForm
+        open={showGrantDialog}
+        onOpenChange={setShowGrantDialog}
+      />
     </div>
   );
 }

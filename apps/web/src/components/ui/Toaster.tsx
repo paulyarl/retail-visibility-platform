@@ -26,7 +26,7 @@ export function Toaster() {
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
       <AnimatePresence mode="popLayout">
-        {toasts.map((t) => {
+        {toasts.filter((t) => t.open !== false).map((t) => {
           const variant = t.variant || 'default';
           return (
             <motion.div

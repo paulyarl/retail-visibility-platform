@@ -2,12 +2,14 @@
 
 import { BusinessTypeSelector, BUSINESS_TYPES, getDefaultCount } from './BusinessTypeSelector';
 
+export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
+
 export interface ProductGenerationSettings {
   businessType: string | null;
   productCount: number;
   generateImages: boolean;
   imageQuality: 'standard' | 'hd';
-  textModel: 'openai' | 'google';
+  textModel: QuickStartTextProvider;
   imageModel: 'openai' | 'google';
 }
 
@@ -119,35 +121,27 @@ export function QuickStartProductSettings({
         <label className="block text-sm font-semibold text-neutral-700 mb-3">
           AI Provider for Product Generation
         </label>
-        <div className="flex gap-2 mb-2">
-          <button
-            type="button"
-            onClick={() => updateSettings({ textModel: 'openai' })}
-            className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-              settings.textModel === 'openai'
-                ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <span className="flex items-center justify-center gap-2">
-              🤖 OpenAI GPT-4
-            </span>
-            <span className="text-xs opacity-75 mt-1 block">Fast & reliable</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => updateSettings({ textModel: 'google' })}
-            className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-              settings.textModel === 'google'
-                ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <span className="flex items-center justify-center gap-2">
-              ✨ Google Gemini
-            </span>
-            <span className="text-xs opacity-75 mt-1 block">Free tier available</span>
-          </button>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+          {([
+            { value: 'openai', label: '🤖 OpenAI', sub: 'Fast & reliable' },
+            { value: 'google', label: '✨ Google Gemini', sub: 'Free tier' },
+            { value: 'anthropic', label: '🧠 Anthropic Claude', sub: 'High quality' },
+            { value: 'mistral', label: '⚡ Mistral', sub: 'EU compliant' },
+          ] as { value: QuickStartTextProvider; label: string; sub: string }[]).map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => updateSettings({ textModel: p.value })}
+              className={`px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                settings.textModel === p.value
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="flex items-center justify-center gap-1">{p.label}</span>
+              <span className="text-xs opacity-75 mt-1 block">{p.sub}</span>
+            </button>
+          ))}
         </div>
         
         {settings.textModel === 'google' && (
@@ -157,6 +151,26 @@ export function QuickStartProductSettings({
               <span>
                 <strong>Slower generation:</strong> Google Gemini has rate limits. 
                 If limits are hit, the system will wait ~40 seconds before retrying.
+              </span>
+            </p>
+          </div>
+        )}
+        {settings.textModel === 'anthropic' && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800 flex items-start gap-2">
+              <span>💡</span>
+              <span>
+                <strong>Anthropic Claude:</strong> Excellent instruction-following for structured product data. Requires <code className="text-xs">ANTHROPIC_API_KEY</code>.
+              </span>
+            </p>
+          </div>
+        )}
+        {settings.textModel === 'mistral' && (
+          <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <p className="text-xs text-purple-800 flex items-start gap-2">
+              <span>💡</span>
+              <span>
+                <strong>Mistral:</strong> Cost-effective with EU data compliance. Requires <code className="text-xs">MISTRAL_API_KEY</code>.
               </span>
             </p>
           </div>

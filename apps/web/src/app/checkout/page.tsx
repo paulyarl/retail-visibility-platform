@@ -119,8 +119,8 @@ function CheckoutPageContent() {
           setTenantDisplayName(data.name || data.business_name || null);
           setTenantDisplayLogo(data.logo_url || data.logoUrl || null);
         }
-      } catch (error) {
-        console.warn('[Checkout] Failed to fetch tenant profile:', error);
+      } catch {
+        // Failed to fetch tenant profile — non-critical
       }
     };
 
@@ -133,7 +133,7 @@ function CheckoutPageContent() {
       if (!tenantId) return;
 
       try {
-        console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
+        // Fetch payment gateways
         // Use CustomerOrderService for public checkout - no auth required
         const { gateways, tenant_tier, commerce_features } = await customerOrderService.getPaymentGateways(tenantId);
 
@@ -172,15 +172,15 @@ function CheckoutPageContent() {
               locationId: config.location_id
             });
           } else {
-            console.log('[Checkout] Square config missing required fields:', config);
+            // Square config missing required fields
           }
         } else {
-          console.log('[Checkout] No Square config found, squareGateway:', squareGateway);
+          // No Square config found
         }
 
         // Set default payment method to first available if current selection is not available
         if (activeTypes.length > 0 && !activeTypes.includes(paymentMethod)) {
-          console.log('[Checkout] Setting default payment method to:', activeTypes[0]);
+          // Set default to first available gateway
           setPaymentMethod(activeTypes[0]);
         }
 
@@ -251,8 +251,8 @@ function CheckoutPageContent() {
         }
 
         // console.log('[Checkout] Tenant tier:', tier, 'Commerce features:', commerce_features, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
-      } catch (error) {
-        console.error('[Checkout] Failed to fetch payment gateways:', error);
+      } catch {
+        // Failed to fetch payment gateways — checkout will show disabled state
       }
     };
 
@@ -327,8 +327,8 @@ function CheckoutPageContent() {
           } : undefined,
         });
       }
-    } catch (error) {
-      console.error('[Checkout] Failed to fetch tenant contact:', error);
+    } catch {
+      // Failed to fetch tenant contact — non-critical
     }
   };
 
@@ -361,14 +361,14 @@ function CheckoutPageContent() {
       }
     } else if (!isInitialized) {
       // Cart doesn't exist yet - give it a moment to load from localStorage
-      console.log('[Checkout] No cart found, waiting for load...');
+      // No cart found, waiting for load
       const timer = setTimeout(() => {
         const loadedCart = tenantId ? getCart(tenantId) : null;
         if (!loadedCart) {
-          console.log('[Checkout] Cart still not found after delay, redirecting');
+          // Cart still not found after delay, redirecting
           router.push('/carts');
         } else {
-          console.log('[Checkout] Cart loaded after delay');
+          // Cart loaded after delay
           setIsInitialized(true);
         }
       }, 300);
@@ -388,8 +388,8 @@ function CheckoutPageContent() {
       try {
         const percentage = await publicPlatformFeeService.getPlatformFeePercentage();
         setPlatformFeePercentage(percentage);
-      } catch (error) {
-        console.warn('[Checkout] Failed to fetch platform fee, using default:', error);
+      } catch {
+        // Failed to fetch platform fee — using default
       }
     };
 
@@ -520,9 +520,9 @@ function CheckoutPageContent() {
             expiryMonth: paymentMethodDetails.expiryMonth,
             expiryYear: paymentMethodDetails.expiryYear,
           });
-          console.log('[Checkout] Payment method saved successfully');
-        } catch (err) {
-          console.error('[Checkout] Failed to save payment method:', err);
+          // Payment method saved successfully
+        } catch {
+          // Failed to save payment method — non-critical, order still completes
         }
       } else if (!isLoggedIn && paymentMethodDetails?.token) {
         // Guest user: store token and show account creation prompt
@@ -553,58 +553,45 @@ function CheckoutPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          {/* Navigation Options */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button
-              variant="ghost"
-              onClick={handleBack}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/carts')}
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Edit Cart
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/tenant/${tenantId}`)}
-            >
-              <Store className="mr-2 h-4 w-4" />
-              Back to Store
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/directory')}
-            >
-              Continue Shopping
-            </Button>
-          </div>
-
-          {/* Store Branding */}
-          <div className="flex items-center gap-3 mb-4 p-4 bg-white rounded-lg border">
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-              {(tenantDisplayLogo || cart.tenant_logo) ? (
-                <img
-                  src={tenantDisplayLogo || cart.tenant_logo || ''}
-                  alt={tenantDisplayName || cart.tenant_name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Store className="h-6 w-6 text-gray-400" />
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBack}
+              >
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Back
+              </Button>
+              {currentStep === 'review' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push('/carts')}
+                >
+                  <ShoppingCart className="mr-1.5 h-4 w-4" />
+                  Edit Cart
+                </Button>
               )}
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Purchasing from</p>
-              <p className="font-semibold text-gray-900">{tenantDisplayName || cart.tenant_name}</p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                {(tenantDisplayLogo || cart.tenant_logo) ? (
+                  <img
+                    src={tenantDisplayLogo || cart.tenant_logo || ''}
+                    alt={tenantDisplayName || cart.tenant_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Store className="h-4 w-4 text-gray-400" />
+                )}
+              </div>
+              <span className="text-sm font-medium text-gray-700 truncate">{tenantDisplayName || cart.tenant_name}</span>
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold">Checkout</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Checkout</h1>
         </div>
 
         {/* Progress Indicator */}
@@ -672,7 +659,7 @@ function CheckoutPageContent() {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => router.push(`/tenant/${tenantId}`)}
@@ -773,6 +760,7 @@ function CheckoutPageContent() {
                             {availableGateways.includes('square') && (
                               <button
                                 onClick={() => setPaymentMethod('square')}
+                                aria-pressed={paymentMethod === 'square'}
                                 className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'square'
                                     ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
                                     : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
@@ -803,6 +791,7 @@ function CheckoutPageContent() {
                             {availableGateways.includes('paypal') && (
                               <button
                                 onClick={() => setPaymentMethod('paypal')}
+                                aria-pressed={paymentMethod === 'paypal'}
                                 className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'paypal'
                                     ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
                                     : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
@@ -832,6 +821,7 @@ function CheckoutPageContent() {
                             {availableGateways.includes('stripe') && (
                               <button
                                 onClick={() => setPaymentMethod('stripe')}
+                                aria-pressed={paymentMethod === 'stripe'}
                                 className={`w-full p-4 rounded-lg border-2 transition-all ${paymentMethod === 'stripe'
                                     ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
                                     : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
@@ -926,7 +916,7 @@ function CheckoutPageContent() {
 
             {/* Right Column - Order Summary */}
             <div className="lg:col-span-1">
-              <div className="sticky top-8">
+              <div className="lg:sticky lg:top-8">
                 <OrderSummary
                   items={mappedCartItems}
                   subtotal={subtotal}
@@ -944,7 +934,7 @@ function CheckoutPageContent() {
                   pickupDeadline={depositInfo?.pickupDeadline}
                   onCheckoutModeChange={(mode) => {
                     setCheckoutMode(mode);
-                    console.log('[Checkout] Customer selected checkout mode:', mode);
+                    // Customer selected checkout mode
                   }}
                 />
               </div>

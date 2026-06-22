@@ -21,10 +21,10 @@ import BulkUploadModal from "@/components/items/BulkUploadModal";
 import PropagationModal from '@/components/items/PropagationModal';
 import BulkPropagationModal from '@/components/items/BulkPropagationModal';
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
-import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
 import { itemsService } from '@/services/ItemsService';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
+import { toast } from '@/hooks/use-toast';
 
 interface ItemsPageClientProps {
   tenantId: string;
@@ -112,15 +112,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   // Bulk selection state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [showQuickStart, setShowQuickStart] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const locationsPerPage = 5;
 
   // Tenant access control for item operations
-  const {
-    hasAccess: hasTenantAccess,
-    loading: tenantAccessLoading,
-  } = useAccessControl(
+  useAccessControl(
     tenantId,
     AccessPresets.TENANT_MEMBER,
     false // Don't fetch organization data for tenant-level operations
@@ -130,7 +124,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const {
     hasAccess: hasOrganizationAccess,
     organizationData,
-    loading: orgAccessLoading,
   } = useAccessControl(
     tenantId,
     AccessPresets.ORGANIZATION_MEMBER,
@@ -214,7 +207,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       shouldOpenModal: params.get('create') === 'true'
     }); */
     if (params.get('create') === 'true' && isProductEnabled) {
-      console.log('[ItemsPageClient] Opening create modal...');
       openCreateModal();
     }
   }, [openCreateModal]);
@@ -242,16 +234,12 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       closeEditModal();
       return updatedItem; // Return the updated item
     } catch (error) {
-      console.error("[ItemsPageClient] Update failed:", error);
       throw error; // Re-throw to handle in modal
     }
   };
 
   const handleCreate = async (data: Partial<Item>) => {
     try {
-      console.log('[ItemsPageClient] Creating item with data:', data);
-      console.log('[ItemsPageClient] Data keys:', Object.keys(data));
-      
       // Use ItemsSingletonService to create a new item
       const itemData = {
         ...data,
@@ -267,7 +255,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       refresh();
       return newItem; // Return the created item
     } catch (error) {
-      console.error("[ItemsPageClient] Create failed:", error);
       throw error; // Re-throw to handle in modal
     }
   };
@@ -281,28 +268,24 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       onConfirm: async () => {
         try {
           const updatedItem = await deleteItem(item.id);
-          console.log('[ItemsPageClient] Item deleted successfully:', updatedItem.id, updatedItem.item_status);
           
           // Update local state instantly with the returned item data
           updateLocalItem(updatedItem.id, updatedItem);
           
-          // Show success message
-          alert(`✅ Item moved to trash\n\n"${updatedItem.name}" has been moved to trash.\n\nYou can restore it later from the trash bin.`);
+          toast({ title: 'Item moved to trash', description: `"${updatedItem.name}" has been moved to trash. You can restore it from the trash bin.`, variant: 'success' });
         } catch (error) {
-          console.error("[ItemsPageClient] Delete failed:", error);
-          
           // Handle specific error types
           if (error && typeof error === 'object' && 'error' in error) {
             const errorObj = error as any;
             if (errorObj.error === 'trash_capacity_exceeded') {
-              alert(`⚠️ Cannot delete item\n\nTrash bin is full (${errorObj.current}/${errorObj.capacity} items).\n\nPlease purge some items from trash first:\n1. Go to the items page\n2. Filter by "Status: Trashed"\n3. Select items and click "Purge"\n\nThis will free up space in the trash bin.`);
+              toast({ title: 'Cannot delete item', description: `Trash bin is full (${errorObj.current}/${errorObj.capacity} items). Please purge some items from trash first.`, variant: 'warning' });
               return;
             }
           }
           
           // Generic error handling
           const errorMessage = error instanceof Error ? error.message : 'Failed to delete item';
-          alert(`❌ Delete failed\n\n${errorMessage}\n\nPlease try again or contact support if the issue persists.`);
+          toast({ title: 'Delete failed', description: errorMessage, variant: 'destructive' });
         }
       },
     });
@@ -312,9 +295,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     try {
       await itemsSingletonService.restoreItem(item.id);
       refresh();
-    } catch (error) {
-      console.error('[ItemsPageClient] Restore failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to restore item');
+    } catch {
+      // Restore failed — non-critical
     }
   };
 
@@ -328,9 +310,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         try {
           await itemsSingletonService.purgeItem(item.id);
           refresh();
-        } catch (error) {
-          console.error('[ItemsPageClient] Purge failed:', error);
-          alert(error instanceof Error ? error.message : 'Failed to purge item');
+        } catch {
+          // Purge failed — non-critical
         }
       },
     });
@@ -345,9 +326,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       
       closeCategoryModal();
       refresh();
-    } catch (error) {
-      console.error("[ItemsPageClient] Category assignment failed:", error);
-      alert(error instanceof Error ? error.message : "Failed to assign category");
+    } catch {
+      // Category assignment failed — non-critical
     }
   };
 
@@ -378,8 +358,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     if (itemIds.length === 0) return;
 
     try {
-      console.log('[handleBulkCategoryAssign] Assigning category to items:', { categoryId, itemIds });
-      
       // Update all selected items
       await Promise.all(
         itemIds.map(itemId => updateItem(itemId, { tenantCategoryId: categoryId }))
@@ -389,10 +367,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       clearSelection();
       refresh();
       
-      alert(`Successfully assigned category to ${itemIds.length} item(s)`);
-    } catch (error) {
-      console.error('[handleBulkCategoryAssign] Failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to assign category to items');
+      toast({ title: 'Category assigned', description: `Successfully assigned category to ${itemIds.length} item${itemIds.length !== 1 ? 's' : ''}.`, variant: 'success' });
+    } catch {
+      // Bulk category assign failed — non-critical
     }
   };
 
@@ -408,8 +385,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         onConfirm: async () => {
           try {
             await updateItem(item.id, { visibility: newVisibility });
-          } catch (error) {
-            console.error("[ItemsPageClient] Visibility toggle failed:", error);
+          } catch {
+            // Visibility toggle failed — non-critical
           }
         },
       });
@@ -417,8 +394,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       (async () => {
         try {
           await updateItem(item.id, { visibility: newVisibility });
-        } catch (error) {
-          console.error("[ItemsPageClient] Visibility toggle failed:", error);
+        } catch {
+          // Visibility toggle failed — non-critical
         }
       })();
     }
@@ -439,8 +416,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           try {
             await updateItem(item.id, { itemStatus: newStatus });
             refresh(); // Refresh the list after update
-          } catch (error) {
-            console.error("[ItemsPageClient] Status toggle failed:", error);
+          } catch {
+            // Status toggle failed — non-critical
           }
         },
       });
@@ -448,9 +425,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       (async () => {
         try {
           await updateItem(item.id, { itemStatus: newStatus });
-          refresh(); // Refresh the list after update
-        } catch (error) {
-          console.error("[ItemsPageClient] Status toggle failed:", error);
+          refresh();
+        } catch {
+          // Status toggle failed — non-critical
         }
       })();
     }
@@ -476,47 +453,34 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         tenantId: tenantId,
       });
       
-      // Show success message with the new product name
-      alert(`✅ Product cloned successfully!\n\nNew product: ${result.product.name}\nSKU: ${result.product.sku}\n\nThe cloned product has been created as a draft. You can edit it to customize the variant.`);
+      toast({ title: 'Product cloned', description: `${result.product.name} (SKU: ${result.product.sku}) has been created as a draft.`, variant: 'success' });
       
       // Refresh the list to show the new product
       refresh();
-    } catch (error) {
-      console.error('[ItemsPageClient] Clone failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to clone product');
+    } catch {
+      // Clone failed — non-critical
     }
   };
 
   const handlePropagate = async (item: Item) => {
-    console.log('[handlePropagate] Called with item:', item.name, {
-      hasOrganizationAccess,
-      orgAccessLoading,
-      organizationData: !!organizationData,
-      tenantId,
-    });
-
     // Check if user has organization access
     if (!hasOrganizationAccess) {
-      console.log('[handlePropagate] Access denied - not an organization member');
-      alert('Propagation is only available for organization members. Upgrade to an organization plan to enable multi-location management.');
+      toast({ title: 'Propagation unavailable', description: 'Propagation is only available for organization members. Upgrade to an organization plan to enable multi-location management.', variant: 'warning' });
       return;
     }
 
     // Check if organization data is loaded
     if (!organizationData) {
-      console.log('[handlePropagate] Organization data not loaded yet');
-      alert('Organization data is still loading. Please try again in a moment.');
+      toast({ title: 'Loading', description: 'Organization data is still loading. Please try again in a moment.', variant: 'info' });
       return;
     }
 
     // Check if organization has multiple locations
     if (organizationData.tenants.length <= 1) {
-      console.log('[handlePropagate] No other tenants to propagate to');
-      alert('Propagation requires multiple locations. Your organization currently has only one location.');
+      toast({ title: 'Propagation unavailable', description: 'Propagation requires multiple locations. Your organization currently has only one location.', variant: 'warning' });
       return;
     }
 
-    console.log('[handlePropagate] Opening modal for item:', item.name);
     setPropagateItem(item);
     setShowPropagateModal(true);
   };
@@ -533,7 +497,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       /* console.log(`[ItemsPageClient] Refreshing list...`); */
       // Refresh is called automatically by updateItem's onSuccess callback
     } catch (error) {
-      console.error('[ItemsPageClient] Stock update failed:', error);
       throw error; // Re-throw so the inline editor can handle it
     }
   };
@@ -564,97 +527,51 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       />
 
       {/* Filters */}
-      <div className="max-w-7xl mx-auto px-4 space-y-4">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or SKU"
-        />
-
-        <div className="flex flex-wrap gap-2">
+      <div className="max-w-7xl mx-auto px-4 space-y-3">
+        <div className="flex gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or SKU"
+          />
           <Button
             size="sm"
-            variant={status === "all" ? "primary" : "ghost"}
-            onClick={() => setStatus("all")}
+            variant="ghost"
+            onClick={refresh}
+            disabled={loading}
+            className="flex-shrink-0"
           >
-            All
-          </Button>
-          <Button
-            size="sm"
-            variant={status === "active" ? "primary" : "ghost"}
-            onClick={() => setStatus("active")}
-          >
-            Active
-          </Button>
-          <Button
-            size="sm"
-            variant={status === "inactive" ? "primary" : "ghost"}
-            onClick={() => setStatus("inactive")}
-          >
-            Inactive
-          </Button>
-          <Button
-            size="sm"
-            variant={status === "syncing" ? "primary" : "ghost"}
-            onClick={() => setStatus("syncing")}
-          >
-            Syncing
-          </Button>
-          <Button
-            size="sm"
-            variant={status === "trashed" ? "danger" : "ghost"}
-            onClick={() => setStatus("trashed")}
-          >
-            Trashed
-          </Button>
-
-          <Button
-            size="sm"
-            variant={visibility === "all" ? "primary" : "ghost"}
-            onClick={() => setVisibility("all")}
-          >
-            All Visibility
-          </Button>
-          <Button
-            size="sm"
-            variant={visibility === "public" ? "primary" : "ghost"}
-            onClick={() => setVisibility("public")}
-          >
-            Public
-          </Button>
-          <Button
-            size="sm"
-            variant={visibility === "private" ? "primary" : "ghost"}
-            onClick={() => setVisibility("private")}
-          >
-            Private
+            {loading && (
+              <svg className="animate-spin h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                <path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75" />
+              </svg>
+            )}
+            {loading ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
 
-        {/* Category Filter Row */}
+        {/* Status + Visibility filters */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-neutral-500 mr-1">Status:</span>
+          <Button size="sm" variant={status === "all" ? "primary" : "ghost"} onClick={() => setStatus("all")}>All</Button>
+          <Button size="sm" variant={status === "active" ? "primary" : "ghost"} onClick={() => setStatus("active")}>Active</Button>
+          <Button size="sm" variant={status === "inactive" ? "primary" : "ghost"} onClick={() => setStatus("inactive")}>Inactive</Button>
+          <Button size="sm" variant={status === "syncing" ? "primary" : "ghost"} onClick={() => setStatus("syncing")}>Syncing</Button>
+          <Button size="sm" variant={status === "trashed" ? "danger" : "ghost"} onClick={() => setStatus("trashed")}>Trashed</Button>
+          <span className="w-px h-5 bg-neutral-300 dark:bg-neutral-600 mx-2" />
+          <span className="text-xs font-medium text-neutral-500 mr-1">Visibility:</span>
+          <Button size="sm" variant={visibility === "all" ? "primary" : "ghost"} onClick={() => setVisibility("all")}>All</Button>
+          <Button size="sm" variant={visibility === "public" ? "primary" : "ghost"} onClick={() => setVisibility("public")}>Public</Button>
+          <Button size="sm" variant={visibility === "private" ? "primary" : "ghost"} onClick={() => setVisibility("private")}>Private</Button>
+        </div>
+
+        {/* Category + View Mode filters */}
         <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-          <span>Category:</span>
-          <Button
-            size="sm"
-            variant={category === null ? "primary" : "ghost"}
-            onClick={() => setCategory(null)}
-          >
-            All
-          </Button>
-          <Button
-            size="sm"
-            variant={category === "assigned" ? "primary" : "ghost"}
-            onClick={() => setCategory("assigned")}
-          >
-            Has Category
-          </Button>
-          <Button
-            size="sm"
-            variant={category === "unassigned" ? "primary" : "ghost"}
-            onClick={() => setCategory("unassigned")}
-          >
-            No Category
-          </Button>
+          <span className="text-xs font-medium text-neutral-500">Category:</span>
+          <Button size="sm" variant={category === null ? "primary" : "ghost"} onClick={() => setCategory(null)}>All</Button>
+          <Button size="sm" variant={category === "assigned" ? "primary" : "ghost"} onClick={() => setCategory("assigned")}>Has Category</Button>
+          <Button size="sm" variant={category === "unassigned" ? "primary" : "ghost"} onClick={() => setCategory("unassigned")}>No Category</Button>
           
           {/* Category Dropdown */}
           <div className="relative" ref={categoryDropdownRef}>
@@ -699,67 +616,45 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
               </div>
             )}
           </div>
-        </div>
-
-        {/* View Mode Toggle */}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-          <span>View:</span>
-          <Button
-            size="sm"
-            variant={viewMode === "grid" ? "primary" : "ghost"}
-            onClick={() => setViewMode("grid")}
-          >
-            Grid
-          </Button>
-          <Button
-            size="sm"
-            variant={viewMode === "list" ? "primary" : "ghost"}
-            onClick={() => setViewMode("list")}
-          >
-            List
-          </Button>
+          <span className="w-px h-5 bg-neutral-300 dark:bg-neutral-600 mx-2" />
+          <span className="text-xs font-medium text-neutral-500">View:</span>
+          <Button size="sm" variant={viewMode === "grid" ? "primary" : "ghost"} onClick={() => setViewMode("grid")}>Grid</Button>
+          <Button size="sm" variant={viewMode === "list" ? "primary" : "ghost"} onClick={() => setViewMode("list")}>List</Button>
         </div>
 
         {/* Bulk Actions Bar - Collapsible */}
         {items.length > 0 && (
-          <div className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 ${
+          <div className={`rounded-xl border transition-colors ${
             bulkMode 
-              ? 'border-primary-500 shadow-lg shadow-primary-500/20' 
-              : 'border-neutral-200 dark:border-neutral-700 hover:border-primary-300 dark:hover:border-primary-700'
+              ? 'border-primary-500' 
+              : 'border-neutral-200 dark:border-neutral-700'
           }`}>
-            {/* Gradient Background */}
-            <div className={`absolute inset-0 transition-opacity duration-300 ${
-              bulkMode 
-                ? 'opacity-100 bg-gradient-to-r from-primary-50 via-blue-50 to-navy-50 dark:from-primary-900/20 dark:via-blue-900/20 dark:to-green-900/20 animate-pulse' 
-                : 'bg-gradient-to-r from-cyan-500 to-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg '
-            }`} />
-            
             {/* Header - Always Visible */}
             <button
               onClick={() => setBulkActionsExpanded(!bulkActionsExpanded)}
-              className="relative w-full flex items-center justify-between p-4 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors"
+              className="w-full flex items-center justify-between p-3 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors rounded-xl"
             >
               <div className="flex items-center gap-3">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-300 ${
+                <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
                   bulkMode 
-                    ? 'bg-primary-500 text-white shadow-lg' 
+                    ? 'bg-primary-500 text-white' 
                     : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'
                 }`}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
                 <div className="text-left">
-                  <h2 className="text-sm font-semibold bg-white/80 dark:bg-neutral-100/80 backdrop-blur-sm rounded-lg p-4 ">
+                  <span className="text-sm font-semibold text-neutral-900 dark:text-white">
                     Bulk Actions
-                  </h2>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-200">
-                    {bulkMode ? `${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''} selected` : 'Click to select multiple items to edit category, status, visibility or propagation'}
+                  </span>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {bulkMode ? `${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''} selected` : 'Select multiple items to edit in bulk'}
                   </p>
                 </div>
               </div>
               <svg 
-                className={`w-5 h-5 text-neutral-400 transition-transform duration-200 ${bulkActionsExpanded ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-neutral-400 transition-transform ${bulkActionsExpanded ? 'rotate-180' : ''}`}
                 fill="none" 
                 viewBox="0 0 24 24" 
                 stroke="currentColor"
@@ -770,7 +665,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
             {/* Expandable Content */}
             {bulkActionsExpanded && (
-              <div className="relative p-4 pt-2 pb-32 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm overflow-visible border-t border-neutral-200 dark:border-neutral-700">
+              <div className="p-3 pt-2 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 rounded-b-xl">
                 {/* Select Items Button */}
                 <Button
                   size="sm"
@@ -779,7 +674,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                     setBulkMode(!bulkMode);
                     if (bulkMode) clearSelection();
                   }}
-                  className="font-semibold shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
                 >
                   {bulkMode ? "Exit Select Mode" : "Select Items"}
                 </Button>
@@ -869,16 +763,13 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                         onClick={async () => {
                           try {
                             const itemIds = Array.from(selectedItems);
-                            console.log('[Bulk Status] Updating items to active:', itemIds);
                             await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'active' })));
-                            console.log('[Bulk Status] Successfully updated items to active');
                             clearSelection();
                             refresh();
                             setStatusDropdownOpen(false);
-                            alert(`✅ Successfully updated ${itemIds.length} item(s) to Active`);
-                          } catch (error) {
-                            console.error('[Bulk Status] Error updating items:', error);
-                            alert(`❌ Error updating items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            toast({ title: 'Status updated', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} set to Active.`, variant: 'success' });
+                          } catch {
+                            // Bulk status update failed
                           }
                         }}
                         className="w-full px-4 py-2 text-left text-sm hover:bg-green-50 dark:hover:bg-green-900/20 text-green-700 dark:text-green-300 flex items-center gap-2"
@@ -890,16 +781,13 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                         onClick={async () => {
                           try {
                             const itemIds = Array.from(selectedItems);
-                            console.log('[Bulk Status] Updating items to inactive:', itemIds);
                             await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'inactive' })));
-                            console.log('[Bulk Status] Successfully updated items to inactive');
                             clearSelection();
                             refresh();
                             setStatusDropdownOpen(false);
-                            alert(`✅ Successfully updated ${itemIds.length} item(s) to Inactive`);
-                          } catch (error) {
-                            console.error('[Bulk Status] Error updating items:', error);
-                            alert(`❌ Error updating items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            toast({ title: 'Status updated', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} set to Inactive.`, variant: 'success' });
+                          } catch {
+                            // Bulk status update failed
                           }
                         }}
                         className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 flex items-center gap-2"
@@ -911,16 +799,13 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                         onClick={async () => {
                           try {
                             const itemIds = Array.from(selectedItems);
-                            console.log('[Bulk Status] Updating items to archived:', itemIds);
                             await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'archived' })));
-                            console.log('[Bulk Status] Successfully updated items to archived');
                             clearSelection();
                             refresh();
                             setStatusDropdownOpen(false);
-                            alert(`✅ Successfully updated ${itemIds.length} item(s) to Archive`);
-                          } catch (error) {
-                            console.error('[Bulk Status] Error updating items:', error);
-                            alert(`❌ Error updating items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            toast({ title: 'Status updated', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} archived.`, variant: 'success' });
+                          } catch {
+                            // Bulk status update failed
                           }
                         }}
                         className="w-full px-4 py-2 text-left text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-700 dark:text-amber-300 flex items-center gap-2 rounded-b-lg"
@@ -992,15 +877,15 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                     onClick={() => {
                       // Check if user has organization access
                       if (!hasOrganizationAccess) {
-                        alert('Propagation is only available for organization members. Upgrade to an organization plan to enable multi-location management.');
+                        toast({ title: 'Propagation unavailable', description: 'Propagation is only available for organization members.', variant: 'warning' });
                         return;
                       }
                       if (!organizationData) {
-                        alert('Organization data is still loading. Please try again in a moment.');
+                        toast({ title: 'Loading', description: 'Organization data is still loading. Please try again.', variant: 'info' });
                         return;
                       }
                       if (organizationData.tenants.length <= 1) {
-                        alert('Propagation requires multiple locations. Your organization currently has only one location.');
+                        toast({ title: 'Propagation unavailable', description: 'Propagation requires multiple locations.', variant: 'warning' });
                         return;
                       }
                       setShowBulkPropagateModal(true);
@@ -1042,27 +927,20 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                           onConfirm: async () => {
                             try {
                               const itemIds = Array.from(selectedItems);
-                              console.log('[Bulk Trash] Moving items to trash:', itemIds);
                               await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'trashed' })));
-                              console.log('[Bulk Trash] Successfully moved items to trash');
                               clearSelection();
                               refresh();
-                              alert(`✅ Successfully moved ${itemIds.length} item(s) to trash`);
+                              toast({ title: 'Items moved to trash', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} moved to trash.`, variant: 'success' });
                             } catch (error) {
-                              console.error('[Bulk Trash] Error moving items to trash:', error);
-                              
-                              // Handle specific error types
                               if (error && typeof error === 'object' && 'error' in error) {
                                 const errorObj = error as any;
                                 if (errorObj.error === 'trash_capacity_exceeded') {
-                                  alert(`⚠️ Cannot move items to trash\n\nTrash bin is full (${errorObj.current}/${errorObj.capacity} items).\n\nPlease purge some items from trash first:\n1. Filter by "Status: Trashed"\n2. Select items and click "Purge"\n\nThis will free up space in the trash bin.`);
+                                  toast({ title: 'Cannot move to trash', description: `Trash bin is full (${errorObj.current}/${errorObj.capacity} items). Please purge some items first.`, variant: 'warning' });
                                   return;
                                 }
                               }
-                              
-                              // Generic error handling
                               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                              alert(`❌ Error moving items to trash\n\n${errorMessage}\n\nPlease try again or contact support if the issue persists.`);
+                              toast({ title: 'Error', description: `Failed to move items to trash: ${errorMessage}`, variant: 'destructive' });
                             }
                           },
                         });
@@ -1083,15 +961,12 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                         onClick={async () => {
                           try {
                             const itemIds = Array.from(selectedItems);
-                            console.log('[Bulk Restore] Restoring items:', itemIds);
                             await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'active' })));
-                            console.log('[Bulk Restore] Successfully restored items');
                             clearSelection();
                             refresh();
-                            alert(`✅ Successfully restored ${itemIds.length} item(s)`);
-                          } catch (error) {
-                            console.error('[Bulk Restore] Error restoring items:', error);
-                            alert(`❌ Error restoring items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            toast({ title: 'Items restored', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} restored from trash.`, variant: 'success' });
+                          } catch {
+                            // Bulk restore failed
                           }
                         }}
                         className="font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
@@ -1114,15 +989,12 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                             onConfirm: async () => {
                               try {
                                 const itemIds = Array.from(selectedItems);
-                                console.log('[Bulk Purge] Purging items:', itemIds);
                                 await itemsSingletonService.emptyTrash(tenantId, itemIds);
-                                console.log('[Bulk Purge] Successfully purged items');
                                 clearSelection();
                                 refresh();
-                                alert(`✅ Successfully purged ${itemIds.length} item(s)`);
-                              } catch (error) {
-                                console.error('[Bulk Purge] Error purging items:', error);
-                                alert(`❌ Error purging items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                                toast({ title: 'Items purged', description: `${itemIds.length} item${itemIds.length !== 1 ? 's' : ''} permanently deleted.`, variant: 'success' });
+                              } catch {
+                                // Bulk purge failed
                               }
                             },
                           });
@@ -1158,12 +1030,34 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         ) : (
           <>
             {loading ? (
-              <div className="text-sm text-neutral-600 dark:text-neutral-300">
+              <div className="flex items-center justify-center py-12 text-neutral-600 dark:text-neutral-300">
+                <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75" />
+                </svg>
                 Loading items…
               </div>
             ) : items.length === 0 ? (
-              <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                No items found.
+              <div className="text-center py-12">
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-3">No items found.</p>
+                {(search || status !== "all" || visibility !== "all" || category !== null) ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSearch("");
+                      setStatus("all");
+                      setVisibility("all");
+                      setCategory(null);
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="primary" onClick={handleCreateClick} disabled={!isProductEnabled}>
+                    Create your first item
+                  </Button>
+                )}
               </div>
             ) : viewMode === "grid" ? (
               <ItemsGrid
@@ -1222,18 +1116,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
             />
-
-            {hasItems && items.length > 0 && <ItemsGuide />}
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button
-                size="sm"
-                onClick={refresh}
-                disabled={loading}
-              >
-                {loading ? "Refreshing…" : "Refresh"}
-              </Button>
-            </div>
           </>
         )}
       </div>
@@ -1326,7 +1208,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           currentTenantId={tenantId}
           organizationId={organizationData.id}
           onSuccess={() => {
-            console.log('[ItemsPageClient] Item propagated successfully');
             refresh();
           }}
         />
@@ -1341,7 +1222,6 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           currentTenantId={tenantId}
           organizationId={organizationData.id}
           onSuccess={() => {
-            console.log('[ItemsPageClient] Bulk propagation completed');
             clearSelection();
             refresh();
           }}

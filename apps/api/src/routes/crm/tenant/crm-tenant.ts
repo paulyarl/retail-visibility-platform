@@ -15,6 +15,7 @@ import CrmTaskService from '../../../services/CrmTaskService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmAlertService from '../../../services/CrmAlertService';
+import CrmUserReadStateService from '../../../services/CrmUserReadStateService';
 import CrmOptionsService from '../../../services/CrmOptionsService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
@@ -29,6 +30,7 @@ const taskService = CrmTaskService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
 const alertService = CrmAlertService.getInstance();
+const userReadStateService = CrmUserReadStateService.getInstance();
 const crmOptionsService = CrmOptionsService.getInstance();
 
 // Helper to get tenant ID from request context
@@ -60,7 +62,8 @@ router.get('/stats', async (req: Request, res: Response) => {
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     if (!(await checkCrmEnabled(tenantId, res))) return;
 
-    const stats = await tenantService.getTenantCrmStats(tenantId);
+    const userId = req.user?.userId || req.user?.user_id || null;
+    const stats = await tenantService.getTenantCrmStats(tenantId, userId ?? undefined);
     res.json({ success: true, data: stats });
   } catch (error) {
     console.error('[CRM Tenant] Error fetching stats:', error);
@@ -575,6 +578,56 @@ router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CRM Tenant] Error dismissing alert:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
+  }
+});
+
+// ====================
+// User Read State (persistent widget read tracking)
+// ====================
+
+// GET /api/tenant/crm/read-state
+router.get('/read-state', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const userId = req.user?.userId || req.user?.user_id;
+    if (!userId) return res.status(401).json({ error: 'unauthenticated', message: 'User ID required' });
+
+    const states = await userReadStateService.getReadStates(userId, tenantId);
+    res.json({ success: true, data: states });
+  } catch (error) {
+    console.error('[CRM Tenant] Error fetching read state:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch read state' });
+  }
+});
+
+// PUT /api/tenant/crm/read-state
+// Body: { scope: string, last_read_at?: ISO string }
+router.put('/read-state', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+    if (!(await checkCrmEnabled(tenantId, res))) return;
+
+    const userId = req.user?.userId || req.user?.user_id;
+    if (!userId) return res.status(401).json({ error: 'unauthenticated', message: 'User ID required' });
+
+    const { scope, last_read_at } = req.body;
+    if (!scope || typeof scope !== 'string') {
+      return res.status(400).json({ error: 'invalid_input', message: 'scope is required' });
+    }
+
+    const lastReadAt = last_read_at && !isNaN(new Date(last_read_at).getTime())
+      ? new Date(last_read_at)
+      : new Date();
+
+    await userReadStateService.setLastReadAt(userId, tenantId, scope, lastReadAt);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Tenant] Error updating read state:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update read state' });
   }
 });
 

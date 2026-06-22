@@ -314,6 +314,11 @@ export interface RequestListParams {
 }
 
 // --- Tenant CRM Stats (for widget) ---
+export interface CrmUserReadState {
+  scope: string;
+  last_read_at: string;
+}
+
 export interface CrmTenantCrmStats {
   open_tickets: CrmTicket[];
   pending_tasks: CrmTask[];
@@ -325,4 +330,7 @@ export interface CrmTenantCrmStats {
   pending_task_count: number;
   open_inquiry_count: number;
   unread_alert_count: number;
+  unread_activity_count: number;
+  last_read_activity_at: string | null;
+  last_read_alert_at: string | null;
 }

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "architecture-patterns": {
+      "source": "FernandoBolzan/Orquestrador-Maestro",
+      "sourceType": "github",
+      "skillPath": "skill-library/community-skills/architecture-patterns/SKILL.md",
+      "computedHash": "27da2393e1c9d115862b8b5b2da4de22151d3a5ea4588655a36659d1314879ae"
+    },
+    "backend-dev-guidelines": {
+      "source": "FernandoBolzan/Orquestrador-Maestro",
+      "sourceType": "github",
+      "skillPath": "skill-library/community-skills/backend-dev-guidelines/SKILL.md",
+      "computedHash": "acd7e57206075376d39cc000c057ca7e8b175393f56be202928c08d9b6a2286d"
+    },
+    "saas-navigation": {
+      "source": "oborchers/fractional-cto",
+      "sourceType": "github",
+      "skillPath": "saas-design-principles/skills/saas-navigation/SKILL.md",
+      "computedHash": "99090735046df4f56f35bf74ba639ce2b07c24c828de4ba38abac528afd502b4"
+    },
+    "skill-frontend-ux-guardrails": {
+      "source": "FernandoBolzan/Orquestrador-Maestro",
+      "sourceType": "github",
+      "skillPath": "codex/skills/skill-frontend-ux-guardrails/SKILL.md",
+      "computedHash": "ecdf30ada4d2957f0e31ae42406be8c0ec13230fb9420379d14e4371a5a96e44"
+    },
+    "skill-saas-admin-dashboard": {
+      "source": "FernandoBolzan/Orquestrador-Maestro",
+      "sourceType": "github",
+      "skillPath": "codex/skills/skill-saas-admin-dashboard/SKILL.md",
+      "computedHash": "6b3ad9a9a3703ff5b24b8e3bce6a5df5ba65744637d2fa2a9bb8f4ec58637f8f"
+    },
+    "skill-saas-factory": {
+      "source": "FernandoBolzan/Orquestrador-Maestro",
+      "sourceType": "github",
+      "skillPath": "codex/skills/skill-saas-factory/SKILL.md",
+      "computedHash": "0ff094cb8a9b12ee063eb88b35682433aa795ec12078d862a30165520ea5f6bd"
+    }
+  }
+}

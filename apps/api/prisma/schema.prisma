@@ -615,6 +615,23 @@ model crm_request_reads {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_user_read_states {
+  id           String    @id
+  user_id      String    @db.VarChar(255)
+  tenant_id    String    @db.VarChar(255)
+  scope        String    @db.VarChar(50)
+  last_read_at DateTime  @default(now()) @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_user_read_states_tenant")
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_user_read_states_user")
+
+  @@unique([user_id, tenant_id, scope], map: "idx_crm_user_read_states_unique")
+  @@index([user_id, tenant_id], map: "idx_crm_user_read_states_user_tenant")
+  @@index([tenant_id, scope], map: "idx_crm_user_read_states_tenant_scope")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_support_tickets {
   id                  String                @id
   tenant_id           String                @db.VarChar(255)
@@ -4175,6 +4192,7 @@ model tenants {
   crm_inquiries                                                                          crm_inquiries[]
   crm_support_tickets                                                                    crm_support_tickets[]
   crm_tasks                                                                              crm_tasks[]
+  crm_user_read_states                                                                   crm_user_read_states[]
   customer_tenant_relationships                                                          customer_tenant_relationships[]
   digital_access_grants                                                                  digital_access_grants[]
   digital_download_pages                                                                 digital_download_pages[]
@@ -4535,6 +4553,7 @@ model users {
   phone                                                       String?                            @db.VarChar(50)
   picture                                                     String?                            @db.VarChar(500)
   consent_records                                             consent_records[]
+  crm_user_read_states                                        crm_user_read_states[]
   digital_download_pages                                      digital_download_pages[]
   directory_featured_listings_list                            directory_featured_listings_list[]
   featured_products                                           featured_products[]
@@ -4571,6 +4590,53 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model navigation_links_backup {
+  id                  String?
+  label               String?
+  href                String?
+  icon                String?
+  badge               String?
+  badge_variant       String?
+  targets             String[]
+  sort_order          Int?
+  is_enabled          Boolean?
+  is_divider_before   Boolean?
+  required_permission String?
+  required_group      String?
+  required_role       String?
+  created_at          DateTime? @db.Timestamptz(6)
+  updated_at          DateTime? @db.Timestamptz(6)
+  created_by          String?
+  metadata            Json?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model navigation_links_backup_phase2 {
+  id                  String?
+  label               String?
+  href                String?
+  icon                String?
+  badge               String?
+  badge_variant       String?
+  targets             String[]
+  sort_order          Int?
+  is_enabled          Boolean?
+  is_divider_before   Boolean?
+  required_permission String?
+  required_group      String?
+  required_role       String?
+  created_at          DateTime? @db.Timestamptz(6)
+  updated_at          DateTime? @db.Timestamptz(6)
+  created_by          String?
+  metadata            Json?
+
+  @@ignore
 }
 
 enum action {

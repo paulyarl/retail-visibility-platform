@@ -10,6 +10,6 @@
     "dist/**",
     "../web/**"
   ],
-  "legacyWatch": true,
-  "exec": "tsx src/index.ts"
+  "delay": 2000,
+  "exec": "tsx watch src/index.ts"
 }

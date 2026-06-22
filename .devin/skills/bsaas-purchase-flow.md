@@ -96,92 +96,172 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 - **Behavior**: `fetchRawCapabilities()` queries `tenant_feature_purchases` where `status='active'` and not expired, merges into `mergedFeatures` map
 - **Source-agnostic**: Resolver doesn't care how a feature was enabled (tier or purchase)
 
-## What's New for Self-Service BSaaS
+## What Was Built (All Phases Complete)
 
-### 1. Feature Catalog Endpoint
-- `GET /api/subscription/feature-catalog` — Returns purchasable features with pricing
-- Reads from `features_list` where `metadata.bsaas_price_cents` is set
-- Groups by capability domain (chatbot, crm, etc.)
-
-### 2. Tenant-Facing Purchase Endpoint
-- `POST /api/subscription/feature-purchase` — Self-service purchase
-- Accepts `{ featureKey, paymentMethodId, billingCycle? }`
-- Validates feature is BSaaS-eligible
-- Charges via Stripe (one-time or recurring)
-- Creates `tenant_feature_purchases` row with `source='bsaas'`
-- Calls `invalidateEffectiveCapabilities(tenantId)`
-- Sends `BillingNotificationService` notification
-
-### 3. Cancel/Suspend Endpoint
+### Phase 1: Backend Purchase API
+- `GET /api/subscription/feature-catalog` — Returns purchasable features from `bsaas_catalog` table with tier-aware status
+- `GET /api/subscription/feature-purchases` — Lists tenant's active purchases
+- `POST /api/subscription/feature-purchase` — Self-service purchase with Stripe charge
 - `POST /api/subscription/feature-purchase/:id/cancel` — Cancel a purchase
-- Sets `status='cancelled'`, invalidates cache, notifies
+- **File**: `apps/api/src/routes/bsaas-purchases.ts`
+- **Catalog table**: `bsaas_catalog` (migration `047_bsaas_catalog.sql`)
+- Purchase metadata includes `payment_method_id` for renewal re-charging
 
-### 4. Frontend Purchase Page
-- `apps/web/src/app/(platform)/settings/feature-store/page.tsx`
-- Shows available features with prices
-- Reuses Stripe Elements payment method flow
-- Shows active purchases with cancel option
+### Phase 2: Frontend Purchase Page
+- **File**: `apps/web/src/app/(platform)/settings/feature-store/page.tsx`
+- Shows catalog with tier-aware UI (`in_tier_active`, `in_tier_gate_off`, `not_in_tier`)
+- Payment method selection + purchase confirmation flow
+- Active purchases list with cancel option
+- **Service**: `apps/web/src/services/BsaasPurchaseService.ts`
 
-### 5. Webhook Extension
-- Extend `stripe-webhooks.ts` to handle BSaaS subscription events
-- On `invoice.payment_failed` → suspend purchase
-- On `invoice.paid` → reactivate purchase
+### Phase 3: Billing Integration
+- **Renewal job**: `apps/api/src/jobs/bsaas-renewal.ts` — Daily job that:
+  - Re-charges expiring monthly/annual purchases via `chargePaymentMethod`
+  - Suspends purchases on payment failure (sets `status='suspended'`)
+  - Expires cancelled purchases past their billing period
+  - Sends `bsaas_renewal_success` or `bsaas_renewal_failed` notifications
+- **Server startup**: Wired into `apps/api/src/index.ts` alongside grace period job
+- **Notification types added to BillingNotificationService**:
+  - `bsaas_purchase_success` — On successful purchase (email + CRM alert + CRM task)
+  - `bsaas_renewal_success` — On successful renewal charge
+  - `bsaas_renewal_failed` — On renewal payment failure (high priority CRM task, 7-day due date)
+  - `bsaas_purchase_cancelled` — On cancellation
+- All notification types include email templates, CRM alerts (tenant-facing), and CRM tasks (staff follow-up)
 
-### 6. Notification Extensions
-- New `BillingNotificationType` values: `feature_purchased`, `feature_payment_failed`, `feature_expired`, `feature_canceled`
-- Reuse existing email → CRM alert → CRM task pipeline
+### Phase 4: Admin Catalog UI
+- **Admin API**: `apps/api/src/routes/admin/bsaas-catalog.ts` — CRUD for `bsaas_catalog` table
+- **Admin proxy route**: `apps/web/src/app/api/admin/bsaas-catalog/route.ts`
+- **Admin service**: `apps/web/src/services/AdminBsaasCatalogService.ts`
+- **Admin UI**: `apps/web/src/admin/components/BsaasCatalogManagement.tsx`
+- **Admin page**: `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx`
+- Nav links added to both admin sidebar and tenant sidebar
 
 ## Purchase Flow (End-to-End)
 
 ```
 1. Merchant visits /settings/feature-store
 2. Sees catalog of purchasable features (e.g., "CRM Assistant Skill — $19/mo")
+   - Features already in their tier show as "Included" (in_tier_active)
+   - Features in tier but gated off show as "Included (inactive)" (in_tier_gate_off)
+  . Features not in tier show price + "Add" button (not_in_tier)
 3. Clicks "Add" on a feature
 4. Selects existing payment method or enters new card (Stripe Elements)
 5. Frontend calls POST /api/subscription/feature-purchase
    { featureKey: 'chatbot_skill_crm_assistant', paymentMethodId: 'pm_xxx' }
 6. Backend:
-   a. Validate feature exists in features_list and has BSaaS pricing
-   b. Get payment method via SubscriptionBillingService
-   c. Charge via Stripe (one-time or create subscription)
-   d. Upsert tenant_feature_purchases (status=active, source=bsaas)
-   e. invalidateEffectiveCapabilities(tenantId)
-   f. BillingNotificationService.sendNotification({ type: 'feature_purchased' })
+   a. Validate feature exists in bsaas_catalog and is active
+   b. Check tenant doesn't already have active purchase or tier inclusion
+   c. Get payment method via SubscriptionBillingService
+   d. Charge via Stripe (chargePaymentMethod — one-time PaymentIntent)
+   e. Upsert tenant_feature_purchases (status=active, source=bsaas, expires_at=+30d or +365d)
+   f. invalidateEffectiveCapabilities(tenantId)
+   g. Audit log (feature_purchase.create)
+   h. BillingNotificationService.sendNotification({ type: 'bsaas_purchase_success' })
 7. Frontend refreshes capabilities → feature is now available
 8. Bot skill endpoints return 200 instead of 403
 ```
 
-## Pricing Model
+## Renewal Flow (Automated)
 
-Feature pricing is stored in `features_list.metadata`:
-
-```json
-{
-  "bsaas_price_cents": 1900,
-  "bsaas_billing_cycle": "monthly",
-  "bsaas_trial_days": 0,
-  "bsaas_marketing_name": "CRM Assistant Skill",
-  "bsaas_description": "AI-powered support ticket creation and CRM context injection"
-}
+```
+1. Daily job (bsaas-renewal.ts) runs at midnight
+2. Finds active purchases where expires_at <= now+24h
+3. For each expiring purchase:
+   a. Read payment_method_id from purchase metadata
+   b. Re-charge via chargePaymentMethod(tenantId, paymentMethodId, priceCents)
+   c. On success: extend expires_at (+30d monthly, +365d annual), send bsaas_renewal_success
+   d. On failure: set status='suspended', invalidate capabilities, send bsaas_renewal_failed
+4. Expire cancelled purchases past their billing period (status → 'expired')
+5. Suspend active purchases whose expiry has passed without renewal
 ```
 
-Features without `bsaas_price_cents` in metadata are not available for self-service purchase (admin-only grant).
+## Pricing Model
+
+Feature pricing is stored in the `bsaas_catalog` table (migration `047_bsaas_catalog.sql`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `feature_key` | VARCHAR(100) | References `features_list.key` |
+| `price_cents` | INTEGER | Price in cents (e.g., 1900 = $19.00) |
+| `billing_cycle` | VARCHAR(20) | `monthly`, `annual`, or `one_time` |
+| `is_active` | BOOLEAN | Whether feature is available for purchase |
+| `sort_order` | INTEGER | Display ordering |
+| `marketing_name` | VARCHAR(255) | Display name in Feature Store |
+| `marketing_description` | TEXT | Marketing copy |
+| `icon_name` | VARCHAR(100) | Icon identifier |
+
+Admins manage the catalog via the admin UI at `/settings/admin/bsaas-catalog`.
 
 ## File Reference
 
 | File | Purpose |
 |------|---------|
-| `apps/api/src/routes/subscription-billing.ts` | Existing subscription routes (mount point) |
-| `apps/api/src/services/subscription/SubscriptionBillingService.ts` | Billing service (reused for payment methods + Stripe) |
-| `apps/api/src/services/subscription/BillingNotificationService.ts` | Notification service (extended with feature_* types) |
-| `apps/api/src/routes/admin/feature-purchases.ts` | Admin CRUD for feature purchases |
+| `apps/api/src/routes/bsaas-purchases.ts` | Tenant-facing purchase API (catalog, purchase, cancel) |
+| `apps/api/src/routes/admin/bsaas-catalog.ts` | Admin CRUD for bsaas_catalog table |
+| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (re-charge, suspend, expire) |
+| `apps/api/src/services/subscription/SubscriptionBillingService.ts` | Billing service (chargePaymentMethod reused) |
+| `apps/api/src/services/subscription/BillingNotificationService.ts` | Notification service (extended with bsaas_* types) |
 | `apps/api/src/services/EffectiveCapabilityResolver.ts` | Automatic merge of purchases into capabilities |
-| `apps/api/src/routes/stripe-webhooks.ts` | Stripe webhook handler (extended for BSaaS) |
-| `apps/web/src/app/(platform)/settings/subscription/page.tsx` | Existing subscription page (pattern reference) |
-| `apps/web/src/components/subscription/SelfServiceBilling.tsx` | Existing billing UI (pattern reference) |
+| `apps/api/src/index.ts` | Server startup (renewal job wired in) |
+| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | Feature Store purchase page |
+| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend purchase service |
+| `apps/web/src/app/api/admin/bsaas-catalog/route.ts` | Admin API proxy route |
+| `apps/web/src/services/AdminBsaasCatalogService.ts` | Admin frontend service |
+| `apps/web/src/admin/components/BsaasCatalogManagement.tsx` | Admin catalog management UI |
+| `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx` | Admin catalog page |
+| `database/migrations/047_bsaas_catalog.sql` | Catalog table migration |
+
+## Expansion Opportunities
+
+### ✅ Completed (Phases E1–E5)
+
+The following were implemented as quick-win expansions. See:
+- **`docs/BSAAS_EXPANSION_PHASED_PLAN.md`** — Phased plan (all phases complete)
+- **`docs/BSAAS_EXPANSION_USER_GUIDE.md`** — User guide for all five features
+
+| Phase | Feature | Summary |
+|-------|---------|---------|
+| E1 | Admin Complimentary Access | Admin UI to grant features at no cost (`source='admin_grant'`, `price_cents=0`) |
+| E2 | Grace Period for Renewal Failures | 7-day grace period with daily retries before suspension (`status='past_due'`) |
+| E3 | Free Trials for BSaaS Features | `trial_days` on catalog entries, no charge during trial, auto-converts on expiry |
+| E4 | Revenue Analytics Dashboard | Admin dashboard with MRR, ARR, churn, trial conversion, per-feature revenue |
+| E5 | Promotional Discounts / Coupon Codes | Stripe coupon/promo code management, discount at checkout, tracked in metadata |
+
+### Remaining Future Opportunities
+
+### 1. Stripe Subscriptions (True Recurring Billing)
+Currently renewals use synchronous `chargePaymentMethod` (PaymentIntent). Migrating to Stripe Subscriptions would enable:
+- Automatic retry via Stripe Smart Retries (no custom retry logic needed)
+- Webhook-driven lifecycle (`invoice.payment_failed`, `customer.subscription.deleted`)
+- Proration when upgrading/downgrading between monthly and annual
+- Stripe-hosted invoice PDFs and receipt emails
+- **Implementation**: Create Stripe Price objects per catalog entry, subscribe customer on purchase, handle `invoice.payment_failed` in `stripe-webhooks.ts` to suspend purchases
+
+### 2. Bundle Pricing / Feature Packs
+- Group multiple features into a discounted bundle
+- New `bsaas_bundles` table with `bundle_price_cents`, `bundle_billing_cycle`
+- Junction table `bsaas_bundle_features` mapping bundles to feature keys
+- Purchase endpoint extended to accept `bundleId` as alternative to `featureKey`
+- Single charge covers all features in the bundle
+
+### 3. Usage-Based Pricing (Metered BSaaS)
+- For features like AI bot conversations, API calls, or product embeddings
+- Stripe Metered Billing: create subscription item with `usage_type=metered`
+- Report usage to Stripe via `subscriptionItems.createUsageRecord()`
+- Invoice generated automatically by Stripe based on usage tiers
+- Requires `bsaas_catalog.price_model` column: `flat` vs `metered` vs `tiered`
+
+### 4. Feature Upgrades / Downgrades
+- Allow tenants to switch between monthly and annual billing
+- Proration logic: calculate remaining value, apply credit or charge difference
+- Update `billing_cycle` and `price_cents` in purchase metadata
+- Adjust `expires_at` based on new cycle
 
 ## Related Documents
 
 - **`add-bsaas-feature.md`** — How to add a purchasable feature to the platform
 - **`docs/BSAAS_PHASED_PLAN.md`** — Original phased plan (Phases 1-5, all complete)
 - **`docs/BSAAS_PURCHASE_PHASED_PLAN.md`** — Phased plan for self-service purchase flow
+- **`docs/BSAAS_EXPANSION_PHASED_PLAN.md`** — Expansion quick wins (Phases E1-E5, all complete)
+- **`docs/BSAAS_USER_GUIDE.md`** — User guide for core BSaaS features
+- **`docs/BSAAS_EXPANSION_USER_GUIDE.md`** — User guide for E1-E5 expansion features

@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { publicBotService } from './PublicBotService';
 
 // ====================
 // TYPES
@@ -92,6 +93,9 @@ export interface BotSkill {
 export interface BotDashboardStats {
   totalConversations: number;
   activeConversations: number;
+  escalatedConversations: number;
+  closedConversations: number;
+  archivedConversations: number;
   resolvedByFaq: number;
   resolvedBySkill: number;
   resolvedByFallback: number;
@@ -194,6 +198,7 @@ class BotService extends TenantApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data.success) throw new Error(result.data.error || 'Failed to update bot config');
     await this.invalidateServiceCaches(tenantId);
+    await publicBotService.invalidateCache(`/api/public/bot/config*${tenantId}*`);
     return result.data.config!;
   }
 
@@ -241,6 +246,37 @@ class BotService extends TenantApiSingleton {
     return {
       conversation: result.data.conversation!,
       messages: result.data.messages || [],
+    };
+  }
+
+  async updateConversationStatus(tenantId: string, conversationId: string, status: 'active' | 'closed' | 'archived'): Promise<BotConversation> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<BotConversation>>(
+      `/api/tenants/${tenantId}/bot/conversations/${conversationId}/status`,
+      { method: 'PUT', body: JSON.stringify({ status }) },
+      `bot-conversation-status-${tenantId}-${conversationId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to update conversation status');
+    await this.invalidateCache(`bot-conversations-${tenantId}`);
+    await this.invalidateCache(`bot-conversation-detail-${tenantId}-${conversationId}`);
+    await this.invalidateCache(`bot-dashboard-${tenantId}`);
+    return result.data.conversation!;
+  }
+
+  async escalateConversation(tenantId: string, conversationId: string, reason: string, summary?: string): Promise<{ ticketId: string; ticketTitle: string }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/conversations/${conversationId}/escalate`,
+      { method: 'POST', body: JSON.stringify({ reason, summary }) },
+      `bot-conversation-escalate-${tenantId}-${conversationId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to escalate conversation');
+    await this.invalidateCache(`bot-conversations-${tenantId}`);
+    await this.invalidateCache(`bot-conversation-detail-${tenantId}-${conversationId}`);
+    await this.invalidateCache(`bot-dashboard-${tenantId}`);
+    return {
+      ticketId: result.data.ticketId,
+      ticketTitle: result.data.ticketTitle,
     };
   }
 
@@ -355,6 +391,7 @@ class BotService extends TenantApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data.success) throw new Error(result.data.error || 'Failed to upload avatar');
     await this.invalidateServiceCaches(tenantId);
+    await publicBotService.invalidateCache(`/api/public/bot/config*${tenantId}*`);
     return result.data.url;
   }
 

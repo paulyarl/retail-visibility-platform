@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { botService, type BotConfig, type BotDashboardStats, type BotConversation } from '@/services/BotService';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { botService } from '@/services/BotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { toast } from '@/hooks/use-toast';
+import { getContrastColor } from '@/lib/color-utils';
 
 interface BotTenantWidgetProps {
   tenantId: string;
@@ -17,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 const CONVERSATION_STATUS_BADGE: Record<string, string> = {
   active: 'bg-blue-100 text-blue-800',
+  escalated: 'bg-amber-100 text-amber-800',
   closed: 'bg-gray-100 text-gray-600',
   archived: 'bg-gray-100 text-gray-400',
 };
@@ -36,43 +39,43 @@ function relativeTime(dateStr: string | null | undefined): string {
 
 export default function BotTenantWidget({ tenantId }: BotTenantWidgetProps) {
   const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
-  const [config, setConfig] = useState<BotConfig | null>(null);
-  const [stats, setStats] = useState<BotDashboardStats | null>(null);
-  const [conversations, setConversations] = useState<BotConversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'overview' | 'conversations'>('overview');
 
-  const fetchData = useCallback(async () => {
-    if (!tenantId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [cfg, dashboardStats, convs] = await Promise.all([
-        botService.getConfig(tenantId),
-        botService.getDashboardStats(tenantId),
-        botService.listConversations(tenantId, { limit: 5 }),
-      ]);
-      setConfig(cfg);
-      setStats(dashboardStats);
-      setConversations(convs.conversations);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load bot data');
-    } finally {
-      setLoading(false);
-    }
-  }, [tenantId]);
+  const { data: config, isLoading: configLoading, error: configError } = useQuery({
+    queryKey: ['bot', 'config', tenantId],
+    queryFn: () => botService.getConfig(tenantId),
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    retry: 0,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['bot', 'dashboard', tenantId],
+    queryFn: () => botService.getDashboardStats(tenantId),
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    retry: 0,
+  });
+
+  const { data: convData, isLoading: convLoading } = useQuery({
+    queryKey: ['bot', 'conversations', tenantId, { limit: 5 }],
+    queryFn: () => botService.listConversations(tenantId, { limit: 5 }),
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    retry: 0,
+  });
+
+  const loading = configLoading || statsLoading || convLoading;
+  const error = configError?.message || null;
+  const conversations = convData?.conversations ?? [];
 
   const handleToggleStatus = async () => {
     if (!config || !tenantId) return;
     const newStatus = config.status === 'active' ? 'paused' : 'active';
     try {
       const updated = await botService.updateConfig(tenantId, { status: newStatus });
-      setConfig(updated);
+      queryClient.setQueryData(['bot', 'config', tenantId], updated);
       toast({ title: newStatus === 'active' ? 'Bot activated' : 'Bot paused' });
     } catch (err: any) {
       toast({ title: 'Failed to update bot status', variant: 'destructive' });
@@ -91,7 +94,7 @@ export default function BotTenantWidget({ tenantId }: BotTenantWidgetProps) {
     return (
       <div className="p-6 text-center">
         <p className="text-red-600 text-sm">{error}</p>
-        <button onClick={fetchData} className="mt-2 text-sm text-indigo-600 hover:underline">
+        <button onClick={() => queryClient.invalidateQueries({ queryKey: ['bot'] })} className="mt-2 text-sm text-indigo-600 hover:underline">
           Try again
         </button>
       </div>
@@ -169,11 +172,13 @@ export default function BotTenantWidget({ tenantId }: BotTenantWidgetProps) {
       {activeTab === 'overview' && stats && (
         <div className="space-y-4">
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Total Chats" value={stats.totalConversations} icon="💬" />
-            <StatCard label="Active" value={stats.activeConversations} icon="🟢" />
-            <StatCard label="FAQ Resolved" value={stats.resolvedByFaq} icon="📚" />
-            <StatCard label="Skill Resolved" value={stats.resolvedBySkill} icon="⚡" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <StatCard label="Total Chats" value={stats.totalConversations ?? 0} icon="💬" />
+            <StatCard label="Active" value={stats.activeConversations ?? 0} icon="🟢" />
+            <StatCard label="Escalated" value={stats.escalatedConversations ?? 0} icon="🚨" />
+            <StatCard label="Closed" value={stats.closedConversations ?? 0} icon="✅" />
+            <StatCard label="Archived" value={stats.archivedConversations ?? 0} icon="📦" />
+            <StatCard label="FAQ Resolved" value={stats.resolvedByFaq ?? 0} icon="📚" />
           </div>
 
           {/* Resolution Breakdown */}
@@ -201,8 +206,8 @@ export default function BotTenantWidget({ tenantId }: BotTenantWidgetProps) {
             <h4 className="text-sm font-medium text-gray-700 mb-2">Widget Preview</h4>
             <div className="flex items-center gap-3 text-sm text-gray-500">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-                style={{ background: config?.widgetColor || '#4F46E5' }}
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: config?.widgetColor || '#4F46E5', color: getContrastColor(config?.widgetColor || '#4F46E5') }}
               >
                 💬
               </div>

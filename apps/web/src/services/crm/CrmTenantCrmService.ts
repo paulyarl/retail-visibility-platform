@@ -7,7 +7,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { unifiedCapabilityService } from '../UnifiedCapabilityService';
 import type {
-  CrmTenantCrmStats, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
+  CrmTenantCrmStats, CrmUserReadState, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
   CrmTask, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
@@ -16,6 +16,7 @@ import type {
 
 class CrmTenantCrmService extends TenantApiSingleton {
   private static instance: CrmTenantCrmService;
+  private inflightStats: Promise<CrmTenantCrmStats> | null = null;
 
   private constructor() {
     super('crm-tenant', { ttl: 3 * 60 * 1000 });
@@ -31,6 +32,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   getServiceCachePatterns(): string[] {
     return [
       'crm-tenant-stats',
+      'crm-tenant-read-state',
       'crm-tenant-contacts',
       'crm-tenant-contact-detail',
       'crm-tenant-tickets',
@@ -42,6 +44,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   }
 
   async invalidateServiceCaches(): Promise<void> {
+    this.inflightStats = null;
     for (const pattern of this.getServiceCachePatterns()) {
       await this.invalidateCache(pattern);
     }
@@ -56,14 +59,49 @@ class CrmTenantCrmService extends TenantApiSingleton {
 
   // --- Stats (widget) ---
   async getStats(): Promise<CrmTenantCrmStats> {
-    const cacheKey = 'crm-tenant-stats';
-    const result = await this.makeDefaultRequest<CrmTenantCrmStats>(
-      '/api/tenant/crm/stats',
+    if (this.inflightStats) {
+      return this.inflightStats;
+    }
+
+    this.inflightStats = (async () => {
+      const cacheKey = 'crm-tenant-stats';
+      const result = await this.makeDefaultRequest<CrmTenantCrmStats>(
+        '/api/tenant/crm/stats',
+        { method: 'GET' },
+        cacheKey,
+        3 * 60 * 1000
+      );
+      return this.unwrap<CrmTenantCrmStats>(result);
+    })().finally(() => {
+      this.inflightStats = null;
+    });
+
+    return this.inflightStats;
+  }
+
+  // --- User Read State (persistent widget read tracking) ---
+  async getReadState(): Promise<CrmUserReadState[]> {
+    const cacheKey = 'crm-tenant-read-state';
+    const result = await this.makeDefaultRequest<CrmUserReadState[]>(
+      '/api/tenant/crm/read-state',
       { method: 'GET' },
       cacheKey,
-      3 * 60 * 1000
+      2 * 60 * 1000
     );
-    return this.unwrap<CrmTenantCrmStats>(result);
+    return this.unwrap<CrmUserReadState[]>(result);
+  }
+
+  async setReadState(scope: string, lastReadAt?: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/tenant/crm/read-state',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ scope, last_read_at: lastReadAt }),
+      }
+    );
+    await this.invalidateCache('crm-tenant-stats');
+    await this.invalidateCache('crm-tenant-read-state');
+    if (!result.success) throw new Error(getErrorMessage(result.error));
   }
 
   // --- Contacts ---

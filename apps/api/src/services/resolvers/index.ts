@@ -17,3 +17,4 @@ export { resolveDirectoryEntryOptions } from './DirectoryEntryOptionsResolver';
 export { resolveFaqOptions } from './FaqOptionsResolver';
 export { resolveCrmOptions } from './CrmOptionsResolver';
 export { resolveChatbotOptions } from './ChatbotOptionsResolver';
+export { resolveOrgOptions } from './OrgOptionsResolver';

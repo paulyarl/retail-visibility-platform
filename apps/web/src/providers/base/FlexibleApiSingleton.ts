@@ -76,13 +76,13 @@ export function getErrorCode(error?: string | { status: number; message: string;
 
 export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton {
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes default
-  
+
   // Default request type for this service (can be overridden)
   protected abstract defaultRequestType: RequestType;
   protected defaultIncludeCredentials?: boolean = true; // Default to include credentials
   protected abstract defaultContext?: AppContext;
   protected abstract defaultIsolation?: CacheIsolation;
-  
+
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
   }
@@ -97,7 +97,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     if (parts.length >= 3) {
       const context = parts[parts.length - 2] as AppContext;
       const isolation = parts[parts.length - 1] as CacheIsolation;
-      
+
       // Validate that these are legitimate context/isolation values
       if (Object.values(AppContext).includes(context) && Object.values(CacheIsolation).includes(isolation)) {
         return { context, isolation };
@@ -115,42 +115,42 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     if (url.includes('/tenants/') || url.includes('/tenant-') || url.includes('/dashboard') || url.includes('/tenants')) {
       return { context: AppContext.TENANT, isolation: CacheIsolation.TENANT };
     }
-    
+
     // Admin context - very specific patterns
     if (url.includes('/admin/') || url.includes('/platform/admin') || url.includes('/system/')) {
       return { context: AppContext.ADMIN, isolation: CacheIsolation.ADMIN };
     }
-    
+
     // Public context - very specific patterns
     if (url.includes('/public/') || url.includes('/platform/public')) {
       return { context: AppContext.PUBLIC, isolation: CacheIsolation.PUBLIC };
     }
-    
+
     // Product context - very specific patterns
     if (url.includes('/products/') || url.includes('/products') || url.includes('/product/') || url.includes('/product') || url.includes('/recommendations/') || url.includes('/featured-products')) {
       return { context: AppContext.PRODUCT, isolation: CacheIsolation.PRODUCT };
     }
-    
+
     // Store context - very specific patterns
     if (url.includes('/store/') || url.includes('/stores/') || url.includes('/tenant/') || url.includes('/storefront')) {
       return { context: AppContext.STORE, isolation: CacheIsolation.STORE };
     }
-    
+
     // Shop context - very specific patterns
     if (url.includes('/shops/') || url.includes('/shop/') || url.includes('/shops/directory') || url.includes('/shops')) {
       return { context: AppContext.SHOP, isolation: CacheIsolation.SHOP };
     }
-    
+
     // Directory context - very specific patterns
     if (url.includes('/directory/') || url.includes('/directory')) {
       return { context: AppContext.DIRECTORY, isolation: CacheIsolation.DIRECTORY };
     }
-    
+
     // System context - very specific patterns
     if (url.includes('/external/') || url.includes('/integrations/')) {
       return { context: AppContext.SYSTEM, isolation: CacheIsolation.SYSTEM };
     }
-    
+
     // Return GLOBAL context to indicate no confident match
     // The calling logic will check for this and ignore it
     return { context: AppContext.GLOBAL, isolation: CacheIsolation.GLOBAL };
@@ -189,7 +189,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         // Try to parse error response from API
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         let errorCode = 'HTTP_ERROR';
-        
+
         try {
           const errorData = await response.json();
           // Check for detailed error structure
@@ -208,14 +208,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
               website: 'Website',
               contact_person: 'Contact person',
             };
-            
+
             const messages: string[] = [];
             for (const [field, errors] of Object.entries(fieldErrors)) {
               const fieldName = fieldNames[field] || field;
               const errorList = errors as string[];
               messages.push(`${fieldName}: ${errorList.join(', ')}`);
             }
-            
+
             errorMessage = messages.join(' | ') || 'Please check your input';
           } else if (errorData.message) {
             errorMessage = errorData.message;
@@ -229,7 +229,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           // If we can't parse JSON, use default message
           console.warn('[FlexibleApiSingleton] Could not parse error response:', parseError);
         }
-        
+
         return {
           success: false,
           data: null as T,
@@ -273,7 +273,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           data = await response.json();
           break;
       }
-      
+
       return {
         success: true,
         data: data
@@ -281,7 +281,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     } catch (error) {
       console.error(`[FlexibleApiSingleton] Request failed:`, error);
       this.errors++;
-      
+
       return {
         success: false,
         data: null as T,
@@ -306,7 +306,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // Handle both structured error objects and raw errors
     const status = error?.status || error?.response?.status;
     const message = error?.message || error?.error || error?.toString();
-    
+
     if (status >= 400 && status < 500) {
       // Expected client errors - use warn to avoid error overlay
       console.warn(`[${this.constructor.name}] ${context} (HTTP ${status}):`, message);
@@ -355,17 +355,17 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for public requests
    */
   private async setupPublicRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
-    cacheKey?: string, 
+    url: string,
+    options: RequestInit,
+    cacheKey?: string,
     ttl?: number,
     requestOptions?: PublicRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onPublicRequest<T>(url, options, cacheKey, ttl);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -386,18 +386,18 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for authenticated requests
    */
   private async setupAuthenticatedRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
-    cacheKey?: string, 
+    url: string,
+    options: RequestInit,
+    cacheKey?: string,
     ttl?: number,
     ssrAuth?: { auth0Email?: string; auth0Id?: string },
     requestOptions?: AuthenticatedRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onAuthenticatedRequest<T>(url, options, cacheKey, ttl, false, ssrAuth);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -418,15 +418,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for tenant requests
    */
   private async setupTenantRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
+    url: string,
+    options: RequestInit,
     requestOptions?: TenantRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onTenantRequest<T>(url, options, requestOptions);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -446,15 +446,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for customer requests
    */
   private async setupCustomerRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
+    url: string,
+    options: RequestInit,
     requestOptions?: CustomerRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onCustomerRequest<T>(url, options, requestOptions);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -475,15 +475,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for admin requests
    */
   private async setupAdminRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
+    url: string,
+    options: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onAdminRequest<T>(url, options, requestOptions);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -504,15 +504,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for system requests
    */
   private async setupSystemRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
+    url: string,
+    options: RequestInit,
     requestOptions?: SystemRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onSystemRequest<T>(url, options, requestOptions);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -533,17 +533,17 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Setup options for external requests
    */
   private async setupExternalRequestOptions<T>(
-    url: string, 
-    options: RequestInit, 
+    url: string,
+    options: RequestInit,
     requestOptions?: ExternalRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onExternalRequest<T>(url, options, requestOptions);
-    
+
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
     // Don't set Content-Type for GET requests - they don't have a body
     const isGetRequest = !modifiedOptions.method || modifiedOptions.method === 'GET';
-    
+
     return {
       options: {
         ...modifiedOptions,
@@ -599,7 +599,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
     // Legacy path for explicit context/isolation
     const requestKey = this.getRequestKey('makePublicRequest', url, RequestType.PUBLIC);
-    
+
     // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
     let finalCacheKey = requestOptions?.cacheKey;
     if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
@@ -607,7 +607,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const isolation = (requestOptions as any).isolation;
       const tenantId = (requestOptions as any).tenantId;
       const userId = (requestOptions as any).userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         requestOptions?.cacheKey || url,
         context,
@@ -615,36 +615,37 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         tenantId,
         userId
       );
-      
-    // console.log(`[${this.constructor.name}] ----------------------------------------`);
-    // console.log(`[${this.constructor.name}] start           : makePublicRequest`);
-    // console.log(`[${this.constructor.name}] url             : ${url}`);
-    // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
-    // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
-    // console.log(`[${this.constructor.name}] requestOptions 2: ${JSON.stringify(requestOptions)}`);
-    // console.log(`[${this.constructor.name}] end             : makePublicRequest  `);      
-    // console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start           : makePublicRequest`);
+      // console.log(`[${this.constructor.name}] url             : ${url}`);
+      // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
+      // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
+      // console.log(`[${this.constructor.name}] finalCacheKey   : ${finalCacheKey}`);
+      // console.log(`[${this.constructor.name}] requestOptions 2: ${JSON.stringify(requestOptions)}`);
+      // console.log(`[${this.constructor.name}] end             : makePublicRequest  `);      
+      // console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
 
 
     }
-    
+
     // Delegate to setup method
     const setupResult = await this.setupPublicRequestOptions<T>(
-      url, 
-      options || {}, 
-      finalCacheKey, 
+      url,
+      options || {},
+      finalCacheKey,
       requestOptions?.ttl,
       requestOptions
     );
-    
+
     // Override target if provided in requestOptions
     if (requestOptions?.requestTarget) {
       setupResult.target = requestOptions.requestTarget;
     }
-    
+
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
-    
+
     // Convert to PublicApiResponse format
     return result as PublicApiResponse<T>;
   }
@@ -682,7 +683,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const context = requestOptions.context;
       const isolation = requestOptions.isolation;
       const userId = requestOptions.userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         requestOptions?.cacheKey || cacheKey || url,
         context,
@@ -690,38 +691,38 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         undefined,  // tenantId
         userId
       );
-      
-    // console.log(`[${this.constructor.name}] ----------------------------------------`);
-    // console.log(`[${this.constructor.name}] start           : makeAuthenticatedRequest`);
-    // console.log(`[${this.constructor.name}] url             : ${url}`);
-    // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
-    // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
-    // console.log(`[${this.constructor.name}] requestOptions 3: ${JSON.stringify(requestOptions)}`);
-    // console.log(`[${this.constructor.name}] end             : makeAuthenticatedRequest  `);      
-    // console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start           : makeAuthenticatedRequest`);
+      // console.log(`[${this.constructor.name}] url             : ${url}`);
+      // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
+      // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
+      // console.log(`[${this.constructor.name}] requestOptions 3: ${JSON.stringify(requestOptions)}`);
+      // console.log(`[${this.constructor.name}] end             : makeAuthenticatedRequest  `);      
+      // console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
 
     }
-    
+
     // Delegate to setup method
     const setupResult = await this.setupAuthenticatedRequestOptions<T>(
-      url, 
-      options || {}, 
-      finalCacheKey, 
+      url,
+      options || {},
+      finalCacheKey,
       requestOptions?.ttl || ttl,
       requestOptions?.ssrAuth,
       requestOptions
     );
-    
+
     // Handle requireAuth if specified
     if (requestOptions?.requireAuth) {
       // Add auth headers or validation as needed
       // TODO: Implement getCurrentAuthToken() in concrete classes
       // console.log(`[${this.constructor.name}] 🔐 Auth required for request`);
     }
-    
+
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
-    
+
     // Convert to AuthenticatedApiResponse format
     return result as AuthenticatedApiResponse<T>;
   }
@@ -744,7 +745,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         options,
         requestOptions?.cacheKey,
         {
-          ttl: requestOptions?.ttl || this.cacheTTL,          
+          ttl: requestOptions?.ttl || this.cacheTTL,
           tenantId: requestOptions?.tenantId || '',
           requestTarget: requestOptions?.requestTarget
         }
@@ -759,7 +760,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const isolation = (requestOptions as any).isolation;
       const tenantId = (requestOptions as any).tenantId;
       const userId = (requestOptions as any).userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         requestOptions?.cacheKey || url,
         context,
@@ -768,21 +769,21 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
 
-      
-    // console.log(`[${this.constructor.name}] ----------------------------------------`);
-    // console.log(`[${this.constructor.name}] start           : makeTenantRequest`);
-    // console.log(`[${this.constructor.name}] url             : ${url}`);
-    // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
-    // console.log(`[${this.constructor.name}] requestOptions 4: ${JSON.stringify(requestOptions)}`);
-    // console.log(`[${this.constructor.name}] end             : makeTenantRequest  `);            
-    // console.log(`[${this.constructor.name}] 🎯 makeTenantRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start           : makeTenantRequest`);
+      // console.log(`[${this.constructor.name}] url             : ${url}`);
+      // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
+      // console.log(`[${this.constructor.name}] requestOptions 4: ${JSON.stringify(requestOptions)}`);
+      // console.log(`[${this.constructor.name}] end             : makeTenantRequest  `);            
+      // console.log(`[${this.constructor.name}] 🎯 makeTenantRequest Enhanced cacheKey generated: ${finalCacheKey}`);
 
     }
-    
+
     // Delegate to setup method
     const setupResult = await this.setupTenantRequestOptions<T>(
-      url, 
-      options || {}, 
+      url,
+      options || {},
       {
         tenantId: requestOptions?.tenantId || '',
         cacheKey: finalCacheKey,
@@ -790,15 +791,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         requestTarget: requestOptions?.requestTarget
       }
     );
-    
+
     // Override target if provided in requestOptions
     if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
       setupResult.target = requestOptions.requestTarget;
     }
-    
+
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
-    
+
     // Convert to TenantApiResponse format
     return result as TenantApiResponse<T>;
   }
@@ -836,7 +837,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const isolation = (requestOptions as any).isolation;
       const tenantId = (requestOptions as any).tenantId;
       const userId = (requestOptions as any).userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         requestOptions?.cacheKey || url,
         context,
@@ -845,7 +846,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
 
-      
+
       // console.log(`[${this.constructor.name}] ----------------------------------------`);
       // console.log(`[${this.constructor.name}] start           : makeAdminRequest`);
       // console.log(`[${this.constructor.name}] url             : ${url}`);
@@ -853,14 +854,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       // console.log(`[${this.constructor.name}] requestOptions 5: ${JSON.stringify(requestOptions)}`);
       // console.log(`[${this.constructor.name}] end             : makeAdminRequest  `);      
       // console.log(`[${this.constructor.name}] 🎯 makeAdminRequest Enhanced cacheKey generated: ${finalCacheKey}`);
-    
+
 
     }
-    
+
     // Delegate to setup method
     const setupResult = await this.setupAdminRequestOptions<T>(
-      url, 
-      options || {}, 
+      url,
+      options || {},
       {
         cacheKey: finalCacheKey,
         ttl: requestOptions?.ttl,
@@ -870,15 +871,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         bypassCache: requestOptions?.bypassCache
       }
     );
-    
+
     // Override target if provided in requestOptions
     if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
       setupResult.target = requestOptions.requestTarget;
     }
-    
+
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
-    
+
     // Convert to AdminApiResponse format
     return result as AdminApiResponse<T>;
   }
@@ -937,7 +938,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const isolation = (requestOptions as any).isolation;
       const tenantId = (requestOptions as any).tenantId;
       const userId = (requestOptions as any).userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         requestOptions?.cacheKey || url,
         context,
@@ -945,14 +946,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         tenantId,
         userId
       );
-      
+
       // console.log(`[${this.constructor.name}] 🎯 makeExternalRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     }
-    
+
     // Delegate to setup method
     const setupResult = await this.setupExternalRequestOptions<T>(
-      url, 
-      options || {}, 
+      url,
+      options || {},
       {
         cacheKey: finalCacheKey,
         ttl: requestOptions?.ttl,
@@ -961,15 +962,15 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         headers: requestOptions?.headers
       }
     );
-    
+
     // Override target if provided in requestOptions
     if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
       setupResult.target = requestOptions.requestTarget;
     }
-    
+
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
-    
+
     // Convert to ExternalApiResponse format
     return result as ExternalApiResponse<T>;
   }
@@ -990,9 +991,9 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
     // const requestContext = requestOptions?.context || this.defaultContext;
     // const requestIsolation = requestOptions?.isolation || this.defaultIsolation;
-    let requestContext = requestOptions?.context ;
-    let requestIsolation = requestOptions?.isolation ;
-    let responseType = requestOptions?.responseType ;
+    let requestContext = requestOptions?.context;
+    let requestIsolation = requestOptions?.isolation;
+    let responseType = requestOptions?.responseType;
     // if (responseType){
     //   console.log("responseType 1", responseType);
     // }
@@ -1017,13 +1018,13 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // if (responseType){
     //   console.log("responseType 2", responseType);
     // }
-     // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
-     if (!requestContext){
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    if (!requestContext) {
       requestContext = requestOptions?.context || this.defaultContext;
-     }
-     if (!requestIsolation){
-         requestIsolation = requestOptions?.isolation || this.defaultIsolation;
-     }
+    }
+    if (!requestIsolation) {
+      requestIsolation = requestOptions?.isolation || this.defaultIsolation;
+    }
     //  console.log(`[FlexibleApiSingleton] makeDefaultRequest - context: ${requestContext}, isolation: ${requestIsolation}`);
 
     let finalCacheKey = cacheKey;
@@ -1032,7 +1033,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const isolation = requestIsolation;
       const tenantId = (requestOptions as any).tenantId;
       const userId = (requestOptions as any).userId;
-      
+
       finalCacheKey = this.generateCacheKey(
         cacheKey || url,
         context,
@@ -1040,22 +1041,22 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         tenantId,
         userId
       );
-      
 
-    // console.log(`[${this.constructor.name}] ----------------------------------------`);
-    // console.log(`[${this.constructor.name}] start           : ${requestType}`);
-    // console.log(`[${this.constructor.name}] url             : ${url}`);
-    // console.log(`[${this.constructor.name}] requestOptions 1: ${JSON.stringify(options)}`);
-    // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
-    // console.log(`[${this.constructor.name}] cacheOptions    : ${JSON.stringify(requestOptions)}`);
-    // console.log(`[${this.constructor.name}] end             : ${requestTarget}  `);   
-    // console.log(`[${this.constructor.name}] 🎯 Enhanced cacheKey generated: ${finalCacheKey}`);
+
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start           : ${requestType}`);
+      // console.log(`[${this.constructor.name}] url             : ${url}`);
+      // console.log(`[${this.constructor.name}] requestOptions 1: ${JSON.stringify(options)}`);
+      // console.log(`[${this.constructor.name}] cacheKey        : ${cacheKey}`);
+      // console.log(`[${this.constructor.name}] cacheOptions    : ${JSON.stringify(requestOptions)}`);
+      // console.log(`[${this.constructor.name}] end             : ${requestTarget}  `);   
+      // console.log(`[${this.constructor.name}] 🎯 Enhanced cacheKey generated: ${finalCacheKey}`);
 
 
     }
-    
+
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
-    
+
     // Delegate to appropriate setup method based on request type
     switch (requestType) {
       case RequestType.PUBLIC:
@@ -1087,16 +1088,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       default:
         throw new Error(`Unsupported request type: ${requestType}`);
     }
-    
+
     // Apply target override if provided
     if (requestTarget && requestTarget !== setupResult.target) {
       setupResult.target = requestTarget;
     }
-    
+
 
     // console.log(`[${this.constructor.name}] 🎯 Enhanced setupResult generated: ${JSON.stringify(setupResult)}`);
 
-    
+
     // Delegate to unified execution - single source of truth
     return await this.executeUnifiedRequest<T>(url, setupResult, responseType || requestOptions?.responseType);
   }
@@ -1124,16 +1125,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     if (typeof window === 'undefined') {
       return null;
     }
-    
+
     try {
       // Try to get from sessionStorage (Auth0 stores it there)
       const token = sessionStorage.getItem('auth0_token');
       if (token) return token;
-      
+
       // Try to get from localStorage
       const localToken = localStorage.getItem('auth0_token');
       if (localToken) return localToken;
-      
+
       return null;
     } catch {
       return null;
@@ -1145,7 +1146,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    */
   protected getAuth0Email(): string | null {
     if (typeof document === 'undefined') return null;
-    
+
     try {
       const cookies = document.cookie.split(';');
       for (const cookie of cookies) {
@@ -1165,7 +1166,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    */
   protected getAuth0Id(): string | null {
     if (typeof document === 'undefined') return null;
-    
+
     try {
       const cookies = document.cookie.split(';');
       for (const cookie of cookies) {
@@ -1199,20 +1200,20 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // For SSR: use ssrAuth parameter
     const auth0Id = ssrAuth?.auth0Id || this.getAuth0Id();
     const email = ssrAuth?.auth0Email || this.getAuth0Email();
-    
-      // console.log('[FlexibleApiSingleton] Making authenticated request to:', url);
-    
+
+    // console.log('[FlexibleApiSingleton] Making authenticated request to:', url);
+
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    
+
     if (auth0Id) {
       headers['x-auth0-id'] = auth0Id;
     }
     if (email) {
       headers['x-auth0-email'] = email;
     }
-    
+
     return {
       ...options,
       headers,
@@ -1233,14 +1234,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    
+
     if (auth0Id) {
       headers['x-auth0-id'] = auth0Id;
     }
     if (email) {
       headers['x-auth0-email'] = email;
     }
-    
+
     return {
       ...options,
       headers,
@@ -1260,7 +1261,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    
+
     // Add customer JWT token if available
     if (typeof window !== 'undefined') {
       const customerToken = localStorage.getItem('customer_auth_token');
@@ -1275,7 +1276,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           if (parsed?.id) {
             headers['x-customer-id'] = parsed.id;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1284,7 +1285,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     if (customerId) {
       headers['x-customer-id'] = customerId;
     }
-    
+
     return {
       ...options,
       headers,
@@ -1305,14 +1306,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    
+
     if (auth0Id) {
       headers['x-auth0-id'] = auth0Id;
     }
     if (email) {
       headers['x-auth0-email'] = email;
     }
-    
+
     return {
       ...options,
       headers,
@@ -1377,19 +1378,19 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     switch (target) {
       case RequestTarget.API:
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ||
-                       process.env.NEXT_PUBLIC_API_URL ||
-                       process.env.API_BASE_URL ||
-                       process.env.API_URL ||
-                       '';
+          process.env.NEXT_PUBLIC_API_URL ||
+          process.env.API_BASE_URL ||
+          process.env.API_URL ||
+          '';
         return `${apiUrl}${url}`;
 
       case RequestTarget.WEB:
         const webUrl = process.env.NEXT_PUBLIC_APP_ORIGIN ||
-                     process.env.NEXTAUTH_URL ||
-                     process.env.WEB_URL ||
-                     process.env.NEXT_PUBLIC_WEB_URL ||
-                     process.env.FRONTEND_URL ||
-                     'http://localhost:3000';
+          process.env.NEXTAUTH_URL ||
+          process.env.WEB_URL ||
+          process.env.NEXT_PUBLIC_WEB_URL ||
+          process.env.FRONTEND_URL ||
+          'http://localhost:3000';
         return `${webUrl}${url}`;
 
       case RequestTarget.EXTERNAL:
@@ -1399,10 +1400,10 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       default:
         // Fallback to API
         const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL ||
-                            process.env.NEXT_PUBLIC_API_URL ||
-                            process.env.API_BASE_URL ||
-                            process.env.API_URL ||
-                            '';
+          process.env.NEXT_PUBLIC_API_URL ||
+          process.env.API_BASE_URL ||
+          process.env.API_URL ||
+          '';
         return `${fallbackUrl}${url}`;
     }
   }
@@ -1452,18 +1453,18 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
     // console.log(`[${this.constructor.name}] cacheKey: ${cacheKey}`);
     // console.log(`[${this.constructor.name}] url: ${url}`);
-    
+
     // Check cache first using context-aware caching with correct priority hierarchy
     const method = (options.method || 'GET').toUpperCase();
-    
+
     // console.log(`[${this.constructor.name}] method: ${method}`);
-    
+
     // 🚀 OPTIMIZATION 1: Check if cacheKey is already enhanced (has context:isolation)
     // This happens for ALL requests to extract context for potential cache invalidation
     let context = this.defaultContext;
     let isolation = this.defaultIsolation;
     let skipContextDetection = false;
-    
+
     if (cacheKey && cacheKey.includes(':')) {
       const detectedFromKey = this.detectContextFromCacheKey(cacheKey);
       if (detectedFromKey) {
@@ -1474,7 +1475,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         // console.log(`[${this.constructor.name}] 🎯 Using enhanced cacheKey - context: ${context}, isolation: ${isolation}`);
       }
     }
-    
+
     // 🚀 OPTIMIZATION 2: Skip context detection if already determined from cacheKey
     if (!skipContextDetection && cacheKey) {
       // Priority: Explicit defaults → URL detection → Generic fallback
@@ -1488,7 +1489,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         }
       }
     }
-    
+
     // 🚀 OPTIMIZATION 3: Check cache as soon as we have the enhanced cacheKey (GET requests only)
     if (cacheKey && method === 'GET') {
       if (context || isolation) {
@@ -1500,17 +1501,17 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           userId: undefined
         };
         const cachedResponse = await this.getContextAwareCache<string>(cacheKey, cacheOptions);
-        
-            // console.log("---------------------------------------------------------------------------------");
-            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) for key: ${cacheKey}`);
-            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) response: ${cachedResponse}`);          
-            // console.log("---------------------------------------------------------------------------------");
+
+        // console.log("---------------------------------------------------------------------------------");
+        // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) for key: ${cacheKey}`);
+        // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) response: ${cachedResponse}`);          
+        // console.log("---------------------------------------------------------------------------------");
 
         if (cachedResponse && typeof cachedResponse === 'string' && cachedResponse.trim() !== '' && cachedResponse !== 'undefined') {
           // Validate that cached response is valid JSON before returning
           try {
             JSON.parse(cachedResponse); // Validate JSON
-            
+
             // console.log("---------------------------------------------------------------------------------");
             // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) for key: ${cacheKey}`);
             // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) response: ${cachedResponse}`);          
@@ -1532,7 +1533,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           // Validate that cached response is valid JSON before returning
           try {
             JSON.parse(cachedResponse); // Validate JSON
-            
+
             // console.log("---------------------------------------------------------------------------------");
             // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) for key: ${cacheKey}`);
             // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) response: ${cachedResponse}`);          
@@ -1549,19 +1550,19 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           }
         }
       }
-      
+
       // console.log(`[${this.constructor.name}] 🎯 Cache MISS for key: ${cacheKey}`);
     }
-    
+
     // Increment API calls counter
     this.apiCalls++;
-    
+
     // Fetch from network - include credentials for Auth0 HTTP-only cookies
-    
+
     // console.log(`[${this.constructor.name}] about to fetch from: ${fullUrl}`);
-    
+
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
-    
+
     let response: Response;
     try {
       response = await fetch(fullUrl, {
@@ -1582,11 +1583,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       // Re-throw other errors to be handled by callers
       throw fetchError;
     }
-    
+
     // console.log(`[${this.constructor.name}] response: ${JSON.stringify(response)}`);
     // console.log(`[${this.constructor.name}] response status: ${response.status}`);
-    
-        
+
+
     // Auto-invalidate cache for non-GET requests (with login exception)
     if (method !== 'GET' && cacheKey) {
       // Skip cache invalidation for login endpoints (they use ttl: 0 and don't need cache management)
@@ -1602,11 +1603,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         }
       }
     }
-    
+
     // Cache successful responses ONLY for GET requests
     if (response.ok && cacheKey && method === 'GET') {
       const responseText = await response.text();
-      
+
       // 🚀 OPTIMIZATION 5: Reuse already determined context/isolation for cache setting
       if (context || isolation) {
         // Use context-aware caching
@@ -1617,7 +1618,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           userId: undefined,
           ttl: ttl || this.cacheTTL
         };
-        
+
         // console.log(`[${this.constructor.name}] Setting context-aware cache for key: ${cacheKey}`);
         // console.log(`[${this.constructor.name}] Cache options: ${JSON.stringify(cacheOptions)}`);
         // console.log(`[${this.constructor.name}] Response text: ${responseText}`);
@@ -1627,14 +1628,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         // console.log(`[${this.constructor.name}] Setting generic cache for key: ${cacheKey}`);
         await this.setCache(cacheKey, responseText, { useAutoUser: true });
       }
-      
+
       // Return new Response from cached text
       return new Response(responseText, {
         status: response.status,
         headers: response.headers
       });
     }
-    
+
     return response;
   }
 
@@ -1667,7 +1668,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   ): Promise<{ success: boolean; refreshed: number; total: number; results: any[] }> {
     try {
       const viewArray = typeof views === 'string' ? [views] : views;
-      
+
       const result = await this.makeDefaultRequest<{ refreshed: number; total: number; results: any[] }>(
         '/api/cache/refresh-mv',
         {

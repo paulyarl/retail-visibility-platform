@@ -7873,6 +7873,11 @@ console.log('✅ Organizations routes mounted at /organizations');
 app.use('/api/organizations', authenticateToken, organizationRoutes);
 console.log('✅ Organizations routes mounted at /api/organizations (with authentication)');
 
+/* ------------------------------ organization capabilities ------------------------------ */
+import organizationCapabilitiesRoutes from './routes/organization-capabilities';
+app.use('/api/organizations', organizationCapabilitiesRoutes);
+console.log('✅ Organization capabilities routes mounted at /api/organizations/:orgId/effective-capabilities');
+
 /* ------------------------------ hero location ------------------------------ */
 import heroLocationRoutes from './routes/hero-location';
 app.use('/api/hero-location', heroLocationRoutes);
@@ -8009,6 +8014,15 @@ if (process.env.NODE_ENV !== "test") {
         console.log('💸 Subscription grace period job started (daily at midnight)');
       } catch (err) {
         console.error('⚠️ Failed to start grace period job:', err);
+      }
+
+      // Start BSaaS feature renewal job (daily at midnight)
+      try {
+        const { startBsaasRenewalJob } = await import('./jobs/bsaas-renewal');
+        startBsaasRenewalJob();
+        console.log('🔄 BSaaS feature renewal job started (daily at midnight)');
+      } catch (err) {
+        console.error('⚠️ Failed to start BSaaS renewal job:', err);
       }
 
       // Start featured products expiry monitor (daily at midnight)

@@ -123,13 +123,14 @@ class BsaasPurchaseService extends TenantApiSingleton {
    */
   async purchaseFeature(
     featureKey: string,
-    paymentMethodId: string
+    paymentMethodId: string,
+    promotionCode?: string
   ): Promise<BsaasPurchaseResult> {
     const response = await this.makeDefaultRequest<BsaasPurchaseResult>(
       '/api/subscription/feature-purchase',
       {
         method: 'POST',
-        body: JSON.stringify({ featureKey, paymentMethodId }),
+        body: JSON.stringify({ featureKey, paymentMethodId, ...(promotionCode ? { promotionCode } : {}) }),
       },
       'bsaas-purchase'
     );

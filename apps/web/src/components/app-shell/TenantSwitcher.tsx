@@ -17,6 +17,47 @@ type Tenant = {
   locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
 };
 
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-amber-500',
+  'bg-rose-500',
+  'bg-cyan-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-fuchsia-500',
+  'bg-orange-500',
+];
+
+function getTenantColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getTenantInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+function TenantAvatar({ id, name, size = 'sm' }: { id: string; name: string; size?: 'sm' | 'md' }) {
+  const sizeClass = size === 'md' ? 'h-8 w-8 text-xs' : 'h-6 w-6 text-[10px]';
+  return (
+    <span
+      className={`${sizeClass} ${getTenantColor(id)} rounded-full inline-flex items-center justify-center text-white font-semibold flex-shrink-0`}
+      aria-hidden="true"
+    >
+      {getTenantInitials(name)}
+    </span>
+  );
+}
+
 const getStatusBadge = (status?: string) => {
   if (!status || status === 'active') return null;
   
@@ -149,6 +190,7 @@ export default function TenantSwitcher() {
           onClick={() => setIsStatusModalOpen(true)}
           className="px-2 py-1 rounded-md hover:bg-neutral-50 flex items-center gap-2"
         >
+          <TenantAvatar id={only.id} name={only.name} />
           <span className="font-medium text-neutral-900">{only.name}</span>
           {getStatusBadge(only.locationStatus)}
           <MobileCapacityIndicator tenantId={only.id} showText={false} />
@@ -196,8 +238,11 @@ export default function TenantSwitcher() {
     );
   }
 
+  const currentTenant = tenants.find(t => t.id === current);
+
   return (
     <div id="tenant-switcher" className="inline-flex items-center gap-2">
+      {currentTenant && <TenantAvatar id={currentTenant.id} name={currentTenant.name} />}
       <label htmlFor="tenant-switcher" className="text-xs text-neutral-500">Location</label>
       <select
         id="tenant-switcher"

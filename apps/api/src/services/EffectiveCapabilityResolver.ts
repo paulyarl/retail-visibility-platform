@@ -28,6 +28,7 @@ import {
   resolveFaqOptions,
   resolveCrmOptions,
   resolveChatbotOptions,
+  resolveOrgOptions,
 } from './resolvers';
 import type {
   EffectiveCapabilities,
@@ -173,6 +174,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.chatbot_options?.features || {},
       rawCaps.capabilities.chatbot_options?.capability_enabled
     ),
+    resolveOrgOptions(
+      rawCaps.capabilities.organization_options?.features || {},
+      rawCaps.capabilities.organization_options?.capability_enabled
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -193,8 +198,10 @@ export async function resolveEffectiveCapabilities(
       faq: effective[11],
       crm: effective[12],
       chatbot: effective[13],
+      org_options: effective[14],
     },
     uncategorized_features: rawCaps.uncategorized_features,
+    purchased_feature_keys: rawCaps.purchased_feature_keys || [],
   };
 
   // 6. Attach raw gates for authenticated / detail=full requests
@@ -289,11 +296,11 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
   }
 
   // Merge purchased features (BSaaS — à la carte feature purchases)
-  // Active, non-expired purchases override tier gates with most-permissive-wins
+  // Active and past_due (grace period) purchases override tier gates with most-permissive-wins
   const purchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       tenant_id: tenantId,
-      status: 'active',
+      status: { in: ['active', 'past_due', 'trial'] },
       OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
     },
     select: { feature_key: true },
@@ -306,7 +313,6 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
       where: { key: { in: purchaseFeatureKeys } },
       select: { id: true, key: true },
     });
-
     const featureIdToKey = new Map(purchaseFeatures.map(f => [f.id, f.key]));
 
     const capLinks = await prisma.capability_features_list.findMany({
@@ -362,6 +368,7 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     tier_description: effectiveTier?.description || '',
     capabilities,
     uncategorized_features: uncategorizedFeatures,
+    purchased_feature_keys: purchases.length > 0 ? purchases.map(p => p.feature_key) : [],
   };
 }
 

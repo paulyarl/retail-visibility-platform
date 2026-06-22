@@ -177,13 +177,25 @@ export default function EnhancedProductCard({
 
         {/* Image Section with Thumbnails */}
         <div className="relative mb-3">
-          <div 
+          <div
             className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+            role="button"
+            tabIndex={0}
             onClick={() => {
               if (bulkMode && onToggleSelection) {
                 onToggleSelection(item.id);
               } else {
                 tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (bulkMode && onToggleSelection) {
+                  onToggleSelection(item.id);
+                } else {
+                  tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                }
               }
             }}
             title={bulkMode ? "Click to select" : "View item details"}
@@ -217,9 +229,17 @@ export default function EnhancedProductCard({
         {/* Product Information */}
         <div className="space-y-2 mb-3">
           {/* Product Name */}
-          <h4 
+          <h4
             className="font-semibold text-neutral-900 dark:text-neutral-900 line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
             onClick={() => tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+              }
+            }}
+            role="button"
+            tabIndex={0}
             title="View item details"
           >
             {item.name}

@@ -28,6 +28,7 @@ export interface RawCapabilitiesInput {
   tier_description: string;
   capabilities: Record<string, CapabilityGroup>;
   uncategorized_features: string[];
+  purchased_feature_keys?: string[];
 }
 
 // ====================
@@ -582,6 +583,31 @@ export interface EffectiveChatbot {
 }
 
 // ====================
+// ORGANIZATION OPTIONS
+// ====================
+
+export type OrgTabKey =
+  | 'overview' | 'locations' | 'propagation' | 'capabilities'
+  | 'team' | 'commerce' | 'billing';
+
+export type OrgPanelKey =
+  | 'task_checklist' | 'quick_links' | 'system_status'
+  | 'recommendations' | 'crm_summary';
+
+export type OrgPropagationType =
+  | 'org_propagation_products' | 'org_propagation_categories'
+  | 'org_propagation_business_info' | 'org_propagation_settings';
+
+export interface EffectiveOrgOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  allowed_tabs: OrgTabKey[];
+  allowed_panels: OrgPanelKey[];
+  allowed_propagation_types: OrgPropagationType[];
+  org_available: boolean;
+}
+
+// ====================
 // TOP-LEVEL RESPONSE
 // ====================
 
@@ -603,6 +629,7 @@ export interface EffectiveCapabilities {
     crm: EffectiveCrm;
     chatbot: EffectiveChatbot;
     barcode_scan: EffectiveBarcodeScan;
+    org_options: EffectiveOrgOptions;
   };
   gates?: {
     tier_hard: Record<string, CapabilityGroup>;
@@ -610,4 +637,5 @@ export interface EffectiveCapabilities {
     org_override?: Record<string, Record<string, boolean>>;
   };
   uncategorized_features: string[];
+  purchased_feature_keys?: string[];
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Select, Textarea, Modal, ModalFooter, ConfirmDialog } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminUsersService, type AdminUser } from '@/services/AdminUsersService';
+import { getContrastColor } from '@/lib/color-utils';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 
@@ -234,10 +235,22 @@ export default function CrmTicketDetailPage() {
                 {messages.map(m => {
                   const isInternal = m.is_internal;
                   const isPlatform = m.author_type === 'platform';
+                  const isCustomer = m.author_type === 'customer';
+                  const accentColor = isCustomer ? '#3B82F6' : isPlatform ? '#8B5CF6' : '#F59E0B';
+                  const useTintedBubble = !isInternal;
                   return (
                     <div
                       key={m.id}
-                      className={`rounded-lg p-4 border ${isInternal ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : isPlatform ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}
+                      className={`rounded-lg p-4 ${
+                        isInternal
+                          ? 'bg-amber-50 dark:bg-amber-900/10 border border-dashed border-amber-200 dark:border-amber-800'
+                          : isCustomer ? 'ml-8' : 'mr-8'
+                      }`}
+                      style={useTintedBubble ? {
+                        background: accentColor + '1A',
+                        border: `1px solid ${accentColor}40`,
+                        color: accentColor,
+                      } : undefined}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">

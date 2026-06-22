@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { publicBotService, type PublicBotConfig } from '@/services/PublicBotService';
+import { publicBotService, type PublicBotConfig, type SteeringChannel } from '@/services/PublicBotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { getContrastColor } from '@/lib/color-utils';
 import SkillCardRenderer from './SkillCardRenderer';
+import BotChannelModal from './BotChannelModal';
 
 interface ChatMessage {
   id: string;
@@ -14,12 +16,15 @@ interface ChatMessage {
   skillCard?: any;
   skillName?: string | null;
   feedback?: 'positive' | 'negative' | null;
+  channels?: SteeringChannel[];
 }
 
 interface PublicBotWidgetProps {
   tenantId: string;
-  pageContext?: 'storefront' | 'product' | 'directory';
+  pageContext?: string;
   hasActivePaymentGateway?: boolean;
+  inline?: boolean;
+  onClose?: () => void;
 }
 
 const POSITION_CLASSES: Record<string, string> = {
@@ -40,6 +45,8 @@ export default function PublicBotWidget({
   tenantId,
   pageContext = 'storefront',
   hasActivePaymentGateway = false,
+  inline = false,
+  onClose,
 }: PublicBotWidgetProps) {
   const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [config, setConfig] = useState<PublicBotConfig | null>(null);
@@ -54,9 +61,38 @@ export default function PublicBotWidget({
   const [error, setError] = useState<string | null>(null);
   const [autoOpenTriggered, setAutoOpenTriggered] = useState(false);
   const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
+  const [modalChannel, setModalChannel] = useState<SteeringChannel | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const startConversation = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await publicBotService.startConversation({
+        tenantId,
+        customerEmail: preChatEmail || undefined,
+        customerPhone: preChatPhone || undefined,
+        pageContext,
+      });
+      setSessionId(result.sessionId);
+      setMessages([{
+        id: 'greeting',
+        role: 'assistant',
+        content: result.greeting,
+        responseType: 'greeting',
+      }]);
+      setPreChatDone(true);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to start conversation');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, preChatEmail, preChatPhone, pageContext]);
+
+  const needsPreChat = config?.preChatEnabled && !preChatDone && !sessionId;
 
   // Fetch platform settings for default logo
   useEffect(() => {
@@ -87,16 +123,16 @@ export default function PublicBotWidget({
     return () => { cancelled = true; };
   }, [tenantId, chatbotCaps?.enabled, chatbotCaps?.widgetEnabled]);
 
-  // Auto-open after delay if configured
+  // Auto-open after delay if configured (floating mode only)
   useEffect(() => {
-    if (!config || autoOpenTriggered || isOpen) return;
-    // Auto-open after 5 seconds as a default; could be made configurable
+    if (inline || !config || autoOpenTriggered || isOpen) return;
+    // Auto-open after 8 seconds as a default; could be made configurable
     const timer = setTimeout(() => {
       setIsOpen(true);
       setAutoOpenTriggered(true);
     }, 8000);
     return () => clearTimeout(timer);
-  }, [config, autoOpenTriggered, isOpen]);
+  }, [inline, config, autoOpenTriggered, isOpen]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -110,31 +146,15 @@ export default function PublicBotWidget({
     }
   }, [isOpen, preChatDone]);
 
-  const startConversation = useCallback(async () => {
-    if (!tenantId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await publicBotService.startConversation({
-        tenantId,
-        customerEmail: preChatEmail || undefined,
-        customerPhone: preChatPhone || undefined,
-        pageContext,
-      });
-      setSessionId(result.sessionId);
-      setMessages([{
-        id: 'greeting',
-        role: 'assistant',
-        content: result.greeting,
-        responseType: 'greeting',
-      }]);
-      setPreChatDone(true);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to start conversation');
-    } finally {
-      setLoading(false);
+  // Inline mode: keep panel open and start conversation once config is ready
+  useEffect(() => {
+    if (!inline || !config || autoOpenTriggered) return;
+    setIsOpen(true);
+    setAutoOpenTriggered(true);
+    if (!needsPreChat && !sessionId) {
+      startConversation();
     }
-  }, [tenantId, preChatEmail, preChatPhone, pageContext]);
+  }, [inline, config, autoOpenTriggered, needsPreChat, sessionId, startConversation]);
 
   const sendMessage = useCallback(async () => {
     if (!sessionId || !inputValue.trim()) return;
@@ -158,6 +178,7 @@ export default function PublicBotWidget({
         skillCard: result.skillCard,
         skillName: result.skillName,
         feedback: null,
+        channels: result.channels,
       }]);
     } catch (err: any) {
       setError(err?.message || 'Failed to send message');
@@ -184,6 +205,7 @@ export default function PublicBotWidget({
     }
   }, [sessionId]);
 
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -201,22 +223,26 @@ export default function PublicBotWidget({
   const posClass = POSITION_CLASSES[position] || POSITION_CLASSES['bottom-right'];
   const panelPosClass = PANEL_POSITION_CLASSES[position] || PANEL_POSITION_CLASSES['bottom-right'];
   const accentColor = config.widgetColor || '#4F46E5';
+  const accentTextColor = getContrastColor(accentColor);
   const botName = config.botName || 'Assistant';
-  const avatarUrl = config.widgetAvatarUrl || platformLogoUrl;
-  const needsPreChat = config.preChatEnabled && !preChatDone && !sessionId;
+  const avatarUrl = config.widgetAvatarUrl || config.platformLogoUrl || platformLogoUrl;
 
   return (
     <>
       {/* Chat Panel */}
       {isOpen && (
         <div
-          className={`fixed ${panelPosClass} z-[9999] w-[calc(100vw-2rem)] sm:w-96 bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden`}
-          style={{ maxHeight: '70vh', height: '70vh' }}
+          className={
+            inline
+              ? 'relative w-full bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden'
+              : `fixed ${panelPosClass} z-[9999] w-[calc(100vw-2rem)] sm:w-96 bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden`
+          }
+          style={inline ? { height: '360px' } : { maxHeight: '70vh', height: '70vh' }}
         >
           {/* Header */}
           <div
-            className="flex items-center justify-between px-4 py-3 text-white shrink-0"
-            style={{ background: accentColor }}
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ background: accentColor, color: accentTextColor }}
           >
             <div className="flex items-center gap-2 min-w-0">
               {avatarUrl ? (
@@ -227,25 +253,29 @@ export default function PublicBotWidget({
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg shrink-0">
-                  💬
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
                 </div>
               )}
               <div className="min-w-0">
                 <div className="font-semibold text-sm truncate">{botName}</div>
-                <div className="text-xs text-white/80 truncate">
+                <div className="text-xs truncate" style={{ color: accentTextColor, opacity: 0.8 }}>
                   {loading ? 'Typing...' : 'Online'}
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-white/20 transition-colors shrink-0"
-              aria-label="Close chat"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {(!inline || onClose) && (
+              <button
+                onClick={() => onClose ? onClose() : setIsOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors shrink-0"
+                aria-label="Close chat"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Messages Area */}
@@ -258,16 +288,43 @@ export default function PublicBotWidget({
                 <div
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${
                     msg.role === 'user'
-                      ? 'text-white rounded-br-sm'
+                      ? 'rounded-br-sm'
                       : 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 rounded-bl-sm shadow-sm'
                   }`}
-                  style={msg.role === 'user' ? { background: accentColor } : undefined}
+                  style={msg.role === 'user' ? {
+                    background: accentColor + '1A',
+                    border: `1px solid ${accentColor}40`,
+                    color: accentColor,
+                  } : undefined}
                 >
                   <p className="whitespace-pre-line">{msg.content}</p>
 
                   {/* Skill Card */}
                   {msg.skillCard && (
                     <SkillCardRenderer card={msg.skillCard} />
+                  )}
+
+                  {/* Channel Steering CTA buttons */}
+                  {msg.role === 'assistant' && msg.channels && msg.channels.length > 0 && (
+                    <div className="mt-2.5 space-y-1.5">
+                      {msg.channels.filter(c => c.enabled).map((channel) => (
+                        <button
+                          key={channel.type}
+                          onClick={() => {
+                            setModalChannel(channel);
+                            setError(null);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-600 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors text-xs"
+                        >
+                          <div className="font-medium text-neutral-900 dark:text-neutral-100">
+                            {channel.label}
+                          </div>
+                          <div className="text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            {channel.description}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
 
                   {/* Feedback buttons for assistant messages */}
@@ -328,7 +385,11 @@ export default function PublicBotWidget({
           {/* Pre-chat Form (overlay at bottom of panel) */}
           {needsPreChat && !loading && (
             <div className="absolute inset-0 top-[52px] bg-white dark:bg-neutral-900 flex flex-col items-center justify-center p-6 gap-3">
-              <div className="text-3xl mb-1">💬</div>
+              <div className="mb-1">
+                <svg className="w-10 h-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
               <h3 className="text-base font-semibold text-neutral-900 dark:text-white text-center">
                 Chat with {botName}
               </h3>
@@ -355,8 +416,8 @@ export default function PublicBotWidget({
               )}
               <button
                 onClick={startConversation}
-                className="w-full max-w-xs px-4 py-2.5 rounded-lg text-white font-medium text-sm transition-colors hover:opacity-90"
-                style={{ background: accentColor }}
+                className="w-full max-w-xs px-4 py-2.5 rounded-lg font-medium text-sm transition-colors hover:opacity-90"
+                style={{ background: accentColor, color: accentTextColor }}
               >
                 Start Chat
               </button>
@@ -380,8 +441,8 @@ export default function PublicBotWidget({
                 <button
                   onClick={sendMessage}
                   disabled={loading || !sessionId || !inputValue.trim()}
-                  className="p-2 rounded-lg text-white transition-colors hover:opacity-90 disabled:opacity-50 shrink-0"
-                  style={{ background: accentColor }}
+                  className="p-2 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50 shrink-0"
+                  style={{ background: accentColor, color: accentTextColor }}
                   aria-label="Send message"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -398,8 +459,16 @@ export default function PublicBotWidget({
         </div>
       )}
 
+      {/* Channel Steering Modal */}
+      <BotChannelModal
+        isOpen={!!modalChannel}
+        onClose={() => setModalChannel(null)}
+        channel={modalChannel}
+        tenantId={tenantId}
+      />
+
       {/* Floating Chat Button */}
-      {!isOpen && (
+      {!inline && !isOpen && (
         <button
           onClick={() => {
             setIsOpen(true);
@@ -408,8 +477,8 @@ export default function PublicBotWidget({
               startConversation();
             }
           }}
-          className={`fixed ${posClass} z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white transition-transform hover:scale-105 active:scale-95`}
-          style={{ background: accentColor }}
+          className={`fixed ${posClass} z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95`}
+          style={{ background: accentColor, color: accentTextColor }}
           aria-label={`Open chat with ${botName}`}
         >
           {avatarUrl ? (

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +9,7 @@ import { canSwitchToTenant } from '@/lib/auth/access-control';
 import { navigateToTenant } from '@/lib/tenant-navigation';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
 interface TenantScopeHeaderProps {
   tenantId: string;
@@ -24,12 +24,11 @@ interface TenantScopeHeaderProps {
  * Uses centralized tenant context for consistency
  */
 export default function TenantScopeHeader({ 
-  tenantId: initialTenantId, 
+  tenantId, 
   pageTitle,
   showPageTitle = true 
 }: TenantScopeHeaderProps) {
   const pathname = usePathname();
-  const [tenantId, setTenantId] = useState(initialTenantId);
   const [tenantData, setTenantData] = useState<any>(null);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -37,36 +36,24 @@ export default function TenantScopeHeader({
   const [availableTenants, setAvailableTenants] = useState<any[]>([]);
   const [switching, setSwitching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const hasFetchedTenantDataRef = useRef<string | null>(null);
   const { user, isAuthenticated, switchTenant } = useAuth();
 
-  // Monitor tenant context changes
-  useEffect(() => {
-    const checkContext = () => {
-      const context = clientTenantContextManager.getTenantContext();
-      if (context.tenantId && context.tenantId !== tenantId) {
-        setTenantId(context.tenantId);
-      }
-    };
-    
-    checkContext();
-    const interval = setInterval(checkContext, 1000);
-    return () => clearInterval(interval);
-  }, [tenantId]);
-
-  // Load tenant data and business profile
+  // Load tenant data and business profile once per tenantId
   useEffect(() => {
     const loadTenantData = async () => {
-      if (!tenantId) return;
-      
+      if (!tenantId || hasFetchedTenantDataRef.current === tenantId) return;
+      hasFetchedTenantDataRef.current = tenantId;
+
       try {
         setLoading(true);
-        
+
         // Fetch both tenant info and business profile in parallel
         const [info, profile] = await Promise.all([
           tenantInfoService.getTenantInfo(tenantId),
           platformHomeService.getTenantProfile(tenantId)
         ]);
-        
+
         setTenantData(info);
         setBusinessProfile(profile);
       } catch (error) {
@@ -80,15 +67,17 @@ export default function TenantScopeHeader({
   }, [tenantId]);
 
   // Load available tenants for dropdown
+  const userRole = user?.role;
+  const userEmail = user?.email;
   useEffect(() => {
     const loadAvailableTenants = async () => {
-      if (!isAuthenticated || !user) return;
+      if (!isAuthenticated || !userEmail) return;
       
       try {
         let list: any[] = [];
         
         // PLATFORM_ADMIN gets all tenants (active and inactive)
-        if (user.role === 'PLATFORM_ADMIN') {
+        if (userRole === 'PLATFORM_ADMIN') {
           const allTenants = await adminSecurityMonitoringService.getAvailableTenants();
           list = allTenants.map((t: any) => ({
             id: t.id,
@@ -116,7 +105,7 @@ export default function TenantScopeHeader({
     };
 
     loadAvailableTenants();
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, userRole, userEmail]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

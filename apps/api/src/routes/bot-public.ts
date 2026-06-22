@@ -24,6 +24,7 @@ import BotSkillService from '../services/BotSkillService';
 import BotCrmIntegrationService from '../services/BotCrmIntegrationService';
 import BotBusinessHoursService from '../services/BotBusinessHoursService';
 import BotDynamicResponseService from '../services/BotDynamicResponseService';
+import BotChannelSteeringService from '../services/BotChannelSteeringService';
 import BotBertGuardrailService from '../services/BotBertGuardrailService';
 import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
@@ -41,6 +42,7 @@ const skillService = BotSkillService.getInstance();
 const crmIntegrationService = BotCrmIntegrationService.getInstance();
 const businessHoursService = BotBusinessHoursService.getInstance();
 const dynamicResponseService = BotDynamicResponseService.getInstance();
+const channelSteeringService = BotChannelSteeringService.getInstance();
 const crmAssistantService = BotCrmAssistantService.getInstance();
 const bertGuardrailService = BotBertGuardrailService.getInstance();
 const bertIntentService = BotBertIntentService.getInstance();
@@ -61,6 +63,61 @@ function checkRateLimit(sessionId: string): boolean {
   if (entry.count >= RATE_LIMIT_PER_MINUTE) return false;
   entry.count++;
   return true;
+}
+
+// Handshake layer — lightweight conversational responses for greetings, gratitude, farewells
+// Prevents these from falling through to the fallback/steering path unnecessarily.
+const GREETING_PATTERNS = [
+  /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening)|what'?s\s+up)\b/i,
+];
+const GRATITUDE_PATTERNS = [
+  /^(thanks|thank\s+you|thx|ty|appreciate\s+(it|that)|cheers)\b/i,
+];
+const FAREWELL_PATTERNS = [
+  /^(bye|goodbye|see\s+you|cya|later|take\s+care|have\s+a\s+(good|great|nice)\s+(day|one)|peace)\b/i,
+];
+
+function getHandshakeResponse(message: string, config: { botName: string; tone: string; greeting: string }): string | null {
+  const trimmed = message.trim();
+
+  for (const pattern of GREETING_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      const name = config.botName || 'Assistant';
+      if (config.tone === 'playful') {
+        return `Hey there! I'm ${name}. What can I help you with today?`;
+      }
+      if (config.tone === 'professional') {
+        return `Hello. I'm ${name}, your shopping assistant. How may I help you today?`;
+      }
+      return `Hi! I'm ${name}. How can I help you today?`;
+    }
+  }
+
+  for (const pattern of GRATITUDE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      if (config.tone === 'playful') {
+        return `You're welcome! Anything else I can help with?`;
+      }
+      if (config.tone === 'professional') {
+        return `You're welcome. Is there anything else I can assist you with?`;
+      }
+      return `You're welcome! Is there anything else I can help you with?`;
+    }
+  }
+
+  for (const pattern of FAREWELL_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      if (config.tone === 'playful') {
+        return `Take care! Come back anytime.`;
+      }
+      if (config.tone === 'professional') {
+        return `Goodbye. Feel free to reach out whenever you need assistance.`;
+      }
+      return `Goodbye! Feel free to come back anytime you have questions.`;
+    }
+  }
+
+  return null;
 }
 
 // Validation schemas
@@ -258,6 +315,29 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       }
     }
 
+    // 3.5. Handshake layer — catch greetings, gratitude, farewells before fallback
+    const handshakeReply = getHandshakeResponse(guardrailResult.modifiedMessage, config);
+    if (handshakeReply) {
+      const botMsg = await conversationService.appendMessage({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: handshakeReply,
+        intent: 'handshake',
+        confidence: 1,
+        responseType: 'handshake',
+        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+      });
+
+      return res.json({
+        success: true,
+        reply: handshakeReply,
+        responseType: 'handshake',
+        matchedFaqId: null,
+        guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+        messageId: botMsg.id,
+      });
+    }
+
     // 4. Tier Router: dynamic (GPT + RAG) vs static (FAQ keyword match)
     const caps = await resolveEffectiveCapabilities(conversation.tenantId);
     const platformAiEnabled = await dynamicResponseService.isPlatformAiEnabled();
@@ -317,9 +397,9 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         metadata: { ragChunksUsed: dynamicResult.ragChunksUsed },
       });
 
-      // Escalation: if fallback and escalation enabled
+      // Escalation: if bot couldn't answer (fallback or channel_steering) and escalation enabled
       let escalated = false;
-      if (dynamicResult.responseType === 'fallback' && config.escalationEnabled) {
+      if ((dynamicResult.responseType === 'fallback' || dynamicResult.responseType === 'channel_steering') && config.escalationEnabled) {
         try {
           const alreadyEscalated = await crmIntegrationService.isEscalated(conversation.id);
           if (!alreadyEscalated) {
@@ -330,7 +410,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
               customerEmail: conversation.customerEmail,
               customerPhone: conversation.customerPhone,
               reason: 'Bot could not answer customer question',
-              summary: `Customer asked: "${message}" — bot responded with fallback message.`,
+              summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
             });
             escalated = true;
           }
@@ -347,6 +427,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
         messageId: botMsg.id,
         escalated,
+        channels: dynamicResult.channels,
       });
     }
 
@@ -357,15 +438,29 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       conversation.pageContext || undefined
     );
 
+    let finalReply = staticResult.reply;
+    let finalResponseType: string = staticResult.responseType;
+    let finalChannels: any[] | undefined;
+
+    // If static FAQ has no match, steer to available human channels instead of
+    // repeating a static fallback message.
+    if (staticResult.responseType === 'fallback') {
+      const steering = await channelSteeringService.steer(conversation.tenantId, config.botName);
+      finalReply = steering.reply;
+      finalResponseType = 'channel_steering';
+      finalChannels = steering.channels;
+    }
+
     const botMsg = await conversationService.appendMessage({
       conversationId: conversation.id,
       role: 'assistant',
-      content: staticResult.reply,
+      content: finalReply,
       intent: intentResult.intent || undefined,
       confidence: intentResult.confidence,
       matchedFaqId: staticResult.matchedFaqId || undefined,
-      responseType: staticResult.responseType,
+      responseType: finalResponseType,
       guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
+      metadata: finalChannels ? { channels: finalChannels } : undefined,
     });
 
     // 5. Escalation: if fallback and escalation enabled, create CRM ticket
@@ -381,7 +476,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
             customerEmail: conversation.customerEmail,
             customerPhone: conversation.customerPhone,
             reason: 'Bot could not answer customer question',
-            summary: `Customer asked: "${message}" — bot responded with fallback message.`,
+            summary: `Customer asked: "${message}" — bot steered the customer to available support channels.`,
           });
           escalated = true;
         }
@@ -392,12 +487,13 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
 
     res.json({
       success: true,
-      reply: staticResult.reply,
-      responseType: staticResult.responseType,
+      reply: finalReply,
+      responseType: finalResponseType,
       matchedFaqId: staticResult.matchedFaqId,
       guardrailResult: guardrailResult.action === 'pass' ? 'pass' : guardrailResult.action,
       messageId: botMsg.id,
       escalated,
+      channels: finalChannels,
     });
   } catch (error) {
     console.error('Error processing message:', error);
