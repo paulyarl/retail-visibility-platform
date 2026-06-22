@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,6 +13,7 @@ import { Switch } from '@/components/ui/Switch';
 import { toast } from '@/hooks/use-toast';
 import { botService, type BotConfig, type UpdateBotConfigInput } from '@/services/BotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 
 interface BotConfigPageProps {
   tenantId: string;
@@ -22,6 +24,7 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState<UpdateBotConfigInput>({});
 
   const fetchConfig = useCallback(async () => {
@@ -186,8 +189,70 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
               <Input id="widgetFont" value={form.widgetFont || ''} onChange={e => setForm({ ...form, widgetFont: e.target.value })} placeholder="system-ui, sans-serif" />
             </div>
             <div>
-              <Label htmlFor="widgetAvatarUrl">Avatar URL (optional)</Label>
-              <Input id="widgetAvatarUrl" value={form.widgetAvatarUrl || ''} onChange={e => setForm({ ...form, widgetAvatarUrl: e.target.value })} placeholder="https://..." />
+              <Label htmlFor="widgetAvatarUrl">Bot Avatar</Label>
+              <div className="mt-2 space-y-3">
+                {(form.widgetAvatarUrl || config?.widgetAvatarUrl) && (
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden border border-neutral-200 dark:border-neutral-700 shrink-0">
+                      <Image
+                        src={form.widgetAvatarUrl || config?.widgetAvatarUrl || ''}
+                        alt="Bot avatar"
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, widgetAvatarUrl: null })}
+                      className="text-sm text-red-500 hover:text-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <input
+                  id="widgetAvatarUrl"
+                  type="file"
+                  accept={getAcceptString(ImageUploadPresets.avatar.allowedTypes!)}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingAvatar(true);
+                    try {
+                      const result = await uploadImage(file, ImageUploadPresets.avatar);
+                      if (result.error) {
+                        toast({ title: result.error.message, variant: 'destructive' });
+                        return;
+                      }
+                      const url = await botService.uploadAvatar(tenantId, result.dataUrl, result.contentType);
+                      setForm({ ...form, widgetAvatarUrl: url });
+                      setConfig(prev => prev ? { ...prev, widgetAvatarUrl: url } : prev);
+                      toast({ title: 'Avatar uploaded successfully' });
+                    } catch (err: any) {
+                      toast({ title: err?.message || 'Failed to upload avatar', variant: 'destructive' });
+                    } finally {
+                      setUploadingAvatar(false);
+                    }
+                  }}
+                  disabled={uploadingAvatar}
+                  className="block w-full text-sm text-neutral-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-primary-50 file:text-primary-700
+                    hover:file:bg-primary-100
+                    dark:file:bg-primary-900/20 dark:file:text-primary-400
+                    dark:hover:file:bg-primary-900/30
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Recommended: Square image, 200x200px to 400x400px. Max 2MB. If not set, the platform logo is used as default.
+                </p>
+                {uploadingAvatar && (
+                  <p className="text-sm text-primary-600 dark:text-primary-400">Uploading...</p>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-6">

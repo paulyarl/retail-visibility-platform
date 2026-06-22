@@ -7,9 +7,35 @@
 import { prisma } from '../prisma';
 import BotRagService from '../services/BotRagService';
 
-const SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const DEFAULT_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const STARTUP_DELAY_MS = 60_000; // 1 minute after server start
 let syncIntervalId: NodeJS.Timeout | null = null;
+
+/**
+ * Get the configured sync interval from platform settings.
+ */
+async function getSyncIntervalMs(): Promise<number> {
+  try {
+    const settings = await prisma.platform_settings_list.findFirst();
+    const hours = settings?.bot_sync_interval_hours ?? 12;
+    if (hours <= 0) return 0; // 0 = manual only
+    return hours * 60 * 60 * 1000;
+  } catch {
+    return DEFAULT_SYNC_INTERVAL_MS;
+  }
+}
+
+/**
+ * Check if bot AI and embedding sync are enabled in platform settings.
+ */
+async function isBotAiEnabled(): Promise<boolean> {
+  try {
+    const settings = await prisma.platform_settings_list.findFirst();
+    return (settings?.bot_ai_enabled ?? true) && (settings?.bot_embedding_sync_enabled ?? true);
+  } catch {
+    return true; // fail open
+  }
+}
 
 /**
  * Get all tenant IDs that have chatbot enabled and dynamic mode on.
@@ -31,6 +57,12 @@ async function getChatbotEnabledTenants(): Promise<string[]> {
  * Run product embedding refresh for all eligible tenants.
  */
 async function runScheduledSync(): Promise<void> {
+  const aiEnabled = await isBotAiEnabled();
+  if (!aiEnabled) {
+    console.log('[BotProductEmbeddingSync] Bot AI or embedding sync is disabled by platform admin, skipping');
+    return;
+  }
+
   console.log('[BotProductEmbeddingSync] Starting scheduled product embedding refresh...');
   const startTime = Date.now();
 
@@ -78,21 +110,30 @@ async function runScheduledSync(): Promise<void> {
 /**
  * Start the scheduled product embedding sync job.
  */
-export function startBotProductEmbeddingSync(): void {
+export async function startBotProductEmbeddingSync(): Promise<void> {
   if (syncIntervalId) {
     console.log('[BotProductEmbeddingSync] Already running');
     return;
   }
 
-  console.log(`[BotProductEmbeddingSync] Starting scheduler (every ${SYNC_INTERVAL_MS / 1000 / 60 / 60} hours)`);
+  const intervalMs = await getSyncIntervalMs();
+  if (intervalMs === 0) {
+    console.log('[BotProductEmbeddingSync] Sync interval is 0 (manual only), scheduler not started');
+    return;
+  }
 
+  const hours = intervalMs / 1000 / 60 / 60;
+  console.log(`[BotProductEmbeddingSync] Starting scheduler (every ${hours} hours)`);
+
+  // Check platform settings before first run; if disabled, still set up the interval
+  // so it can self-activate when settings change (the runScheduledSync will no-op)
   setTimeout(() => {
     runScheduledSync();
   }, STARTUP_DELAY_MS);
 
   syncIntervalId = setInterval(() => {
     runScheduledSync();
-  }, SYNC_INTERVAL_MS);
+  }, intervalMs);
 }
 
 /**

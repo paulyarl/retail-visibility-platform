@@ -56,10 +56,12 @@
   "license": "ISC",
   "packageManager": "pnpm@10.18.3",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "@aws-sdk/client-s3": "^3.917.0",
     "@google/genai": "^2.8.0",
     "@google/generative-ai": "^0.24.1",
     "@huggingface/transformers": "^4.2.0",
+    "@mistralai/mistralai": "^2.2.6",
     "@paypal/paypal-server-sdk": "^2.1.0",
     "@platform/feature-definitions": "workspace:*",
     "@prisma/client": "^6.17.1",

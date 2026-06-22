@@ -56,6 +56,7 @@ import CapabilityShowcase from "./CapabilityShowcase";
 import { useAllCapabilities, useMerchantGates } from "@/hooks/tenant-access/useCapabilityAccess";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
 import BotTenantWidget from '@/components/bot/BotTenantWidget';
+import BotDashboardChat from '@/components/bot/BotDashboardChat';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -693,6 +694,9 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
           </motion.div>
         )}
       </main>
+
+      {/* Floating platform assistant — capability + tier aware bot chat */}
+      <BotDashboardChat tenantId={tenantId} />
     </div>
   );
 }

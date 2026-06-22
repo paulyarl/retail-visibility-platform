@@ -271,7 +271,7 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     });
   }
 
-  // Merge features: most-permissive-wins
+  // Merge features: most-permissive-wins (org-tier + tenant-tier)
   const mergedFeatures = new Map<string, { feature_key: string; is_enabled: boolean; is_highlighted: boolean; capability_type_list: any }>();
   for (const tf of tierFeatures) {
     const existing = mergedFeatures.get(tf.feature_key);
@@ -285,6 +285,54 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
         is_highlighted: tf.is_highlighted ?? false,
         capability_type_list: tf.capability_type_list,
       });
+    }
+  }
+
+  // Merge purchased features (BSaaS — à la carte feature purchases)
+  // Active, non-expired purchases override tier gates with most-permissive-wins
+  const purchases = await prisma.tenant_feature_purchases.findMany({
+    where: {
+      tenant_id: tenantId,
+      status: 'active',
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { feature_key: true },
+  });
+
+  if (purchases.length > 0) {
+    // Resolve capability_type for purchased features that may not be in any tier
+    const purchaseFeatureKeys = purchases.map(p => p.feature_key);
+    const purchaseFeatures = await prisma.features_list.findMany({
+      where: { key: { in: purchaseFeatureKeys } },
+      select: { id: true, key: true },
+    });
+
+    const featureIdToKey = new Map(purchaseFeatures.map(f => [f.id, f.key]));
+
+    const capLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: [...featureIdToKey.keys()] } },
+      include: { capability_type_list: { select: { key: true, name: true, category: true } } },
+    });
+
+    const featureKeyToCapType = new Map<string, any>();
+    for (const link of capLinks) {
+      const fKey = featureIdToKey.get(link.feature_id);
+      if (fKey) featureKeyToCapType.set(fKey, link.capability_type_list);
+    }
+
+    for (const purchase of purchases) {
+      const existing = mergedFeatures.get(purchase.feature_key);
+      if (existing) {
+        existing.is_enabled = true; // purchased = always enabled
+      } else {
+        const capType = featureKeyToCapType.get(purchase.feature_key) || null;
+        mergedFeatures.set(purchase.feature_key, {
+          feature_key: purchase.feature_key,
+          is_enabled: true,
+          is_highlighted: false,
+          capability_type_list: capType,
+        });
+      }
     }
   }
 

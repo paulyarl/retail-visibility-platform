@@ -227,6 +227,7 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Tier Management',  href: '/settings/admin/tier-system' },
       { label: 'Subscription Mgmt', href: '/settings/admin/tiers' },
       { label: 'Billing Mgmt',      href: '/settings/admin/billing' },
+      { label: 'BSaaS Catalog',     href: '/settings/admin/bsaas-catalog' },
       { label: 'Email Logs',        href: '/settings/admin/notification-logs' },
     ],
   },

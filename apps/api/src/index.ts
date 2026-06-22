@@ -8020,11 +8020,17 @@ if (process.env.NODE_ENV !== "test") {
         console.error('⚠️ Failed to start featured products expiry monitor:', err);
       }
 
-      // Start bot product embedding sync (every 12 hours)
+      // Start bot product embedding sync (every 12 hours) — gated by platform settings
       try {
-        const { startBotProductEmbeddingSync } = await import('./jobs/bot-product-embedding-sync');
-        startBotProductEmbeddingSync();
-        console.log('🤖 Bot product embedding sync started (every 12 hours)');
+        const settings = await prisma.platform_settings_list.findFirst();
+        const aiEnabled = (settings?.bot_ai_enabled ?? true) && (settings?.bot_embedding_sync_enabled ?? true);
+        if (aiEnabled) {
+          const { startBotProductEmbeddingSync } = await import('./jobs/bot-product-embedding-sync');
+          await startBotProductEmbeddingSync();
+          console.log('🤖 Bot product embedding sync started');
+        } else {
+          console.log('🤖 Bot product embedding sync skipped (disabled by platform admin)');
+        }
       } catch (err) {
         console.error('⚠️ Failed to start bot product embedding sync:', err);
       }

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../prisma';
+import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import { randomUUID } from 'crypto';
 
@@ -276,36 +277,38 @@ export class BotConversationService {
     resolvedByFallback: number;
     avgRating: number | null;
   }> {
+    const pool = getDirectPool();
     const [convStats, feedbackStats] = await Promise.all([
-      prisma.$queryRaw`
-        SELECT
-          COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-          COUNT(*) FILTER (WHERE resolved_by = 'faq')::int AS faq_resolved,
-          COUNT(*) FILTER (WHERE resolved_by = 'skill')::int AS skill_resolved,
-          COUNT(*) FILTER (WHERE resolved_by = 'fallback')::int AS fallback_resolved
+      pool.query(
+        `SELECT
+          COUNT(*)::text AS total,
+          COUNT(*) FILTER (WHERE status = 'active')::text AS active,
+          COUNT(*) FILTER (WHERE resolved_by = 'faq')::text AS faq_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'skill')::text AS skill_resolved,
+          COUNT(*) FILTER (WHERE resolved_by = 'fallback')::text AS fallback_resolved
         FROM bot_conversations
-        WHERE tenant_id = ${tenantId}
-      `,
-      prisma.$queryRaw`
-        SELECT
-          COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE rating = 'positive')::int AS positive
-        FROM bot_conversation_feedback
-      `,
+        WHERE tenant_id = $1`,
+        [tenantId]
+      ),
+      pool.query(
+        `SELECT
+          COUNT(*)::text AS total,
+          COUNT(*) FILTER (WHERE rating = 'positive')::text AS positive
+        FROM bot_conversation_feedback`
+      ),
     ]);
 
-    const conv = (convStats as any[])[0];
-    const fb = (feedbackStats as any[])[0];
-    const totalFeedback = fb?.total ?? 0;
-    const positiveFeedback = fb?.positive ?? 0;
+    const conv = convStats.rows[0];
+    const fb = feedbackStats.rows[0];
+    const totalFeedback = parseInt(fb?.total ?? '0', 10);
+    const positiveFeedback = parseInt(fb?.positive ?? '0', 10);
 
     return {
-      totalConversations: conv?.total ?? 0,
-      activeConversations: conv?.active ?? 0,
-      resolvedByFaq: conv?.faq_resolved ?? 0,
-      resolvedBySkill: conv?.skill_resolved ?? 0,
-      resolvedByFallback: conv?.fallback_resolved ?? 0,
+      totalConversations: parseInt(conv?.total ?? '0', 10),
+      activeConversations: parseInt(conv?.active ?? '0', 10),
+      resolvedByFaq: parseInt(conv?.faq_resolved ?? '0', 10),
+      resolvedBySkill: parseInt(conv?.skill_resolved ?? '0', 10),
+      resolvedByFallback: parseInt(conv?.fallback_resolved ?? '0', 10),
       avgRating: totalFeedback > 0 ? positiveFeedback / totalFeedback : null,
     };
   }

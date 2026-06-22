@@ -135,6 +135,7 @@ interface ApiEnvelope<T> {
   analytics?: any;
   error?: string;
   message?: string;
+  [key: string]: any;
 }
 
 class BotService extends TenantApiSingleton {
@@ -299,6 +300,74 @@ class BotService extends TenantApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data.success) throw new Error(result.data.error || 'Failed to get analytics');
     return result.data.analytics;
+  }
+
+  // ====================
+  // DASHBOARD CHAT
+  // ====================
+
+  async startDashboardChat(tenantId: string): Promise<{ sessionId: string; conversationId: string; greeting: string }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/dashboard-chat/start`,
+      { method: 'POST' },
+      `bot-dashboard-chat-start-${tenantId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to start dashboard chat');
+    return {
+      sessionId: result.data.sessionId,
+      conversationId: result.data.conversationId,
+      greeting: result.data.greeting,
+    };
+  }
+
+  async sendDashboardMessage(tenantId: string, sessionId: string, message: string): Promise<{
+    reply: string;
+    responseType: string;
+    matchedFaqId: string | null;
+    messageId: string;
+    skillCard?: any;
+    skillName?: string | null;
+  }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/dashboard-chat/message`,
+      { method: 'POST', body: JSON.stringify({ sessionId, message }) },
+      `bot-dashboard-chat-msg-${tenantId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to send message');
+    return {
+      reply: result.data.reply,
+      responseType: result.data.responseType,
+      matchedFaqId: result.data.matchedFaqId ?? null,
+      messageId: result.data.messageId,
+      skillCard: result.data.skillCard,
+      skillName: result.data.skillName ?? null,
+    };
+  }
+
+  async uploadAvatar(tenantId: string, dataUrl: string, contentType: string): Promise<string> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/avatar`,
+      { method: 'POST', body: JSON.stringify({ dataUrl, contentType }) },
+      `bot-avatar-upload-${tenantId}`
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to upload avatar');
+    await this.invalidateServiceCaches(tenantId);
+    return result.data.url;
+  }
+
+  async getPlatformGuide(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/platform-guide`,
+      { method: 'GET' },
+      `bot-platform-guide-${tenantId}`,
+      this.cacheTTL
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to get platform guide');
+    return result.data.guide;
   }
 }
 

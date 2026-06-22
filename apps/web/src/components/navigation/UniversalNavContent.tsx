@@ -203,6 +203,7 @@ const buildNavItems = (userRole: string, tenants: { id: string; name: string; ro
       children: [
         { label: 'Profile', href: '/settings/account' },
         { label: 'Subscription', href: '/settings/subscription' },
+        { label: 'Feature Store', href: '/settings/feature-store' },
       ],
     },
     {

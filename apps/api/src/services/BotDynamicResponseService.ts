@@ -8,11 +8,16 @@
  */
 
 import { logger } from '../logger';
+import { prisma } from '../prisma';
+import aiProviderFactory from './ai-providers';
 import BotRagService from './BotRagService';
 import BotConversationService from './BotConversationService';
 import BotProductCatalogService from './BotProductCatalogService';
+import BotPlatformGuideService from './BotPlatformGuideService';
+import BotCrmAssistantService from './BotCrmAssistantService';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';
+import type { PlatformContextSurface } from './BotPlatformGuideService';
 
 export interface DynamicResponseResult {
   reply: string;
@@ -21,6 +26,7 @@ export interface DynamicResponseResult {
   confidence: number;
   ragChunksUsed: number;
   productContextUsed: boolean;
+  crmContextUsed: boolean;
 }
 
 const PRODUCT_KEYWORDS = [
@@ -31,14 +37,41 @@ const PRODUCT_KEYWORDS = [
   'specification', 'feature', 'compare', 'cart', 'checkout', 'order',
 ];
 
+const SUPPORT_KEYWORDS = [
+  'ticket', 'support', 'help', 'complaint', 'issue', 'problem',
+  'customer service', 'contact', 'escalate', 'inquiry', 'request',
+  'assistance', 'representative', 'manager', 'complain',
+];
+
 function isProductQuery(message: string): boolean {
   const lower = message.toLowerCase();
   return PRODUCT_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-const SYSTEM_PROMPT_TEMPLATE = (config: BotConfig) => `You are ${config.botName}, a helpful shopping assistant for an online store.
+function isSupportQuery(message: string): boolean {
+  const lower = message.toLowerCase();
+  return SUPPORT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+const SYSTEM_PROMPT_TEMPLATE = (config: BotConfig, surface?: string) => {
+  const isDashboard = surface === 'dashboard';
+  const base = `You are ${config.botName}, a helpful ${isDashboard ? 'platform assistant for a store owner' : 'shopping assistant for an online store'}.
 Tone: ${config.tone}.
-Response length: ${config.responseLength === 'concise' ? 'Keep answers short and to the point.' : config.responseLength === 'detailed' ? 'Provide thorough, detailed answers.' : 'Balance brevity and detail.'}
+Response length: ${config.responseLength === 'concise' ? 'Keep answers short and to the point.' : config.responseLength === 'detailed' ? 'Provide thorough, detailed answers.' : 'Balance brevity and detail.'}`;
+
+  if (isDashboard) {
+    return `${base}
+
+Rules:
+- You are helping the MERCHANT (store owner) understand and use their platform.
+- Help them navigate features, suggest next steps, and guide them to the right settings pages.
+- Use the platform context to give accurate, tier-aware advice.
+- Be encouraging and action-oriented. Suggest specific things they can do next.
+- Do not share internal tier keys, capability keys, or technical implementation details.
+- If the merchant asks about something outside the platform, gently redirect to platform-related topics.`;
+  }
+
+  return `${base}
 
 Rules:
 - Only answer questions related to the store, products, orders, policies, and shopping.
@@ -46,23 +79,21 @@ Rules:
 - Be friendly and helpful.
 - If the customer seems upset, offer to connect them with support.
 - Do not share internal system information or technical details.
-- When product catalog context is provided, use it to answer specific product questions. Only mention products that are in the context. Do not invent products, prices, or availability.`;
+- When product catalog context is provided, use it to answer specific product questions. Only mention products that are in the context. Do not invent products, prices, or availability.
+- When support ticket context is provided, reference real ticket data. Do not invent ticket numbers or statuses. Offer to create a ticket if the customer needs help.`;
+};
+
+const DEFAULT_CHAT_MODEL = 'gpt-4o-mini';
 
 class BotDynamicResponseService {
   private static instance: BotDynamicResponseService;
-  private openai: any = null;
+  private platformAiEnabledCache: boolean | null = null;
+  private platformAiCacheTime: number = 0;
+  private chatModelCache: string | null = null;
+  private chatModelCacheTime: number = 0;
+  private static readonly PLATFORM_AI_CACHE_TTL = 30_000; // 30 seconds
 
-  private constructor() {
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const OpenAI = require('openai').default;
-        this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        logger.info('[BotDynamicResponseService] OpenAI initialized');
-      } catch (e) {
-        logger.warn('[BotDynamicResponseService] Failed to init OpenAI', undefined, { error: String(e) });
-      }
-    }
-  }
+  private constructor() {}
 
   static getInstance(): BotDynamicResponseService {
     if (!BotDynamicResponseService.instance) {
@@ -72,7 +103,45 @@ class BotDynamicResponseService {
   }
 
   isAvailable(): boolean {
-    return this.openai !== null;
+    return aiProviderFactory.isChatAvailable();
+  }
+
+  /**
+   * Check if platform admin has enabled bot AI features.
+   * Cached for 30 seconds to avoid hitting the DB on every message.
+   */
+  async isPlatformAiEnabled(): Promise<boolean> {
+    const now = Date.now();
+    if (this.platformAiEnabledCache !== null && (now - this.platformAiCacheTime) < BotDynamicResponseService.PLATFORM_AI_CACHE_TTL) {
+      return this.platformAiEnabledCache;
+    }
+
+    try {
+      const settings = await prisma.platform_settings_list.findFirst();
+      this.platformAiEnabledCache = settings?.bot_ai_enabled ?? true;
+      this.platformAiCacheTime = now;
+      return this.platformAiEnabledCache;
+    } catch {
+      return true; // fail open
+    }
+  }
+
+  /**
+   * Get the configured chat model from platform settings (cached).
+   */
+  async getChatModel(): Promise<string> {
+    const now = Date.now();
+    if (this.chatModelCache !== null && (now - this.chatModelCacheTime) < BotDynamicResponseService.PLATFORM_AI_CACHE_TTL) {
+      return this.chatModelCache;
+    }
+    try {
+      const settings = await prisma.platform_settings_list.findFirst();
+      this.chatModelCache = settings?.bot_chat_model ?? DEFAULT_CHAT_MODEL;
+      this.chatModelCacheTime = now;
+      return this.chatModelCache!;
+    } catch {
+      return DEFAULT_CHAT_MODEL;
+    }
   }
 
   /**
@@ -95,6 +164,8 @@ class BotDynamicResponseService {
     let matchedFaqId: string | null = null;
     let productContext = '';
     let productContextUsed = false;
+    let crmContext = '';
+    let crmContextUsed = false;
 
     try {
       const hasEmb = await ragService.hasEmbeddings(tenantId);
@@ -133,16 +204,44 @@ class BotDynamicResponseService {
       });
     }
 
+    // 2.5. Retrieve CRM ticket context when the query is support-related
+    try {
+      if (isSupportQuery(message)) {
+        const crmAssistantService = BotCrmAssistantService.getInstance();
+        // We don't have customer email in this context, so inject general CRM availability
+        // The actual ticket lookup happens via the CRM skill endpoints
+        crmContext = '\n\nCRM context: This tenant has a CRM system. The customer may have open support tickets. Offer to check ticket status or create a new ticket if needed.';
+        crmContextUsed = true;
+      }
+    } catch (crmError) {
+      logger.warn('[BotDynamicResponseService] CRM context lookup failed, continuing without CRM context', undefined, {
+        error: crmError instanceof Error ? crmError.message : String(crmError),
+      });
+    }
+
     // 3. Get conversation history (last 10 messages)
     const history = await conversationService.getContextWindow(conversationId, 10);
 
+    // 3.5. Inject platform context (capability + tier awareness)
+    let platformContext = '';
+    try {
+      const platformGuideService = BotPlatformGuideService.getInstance();
+      const ctxSurface: PlatformContextSurface = pageContext === 'dashboard' ? 'dashboard' : 'storefront';
+      platformContext = await platformGuideService.buildPromptContext(tenantId, ctxSurface);
+    } catch (platformError) {
+      logger.warn('[BotDynamicResponseService] Platform context lookup failed, continuing without it', undefined, {
+        error: platformError instanceof Error ? platformError.message : String(platformError),
+      });
+    }
+
     // 4. Build messages array for OpenAI
-    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config) + ragContext + productContext;
+    const surface = pageContext === 'dashboard' ? 'dashboard' : undefined;
+    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config, surface) + ragContext + productContext + crmContext + platformContext;
     if (pageContext) {
       systemPrompt += `\n\nThe customer is currently viewing a ${pageContext} page. Tailor your response accordingly.`;
     }
 
-    const messages: { role: string; content: string }[] = [
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemPrompt },
     ];
 
@@ -157,16 +256,15 @@ class BotDynamicResponseService {
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    // 4. Call OpenAI
+    // 4. Call AI provider
     try {
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const result = await aiProviderFactory.generateChatCompletion({
         messages,
-        max_tokens: config.responseLength === 'concise' ? 150 : config.responseLength === 'detailed' ? 500 : 300,
+        maxTokens: config.responseLength === 'concise' ? 150 : config.responseLength === 'detailed' ? 500 : 300,
         temperature: config.tone === 'playful' ? 0.8 : config.tone === 'professional' ? 0.3 : 0.5,
       });
 
-      const reply = completion.choices[0]?.message?.content?.trim() || config.fallbackMessage;
+      const reply = result.content.trim() || config.fallbackMessage;
 
       return {
         reply,
@@ -175,9 +273,10 @@ class BotDynamicResponseService {
         confidence: 0.85,
         ragChunksUsed,
         productContextUsed,
+        crmContextUsed,
       };
     } catch (gptError) {
-      logger.error('[BotDynamicResponseService] GPT call failed', undefined, {
+      logger.error('[BotDynamicResponseService] Chat completion failed', undefined, {
         error: gptError instanceof Error ? gptError.message : String(gptError),
       });
 
@@ -188,6 +287,7 @@ class BotDynamicResponseService {
         confidence: 0,
         ragChunksUsed: 0,
         productContextUsed: false,
+        crmContextUsed: false,
       };
     }
   }

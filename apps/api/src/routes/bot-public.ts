@@ -8,6 +8,8 @@
  * GET    /api/public/bot/config?tenantId=            — Fetch widget config
  * GET    /api/public/bot/skills/:skillName            — Execute skill
  * GET    /api/public/bot/products/search              — Search tenant product catalog
+ * GET    /api/public/bot/crm/ticket-status             — Look up support tickets (CRM assistant skill)
+ * POST   /api/public/bot/crm/create-ticket             — Create support ticket from chat (CRM assistant skill)
  * POST   /api/public/bot/conversations/:sessionId/feedback — Submit feedback
  */
 
@@ -25,7 +27,9 @@ import BotDynamicResponseService from '../services/BotDynamicResponseService';
 import BotBertGuardrailService from '../services/BotBertGuardrailService';
 import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
+import BotCrmAssistantService from '../services/BotCrmAssistantService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 
 const router = Router();
 const configService = BotConfigurationService.getInstance();
@@ -37,6 +41,7 @@ const skillService = BotSkillService.getInstance();
 const crmIntegrationService = BotCrmIntegrationService.getInstance();
 const businessHoursService = BotBusinessHoursService.getInstance();
 const dynamicResponseService = BotDynamicResponseService.getInstance();
+const crmAssistantService = BotCrmAssistantService.getInstance();
 const bertGuardrailService = BotBertGuardrailService.getInstance();
 const bertIntentService = BotBertIntentService.getInstance();
 const productCatalogService = BotProductCatalogService.getInstance();
@@ -60,10 +65,13 @@ function checkRateLimit(sessionId: string): boolean {
 
 // Validation schemas
 const startConversationSchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  embedKey: z.string().min(1).optional(),
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().max(50).optional(),
   pageContext: z.string().max(100).optional(),
+}).refine(data => data.tenantId || data.embedKey, {
+  message: 'Either tenantId or embedKey is required',
 });
 
 const sendMessageSchema = z.object({
@@ -75,12 +83,12 @@ const feedbackSchema = z.object({
   rating: z.enum(['positive', 'negative']),
 });
 
-// GET /api/public/bot/config?tenantId=
-router.get('/config', async (req, res) => {
+// GET /api/public/bot/config?tenantId=&embedKey=
+router.get('/config', resolveEmbedKey, async (req, res) => {
   try {
-    const { tenantId } = req.query;
-    if (!tenantId || typeof tenantId !== 'string') {
-      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId query parameter is required' });
+    const tenantId = getTenantIdFromRequest(req, res);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
     const caps = await resolveEffectiveCapabilities(tenantId);
@@ -97,14 +105,18 @@ router.get('/config', async (req, res) => {
 });
 
 // POST /api/public/bot/conversations
-router.post('/conversations', async (req, res) => {
+router.post('/conversations', resolveEmbedKey, async (req, res) => {
   try {
     const validation = startConversationSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
     }
 
-    const { tenantId, customerEmail, customerPhone, pageContext } = validation.data;
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+    const { customerEmail, customerPhone, pageContext } = validation.data;
     const caps = await resolveEffectiveCapabilities(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
@@ -248,7 +260,8 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
 
     // 4. Tier Router: dynamic (GPT + RAG) vs static (FAQ keyword match)
     const caps = await resolveEffectiveCapabilities(conversation.tenantId);
-    const useDynamic = caps?.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable();
+    const platformAiEnabled = await dynamicResponseService.isPlatformAiEnabled();
+    const useDynamic = caps?.effective.chatbot.dynamic_enabled && dynamicResponseService.isAvailable() && platformAiEnabled;
 
     if (useDynamic) {
       // BERT-enhanced guardrail check (in addition to rule-based)
@@ -392,14 +405,15 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
   }
 });
 
-// GET /api/public/bot/skills/:skillName?tenantId=
-router.get('/skills/:skillName', async (req, res) => {
+// GET /api/public/bot/skills/:skillName?tenantId=&embedKey=
+router.get('/skills/:skillName', resolveEmbedKey, async (req, res) => {
   try {
     const { skillName } = req.params;
-    const { tenantId, ...params } = req.query;
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { tenantId: _omit, embedKey: _omit2, ...params } = req.query;
 
-    if (!tenantId || typeof tenantId !== 'string') {
-      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId query parameter is required' });
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
     const result = await skillService.executeSkill(tenantId, skillName, params);
@@ -414,13 +428,16 @@ router.get('/skills/:skillName', async (req, res) => {
 // Exposes a curated subset of the storefront product catalog to the bot.
 // Requires chatbot capability to be enabled for the tenant.
 const productSearchSchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
+  embedKey: z.string().min(1).optional(),
   query: z.string().min(1).max(200),
   badge: z.enum(['featured', 'new_arrival', 'staff_pick', 'seasonal', 'sale', 'clearance', 'store_selection', 'trending', 'recommended', 'bestseller', 'random_featured']).optional(),
   limit: z.coerce.number().min(1).max(20).default(5),
+}).refine(data => data.tenantId || data.embedKey, {
+  message: 'Either tenantId or embedKey is required',
 });
 
-router.get('/products/search', async (req, res) => {
+router.get('/products/search', resolveEmbedKey, async (req, res) => {
   try {
     const validation = productSearchSchema.safeParse(req.query);
     if (!validation.success) {
@@ -432,7 +449,11 @@ router.get('/products/search', async (req, res) => {
       });
     }
 
-    const { tenantId, query, badge, limit } = validation.data;
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+    const { query, badge, limit } = validation.data;
 
     const caps = await resolveEffectiveCapabilities(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
@@ -481,11 +502,12 @@ router.get('/products/search', async (req, res) => {
 
 // POST /api/public/bot/preview — Preview bot response (for FAQ bot preview component)
 // Returns a static FAQ match without creating a conversation
-router.post('/preview', async (req, res) => {
+router.post('/preview', resolveEmbedKey, async (req, res) => {
   try {
-    const { tenantId, message, pageContext } = req.body || {};
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { message, pageContext } = req.body || {};
     if (!tenantId || !message) {
-      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId and message are required' });
+      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and message are required' });
     }
 
     const caps = await resolveEffectiveCapabilities(tenantId);
@@ -526,6 +548,80 @@ router.post('/conversations/:sessionId/feedback', async (req, res) => {
   } catch (error) {
     console.error('Error submitting feedback:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit feedback' });
+  }
+});
+
+// ====================
+// CRM Assistant Skill Endpoints
+// ====================
+
+// GET /api/public/bot/crm/ticket-status?tenantId=&customerEmail=
+router.get('/crm/ticket-status', resolveEmbedKey, async (req, res) => {
+  try {
+    const tenantId = getTenantIdFromRequest(req, res);
+    const { customerEmail } = req.query;
+    if (!tenantId || !customerEmail) {
+      return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and customerEmail are required' });
+    }
+
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
+    }
+    if (!caps.effective.chatbot.allowed_skill_types.includes('chatbot_skill_crm_assistant' as any)) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'CRM assistant skill is not available for this tier' });
+    }
+
+    const tickets = await crmAssistantService.lookupTickets(tenantId, customerEmail as string);
+    res.json({ success: true, data: tickets });
+  } catch (error) {
+    console.error('Error looking up tickets:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to look up tickets' });
+  }
+});
+
+// POST /api/public/bot/crm/create-ticket
+const createTicketSchema = z.object({
+  tenantId: z.string().optional(),
+  embedKey: z.string().optional(),
+  conversationId: z.string(),
+  sessionId: z.string(),
+  customerEmail: z.string().optional(),
+  issueSummary: z.string().min(5).max(500),
+});
+
+router.post('/crm/create-ticket', resolveEmbedKey, async (req, res) => {
+  try {
+    const validation = createTicketSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
+    }
+
+    const tenantId = res.locals.embedTenantId || validation.data.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
+    }
+    if (!caps.effective.chatbot.allowed_skill_types.includes('chatbot_skill_crm_assistant' as any)) {
+      return res.status(403).json({ success: false, error: 'capability_disabled', message: 'CRM assistant skill is not available for this tier' });
+    }
+
+    const { conversationId, sessionId, customerEmail, issueSummary } = validation.data;
+    const ticket = await crmAssistantService.createTicket(
+      tenantId,
+      conversationId,
+      sessionId,
+      customerEmail || null,
+      issueSummary
+    );
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to create ticket' });
   }
 });
 

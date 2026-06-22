@@ -12,8 +12,10 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../prisma';
+import aiProviderFactory from './ai-providers';
 
-export type AIProvider = 'google' | 'openai';
+export type AIProvider = 'google' | 'openai' | 'anthropic' | 'mistral';
+export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
 export type ImageQuality = 'standard' | 'hd';
 
 export interface AIConfig {
@@ -103,7 +105,7 @@ export class AIProviderService {
     businessType: string,
     categoryName: string,
     count: number,
-    providerOverride?: 'openai' | 'google'
+    providerOverride?: QuickStartTextProvider
   ): Promise<GeneratedProductData[]> {
     const config = await this.getConfig();
     
@@ -115,8 +117,14 @@ export class AIProviderService {
     try {
       if (provider === 'google' && this.gemini) {
         return await this.generateWithGemini(businessType, categoryName, count);
+      } else if (provider === 'openai' && this.openai) {
+        return await this.generateWithOpenAI(businessType, categoryName, count);
+      } else if (provider === 'anthropic' || provider === 'mistral') {
+        return await this.generateWithGenericProvider(businessType, categoryName, count, provider);
       } else if (this.openai) {
         return await this.generateWithOpenAI(businessType, categoryName, count);
+      } else if (this.gemini) {
+        return await this.generateWithGemini(businessType, categoryName, count);
       }
       throw new Error('No AI provider available');
     } catch (error: any) {
@@ -126,10 +134,12 @@ export class AIProviderService {
       if (config.fallbackEnabled) {
         console.log('[AI] Attempting fallback provider...');
         try {
-          if (provider === 'google' && this.openai) {
+          if (provider !== 'openai' && this.openai) {
             return await this.generateWithOpenAI(businessType, categoryName, count);
-          } else if (provider === 'openai' && this.gemini) {
+          } else if (provider !== 'google' && this.gemini) {
             return await this.generateWithGemini(businessType, categoryName, count);
+          } else {
+            return await this.generateWithGenericProvider(businessType, categoryName, count, 'anthropic');
           }
         } catch (fallbackError: any) {
           console.error('[AI] Fallback also failed:', fallbackError.message);
@@ -315,6 +325,77 @@ Return ONLY a JSON object with a "products" array.`;
     const products = data.products || [];
 
     console.log(`[AI] OpenAI generated ${products.length} products`);
+
+    return products
+      .filter((p: any) => this.validateProduct(p))
+      .slice(0, count);
+  }
+
+  /**
+   * Generate products using a generic provider via AiProviderFactory (Anthropic, Mistral)
+   */
+  private async generateWithGenericProvider(
+    businessType: string,
+    categoryName: string,
+    count: number,
+    provider: 'anthropic' | 'mistral'
+  ): Promise<GeneratedProductData[]> {
+    const prompt = `Generate ${count} realistic products for a ${businessType} business in the category "${categoryName}".
+
+For each product, provide:
+1. name: Realistic product name (include size/quantity if relevant)
+2. price: Realistic price in cents (integer, e.g., 1299 for $12.99)
+3. brand: Real or realistic brand name
+4. description: 1-2 sentence product description
+5. enhancedDescription: 2-3 paragraph detailed description (SEO-friendly)
+6. features: Array of 3-5 key features/benefits
+7. specifications: Object with technical specs (size, quantity, ingredients, etc.)
+8. sku: Generate a realistic SKU format
+
+Requirements:
+- Products must be realistic and commonly sold
+- Prices should reflect actual market prices (in cents)
+- Use real brand names when appropriate
+- Vary the products within the category
+- Include size/quantity in product names when relevant
+- Enhanced descriptions should be detailed and SEO-friendly
+- Features should highlight benefits
+- Specifications should be product-specific
+
+Return ONLY a JSON object with a "products" array. No markdown, no code blocks, just pure JSON.`;
+
+    const result = await aiProviderFactory.generateChatCompletion({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a product data expert. Return only valid JSON with a products array containing detailed product information.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      maxTokens: 2000,
+      temperature: 0.8,
+    });
+
+    const content = result.content;
+    if (!content) {
+      throw new Error(`Empty response from ${provider}`);
+    }
+
+    // Parse JSON from response (may be wrapped in markdown code blocks)
+    let jsonText = content.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '');
+    }
+
+    const data = JSON.parse(jsonText);
+    const products = data.products || [];
+
+    console.log(`[AI] ${provider} generated ${products.length} products`);
 
     return products
       .filter((p: any) => this.validateProduct(p))

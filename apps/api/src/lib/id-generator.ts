@@ -954,6 +954,18 @@ export function generateCrmAlertId(tenantId: string): string {
 }
 
 /**
+ * Generate bot embed key for external site licensing
+ * Format: ek-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ * The tenant key prefix allows visual identification of which tenant
+ * owns the key without a database lookup
+ */
+export function generateEmbedKey(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `ek-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate product slug using new UPC/LPC system
  * Matches database trigger logic exactly
  * 

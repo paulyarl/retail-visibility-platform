@@ -1769,4 +1769,10 @@ router.post('/change-tier', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
   }
 });
 
+// ====================
+// BSaaS Feature Purchase Routes
+// ====================
+import bsaasPurchaseRoutes from './bsaas-purchases';
+router.use(bsaasPurchaseRoutes);
+
 export default router;

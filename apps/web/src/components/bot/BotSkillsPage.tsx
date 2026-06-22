@@ -19,6 +19,12 @@ export default function BotSkillsPage({ tenantId }: BotSkillsPageProps) {
   const [skills, setSkills] = useState<BotSkill[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const SKILL_DISPLAY_NAMES: Record<string, string> = {
+    platform_guide: 'Platform Guide',
+  };
+
+  const getSkillDisplayName = (name: string) => SKILL_DISPLAY_NAMES[name] || name;
+
   const fetchSkills = useCallback(async () => {
     setLoading(true);
     try {
@@ -92,7 +98,7 @@ export default function BotSkillsPage({ tenantId }: BotSkillsPageProps) {
             <Card key={skill.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{skill.name}</CardTitle>
+                  <CardTitle className="text-base">{getSkillDisplayName(skill.name)}</CardTitle>
                   <Switch
                     checked={skill.enabled}
                     onCheckedChange={(v) => handleToggle(skill, v)}

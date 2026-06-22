@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { publicBotService, type PublicBotConfig } from '@/services/PublicBotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import SkillCardRenderer from './SkillCardRenderer';
 
 interface ChatMessage {
   id: string;
@@ -51,9 +53,26 @@ export default function PublicBotWidget({
   const [preChatPhone, setPreChatPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [autoOpenTriggered, setAutoOpenTriggered] = useState(false);
+  const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch platform settings for default logo
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await platformSettingsService.getPlatformSettings();
+        if (!cancelled && settings?.logoUrl) {
+          setPlatformLogoUrl(settings.logoUrl);
+        }
+      } catch {
+        // Non-critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch widget config when capability is confirmed
   useEffect(() => {
@@ -183,6 +202,7 @@ export default function PublicBotWidget({
   const panelPosClass = PANEL_POSITION_CLASSES[position] || PANEL_POSITION_CLASSES['bottom-right'];
   const accentColor = config.widgetColor || '#4F46E5';
   const botName = config.botName || 'Assistant';
+  const avatarUrl = config.widgetAvatarUrl || platformLogoUrl;
   const needsPreChat = config.preChatEnabled && !preChatDone && !sessionId;
 
   return (
@@ -199,9 +219,9 @@ export default function PublicBotWidget({
             style={{ background: accentColor }}
           >
             <div className="flex items-center gap-2 min-w-0">
-              {config.widgetAvatarUrl ? (
+              {avatarUrl ? (
                 <img
-                  src={config.widgetAvatarUrl}
+                  src={avatarUrl}
                   alt={botName}
                   className="w-8 h-8 rounded-full object-cover shrink-0"
                 />
@@ -247,14 +267,7 @@ export default function PublicBotWidget({
 
                   {/* Skill Card */}
                   {msg.skillCard && (
-                    <div className="mt-2 p-2 bg-neutral-100 dark:bg-neutral-600 rounded-lg text-xs">
-                      {msg.skillCard.title && (
-                        <div className="font-semibold mb-1">{msg.skillCard.title}</div>
-                      )}
-                      {msg.skillCard.body && (
-                        <div className="text-neutral-600 dark:text-neutral-300">{msg.skillCard.body}</div>
-                      )}
-                    </div>
+                    <SkillCardRenderer card={msg.skillCard} />
                   )}
 
                   {/* Feedback buttons for assistant messages */}
@@ -399,9 +412,9 @@ export default function PublicBotWidget({
           style={{ background: accentColor }}
           aria-label={`Open chat with ${botName}`}
         >
-          {config.widgetAvatarUrl ? (
+          {avatarUrl ? (
             <img
-              src={config.widgetAvatarUrl}
+              src={avatarUrl}
               alt={botName}
               className="w-10 h-10 rounded-full object-cover"
             />

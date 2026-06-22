@@ -3,10 +3,12 @@
  *
  * Usage:
  *   <script src="/bot-widget/bot-widget.js" data-tenant-id="tid-xxx" defer></script>
+ *   <script src="https://platform.com/bot-widget/bot-widget.js" data-embed-key="ek-xxx" defer></script>
  *
  * Or programmatically:
  *   <script>
  *     BotWidget.init({ tenantId: 'tid-xxx', pageContext: 'storefront' });
+ *     BotWidget.init({ embedKey: 'ek-xxx', pageContext: 'storefront' });
  *   </script>
  *
  * Features:
@@ -40,6 +42,7 @@
 
   var state = {
     tenantId: null,
+    embedKey: null,
     pageContext: null,
     config: null,
     sessionId: null,
@@ -113,9 +116,26 @@
     return (window.location.origin || '');
   }
 
+  function authHeaders() {
+    var headers = { 'Content-Type': 'application/json' };
+    if (state.embedKey) {
+      headers['x-embed-key'] = state.embedKey;
+    }
+    return headers;
+  }
+
+  function tenantParam() {
+    if (state.embedKey) {
+      return 'embedKey=' + encodeURIComponent(state.embedKey);
+    }
+    return 'tenantId=' + encodeURIComponent(state.tenantId);
+  }
+
   async function fetchWidgetConfig(tenantId) {
-    var url = apiBase() + '/api/public/bot/config?tenantId=' + encodeURIComponent(tenantId);
-    var resp = await fetch(url);
+    var url = apiBase() + '/api/public/bot/config?' + tenantParam();
+    var resp = await fetch(url, {
+      headers: state.embedKey ? { 'x-embed-key': state.embedKey } : {},
+    });
     if (!resp.ok) return null;
     var json = await resp.json();
     return json.success && json.config ? json.config : null;
@@ -123,15 +143,20 @@
 
   async function startConversation(tenantId, opts) {
     var url = apiBase() + '/api/public/bot/conversations';
+    var body = {
+      customerEmail: opts.email || undefined,
+      customerPhone: opts.phone || undefined,
+      pageContext: state.pageContext,
+    };
+    if (state.embedKey) {
+      body.embedKey = state.embedKey;
+    } else {
+      body.tenantId = tenantId;
+    }
     var resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: tenantId,
-        customerEmail: opts.email || undefined,
-        customerPhone: opts.phone || undefined,
-        pageContext: state.pageContext,
-      }),
+      headers: authHeaders(),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error('Failed to start conversation');
     var json = await resp.json();
@@ -144,7 +169,7 @@
     var url = apiBase() + '/api/public/bot/conversations/' + sessionId + '/messages';
     var resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ message: message }),
     });
     if (!resp.ok) throw new Error('Failed to send message');
@@ -158,7 +183,7 @@
     try {
       await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ messageId: messageId, rating: rating }),
       });
     } catch (e) {}
@@ -307,11 +332,12 @@
 
   BotWidget.prototype.init = function (opts) {
     var self = this;
-    state.tenantId = opts.tenantId || (document.currentScript && document.currentScript.getAttribute('data-tenant-id'));
+    state.tenantId = opts.tenantId || (document.currentScript && document.currentScript.getAttribute('data-tenant-id')) || null;
+    state.embedKey = opts.embedKey || (document.currentScript && document.currentScript.getAttribute('data-embed-key')) || null;
     state.pageContext = opts.pageContext || (document.currentScript && document.currentScript.getAttribute('data-page-context')) || null;
 
-    if (!state.tenantId) {
-      console.warn('[BotWidget] No tenantId provided');
+    if (!state.tenantId && !state.embedKey) {
+      console.warn('[BotWidget] No tenantId or embedKey provided');
       return;
     }
 
@@ -767,9 +793,10 @@
 
   if (currentScript) {
     var tenantId = currentScript.getAttribute('data-tenant-id');
-    if (tenantId) {
+    var embedKey = currentScript.getAttribute('data-embed-key');
+    if (tenantId || embedKey) {
       var pageContext = currentScript.getAttribute('data-page-context');
-      widget.init({ tenantId: tenantId, pageContext: pageContext });
+      widget.init({ tenantId: tenantId, embedKey: embedKey, pageContext: pageContext });
     }
   }
 })();

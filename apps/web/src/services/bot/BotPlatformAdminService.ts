@@ -91,6 +91,34 @@ export interface BotTenantSummary {
   conversationCount: number;
 }
 
+export type AiProviderType = 'openai' | 'anthropic' | 'google' | 'mistral';
+
+export interface BotPlatformSettings {
+  botAiEnabled: boolean;
+  botEmbeddingSyncEnabled: boolean;
+  botEmbeddingModel: string;
+  botChatModel: string;
+  botSyncIntervalHours: number;
+  botEmbeddingProvider: AiProviderType;
+  botChatProvider: AiProviderType;
+}
+
+export interface BotSyncEstimate {
+  tenantCount: number;
+  totalProducts: number;
+  estimatedChunks: number;
+  estimatedTokens: number;
+  estimatedCostUsd: number;
+  embeddingModel: string;
+}
+
+export interface BotSyncResult {
+  tenants: number;
+  products: number;
+  chunks: number;
+  failed: number;
+}
+
 export interface PaginatedResult<T> {
   data: T[];
   total: number;
@@ -115,7 +143,7 @@ class BotPlatformAdminService extends AdminApiSingleton {
   }
 
   getServiceCachePatterns(): string[] {
-    return ['bot-dashboard', 'bot-guardrails', 'bot-intents', 'bot-skills', 'bot-knowledge', 'bot-tenants'];
+    return ['bot-dashboard', 'bot-guardrails', 'bot-intents', 'bot-skills', 'bot-knowledge', 'bot-tenants', 'bot-settings', 'bot-sync-estimate'];
   }
 
   async invalidateServiceCaches(): Promise<void> {
@@ -275,6 +303,45 @@ class BotPlatformAdminService extends AdminApiSingleton {
     );
     await this.invalidateCache('bot-knowledge');
     return this.unwrap<any>(result);
+  }
+
+  // --- Platform AI Controls ---
+
+  async getBotSettings(): Promise<BotPlatformSettings> {
+    const result = await this.makeDefaultRequest<BotPlatformSettings>(
+      '/api/admin/bot/settings',
+      { method: 'GET' },
+      'bot-settings',
+      30 * 1000,
+    );
+    return this.unwrap<BotPlatformSettings>(result);
+  }
+
+  async updateBotSettings(data: BotPlatformSettings): Promise<BotPlatformSettings> {
+    const result = await this.makeDefaultRequest<BotPlatformSettings>(
+      '/api/admin/bot/settings',
+      { method: 'PUT', body: JSON.stringify(data) },
+    );
+    await this.invalidateCache('bot-settings');
+    return this.unwrap<BotPlatformSettings>(result);
+  }
+
+  async triggerSyncNow(): Promise<BotSyncResult> {
+    const result = await this.makeDefaultRequest<BotSyncResult>(
+      '/api/admin/bot/sync-now',
+      { method: 'POST' },
+    );
+    return this.unwrap<BotSyncResult>(result);
+  }
+
+  async getSyncEstimate(): Promise<BotSyncEstimate> {
+    const result = await this.makeDefaultRequest<BotSyncEstimate>(
+      '/api/admin/bot/sync-estimate',
+      { method: 'GET' },
+      'bot-sync-estimate',
+      60 * 1000,
+    );
+    return this.unwrap<BotSyncEstimate>(result);
   }
 
   // --- Tenants ---
