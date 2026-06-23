@@ -11,7 +11,7 @@ const router = Router();
 // Validation schema
 const storefrontTypeSettingsSchema = z.object({
   storefront_type_enabled: z.boolean().optional(),
-  selected_storefront_type: z.enum(['online', 'retail', 'service', 'both']).nullable().optional(),
+  selected_storefront_type: z.enum(['online', 'retail', 'service', 'social', 'both']).nullable().optional(),
 });
 
 // Default settings (selected_storefront_type is null so frontend derives from tier type)
