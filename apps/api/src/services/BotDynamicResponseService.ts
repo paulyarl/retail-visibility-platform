@@ -15,7 +15,7 @@ import BotConversationService from './BotConversationService';
 import BotProductCatalogService from './BotProductCatalogService';
 import BotPlatformGuideService from './BotPlatformGuideService';
 import BotCrmAssistantService from './BotCrmAssistantService';
-import StorefrontPolicyService from './StorefrontPolicyService';
+import { StorefrontPolicyService } from './StorefrontPolicyService';
 import BotChannelSteeringService, { type SteeringChannel } from './BotChannelSteeringService';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';

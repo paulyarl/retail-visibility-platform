@@ -173,6 +173,11 @@ export default function StorefrontFooter({
                 {policies?.refund_policy && (
                   <li><Link href={`/tenant/${tenantId}/policies/refund_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Refunds</Link></li>
                 )}
+                <li>
+                  <Link href="/privacy/ccpa" className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                    Do Not Sell My Info
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -315,6 +320,11 @@ export default function StorefrontFooter({
               {policies?.terms_of_service && (
                 <li><Link href={`/tenant/${tenantId}/policies/terms_of_service`} className="text-neutral-400 hover:text-white transition-colors">Terms of Service</Link></li>
               )}
+              <li>
+                <Link href="/privacy/ccpa" className="text-neutral-400 hover:text-white transition-colors">
+                  Do Not Sell My Info
+                </Link>
+              </li>
             </ul>
           </div>
 

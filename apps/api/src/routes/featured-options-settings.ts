@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import FeaturedOptionsService, { FeaturedType } from '../services/FeaturedOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { generateFeaturedOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -205,7 +206,7 @@ router.put('/:tenantId/featured-options', authenticateToken, async (req, res) =>
       // Create new settings
       settings = await prisma.tenant_featured_options_settings.create({
         data: {
-          id: `fos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateFeaturedOptionsSettingsId(tenantId),
           tenant_id: tenantId,
           ...filteredData,
         },

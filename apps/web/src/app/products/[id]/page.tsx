@@ -1,27 +1,14 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-// import Link from 'next/link';
-import Image from 'next/image';
 import ProductGallery from '@/components/products/ProductGallery';
 
 // Tier Based Landing Page
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 
 // Product Components
-// import { ProductNavigation } from '@/components/products/ProductNavigation';
-import { ProductRecommendations } from '@/components/products/ProductRecommendations';
-import { FeaturedTypeProducts } from '@/components/products/FeaturedTypeProducts';
-import LastViewed from '@/components/directory/LastViewed';
-// import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
-import ProductBusinessInfoWrapper from '@/components/products/ProductBusinessInfoWrapper';
-import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
-// import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsWrapper';
-import DirectoryActions from '@/components/directory/DirectoryActions';
-// import { Badge, Group } from '@mantine/core';
-// import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 import { productDataService } from '@/services/ProductDataService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
@@ -29,19 +16,23 @@ import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
-import { AvailableNearby } from '@/components/products/AvailableNearby';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState, type FeaturedType } from '@/services/CapabilityResolutionService';
-import { publicFaqService } from '@/services/PublicFaqService';
-import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
-import FaqProductDisplay from '@/components/faq/FaqProductDisplay';
-import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
-import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
-import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
+import LastViewed from '@/components/directory/LastViewed';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
+
+// Shared product page sections
+import { ProductHeaderSection } from '@/components/products/sections/ProductHeaderSection';
+import { FeaturedProductsSection } from '@/components/products/sections/FeaturedProductsSection';
+import { ProductBusinessInfoSection } from '@/components/products/sections/ProductBusinessInfoSection';
+import { ProductReviewsSectionWrapper } from '@/components/products/sections/ProductReviewsSectionWrapper';
+import { ProductFAQSection } from '@/components/products/sections/ProductFAQSection';
+import { ProductRecommendationsSection } from '@/components/products/sections/ProductRecommendationsSection';
+import { ProductInquirySection } from '@/components/products/sections/ProductInquirySection';
+import { ProductFooterSection } from '@/components/products/sections/ProductFooterSection';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -495,115 +486,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         />
 
         {/* Hero Header - Store Brand Identity, Navigation, Actions */}
-        <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Main Header Row */}
-            <div className="flex items-center gap-4 py-4">
-              {/* Brand Identity */}
-              <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
-                {/* Store Logo */}
-                <div className="flex-shrink-0">
-                  {tenantProfile?.profileData?.logoUrl || tenantProfile?.profileData?.logo_url ? (
-                    <div className="relative w-14 h-14">
-                      <Image
-                        src={tenantProfile.profileData.logoUrl || tenantProfile.profileData.logo_url}
-                        alt={tenantProfile.profileData.businessName || tenantProfile.profileData.business_name || businessName}
-                        fill
-                        className="object-contain rounded-lg shadow-sm"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
-                      <svg className="w-7 h-7 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                {/* Store Name and Category */}
-                <div className="flex flex-col min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
-                      {tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
-                    </h1>
-                  </div>
-                  {product.category && (
-                    <a
-                      title={`Browse to store's ${product.category.name} products`}
-                      className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
-                      href={`/tenant/${product.tenantId}?category=${product.category.slug}`}
-                    >
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                        {product.category.name}
-                      </p>
-                    </a>
-                  )}
-                </div>
-              </div>
-
-
-            </div>
-            {/* Quick Actions */}
-            <div className="hidden sm:flex justify-end mt-3">
-              {/* Directory Actions */}
-              {optFlags?.showStorefrontActions !== false && <DirectoryActions
-                listing={{
-                  business_name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || '',
-                  slug: tenantProfile?.slug || '',
-                  tenantId: product.tenantId || '',
-                  id: product.id || ''
-                }}
-                currentUrl={currentUrl}
-                entity_name={product.name}
-                variant="product"
-              />}
-            </div>
-            {/* Navigation Pills */}
-
-
-            {/* Mobile Navigation */}
-            <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
-              {/* Directory Actions */}
-              {optFlags?.showStorefrontActions !== false && <DirectoryActions
-                listing={{
-                  business_name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || '',
-                  slug: tenantProfile?.slug || '',
-                  tenantId: product.tenantId || '',
-                  id: product.id || ''
-                }}
-                currentUrl={currentUrl}
-                entity_name={product.name}
-                variant="product"
-              />}
-              <div className="hidden sm:flex justify-end mt-3">
-                {tenantProfile?.slug && (
-                  <a
-                    href={`/tenant/${product.tenantId}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <span>Store</span>
-                  </a>
-                )}
-                {tenantProfile?.slug && (
-                  <a
-                    href={`/directory/${tenantProfile.slug}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <span>Directory</span>
-                  </a>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </header>
+        <ProductHeaderSection
+          product={product}
+          tenantProfile={tenantProfile}
+          businessName={businessName}
+          currentUrl={currentUrl}
+          optFlags={optFlags}
+          layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+        />
 
         {/* Alert for non-public products (only shown to authenticated users) */}
         {!isPubliclyAccessible && (
@@ -943,172 +833,83 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
 
           {/* Featured Type Products - Full Width */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <FeaturedTypeProducts
-              currentProductId={product.id}
-              tenantId={product.tenantId}
-              featuredTypes={merchantFilteredFeaturedTypes}
-              groupedProducts={merchantFilteredGroupedProducts}
-              allowedFeaturedTypes={merchantFilteredFeaturedTypes.length > 0 ? merchantFilteredFeaturedTypes : undefined}
-            />
-          </div>
+          <FeaturedProductsSection
+            currentProductId={product.id}
+            tenantId={product.tenantId}
+            featuredTypes={merchantFilteredFeaturedTypes}
+            groupedProducts={merchantFilteredGroupedProducts}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
-          {/* Available Nearby - Cross-Tenant Product Discovery */}
-          {productOptFlags?.showsLocationAvailability !== false && product.productSlug && product.otherTenantsCount && product.otherTenantsCount > 0 && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-              <AvailableNearby
-                productSlug={product.productSlug}
-                currentTenantId={product.tenantId}
-                className="w-full max-w-md mx-auto"
-              />
-            </div>
-          )}
-
-          {/* Business Information - Contact Us - Full Width */}
-          {product.productType != 'digital' ? (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <ProductBusinessInfoWrapper
-                product={product as any}
-                tenant={{
-                  id: product.tenantId || tenantProfile?.id || '',
-                  name: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || product.tenant?.name || '',
-                  metadata: {
-                    businessName: tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name,
-                    businessDescription: tenantProfile?.profileData?.business_description || tenantProfile?.profileData?.businessDescription,
-                    phone: tenantProfile?.profileData?.phone_number,
-                    email: tenantProfile?.profileData?.email,
-                    website: tenantProfile?.profileData?.website,
-                    address: tenantProfile?.profileData?.state == null ? '' : `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
-
-                    logoUrl: tenantProfile?.profileData?.logo_url,
-                    socialLinks: tenantProfile?.profileData?.social_links || undefined,
-                  }
-                }}
-                initialOptFlags={optFlags}
-              />
-            </div>
-          ) : (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-                Digital Product
-              </h2>
-              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                Download link will be available after successful checkout.
-              </p>
-            </div>
-          )}
+          {/* Business Info, Available Nearby, Digital Product Info */}
+          <ProductBusinessInfoSection
+            product={product}
+            tenantProfile={tenantProfile}
+            productOptFlags={productOptFlags}
+            optFlags={optFlags}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
           {/* Product Recommendations - Full Width */}
-          {/* You Might Also Like */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
-          </div>
+          <ProductRecommendationsSection
+            product={product}
+            tenantId={product.tenantId}
+            tenantSlug={product.tenant?.slug || ''}
+            productOptFlags={productOptFlags}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
           {/* Product FAQs */}
-          {faqOptionsFlags?.faq_enabled && faqOptionsFlags?.faq_display_product_accordion && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <FaqProductDisplay
-                tenantId={product.tenantId}
-                productId={product.id}
-                merchantName={businessName}
-                enabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_product_accordion}
-                feedbackEnabled={faqOptionsFlags.faq_enabled && faqOptionsFlags.faq_display_feedback}
-              />
-            </div>
-          )}
+          <ProductFAQSection
+            tenantId={product.tenantId}
+            productId={product.id}
+            businessName={businessName}
+            faqOptionsFlags={faqOptionsFlags}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
           {/* Inquiry Form — for tenants without storefront/directory */}
-          {crmOptionsFlags?.crm_enabled && crmOptionsFlags?.crm_inquiry_product_enabled && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-              <div className="max-w-lg mx-auto">
-                <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Ask about this product</h3>
-                      <p className="text-xs text-neutral-500">Send an inquiry to {businessName}</p>
-                    </div>
-                  </div>
-                  <PublicInquiryForm
-                    tenantId={product.tenantId}
-                    tenantName={businessName}
-                    sourceLabel="Product"
-                    productId={product.id}
-                    productName={product.name || product.title}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+          <ProductInquirySection
+            tenantId={product.tenantId}
+            businessName={businessName}
+            productId={product.id}
+            productName={product.name || product.title}
+            crmOptionsFlags={crmOptionsFlags}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
           {/* Product Reviews - Full Width */}
-          {productOptFlags?.showsReviews !== false && (
-            <>
-              <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-              <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                  <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
-                </div>
-              </div>
-            </>
-          )}
+          <ProductReviewsSectionWrapper
+            productId={product.id}
+            tenantId={product.tenantId}
+            productOptFlags={productOptFlags}
+            layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          />
 
         </ProductPageStatusWrapper>
 
         {/* Recently Viewed Products */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {productOptFlags?.showsRecentlyViewed !== false && <LastViewed
-            title="Recently Viewed Products"
-            entityType="product"
-            limit={4}
-            showEmptyState={false}
-            currentProductId={product.id}
-          />}
+          {productOptFlags?.showsRecentlyViewed !== false && (
+            <LastViewed
+              title="Recently Viewed Products"
+              entityType="product"
+              limit={4}
+              showEmptyState={false}
+              currentProductId={product.id}
+            />
+          )}
         </div>
 
         {/* Storefront Footer (includes platform branding) */}
-        <StorefrontFooter
-          tenantId={product.tenantId}
-          businessName={tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
-          businessDescription={tenantProfile?.profileData?.business_description || tenantProfile?.profileData?.businessDescription || ''}
-          logoUrl={tenantProfile?.profileData?.logo_url || null}
+        <ProductFooterSection
+          product={product}
+          tenantProfile={tenantProfile}
+          businessName={businessName}
           platformSettings={platformSettings}
-          features={null}
-          directoryPublished={tenantProfile?.hasDirectory || false}
-          tenantSlug={product.tenant?.slug || ''}
-          isRetailStore={tenantProfile?.metadata?.store_type !== 'online'}
-          contactInfo={{
-            address: tenantProfile?.profileData
-              ? [
-                  tenantProfile.profileData.address_line1,
-                  tenantProfile.profileData.city,
-                  tenantProfile.profileData.state,
-                  tenantProfile.profileData.postal_code,
-                ].filter(Boolean).join(', ') || null
-              : null,
-            phone: tenantProfile?.profileData?.phone_number || null,
-            email: tenantProfile?.profileData?.email || null,
-            website: tenantProfile?.profileData?.website || null,
-          }}
-          socialLinks={((): { platform: string; url: string; icon: string }[] => {
-            const links: { platform: string; url: string; icon: string }[] = [];
-            const meta = tenantProfile?.metadata || {};
-            if (meta.instagram) links.push({ platform: 'Instagram', url: meta.instagram, icon: 'instagram' });
-            if (meta.facebook) links.push({ platform: 'Facebook', url: meta.facebook, icon: 'facebook' });
-            if (meta.twitter || meta.x) links.push({ platform: 'X', url: meta.twitter || meta.x, icon: 'x' });
-            if (meta.tiktok) links.push({ platform: 'TikTok', url: meta.tiktok, icon: 'tiktok' });
-            if (meta.linkedin) links.push({ platform: 'LinkedIn', url: meta.linkedin, icon: 'linkedin' });
-            if (meta.youtube) links.push({ platform: 'YouTube', url: meta.youtube, icon: 'youtube' });
-            return links;
-          })()}
-          showsSocialMedia={!!(tenantProfile?.metadata?.instagram || tenantProfile?.metadata?.facebook || tenantProfile?.metadata?.twitter || tenantProfile?.metadata?.x || tenantProfile?.metadata?.tiktok || tenantProfile?.metadata?.linkedin || tenantProfile?.metadata?.youtube)}
           optFlags={optFlags}
           currentUrl={currentUrl}
-          variant={productLayout === 'quick-commerce' ? 'compact' : 'full'}
+          layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
         />
       </ProductLikeProvider>
       <PublicBotWidget

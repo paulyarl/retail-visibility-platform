@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { generatePaymentGatewaySettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -157,7 +158,7 @@ router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
     } else {
       settings = await prisma.tenant_payment_gateway_settings.create({
         data: {
-          id: `pgs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generatePaymentGatewaySettingsId(tenantId),
           tenant_id: tenantId,
           ...data,
         },

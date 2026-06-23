@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "./prisma";
 import { Flags } from "./config";
+import { generateCorrelationId } from "./lib/id-generator";
 
 export type RequestCtx = {
   region: string;
@@ -11,8 +12,9 @@ export type RequestCtx = {
   correlationId?: string;
 };
 
-export async function setRequestContext(req: Request, _res: Response, next: NextFunction) {
+export async function setRequestContext(req: Request, res: Response, next: NextFunction) {
   const ctx: RequestCtx = { region: "us-east-1" };
+
   // Best-effort tenantId discovery without changing behavior
   const tenantId =
     (typeof (req.query as any)?.tenantId === "string" && (req.query as any).tenantId) ||
@@ -21,6 +23,13 @@ export async function setRequestContext(req: Request, _res: Response, next: Next
     undefined;
 
   if (tenantId) ctx.tenantId = tenantId;
+
+  // Generate tenant-scoped correlation ID: corr-{tk|GLBL}-{nanoid}
+  // Honor incoming x-correlation-id header for distributed tracing
+  ctx.correlationId = (req.headers['x-correlation-id'] as string) || generateCorrelationId(tenantId);
+
+  // Expose correlation ID on response header for client-side tracing
+  res.setHeader('X-Correlation-Id', ctx.correlationId);
 
   // Only resolve region from DB when the flag is ON and we have a tenantId
   if (Flags.GLOBAL_TENANT_META && tenantId) {

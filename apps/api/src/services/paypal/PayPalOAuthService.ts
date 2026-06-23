@@ -1,6 +1,7 @@
 import { TokenEncryptionService } from '../TokenEncryptionService';
 import { prisma } from '../../prisma';
 import crypto from 'crypto';
+import { generatePaymentGatewayId } from '../../lib/id-generator';
 
 interface PayPalTokenResponse {
   access_token: string;
@@ -256,7 +257,7 @@ export class PayPalOAuthService {
       });
     } else {
       // Create new gateway record for OAuth connection
-      const gatewayId = `gateway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const gatewayId = generatePaymentGatewayId(tenantId);
       await prisma.tenant_payment_gateways.create({
         data: {
           id: gatewayId,

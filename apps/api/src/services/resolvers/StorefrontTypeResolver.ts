@@ -11,7 +11,7 @@ import type {
   StorefrontTypeMerchantSettings,
 } from './types';
 
-export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'both' | 'none';
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
 
 /**
  * Resolve effective storefront type state.

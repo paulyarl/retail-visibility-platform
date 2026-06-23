@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, checkTenantAccess } from '../middleware/auth';
 import crypto from 'crypto';
+import { generatePaymentGatewayId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -351,7 +352,7 @@ router.post('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async
     const encryptedSecret = encrypt(apiSecret);
 
     // Create gateway
-    const gatewayId = `gateway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const gatewayId = generatePaymentGatewayId(tenantId);
     const gateway = await prisma.tenant_payment_gateways.create({
       data: {
         id: gatewayId,

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Store, Globe, Building2, Wrench, Save, AlertCircle, ArrowRight, Zap, Settings, ExternalLink } from 'lucide-react';
+import { Store, Globe, Building2, Wrench, Share2, Save, AlertCircle, ArrowRight, Zap, Settings, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
@@ -12,7 +12,7 @@ import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface StorefrontTypeSettings {
   storefront_type_enabled: boolean;
-  selected_storefront_type: 'online' | 'retail' | 'service' | 'both' | null;
+  selected_storefront_type: 'online' | 'retail' | 'service' | 'social' | 'both' | null;
 }
 
 interface StorefrontTypeOptionsSettingsClientProps {
@@ -51,6 +51,17 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
       description: 'Manage your retail directory presence',
       href: `/t/${tenantId}/settings/directory`,
       icon: Building2,
+      variant: 'storefront',
+    });
+  }
+
+  if (type === 'social' || type === 'both') {
+    actions.push({
+      id: 'social-commerce',
+      label: 'Social Commerce',
+      description: 'Manage TikTok/Instagram shopping integration',
+      href: `/t/${tenantId}/settings/social-commerce`,
+      icon: Share2,
       variant: 'storefront',
     });
   }
@@ -136,14 +147,15 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleTypeChange = (type: 'online' | 'retail' | 'service') => {
+  const handleTypeChange = (type: 'online' | 'retail' | 'service' | 'social') => {
     setSettings(prev => ({ ...prev, selected_storefront_type: type }));
   };
 
-  const typeOptions: { value: 'online' | 'retail' | 'service'; label: string; description: string; icon: typeof Globe }[] = [
+  const typeOptions: { value: 'online' | 'retail' | 'service' | 'social'; label: string; description: string; icon: typeof Globe }[] = [
     { value: 'online', label: 'Online', description: 'E-commerce and digital storefront', icon: Globe },
     { value: 'retail', label: 'Retail', description: 'Physical store and in-person sales', icon: Building2 },
     { value: 'service', label: 'Service', description: 'Service-based business model', icon: Wrench },
+    { value: 'social', label: 'Social', description: 'Social commerce (TikTok/Instagram) storefront', icon: Share2 },
   ];
 
   const effectiveType = isFlexible && settings.storefront_type_enabled && settings.selected_storefront_type && allowedTypes.includes(settings.selected_storefront_type)

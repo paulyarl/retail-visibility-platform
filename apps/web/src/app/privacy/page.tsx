@@ -127,7 +127,24 @@ export default function PrivacyPage() {
               your browser settings, but disabling them may affect how the service works.
             </p>
 
-            <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">8. Contact Us</h2>
+            <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">8. California Privacy Rights (CCPA)</h2>
+            <p className="text-neutral-700 mb-4">
+              California residents have rights under the California Consumer Privacy Act (CCPA),
+              including the right to know what personal information is collected, the right to
+              delete their personal information, and the right to opt out of the &quot;sale&quot;
+              of their personal information.
+            </p>
+            <p className="text-neutral-700 mb-6">
+              To exercise your right to opt out of the sale of your personal information, please
+              visit our{' '}
+              <Link href="/privacy/ccpa" className="text-primary-600 hover:text-primary-700 underline">
+                Do Not Sell My Personal Information
+              </Link>{' '}
+              page. For right-to-know or right-to-delete requests, you may use the data export
+              and account deletion tools available in your account settings.
+            </p>
+
+            <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">9. Contact Us</h2>
             <p className="text-neutral-700 mb-6">
               If you have questions about this Privacy Policy or how we handle data, you can contact
               us from the in-product Contact page or by using the Contact link in the footer.

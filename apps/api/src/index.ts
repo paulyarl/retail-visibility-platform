@@ -4,6 +4,9 @@ import * as Sentry from '@sentry/node';
 // New Relic APM - Must be imported first
 import './newrelic';
 
+// Platform-level structured logger — available before any other code runs
+import { requestLogger, logger } from "./logger";
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -14,7 +17,7 @@ import { user_role } from '@prisma/client';
 // This allows Node.js to accept Supabase's SSL certificates
 if (process.env.NODE_ENV === 'production') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  console.log('⚠️  SSL certificate validation disabled for Supabase compatibility');
+  logger.warn('SSL certificate validation disabled for Supabase compatibility');
 }
 import { Pool } from 'pg';
 import { prisma, basePrisma } from "./prisma";
@@ -197,6 +200,8 @@ import tierSystemRoutes from './routes/admin/tier-system';
 // import testGbpRoutes from './routes/test-gbp';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
+import metaOAuthRoutes from './routes/meta-oauth';
+import socialPixelRoutes from './routes/social-pixels';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
 // Legacy Square routes (lazy import) - replaced by /api/integrations routes
@@ -261,19 +266,19 @@ if (sentryEnabled) {
       // Don't send errors in development
       beforeSend(event, hint) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('Sentry error (not sent in dev):', hint.originalException || event);
+          logger.error('Sentry error (not sent in dev)', undefined, { error: hint.originalException || event });
           return null;
         }
         return event;
       },
     });
 
-    console.log('✅ Sentry error tracking initialized');
+    logger.info('Sentry error tracking initialized');
   } catch (error) {
-    console.error('⚠️  Failed to initialize Sentry:', error);
+    logger.error('Failed to initialize Sentry', undefined, { error: { name: error instanceof Error ? error.name : 'Error', message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } });
   }
 } else {
-  console.log('⚠️  Sentry DSN not found - error tracking disabled');
+  logger.warn('Sentry DSN not found - error tracking disabled');
 }
 
 /* ------------------------- middleware ------------------------- */
@@ -303,7 +308,7 @@ app.use(async (req, res, next) => {
     const result = await rateLimitingService.checkRateLimit(ip, 'standard', path);
 
     if (!result.allowed) {
-      console.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
+      logger.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
 
       return res.status(429).json({
         error: 'Too Many Requests',
@@ -315,7 +320,7 @@ app.use(async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('[RateLimitingService] Middleware error:', error);
+    logger.error('[RateLimitingService] Middleware error', undefined, { error: { name: error instanceof Error ? error.name : 'Error', message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } });
     next(); // Allow request on error
   }
 });
@@ -328,8 +333,13 @@ app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id'],
+  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-correlation-id'],
 }));
+
+// Client error reporting — mounted BEFORE auth middleware (errors can occur pre-login)
+import clientErrorRoutes from './routes/client-errors';
+app.use('/api/client-errors', express.json({ limit: '1mb' }), clientErrorRoutes);
+console.log('✅ Client error reporting mounted at /api/client-errors');
 
 // IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
 // Stripe signature verification requires raw body access
@@ -362,6 +372,7 @@ app.use(performanceMonitoring);
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(setRequestContext);
+app.use(requestLogger);
 // CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
 app.use(setCsrfCookie);
 app.use(csrfProtect);
@@ -7266,6 +7277,11 @@ import sentryRoutes from './routes/admin/sentry';
 app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
 console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
 
+/* ------------------------------ admin error log ------------------------------ */
+import errorLogRoutes from './routes/admin/errors';
+app.use('/api/admin/errors', authenticateToken, requireAdmin, errorLogRoutes);
+console.log('✅ Admin error log routes mounted at /api/admin/errors');
+
 /* ------------------------------ admin manual billing ------------------------------ */
 import manualBillingRoutes from './routes/admin/manual-billing';
 app.use('/api/admin/manual-billing', manualBillingRoutes);
@@ -7834,6 +7850,11 @@ app.use('/api', accountDeletionRoutes);
 console.log('✅ GDPR compliance routes mounted (data export, consent management)');
 console.log('✅ Account deletion request routes mounted (30-day grace period)');
 
+/* ------------------------------ CCPA compliance ------------------------------ */
+import ccpaRoutes from './routes/ccpa';
+app.use('/api/ccpa', ccpaRoutes);
+console.log('✅ CCPA compliance routes mounted (opt-out-sale, data categories)');
+
 /* ------------------------------ MFA (Multi-Factor Authentication) ------------------------------ */
 import mfaRoutes from './routes/mfa';
 app.use('/api/auth/mfa', mfaRoutes);
@@ -7956,6 +7977,14 @@ console.log('✅ Google Business Profile OAuth routes mounted at /api/google/bus
 app.use('/api', googleMerchantOAuthRoutes);
 console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oauth');
 
+/* ------------------------------ Meta Commerce OAuth ------------------------------ */
+app.use('/api', metaOAuthRoutes);
+console.log('✅ Meta Commerce OAuth routes mounted at /api/meta/oauth');
+
+/* ------------------------------ Social Pixels ------------------------------ */
+app.use('/api', socialPixelRoutes);
+console.log('✅ Social Pixels routes mounted at /api/social-pixels');
+
 /* ------------------------------ store reviews ------------------------------ */
 import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api/stores', storeReviewsRoutes);
@@ -7998,52 +8027,52 @@ if (process.env.NODE_ENV !== "test") {
   try {
     console.log('🔧 About to start server...');
     const server = app.listen(port, '0.0.0.0', async () => {
-      console.log(`\n✅ API server running → http://localhost:${port}/health`);
-      console.log(`📋 View all routes → http://localhost:${port}/__routes\n`);
+      logger.info(`API server running → http://localhost:${port}/health`);
+      logger.info(`View all routes → http://localhost:${port}/__routes`);
 
       // Start GMC scheduled sync (every 6 hours)
       try {
         const { startGMCScheduledSync } = await import('./jobs/gmc-scheduled-sync');
         startGMCScheduledSync();
-        console.log('🔄 GMC scheduled sync started (every 6 hours)');
+        logger.info('GMC scheduled sync started (every 6 hours)');
       } catch (err) {
-        console.error('⚠️ Failed to start GMC scheduled sync:', err);
+        logger.error('Failed to start GMC scheduled sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start OAuth token refresh (every hour)
       try {
         const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');
         startOAuthTokenRefresh();
-        console.log('🔑 OAuth token refresh started (every hour)');
+        logger.info('OAuth token refresh started (every hour)');
       } catch (err) {
-        console.error('⚠️ Failed to start OAuth token refresh:', err);
+        logger.error('Failed to start OAuth token refresh', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start subscription grace period job (daily at midnight)
       try {
         const { startGracePeriodJob } = await import('./jobs/subscription-grace-period');
         startGracePeriodJob();
-        console.log('💸 Subscription grace period job started (daily at midnight)');
+        logger.info('Subscription grace period job started (daily at midnight)');
       } catch (err) {
-        console.error('⚠️ Failed to start grace period job:', err);
+        logger.error('Failed to start grace period job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start BSaaS feature renewal job (daily at midnight)
       try {
         const { startBsaasRenewalJob } = await import('./jobs/bsaas-renewal');
         startBsaasRenewalJob();
-        console.log('🔄 BSaaS feature renewal job started (daily at midnight)');
+        logger.info('BSaaS feature renewal job started (daily at midnight)');
       } catch (err) {
-        console.error('⚠️ Failed to start BSaaS renewal job:', err);
+        logger.error('Failed to start BSaaS renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start featured products expiry monitor (daily at midnight)
       try {
         const { startFeaturedExpiryMonitor } = await import('./jobs/featured-products-expiry-monitor');
         startFeaturedExpiryMonitor();
-        console.log('⭐ Featured products expiry monitor started (daily at midnight)');
+        logger.info('Featured products expiry monitor started (daily at midnight)');
       } catch (err) {
-        console.error('⚠️ Failed to start featured products expiry monitor:', err);
+        logger.error('Failed to start featured products expiry monitor', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start bot product embedding sync (every 12 hours) — gated by platform settings
@@ -8053,36 +8082,61 @@ if (process.env.NODE_ENV !== "test") {
         if (aiEnabled) {
           const { startBotProductEmbeddingSync } = await import('./jobs/bot-product-embedding-sync');
           await startBotProductEmbeddingSync();
-          console.log('🤖 Bot product embedding sync started');
+          logger.info('Bot product embedding sync started');
         } else {
-          console.log('🤖 Bot product embedding sync skipped (disabled by platform admin)');
+          logger.info('Bot product embedding sync skipped (disabled by platform admin)');
         }
       } catch (err) {
-        console.error('⚠️ Failed to start bot product embedding sync:', err);
+        logger.error('Failed to start bot product embedding sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start log purge job (daily at 2 AM UTC)
+      try {
+        const { startLogPurgeJob } = await import('./jobs/log-purge');
+        startLogPurgeJob();
+        logger.info('Log purge job started (daily at 2 AM UTC)');
+      } catch (err) {
+        logger.error('Failed to start log purge job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 
     // Handle server errors
     server.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} is already in use`);
+        logger.error(`Port ${port} is already in use`);
       } else {
-        console.error('❌ Server error:', error);
+        logger.error('Server error', undefined, { error: { name: error.name, message: error.message, stack: error.stack } });
       }
       process.exit(1);
     });
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
+      logger.warn('SIGTERM received, shutting down gracefully...');
       server.close(() => {
-        console.log('✅ Server closed');
+        logger.info('Server closed');
         process.exit(0);
       });
     });
+
+    // Capture uncaught exceptions — log to all transports (DB, Sentry, console) then exit
+    process.on('uncaughtException', (error: Error) => {
+      logger.error('uncaughtException', undefined, {
+        error: { name: error.name, message: error.message, stack: error.stack },
+      });
+      // Give transports a moment to flush, then exit
+      setImmediate(() => process.exit(1));
+    });
+
+    // Capture unhandled promise rejections — log but don't crash (Node 15+ defaults to exit)
+    process.on('unhandledRejection', (reason: unknown) => {
+      const err = reason instanceof Error ? reason : new Error(String(reason));
+      logger.error('unhandledRejection', undefined, {
+        error: { name: err.name, message: err.message, stack: err.stack },
+      });
+    });
   } catch (error) {
-    console.error('❌ Fatal error during server startup:', error);
-    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
+    logger.error('Fatal error during server startup', undefined, { error: { name: error instanceof Error ? error.name : 'Error', message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } });
     process.exit(1);
   }
 }

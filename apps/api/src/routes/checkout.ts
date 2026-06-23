@@ -19,6 +19,7 @@ import {
   CheckoutMode,
 } from '../utils/deposit-calculator';
 import { taxService } from '../services/TaxService';
+import { socialPixelService } from '../services/SocialPixelService';
 import {
   getTenantCommerceCapabilities,
   getCheckoutMode,
@@ -861,6 +862,33 @@ router.post('/orders', async (req: Request, res: Response) => {
         is_deposit_payment: payment.is_deposit_payment,
       },
     });
+
+    // Fire server-side conversion events (async, non-blocking)
+    const orderTotal = Number(order.total_cents) / 100;
+    const orderCurrency = 'USD';
+    const customerEmail = (order as any).customer_email || undefined;
+    const userAgent = req.headers['user-agent'] || undefined;
+    const pageUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+
+    socialPixelService.sendMetaConversionEvent(tenant_id, {
+      eventName: 'Purchase',
+      eventId: order.id,
+      value: orderTotal,
+      currency: orderCurrency,
+      email: customerEmail,
+      userAgent,
+      url: pageUrl,
+    }).catch(() => {});
+
+    socialPixelService.sendTikTokConversionEvent(tenant_id, {
+      eventName: 'CompletePayment',
+      eventId: order.id,
+      value: orderTotal,
+      currency: orderCurrency,
+      email: customerEmail,
+      userAgent,
+      url: pageUrl,
+    }).catch(() => {});
   } catch (error) {
     console.error('Checkout order creation error:', error);
     res.status(500).json({

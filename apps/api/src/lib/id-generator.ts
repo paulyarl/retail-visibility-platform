@@ -1048,3 +1048,147 @@ export function generateProductSlug(params: {
     return `lpc_${normalizePart(params.sku)}_${normalizePart(category)}_${params.itemId}_${nameHash}`;
   }
 }
+
+/**
+ * Generates CCPA request IDs
+ * Format: ccpa-{tenantKey}-{nanoid} (tenant-scoped) or ccpa-{nanoid} (global)
+ * URL-safe, readable, unique, tenant-traceable when tenant context is available
+ */
+export function generateCcpaRequestId(tenantId?: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  if (tenantId) {
+    return `ccpa-${generateTenantKey(tenantId)}-${nanoid()}`;
+  }
+  return `ccpa-${nanoid()}`;
+}
+
+/**
+ * Generate payment gateway ID
+ * Format: gw-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePaymentGatewayId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `gw-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate payment gateway settings ID
+ * Format: pgs-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePaymentGatewaySettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pgs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate storefront options settings ID
+ * Format: sos-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontOptionsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sos-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate storefront type settings ID
+ * Format: sts-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontTypeSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sts-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate featured options settings ID
+ * Format: fos-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFeaturedOptionsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fos-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate product options settings ID
+ * Format: pos-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateProductOptionsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pos-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate quickstart options settings ID
+ * Format: qos-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateQuickstartOptionsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `qos-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate feature override ID
+ * Format: fov-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFeatureOverrideId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fov-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate feature flag ID
+ * Format: ff-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFeatureFlagId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ff-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate shipping carrier ID
+ * Format: carrier-{tenantKey}-{nanoid} (22 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ * Uses 'carrier' prefix to avoid collision with generateShipmentId ('ship')
+ */
+export function generateShippingCarrierId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `carrier-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate Meta OAuth account ID
+ * Format: moa-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateMetaOAuthAccountId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `moa-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate Meta OAuth token ID
+ * Format: mot-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateMetaOAuthTokenId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mot-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate Social Pixel config ID
+ * Format: spx-{tenantKey}-{nanoid} (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateSocialPixelId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `spx-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

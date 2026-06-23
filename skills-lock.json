@@ -37,6 +37,12 @@
       "skillPath": "codex/skills/skill-saas-factory/SKILL.md",
       "computedHash": "0ff094cb8a9b12ee063eb88b35682433aa795ec12078d862a30165520ea5f6bd"
     },
+    "social-commerce": {
+      "source": "finsilabs/awesome-ecommerce-skills",
+      "sourceType": "github",
+      "skillPath": "skills/marketing-growth/social-commerce/SKILL.md",
+      "computedHash": "55c4dde5593240abe82269741da1ce8fa0d4e95599984af1672dd159cae0a7d7"
+    },
     "video-commerce-integration": {
       "source": "finsilabs/awesome-ecommerce-skills",
       "sourceType": "github",

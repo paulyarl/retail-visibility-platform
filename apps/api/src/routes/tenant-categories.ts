@@ -8,7 +8,7 @@ import { getCategoryById } from '../lib/google/taxonomy';
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { authenticateToken, requireTenantAdmin, checkTenantAccess } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateProductCatId, generateQsCatId, generateQuickStart, generateSpecialHoursId, generateUserTenantId } from '../lib/id-generator';
+import { generateFeatureFlagId, generateProductCatId, generateQsCatId, generateQuickStart, generateSpecialHoursId, generateUserTenantId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
@@ -1289,6 +1289,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
             
             await prisma.tenant_feature_flags_list.create({
               data: {
+                id: generateFeatureFlagId(location.id),
                 tenantId: location.id,
                 flag: heroFlag.flag,
                 enabled: heroFlag.enabled,

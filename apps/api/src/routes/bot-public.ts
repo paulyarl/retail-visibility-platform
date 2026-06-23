@@ -30,7 +30,7 @@ import BotBertGuardrailService from '../services/BotBertGuardrailService';
 import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
 import BotCrmAssistantService from '../services/BotCrmAssistantService';
-import StorefrontPolicyService from '../services/StorefrontPolicyService';
+import { StorefrontPolicyService } from '../services/StorefrontPolicyService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 

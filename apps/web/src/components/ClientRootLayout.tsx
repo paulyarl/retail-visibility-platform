@@ -12,6 +12,7 @@ import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
 import { UniversalProvider } from "@/providers/UniversalProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import GlobalErrorHandler from "@/components/GlobalErrorHandler";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { CommandPalette } from "@/components/app-shell/CommandPalette";
 import { Notifications } from "@mantine/notifications";
@@ -59,6 +60,7 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
                       <UniversalProvider>
                         <Notifications position="top-right" />
                         <Toaster />
+                        <GlobalErrorHandler />
                         <div key="error-boundary-wrapper">
                           <ErrorBoundary>
                             {children}

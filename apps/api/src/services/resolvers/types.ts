@@ -251,7 +251,7 @@ export interface EffectivePaymentGateway {
   is_flexible: boolean;
 }
 
-export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'both' | 'none';
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
 
 export interface EffectiveStorefront {
   enabled: boolean;

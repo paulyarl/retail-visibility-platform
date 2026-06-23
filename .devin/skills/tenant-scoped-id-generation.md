@@ -143,6 +143,23 @@ Some IDs embed **two** correlation keys for cross-entity tracing:
 | `generateBotConversationSessionId(tenantId)` | `botconv` | `botconv-{tk}-{nanoid}` | Bot conversation sessions |
 | `generateCorrelationId(tenantId?)` | `corr` | `corr-{tk\|GLBL}-{nanoid}` | Request tracing |
 
+### Merchant Gate / Settings IDs (tenant-scoped)
+
+Added during merchant gate table correlation key audit (June 2026). These replace ad-hoc `Date.now()` + `Math.random()` patterns that were used before the audit.
+
+| Generator | Prefix | Format | Use Case |
+|---|---|---|---|
+| `generatePaymentGatewayId(tenantId)` | `gw` | `gw-{tk}-{nanoid}` | Payment gateways (Square, PayPal, Stripe) |
+| `generatePaymentGatewaySettingsId(tenantId)` | `pgs` | `pgs-{tk}-{nanoid}` | Payment gateway settings |
+| `generateStorefrontOptionsSettingsId(tenantId)` | `sos` | `sos-{tk}-{nanoid}` | Storefront options settings |
+| `generateStorefrontTypeSettingsId(tenantId)` | `sts` | `sts-{tk}-{nanoid}` | Storefront type settings |
+| `generateFeaturedOptionsSettingsId(tenantId)` | `fos` | `fos-{tk}-{nanoid}` | Featured options settings |
+| `generateProductOptionsSettingsId(tenantId)` | `pos` | `pos-{tk}-{nanoid}` | Product options settings |
+| `generateQuickstartOptionsSettingsId(tenantId)` | `qos` | `qos-{tk}-{nanoid}` | Quickstart options settings |
+| `generateFeatureOverrideId(tenantId)` | `fov` | `fov-{tk}-{nanoid}` | Feature overrides (pricing, limits, featured, approvals) |
+| `generateFeatureFlagId(tenantId)` | `ff` | `ff-{tk}-{nanoid}` | Feature flags |
+| `generateShippingCarrierId(tenantId)` | `carrier` | `carrier-{tk}-{nanoid}` | Shipping carriers (uses 'carrier' to avoid collision with `ship` prefix) |
+
 ### CRM IDs (tenant-scoped)
 
 | Generator | Prefix | Format | Use Case |
@@ -345,6 +362,9 @@ When migrating an existing entity from UUID to tenant-scoped IDs:
 - **Don't** use tenant-scoped IDs for primary keys that are `@db.Uuid` in the database — Postgres `gen_random_uuid()` generates UUIDs at the DB level. You need to pass the ID explicitly from the application layer and change the column type.
 - **Don't** use the tenant key as a security boundary — it's a visual aid, not an access control mechanism. Always enforce tenant isolation with RLS and explicit `WHERE tenant_id = $1` queries.
 - **Don't** change the tenant key algorithm — it's deterministic. Changing it would break all existing correlation keys in logs and external systems.
+- **Don't** use ad-hoc `Date.now()` + `Math.random()` patterns for tenant-scoped entity IDs — they produce opaque, non-correlatable IDs. Always use the corresponding generator from `id-generator.ts`.
+- **Don't** rely on DB-level `@default(dbgenerated("gen_random_uuid()"))` for tenant-scoped tables — the application layer should always pass an explicit tenant-scoped ID. If a schema column has this default, remove it and pass the ID explicitly from the service/route layer.
+- **Don't** forget to check for prefix collisions when adding new generators — e.g., `generateShipmentId` uses `ship-`, so `generateShippingCarrierId` uses `carrier-` instead.
 
 ---
 
@@ -356,7 +376,37 @@ When migrating an existing entity from UUID to tenant-scoped IDs:
 | `apps/api/prisma/schema.prisma` | Column types (`@db.Uuid` vs `@db.VarChar`) |
 | `apps/api/src/services/*.ts` | Service layer — where generators are called |
 
-## 10. Verification
+---
+
+## 10. Audit History
+
+### Merchant Gate Tables Audit (June 2026)
+
+Audited all `tenant_*` merchant gate tables for correlation key compliance. Found 12 of 14 tables using ad-hoc `Date.now()` + `Math.random()` patterns or DB-generated UUIDs instead of tenant-scoped generators.
+
+**Fixed (13 tables, 20 call sites):**
+- `tenant_payment_gateways` — 4 sites (SquareOAuthService x2, PayPalOAuthService, payment-gateways.ts) → `generatePaymentGatewayId`
+- `tenant_payment_gateway_settings` — 1 site → `generatePaymentGatewaySettingsId`
+- `tenant_storefront_options_settings` — 2 sites → `generateStorefrontOptionsSettingsId`
+- `tenant_storefront_type_settings` — 1 site → `generateStorefrontTypeSettingsId`
+- `tenant_featured_options_settings` — 1 site → `generateFeaturedOptionsSettingsId`
+- `tenant_product_options_settings` — 1 site → `generateProductOptionsSettingsId`
+- `tenant_quickstart_options_settings` — 1 site → `generateQuickstartOptionsSettingsId`
+- `tenant_feature_overrides_list` — 7 sites → `generateFeatureOverrideId`
+- `tenant_feature_flags_list` — 1 site → `generateFeatureFlagId`
+- Subscription payment in `subscription-billing.ts` — 1 site → existing `generatePaymentId`
+
+**Already compliant (2 tables):**
+- `tenant_commerce_settings` — already used `generateTenantCommerceSettingsId`
+- `tenant_storefront_policies` — already used `generateStorefrontPolicyId`
+
+**Deferred (1 table — requires column type migration):**
+- `tenant_feature_purchases` — schema uses `@db.Uuid` with `gen_random_uuid()` default. Needs migration to `VarChar(255)` + `generateFeaturePurchaseId(tenantId)` → `fpur-{tk}-{nanoid}`. Low priority (admin-only table, low volume).
+
+**No app-level creates found (1 table):**
+- `tenant_shipping_carriers` — no `prisma.tenant_shipping_carriers.create()` calls in `src/`. Generator `generateShippingCarrierId` added for future use.
+
+## 11. Verification
 
 ```bash
 # Backend type check

@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { generateQuickstartOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -115,7 +116,7 @@ router.put('/:tenantId/quickstart-options', authenticateToken, async (req, res) 
       // Create new settings
       settings = await prisma.tenant_quickstart_options_settings.create({
         data: {
-          id: `qos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateQuickstartOptionsSettingsId(tenantId),
           tenant_id: tenantId,
           ...data,
         },

@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import StorefrontTypeService, { StorefrontType } from '../services/StorefrontTypeService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { generateStorefrontTypeSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -146,6 +147,7 @@ router.put('/:tenantId/storefront-type', authenticateToken, async (req, res) => 
       // Create new settings
       settings = await prisma.tenant_storefront_type_settings.create({
         data: {
+          id: generateStorefrontTypeSettingsId(tenantId),
           tenant_id: tenantId,
           ...effectiveData,
         },

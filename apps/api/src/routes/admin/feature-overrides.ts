@@ -13,6 +13,7 @@ import { authenticateToken } from '../../middleware/auth';
 import { isPlatformAdmin } from '../../utils/platform-admin';
 import { getCacheService } from '../../services/OverrideCacheService';
 import { getAnalyticsService } from '../../services/OverrideAnalyticsService';
+import { generateFeatureOverrideId } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -341,7 +342,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     // Create override
     const override = await prisma.tenant_feature_overrides_list.create({
       data: {
-        id: `override_${body.tenantId}_${body.feature}_${Date.now()}`,
+        id: generateFeatureOverrideId(body.tenantId),
         tenant_id: body.tenantId,
         feature: body.feature,
         granted: body.granted,
@@ -644,7 +645,7 @@ router.post('/pricing', authenticateToken, requirePlatformAdmin, async (req: Req
     // Create pricing override using feature override pattern
     const override = await prisma.tenant_feature_overrides_list.create({
       data: {
-        id: `pricing_${body.tenantId}_${body.subscriptionTier}_${Date.now()}`,
+        id: generateFeatureOverrideId(body.tenantId),
         tenant_id: body.tenantId,
         feature: `pricing_${body.subscriptionTier}`,
         granted: true,
@@ -741,7 +742,7 @@ router.post('/limits', authenticateToken, requirePlatformAdmin, async (req: Requ
     // Create limits override
     const override = await prisma.tenant_feature_overrides_list.create({
       data: {
-        id: `limits_${body.tenantId}_${body.limitType}_${Date.now()}`,
+        id: generateFeatureOverrideId(body.tenantId),
         tenant_id: body.tenantId,
         feature: `limits_${body.limitType}`,
         granted: true,
@@ -835,7 +836,7 @@ router.post('/featured', authenticateToken, requirePlatformAdmin, async (req: Re
     // Create featured products override
     const override = await prisma.tenant_feature_overrides_list.create({
       data: {
-        id: `featured_${body.tenantId}_${body.featuredType}_${Date.now()}`,
+        id: generateFeatureOverrideId(body.tenantId),
         tenant_id: body.tenantId,
         feature: `featured_${body.featuredType}`,
         granted: true,
@@ -1135,7 +1136,7 @@ async function handleBulkCreate(override: any, userId: string) {
 
   return await prisma.tenant_feature_overrides_list.create({
     data: {
-      id: `override_${tenantId}_${feature}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: generateFeatureOverrideId(tenantId),
       tenant_id: tenantId,
       feature,
       granted,
@@ -1295,7 +1296,7 @@ router.post('/approval-requests', authenticateToken, requirePlatformAdmin, async
     }
 
     // Create approval request (using existing override table with approval metadata)
-    const requestId = `approval_${body.overrideType}_${body.tenantId}_${Date.now()}`;
+    const requestId = generateFeatureOverrideId(body.tenantId);
     
     const approvalRequest = await prisma.tenant_feature_overrides_list.create({
       data: {
@@ -1722,7 +1723,7 @@ function parseApprovalMetadata(reason: string) {
 async function createOverrideFromApproval(approvalMetadata: any, approvedBy: string) {
   // This would create the actual override based on the approval metadata
   // For now, we'll create a simple feature override
-  const overrideId = `approved_${approvalMetadata.overrideType}_${approvalMetadata.tenantId}_${Date.now()}`;
+  const overrideId = generateFeatureOverrideId(approvalMetadata.tenantId);
   
   return await prisma.tenant_feature_overrides_list.create({
     data: {

@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
+import { clientLogger } from '@/lib/client-logger';
+import { clearCorrelationId } from '@/lib/correlation-id';
 
 // User type
 
@@ -191,6 +193,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setCurrentTenantId(null);
       localStorage.removeItem('current_tenant_id');
+      clearCorrelationId();
+      clientLogger.setTenantId(undefined);
+      clientLogger.setUserId(undefined);
       
       // Clear cached auth data
       authContextSingleton.clearCachedAuthUser().catch(() => {});
@@ -254,6 +259,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetchUser();
     }
   }, [pathname, user, fetchUser]);
+
+  // Sync clientLogger tenant/user context
+  useEffect(() => {
+    clientLogger.setTenantId(currentTenantId || undefined);
+    clientLogger.setUserId(user?.id);
+  }, [currentTenantId, user?.id]);
 
   const value: AuthContextType = {
     user,

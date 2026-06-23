@@ -52,6 +52,32 @@ model audit_log {
   @@index([tenant_id, occurred_at(sort: Desc)], map: "audit_log_tenant_id_occurred_at_sort_desc_idx")
 }
 
+model application_error_log {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurred_at     DateTime  @default(now()) @db.Timestamptz(6)
+  level           String    @default("error") @db.VarChar(10)
+  message         String
+  stack_trace     String?
+  error_name      String?   @db.VarChar(255)
+  tenant_id       String?   @db.VarChar(255)
+  user_id         String?   @db.VarChar(255)
+  request_method  String?   @db.VarChar(10)
+  request_path    String?
+  request_query   Json?
+  status_code     Int?
+  correlation_id  String?   @db.VarChar(255)
+  service         String?   @db.VarChar(100)
+  context         Json?     @default("{}")
+  sentry_event_id String?   @db.VarChar(255)
+  resolved        Boolean   @default(false)
+  resolved_at     DateTime? @db.Timestamptz(6)
+  resolved_by     String?   @db.VarChar(255)
+
+  @@index([tenant_id, occurred_at(sort: Desc)], map: "idx_app_error_log_tenant_time")
+  @@index([level, occurred_at(sort: Desc)], map: "idx_app_error_log_level_time")
+  @@index([service, occurred_at(sort: Desc)], map: "idx_app_error_log_service_time")
+}
+
 model barcode_enrichment {
   id                  String   @id
   barcode             String   @unique
@@ -4249,6 +4275,7 @@ model tenants {
   merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]          @relation("merchant_billing_gateways_tenant_idTotenants")
   merchant_paypal_connections                                                            merchant_paypal_connections?
   merchant_stripe_connections                                                            merchant_stripe_connections?
+  meta_oauth_accounts_list                                                               meta_oauth_accounts_list[]
   oauth_tokens                                                                           oauth_tokens[]
   orders                                                                                 orders[]
   payments                                                                               payments[]
@@ -4283,6 +4310,7 @@ model tenants {
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
+  tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_type_settings                                                        tenant_storefront_type_settings?
@@ -4659,6 +4687,79 @@ model navigation_links_backup_phase2 {
   metadata            Json?
 
   @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ccpa_requests {
+  id           String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  customer_id  String?
+  email        String
+  tenant_id    String?
+  request_type String    @default("opt_out_sale") @db.VarChar(20)
+  status       String    @default("pending") @db.VarChar(20)
+  notes        String?
+  ip_address   String?
+  user_agent   String?
+  completed_at DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "idx_ccpa_requests_created_at")
+  @@index([email], map: "idx_ccpa_requests_email")
+  @@index([status], map: "idx_ccpa_requests_status")
+  @@index([tenant_id], map: "idx_ccpa_requests_tenant_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model meta_oauth_accounts_list {
+  id                     String                  @id
+  tenant_id              String
+  meta_account_id        String
+  email                  String?
+  display_name           String?
+  profile_picture_url    String?
+  business_id            String?
+  catalog_id             String?
+  instagram_account_id   String?
+  scopes                 String[]                @default([])
+  created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
+  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meta_oauth_tenant")
+  meta_oauth_tokens_list meta_oauth_tokens_list?
+
+  @@unique([tenant_id, meta_account_id], map: "idx_meta_oauth_accounts_tenant_meta")
+  @@index([tenant_id], map: "idx_meta_oauth_accounts_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model meta_oauth_tokens_list {
+  id                       String                   @id
+  account_id               String                   @unique
+  access_token_encrypted   String
+  token_type               String                   @default("Bearer")
+  expires_at               DateTime                 @db.Timestamptz(6)
+  scopes                   String[]                 @default([])
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  meta_oauth_accounts_list meta_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meta_tokens_account")
+
+  @@index([account_id], map: "idx_meta_tokens_account")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_social_pixels {
+  id                  String    @id @db.VarChar(100)
+  tenant_id           String    @unique(map: "uq_social_pixels_tenant") @db.VarChar(100)
+  meta_pixel_id       String?   @db.VarChar(50)
+  meta_access_token   String?   @db.VarChar(500)
+  tiktok_pixel_id     String?   @db.VarChar(50)
+  tiktok_access_token String?   @db.VarChar(500)
+  created_at          DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+  tenants             tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_pixels_tenant")
+
+  @@index([tenant_id], map: "idx_social_pixels_tenant")
 }
 
 enum action {

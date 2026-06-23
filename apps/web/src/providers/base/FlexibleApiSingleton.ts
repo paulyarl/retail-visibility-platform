@@ -16,6 +16,7 @@ import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 import { EnhancedCacheOptions } from '@/utils/contextAwareCacheManager';
+import { getOrCreateCorrelationId, setCorrelationId, CORRELATION_ID_HEADER, CORRELATION_ID_RESPONSE_HEADER } from '@/lib/correlation-id';
 
 // Re-export all types for compatibility with existing services
 export {
@@ -1563,12 +1564,26 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
 
+    // Inject correlation ID header for request tracing
+    const correlationId = getOrCreateCorrelationId();
+    const headers = new Headers(options.headers);
+    if (correlationId && !headers.has(CORRELATION_ID_HEADER)) {
+      headers.set(CORRELATION_ID_HEADER, correlationId);
+    }
+
     let response: Response;
     try {
       response = await fetch(fullUrl, {
         ...options,
+        headers,
         credentials: this.defaultIncludeCredentials !== false ? 'include' : 'omit', // Use service default
       });
+
+      // Adopt server's correlation ID if present (server is authoritative)
+      const serverCorrelationId = response.headers.get(CORRELATION_ID_RESPONSE_HEADER);
+      if (serverCorrelationId) {
+        setCorrelationId(serverCorrelationId);
+      }
     } catch (fetchError: any) {
       // Handle timeout/abort errors gracefully - log and return error response
       if (fetchError?.name === 'TimeoutError' || fetchError?.name === 'AbortError') {

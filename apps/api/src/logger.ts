@@ -1,12 +1,19 @@
 /**
  * Centralized Logging System with Multiple Transports
- * Supports console, file, and external services for production monitoring
+ * Supports console, file, database, and Sentry for production monitoring
  * REQ: REQ-2025-904
+ *
+ * Transports:
+ *   1. ConsoleTransport  — always on, colorized in dev, JSON in prod
+ *   2. FileTransport     — production only, async writes with size-based rotation
+ *   3. DatabaseTransport — ERROR-level entries persisted to application_error_log table
+ *   4. SentryTransport   — ERROR-level entries sent to Sentry (when DSN is configured)
  */
 import type { Request, Response, NextFunction } from "express";
 import type { RequestCtx } from "./context";
 import * as fs from 'fs';
 import * as path from 'path';
+import { prisma } from "./prisma";
 
 // Log levels with severity
 export enum LogLevel {
@@ -77,11 +84,12 @@ class ConsoleTransport implements LogTransport {
   }
 }
 
-// File transport for production logging
+// File transport for production logging — async, non-blocking
 class FileTransport implements LogTransport {
   private logDir: string;
   private maxFileSize: number;
   private maxFiles: number;
+  private streamCache: Map<string, fs.WriteStream> = new Map();
 
   constructor(logDir = './logs', maxFileSize = 10 * 1024 * 1024, maxFiles = 5) {
     this.logDir = logDir;
@@ -101,15 +109,38 @@ class FileTransport implements LogTransport {
     return path.join(this.logDir, `app-${date}.log`);
   }
 
+  private getStream(logFile: string): fs.WriteStream {
+    let stream = this.streamCache.get(logFile);
+    if (stream && !stream.destroyed) {
+      return stream;
+    }
+
+    stream = fs.createWriteStream(logFile, { flags: 'a' });
+    stream.on('error', (err) => {
+      console.error('File log stream error:', err);
+      this.streamCache.delete(logFile);
+    });
+    this.streamCache.set(logFile, stream);
+    return stream;
+  }
+
   private rotateLogFile(): void {
     const logFile = this.getLogFilePath();
-    if (fs.existsSync(logFile)) {
-      const stats = fs.statSync(logFile);
-      if (stats.size > this.maxFileSize) {
-        // Simple rotation - rename current file and create new one
-        const backupFile = `${logFile}.${Date.now()}.bak`;
-        fs.renameSync(logFile, backupFile);
+    try {
+      if (fs.existsSync(logFile)) {
+        const stats = fs.statSync(logFile);
+        if (stats.size > this.maxFileSize) {
+          const backupFile = `${logFile}.${Date.now()}.bak`;
+          const stream = this.streamCache.get(logFile);
+          if (stream) {
+            stream.end();
+            this.streamCache.delete(logFile);
+          }
+          fs.renameSync(logFile, backupFile);
+        }
       }
+    } catch {
+      // rotation is best-effort
     }
   }
 
@@ -117,13 +148,131 @@ class FileTransport implements LogTransport {
     try {
       this.rotateLogFile();
       const logFile = this.getLogFilePath();
+      const stream = this.getStream(logFile);
       const logLine = JSON.stringify(entry) + '\n';
-      fs.appendFileSync(logFile, logLine);
+      stream.write(logLine);
     } catch (error) {
       // Fallback to console if file logging fails
       console.error('File logging failed:', error);
       new ConsoleTransport().log(entry);
     }
+  }
+}
+
+// Database transport — persists ERROR-level entries to application_error_log
+class DatabaseTransport implements LogTransport {
+  private enabled: boolean;
+
+  constructor() {
+    this.enabled = process.env.LOG_DB_ENABLED === 'true' ||
+                   process.env.NODE_ENV === 'production';
+  }
+
+  log(entry: LogEntry): void {
+    if (!this.enabled || entry.level !== LogLevel.ERROR) return;
+
+    // Fire-and-forget — never block the event loop for DB logging
+    setImmediate(() => {
+      this.persist(entry).catch(() => {
+        // Silently fail — console transport already has the entry
+      });
+    });
+  }
+
+  private async persist(entry: LogEntry): Promise<void> {
+    const data: any = {
+      level: LogLevel[entry.level].toLowerCase(),
+      message: entry.message,
+      stack_trace: entry.error?.stack || null,
+      error_name: entry.error?.name || null,
+      tenant_id: entry.tenantId || null,
+      user_id: entry.userId || null,
+      request_method: entry.method || null,
+      request_path: entry.path || null,
+      status_code: entry.statusCode || null,
+      correlation_id: entry.correlationId || null,
+      context: {
+        region: entry.region,
+        ip: entry.ip,
+        userAgent: entry.userAgent,
+        duration: entry.duration,
+        ...this.extractExtraContext(entry),
+      },
+    };
+
+    await prisma.application_error_log.create({ data });
+  }
+
+  private extractExtraContext(entry: LogEntry): Record<string, any> {
+    const known = new Set([
+      'timestamp', 'level', 'message', 'tenantId', 'region',
+      'method', 'path', 'statusCode', 'duration', 'userId',
+      'ip', 'userAgent', 'correlationId', 'error',
+    ]);
+    const extra: Record<string, any> = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (!known.has(key)) {
+        extra[key] = value;
+      }
+    }
+    return extra;
+  }
+}
+
+// Sentry transport — sends ERROR-level entries to Sentry
+class SentryTransport implements LogTransport {
+  private enabled: boolean;
+
+  constructor() {
+    this.enabled = !!process.env.SENTRY_DSN && process.env.SENTRY_DSN.trim() !== '';
+  }
+
+  log(entry: LogEntry): void {
+    if (!this.enabled || entry.level !== LogLevel.ERROR) return;
+    if (process.env.NODE_ENV === 'development') return;
+
+    try {
+      this.capture(entry);
+    } catch {
+      // Silently fail — console transport already has the entry
+    }
+  }
+
+  private capture(entry: LogEntry): void {
+    // Dynamic import to avoid loading Sentry in dev
+    const Sentry = require('@sentry/node') as typeof import('@sentry/node');
+
+    Sentry.withScope((scope) => {
+      if (entry.tenantId) scope.setTag('tenant_id', entry.tenantId);
+      if (entry.userId) scope.setUser({ id: entry.userId });
+      if (entry.correlationId) scope.setTag('correlation_id', entry.correlationId);
+      if (entry.method) scope.setTag('method', entry.method);
+      if (entry.path) scope.setTag('path', entry.path);
+      if (entry.statusCode) scope.setTag('status_code', entry.statusCode);
+      if (entry.region) scope.setTag('region', entry.region);
+
+      scope.setContext('log_entry', {
+        message: entry.message,
+        timestamp: entry.timestamp,
+        level: LogLevel[entry.level],
+        ip: entry.ip,
+        userAgent: entry.userAgent,
+        duration: entry.duration,
+      });
+
+      const error = entry.error
+        ? new Error(entry.error.message)
+        : new Error(entry.message);
+
+      if (entry.error?.name) {
+        (error as any).name = entry.error.name;
+      }
+      if (entry.error?.stack) {
+        (error as any).stack = entry.error.stack;
+      }
+
+      Sentry.captureException(error);
+    });
   }
 }
 
@@ -147,10 +296,11 @@ class Logger {
       this.transports.push(new FileTransport(logDir));
     }
 
-    // Future: Add external service transports (CloudWatch, Loki, etc.)
-    // if (process.env.LOG_CLOUDWATCH_ENABLED === 'true') {
-    //   this.transports.push(new CloudWatchTransport());
-    // }
+    // Add database transport for persistent error storage
+    this.transports.push(new DatabaseTransport());
+
+    // Add Sentry transport for error tracking
+    this.transports.push(new SentryTransport());
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -173,7 +323,10 @@ class Logger {
     if (context) {
       entry.tenantId = context.tenantId;
       entry.region = context.region;
-      // correlationId not available in RequestCtx
+      if (context.correlationId) entry.correlationId = context.correlationId;
+      if (context.userId) entry.userId = context.userId;
+      if (context.ip) entry.ip = context.ip;
+      if (context.userAgent) entry.userAgent = context.userAgent;
     }
 
     return entry;
@@ -239,7 +392,7 @@ export function logWithContext(req: Request, level: "info" | "warn" | "error", m
 }
 
 // Request logging middleware
-export function requestLogger(req: Request, res: Response, next: Function): void {
+export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const startTime = Date.now();
   const ctx = (req as any).ctx as RequestCtx | undefined;
 
@@ -255,8 +408,8 @@ export function requestLogger(req: Request, res: Response, next: Function): void
   // Log response when finished
   (res as any).on('finish', () => {
     const duration = Date.now() - startTime;
-    const level = (res as any).statusCode >= 400 ? LogLevel.WARN :
-                  (res as any).statusCode >= 500 ? LogLevel.ERROR :
+    const level = (res as any).statusCode >= 500 ? LogLevel.ERROR :
+                  (res as any).statusCode >= 400 ? LogLevel.WARN :
                   LogLevel.INFO;
 
     logger.log(level, `Response: ${req.method} ${req.path} ${(res as any).statusCode}`, ctx, {

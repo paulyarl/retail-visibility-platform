@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import ProductOptionsService, { ProductType } from '../services/ProductOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { generateProductOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -290,7 +291,7 @@ router.put('/:tenantId/product-options', authenticateToken, async (req, res) => 
       // Create new settings
       settings = await prisma.tenant_product_options_settings.create({
         data: {
-          id: `pos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateProductOptionsSettingsId(tenantId),
           tenant_id: tenantId,
           ...filteredData,
         },

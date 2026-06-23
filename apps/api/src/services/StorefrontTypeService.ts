@@ -2,7 +2,7 @@
  * Storefront Type Service
  *
  * Capability-aware service for resolving and managing storefront type options.
- * Determines which storefront types (online, retail, service) are available
+ * Determines which storefront types (online, retail, service, social) are available
  * to a tenant based on their tier capabilities.
  *
  * Pattern: Follows IntegrationOptionsService for consistency.
@@ -16,7 +16,7 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 // TYPES
 // ====================
 
-export type StorefrontType = 'online' | 'retail' | 'service' | 'both' | 'none';
+export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
 
 export interface StorefrontTypeState {
   /** Whether storefront is enabled at the tier level (master gate) */
@@ -132,6 +132,7 @@ class StorefrontTypeService {
     const online = !!features.storefront_online;
     const retail = !!features.storefront_retail;
     const service = !!features.storefront_service;
+    const social = !!features.storefront_social;
 
     // Flexible gate
     const bothOptions = !!features.storefront_both_options;
@@ -140,7 +141,7 @@ class StorefrontTypeService {
     // 1. Deactivation master gate takes highest priority
     // 2. Activation master gates enable explicitly
     // 3. Feature/flexible gates enable implicitly when master gates are untouched
-    const hasAnyFeatureGate = online || retail || service || bothOptions;
+    const hasAnyFeatureGate = online || retail || service || social || bothOptions;
     const isEnabled = masterDeactivate
       ? false
       : masterActivate
@@ -151,8 +152,10 @@ class StorefrontTypeService {
     let type: StorefrontType = 'none';
     if (!isEnabled) {
       type = 'none';
-    } else if (bothOptions || (online && retail) || (online && service) || (retail && service)) {
+    } else if (bothOptions || (online && retail) || (online && service) || (online && social) || (retail && service) || (retail && social) || (service && social)) {
       type = 'both';
+    } else if (social) {
+      type = 'social';
     } else if (online) {
       type = 'online';
     } else if (retail) {
@@ -166,11 +169,12 @@ class StorefrontTypeService {
     if (isEnabled) {
       if (bothOptions) {
         // Flexible: all individual types allowed
-        allowedTypes.push('online', 'retail', 'service');
+        allowedTypes.push('online', 'retail', 'service', 'social');
       } else {
         if (online) allowedTypes.push('online');
         if (retail) allowedTypes.push('retail');
         if (service) allowedTypes.push('service');
+        if (social) allowedTypes.push('social');
       }
     }
 

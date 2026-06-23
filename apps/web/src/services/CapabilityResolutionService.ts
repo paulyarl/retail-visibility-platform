@@ -85,11 +85,11 @@ export interface PaymentGatewayState {
 
 // --- Storefront Types ---
 
-export type StorefrontType = 'online' | 'retail' | 'service' | 'both' | 'none';
+export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
 
 export interface StorefrontState {
   enabled: boolean;
-  /** Type determined by tier features (online/retail/service/both/none) */
+  /** Type determined by tier features (online/retail/service/social/both/none) */
   type: StorefrontType;
   /** Type effectively used after applying merchant preferences */
   effectiveType: StorefrontType;
@@ -1938,6 +1938,7 @@ export function resolveStorefrontState(
   const online = !!features.storefront_online;
   const retail = !!features.storefront_retail;
   const service = !!features.storefront_service;
+  const social = !!features.storefront_social;
 
   // Flexible gate
   const bothOptions = !!features.storefront_both_options;
@@ -1946,7 +1947,7 @@ export function resolveStorefrontState(
   // 1. Deactivation master gate takes highest priority
   // 2. Activation master gates enable explicitly
   // 3. Feature/flexible gates enable implicitly when master gates are untouched
-  const hasAnyFeatureGate = online || retail || service || bothOptions;
+  const hasAnyFeatureGate = online || retail || service || social || bothOptions;
   const isEnabled = masterDeactivate
     ? false
     : masterActivate
@@ -1957,8 +1958,10 @@ export function resolveStorefrontState(
   let type: StorefrontType = 'none';
   if (!isEnabled) {
     type = 'none';
-  } else if (bothOptions || (online && retail) || (online && service) || (retail && service)) {
+  } else if (bothOptions || (online && retail) || (online && service) || (online && social) || (retail && service) || (retail && social) || (service && social)) {
     type = 'both';
+  } else if (social) {
+    type = 'social';
   } else if (online) {
     type = 'online';
   } else if (retail) {
@@ -1972,11 +1975,12 @@ export function resolveStorefrontState(
   if (isEnabled) {
     if (bothOptions) {
       // Flexible: all individual types allowed
-      allowedTypes.push('online', 'retail', 'service');
+      allowedTypes.push('online', 'retail', 'service', 'social');
     } else {
       if (online) allowedTypes.push('online');
       if (retail) allowedTypes.push('retail');
       if (service) allowedTypes.push('service');
+      if (social) allowedTypes.push('social');
     }
   }
 
@@ -2000,6 +2004,9 @@ export function resolveStorefrontState(
       hasMerchantSelection = true;
     } else if (selected === 'service' && allowedTypes.includes('service')) {
       effectiveType = 'service';
+      hasMerchantSelection = true;
+    } else if (selected === 'social' && allowedTypes.includes('social')) {
+      effectiveType = 'social';
       hasMerchantSelection = true;
     }
   }

@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, ReactNode } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Props {
   children: ReactNode;
@@ -30,7 +31,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: any) {
     // Only log serious errors, ignore DOM manipulation warnings
     if (!error.message.includes('Node.removeChild') && !error.message.includes('removeChild')) {
-      console.error('ErrorBoundary caught:', error, errorInfo);
+      clientLogger.error(`ErrorBoundary: ${error.message}`, {
+        componentStack: errorInfo?.componentStack || 'No component stack available',
+      });
     } else {
       console.warn('ErrorBoundary ignored React DOM manipulation error (development only):', error.message);
     }

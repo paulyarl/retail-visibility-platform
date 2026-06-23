@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getTierFeatures } from '../services/TierService';
+import { generateStorefrontOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -201,7 +202,7 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
     } else {
       settings = await prisma.tenant_storefront_options_settings.create({
         data: {
-          id: `des-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateStorefrontOptionsSettingsId(tenantId),
           tenant_id: tenantId,
           page_type: 'directory_entry',
           ...data,

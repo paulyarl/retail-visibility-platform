@@ -13,6 +13,7 @@ import { requirePermission } from '../middleware/role-validation';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { SubscriptionValidationService } from '../services/subscription/SubscriptionValidationService';
 import { prisma } from '../prisma';
+import { generatePaymentId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -693,7 +694,7 @@ router.post('/paypal/activate', async (req: Request, res: Response) => {
         updated_at: now,
         subscription_payments: {
           create: {
-            id: `pay-${tenantId}-${Date.now().toString(36)}`,
+            id: generatePaymentId(tenantId),
             gateway_type: 'paypal',
             transaction_id: subscriptionId,
             amount_cents: amount,
