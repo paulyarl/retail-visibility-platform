@@ -22,6 +22,8 @@ export interface PublicBotConfig {
   widgetFont: string;
   widgetAvatarUrl: string | null;
   platformLogoUrl: string | null;
+  autoOpen: boolean;
+  autoOpenDelay: number;
   afterHoursEnabled: boolean;
   afterHoursMessage: string | null;
   preChatEnabled: boolean;
@@ -136,6 +138,7 @@ class PublicBotService extends PublicApiSingleton {
     customerEmail?: string;
     customerPhone?: string;
     pageContext?: string;
+    contextEntityName?: string;
   }): Promise<StartConversationResult> {
     const result = await this.makePublicRequest<ApiEnvelope<any>>(
       `/api/public/bot/conversations`,

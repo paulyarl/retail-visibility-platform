@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings, ArrowRight, Zap, Truck, ClipboardList } from 'lucide-react';
+import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info, Settings, ArrowRight, Zap, Truck, ClipboardList, Percent } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
@@ -32,6 +32,12 @@ interface CommerceSettings {
   notify_on_payment: boolean;
   notify_on_deposit: boolean;
   notify_on_fulfillment: boolean;
+
+  // Tax
+  tax_enabled?: boolean;
+  tax_provider?: 'stripe_tax' | 'manual' | null;
+  manual_tax_rate_percent?: number | null;
+  tax_shipping?: boolean;
 }
 
 interface CommerceSettingsClientProps {
@@ -103,6 +109,10 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     notify_on_payment: true,
     notify_on_deposit: true,
     notify_on_fulfillment: true,
+    tax_enabled: false,
+    tax_provider: null,
+    manual_tax_rate_percent: null,
+    tax_shipping: false,
   });
   
   const [loading, setLoading] = useState(true);
@@ -594,6 +604,98 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                 <span className="text-sm">Enable</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tax Settings */}
+      {commerceFeatures && !commerceFeatures.commerce_disabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Percent className="h-5 w-5" />
+              Sales Tax
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Enable Tax Calculation</h3>
+                <p className="text-sm text-neutral-600">
+                  Automatically calculate sales tax during checkout
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={settings.tax_enabled ?? false}
+                  onCheckedChange={(checked) => setSettings({ ...settings, tax_enabled: checked })}
+                />
+                <span className="text-sm">Enable</span>
+              </div>
+            </div>
+
+            {settings.tax_enabled && (
+              <div className="ml-4 space-y-4 p-4 bg-neutral-50 rounded-lg">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Tax Provider</label>
+                  <select
+                    value={settings.tax_provider ?? ''}
+                    onChange={(e) => setSettings({ ...settings, tax_provider: (e.target.value || null) as 'stripe_tax' | 'manual' | null })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded"
+                  >
+                    <option value="">Select a provider...</option>
+                    <option value="stripe_tax">Stripe Tax (real-time, address-based)</option>
+                    <option value="manual">Manual Rate (flat percentage)</option>
+                  </select>
+                </div>
+
+                {settings.tax_provider === 'manual' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Tax Rate (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={settings.manual_tax_rate_percent ? settings.manual_tax_rate_percent * 100 : 0}
+                      onChange={(e) => setSettings({ ...settings, manual_tax_rate_percent: parseFloat(e.target.value) / 100 || null })}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Enter the tax rate as a percentage (e.g., 8.25 for 8.25%)
+                    </p>
+                  </div>
+                )}
+
+                {settings.tax_provider === 'stripe_tax' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium">Stripe Tax</p>
+                        <p className="mt-1">Calculates real-time tax based on the customer's shipping address. Requires a Stripe account with Tax enabled. Tax is calculated during checkout and included in the order total.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-sm">Tax Shipping Charges</h4>
+                    <p className="text-xs text-neutral-600">
+                      Apply tax to shipping fees in addition to product subtotal
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={settings.tax_shipping ?? false}
+                      onCheckedChange={(checked) => setSettings({ ...settings, tax_shipping: checked })}
+                    />
+                    <span className="text-sm">Tax shipping</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

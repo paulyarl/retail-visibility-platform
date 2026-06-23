@@ -13,6 +13,7 @@
 import { prisma } from '../../prisma';
 import { getBillingNotificationService } from './BillingNotificationService';
 import { getTrialManagementService } from './TrialManagementService';
+import { invalidateEffectiveCapabilities } from '../EffectiveCapabilityResolver';
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
@@ -93,6 +94,9 @@ export class SubscriptionStatusService {
         // Don't fail the subscription activation if revenue tracking fails
       }
     }
+
+    // Invalidate capability cache so subscription-status-aware override takes effect
+    invalidateEffectiveCapabilities(tenantId);
 
     return {
       previousStatus: current.status,
@@ -187,6 +191,9 @@ export class SubscriptionStatusService {
       reason,
     }).catch(err => console.error('[SubscriptionStatus] Failed to create CRM task:', err));
 
+    // Invalidate capability cache so subscription-status-aware override takes effect
+    invalidateEffectiveCapabilities(tenantId);
+
     return {
       previousStatus: current.status,
       newStatus: 'past_due',
@@ -242,6 +249,9 @@ export class SubscriptionStatusService {
     // Log the transition
     await this.logStatusTransition(tenantId, current.status, 'canceled', current.tier, current.tier, reason);
 
+    // Invalidate capability cache so subscription-status-aware override takes effect
+    invalidateEffectiveCapabilities(tenantId);
+
     return {
       previousStatus: current.status,
       newStatus: 'canceled',
@@ -280,6 +290,9 @@ export class SubscriptionStatusService {
       type: 'subscription_reactivated',
       tier,
     }).catch(err => console.error('[SubscriptionStatus] Failed to send notification:', err));
+
+    // Invalidate capability cache so subscription-status-aware override takes effect
+    invalidateEffectiveCapabilities(tenantId);
 
     return {
       previousStatus: current.status,

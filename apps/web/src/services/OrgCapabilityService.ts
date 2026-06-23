@@ -24,6 +24,14 @@ export type OrgPropagationType =
   | 'org_propagation_products' | 'org_propagation_categories'
   | 'org_propagation_business_info' | 'org_propagation_settings';
 
+export interface OrgSubscriptionContext {
+  internalStatus: string;
+  maintenanceState: string | null;
+  isReadOnly: boolean;
+  isLimited: boolean;
+  writable: boolean;
+}
+
 export interface OrgCapabilitiesState {
   enabled: boolean;
   isFlexible: boolean;
@@ -37,6 +45,7 @@ export interface OrgCapabilitiesState {
     description: string;
   };
   purchasedFeatureKeys?: string[];
+  subscriptionContext?: OrgSubscriptionContext;
 }
 
 // ====================
@@ -97,6 +106,13 @@ interface BackendOrgCapabilities {
   org_available: boolean;
   tier?: { key: string; name: string; description: string };
   purchased_feature_keys?: string[];
+  subscription_context?: {
+    internal_status: string;
+    maintenance_state: string | null;
+    is_read_only: boolean;
+    is_limited: boolean;
+    writable: boolean;
+  };
 }
 
 function mapOrgCapabilities(b: BackendOrgCapabilities): OrgCapabilitiesState {
@@ -109,6 +125,15 @@ function mapOrgCapabilities(b: BackendOrgCapabilities): OrgCapabilitiesState {
     orgAvailable: b.org_available,
     tier: b.tier,
     purchasedFeatureKeys: b.purchased_feature_keys || [],
+    subscriptionContext: b.subscription_context
+      ? {
+          internalStatus: b.subscription_context.internal_status,
+          maintenanceState: b.subscription_context.maintenance_state,
+          isReadOnly: b.subscription_context.is_read_only,
+          isLimited: b.subscription_context.is_limited,
+          writable: b.subscription_context.writable,
+        }
+      : undefined,
   };
 }
 

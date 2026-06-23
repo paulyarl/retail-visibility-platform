@@ -834,6 +834,16 @@ export function generateTenantCommerceSettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate storefront policy ID
+ * Format: pol-tid-abc123 (17 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontPolicyId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pol-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate organization commerce settings ID
  * Format: ocs-org-abc123 (18 chars)
  * URL-safe, readable, unique, organization-traceable

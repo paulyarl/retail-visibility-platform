@@ -72,9 +72,18 @@ import {
 // BACKEND RESPONSE TYPES (snake_case)
 // ====================
 
+interface BackendSubscriptionContext {
+  internalStatus: 'trialing' | 'active' | 'past_due' | 'maintenance' | 'frozen' | 'canceled' | 'expired';
+  maintenanceState: 'maintenance' | 'freeze' | null;
+  isReadOnly: boolean;
+  isLimited: boolean;
+  writable: boolean;
+}
+
 interface BackendEffectiveCapabilities {
   tenant_id: string;
   tier: { key: string; name: string; description: string };
+  subscription_context: BackendSubscriptionContext;
   effective: {
     commerce: BackendEffectiveCommerce;
     payment_gateway: BackendEffectivePaymentGateway;
@@ -701,6 +710,19 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     tierKey: b.tier.key,
     tierName: b.tier.name,
     tierDescription: b.tier.description,
+    subscriptionContext: b.subscription_context ? {
+      internalStatus: b.subscription_context.internalStatus,
+      maintenanceState: b.subscription_context.maintenanceState,
+      isReadOnly: b.subscription_context.isReadOnly,
+      isLimited: b.subscription_context.isLimited,
+      writable: b.subscription_context.writable,
+    } : {
+      internalStatus: 'active',
+      maintenanceState: null,
+      isReadOnly: false,
+      isLimited: false,
+      writable: true,
+    },
     commerce: mapCommerce(b.effective.commerce),
     paymentGateway: mapPaymentGateway(b.effective.payment_gateway),
     storefront: mapStorefront(b.effective.storefront),

@@ -53,6 +53,7 @@ interface ProductShowcaseLayoutProps {
   tenant: any;
   storeStatus?: any;
   gallery?: React.ReactNode;
+  videoPlayer?: React.ReactNode;
   fulfillmentPane?: React.ReactNode;
   slug?: string;
   currentUrl?: string;
@@ -101,6 +102,7 @@ export function ProductShowcaseLayout({
   tenant,
   storeStatus,
   gallery,
+  videoPlayer,
   fulfillmentPane,
   slug,
   currentUrl,
@@ -371,6 +373,13 @@ export function ProductShowcaseLayout({
               <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center mt-2 hidden lg:block">
                 Click image to zoom
               </p>
+            )}
+
+            {/* Video Player */}
+            {videoPlayer && (
+              <div className="mt-4">
+                {videoPlayer}
+              </div>
             )}
           </div>
 

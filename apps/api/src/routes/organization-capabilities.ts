@@ -10,6 +10,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { deriveInternalStatus, getMaintenanceState } from '../utils/subscription-status';
 import { resolveOrgOptions } from '../services/resolvers';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { BotConfigurationService } from '../services/BotConfigurationService';
@@ -83,10 +84,36 @@ router.get('/:orgId/effective-capabilities', async (req: Request, res: Response)
     const orgTierKey = org.subscription_tier || null;
     const resolvedTierKey = orgTierKey ? getEffectiveTier(orgTierKey) : null;
 
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: org.subscription_status,
+      subscription_tier: org.subscription_tier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    const orgMaintenanceState = getMaintenanceState({
+      tier: org.subscription_tier,
+      status: org.subscription_status,
+      trialEndsAt: null,
+    });
+    const orgIsReadOnly = orgInternalStatus === 'frozen' || orgInternalStatus === 'canceled' || orgInternalStatus === 'expired';
+    const orgIsLimited = orgInternalStatus === 'maintenance' || orgInternalStatus === 'past_due';
+
     if (!resolvedTierKey) {
       // No tier assigned — return minimal defaults
       const result = resolveOrgOptions({}, false);
-      return res.json({ success: true, data: result });
+      return res.json({
+        success: true,
+        data: {
+          ...result,
+          subscription_context: {
+            internal_status: orgInternalStatus,
+            maintenance_state: orgMaintenanceState,
+            is_read_only: orgIsReadOnly,
+            is_limited: orgIsLimited,
+            writable: !orgIsReadOnly,
+          },
+        },
+      });
     }
 
     // 2. Fetch tier features for organization_options capability type
@@ -98,7 +125,19 @@ router.get('/:orgId/effective-capabilities', async (req: Request, res: Response)
     if (!tier) {
       logger.warn('[OrgCapabilities] Tier not found', undefined, { ...logMeta, tierKey: resolvedTierKey });
       const result = resolveOrgOptions({}, false);
-      return res.json({ success: true, data: result });
+      return res.json({
+        success: true,
+        data: {
+          ...result,
+          subscription_context: {
+            internal_status: orgInternalStatus,
+            maintenance_state: orgMaintenanceState,
+            is_read_only: orgIsReadOnly,
+            is_limited: orgIsLimited,
+            writable: !orgIsReadOnly,
+          },
+        },
+      });
     }
 
     // Find capability type
@@ -162,7 +201,18 @@ router.get('/:orgId/effective-capabilities', async (req: Request, res: Response)
     }
 
     // 4. Resolve
-    const result = resolveOrgOptions(features, true);
+    const capabilityEnabled = !orgIsReadOnly;
+    const result = resolveOrgOptions(features, capabilityEnabled);
+
+    // When org subscription is read-only (frozen/canceled/expired),
+    // force-disable all org capabilities regardless of tier features.
+    if (orgIsReadOnly) {
+      result.enabled = false;
+      result.org_available = false;
+      result.allowed_tabs = [];
+      result.allowed_panels = [];
+      result.allowed_propagation_types = [];
+    }
 
     res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
@@ -175,6 +225,13 @@ router.get('/:orgId/effective-capabilities', async (req: Request, res: Response)
           description: tier.description || '',
         },
         purchased_feature_keys: purchasedFeatureKeys,
+        subscription_context: {
+          internal_status: orgInternalStatus,
+          maintenance_state: orgMaintenanceState,
+          is_read_only: orgIsReadOnly,
+          is_limited: orgIsLimited,
+          writable: !orgIsReadOnly,
+        },
       },
     });
   } catch (error: any) {

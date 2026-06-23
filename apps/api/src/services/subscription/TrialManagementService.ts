@@ -11,6 +11,7 @@
 import { prisma } from '../../prisma';
 import { getSubscriptionBillingService } from './SubscriptionBillingService';
 import { getBillingNotificationService } from './BillingNotificationService';
+import { invalidateEffectiveCapabilities } from '../EffectiveCapabilityResolver';
 
 // Trial constants
 export const TRIAL_DURATION_DAYS = 14;
@@ -359,6 +360,9 @@ export class TrialManagementService {
       tenantId,
       type: 'trial_expired',
     }).catch(err => console.error('[TrialManagement] Failed to send notification:', err));
+
+    // Invalidate capability cache so subscription-status-aware override takes effect
+    invalidateEffectiveCapabilities(tenantId);
   }
 
   /**

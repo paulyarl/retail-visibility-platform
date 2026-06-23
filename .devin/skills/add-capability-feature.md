@@ -94,10 +94,12 @@ After adding to `features_list`, the feature is **not automatically available to
 
 2. **Enable for tiers** via `tier_features_list`:
    ```sql
-   INSERT INTO tier_features_list (tier_id, feature_key, capability_type_id, is_enabled)
+   INSERT INTO tier_features_list (id, tier_id, feature_key, feature_name, capability_type_id, is_enabled)
    VALUES (
+     gen_random_uuid()::text,
      (SELECT id FROM subscription_tiers_list WHERE key = 'discovery'),
      'product_opt_recently_viewed',
+     'Recently Viewed',
      (SELECT id FROM capability_type_list WHERE key = 'product_options'),
      true
    );

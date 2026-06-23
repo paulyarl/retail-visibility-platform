@@ -149,6 +149,8 @@ export class BotConfigurationService {
       widgetFont: config.widgetFont,
       widgetAvatarUrl: config.widgetAvatarUrl,
       platformLogoUrl,
+      autoOpen: config.autoOpen,
+      autoOpenDelay: config.autoOpenDelay,
       afterHoursEnabled: config.afterHoursEnabled,
       afterHoursMessage: config.afterHoursMessage,
       preChatEnabled: config.preChatEnabled,
@@ -166,16 +168,22 @@ export class BotConfigurationService {
    * - storefront: default greeting
    * - after-hours: after-hours message if enabled
    */
-  getContextualGreeting(config: BotConfig, pageContext?: string | null, isOpen?: boolean): string {
+  getContextualGreeting(config: BotConfig, pageContext?: string | null, isOpen?: boolean, contextEntityName?: string | null): string {
     if (config.afterHoursEnabled && isOpen === false && config.afterHoursMessage) {
       return config.afterHoursMessage;
     }
 
     const ctx = (pageContext || '').toLowerCase();
     if (ctx === 'product') {
+      if (contextEntityName) {
+        return `Hi! Have a question about ${contextEntityName}? I'm here to help.`;
+      }
       return `Hi! Have a question about this product? I'm here to help.`;
     }
     if (ctx === 'category') {
+      if (contextEntityName) {
+        return `Hi! Looking for something in ${contextEntityName}? Ask me anything.`;
+      }
       return `Hi! Looking for something in this category? Ask me anything.`;
     }
 

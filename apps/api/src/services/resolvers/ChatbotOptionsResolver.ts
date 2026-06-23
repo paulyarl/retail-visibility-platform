@@ -18,7 +18,8 @@ export type ChatbotSkillType =
   | 'chatbot_skill_order_tracking'
   | 'chatbot_skill_store_hours'
   | 'chatbot_skill_cross_merchant'
-  | 'chatbot_skill_crm_assistant';
+  | 'chatbot_skill_crm_assistant'
+  | 'chatbot_skill_policy_faq';
 
 export type ChatbotKnowledgeBaseType =
   | 'chatbot_kb_static_faq'
@@ -64,7 +65,7 @@ export function resolveChatbotOptions(
 
   const allowedSkills: ChatbotSkillType[] = [];
   if (flexible) {
-    allowedSkills.push('chatbot_skill_product_search', 'chatbot_skill_inventory', 'chatbot_skill_order_tracking', 'chatbot_skill_store_hours', 'chatbot_skill_cross_merchant', 'chatbot_skill_crm_assistant');
+    allowedSkills.push('chatbot_skill_product_search', 'chatbot_skill_inventory', 'chatbot_skill_order_tracking', 'chatbot_skill_store_hours', 'chatbot_skill_cross_merchant', 'chatbot_skill_crm_assistant', 'chatbot_skill_policy_faq');
   } else {
     if (feat.chatbot_skill_product_search) allowedSkills.push('chatbot_skill_product_search');
     if (feat.chatbot_skill_inventory) allowedSkills.push('chatbot_skill_inventory');
@@ -72,6 +73,7 @@ export function resolveChatbotOptions(
     if (feat.chatbot_skill_store_hours) allowedSkills.push('chatbot_skill_store_hours');
     if (feat.chatbot_skill_cross_merchant) allowedSkills.push('chatbot_skill_cross_merchant');
     if (feat.chatbot_skill_crm_assistant) allowedSkills.push('chatbot_skill_crm_assistant');
+    if (feat.chatbot_skill_policy_faq) allowedSkills.push('chatbot_skill_policy_faq');
   }
 
   const allowedKbTypes: ChatbotKnowledgeBaseType[] = [];

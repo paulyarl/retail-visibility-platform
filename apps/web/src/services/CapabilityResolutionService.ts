@@ -702,7 +702,8 @@ export type ChatbotSkillType =
   | 'chatbot_skill_product_search' | 'chatbot_skill_inventory'
   | 'chatbot_skill_order_tracking' | 'chatbot_skill_store_hours'
   | 'chatbot_skill_cross_merchant'
-  | 'chatbot_skill_crm_assistant';
+  | 'chatbot_skill_crm_assistant'
+  | 'chatbot_skill_policy_faq';
 
 export type ChatbotKnowledgeBaseType =
   | 'chatbot_kb_static_faq' | 'chatbot_kb_rag_retrieval'
@@ -785,10 +786,19 @@ export interface QuickstartOptionsState {
 
 // --- Combined ---
 
+export interface SubscriptionContextState {
+  internalStatus: 'trialing' | 'active' | 'past_due' | 'maintenance' | 'frozen' | 'canceled' | 'expired';
+  maintenanceState: 'maintenance' | 'freeze' | null;
+  isReadOnly: boolean;
+  isLimited: boolean;
+  writable: boolean;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
   tierDescription: string;
+  subscriptionContext: SubscriptionContextState;
   commerce: CommerceState;
   paymentGateway: PaymentGatewayState;
   storefront: StorefrontState;

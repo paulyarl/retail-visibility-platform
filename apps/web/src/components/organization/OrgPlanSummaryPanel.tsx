@@ -71,7 +71,8 @@ export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName }: OrgP
     );
   }
 
-  const { tier, enabled, isFlexible, allowedTabs, allowedPanels, allowedPropagationTypes, purchasedFeatureKeys } = orgCaps;
+  const { tier, enabled, isFlexible, allowedTabs, allowedPanels, allowedPropagationTypes, purchasedFeatureKeys, subscriptionContext } = orgCaps;
+  const isLocked = subscriptionContext && !subscriptionContext.writable;
 
   const isPurchased = (key: string): boolean => !!purchasedFeatureKeys?.includes(key);
 
@@ -119,54 +120,93 @@ export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName }: OrgP
     >
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+        <div className={`px-6 py-5 border-b ${isLocked ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/20 dark:to-red-950/20 border-red-200 dark:border-red-900/30' : 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 border-gray-100 dark:border-gray-800'}`}>
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-0.5">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <Crown className="h-5 w-5 text-white" />
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${isLocked ? 'bg-gradient-to-br from-red-400 to-red-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600'}`}>
+                {isLocked ? (
+                  <Lock className="h-5 w-5 text-white" />
+                ) : (
+                  <Crown className="h-5 w-5 text-white" />
+                )}
               </div>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
+                <h3 className={`font-semibold text-lg ${isLocked ? 'text-red-900 dark:text-red-100' : 'text-gray-900 dark:text-white'}`}>
                   {tier?.name || tierName || "Chain Plan"}
                 </h3>
                 {tier?.key && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isLocked ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'}`}>
                     <Shield className="w-3 h-3" />
                     {tier.key}
                   </span>
                 )}
-                {isFlexible && (
+                {isLocked && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                    <Lock className="w-3 h-3" />
+                    Read-only
+                  </span>
+                )}
+                {isFlexible && !isLocked && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                     Flexible
                   </span>
                 )}
               </div>
               {tier?.description && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{tier.description}</p>
+                <p className={`text-sm mt-0.5 ${isLocked ? 'text-red-700 dark:text-red-300' : 'text-gray-500 dark:text-gray-400'}`}>{tier.description}</p>
               )}
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                {enabledCount} of {totalCount} features unlocked
-              </p>
+              {!isLocked && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {enabledCount} of {totalCount} features unlocked
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-5">
-          {/* Tabs section */}
-          <Section title="Dashboard Tabs" items={tabItems} />
+        {isLocked ? (
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center">
+                  <Lock className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-red-900 dark:text-red-100 text-base">
+                  Subscription {subscriptionContext?.internalStatus}
+                </h4>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  Your organization subscription is {subscriptionContext?.internalStatus}. Organization features are in read-only mode.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/settings/subscription"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+            >
+              <ArrowUpCircle className="w-4 h-4" />
+              Upgrade plan
+            </Link>
+          </div>
+        ) : (
+          <div className="p-6 space-y-5">
+            {/* Tabs section */}
+            <Section title="Dashboard Tabs" items={tabItems} />
 
-          {/* Panels section */}
-          <Section title="Overview Panels" items={panelItems} />
+            {/* Panels section */}
+            <Section title="Overview Panels" items={panelItems} />
 
-          {/* Propagation section */}
-          <Section title="Propagation Types" items={propagationItems} />
-        </div>
+            {/* Propagation section */}
+            <Section title="Propagation Types" items={propagationItems} />
+          </div>
+        )}
 
         {/* Footer */}
-        {!enabled && (
+        {!enabled && !isLocked && (
           <div className="px-6 py-4 bg-amber-50 dark:bg-amber-950/20 border-t border-amber-100 dark:border-amber-900/30">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />

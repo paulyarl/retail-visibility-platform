@@ -757,17 +757,53 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
     );
   }
 
-  const { tierKey, tierName, tierDescription } = capabilities;
+  const { tierKey, tierName, tierDescription, subscriptionContext } = capabilities;
   const summaries = resolveCapabilitySummaries(capabilities, highlightCapability, merchantGates);
 
+  const isLocked = subscriptionContext && !subscriptionContext.writable;
+
   return (
-    <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+    <Card className={`bg-gradient-to-br ${isLocked ? 'from-red-50 to-red-100 border-red-200' : 'from-blue-50 to-indigo-50 border-blue-200'}`}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Shield className="h-5 w-5 text-blue-600" />
+          {isLocked ? (
+            <Lock className="h-5 w-5 text-red-600" />
+          ) : (
+            <Shield className="h-5 w-5 text-blue-600" />
+          )}
           Your Plan
+          {isLocked && (
+            <Badge variant="error" className="ml-1 text-[10px]">Read-only</Badge>
+          )}
         </CardTitle>
       </CardHeader>
+      {isLocked && (
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center">
+                <Lock className="h-5 w-5 text-white" />
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-neutral-900 text-lg">{tierName}</h3>
+                <Badge variant="info">{tierKey}</Badge>
+              </div>
+              <p className="text-sm text-red-700 mt-1 font-medium">
+                Your subscription is {subscriptionContext.internalStatus}. Most features are in read-only mode.
+              </p>
+            </div>
+          </div>
+          <a
+            href={tenantId ? `/t/${tenantId}/settings/subscription` : '/settings/subscription'}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Upgrade plan →
+          </a>
+        </CardContent>
+      )}
+      {!isLocked && (
       <CardContent className="space-y-4">
         {/* Tier name and description */}
         <div className="flex items-start gap-3">
@@ -849,6 +885,7 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
           })}
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }

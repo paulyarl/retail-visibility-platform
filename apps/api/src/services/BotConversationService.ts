@@ -92,6 +92,7 @@ export class BotConversationService {
     customerEmail?: string;
     customerPhone?: string;
     pageContext?: string;
+    contextEntityName?: string;
     source?: string;
   }): Promise<{ conversation: BotConversation; greeting: string }> {
     const sessionId = generateBotConversationSessionId(params.tenantId);

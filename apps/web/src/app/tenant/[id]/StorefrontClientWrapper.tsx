@@ -29,6 +29,7 @@ import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShow
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import { StorefrontStatusPanel, useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
+import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
 
 // Product Discovery & Navigation
 import ProductSearch from '@/components/storefront/ProductSearch';
@@ -556,6 +557,14 @@ export default function StorefrontClientWrapper({
           </div>
         </div>
       </header>
+
+      {/* Subscription status panel for non-active subscriptions */}
+      <SubscriptionStatusPanel
+        subscriptionStatus={tenant?.subscriptionStatus || 'active'}
+        subscriptionTier={tier}
+        trialEndsAt={tenant?.trialEndsAt ?? null}
+        subscriptionEndsAt={tenant?.subscriptionEndsAt ?? null}
+      />
 
       {/* Shop Description & Gallery - About the Store */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">

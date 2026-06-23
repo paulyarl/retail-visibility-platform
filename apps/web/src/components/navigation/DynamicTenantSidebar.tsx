@@ -10,6 +10,7 @@ import { DynamicNavTemplates, type Tenant as NavTenant } from '@/services/Dynami
 import { NavItemRow, type NavItem } from '@/components/navigation/NavItemRow';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavLinks } from '@/hooks/useNavLinks';
+import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
 import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
 
@@ -592,6 +593,32 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const { filterNavItems } = useRBAC();
   const { user } = useAuth();
   const { tenantLinks } = useNavLinks();
+  const allCaps = useAllCapabilities(tenantId);
+
+  // Capability flags for nav filtering
+  const chatbotEnabled = allCaps.data?.chatbotOptions?.enabled ?? true;
+  const barcodeScanEnabled = allCaps.data?.barcodeScan?.enabled ?? true;
+  const quickstartEnabled = allCaps.data?.quickstartOptions?.enabled ?? true;
+
+  // Filter nav items by capability state
+  const filterByCapability = (navItems: NavItem[]): NavItem[] => {
+    return navItems
+      .filter(item => {
+        if (!item.href) return true;
+        // Bot link → chatbot capability
+        if (item.href.includes('/bot') && !item.href.includes('/bot/')) return chatbotEnabled;
+        // Barcode scan link
+        if (item.href.includes('/scan')) return barcodeScanEnabled;
+        // Quick start link
+        if (item.href.includes('/quick-start')) return quickstartEnabled;
+        return true;
+      })
+      .map(item => ({
+        ...item,
+        children: item.children ? filterByCapability(item.children) : item.children,
+      }))
+      .filter(item => !item.children || item.children.length > 0 || !item.href || item.href.includes('/bot'));
+  };
 
   // Stabilize user.tenants to prevent infinite re-renders
   const prevTenantsRef = useRef<NavTenant[] | undefined>(undefined);
@@ -739,9 +766,9 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
       }));
     }
     
-    return filterNavItems(processedItems);
+    return filterByCapability(filterNavItems(processedItems));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished]);
+  }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished, chatbotEnabled, barcodeScanEnabled, quickstartEnabled]);
 
   // Expanded state for navigation items
   const [expanded, setExpanded] = useState<Set<string>>(() => computeExpanded(items, pathname));

@@ -165,12 +165,14 @@ import tenantsRoutes from './routes/tenants';
 import paymentGatewaysRoutes from './routes/payment-gateways';
 import fulfillmentSettingsRoutes from './routes/fulfillment-settings';
 import commerceSettingsRoutes from './routes/commerce-settings';
+import taxRoutes from './routes/tax';
 import productOptionsSettingsRoutes from './routes/product-options-settings';
 import featuredOptionsSettingsRoutes from './routes/featured-options-settings';
 import quickstartOptionsSettingsRoutes from './routes/quickstart-options-settings';
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
 import directoryEntryOptionsSettingsRoutes from './routes/directory-entry-options-settings';
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
+import storefrontPolicyRoutes from './routes/storefront-policies';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import crmOptionsSettingsRoutes from './routes/crm-options-settings';
 import chatbotOptionsSettingsRoutes from './routes/chatbot-options-settings';
@@ -7477,6 +7479,11 @@ app.use('/api/tenants', commerceSettingsRoutes);
 app.use('/api', commerceSettingsRoutes);
 console.log('✅ Commerce settings routes mounted at /api/tenants/:tenantId/commerce-settings and /api/public/tenant/:tenantId/commerce-settings');
 
+/* ------------------------------ tax engine ------------------------------ */
+app.use('/api/tax', taxRoutes);
+app.use('/api/tenants', taxRoutes);
+console.log('✅ Tax engine routes mounted at /api/tax/calculate and /api/tenants/:tenantId/tax-settings');
+
 /* ------------------------------ product options settings ------------------------------ */
 app.use('/api/tenants', productOptionsSettingsRoutes);
 console.log('✅ Product options settings routes mounted at /api/tenants/:tenantId/product-options');
@@ -7525,6 +7532,11 @@ console.log('✅ Directory entry options settings routes mounted at /api/tenants
 app.use('/api/tenants', storefrontTypeSettingsRoutes);
 app.use('/api', storefrontTypeSettingsRoutes);
 console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type and /api/public/tenant/:tenantId/storefront-type');
+
+/* ------------------------------ storefront policies ------------------------------ */
+app.use('/api/tenants', storefrontPolicyRoutes);
+app.use('/api', storefrontPolicyRoutes);
+console.log('✅ Storefront policy routes mounted at /api/tenants/:tenantId/storefront-policies and /api/public/storefront-policies/:tenantId');
 
 /* ------------------------------ barcode scan settings ------------------------------ */
 app.use('/api/tenants', barcodeScanSettingsRoutes);

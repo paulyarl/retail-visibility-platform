@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { publicStorefrontPolicyService } from '@/services/PublicStorefrontPolicyService';
 
 interface SocialLink {
   platform: string;
@@ -34,6 +35,13 @@ interface StorefrontFooterProps {
   /** Compact 2-column variant for Immersive layout */
   variant?: 'full' | 'compact';
   className?: string;
+  storefrontPolicies?: {
+    return_policy: string | null;
+    shipping_policy: string | null;
+    privacy_policy: string | null;
+    terms_of_service: string | null;
+    refund_policy: string | null;
+  } | null;
 }
 
 // Inline social icon SVGs (zero-dependency)
@@ -87,10 +95,23 @@ export default function StorefrontFooter({
   currentUrl,
   variant = 'full',
   className = '',
+  storefrontPolicies = null,
 }: StorefrontFooterProps) {
   const platformName = platformSettings?.platformName || 'Visible Shelf';
   const platformLogo = platformSettings?.logoUrl;
   const removeBranding = features?.removePlatformBranding ?? false;
+
+  // Fetch policies if not passed as prop
+  const [policies, setPolicies] = useState(storefrontPolicies);
+  useEffect(() => {
+    if (storefrontPolicies) { setPolicies(storefrontPolicies); return; }
+    if (!tenantId) return;
+    let cancelled = false;
+    publicStorefrontPolicyService.getPolicies(tenantId).then(result => {
+      if (!cancelled && result) setPolicies(result);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [tenantId, storefrontPolicies]);
 
   // Compact variant (2-col) for Immersive layout
   if (variant === 'compact') {
@@ -137,6 +158,21 @@ export default function StorefrontFooter({
                     Browse Directory
                   </Link>
                 </li>
+                {policies?.return_policy && (
+                  <li><Link href={`/tenant/${tenantId}/policies/return_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Returns</Link></li>
+                )}
+                {policies?.shipping_policy && (
+                  <li><Link href={`/tenant/${tenantId}/policies/shipping_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Shipping</Link></li>
+                )}
+                {policies?.privacy_policy && (
+                  <li><Link href={`/tenant/${tenantId}/policies/privacy_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Privacy</Link></li>
+                )}
+                {policies?.terms_of_service && (
+                  <li><Link href={`/tenant/${tenantId}/policies/terms_of_service`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Terms</Link></li>
+                )}
+                {policies?.refund_policy && (
+                  <li><Link href={`/tenant/${tenantId}/policies/refund_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Refunds</Link></li>
+                )}
               </ul>
             </div>
 
@@ -264,6 +300,21 @@ export default function StorefrontFooter({
                   Browse Shops
                 </Link>
               </li>
+              {policies?.return_policy && (
+                <li><Link href={`/tenant/${tenantId}/policies/return_policy`} className="text-neutral-400 hover:text-white transition-colors">Return Policy</Link></li>
+              )}
+              {policies?.shipping_policy && (
+                <li><Link href={`/tenant/${tenantId}/policies/shipping_policy`} className="text-neutral-400 hover:text-white transition-colors">Shipping Policy</Link></li>
+              )}
+              {policies?.refund_policy && (
+                <li><Link href={`/tenant/${tenantId}/policies/refund_policy`} className="text-neutral-400 hover:text-white transition-colors">Refund Policy</Link></li>
+              )}
+              {policies?.privacy_policy && (
+                <li><Link href={`/tenant/${tenantId}/policies/privacy_policy`} className="text-neutral-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+              )}
+              {policies?.terms_of_service && (
+                <li><Link href={`/tenant/${tenantId}/policies/terms_of_service`} className="text-neutral-400 hover:text-white transition-colors">Terms of Service</Link></li>
+              )}
             </ul>
           </div>
 

@@ -42,6 +42,7 @@ interface ProductQuickCommerceLayoutProps {
   tenant: any;
   storeStatus?: any;
   gallery?: React.ReactNode;
+  videoPlayer?: React.ReactNode;
   fulfillmentPane?: React.ReactNode;
   slug?: string;
   currentUrl?: string;
@@ -76,6 +77,7 @@ export default function ProductQuickCommerceLayout({
   tenant,
   storeStatus,
   gallery,
+  videoPlayer,
   fulfillmentPane,
   slug,
   currentUrl,
@@ -344,6 +346,13 @@ export default function ProductQuickCommerceLayout({
             </div>
             {lightboxImages.length > 0 && (
               <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center mt-1 hidden lg:block">Click to zoom</p>
+            )}
+
+            {/* Video Player */}
+            {videoPlayer && (
+              <div className="mt-3">
+                {videoPlayer}
+              </div>
             )}
           </div>
 

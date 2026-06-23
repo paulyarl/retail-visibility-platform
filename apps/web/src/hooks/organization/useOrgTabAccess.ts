@@ -70,10 +70,21 @@ export function useOrgTabAccess(
       ALL_TABS.filter((tab) => roleAllowed.includes(tab) && capAllowed.includes(tab))
     );
 
+    // Always allow the capabilities tab when orgCaps is loaded,
+    // even if subscription is read-only — so users can see their plan summary.
+    if (orgCaps && roleAllowed.includes('capabilities') && !allowedSet.has('capabilities')) {
+      allowedSet.add('capabilities');
+    }
+
     // Tab is locked if role allows it but capability doesn't
     const lockedSet = new Set<OrgTabKey>(
       ALL_TABS.filter((tab) => roleAllowed.includes(tab) && !capAllowed.includes(tab))
     );
+
+    // Don't show capabilities as locked if we force-allowed it above
+    if (allowedSet.has('capabilities')) {
+      lockedSet.delete('capabilities');
+    }
 
     const visibleTabs = allTabs.filter((t) => allowedSet.has(t.key as OrgTabKey));
     const lockedTabs = allTabs.filter((t) => lockedSet.has(t.key as OrgTabKey));

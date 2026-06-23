@@ -22,6 +22,7 @@ interface ChatMessage {
 interface PublicBotWidgetProps {
   tenantId: string;
   pageContext?: string;
+  contextEntityName?: string;
   hasActivePaymentGateway?: boolean;
   inline?: boolean;
   onClose?: () => void;
@@ -44,6 +45,7 @@ const PANEL_POSITION_CLASSES: Record<string, string> = {
 export default function PublicBotWidget({
   tenantId,
   pageContext = 'storefront',
+  contextEntityName,
   hasActivePaymentGateway = false,
   inline = false,
   onClose,
@@ -76,6 +78,7 @@ export default function PublicBotWidget({
         customerEmail: preChatEmail || undefined,
         customerPhone: preChatPhone || undefined,
         pageContext,
+        contextEntityName,
       });
       setSessionId(result.sessionId);
       setMessages([{
@@ -90,7 +93,7 @@ export default function PublicBotWidget({
     } finally {
       setLoading(false);
     }
-  }, [tenantId, preChatEmail, preChatPhone, pageContext]);
+  }, [tenantId, preChatEmail, preChatPhone, pageContext, contextEntityName]);
 
   const needsPreChat = config?.preChatEnabled && !preChatDone && !sessionId;
 
@@ -125,12 +128,12 @@ export default function PublicBotWidget({
 
   // Auto-open after delay if configured (floating mode only)
   useEffect(() => {
-    if (inline || !config || autoOpenTriggered || isOpen) return;
-    // Auto-open after 8 seconds as a default; could be made configurable
+    if (inline || !config || autoOpenTriggered || isOpen || !config.autoOpen) return;
+    const delayMs = (config.autoOpenDelay ?? 0) * 1000;
     const timer = setTimeout(() => {
       setIsOpen(true);
       setAutoOpenTriggered(true);
-    }, 8000);
+    }, delayMs);
     return () => clearTimeout(timer);
   }, [inline, config, autoOpenTriggered, isOpen]);
 

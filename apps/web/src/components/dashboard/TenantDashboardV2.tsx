@@ -16,6 +16,7 @@ import {
   MessageSquare,
   MapPin,
   Bot,
+  Lock,
 } from "lucide-react";
 
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
@@ -67,6 +68,11 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
   const { profile, loading: profileLoading } = useUserProfile();
   const allCaps = useAllCapabilities(tenantId);
+
+  // Subscription-status-aware capability flags
+  const chatbotEnabled = allCaps.data?.chatbotOptions?.enabled ?? true;
+  const crmEnabled = allCaps.data?.crmOptions?.enabled ?? true;
+  const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
 
   const [
     { data: businessProfile },
@@ -325,63 +331,85 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 </div>
 
                 {/* CRM Widget */}
-                <CrmTenantWidget tenantId={tenantId} />
+                {crmEnabled ? (
+                  <CrmTenantWidget tenantId={tenantId} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 px-4 rounded-xl bg-gray-50 border border-gray-200">
+                    <Lock className="w-5 h-5 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500 text-center">CRM is unavailable with your current subscription plan.</p>
+                    <Link href={`/t/${tenantId}/settings/subscription`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
+                      Upgrade plan →
+                    </Link>
+                  </div>
+                )}
 
                 {/* Divider */}
                 <div className="border-t border-gray-100 my-4" />
 
                 {/* Bot Stat Badges */}
-                <div className="flex items-center gap-2 mb-3">
-                  <Bot className="w-4 h-4 text-indigo-600" />
-                  <span className="text-sm font-medium text-gray-700">Chatbot</span>
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    botConfig?.status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      botConfig?.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'
-                    }`} />
-                    {botConfig?.status === 'active' ? 'Online' : 'Inactive'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{botStats?.totalConversations ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Conversations</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{botStats?.activeConversations ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Active</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{botStats?.resolvedByFaq ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">FAQ Resolved</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{botStats?.avgRating ? botStats.avgRating.toFixed(1) : '—'}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Avg Rating</p>
-                  </div>
-                </div>
-
-                {/* Inline bot preview */}
-                {botConfig?.status === 'active' && (
-                  <div className="mt-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-gray-500">Live preview</span>
-                      <span className="text-xs text-gray-400">Test the exact experience your customers see</span>
+                {chatbotEnabled ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Bot className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm font-medium text-gray-700">Chatbot</span>
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        botConfig?.status === 'active'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          botConfig?.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'
+                        }`} />
+                        {botConfig?.status === 'active' ? 'Online' : 'Inactive'}
+                      </span>
                     </div>
-                    <PublicBotWidget tenantId={tenantId} pageContext="dashboard" inline />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-xl bg-gray-50 p-3 text-center">
+                        <p className="text-2xl font-bold text-gray-900">{botStats?.totalConversations ?? 0}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Conversations</p>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-3 text-center">
+                        <p className="text-2xl font-bold text-gray-900">{botStats?.activeConversations ?? 0}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Active</p>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-3 text-center">
+                        <p className="text-2xl font-bold text-gray-900">{botStats?.resolvedByFaq ?? 0}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">FAQ Resolved</p>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-3 text-center">
+                        <p className="text-2xl font-bold text-gray-900">{botStats?.avgRating ? botStats.avgRating.toFixed(1) : '—'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Avg Rating</p>
+                      </div>
+                    </div>
+
+                    {/* Inline bot preview */}
+                    {botConfig?.status === 'active' && (
+                      <div className="mt-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-gray-500">Live preview</span>
+                          <span className="text-xs text-gray-400">Test the exact experience your customers see</span>
+                        </div>
+                        <PublicBotWidget tenantId={tenantId} pageContext="dashboard" inline />
+                      </div>
+                    )}
+
+                    {/* Bot footer */}
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                      <span className="text-xs text-gray-400">{botConfig?.botName || 'Assistant'}</span>
+                      <Link href={`/t/${tenantId}/bot/conversations`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                        View conversations →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 px-4 rounded-xl bg-gray-50 border border-gray-200">
+                    <Lock className="w-5 h-5 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500 text-center">Chatbot is unavailable with your current subscription plan.</p>
+                    <Link href={`/t/${tenantId}/settings/subscription`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
+                      Upgrade plan →
+                    </Link>
                   </div>
                 )}
-
-                {/* Bot footer */}
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                  <span className="text-xs text-gray-400">{botConfig?.botName || 'Assistant'}</span>
-                  <Link href={`/t/${tenantId}/bot/conversations`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
-                    View conversations →
-                  </Link>
-                </div>
               </div>
             </motion.div>
 

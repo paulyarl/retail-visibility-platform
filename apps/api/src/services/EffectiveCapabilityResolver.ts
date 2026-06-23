@@ -11,6 +11,7 @@
 
 import { prisma } from '../prisma';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { deriveInternalStatus, getMaintenanceState } from '../utils/subscription-status';
 import { logger } from '../logger';
 import { generateCorrelationId, generateTenantKey } from '../lib/id-generator';
 import {
@@ -34,6 +35,7 @@ import type {
   EffectiveCapabilities,
   MerchantSettingsBundle,
   RawCapabilitiesInput,
+  SubscriptionContext,
 } from './resolvers/types';
 
 // ====================
@@ -102,8 +104,10 @@ export async function resolveEffectiveCapabilities(
         name: true,
         subscription_tier: true,
         subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
         organization_id: true,
-        organizations_list: { select: { subscription_tier: true } },
+        organizations_list: { select: { subscription_tier: true, subscription_status: true } },
       },
     }),
     fetchRawCapabilities(tenantId),
@@ -183,6 +187,13 @@ export async function resolveEffectiveCapabilities(
   const result: EffectiveCapabilities = {
     tenant_id: tenantId,
     tier: tierInfo,
+    subscription_context: {
+      internalStatus: 'active',
+      maintenanceState: null,
+      isReadOnly: false,
+      isLimited: false,
+      writable: true,
+    },
     effective: {
       commerce: effective[0],
       payment_gateway: effective[1],
@@ -204,7 +215,82 @@ export async function resolveEffectiveCapabilities(
     purchased_feature_keys: rawCaps.purchased_feature_keys || [],
   };
 
-  // 6. Attach raw gates for authenticated / detail=full requests
+  // 6. Apply subscription-status-aware capability override
+  const internalStatus = deriveInternalStatus({
+    subscription_status: tenant.subscription_status,
+    subscription_tier: tenant.subscription_tier,
+    trialEndsAt: tenant.trial_ends_at,
+    subscription_ends_at: tenant.subscription_ends_at,
+  });
+
+  const maintenanceState = getMaintenanceState({
+    tier: tenant.subscription_tier,
+    status: tenant.subscription_status,
+    trialEndsAt: tenant.trial_ends_at,
+  });
+
+  const isReadOnly = internalStatus === 'frozen' || internalStatus === 'canceled' || internalStatus === 'expired';
+  const isLimited = internalStatus === 'maintenance' || internalStatus === 'past_due';
+
+  const subCtx: SubscriptionContext = {
+    internalStatus,
+    maintenanceState,
+    isReadOnly,
+    isLimited,
+    writable: !isReadOnly,
+  };
+  result.subscription_context = subCtx;
+
+  if (isReadOnly) {
+    // Fully disabled capabilities — set enabled=false and zero out sub-features
+    result.effective.chatbot.enabled = false;
+    result.effective.barcode_scan.enabled = false;
+    result.effective.quickstart.enabled = false;
+    result.effective.commerce.enabled = false;
+    result.effective.fulfillment.enabled = false;
+    result.effective.integrations.enabled = false;
+    result.effective.payment_gateway.enabled = false;
+
+    // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
+    // Frontend checks subscription_context.writable to lock write operations
+    // CRM, Storefront, Product Options, Featured, Storefront Options, Directory Entry, FAQ, Org Options
+  }
+
+  if (isLimited) {
+    // Maintenance mode: disable write-heavy capabilities
+    result.effective.barcode_scan.enabled = false;
+    result.effective.quickstart.enabled = false;
+    result.effective.featured.enabled = false;
+    result.effective.chatbot.enabled = false;
+    // Payment Gateway stays active in maintenance
+    // CRM stays active in maintenance
+    // FAQ stays active in maintenance
+  }
+
+  // Org-level subscription status check
+  const orgStatus = tenant.organizations_list?.subscription_status;
+  const orgTier = tenant.organizations_list?.subscription_tier;
+  if (orgStatus && orgTier) {
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: orgStatus,
+      subscription_tier: orgTier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    const orgReadOnly = orgInternalStatus === 'frozen' || orgInternalStatus === 'canceled' || orgInternalStatus === 'expired';
+    if (orgReadOnly) {
+      result.effective.org_options.enabled = false;
+    }
+  }
+
+  logger.debug('[EffectiveCapabilityResolver] Subscription context applied', undefined, {
+    ...logMeta,
+    internalStatus,
+    isReadOnly,
+    isLimited,
+  });
+
+  // 7. Attach raw gates for authenticated / detail=full requests
   if (detail === 'full') {
     result.gates = {
       tier_hard: rawCaps.capabilities,
@@ -212,7 +298,7 @@ export async function resolveEffectiveCapabilities(
     };
   }
 
-  // 7. Cache in memory
+  // 8. Cache in memory
   MEMORY_CACHE.set(tenantId, { data: result, expiry: Date.now() + MEMORY_TTL_MS });
 
   return result;

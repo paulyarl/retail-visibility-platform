@@ -556,7 +556,8 @@ export type ChatbotSkillType =
   | 'chatbot_skill_product_search' | 'chatbot_skill_inventory'
   | 'chatbot_skill_order_tracking' | 'chatbot_skill_store_hours'
   | 'chatbot_skill_cross_merchant'
-  | 'chatbot_skill_crm_assistant';
+  | 'chatbot_skill_crm_assistant'
+  | 'chatbot_skill_policy_faq';
 
 export type ChatbotKnowledgeBaseType =
   | 'chatbot_kb_static_faq' | 'chatbot_kb_rag_retrieval'
@@ -608,12 +609,25 @@ export interface EffectiveOrgOptions {
 }
 
 // ====================
+// SUBSCRIPTION CONTEXT
+// ====================
+
+export interface SubscriptionContext {
+  internalStatus: 'trialing' | 'active' | 'past_due' | 'maintenance' | 'frozen' | 'canceled' | 'expired';
+  maintenanceState: 'maintenance' | 'freeze' | null;
+  isReadOnly: boolean;   // frozen || canceled || expired
+  isLimited: boolean;    // maintenance || past_due
+  writable: boolean;     // !isReadOnly (convenience for frontend)
+}
+
+// ====================
 // TOP-LEVEL RESPONSE
 // ====================
 
 export interface EffectiveCapabilities {
   tenant_id: string;
   tier: TierInfo;
+  subscription_context: SubscriptionContext;
   effective: {
     commerce: EffectiveCommerce;
     payment_gateway: EffectivePaymentGateway;

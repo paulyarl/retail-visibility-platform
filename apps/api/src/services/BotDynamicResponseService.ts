@@ -15,6 +15,7 @@ import BotConversationService from './BotConversationService';
 import BotProductCatalogService from './BotProductCatalogService';
 import BotPlatformGuideService from './BotPlatformGuideService';
 import BotCrmAssistantService from './BotCrmAssistantService';
+import StorefrontPolicyService from './StorefrontPolicyService';
 import BotChannelSteeringService, { type SteeringChannel } from './BotChannelSteeringService';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';
@@ -28,6 +29,7 @@ export interface DynamicResponseResult {
   ragChunksUsed: number;
   productContextUsed: boolean;
   crmContextUsed: boolean;
+  policyContextUsed: boolean;
   channels?: SteeringChannel[];
 }
 
@@ -45,6 +47,13 @@ const SUPPORT_KEYWORDS = [
   'assistance', 'representative', 'manager', 'complain',
 ];
 
+const POLICY_KEYWORDS = [
+  'return policy', 'shipping policy', 'refund policy', 'privacy policy',
+  'terms of service', 'terms and conditions', 'refund', 'return',
+  'exchange', 'warranty', 'guarantee', 'shipping', 'delivery time',
+  'how long do i have to return', 'can i get a refund', 'money back',
+];
+
 function isProductQuery(message: string): boolean {
   const lower = message.toLowerCase();
   return PRODUCT_KEYWORDS.some(kw => lower.includes(kw));
@@ -53,6 +62,11 @@ function isProductQuery(message: string): boolean {
 function isSupportQuery(message: string): boolean {
   const lower = message.toLowerCase();
   return SUPPORT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isPolicyQuery(message: string): boolean {
+  const lower = message.toLowerCase();
+  return POLICY_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 const SYSTEM_PROMPT_TEMPLATE = (config: BotConfig, surface?: string) => {
@@ -82,7 +96,8 @@ Rules:
 - If the customer seems upset, offer to connect them with support.
 - Do not share internal system information or technical details.
 - When product catalog context is provided, use it to answer specific product questions. Only mention products that are in the context. Do not invent products, prices, or availability.
-- When support ticket context is provided, reference real ticket data. Do not invent ticket numbers or statuses. Offer to create a ticket if the customer needs help.`;
+- When support ticket context is provided, reference real ticket data. Do not invent ticket numbers or statuses. Offer to create a ticket if the customer needs help.
+- When store policy context is provided, use it to answer policy questions accurately. Do not invent policy details. If a policy is not configured, say so and suggest contacting the store.`;
 };
 
 const DEFAULT_CHAT_MODEL = 'gpt-4o-mini';
@@ -169,6 +184,8 @@ class BotDynamicResponseService {
     let productContextUsed = false;
     let crmContext = '';
     let crmContextUsed = false;
+    let policyContext = '';
+    let policyContextUsed = false;
 
     try {
       const hasEmb = await ragService.hasEmbeddings(tenantId);
@@ -222,6 +239,29 @@ class BotDynamicResponseService {
       });
     }
 
+    // 2.6. Retrieve storefront policy context when the query is policy-related
+    try {
+      if (isPolicyQuery(message)) {
+        const policies = await StorefrontPolicyService.getInstance().getPolicies(tenantId);
+        if (policies.hasAnyPolicies) {
+          const parts: string[] = [];
+          if (policies.return_policy) parts.push(`Return Policy:\n${policies.return_policy}`);
+          if (policies.shipping_policy) parts.push(`Shipping Policy:\n${policies.shipping_policy}`);
+          if (policies.refund_policy) parts.push(`Refund Policy:\n${policies.refund_policy}`);
+          if (policies.privacy_policy) parts.push(`Privacy Policy:\n${policies.privacy_policy}`);
+          if (policies.terms_of_service) parts.push(`Terms of Service:\n${policies.terms_of_service}`);
+          if (parts.length > 0) {
+            policyContext = '\n\nStore policies context:\n' + parts.join('\n\n');
+            policyContextUsed = true;
+          }
+        }
+      }
+    } catch (policyError) {
+      logger.warn('[BotDynamicResponseService] Policy context lookup failed, continuing without policies', undefined, {
+        error: policyError instanceof Error ? policyError.message : String(policyError),
+      });
+    }
+
     // 3. Get conversation history (last 10 messages)
     const history = await conversationService.getContextWindow(conversationId, 10);
 
@@ -239,7 +279,7 @@ class BotDynamicResponseService {
 
     // 4. Build messages array for OpenAI
     const surface = pageContext === 'dashboard' ? 'dashboard' : undefined;
-    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config, surface) + ragContext + productContext + crmContext + platformContext;
+    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config, surface) + ragContext + productContext + crmContext + policyContext + platformContext;
     if (pageContext) {
       systemPrompt += `\n\nThe customer is currently viewing a ${pageContext} page. Tailor your response accordingly.`;
     }
@@ -279,6 +319,7 @@ class BotDynamicResponseService {
           ragChunksUsed: 0,
           productContextUsed: false,
           crmContextUsed: false,
+          policyContextUsed: false,
           channels: steering.channels,
         };
       }
@@ -291,6 +332,7 @@ class BotDynamicResponseService {
         ragChunksUsed,
         productContextUsed,
         crmContextUsed,
+        policyContextUsed,
       };
     } catch (gptError) {
       logger.error('[BotDynamicResponseService] Chat completion failed', undefined, {
@@ -307,6 +349,7 @@ class BotDynamicResponseService {
         ragChunksUsed: 0,
         productContextUsed: false,
         crmContextUsed: false,
+        policyContextUsed: false,
         channels: steering.channels,
       };
     }

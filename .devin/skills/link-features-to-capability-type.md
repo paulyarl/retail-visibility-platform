@@ -115,11 +115,13 @@ Linking features to a capability type only makes them **available at the capabil
 
 1. **Enable for tiers** in `tier_features_list`:
    ```sql
-   INSERT INTO tier_features_list (tier_id, capability_type_id, feature_key, is_enabled)
+   INSERT INTO tier_features_list (id, tier_id, capability_type_id, feature_key, feature_name, is_enabled)
    VALUES (
+     gen_random_uuid()::text,
      (SELECT id FROM subscription_tiers_list WHERE tier_key = 'discovery'),
      (SELECT id FROM capability_type_list WHERE key = 'product_options'),
      'product_opt_recently_viewed',
+     'Recently Viewed',
      true
    );
    ```
@@ -178,5 +180,6 @@ When adding a sub-feature:
 ## Common Pitfalls
 
 - **Forgetting `tier_features_list`**: The feature may be linked to the capability type but still disabled for every tier.
+- **Missing required columns in `tier_features_list`**: The `id` column has no default — always pass `gen_random_uuid()::text`. The `feature_name` column is `NOT NULL` — always include a human-readable name.
 - **Stale sort_order**: If you re-order the array and re-run the script, the new `sort_order` values are applied immediately.
 - **Case-sensitive keys**: `features_list.key` is case-sensitive. Always use the exact key stored in the database.

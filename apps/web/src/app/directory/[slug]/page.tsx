@@ -23,6 +23,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { externalApiService } from '@/services/ExternalApiService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
 // tenant public data
@@ -650,6 +651,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'editorial':
       return (
         <>
+          <SubscriptionStatusPanel
+            subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
+            subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
+            trialEndsAt={tenantInfo?.trialEndsAt ?? null}
+            subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
+          />
           <DirectoryEntryEditorialLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -661,6 +668,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'immersive':
       return (
         <>
+          <SubscriptionStatusPanel
+            subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
+            subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
+            trialEndsAt={tenantInfo?.trialEndsAt ?? null}
+            subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
+          />
           <DirectoryEntryImmersiveLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -672,6 +685,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'premium':
       return (
         <>
+          <SubscriptionStatusPanel
+            subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
+            subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
+            trialEndsAt={tenantInfo?.trialEndsAt ?? null}
+            subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
+          />
           <DirectoryEntryPremiumLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}
@@ -684,6 +703,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     default:
       return (
         <>
+          <SubscriptionStatusPanel
+            subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
+            subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
+            trialEndsAt={tenantInfo?.trialEndsAt ?? null}
+            subscriptionEndsAt={tenantInfo?.subscriptionEndsAt ?? null}
+          />
           <DirectoryEntryClassicLayout {...layoutProps} />
           <PublicBotWidget
             tenantId={listing.tenantId}

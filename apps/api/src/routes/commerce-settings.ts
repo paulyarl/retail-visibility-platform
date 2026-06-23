@@ -30,6 +30,12 @@ const commerceSettingsSchema = z.object({
   notify_on_payment: z.boolean().optional(),
   notify_on_deposit: z.boolean().optional(),
   notify_on_fulfillment: z.boolean().optional(),
+
+  // Tax
+  tax_enabled: z.boolean().optional(),
+  tax_provider: z.enum(['stripe_tax', 'manual']).nullable().optional(),
+  manual_tax_rate_percent: z.number().min(0).max(1).nullable().optional(),
+  tax_shipping: z.boolean().optional(),
 });
 
 // Get commerce settings for a tenant
@@ -56,6 +62,10 @@ router.get('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
         notify_on_payment: capabilities.notify_on_payment,
         notify_on_deposit: capabilities.notify_on_deposit,
         notify_on_fulfillment: capabilities.notify_on_fulfillment,
+        tax_enabled: (capabilities as any).tax_enabled ?? false,
+        tax_provider: (capabilities as any).tax_provider ?? null,
+        manual_tax_rate_percent: (capabilities as any).manual_tax_rate_percent ?? null,
+        tax_shipping: (capabilities as any).tax_shipping ?? false,
       },
     });
   } catch (error) {
@@ -151,6 +161,12 @@ router.put('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
         notify_on_payment: result.notify_on_payment,
         notify_on_deposit: result.notify_on_deposit,
         notify_on_fulfillment: result.notify_on_fulfillment,
+        tax_enabled: result.tax_enabled,
+        tax_provider: result.tax_provider,
+        manual_tax_rate_percent: result.manual_tax_rate_percent
+          ? parseFloat(result.manual_tax_rate_percent.toString())
+          : null,
+        tax_shipping: result.tax_shipping,
       },
     });
   } catch (error) {

@@ -41,6 +41,7 @@ import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import StorefrontFooter from '@/app/tenant/[id]/layouts/shared/StorefrontFooter';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
 
 import { tenantPublicService, SubscriptionStatusInfo, LocationStatusInfo, PublicTenantInfo, TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
@@ -676,6 +677,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   downloadLimit: product.downloadLimit,
                   productSlug: product.productSlug,
                   slugType: product.slugType,
+                  videoUrl: (product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl || null,
                 } as any}
                 tenant={{
                   id: product.tenantId,
@@ -704,6 +706,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 } as any}
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} /> : undefined}
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
@@ -755,6 +758,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   downloadLimit: product.downloadLimit,
                   productSlug: product.productSlug,
                   slugType: product.slugType,
+                  videoUrl: (product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl || null,
                 } as any}
                 tenant={{
                   id: product.tenantId,
@@ -783,6 +787,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 } as any}
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} compact /> : undefined}
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
@@ -1109,6 +1114,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       <PublicBotWidget
         tenantId={product.tenantId}
         pageContext="product"
+        contextEntityName={product.name}
         hasActivePaymentGateway={tenant?.metadata?.hasActivePaymentGateway ?? false}
       />
     </>

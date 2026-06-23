@@ -36,6 +36,7 @@ import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 import VariantPhotoUploadModal from '../VariantPhotoUploadModal';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { itemsService } from '@/services/ItemsSingletonService';
+import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -104,41 +105,73 @@ const CLONING_STRATEGIES = [
   }
 ];
 
-// Helper function to convert video URLs to embeddable formats
-function getVideoEmbedUrl(url: string): string | null {
-  if (!url) return null;
-  
+// Validate video URL and detect provider/type
+type VideoValidation =
+  | { valid: true; provider: 'youtube' | 'vimeo'; isPlaylist: boolean; label: string }
+  | { valid: false; reason: string };
+
+function validateVideoUrl(url: string): VideoValidation {
+  if (!url || !url.trim()) return { valid: false, reason: 'empty' };
+
+  const trimmed = url.trim();
+
+  // Must start with http:// or https://
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return { valid: false, reason: 'URL must start with http:// or https://' };
+  }
+
   try {
-    const urlObj = new URL(url);
-    
-    // YouTube URLs
+    const urlObj = new URL(trimmed);
+
+    // YouTube
     if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      const playlistId = urlObj.searchParams.get('list');
       let videoId: string | undefined;
-      
+
       if (urlObj.hostname.includes('youtu.be')) {
-        // youtu.be/VIDEO_ID
         videoId = urlObj.pathname.slice(1);
+      } else if (urlObj.pathname.startsWith('/embed/')) {
+        videoId = urlObj.pathname.split('/')[2];
+      } else if (urlObj.pathname.startsWith('/playlist')) {
+        videoId = undefined;
+      } else if (urlObj.pathname.includes('/shorts/')) {
+        const parts = urlObj.pathname.split('/');
+        videoId = parts[parts.indexOf('shorts') + 1];
       } else {
-        // youtube.com/watch?v=VIDEO_ID or youtube.com/embed/VIDEO_ID
-        videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
+        videoId = urlObj.searchParams.get('v') || undefined;
       }
-      
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
+
+      // Pure playlist
+      if (!videoId && playlistId) {
+        return { valid: true, provider: 'youtube', isPlaylist: true, label: 'YouTube Playlist' };
       }
+
+      // Video with or without playlist
+      if (videoId && videoId.length >= 11) {
+        return {
+          valid: true,
+          provider: 'youtube',
+          isPlaylist: !!playlistId,
+          label: playlistId ? 'YouTube Video + Playlist' : 'YouTube Video',
+        };
+      }
+
+      return { valid: false, reason: 'Could not extract a valid YouTube video ID from this URL' };
     }
-    
-    // Vimeo URLs
+
+    // Vimeo
     if (urlObj.hostname.includes('vimeo.com')) {
-      const vimeoId = urlObj.pathname.split('/').pop();
-      if (vimeoId) {
-        return `https://player.vimeo.com/video/${vimeoId}`;
+      const segments = urlObj.pathname.split('/').filter(Boolean);
+      const vimeoId = segments[segments.length - 1];
+      if (vimeoId && /^\d+$/.test(vimeoId)) {
+        return { valid: true, provider: 'vimeo', isPlaylist: false, label: 'Vimeo Video' };
       }
+      return { valid: false, reason: 'Could not extract a valid Vimeo video ID from this URL' };
     }
-    
-    return null;
+
+    return { valid: false, reason: 'Unsupported provider. Only YouTube and Vimeo URLs are supported.' };
   } catch {
-    return null;
+    return { valid: false, reason: 'Invalid URL format' };
   }
 }
 
@@ -342,7 +375,13 @@ export default function MediaStep({ data, errors, productType, variants, onChang
     setDeleteConfirmation({ isOpen: false, imageId: '', isPrimary: false, imageName: '', isVideo: false });
   };
 
+  const [videoTouched, setVideoTouched] = useState(false);
+
+  const videoValidation = data.videoUrl ? validateVideoUrl(data.videoUrl) : null;
+  const showVideoError = videoTouched && videoValidation && !videoValidation.valid && videoValidation.reason !== 'empty';
+
   const handleVideoUrlChange = (url: string) => {
+    setVideoTouched(true);
     onChange({
       ...data,
       videoUrl: url
@@ -672,8 +711,16 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           placeholder="Enter YouTube or Vimeo video URL..."
           value={data.videoUrl || ''}
           onChange={(e) => handleVideoUrlChange(e.target.value)}
+          onBlur={() => setVideoTouched(true)}
+          className={showVideoError ? 'border-red-400 focus:border-red-500' : (videoValidation?.valid ? 'border-green-400 focus:border-green-500' : '')}
         />
-        {data.videoUrl && (
+        {showVideoError && (
+          <p className="text-xs text-red-600 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            {videoValidation!.reason}
+          </p>
+        )}
+        {data.videoUrl && videoValidation?.valid && (
           <>
             <Card className="border-blue-200 bg-blue-50">
               <CardContent className="p-4">
@@ -684,7 +731,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
                     <div className="text-sm text-gray-600 truncate">{data.videoUrl}</div>
                   </div>
                   <Badge className="bg-blue-100 text-blue-800">
-                    Ready
+                    {videoValidation.label}
                   </Badge>
                 </div>
               </CardContent>
@@ -709,27 +756,12 @@ export default function MediaStep({ data, errors, productType, variants, onChang
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  {getVideoEmbedUrl(data.videoUrl) ? (
-                    <iframe
-                      src={getVideoEmbedUrl(data.videoUrl)!}
-                      className="w-full h-full"
-                      allowFullScreen
-                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                      title="Product Video Preview"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-center text-white">
-                        <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm opacity-75">Video preview not available</p>
-                        <p className="text-xs opacity-50 mt-1">Please enter a valid YouTube or Vimeo URL</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <ProductVideoPlayer
+                  videoUrl={data.videoUrl}
+                  title="Product Video Preview"
+                />
                 <div className="mt-3 text-xs text-gray-500">
-                  💡 Supported: YouTube, Vimeo videos
+                  💡 Supported: YouTube (videos, playlists, shorts), Vimeo videos
                 </div>
               </CardContent>
             </Card>

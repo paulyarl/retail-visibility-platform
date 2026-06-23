@@ -8,6 +8,7 @@
  * GET    /api/public/bot/config?tenantId=            — Fetch widget config
  * GET    /api/public/bot/skills/:skillName            — Execute skill
  * GET    /api/public/bot/products/search              — Search tenant product catalog
+ * GET    /api/public/bot/policies                       — Fetch tenant storefront policies
  * GET    /api/public/bot/crm/ticket-status             — Look up support tickets (CRM assistant skill)
  * POST   /api/public/bot/crm/create-ticket             — Create support ticket from chat (CRM assistant skill)
  * POST   /api/public/bot/conversations/:sessionId/feedback — Submit feedback
@@ -29,6 +30,7 @@ import BotBertGuardrailService from '../services/BotBertGuardrailService';
 import BotBertIntentService from '../services/BotBertIntentService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
 import BotCrmAssistantService from '../services/BotCrmAssistantService';
+import StorefrontPolicyService from '../services/StorefrontPolicyService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 
@@ -127,6 +129,7 @@ const startConversationSchema = z.object({
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().max(50).optional(),
   pageContext: z.string().max(100).optional(),
+  contextEntityName: z.string().max(200).optional(),
 }).refine(data => data.tenantId || data.embedKey, {
   message: 'Either tenantId or embedKey is required',
 });
@@ -173,7 +176,7 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
     if (!tenantId) {
       return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
-    const { customerEmail, customerPhone, pageContext } = validation.data;
+    const { customerEmail, customerPhone, pageContext, contextEntityName } = validation.data;
     const caps = await resolveEffectiveCapabilities(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
@@ -196,11 +199,12 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
       customerEmail,
       customerPhone,
       pageContext,
+      contextEntityName,
       source: 'widget',
     });
 
     // Use context-aware greeting
-    const contextualGreeting = configService.getContextualGreeting(config, pageContext, isOpen);
+    const contextualGreeting = configService.getContextualGreeting(config, pageContext, isOpen, contextEntityName);
 
     res.json({ success: true, sessionId: conversation.sessionId, greeting: contextualGreeting || greeting });
   } catch (error) {
@@ -592,6 +596,45 @@ router.get('/products/search', resolveEmbedKey, async (req, res) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to search product catalog',
+    });
+  }
+});
+
+// GET /api/public/bot/policies?tenantId=&embedKey=&type=
+router.get('/policies', resolveEmbedKey, async (req, res) => {
+  try {
+    const tenantId = res.locals.embedTenantId || (req.query.tenantId as string);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
+    }
+
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps || !caps.effective.chatbot.enabled) {
+      return res.status(403).json({
+        success: false,
+        error: 'capability_disabled',
+        message: 'Chatbot is not enabled for this tenant',
+      });
+    }
+
+    const policyType = req.query.type as string | undefined;
+    const policies = await StorefrontPolicyService.getInstance().getPolicies(tenantId);
+
+    if (policyType) {
+      const content = (policies as any)[policyType] as string | null;
+      if (!content) {
+        return res.status(404).json({ success: false, error: 'not_found', message: 'Policy not configured' });
+      }
+      return res.json({ success: true, type: policyType, content, updatedAt: policies.updatedAt });
+    }
+
+    return res.json({ success: true, policies });
+  } catch (error) {
+    console.error('[BotPublic] Policy lookup failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch policies',
     });
   }
 });

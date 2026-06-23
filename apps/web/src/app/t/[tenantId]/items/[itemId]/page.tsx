@@ -18,6 +18,7 @@ import VariantsView from '@/components/items/VariantsView';
 import { Item as ItemType } from '@/services/itemsDataService';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
+import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -535,51 +536,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </CardContent>
             </Card>
 
-            {/* Video Player - YouTube embed */}
-            {(item as any).videoUrl && (() => {
-              // Extract YouTube video ID from various URL formats
-              const getYouTubeId = (url: string): string | null => {
-                const patterns = [
-                  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-                  /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/
-                ];
-                for (const pattern of patterns) {
-                  const match = url.match(pattern);
-                  if (match) return match[1];
-                }
-                return null;
-              };
-              const videoId = getYouTubeId((item as any).videoUrl);
-              return videoId ? (
-                <Card data-section="video">
-                  <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                      🎬 Product Video
-                    </h2>
-                    <div className="aspect-video bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${videoId}`}
-                        title="Product Video"
-                        className="w-full h-full"
-                        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                    <a 
-                      href={(item as any).videoUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700 text-sm mt-2 inline-flex items-center gap-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      Watch on YouTube
-                    </a>
-                  </CardContent>
-                </Card>
-              ) : null;
-            })()}
+            {/* Video Player */}
+            {(item as any).videoUrl && (
+              <Card data-section="video">
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    🎬 Product Video
+                  </h2>
+                  <ProductVideoPlayer
+                    videoUrl={(item as any).videoUrl}
+                    title={`${item.name || 'Product'} Video`}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {/* Description */}
             {item.description && (

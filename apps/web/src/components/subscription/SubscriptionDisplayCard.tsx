@@ -13,6 +13,7 @@ import {
   type SubscriptionDisplayField 
 } from '@/hooks/useSubscriptionDisplay';
 import { SubscriptionDisplayOptionsModal } from './SubscriptionDisplayOptionsModal';
+import { deriveInternalStatus, getStatusLabel, type InternalStatus } from '@/lib/subscription-status';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -91,16 +92,49 @@ export function SubscriptionDisplayCard({
     trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }
 
-  // Status badge color
-  const getStatusColor = (status: string): 'success' | 'info' | 'warning' | 'error' | 'default' => {
+  // Derive internal status from tier data
+  const internalStatus = deriveInternalStatus({
+    subscriptionStatus: tierData.subscriptionStatus,
+    subscriptionTier: tierData.tier,
+    trialEndsAt: tierData.trialEndsAt,
+    subscriptionEndsAt: tierData.subscriptionEndsAt,
+  });
+
+  // Status badge color based on internal status
+  const getStatusColor = (status: InternalStatus): 'success' | 'info' | 'warning' | 'error' | 'default' => {
     switch (status) {
       case 'active': return 'success';
-      case 'trial': return 'info';
+      case 'trialing': return 'info';
       case 'past_due': return 'warning';
+      case 'maintenance': return 'warning';
+      case 'frozen': return 'error';
       case 'canceled': return 'error';
+      case 'expired': return 'error';
       default: return 'default';
     }
   };
+
+  // Visual treatment classes based on internal status
+  const getStatusStyles = (status: InternalStatus): { border: string; bg: string; dot: string } => {
+    switch (status) {
+      case 'active':
+        return { border: 'border-emerald-200 dark:border-emerald-800', bg: 'bg-emerald-50/30 dark:bg-emerald-950/30', dot: 'bg-emerald-500' };
+      case 'trialing':
+        return { border: 'border-blue-200 dark:border-blue-800', bg: 'bg-blue-50/30 dark:bg-blue-950/30', dot: 'bg-blue-500' };
+      case 'past_due':
+        return { border: 'border-amber-200 dark:border-amber-800', bg: 'bg-amber-50/30 dark:bg-amber-950/30', dot: 'bg-amber-500' };
+      case 'maintenance':
+        return { border: 'border-yellow-200 dark:border-yellow-800', bg: 'bg-yellow-50/30 dark:bg-yellow-950/30', dot: 'bg-yellow-500' };
+      case 'frozen':
+      case 'canceled':
+      case 'expired':
+        return { border: 'border-red-200 dark:border-red-800', bg: 'bg-red-50/30 dark:bg-red-950/30', dot: 'bg-red-500' };
+      default:
+        return { border: '', bg: '', dot: 'bg-gray-400' };
+    }
+  };
+
+  const statusStyles = getStatusStyles(internalStatus);
 
   // Render individual field
   const renderField = (field: SubscriptionDisplayField) => {
@@ -124,8 +158,8 @@ export function SubscriptionDisplayCard({
           <div key={field} className="flex items-center gap-2">
             <Icon className="w-4 h-4 text-primary-600" />
             <span className="text-sm text-gray-600 dark:text-gray-400">Status:</span>
-            <Badge variant={getStatusColor(tierData.subscriptionStatus)}>
-              {tierData.subscriptionStatus.charAt(0).toUpperCase() + tierData.subscriptionStatus.slice(1)}
+            <Badge variant={getStatusColor(internalStatus)}>
+              {getStatusLabel(internalStatus)}
             </Badge>
           </div>
         );
@@ -265,9 +299,12 @@ export function SubscriptionDisplayCard({
 
   return (
     <>
-      <Card className={`${className}`}>
+      <Card className={`${statusStyles.border} ${statusStyles.bg} ${className}`}>
         <CardHeader className="flex flex-row items-center justify-between py-3">
-          <CardTitle className="text-base font-medium">Subscription</CardTitle>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${statusStyles.dot}`} />
+            Subscription
+          </CardTitle>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowOptions(true)}

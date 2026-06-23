@@ -18,6 +18,7 @@ import {
   calculateDeposit,
   CheckoutMode,
 } from '../utils/deposit-calculator';
+import { taxService } from '../services/TaxService';
 import {
   getTenantCommerceCapabilities,
   getCheckoutMode,
@@ -475,6 +476,59 @@ router.post('/orders', async (req: Request, res: Response) => {
       };
     });
     const totals = calculateOrderTotals(line_items, shipping_cents);
+
+    // Calculate sales tax using TaxService (Stripe Tax or manual rate)
+    let calculatedTaxCents = totals.tax_cents;
+    try {
+      const taxAddress = shipping_address ? {
+        line1: shipping_address.addressLine1,
+        line2: shipping_address.addressLine2,
+        city: shipping_address.city,
+        state: shipping_address.state,
+        postalCode: shipping_address.postalCode,
+        country: shipping_address.country || 'US',
+      } : null;
+
+      const taxResult = await taxService.calculateTax(
+        tenant_id,
+        totals.subtotal_cents,
+        shipping_cents,
+        taxAddress,
+        line_items.map(li => ({ amountCents: li.subtotal_cents, reference: li.sku }))
+      );
+
+      calculatedTaxCents = taxResult.taxCents;
+
+      // Update line items with tax if provider returned itemized tax
+      if (taxResult.lineItems && taxResult.lineItems.length > 0) {
+        taxResult.lineItems.forEach((taxLi, idx) => {
+          if (line_items[idx]) {
+            line_items[idx].tax_cents = taxLi.taxCents;
+          }
+        });
+      } else if (calculatedTaxCents > 0 && line_items.length > 0) {
+        // Distribute tax proportionally across line items
+        const totalSubtotal = line_items.reduce((sum, li) => sum + li.subtotal_cents, 0);
+        let allocatedTax = 0;
+        line_items.forEach((li, idx) => {
+          if (idx === line_items.length - 1) {
+            // Last item gets remainder to avoid rounding drift
+            li.tax_cents = calculatedTaxCents - allocatedTax;
+          } else {
+            const proportion = totalSubtotal > 0 ? li.subtotal_cents / totalSubtotal : 0;
+            const itemTax = Math.round(calculatedTaxCents * proportion);
+            li.tax_cents = itemTax;
+            allocatedTax += itemTax;
+          }
+        });
+      }
+
+      // Recalculate totals with updated tax
+      totals.tax_cents = calculatedTaxCents;
+      totals.total_cents = totals.subtotal_cents - totals.discount_cents + calculatedTaxCents + totals.shipping_cents;
+    } catch (taxError) {
+      console.warn('[Checkout] Tax calculation failed, proceeding with zero tax:', taxError);
+    }
 
     // Fetch dynamic platform fee and include in order total (only if non-zero)
     const platformFeePercentage = await getPlatformFeePercentage();

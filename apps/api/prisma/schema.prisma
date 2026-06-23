@@ -49,7 +49,6 @@ model audit_log {
   user_agent   String?
   action       action
 
-  @@index([tenant_id, occurred_at(sort: Desc)])
   @@index([tenant_id, occurred_at(sort: Desc)], map: "audit_log_tenant_id_occurred_at_sort_desc_idx")
 }
 
@@ -399,7 +398,6 @@ model category_mirror_runs {
   completed_at DateTime?
   tenants      tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
-  @@index([tenant_id, strategy, started_at(sort: Desc)])
   @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
 }
 
@@ -1899,10 +1897,10 @@ model inventory_items {
   featured_priority                                                               Int?                     @default(0)
   featured_type                                                                   String?                  @default("store_selection")
   product_slug                                                                    String?                  @db.VarChar(255)
-  seo_keywords                                                                    String[]
   download_page_id                                                                String?                  @db.VarChar(255)
   seo_title                                                                       String?
   seo_description                                                                 String?
+  seo_keywords                                                                    String[]
   enhanced_description                                                            String?
   tags                                                                            String[]
   video_url                                                                       String?
@@ -2077,16 +2075,16 @@ model location_inventory_pools {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model location_status_logs {
+  id             Int             @id @default(autoincrement())
   tenant_id      String          @db.VarChar(255)
   old_status     location_status
   new_status     location_status
   changed_by     String?         @db.VarChar(255)
   reason         String?
   reopening_date DateTime?       @db.Timestamp(6)
-  metadata       Json?
   created_at     DateTime        @default(now()) @db.Timestamp(6)
   updated_at     DateTime        @default(now()) @db.Timestamp(6)
-  id             Int             @id @default(autoincrement())
+  metadata       Json?
   tenants        tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([created_at(sort: Desc)], map: "idx_location_status_logs_created_at")
@@ -2259,11 +2257,11 @@ model oauth_integrations {
   access_token  String
   refresh_token String?
   scopes        String[]  @default([])
+  expiresAt     DateTime? @db.Timestamptz(6)
+  isActive      Boolean?  @default(true)
   metadata      Json?
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
   updated_at    DateTime? @default(now()) @db.Timestamptz(6)
-  expiresAt     DateTime? @db.Timestamptz(6)
-  isActive      Boolean?  @default(true)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -3721,6 +3719,10 @@ model tenant_commerce_settings {
   notify_on_fulfillment      Boolean?  @default(true)
   created_at                 DateTime? @default(now()) @db.Timestamp(6)
   updated_at                 DateTime? @default(now()) @db.Timestamp(6)
+  tax_enabled                Boolean?  @default(false)
+  tax_provider               String?   @db.VarChar(50)
+  manual_tax_rate_percent    Decimal?  @db.Decimal(5, 4)
+  tax_shipping               Boolean?  @default(false)
   tenants                    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_commerce_tenant")
 
   @@index([deposit_enabled], map: "idx_commerce_deposit")
@@ -4117,6 +4119,21 @@ model tenant_storefront_type_settings {
   @@index([tenant_id], map: "idx_storefront_type_tenant")
 }
 
+model tenant_storefront_policies {
+  id               String    @id @db.VarChar(255)
+  tenant_id        String    @unique(map: "uq_storefront_policies_tenant") @db.VarChar(255)
+  return_policy    String?
+  shipping_policy  String?
+  privacy_policy   String?
+  terms_of_service String?
+  refund_policy    String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  tenants          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_policies_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_policies_tenant")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
   id                                                                                     String                               @unique
@@ -4267,6 +4284,7 @@ model tenants {
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
+  tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_type_settings                                                        tenant_storefront_type_settings?
   merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?           @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users                                                                                  users?                               @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -4290,6 +4308,9 @@ model tenants {
   @@index([directory_visible], map: "idx_tenant_directory_visible")
   @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
   @@index([slug], map: "idx_tenant_slug")
+  @@index([directory_visible], map: "tenant_directory_visible_idx")
+  @@index([google_sync_enabled, google_last_sync], map: "tenant_google_sync_enabled_google_last_sync_idx")
+  @@index([slug], map: "tenant_slug_idx")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -4689,10 +4710,10 @@ enum digital_delivery_status {
 }
 
 enum enrichment_status {
-  COMPLETE
   NEEDS_ENRICHMENT
   PARTIALLY_ENRICHED
   PENDING
+  COMPLETE
   FAILED
 }
 
@@ -4730,7 +4751,6 @@ enum item_status {
   inactive
   archived
   trashed
-  draft
 }
 
 enum item_visibility {
@@ -4818,13 +4838,11 @@ enum product_condition {
 
 enum product_source {
   MANUAL
-  QUICK_START_WIZARD
-  PRODUCT_SCAN
-  IMPORT
-  API
+  BARCODE_SCAN
   BULK_UPLOAD
-  CLOVER_DEMO
   API_IMPORT
+  QUICK_START_WIZARD
+  CLOVER_DEMO
 }
 
 enum product_type {
@@ -4891,12 +4909,12 @@ enum transfer_status {
 }
 
 enum user_role {
-  ADMIN
-  OWNER
-  USER
   PLATFORM_ADMIN
   PLATFORM_SUPPORT
   PLATFORM_VIEWER
+  ADMIN
+  OWNER
+  USER
   TENANT_OWNER
   TENANT_ADMIN
   TENANT_MANAGER
@@ -4907,7 +4925,7 @@ enum user_role {
 enum user_tenant_role {
   OWNER
   ADMIN
+  SUPPORT
   MEMBER
   VIEWER
-  SUPPORT
 }

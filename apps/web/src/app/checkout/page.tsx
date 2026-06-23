@@ -101,6 +101,7 @@ function CheckoutPageContent() {
   const [squareConfig, setSquareConfig] = useState<{ applicationId: string; locationId: string } | null>(null);
   // Dynamic platform fee percentage from admin settings
   const [platformFeePercentage, setPlatformFeePercentage] = useState<number>(3.0);
+  const [taxAmount, setTaxAmount] = useState<number>(0);
 
   // Get the cart for this tenant (gateway selected at checkout)
   const cart = tenantId ? getCart(tenantId) : null;
@@ -380,7 +381,7 @@ function CheckoutPageContent() {
   const platformFee = platformFeePercentage > 0
     ? Math.round(subtotal * (platformFeePercentage / 100))
     : 0;
-  const total = subtotal + platformFee + fulfillmentFee;
+  const total = subtotal + platformFee + fulfillmentFee + taxAmount;
 
   // Fetch dynamic platform fee percentage
   useEffect(() => {
@@ -395,6 +396,58 @@ function CheckoutPageContent() {
 
     fetchPlatformFee();
   }, []);
+
+  // Calculate tax when shipping address or fulfillment changes
+  useEffect(() => {
+    const fetchTax = async () => {
+      if (!tenantId || subtotal <= 0) {
+        setTaxAmount(0);
+        return;
+      }
+
+      // Only calculate tax for delivery/shipping (not pickup — tax is based on ship-to address)
+      if (fulfillmentMethod === 'pickup' || !shippingAddress) {
+        setTaxAmount(0);
+        return;
+      }
+
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+        const response = await fetch(`${API_BASE}/api/tax/calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant_id: tenantId,
+            subtotal_cents: subtotal,
+            shipping_cents: fulfillmentFee,
+            shipping_address: {
+              line1: shippingAddress.addressLine1,
+              line2: shippingAddress.addressLine2,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postalCode: shippingAddress.postalCode,
+              country: shippingAddress.country || 'US',
+            },
+            line_items: cartItems.map(item => ({
+              amountCents: item.price_cents * item.quantity,
+              reference: item.product_sku || item.product_id,
+            })),
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.tax) {
+            setTaxAmount(data.tax.tax_cents || 0);
+          }
+        }
+      } catch {
+        // Tax calculation failed — proceed with zero tax
+      }
+    };
+
+    fetchTax();
+  }, [tenantId, subtotal, fulfillmentFee, fulfillmentMethod, shippingAddress, cartItems]);
 
   // Calculate deposit for Tier 3 commitment — matches backend logic exactly
   useEffect(() => {
@@ -924,6 +977,7 @@ function CheckoutPageContent() {
                   platformFeePercentage={platformFeePercentage}
                   shipping={fulfillmentFee}
                   total={total}
+                  tax={taxAmount}
                   fulfillmentMethod={fulfillmentMethod || undefined}
                   // Tier 3 Commitment - Deposit fields
                   checkoutMode={checkoutMode}

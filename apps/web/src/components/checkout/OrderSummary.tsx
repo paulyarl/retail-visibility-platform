@@ -27,6 +27,7 @@ interface OrderSummaryProps {
   platformFeePercentage?: number;
   shipping: number;
   total: number;
+  tax?: number;
   fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping';
   // Tier 3 Commitment - Deposit fields
   checkoutMode?: 'deposit' | 'full_payment' | 'disabled';
@@ -52,6 +53,7 @@ export function OrderSummary({
   platformFeePercentage = 3.0,
   shipping,
   total,
+  tax = 0,
   fulfillmentMethod,
   // Tier 3 Commitment - Deposit fields
   checkoutMode,
@@ -154,6 +156,13 @@ export function OrderSummary({
               {shipping === 0 ? 'FREE' : formatCurrency(shipping)}
             </span>
           </div>
+
+          {tax > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Tax</span>
+              <span>{formatCurrency(tax)}</span>
+            </div>
+          )}
         </div>
 
         <Separator />
