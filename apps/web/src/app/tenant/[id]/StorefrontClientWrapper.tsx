@@ -208,14 +208,15 @@ export default function StorefrontClientWrapper({
   const storefrontCap = {
     data: {
       enabled: initialStorefrontTypeSettings?.settings?.storefront_type_enabled ?? true,
-      type: initialStorefrontTypeSettings?.tierState?.effectiveType ?? initialStorefrontTypeSettings?.tierState?.type ?? 'both',
+      type: initialStorefrontTypeSettings?.tierState?.effectiveType ?? initialStorefrontTypeSettings?.tierState?.type ?? 'flexible',
     },
     loading: false,
   };
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
-  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
-  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
-  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
+  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'flexible';
+  const isSocialStore = storefrontCap.data?.type === 'social' || storefrontCap.data?.type === 'flexible';
   // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
   // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
 

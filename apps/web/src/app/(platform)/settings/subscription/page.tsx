@@ -715,7 +715,9 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       {allCapabilities.data.storefront.type === 'none' ? 'No storefront' :
                        allCapabilities.data.storefront.type === 'online' ? 'Online only' :
                        allCapabilities.data.storefront.type === 'retail' ? 'Retail only' :
-                       allCapabilities.data.storefront.type === 'both' ? 'Online + Retail' :
+                       allCapabilities.data.storefront.type === 'service' ? 'Service only' :
+                       allCapabilities.data.storefront.type === 'social' ? 'Social only' :
+                       allCapabilities.data.storefront.type === 'flexible' ? 'Flexible (multi-type)' :
                        'Standard'}
                     </p>
                   </div>

@@ -74,6 +74,7 @@ The route at `apps/api/src/routes/<capability>-options-settings.ts` handles:
 - [ ] PUT rejects updates for features not allowed by tier (403 `tier_restricted`)
 - [ ] PUT rejects all updates if `tierState.enabled` is false (403 `capability_disabled`)
 - [ ] Settings are filtered by tier before returning (merchant can't see tier-restricted features)
+- [ ] **Zod validation schema** includes all type values from the resolver's type union (e.g. `z.enum(['online','retail','service','social','both'])` must match `StorefrontTypeValue`). When adding a new type value to the enum, the Zod schema in the route file must be updated too — otherwise PUT will 400-reject the new value before it reaches the tier gate.
 
 ### 4. Check Unified Effective Capabilities Endpoint
 
@@ -186,3 +187,5 @@ All resolution happens in the backend resolver. The frontend `UnifiedCapabilityS
 7. **Cache not invalidated after settings update**: The unified endpoint serves stale data for up to 60 seconds after a merchant changes a setting. Fix: ensure the settings PUT handler calls `invalidateEffectiveCapabilities(tenantId)`.
 
 8. **Wrong property name on state object**: Backend routes or other consumers using incorrect property names (e.g., `customerTickets` instead of `customerTicketsEnabled`). Fix: check the `*OptionsState` interface in `CapabilityResolutionService.ts` (type source) for exact property names.
+
+9. **Zod schema enum out of sync with type union**: When adding a new value to a capability's type enum (e.g. adding `'social'` to `StorefrontTypeValue`), the Zod validation schema in the route file (`z.enum([...])`) must be updated to include the new value. Otherwise the PUT endpoint will 400-reject the new value before it reaches the tier gate, even though the resolver, service, and frontend all accept it. This is a silent gap — TypeScript won't catch it because the Zod schema is a runtime construct, not a type-level constraint. Fix: grep for `z.enum(` in the route file and ensure all enum values match the type union.

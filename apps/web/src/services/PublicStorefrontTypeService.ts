@@ -8,7 +8,7 @@
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
-export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
 export interface StorefrontTypeSettings {
   storefront_type_enabled: boolean;

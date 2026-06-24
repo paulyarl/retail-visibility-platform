@@ -85,16 +85,16 @@ export interface PaymentGatewayState {
 
 // --- Storefront Types ---
 
-export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
+export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
 export interface StorefrontState {
   enabled: boolean;
-  /** Type determined by tier features (online/retail/service/social/both/none) */
+  /** Type determined by tier features (online/retail/service/social/flexible/none) */
   type: StorefrontType;
   /** Type effectively used after applying merchant preferences */
   effectiveType: StorefrontType;
   isFlexible: boolean;
-  /** Which individual storefront types are allowed by the tier (e.g. ['retail','service'] when type='both') */
+  /** Which individual storefront types are allowed by the tier (e.g. ['retail','service'] when type='flexible') */
   allowedTypes: StorefrontType[];
   /** Whether the merchant has selected a specific type when multiple are available */
   hasMerchantSelection: boolean;
@@ -692,6 +692,40 @@ export function toPublicCrmOptionsFlags(state: CrmOptionsState): PublicCrmOption
   };
 }
 
+// --- Social Commerce Options ---
+
+export type SocialCommerceMetaType =
+  | 'social_commerce_meta_catalog' | 'social_commerce_meta_shop' | 'social_commerce_meta_pixel';
+
+export type SocialCommerceTikTokType =
+  | 'social_commerce_tiktok_catalog' | 'social_commerce_tiktok_shop' | 'social_commerce_tiktok_pixel';
+
+export type SocialCommerceExperienceType =
+  | 'social_commerce_share_buttons' | 'social_commerce_social_proof' | 'social_commerce_abandoned_cart';
+
+export interface SocialCommerceOptionsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  metaEnabled: boolean;
+  allowedMetaTypes: SocialCommerceMetaType[];
+  tiktokEnabled: boolean;
+  allowedTikTokTypes: SocialCommerceTikTokType[];
+  experienceEnabled: boolean;
+  allowedExperienceTypes: SocialCommerceExperienceType[];
+  canUseMetaCatalog: boolean;
+  canUseMetaShop: boolean;
+  canUseMetaPixel: boolean;
+  canUseTikTokCatalog: boolean;
+  canUseTikTokShop: boolean;
+  canUseTikTokPixel: boolean;
+  canUseShareButtons: boolean;
+  canUseSocialProof: boolean;
+  canUseAbandonedCart: boolean;
+  socialCommerceAvailable: boolean;
+  merchantPreferences: Record<string, boolean>;
+  features: Record<string, boolean>;
+}
+
 // --- Chatbot Options ---
 
 export type ChatbotResponseEngineType =
@@ -813,6 +847,7 @@ export interface AllCapabilitiesState {
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
   chatbotOptions: ChatbotOptionsState;
+  socialCommerceOptions: SocialCommerceOptionsState;
   uncategorizedFeatures: string[];
 }
 
@@ -835,6 +870,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   faq_: 'faq_options',
   crm_: 'crm_options',
   chatbot_: 'chatbot_options',
+  social_commerce_: 'social_commerce_options',
 };
 
 /**
@@ -1959,7 +1995,7 @@ export function resolveStorefrontState(
   if (!isEnabled) {
     type = 'none';
   } else if (bothOptions || (online && retail) || (online && service) || (online && social) || (retail && service) || (retail && social) || (service && social)) {
-    type = 'both';
+    type = 'flexible';
   } else if (social) {
     type = 'social';
   } else if (online) {
@@ -1970,7 +2006,7 @@ export function resolveStorefrontState(
     type = 'service';
   }
 
-  // Compute allowed types from actual feature gates (not just type='both' → all)
+  // Compute allowed types from actual feature gates (not just type='flexible' → all)
   const allowedTypes: StorefrontType[] = [];
   if (isEnabled) {
     if (bothOptions) {
@@ -1994,7 +2030,7 @@ export function resolveStorefrontState(
   let effectiveType: StorefrontType = type;
   let hasMerchantSelection = false;
 
-  if (type === 'both' && prefs.storefront_type_enabled) {
+  if (type === 'flexible' && prefs.storefront_type_enabled) {
     const selected = prefs.selected_storefront_type;
     if (selected === 'online' && allowedTypes.includes('online')) {
       effectiveType = 'online';

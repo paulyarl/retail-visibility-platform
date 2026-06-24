@@ -12,7 +12,7 @@ import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface StorefrontTypeSettings {
   storefront_type_enabled: boolean;
-  selected_storefront_type: 'online' | 'retail' | 'service' | 'social' | 'both' | null;
+  selected_storefront_type: 'online' | 'retail' | 'service' | 'social' | 'flexible' | null;
 }
 
 interface StorefrontTypeOptionsSettingsClientProps {
@@ -33,7 +33,7 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
 
   if (!settings.storefront_type_enabled) return actions;
 
-  if (type === 'online' || type === 'both') {
+  if (type === 'online' || type === 'flexible') {
     actions.push({
       id: 'storefront',
       label: 'View Storefront',
@@ -44,7 +44,7 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
     });
   }
 
-  if (type === 'retail' || type === 'both') {
+  if (type === 'retail' || type === 'flexible') {
     actions.push({
       id: 'directory',
       label: 'Directory Listing',
@@ -55,7 +55,7 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
     });
   }
 
-  if (type === 'social' || type === 'both') {
+  if (type === 'social' || type === 'flexible') {
     actions.push({
       id: 'social-commerce',
       label: 'Social Commerce',
@@ -89,9 +89,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
   const isTierAllowed = resolvedState
     ? resolvedState.enabled || resolvedState.merchantPreferences.storefront_type_enabled === false
     : true;
-  const isStorefrontEnabled = resolvedState?.enabled ?? true;
   const tierType = storefrontCap.data?.type ?? 'none';
-  const isFlexible = storefrontCap.data?.isFlexible ?? false;
   const allowedTypes = storefrontCap.data?.allowedTypes ?? [];
 
   const [settings, setSettings] = useState<StorefrontTypeSettings>({
@@ -158,7 +156,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
     { value: 'social', label: 'Social', description: 'Social commerce (TikTok/Instagram) storefront', icon: Share2 },
   ];
 
-  const effectiveType = isFlexible && settings.storefront_type_enabled && settings.selected_storefront_type && allowedTypes.includes(settings.selected_storefront_type)
+  const effectiveType = settings.storefront_type_enabled && settings.selected_storefront_type && allowedTypes.includes(settings.selected_storefront_type)
     ? settings.selected_storefront_type
     : (allowedTypes.length === 1 ? allowedTypes[0] : tierType);
 
@@ -231,7 +229,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
             Storefront Type
           </CardTitle>
           <p className="text-sm text-neutral-600 mt-1">
-            {isFlexible
+            {allowedTypes.length > 1
               ? 'Your plan supports multiple storefront types. Select the one that best fits your business.'
               : 'Your current plan determines your storefront type. Upgrade to switch between types.'}
           </p>
@@ -240,9 +238,9 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
           <div className="space-y-3">
             {typeOptions.map(({ value, label, description, icon: IconComp }) => {
               const isAllowed = allowedTypes.includes(value);
-              const activeSelection = settings.selected_storefront_type ?? (tierType !== 'both' && tierType !== 'none' ? tierType : null);
+              const activeSelection = settings.selected_storefront_type ?? (tierType !== 'flexible' && tierType !== 'none' ? tierType : null);
               const isSelected = activeSelection === value;
-              const canSelect = isFlexible && settings.storefront_type_enabled && isAllowed;
+              const canSelect = settings.storefront_type_enabled && isAllowed;
 
               return (
                 <div
@@ -262,7 +260,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                       <p className={`font-medium ${isSelected && canSelect ? 'text-primary-700' : 'text-neutral-900'}`}>
                         {label}
                       </p>
-                      {!isFlexible && isAllowed && allowedTypes.length === 1 && allowedTypes[0] === value && (
+                      {isAllowed && allowedTypes.length === 1 && allowedTypes[0] === value && (
                         <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium">Current</span>
                       )}
                       {!isAllowed && (
@@ -282,13 +280,13 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
             })}
           </div>
 
-          {!isFlexible && (
+          {allowedTypes.length <= 1 && (
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <p className="text-sm text-amber-800">
                 {allowedTypes.length === 1
                   ? <>Your current plan only supports the <strong>{allowedTypes[0]}</strong> storefront type. To enable multiple types, upgrade your plan.</>
-                  : <>Your current plan supports <strong>{allowedTypes.join(' and ')}</strong> storefront types. To choose between them, upgrade your plan.</>
+                  : <>No storefront types are enabled in your current plan. Upgrade to access storefront types.</>
                 }
               </p>
             </div>

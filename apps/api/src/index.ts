@@ -178,6 +178,7 @@ import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
 import storefrontPolicyRoutes from './routes/storefront-policies';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import crmOptionsSettingsRoutes from './routes/crm-options-settings';
+import socialCommerceOptionsSettingsRoutes from './routes/social-commerce-options-settings';
 import chatbotOptionsSettingsRoutes from './routes/chatbot-options-settings';
 import botPublicRoutes from './routes/bot-public';
 import botMerchantRoutes from './routes/bot-merchant';
@@ -7518,6 +7519,11 @@ console.log('✅ FAQ options settings routes mounted at /api/tenants/:tenantId/f
 app.use('/api/tenants', crmOptionsSettingsRoutes);
 app.use('/api', crmOptionsSettingsRoutes);
 console.log('✅ CRM options settings routes mounted at /api/tenants/:tenantId/crm-options and /api/public/tenant/:tenantId/crm-options');
+
+/* ------------------------------ social commerce options settings ------------------------------ */
+app.use('/api/tenants', socialCommerceOptionsSettingsRoutes);
+app.use('/api', socialCommerceOptionsSettingsRoutes);
+console.log('✅ Social commerce options settings routes mounted at /api/tenants/:tenantId/social-commerce-options');
 
 /* ------------------------------ chatbot options settings ------------------------------ */
 app.use('/api/tenants', chatbotOptionsSettingsRoutes);

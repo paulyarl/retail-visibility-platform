@@ -11,7 +11,7 @@ import type {
   StorefrontTypeMerchantSettings,
 } from './types';
 
-export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
 /**
  * Resolve effective storefront type state.
@@ -31,7 +31,7 @@ export async function resolveStorefrontType(
   let selectedStorefrontType: StorefrontTypeValue = tierState.type;
   let hasMerchantSelection = false;
 
-  if (tierState.enabled && tierState.type === 'both' && storefrontTypeEnabled && rawSelected) {
+  if (tierState.enabled && tierState.type === 'flexible' && storefrontTypeEnabled && rawSelected) {
     const allowed = tierState.allowedTypes as StorefrontTypeValue[];
     if (allowed.includes(rawSelected as StorefrontTypeValue)) {
       selectedStorefrontType = rawSelected as StorefrontTypeValue;
@@ -41,9 +41,9 @@ export async function resolveStorefrontType(
 
   // Effective type: if merchant has selected a specific type and tier allows it, use it
   let effectiveType: StorefrontTypeValue = tierState.type;
-  if (tierState.enabled && tierState.type === 'both' && storefrontTypeEnabled) {
+  if (tierState.enabled && tierState.type === 'flexible' && storefrontTypeEnabled) {
     const allowed = tierState.allowedTypes as StorefrontTypeValue[];
-    if (selectedStorefrontType !== 'both' && allowed.includes(selectedStorefrontType)) {
+    if (selectedStorefrontType !== 'flexible' && allowed.includes(selectedStorefrontType)) {
       effectiveType = selectedStorefrontType;
     }
   }

@@ -30,6 +30,7 @@ import {
   resolveCrmOptions,
   resolveChatbotOptions,
   resolveOrgOptions,
+  resolveSocialCommerceOptions,
 } from './resolvers';
 import type {
   EffectiveCapabilities,
@@ -182,6 +183,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.organization_options?.features || {},
       rawCaps.capabilities.organization_options?.capability_enabled
     ),
+    resolveSocialCommerceOptions(
+      rawCaps.capabilities.social_commerce_options?.features || {},
+      merchantBundle.socialCommerceOptions
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -210,6 +215,7 @@ export async function resolveEffectiveCapabilities(
       crm: effective[12],
       chatbot: effective[13],
       org_options: effective[14],
+      social_commerce_options: effective[15],
     },
     uncategorized_features: rawCaps.uncategorized_features,
     purchased_feature_keys: rawCaps.purchased_feature_keys || [],
@@ -478,6 +484,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     crmOptions,
     chatbotOptions,
     barcodeScan,
+    socialCommerceOptions,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -493,6 +500,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_social_commerce_options_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {
@@ -510,6 +518,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     crmOptions: crmOptions as any,
     chatbotOptions: chatbotOptions as any,
     barcodeScan: barcodeScan as any,
+    socialCommerceOptions: socialCommerceOptions as any,
   };
 }
 

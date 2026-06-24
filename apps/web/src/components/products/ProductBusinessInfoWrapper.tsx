@@ -15,9 +15,9 @@ export default function ProductBusinessInfoWrapper({ product, tenant, initialOpt
   // Storefront capability-driven content control
   const storefrontCap = useStorefrontCapability(product.tenantId);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
-  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
-  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
-  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
+  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'flexible';
 
   // Storefront options capability flags — initialized from server-side fetch (no waterfall)
   const [optFlags] = useState<StorefrontOptionFlags | null>(initialOptFlags ?? null);

@@ -16,7 +16,7 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 // TYPES
 // ====================
 
-export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
+export type StorefrontType = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
 export interface StorefrontTypeState {
   /** Whether storefront is enabled at the tier level (master gate) */
@@ -153,7 +153,7 @@ class StorefrontTypeService {
     if (!isEnabled) {
       type = 'none';
     } else if (bothOptions || (online && retail) || (online && service) || (online && social) || (retail && service) || (retail && social) || (service && social)) {
-      type = 'both';
+      type = 'flexible';
     } else if (social) {
       type = 'social';
     } else if (online) {

@@ -136,20 +136,23 @@ export function useStorefrontState({
       type:
         initialStorefrontTypeSettings?.tierState?.effectiveType ??
         initialStorefrontTypeSettings?.tierState?.type ??
-        'both',
+        'flexible',
     },
     loading: false,
   };
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore =
     storefrontCap.data?.type === 'retail' ||
-    storefrontCap.data?.type === 'both';
+    storefrontCap.data?.type === 'flexible';
   const isOnlineStore =
     storefrontCap.data?.type === 'online' ||
-    storefrontCap.data?.type === 'both';
+    storefrontCap.data?.type === 'flexible';
   const isServiceStore =
     storefrontCap.data?.type === 'service' ||
-    storefrontCap.data?.type === 'both';
+    storefrontCap.data?.type === 'flexible';
+  const isSocialStore =
+    storefrontCap.data?.type === 'social' ||
+    storefrontCap.data?.type === 'flexible';
 
   // ---- Storefront option flags ----
   const [storefrontOptionFlags] = useState<StorefrontOptionFlags | null>(

@@ -50,6 +50,7 @@ export interface MerchantSettingsBundle {
   crmOptions: CrmOptionsMerchantSettings | null;
   chatbotOptions: ChatbotOptionsMerchantSettings | null;
   barcodeScan: BarcodeScanMerchantSettings | null;
+  socialCommerceOptions: SocialCommerceOptionsMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -221,6 +222,21 @@ export interface BarcodeScanMerchantSettings {
   default_scan_mode?: string | null;
 }
 
+export interface SocialCommerceOptionsMerchantSettings {
+  social_commerce_enabled?: boolean | null;
+  social_commerce_meta_enabled?: boolean | null;
+  social_commerce_meta_catalog?: boolean | null;
+  social_commerce_meta_shop?: boolean | null;
+  social_commerce_meta_pixel?: boolean | null;
+  social_commerce_tiktok_enabled?: boolean | null;
+  social_commerce_tiktok_catalog?: boolean | null;
+  social_commerce_tiktok_shop?: boolean | null;
+  social_commerce_tiktok_pixel?: boolean | null;
+  social_commerce_share_buttons?: boolean | null;
+  social_commerce_social_proof?: boolean | null;
+  social_commerce_abandoned_cart?: boolean | null;
+}
+
 // ====================
 // EFFECTIVE (RESOLVED) STATE
 // ====================
@@ -251,7 +267,7 @@ export interface EffectivePaymentGateway {
   is_flexible: boolean;
 }
 
-export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'both' | 'none';
+export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
 export interface EffectiveStorefront {
   enabled: boolean;
@@ -584,6 +600,41 @@ export interface EffectiveChatbot {
 }
 
 // ====================
+// SOCIAL COMMERCE OPTIONS
+// ====================
+
+export type SocialCommerceMetaType =
+  | 'social_commerce_meta_catalog' | 'social_commerce_meta_shop' | 'social_commerce_meta_pixel';
+
+export type SocialCommerceTikTokType =
+  | 'social_commerce_tiktok_catalog' | 'social_commerce_tiktok_shop' | 'social_commerce_tiktok_pixel';
+
+export type SocialCommerceExperienceType =
+  | 'social_commerce_share_buttons' | 'social_commerce_social_proof' | 'social_commerce_abandoned_cart';
+
+export interface EffectiveSocialCommerceOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  meta_enabled: boolean;
+  allowed_meta_types: SocialCommerceMetaType[];
+  tiktok_enabled: boolean;
+  allowed_tiktok_types: SocialCommerceTikTokType[];
+  experience_enabled: boolean;
+  allowed_experience_types: SocialCommerceExperienceType[];
+  can_use_meta_catalog: boolean;
+  can_use_meta_shop: boolean;
+  can_use_meta_pixel: boolean;
+  can_use_tiktok_catalog: boolean;
+  can_use_tiktok_shop: boolean;
+  can_use_tiktok_pixel: boolean;
+  can_use_share_buttons: boolean;
+  can_use_social_proof: boolean;
+  can_use_abandoned_cart: boolean;
+  social_commerce_available: boolean;
+  merchant_preferences: Record<string, boolean>;
+}
+
+// ====================
 // ORGANIZATION OPTIONS
 // ====================
 
@@ -644,6 +695,7 @@ export interface EffectiveCapabilities {
     chatbot: EffectiveChatbot;
     barcode_scan: EffectiveBarcodeScan;
     org_options: EffectiveOrgOptions;
+    social_commerce_options: EffectiveSocialCommerceOptions;
   };
   gates?: {
     tier_hard: Record<string, CapabilityGroup>;

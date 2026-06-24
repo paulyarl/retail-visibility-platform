@@ -3788,6 +3788,28 @@ model tenant_crm_options_settings {
   @@index([tenant_id], map: "idx_crm_options_tenant")
 }
 
+model tenant_social_commerce_options_settings {
+  id                             String    @id @db.VarChar(255)
+  tenant_id                      String    @unique @db.VarChar(255)
+  social_commerce_enabled        Boolean?  @default(true)
+  social_commerce_meta_enabled   Boolean?  @default(false)
+  social_commerce_meta_catalog   Boolean?  @default(false)
+  social_commerce_meta_shop      Boolean?  @default(false)
+  social_commerce_meta_pixel     Boolean?  @default(false)
+  social_commerce_tiktok_enabled Boolean?  @default(false)
+  social_commerce_tiktok_catalog Boolean?  @default(false)
+  social_commerce_tiktok_shop    Boolean?  @default(false)
+  social_commerce_tiktok_pixel   Boolean?  @default(false)
+  social_commerce_share_buttons  Boolean?  @default(false)
+  social_commerce_social_proof   Boolean?  @default(false)
+  social_commerce_abandoned_cart Boolean?  @default(false)
+  created_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  tenants                        tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_commerce_options_tenant")
+
+  @@index([tenant_id], map: "idx_social_commerce_options_tenant")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_faq_options_settings {
@@ -4162,70 +4184,70 @@ model tenant_storefront_policies {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
-  id                                                                                     String                               @unique
+  id                                                                                     String                                   @unique
   name                                                                                   String
-  created_at                                                                             DateTime                             @default(now())
-  region                                                                                 String                               @default("us-east-1")
-  language                                                                               String                               @default("en-US")
-  currency                                                                               String                               @default("USD")
-  data_policy_accepted                                                                   Boolean                              @default(false)
+  created_at                                                                             DateTime                                 @default(now())
+  region                                                                                 String                                   @default("us-east-1")
+  language                                                                               String                                   @default("en-US")
+  currency                                                                               String                                   @default("USD")
+  data_policy_accepted                                                                   Boolean                                  @default(false)
   metadata                                                                               Json?
-  subscription_status                                                                    String?                              @default("trial")
-  subscription_tier                                                                      String?                              @default("starter")
+  subscription_status                                                                    String?                                  @default("trial")
+  subscription_tier                                                                      String?                                  @default("starter")
   trial_ends_at                                                                          DateTime?
   subscription_ends_at                                                                   DateTime?
-  stripe_customer_id                                                                     String?                              @unique
-  stripe_subscription_id                                                                 String?                              @unique
+  stripe_customer_id                                                                     String?                                  @unique
+  stripe_subscription_id                                                                 String?                                  @unique
   organization_id                                                                        String?
-  service_level                                                                          String?                              @default("self_service")
-  managed_services_active                                                                Boolean                              @default(false)
+  service_level                                                                          String?                                  @default("self_service")
+  managed_services_active                                                                Boolean                                  @default(false)
   dedicated_manager                                                                      String?
   monthly_sku_quota                                                                      Int?
-  skus_added_this_month                                                                  Int                                  @default(0)
+  skus_added_this_month                                                                  Int                                      @default(0)
   google_business_access_token                                                           String?
   google_business_refresh_token                                                          String?
   google_business_token_expiry                                                           DateTime?
   created_by                                                                             String?
-  location_status                                                                        location_status                      @default(active)
+  location_status                                                                        location_status                          @default(active)
   status_changed_at                                                                      DateTime?
   status_changed_by                                                                      String?
   reopening_date                                                                         DateTime?
   closure_reason                                                                         String?
-  slug                                                                                   String?                              @unique
-  google_sync_enabled                                                                    Boolean?                             @default(false)
-  google_last_sync                                                                       DateTime?                            @db.Timestamp(6)
-  google_product_count                                                                   Int?                                 @default(0)
-  directory_visible                                                                      Boolean?                             @default(true)
-  subdomain                                                                              String?                              @unique
-  platform_fee_percentage                                                                Decimal?                             @default(0.00) @db.Decimal(5, 2)
-  platform_fee_fixed_cents                                                               Int?                                 @default(0)
-  platform_fee_waived                                                                    Boolean?                             @default(false)
+  slug                                                                                   String?                                  @unique
+  google_sync_enabled                                                                    Boolean?                                 @default(false)
+  google_last_sync                                                                       DateTime?                                @db.Timestamp(6)
+  google_product_count                                                                   Int?                                     @default(0)
+  directory_visible                                                                      Boolean?                                 @default(true)
+  subdomain                                                                              String?                                  @unique
+  platform_fee_percentage                                                                Decimal?                                 @default(0.00) @db.Decimal(5, 2)
+  platform_fee_fixed_cents                                                               Int?                                     @default(0)
+  platform_fee_waived                                                                    Boolean?                                 @default(false)
   platform_fee_waived_reason                                                             String?
-  platform_fee_waived_until                                                              DateTime?                            @db.Timestamp(6)
-  featured_access_approved                                                               Boolean?                             @default(false)
+  platform_fee_waived_until                                                              DateTime?                                @db.Timestamp(6)
+  featured_access_approved                                                               Boolean?                                 @default(false)
   featured_access_approved_by                                                            String?
-  featured_access_approved_at                                                            DateTime?                            @db.Timestamp(6)
+  featured_access_approved_at                                                            DateTime?                                @db.Timestamp(6)
   featured_access_rejection_reason                                                       String?
-  updated_at                                                                             DateTime?                            @default(now()) @db.Timestamp(6)
-  tier_updated_at                                                                        DateTime?                            @default(now()) @db.Timestamp(6)
-  billing_cycle_start                                                                    DateTime?                            @db.Timestamptz(6)
-  billing_cycle_end                                                                      DateTime?                            @db.Timestamptz(6)
+  updated_at                                                                             DateTime?                                @default(now()) @db.Timestamp(6)
+  tier_updated_at                                                                        DateTime?                                @default(now()) @db.Timestamp(6)
+  billing_cycle_start                                                                    DateTime?                                @db.Timestamptz(6)
+  billing_cycle_end                                                                      DateTime?                                @db.Timestamptz(6)
   billing_payment_method_id                                                              String?
-  trial_selected_tier                                                                    String?                              @db.VarChar(50)
-  grace_ends_at                                                                          DateTime?                            @db.Timestamptz(6)
-  trial_payment_retry_count                                                              Int?                                 @default(0)
-  trial_payment_failed_at                                                                DateTime?                            @db.Timestamptz(6)
-  manual_subscription_control                                                            Boolean?                             @default(false)
-  manual_subscription_expires_at                                                         DateTime?                            @db.Timestamptz(6)
+  trial_selected_tier                                                                    String?                                  @db.VarChar(50)
+  grace_ends_at                                                                          DateTime?                                @db.Timestamptz(6)
+  trial_payment_retry_count                                                              Int?                                     @default(0)
+  trial_payment_failed_at                                                                DateTime?                                @db.Timestamptz(6)
+  manual_subscription_control                                                            Boolean?                                 @default(false)
+  manual_subscription_expires_at                                                         DateTime?                                @db.Timestamptz(6)
   manual_subscription_reason                                                             String?
-  effective_expires_at                                                                   DateTime?                            @db.Timestamp(6)
-  effective_expires_type                                                                 String?                              @default("automatic") @db.VarChar(20)
-  effective_expires_source                                                               String?                              @default("automatic_trial") @db.VarChar(50)
-  gbp_primary_category_id                                                                String?                              @db.VarChar(255)
-  gbp_primary_category_name                                                              String?                              @db.VarChar(255)
-  gbp_secondary_categories                                                               Json?                                @default("[]")
-  gbp_categories_sync_status                                                             String?                              @default("pending") @db.VarChar(50)
-  gbp_categories_last_synced_at                                                          DateTime?                            @db.Timestamptz(6)
+  effective_expires_at                                                                   DateTime?                                @db.Timestamp(6)
+  effective_expires_type                                                                 String?                                  @default("automatic") @db.VarChar(20)
+  effective_expires_source                                                               String?                                  @default("automatic_trial") @db.VarChar(50)
+  gbp_primary_category_id                                                                String?                                  @db.VarChar(255)
+  gbp_primary_category_name                                                              String?                                  @db.VarChar(255)
+  gbp_secondary_categories                                                               Json?                                    @default("[]")
+  gbp_categories_sync_status                                                             String?                                  @default("pending") @db.VarChar(50)
+  gbp_categories_last_synced_at                                                          DateTime?                                @db.Timestamptz(6)
   bot_configurations                                                                     bot_configurations?
   bot_conversations                                                                      bot_conversations[]
   bot_faq_embeddings                                                                     bot_faq_embeddings[]
@@ -4262,17 +4284,17 @@ model tenants {
   gbp_sync_tracking                                                                      gbp_sync_tracking[]
   google_oauth_accounts_list                                                             google_oauth_accounts_list[]
   inventory_items                                                                        inventory_items[]
-  inventory_sync_events_inventory_sync_events_location_idTotenants                       inventory_sync_events[]              @relation("inventory_sync_events_location_idTotenants")
-  inventory_sync_events_inventory_sync_events_tenant_idTotenants                         inventory_sync_events[]              @relation("inventory_sync_events_tenant_idTotenants")
+  inventory_sync_events_inventory_sync_events_location_idTotenants                       inventory_sync_events[]                  @relation("inventory_sync_events_location_idTotenants")
+  inventory_sync_events_inventory_sync_events_tenant_idTotenants                         inventory_sync_events[]                  @relation("inventory_sync_events_tenant_idTotenants")
   inventory_transfer_logs                                                                inventory_transfer_logs[]
-  inventory_transfers_inventory_transfers_source_location_idTotenants                    inventory_transfers[]                @relation("inventory_transfers_source_location_idTotenants")
-  inventory_transfers_inventory_transfers_target_location_idTotenants                    inventory_transfers[]                @relation("inventory_transfers_target_location_idTotenants")
-  inventory_transfers_inventory_transfers_tenant_idTotenants                             inventory_transfers[]                @relation("inventory_transfers_tenant_idTotenants")
+  inventory_transfers_inventory_transfers_source_location_idTotenants                    inventory_transfers[]                    @relation("inventory_transfers_source_location_idTotenants")
+  inventory_transfers_inventory_transfers_target_location_idTotenants                    inventory_transfers[]                    @relation("inventory_transfers_target_location_idTotenants")
+  inventory_transfers_inventory_transfers_tenant_idTotenants                             inventory_transfers[]                    @relation("inventory_transfers_tenant_idTotenants")
   invitations                                                                            invitations[]
-  location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]           @relation("location_inventory_pools_location_idTotenants")
-  location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]           @relation("location_inventory_pools_tenant_idTotenants")
+  location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]               @relation("location_inventory_pools_location_idTotenants")
+  location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]               @relation("location_inventory_pools_tenant_idTotenants")
   location_status_logs                                                                   location_status_logs[]
-  merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]          @relation("merchant_billing_gateways_tenant_idTotenants")
+  merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]              @relation("merchant_billing_gateways_tenant_idTotenants")
   merchant_paypal_connections                                                            merchant_paypal_connections?
   merchant_stripe_connections                                                            merchant_stripe_connections?
   meta_oauth_accounts_list                                                               meta_oauth_accounts_list[]
@@ -4310,13 +4332,14 @@ model tenants {
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
+  tenant_social_commerce_options_settings                                                tenant_social_commerce_options_settings?
   tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_type_settings                                                        tenant_storefront_type_settings?
-  merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?           @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users                                                                                  users?                               @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  organizations_list                                                                     organizations_list?                  @relation(fields: [organization_id], references: [id])
+  merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?               @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                                                                                  users?                                   @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations_list                                                                     organizations_list?                      @relation(fields: [organization_id], references: [id])
   user_tenants                                                                           user_tenants[]
 
   @@index([featured_access_approved, subscription_tier], map: "idx_tenant_featured_approval")

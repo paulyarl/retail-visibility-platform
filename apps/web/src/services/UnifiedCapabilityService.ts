@@ -31,6 +31,10 @@ import {
   CrmOptionsState,
   PublicCrmOptionsFlags,
   toPublicCrmOptionsFlags,
+  SocialCommerceOptionsState,
+  SocialCommerceMetaType,
+  SocialCommerceTikTokType,
+  SocialCommerceExperienceType,
   CommercePaymentType,
   GatewayType,
   StorefrontType,
@@ -99,6 +103,7 @@ interface BackendEffectiveCapabilities {
     crm: BackendEffectiveCrm;
     chatbot: BackendEffectiveChatbot;
     barcode_scan: BackendEffectiveBarcodeScan;
+    social_commerce_options: BackendEffectiveSocialCommerceOptions;
   };
   gates?: {
     tier_hard: Record<string, { capability_enabled: boolean; is_highlighted: boolean; features: Record<string, boolean> }>;
@@ -375,6 +380,28 @@ interface BackendEffectiveChatbot {
   allowed_widget_types: ChatbotWidgetType[];
   is_flexible: boolean;
   chatbot_available: boolean;
+}
+
+interface BackendEffectiveSocialCommerceOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  meta_enabled: boolean;
+  allowed_meta_types: SocialCommerceMetaType[];
+  tiktok_enabled: boolean;
+  allowed_tiktok_types: SocialCommerceTikTokType[];
+  experience_enabled: boolean;
+  allowed_experience_types: SocialCommerceExperienceType[];
+  can_use_meta_catalog: boolean;
+  can_use_meta_shop: boolean;
+  can_use_meta_pixel: boolean;
+  can_use_tiktok_catalog: boolean;
+  can_use_tiktok_shop: boolean;
+  can_use_tiktok_pixel: boolean;
+  can_use_share_buttons: boolean;
+  can_use_social_proof: boolean;
+  can_use_abandoned_cart: boolean;
+  social_commerce_available: boolean;
+  merchant_preferences: Record<string, boolean>;
 }
 
 function mapCommerce(b: BackendEffectiveCommerce): CommerceState {
@@ -705,6 +732,31 @@ function mapChatbot(b: BackendEffectiveChatbot): ChatbotOptionsState {
   };
 }
 
+function mapSocialCommerceOptions(b: BackendEffectiveSocialCommerceOptions): SocialCommerceOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    metaEnabled: b.meta_enabled,
+    allowedMetaTypes: b.allowed_meta_types,
+    tiktokEnabled: b.tiktok_enabled,
+    allowedTikTokTypes: b.allowed_tiktok_types,
+    experienceEnabled: b.experience_enabled,
+    allowedExperienceTypes: b.allowed_experience_types,
+    canUseMetaCatalog: b.can_use_meta_catalog,
+    canUseMetaShop: b.can_use_meta_shop,
+    canUseMetaPixel: b.can_use_meta_pixel,
+    canUseTikTokCatalog: b.can_use_tiktok_catalog,
+    canUseTikTokShop: b.can_use_tiktok_shop,
+    canUseTikTokPixel: b.can_use_tiktok_pixel,
+    canUseShareButtons: b.can_use_share_buttons,
+    canUseSocialProof: b.can_use_social_proof,
+    canUseAbandonedCart: b.can_use_abandoned_cart,
+    socialCommerceAvailable: b.social_commerce_available,
+    merchantPreferences: b.merchant_preferences,
+    features: {},
+  };
+}
+
 function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
@@ -737,6 +789,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
     chatbotOptions: mapChatbot(b.effective.chatbot),
+    socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
     uncategorizedFeatures: b.uncategorized_features,
   };
 }
@@ -924,6 +977,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     return all.chatbotOptions;
   }
 
+  async getSocialCommerceOptionsState(tenantId: string): Promise<SocialCommerceOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.socialCommerceOptions;
+  }
+
   async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
@@ -953,6 +1011,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   faq_: 'faqOptions',
   crm_: 'crmOptions',
   chatbot_: 'chatbotOptions',
+  social_commerce_: 'socialCommerceOptions',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

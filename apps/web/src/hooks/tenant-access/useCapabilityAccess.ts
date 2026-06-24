@@ -32,6 +32,7 @@ import {
   FaqOptionsState,
   CrmOptionsState,
   ChatbotOptionsState,
+  SocialCommerceOptionsState,
   AllCapabilitiesState,
   resolveCommerceState,
   resolvePaymentGatewayState,
@@ -476,6 +477,38 @@ export function useChatbotOptionsCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch chatbot options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useSocialCommerceOptionsCapability
+// ====================
+
+export function useSocialCommerceOptionsCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<SocialCommerceOptionsState> {
+  const [data, setData] = useState<SocialCommerceOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getSocialCommerceOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch social commerce options capability');
     } finally {
       setLoading(false);
     }

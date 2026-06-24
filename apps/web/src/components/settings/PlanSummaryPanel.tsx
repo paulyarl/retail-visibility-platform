@@ -97,8 +97,9 @@ const COMMERCE_DETAIL_LABELS: Record<string, string> = {
 const STOREFRONT_TYPE_LABELS: Record<string, string> = {
   online: 'Online',
   retail: 'Retail',
-  both: 'Both',
+  flexible: 'Flexible',
   service: 'Service',
+  social: 'Social',
   none: '',
 };
 
@@ -106,8 +107,9 @@ const STOREFRONT_TYPE_LABELS: Record<string, string> = {
 const STOREFRONT_GROUP_FEATURES: Record<string, string[]> = {
   online: ['Online'],
   retail: ['Retail'],
-  both: ['Online', 'Retail'],
+  flexible: ['Online', 'Retail', 'Service', 'Social'],
   service: ['Service'],
+  social: ['Social'],
 };
 
 const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
@@ -357,7 +359,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       if (label) {
         specifics.push(label);
         const eff = sf.effectiveType;
-        const isEnabled = eff === t || eff === 'both' || (eff !== 'none' && tierTypes.includes(eff as any) && t === eff);
+        const isEnabled = eff === t || eff === 'flexible' || (eff !== 'none' && tierTypes.includes(eff as any) && t === eff);
         statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
       }
     });

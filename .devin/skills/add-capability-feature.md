@@ -141,6 +141,7 @@ After adding to `features_list`, the feature is **not automatically available to
    - If merchant-configurable, read the new column from `merchantBundle.{domain}` and apply it to compute `effective_*` values.
    - **Choice-based config (layouts, types, modes):** compute an `effective_*` single value from `allowed_*` ∩ `merchant_prefs.*` with fallback. Do not expose raw merchant preference as the resolved value.
    - **Non-boolean config (fees, timings, limits):** selectively add the needed scalar fields to the resolver output. Do not dump the entire raw merchant settings blob.
+   - **Adding a new enum value to an existing type union** (e.g. adding `'social'` to `StorefrontTypeValue`): also update the Zod validation schema in the route file at `apps/api/src/routes/{domain}-settings.ts`. The `z.enum([...])` must include every value in the type union — TypeScript will not catch a mismatch because Zod enums are runtime constructs. A missing value will cause the PUT endpoint to 400-reject the new value before it reaches the tier gate.
 
 5. **Wire into the orchestrator** in `apps/api/src/services/EffectiveCapabilityResolver.ts`:
    - Ensure `fetchMerchantSettings()` fetches the correct settings table (already covered if you used an existing table).
@@ -242,5 +243,6 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the backend resolver** — the feature may be enabled in the DB but still unavailable to the frontend if the domain resolver in `apps/api/src/services/resolvers/` doesn't map the key into `allowed_*` / `effective_*`.
 - **Do not forget cache invalidation** — after adding a merchant gate column and its settings PUT handler, ensure the handler calls `invalidateEffectiveCapabilities(tenantId)` or the unified endpoint will serve stale data for up to 60 seconds.
 - **Do not duplicate resolution logic in the frontend** — `CapabilityResolutionService.ts` is obsolete. All resolution belongs in the backend resolver. The frontend `UnifiedCapabilityService` only maps.
+- **Do not forget the Zod validation schema** — when adding a new enum value to a capability's type union (e.g. `'social'` in `StorefrontTypeValue`), the `z.enum([...])` in the route file must be updated to include it. TypeScript will not catch this because Zod enums are runtime constructs. A missing value causes the PUT endpoint to 400-reject the new value before it reaches the tier gate, even though the resolver, service, and frontend all accept it.
 - **Do not forget the PlanSummaryPanel** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear in the tenant's plan summary card, even though it works functionally.
 - **Do not forget the CapabilityShowcase** — a capability missing from the `rows` array in `CapabilityShowcase.tsx` will not appear in the "Your Capabilities" card on the tenant dashboard, even though it works functionally.

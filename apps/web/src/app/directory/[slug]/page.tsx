@@ -404,9 +404,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   // Storefront capability-driven content control
   const storefrontCap = useStorefrontCapability(consolidatedData?.listing?.tenantId || null);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
-  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'both';
-  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'both';
-  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'both';
+  const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
+  const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
+  const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'flexible';
   // showsHours/showsMap/showsLocation now come from storefront_options (merchant-controlled)
   // storefront_type (platform-controlled) still determines isRetailStore/isOnlineStore/isServiceStore
 

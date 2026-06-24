@@ -11,7 +11,7 @@ const router = Router();
 // Validation schema
 const storefrontTypeSettingsSchema = z.object({
   storefront_type_enabled: z.boolean().optional(),
-  selected_storefront_type: z.enum(['online', 'retail', 'service', 'social', 'both']).nullable().optional(),
+  selected_storefront_type: z.enum(['online', 'retail', 'service', 'social']).nullable().optional(),
 });
 
 // Default settings (selected_storefront_type is null so frontend derives from tier type)
@@ -58,7 +58,12 @@ router.get('/:tenantId/storefront-type', authenticateToken, async (req, res) => 
     // Validate selected_storefront_type against tier allowed types
     if (selectedStorefrontType && !tierState.allowedTypes.includes(selectedStorefrontType as StorefrontType)) {
       // Merchant selected a type not allowed by tier — fall back to tier type
-      selectedStorefrontType = tierState.type === 'both' ? null : (tierState.type !== 'none' ? tierState.type : null);
+      selectedStorefrontType = tierState.type === 'flexible' ? null : (tierState.type !== 'none' ? tierState.type : null);
+    }
+
+    // Treat legacy 'both' value as null (no specific selection)
+    if (selectedStorefrontType === 'both') {
+      selectedStorefrontType = null;
     }
 
     res.json({
@@ -232,7 +237,12 @@ router.get('/public/tenant/:tenantId/storefront-type', async (req, res) => {
 
     // Validate selected_storefront_type against tier allowed types
     if (selectedStorefrontType && !tierState.allowedTypes.includes(selectedStorefrontType as StorefrontType)) {
-      selectedStorefrontType = tierState.type === 'both' ? null : (tierState.type !== 'none' ? tierState.type : null);
+      selectedStorefrontType = tierState.type === 'flexible' ? null : (tierState.type !== 'none' ? tierState.type : null);
+    }
+
+    // Treat legacy 'both' value as null (no specific selection)
+    if (selectedStorefrontType === 'both') {
+      selectedStorefrontType = null;
     }
 
     res.json({
