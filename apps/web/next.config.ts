@@ -4,8 +4,8 @@ import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
 
-const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT);
-const isPwaEnabled = process.env.NODE_ENV !== "development" && process.env.VERCEL_ENV !== "production";
+const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) && process.env.SENTRY_DISABLE_BUILD_PLUGIN !== 'true';
+const isPwaEnabled = process.env.ENABLE_PWA === 'true';
 
 const withPWA = isPwaEnabled ? withPWAInit({
   dest: "public",
@@ -82,6 +82,15 @@ const nextConfig: NextConfig = {
 
   trailingSlash: false,
   poweredByHeader: false,
+
+  // Skip type checking and linting during builds to reduce memory usage.
+  // Run `tsc --noEmit` and `eslint` separately in CI for quality gates.
+  typescript: {
+    ignoreBuildErrors: process.env.NEXT_SKIP_TYPE_CHECK === 'true',
+  },
+  eslint: {
+    ignoreDuringBuilds: process.env.NEXT_SKIP_LINT === 'true',
+  },
 
   // Disable 404 page generation to avoid prerendering issues
   generateEtags: false,
