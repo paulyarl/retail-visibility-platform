@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { CustomerSidebar } from '@/components/customer/CustomerSidebar';
+import CrmCustomerAlertToastWatcher from '@/components/crm/CrmCustomerAlertToastWatcher';
 import { Loader2 } from 'lucide-react';
 
 export default function AccountLayout({
@@ -34,6 +35,7 @@ export default function AccountLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      <CrmCustomerAlertToastWatcher />
       <CustomerSidebar />
       <main className="flex-1 p-8">
         {children}

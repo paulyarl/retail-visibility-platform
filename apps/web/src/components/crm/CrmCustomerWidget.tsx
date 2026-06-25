@@ -39,19 +39,26 @@ export default function CrmCustomerWidget() {
   const [alerts, setAlerts] = useState<CrmAlert[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [readStates, setReadStates] = useState<Record<string, string>>({});
   const isFirstLoadRef = useRef(true);
   const prevAlertIdsRef = useRef<Set<string>>(new Set());
   const prevUnreadRef = useRef<number>(0);
 
   const loadData = useCallback(async () => {
     try {
-      const [t, i, a] = await Promise.allSettled([
+      const [t, i, a, rs] = await Promise.allSettled([
         crmCustomerService.listTickets({ status: 'open' }),
         crmCustomerService.listInquiries({ status: 'open' }),
         crmCustomerService.listAlerts(),
+        crmCustomerService.getReadState(),
       ]);
       if (t.status === 'fulfilled') setTickets(t.value.slice(0, 3));
       if (i.status === 'fulfilled') setInquiries(i.value.slice(0, 3));
+      if (rs.status === 'fulfilled') {
+        const map: Record<string, string> = {};
+        for (const s of rs.value) map[s.scope] = s.last_read_at;
+        setReadStates(map);
+      }
 
       let newAlerts: CrmAlert[] = [];
       let newUnreadAlertCount = 0;
@@ -105,7 +112,16 @@ export default function CrmCustomerWidget() {
     );
   }
 
-  const totalOpen = tickets.length + inquiries.length + unreadAlertCount;
+  const lastReadTickets = readStates['ticket_feed'];
+  const lastReadInquiries = readStates['inquiry_feed'];
+  const unreadTicketCount = tickets.filter(
+    (t) => !lastReadTickets || new Date(t.created_at).getTime() > new Date(lastReadTickets).getTime()
+  ).length;
+  const unreadInquiryCount = inquiries.filter(
+    (i) => !lastReadInquiries || new Date(i.created_at).getTime() > new Date(lastReadInquiries).getTime()
+  ).length;
+
+  const totalOpen = unreadTicketCount + unreadInquiryCount + unreadAlertCount;
 
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -187,9 +203,19 @@ export default function CrmCustomerWidget() {
       {/* Open Tickets */}
       {tickets.length > 0 && (
         <Stack gap="xs" mb="sm">
-          <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-            Open Tickets
-          </Text>
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+              Open Tickets
+            </Text>
+            {unreadTicketCount > 0 && (
+              <button
+                onClick={async () => { await crmCustomerService.setReadState('ticket_feed'); loadData(); }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Mark read
+              </button>
+            )}
+          </Group>
           {tickets.map((t) => (
             <NavLink
               key={t.id}
@@ -222,9 +248,19 @@ export default function CrmCustomerWidget() {
       {/* Open Inquiries */}
       {inquiries.length > 0 && (
         <Stack gap="xs" mb="sm">
-          <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-            Open Inquiries
-          </Text>
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+              Open Inquiries
+            </Text>
+            {unreadInquiryCount > 0 && (
+              <button
+                onClick={async () => { await crmCustomerService.setReadState('inquiry_feed'); loadData(); }}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+              >
+                Mark read
+              </button>
+            )}
+          </Group>
           {inquiries.map((i) => (
             <NavLink
               key={i.id}

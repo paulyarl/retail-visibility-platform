@@ -253,6 +253,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
   chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot' },
+  social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -528,12 +529,14 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   }
 
   // FAQ Options
+  // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
+  // So all tier-allowed features show as 'enabled' when the capability is enabled.
   const faq = caps.faqOptions;
   if (faq.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
-    const addFaq = (label: string, enabled: boolean) => {
-      if (enabled) { specifics.push(label); statuses.push({ label, status: 'enabled' }); }
+    const addFaq = (label: string, tierAllowed: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: 'enabled' }); }
     };
     addFaq('Storefront FAQs', faq.storefrontEnabled);
     addFaq('Product FAQs', faq.productEnabled);
@@ -644,13 +647,13 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     const addDe = (label: string, tierAllowed: boolean, effective: boolean) => {
       if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
     };
-    addDe('Hours', de.hoursEnabled, de.hoursEnabled);
-    addDe('Map', de.mapEnabled, de.mapEnabled);
-    addDe('Contact', de.contactEnabled, de.contactEnabled);
-    addDe('Gallery', de.galleryEnabled, de.galleryEnabled);
-    addDe('QR', de.qrEnabled, de.qrEnabled);
-    addDe('Social', de.socialEnabled, de.socialEnabled);
-    addDe('SEO', de.seoEnabled, de.seoEnabled);
+    addDe('Hours', de.canShowHours, de.hoursEnabled);
+    addDe('Map', de.canShowMap, de.mapEnabled);
+    addDe('Contact', de.canShowContact, de.contactEnabled);
+    addDe('Gallery', de.canShowGallery, de.galleryEnabled);
+    addDe('QR', de.canShowQr, de.qrEnabled);
+    addDe('Social', de.canShowSocial, de.socialEnabled);
+    addDe('SEO', de.canShowSeo, de.seoEnabled);
     summaries.push({
       key: 'directory_entry',
       label: CAPABILITY_DISPLAY.directory_entry.label,
@@ -665,33 +668,35 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   }
 
   // CRM Options
+  // CRM only has a master toggle merchant pref (crm_enabled), no per-feature merchant prefs.
+  // So all tier-allowed features show as 'enabled' when the capability is enabled.
   const crm = caps.crmOptions;
   if (crm.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
     if (crm.allowedInquiryTypes.length > 0) {
       specifics.push('Inquiries');
-      statuses.push({ label: 'Inquiries', status: (crm.inquiryProductEnabled || crm.inquiryStorefrontEnabled || crm.inquiryDirectoryEnabled) ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Inquiries', status: 'enabled' });
     }
     if (crm.allowedContactTypes.length > 0) {
       specifics.push('Contacts');
-      statuses.push({ label: 'Contacts', status: crm.contactsEnabled ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Contacts', status: 'enabled' });
     }
     if (crm.allowedTicketTypes.length > 0) {
       specifics.push('Tickets');
-      statuses.push({ label: 'Tickets', status: crm.ticketFeaturesEnabled ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Tickets', status: 'enabled' });
     }
     if (crm.allowedMessageTypes.length > 0) {
       specifics.push('Messages');
-      statuses.push({ label: 'Messages', status: crm.messageFeaturesEnabled ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Messages', status: 'enabled' });
     }
     if (crm.allowedCustomerTicketTypes.length > 0) {
       specifics.push('Customer Portal');
-      statuses.push({ label: 'Customer Portal', status: crm.customerTicketsEnabled ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Customer Portal', status: 'enabled' });
     }
     if (crm.allowedDashboardTypes.length > 0) {
       specifics.push('Dashboard');
-      statuses.push({ label: 'Dashboard', status: crm.dashboardEnabled ? 'enabled' : 'merchant-gated' });
+      statuses.push({ label: 'Dashboard', status: 'enabled' });
     }
     summaries.push({
       key: 'crm_options',
@@ -711,25 +716,21 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   if (bot.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
-    if (bot.staticEnabled) {
-      specifics.push('Static FAQ');
-      statuses.push({ label: 'Static FAQ', status: 'enabled' });
+    const addBot = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    if (bot.allowedResponseEngines.length > 0) {
+      addBot('Static FAQ', bot.allowedResponseEngines.includes('chatbot_static_lookup'), bot.staticEnabled);
+      addBot('Dynamic AI', bot.allowedResponseEngines.includes('chatbot_shared_dynamic'), bot.dynamicEnabled);
     }
-    if (bot.dynamicEnabled) {
-      specifics.push('Dynamic AI');
-      statuses.push({ label: 'Dynamic AI', status: 'enabled' });
+    if (bot.allowedSkillTypes.length > 0) {
+      addBot('Skills', true, bot.skillsEnabled);
     }
-    if (bot.skillsEnabled) {
-      specifics.push('Skills');
-      statuses.push({ label: 'Skills', status: 'enabled' });
+    if (bot.allowedKbTypes.length > 0) {
+      addBot('Knowledge Base', true, bot.kbEnabled);
     }
-    if (bot.kbEnabled) {
-      specifics.push('Knowledge Base');
-      statuses.push({ label: 'Knowledge Base', status: 'enabled' });
-    }
-    if (bot.widgetEnabled) {
-      specifics.push('Widget');
-      statuses.push({ label: 'Widget', status: 'enabled' });
+    if (bot.allowedWidgetTypes.length > 0) {
+      addBot('Widget', true, bot.widgetEnabled);
     }
     summaries.push({
       key: 'chatbot_options',
@@ -741,6 +742,46 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'chatbot_options',
       settingsPath: CAPABILITY_DISPLAY.chatbot_options.settingsPath ?? null,
+    });
+  }
+
+  // Social Commerce Options
+  const sc = caps.socialCommerceOptions;
+  if (sc && sc.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (sc.allowedMetaTypes.length > 0) {
+      specifics.push('Meta Commerce');
+      statuses.push({ label: 'Meta Commerce', status: sc.canUseMetaCatalog || sc.canUseMetaShop || sc.canUseMetaPixel ? 'enabled' : 'merchant-gated' });
+    }
+    if (sc.allowedTikTokTypes.length > 0) {
+      specifics.push('TikTok Commerce');
+      statuses.push({ label: 'TikTok Commerce', status: sc.canUseTikTokCatalog || sc.canUseTikTokShop || sc.canUseTikTokPixel ? 'enabled' : 'merchant-gated' });
+    }
+    if (sc.allowedExperienceTypes.length > 0) {
+      if (sc.allowedExperienceTypes.includes('social_commerce_share_buttons')) {
+        specifics.push('Share Buttons');
+        statuses.push({ label: 'Share Buttons', status: sc.canUseShareButtons ? 'enabled' : 'merchant-gated' });
+      }
+      if (sc.allowedExperienceTypes.includes('social_commerce_social_proof')) {
+        specifics.push('Social Proof');
+        statuses.push({ label: 'Social Proof', status: sc.canUseSocialProof ? 'enabled' : 'merchant-gated' });
+      }
+      if (sc.allowedExperienceTypes.includes('social_commerce_abandoned_cart')) {
+        specifics.push('Abandoned Cart');
+        statuses.push({ label: 'Abandoned Cart', status: sc.canUseAbandonedCart ? 'enabled' : 'merchant-gated' });
+      }
+    }
+    summaries.push({
+      key: 'social_commerce_options',
+      label: CAPABILITY_DISPLAY.social_commerce_options.label,
+      icon: CAPABILITY_DISPLAY.social_commerce_options.icon,
+      enabled: sc.enabled,
+      merchantGated: merchantGates?.['social_commerce_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'social_commerce_options',
+      settingsPath: CAPABILITY_DISPLAY.social_commerce_options.settingsPath ?? null,
     });
   }
 

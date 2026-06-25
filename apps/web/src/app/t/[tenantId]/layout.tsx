@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import SetTenantId from "@/components/client/SetTenantId";
 import DynamicTenantSidebar from "@/components/navigation/DynamicTenantSidebar";
+import CrmAlertToastWatcher from '@/components/crm/CrmAlertToastWatcher';
 import TenantContextProvider from '@/components/tenant/TenantContextProvider';
 import { getTenantContext } from '@/lib/tenantContext';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
@@ -71,6 +72,7 @@ export default async function TenantPageLayout({ children, params }: { children:
       {/* Persist last visited tenant route for restore-after-login UX */}
       <RememberTenantRoute tenantId={tenantId} />
       <TenantContextProvider value={{ tenantId: tenantId ?? tenantCtx.tenantId, tenantSlug: tenantSlug ?? tenantCtx.tenantSlug, aud: tenantCtx.aud, hasPublishedDirectory: hasPublishedDirectory }}>
+        <CrmAlertToastWatcher tenantId={tenantId} />
         <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug} hasPublishedDirectory={hasPublishedDirectory}>
           {children}
         </DynamicTenantSidebar>

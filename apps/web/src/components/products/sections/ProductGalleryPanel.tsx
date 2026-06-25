@@ -4,6 +4,7 @@ import React from 'react';
 import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
 import { SafeImage } from '@/components/SafeImage';
+import { ShoppableEmbeds } from '../type-sections/ShoppableEmbeds';
 
 type LayoutVariant = 'classic' | 'showcase' | 'quick-commerce';
 
@@ -13,6 +14,7 @@ interface ProductGalleryPanelProps {
   videoPlayer?: React.ReactNode;
   onGalleryClick: (index: number) => void;
   layoutVariant?: LayoutVariant;
+  storefrontType?: string;
 }
 
 export function ProductGalleryPanel({
@@ -21,6 +23,7 @@ export function ProductGalleryPanel({
   videoPlayer,
   onGalleryClick,
   layoutVariant = 'showcase',
+  storefrontType,
 }: ProductGalleryPanelProps) {
   const isQuickCommerce = layoutVariant === 'quick-commerce';
   const roundedClass = isQuickCommerce ? 'rounded-xl' : 'rounded-xl';
@@ -88,6 +91,18 @@ export function ProductGalleryPanel({
       </div>
 
       {videoPlayer && <div className={videoClass}>{videoPlayer}</div>}
+
+      {storefrontType === 'social' && (
+        <ShoppableEmbeds
+          product={product}
+          layoutVariant={layoutVariant}
+          storefrontType={storefrontType}
+          socialPlatformFlags={{
+            tiktok: true,
+            instagram: true,
+          }}
+        />
+      )}
     </div>
   );
 }

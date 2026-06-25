@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { SocialProofBadges } from '../type-sections/SocialProofBadges';
 
 interface ProductHeaderSectionProps {
   product: any;
@@ -11,6 +12,8 @@ interface ProductHeaderSectionProps {
   currentUrl: string;
   optFlags?: StorefrontOptionFlags | null;
   layoutVariant?: 'classic' | 'showcase' | 'quick-commerce';
+  storefrontType?: string;
+  socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
 }
 
 export function ProductHeaderSection({
@@ -20,7 +23,11 @@ export function ProductHeaderSection({
   currentUrl,
   optFlags,
   layoutVariant = 'classic',
+  storefrontType,
+  socialCommerceFlags,
 }: ProductHeaderSectionProps) {
+  const isSocialStorefront = storefrontType === 'social';
+  const showSocialProof = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseSocialProof) || isSocialStorefront;
   return (
     <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,6 +61,13 @@ export function ProductHeaderSection({
                 <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
                   {tenantProfile?.profileData?.businessName || tenantProfile?.profileData?.business_name || businessName || 'Store'}
                 </h1>
+                {showSocialProof && (
+                  <SocialProofBadges
+                    product={product}
+                    layoutVariant={layoutVariant}
+                    showSocialProof={showSocialProof}
+                  />
+                )}
               </div>
               {product.category && (
                 <a

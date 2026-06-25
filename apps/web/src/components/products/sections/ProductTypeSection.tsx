@@ -6,6 +6,9 @@ import { ConditionInfo } from '../type-sections/ConditionInfo';
 import { DigitalDownloadInfo } from '../type-sections/DigitalDownloadInfo';
 import { LicenseInfo } from '../type-sections/LicenseInfo';
 import { AccessDurationInfo } from '../type-sections/AccessDurationInfo';
+import { ServiceBookingCTA } from '../type-sections/ServiceBookingCTA';
+import { ServiceDurationInfo } from '../type-sections/ServiceDurationInfo';
+import { ServiceAreaInfo } from '../type-sections/ServiceAreaInfo';
 
 type ProductType = 'physical' | 'digital' | 'service' | 'hybrid';
 type LayoutVariant = 'classic' | 'showcase' | 'quick-commerce';
@@ -71,8 +74,17 @@ export function ProductTypeSection({
       );
 
     case 'service':
-      // Service sub-components will be added in Phase 1
-      return null;
+      return (
+        <div className="space-y-3">
+          <ServiceBookingCTA
+            product={product}
+            layoutVariant={layoutVariant}
+            storefrontType={storefrontType}
+          />
+          <ServiceDurationInfo product={product} layoutVariant={layoutVariant} />
+          <ServiceAreaInfo product={product} layoutVariant={layoutVariant} />
+        </div>
+      );
 
     default:
       return null;

@@ -83,13 +83,10 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   poweredByHeader: false,
 
-  // Skip type checking and linting during builds to reduce memory usage.
-  // Run `tsc --noEmit` and `eslint` separately in CI for quality gates.
+  // Skip type checking during builds to reduce memory usage.
+  // Run `tsc --noEmit` separately in CI for quality gates.
   typescript: {
     ignoreBuildErrors: process.env.NEXT_SKIP_TYPE_CHECK === 'true',
-  },
-  eslint: {
-    ignoreDuringBuilds: process.env.NEXT_SKIP_LINT === 'true',
   },
 
   // Disable 404 page generation to avoid prerendering issues

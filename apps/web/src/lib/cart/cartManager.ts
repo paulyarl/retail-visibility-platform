@@ -3,6 +3,43 @@
  * Handles cart management per tenant (gateway selection at checkout)
  */
 
+let trackCartTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function trackCartWithServer(tenantId: string, cart: Cart): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (cart.items.length === 0) return;
+
+  try {
+    const cartId = getCartKey(tenantId);
+    const customerEmail = localStorage.getItem('customer_email') || undefined;
+    const customerName = localStorage.getItem('customer_name') || undefined;
+    const customerId = localStorage.getItem('customer_id') || undefined;
+
+    await fetch('/api/cart/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId,
+        cartId,
+        customerEmail,
+        customerName,
+        customerId,
+        items: cart.items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price_cents: item.price_cents,
+          product_image: item.product_image,
+          variant_id: item.variant_id,
+          variant_name: item.variant_name,
+        })),
+      }),
+    });
+  } catch {
+    // Silent fail — tracking is best-effort
+  }
+}
+
 export interface CartItem {
   product_id: string;
   product_name: string;
@@ -134,6 +171,12 @@ export function saveCart(cart: Cart): void {
   const key = getCartKey(cart.tenant_id);
   cart.updated_at = new Date().toISOString();
   localStorage.setItem(key, JSON.stringify(cart));
+
+  // Debounced server tracking for abandoned cart recovery
+  if (trackCartTimer) clearTimeout(trackCartTimer);
+  trackCartTimer = setTimeout(() => {
+    trackCartWithServer(cart.tenant_id, cart);
+  }, 5000);
 }
 
 /**

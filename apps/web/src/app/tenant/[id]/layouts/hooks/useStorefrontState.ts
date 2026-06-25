@@ -20,7 +20,14 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
+import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+
+export interface SocialCommerceFlags {
+  enabled?: boolean;
+  canUseShareButtons?: boolean;
+  canUseSocialProof?: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +56,8 @@ export interface UseStorefrontStateProps {
   } | null;
   initialFaqFlags?: PublicFaqOptionsFlags | null;
   initialCrmFlags?: PublicCrmOptionsFlags | null;
+  initialProductOptionFlags?: ProductOptionFlags | null;
+  initialSocialCommerceFlags?: SocialCommerceFlags | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +77,8 @@ export function useStorefrontState({
   initialStorefrontTypeSettings,
   initialFaqFlags,
   initialCrmFlags,
+  initialProductOptionFlags,
+  initialSocialCommerceFlags,
 }: UseStorefrontStateProps) {
   // ---- Navigation ----
   const router = useRouter();
@@ -209,6 +220,19 @@ export function useStorefrontState({
   const crmInquiryStorefrontEnabled =
     crmFlags?.crm_enabled && crmFlags?.crm_inquiry_storefront_enabled;
 
+  // ---- Product option flags ----
+  const [productOptionFlags] = useState<ProductOptionFlags | null>(
+    initialProductOptionFlags ?? null,
+  );
+  const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled);
+
+  // ---- Social commerce flags ----
+  const [socialCommerceFlags] = useState<SocialCommerceFlags | null>(
+    initialSocialCommerceFlags ?? null,
+  );
+  const showSocialProof =
+    !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseSocialProof) || isSocialStore;
+
   // ---- Contact info (memoized) ----
   const contactInfo = useMemo(() => {
     if (storefrontCap.loading)
@@ -333,6 +357,7 @@ export function useStorefrontState({
     isRetailStore,
     isOnlineStore,
     isServiceStore,
+    isSocialStore,
 
     // Option flags
     optFlags,
@@ -369,6 +394,14 @@ export function useStorefrontState({
     // CRM
     crmFlags,
     crmInquiryStorefrontEnabled,
+
+    // Product options
+    productOptionFlags,
+    showServices,
+
+    // Social commerce
+    socialCommerceFlags,
+    showSocialProof,
 
     // Contact
     contactInfo,

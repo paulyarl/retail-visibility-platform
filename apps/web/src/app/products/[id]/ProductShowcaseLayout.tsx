@@ -26,6 +26,8 @@ interface ProductShowcaseLayoutProps {
   disableQRCode?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
   productOptFlags?: ProductOptionFlags | null;
+  storefrontType?: string;
+  socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
 }
 
 export function ProductShowcaseLayout({
@@ -38,6 +40,8 @@ export function ProductShowcaseLayout({
   disableQRCode,
   initialOptFlags,
   productOptFlags,
+  storefrontType,
+  socialCommerceFlags,
 }: ProductShowcaseLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
 
@@ -74,6 +78,7 @@ export function ProductShowcaseLayout({
             videoPlayer={videoPlayer}
             onGalleryClick={s.handleGalleryImageClick}
             layoutVariant="showcase"
+            storefrontType={storefrontType}
           />
 
           <ProductPurchasePanel
@@ -119,6 +124,8 @@ export function ProductShowcaseLayout({
             disableQRCode={disableQRCode}
             productSlug={productSlug}
             slugType={slugType}
+            storefrontType={storefrontType}
+            socialCommerceFlags={socialCommerceFlags}
           />
         </div>
 

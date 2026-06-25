@@ -531,6 +531,7 @@ export interface EffectiveFaq {
   allowed_kb_types: FaqKnowledgeBaseType[];
   is_flexible: boolean;
   faq_available: boolean;
+  merchant_preferences: FaqOptionsMerchantSettings | null;
 }
 
 export type CrmInquiryType =
@@ -562,6 +563,7 @@ export interface EffectiveCrm {
   allowed_dashboard_types: CrmDashboardType[];
   is_flexible: boolean;
   crm_available: boolean;
+  merchant_preferences: CrmOptionsMerchantSettings | null;
 }
 
 export type ChatbotResponseEngineType =
@@ -597,6 +599,10 @@ export interface EffectiveChatbot {
   allowed_widget_types: ChatbotWidgetType[];
   is_flexible: boolean;
   chatbot_available: boolean;
+  can_use_widget_custom_theme: boolean;
+  can_use_widget_skill_cards: boolean;
+  can_use_widget_after_hours: boolean;
+  merchant_preferences: ChatbotOptionsMerchantSettings | null;
 }
 
 // ====================

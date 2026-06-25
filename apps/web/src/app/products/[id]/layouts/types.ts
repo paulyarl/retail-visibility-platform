@@ -144,6 +144,8 @@ export interface StorefrontLayoutProps {
   initialStorefrontTypeSettings?: any;
   initialFaqFlags?: PublicFaqOptionsFlags | null;
   initialCrmFlags?: PublicCrmOptionsFlags | null;
+  initialProductOptionFlags?: ProductOptionFlags | null;
+  initialSocialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
 
   // Layout hint
   layoutVariant: StorefrontLayoutKey;

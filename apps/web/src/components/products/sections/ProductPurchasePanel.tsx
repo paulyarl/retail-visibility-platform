@@ -9,7 +9,8 @@ import { FeaturedTypeBadges } from '@/components/products/FeaturedTypeBadges';
 import { getFeaturedTypeDisplay } from '@/types/product-display';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
-import { Package, Download, Globe } from 'lucide-react';
+import { Package, Download, Globe, Calendar } from 'lucide-react';
+import { SocialShareButtons } from '../type-sections/SocialShareButtons';
 
 type LayoutVariant = 'classic' | 'showcase' | 'quick-commerce';
 
@@ -60,6 +61,8 @@ interface ProductPurchasePanelProps {
   disableQRCode?: boolean;
   productSlug?: string;
   slugType?: string;
+  storefrontType?: string;
+  socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
 }
 
 export function ProductPurchasePanel({
@@ -105,8 +108,14 @@ export function ProductPurchasePanel({
   disableQRCode,
   productSlug,
   slugType,
+  storefrontType,
+  socialCommerceFlags,
 }: ProductPurchasePanelProps) {
   const isQuickCommerce = layoutVariant === 'quick-commerce';
+  const isServiceProduct = product.productType === 'service';
+  const isHybridProduct = product.productType === 'hybrid';
+  const isSocialStorefront = storefrontType === 'social';
+  const canShare = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) || isSocialStorefront;
   const spaceY = isQuickCommerce ? 'space-y-4' : 'space-y-6';
   const titleClass = isQuickCommerce
     ? 'text-2xl lg:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white'
@@ -271,14 +280,65 @@ export function ProductPurchasePanel({
               {product.productType === 'physical' && <Package size={isQuickCommerce ? 12 : 14} />}
               {product.productType === 'digital' && <Download size={isQuickCommerce ? 12 : 14} />}
               {product.productType === 'hybrid' && <Globe size={isQuickCommerce ? 12 : 14} />}
+              {product.productType === 'service' && <Calendar size={isQuickCommerce ? 12 : 14} />}
               {product.productType.charAt(0).toUpperCase() + product.productType.slice(1)}
             </span>
           </>
         )}
       </div>
 
-      {/* Quantity + Add to Cart */}
+      {/* Quantity + Add to Cart / Book Now */}
       {!showStatusPanel && (effectiveCanPurchase || commerceDisabled) && (
+        isServiceProduct ? (
+          <div
+            ref={cartButtonRef}
+            className={
+              isQuickCommerce
+                ? 'pt-2'
+                : 'p-5 bg-gradient-to-br from-primary-50 to-indigo-50 dark:from-primary-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-primary-200 dark:border-primary-800 shadow-sm'
+            }
+          >
+            {!isQuickCommerce && (
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="flex items-center justify-center h-5 text-primary-600 dark:text-primary-400" />
+                <span className="text-sm font-semibold text-primary-700 dark:text-primary-300">Book This Service</span>
+              </div>
+            )}
+            {(() => {
+              const bookingUrl = product.metadata?.bookingUrl || product.metadata?.booking_url;
+              const bookingPhone = product.metadata?.bookingPhone || product.metadata?.booking_phone;
+              if (bookingUrl) {
+                return (
+                  <a
+                    href={bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors ${isQuickCommerce ? 'text-sm' : 'text-base'}`}
+                  >
+                    <Calendar size={isQuickCommerce ? 16 : 20} />
+                    Book Now
+                  </a>
+                );
+              }
+              if (bookingPhone) {
+                return (
+                  <a
+                    href={`tel:${bookingPhone}`}
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors ${isQuickCommerce ? 'text-sm' : 'text-base'}`}
+                  >
+                    <Calendar size={isQuickCommerce ? 16 : 20} />
+                    Call to Book: {bookingPhone}
+                  </a>
+                );
+              }
+              return (
+                <p className={`text-neutral-600 dark:text-neutral-400 ${isQuickCommerce ? 'text-xs' : 'text-sm'}`}>
+                  Contact the store to schedule this service.
+                </p>
+              );
+            })()}
+          </div>
+        ) : (
         <div
           ref={cartButtonRef}
           className={
@@ -355,6 +415,15 @@ export function ProductPurchasePanel({
             layout={layout as 'horizontal' | 'stacked'}
           />
         </div>
+        )
+      )}
+
+      {/* Hybrid: Digital Download Companion Hint */}
+      {isHybridProduct && !showStatusPanel && (effectiveCanPurchase || commerceDisabled) && (
+        <div className={`flex items-center gap-2 ${isQuickCommerce ? 'text-xs' : 'text-sm'} text-neutral-600 dark:text-neutral-400`}>
+          <Download size={isQuickCommerce ? 14 : 16} className="text-indigo-500 dark:text-indigo-400" />
+          <span>Includes digital download — access link provided after checkout</span>
+        </div>
       )}
 
       {/* Fulfillment Options */}
@@ -403,6 +472,17 @@ export function ProductPurchasePanel({
           maxDistance={50}
           maxResults={isQuickCommerce ? 3 : 5}
           useSmartFallback={true}
+        />
+      )}
+
+      {/* Social Share Buttons — gated by storefrontType='social' or socialCommerceFlags */}
+      {canShare && (
+        <SocialShareButtons
+          product={product}
+          currentUrl={resolvedCurrentUrl}
+          layoutVariant={layoutVariant}
+          storefrontType={storefrontType}
+          canUseShareButtons={canShare}
         />
       )}
     </div>

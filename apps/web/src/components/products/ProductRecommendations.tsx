@@ -33,9 +33,10 @@ interface ProductRecommendationsProps {
   tenantSlug?: string;
   productCategory?: string;
   productCategorySlug?: string;
+  priority?: 'trending' | undefined;
 }
 
-export function ProductRecommendations({ productId, tenantId, tenantSlug, productCategory, productCategorySlug }: ProductRecommendationsProps) {
+export function ProductRecommendations({ productId, tenantId, tenantSlug, productCategory, productCategorySlug, priority }: ProductRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +50,17 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
         // console.log('[ProductRecommendations] API response:', data);
         
         if (data && isMounted) {
-          setRecommendations(data.recommendations || []);
+          let recs = data.recommendations || [];
+          if (priority === 'trending') {
+            recs = [...recs].sort((a, b) => {
+              const aTrending = (a.featuredTypes || []).includes('trending') || a.featuredType === 'trending';
+              const bTrending = (b.featuredTypes || []).includes('trending') || b.featuredType === 'trending';
+              if (aTrending && !bTrending) return -1;
+              if (!aTrending && bTrending) return 1;
+              return b.relevanceScore - a.relevanceScore;
+            });
+          }
+          setRecommendations(recs);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
@@ -78,7 +89,7 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
   return (
     <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
       <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-6">
-        You Might Also Like
+        {priority === 'trending' ? 'Trending Now' : 'You Might Also Like'}
       </h2>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

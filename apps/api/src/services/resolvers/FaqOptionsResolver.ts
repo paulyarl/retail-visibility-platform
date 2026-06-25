@@ -1,11 +1,10 @@
 /**
  * FAQ Options Resolver
  *
- * Resolves effective FAQ options state from tier features.
- * (No merchant preferences yet for FAQ)
+ * Resolves effective FAQ options state from tier features and merchant preferences.
  */
 
-import type { EffectiveFaq } from './types';
+import type { EffectiveFaq, FaqOptionsMerchantSettings } from './types';
 
 export type FaqManagementType =
   | 'faq_management_hub' | 'faq_management_templates' | 'faq_management_import'
@@ -24,8 +23,11 @@ export type FaqKnowledgeBaseType =
   | 'faq_kb_static_lookup' | 'faq_kb_rag_retrieval' | 'faq_kb_product_scoped'
   | 'faq_kb_auto_sync' | 'faq_kb_coverage_metrics';
 
-export function resolveFaqOptions(features: Record<string, boolean>): EffectiveFaq {
-  const enabled = !!features.faq_enabled;
+export function resolveFaqOptions(
+  features: Record<string, boolean>,
+  merchantPrefs?: FaqOptionsMerchantSettings | null
+): EffectiveFaq {
+  const enabled = !!features.faq_enabled && (merchantPrefs?.faq_enabled !== false);
   const flexible = !!features.faq_flexible;
 
   const storefrontEnabled = flexible || !!features.faq_storefront_enabled;
@@ -101,15 +103,16 @@ export function resolveFaqOptions(features: Record<string, boolean>): EffectiveF
     storefront_enabled: enabled && storefrontEnabled,
     product_enabled: enabled && productEnabled,
     templates_enabled: enabled && templatesEnabled,
-    management_enabled: managementGroupEnabled,
-    preview_enabled: previewGroupEnabled,
-    display_enabled: displayGroupEnabled,
-    kb_enabled: kbGroupEnabled,
+    management_enabled: enabled && managementGroupEnabled,
+    preview_enabled: enabled && previewGroupEnabled,
+    display_enabled: enabled && displayGroupEnabled,
+    kb_enabled: enabled && kbGroupEnabled,
     allowed_management_types: allowedManagementTypes,
     allowed_preview_types: allowedPreviewTypes,
     allowed_display_types: allowedDisplayTypes,
     allowed_kb_types: allowedKbTypes,
     is_flexible: flexible,
     faq_available: enabled && allTypes.length > 0,
+    merchant_preferences: merchantPrefs ?? null,
   };
 }

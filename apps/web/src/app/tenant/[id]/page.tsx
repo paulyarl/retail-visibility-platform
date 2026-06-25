@@ -465,7 +465,20 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch product option flags:', e);
     }
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags };
+    // Fetch social commerce options server-side (no client waterfall)
+    let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
+    try {
+      const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug);
+      socialCommerceFlags = {
+        enabled: socialCommerceState.enabled,
+        canUseShareButtons: socialCommerceState.canUseShareButtons,
+        canUseSocialProof: socialCommerceState.canUseSocialProof,
+      };
+    } catch (e) {
+      console.error('Failed to fetch social commerce options:', e);
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -482,14 +495,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const { tenant, storefrontOptionFlags } = data;
+  const { tenant, storefrontOptionFlags, storefrontTypeSettings } = data;
   const businessName = tenant.metadata?.businessName || tenant.name;
   const showEnhancedSEO = storefrontOptionFlags?.showEnhancedSEO ?? false;
+  const storefrontType = storefrontTypeSettings?.effectiveType || 'retail';
+
+  // Type-specific SEO labels
+  const typeLabels: Record<string, { title: string; desc: string; schemaType: string }> = {
+    retail:   { title: 'Store Catalog',       desc: 'Browse products',           schemaType: 'Store' },
+    online:   { title: 'Online Store',        desc: 'Shop online',               schemaType: 'OnlineStore' },
+    service:  { title: 'Services',            desc: 'Book professional services', schemaType: 'Service' },
+    social:   { title: 'Shop',                desc: 'Discover and shop',          schemaType: 'Store' },
+    flexible: { title: 'Store & Services',    desc: 'Browse products and services', schemaType: 'Store' },
+    none:     { title: 'Storefront',          desc: 'View store',                schemaType: 'Store' },
+  };
+  const typeLabel = typeLabels[storefrontType] || typeLabels.retail;
 
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {
-    title: `${businessName} - Store Catalog`,
-    description: `Browse products from ${businessName}.`,
+    title: `${businessName} - ${typeLabel.title}`,
+    description: `${typeLabel.desc} from ${businessName}.`,
   };
 
   if (!showEnhancedSEO) {
@@ -500,12 +525,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const businessDescription = tenant.metadata?.business_description;
   const seoTags = tenant.profileData?.seo_tags || tenant.directoryData?.seo_keywords || [];
   const enhancedDescription = businessDescription
-    ? `Browse products from ${businessName}. ${businessDescription}`
-    : basicMetadata.description;
+    ? `${typeLabel.desc} from ${businessName}. ${businessDescription}`
+    : `${typeLabel.desc} from ${businessName}.`;
 
   const schema = {
     '@context': 'https://schema.org',
-    '@type': 'Store',
+    '@type': typeLabel.schemaType,
     name: businessName,
     description: enhancedDescription,
     image: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : undefined,
@@ -524,12 +549,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 
   return {
-    title: `${businessName} - Store Catalog`,
+    title: `${businessName} - ${typeLabel.title}`,
     description: enhancedDescription as string,
     keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
     openGraph: {
       title: businessName,
-      description: `Shop products from ${businessName} catalog`,
+      description: `${typeLabel.desc} from ${businessName}`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',
     },
@@ -577,7 +602,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {
@@ -589,7 +614,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     });
   } else {
     // Track general storefront view
-    trackStorefrontView(id, storeCategories || []).catch(err =>
+    trackStorefrontView(id, storeCategories || [], storefrontTypeSettings?.effectiveType).catch(err =>
       console.error('Failed to track storefront view:', err)
     );
   }
@@ -765,6 +790,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             initialStorefrontTypeSettings={storefrontTypeSettings}
             initialFaqFlags={faqOptionsFlags}
             initialCrmFlags={crmOptionsFlags}
+            initialProductOptionFlags={productOptionFlags}
+            initialSocialCommerceFlags={socialCommerceFlags}
             layoutVariant="editorial"
           />
         ) : storefrontLayout === 'immersive' ? (
@@ -807,6 +834,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             initialStorefrontTypeSettings={storefrontTypeSettings}
             initialFaqFlags={faqOptionsFlags}
             initialCrmFlags={crmOptionsFlags}
+            initialProductOptionFlags={productOptionFlags}
+            initialSocialCommerceFlags={socialCommerceFlags}
             layoutVariant="immersive"
           />
         ) : (
@@ -849,6 +878,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             initialStorefrontTypeSettings={storefrontTypeSettings}
             initialFaqFlags={faqOptionsFlags}
             initialCrmFlags={crmOptionsFlags}
+            initialProductOptionFlags={productOptionFlags}
+            initialSocialCommerceFlags={socialCommerceFlags}
           />
         )}
       </TenantPaymentProvider>

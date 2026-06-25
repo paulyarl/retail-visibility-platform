@@ -1,10 +1,10 @@
 /**
  * Chatbot Options Resolver
  *
- * Resolves effective chatbot options state from tier features.
+ * Resolves effective chatbot options state from tier features and merchant preferences.
  */
 
-import type { EffectiveChatbot } from './types';
+import type { EffectiveChatbot, ChatbotOptionsMerchantSettings } from './types';
 
 export type ChatbotResponseEngineType =
   | 'chatbot_static_lookup'
@@ -36,7 +36,7 @@ export type ChatbotWidgetType =
 
 export function resolveChatbotOptions(
   features: Record<string, boolean>,
-  capabilityEnabled?: boolean
+  merchantPrefs?: ChatbotOptionsMerchantSettings | null
 ): EffectiveChatbot {
   const cleanFeatures: Record<string, boolean> = {};
   for (const [key, val] of Object.entries(features)) {
@@ -44,14 +44,23 @@ export function resolveChatbotOptions(
   }
   const feat = cleanFeatures;
 
-  const enabled = capabilityEnabled ?? !!feat.chatbot_enabled;
+  const tierEnabled = !!feat.chatbot_enabled;
+  const enabled = tierEnabled && (merchantPrefs?.chatbot_enabled !== false);
   const flexible = !!feat.chatbot_flexible;
 
-  const staticEnabled = flexible || !!feat.chatbot_static_enabled;
-  const dynamicEnabled = flexible || !!feat.chatbot_dynamic_enabled;
-  const skillsEnabled = flexible || !!feat.chatbot_skills_enabled;
-  const kbEnabled = flexible || !!feat.chatbot_kb_enabled;
-  const widgetEnabled = flexible || !!feat.chatbot_widget_enabled;
+  // Tier-allowed group flags
+  const staticTier = flexible || !!feat.chatbot_static_enabled;
+  const dynamicTier = flexible || !!feat.chatbot_dynamic_enabled;
+  const skillsTier = flexible || !!feat.chatbot_skills_enabled;
+  const kbTier = flexible || !!feat.chatbot_kb_enabled;
+  const widgetTier = flexible || !!feat.chatbot_widget_enabled;
+
+  // Effective flags: tier allows AND merchant enabled (merchant defaults to true when unset)
+  const staticEnabled = staticTier && (merchantPrefs?.chatbot_static_enabled !== false);
+  const dynamicEnabled = dynamicTier && (merchantPrefs?.chatbot_dynamic_enabled !== false);
+  const skillsEnabled = skillsTier && (merchantPrefs?.chatbot_skills_enabled !== false);
+  const kbEnabled = kbTier && (merchantPrefs?.chatbot_kb_enabled !== false);
+  const widgetEnabled = widgetTier && (merchantPrefs?.chatbot_widget_enabled !== false);
 
   const allowedResponseEngines: ChatbotResponseEngineType[] = [];
   if (flexible) {
@@ -112,5 +121,9 @@ export function resolveChatbotOptions(
     allowed_widget_types: allowedWidgetTypes,
     is_flexible: flexible,
     chatbot_available: enabled && allTypes.length > 0,
+    can_use_widget_custom_theme: enabled && widgetEnabled && (merchantPrefs?.chatbot_widget_custom_theme !== false),
+    can_use_widget_skill_cards: enabled && widgetEnabled && (merchantPrefs?.chatbot_widget_skill_cards !== false),
+    can_use_widget_after_hours: enabled && widgetEnabled && (merchantPrefs?.chatbot_widget_after_hours !== false),
+    merchant_preferences: merchantPrefs ?? null,
   };
 }

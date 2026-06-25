@@ -54,6 +54,13 @@ function toApiShape(row: any) {
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const navFlag = await prisma.platform_feature_flags_list.findUnique({
+      where: { flag: 'use_file_based_navigation' },
+    });
+    if (navFlag?.enabled) {
+      return res.json({ success: true, data: [] });
+    }
+
     const links = await prisma.navigation_links.findMany({
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
     });

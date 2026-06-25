@@ -37,6 +37,10 @@ import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import { StorefrontRecommendations } from './StorefrontClient';
 
+// Service section
+import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
+import { SocialProofSection } from '@/components/storefront/sections/SocialProofSection';
+
 // FAQ & CRM
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -93,6 +97,8 @@ export default function StorefrontEditorialLayout({
   initialStorefrontTypeSettings,
   initialFaqFlags,
   initialCrmFlags,
+  initialProductOptionFlags,
+  initialSocialCommerceFlags,
   layoutVariant,
 }: StorefrontLayoutProps) {
   // ---- Shared state via hook ----
@@ -108,6 +114,7 @@ export default function StorefrontEditorialLayout({
     isRetailStore,
     isOnlineStore,
     isServiceStore,
+    isSocialStore,
     optFlags,
     showsHours,
     showsMap,
@@ -133,6 +140,9 @@ export default function StorefrontEditorialLayout({
     faqEnabled,
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
+    showServices,
+    showSocialProof,
+    socialCommerceFlags,
     contactInfo,
     featuredData,
     featuredCounts,
@@ -151,6 +161,8 @@ export default function StorefrontEditorialLayout({
     initialStorefrontTypeSettings,
     initialFaqFlags,
     initialCrmFlags,
+    initialProductOptionFlags,
+    initialSocialCommerceFlags,
   });
 
   // ---- Ref for hero CTA scroll ----
@@ -163,6 +175,30 @@ export default function StorefrontEditorialLayout({
   // ---- Derived: banner image or gradient ----
   const bannerUrl = tenant?.metadata?.banner_url || null;
   const primaryColor = tenant?.metadata?.primary_color || tenant?.branding?.primaryColor || '#6366f1';
+
+  // ---- Derived: filter products by product_type (switch-based for extensibility) ----
+  const { physicalProducts, serviceProducts } = useMemo(() => {
+    const buckets: Record<string, any[]> = { physical: [], service: [], digital: [], hybrid: [] };
+    for (const p of products) {
+      const pt = p.productType || p.product_type || 'physical';
+      switch (pt) {
+        case 'service':
+          buckets.service.push(p);
+          break;
+        case 'digital':
+          buckets.digital.push(p);
+          break;
+        case 'hybrid':
+          buckets.hybrid.push(p);
+          break;
+        case 'physical':
+        default:
+          buckets.physical.push(p);
+          break;
+      }
+    }
+    return { physicalProducts: buckets.physical, serviceProducts: buckets.service };
+  }, [products]);
 
   // ---- Derived: first 3 featured products for spotlight ----
   const spotlightProducts = useMemo(() => {
@@ -388,7 +424,7 @@ export default function StorefrontEditorialLayout({
             )}
 
             {/* CTA: Browse Collection */}
-            {isRetailStore && products.length > 0 && (
+            {isRetailStore && physicalProducts.length > 0 && (
               <button
                 onClick={scrollToCollection}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-neutral-900 font-semibold text-sm hover:bg-neutral-100 transition-colors shadow-lg"
@@ -530,7 +566,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* SECTION: "Our Collection" (bg-neutral-50)                          */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && !isProductsOnly && products.length > 0 && (
+      {!storefrontStatus.shouldShowPanel && !isProductsOnly && physicalProducts.length > 0 && (
         <section
           ref={collectionRef}
           className="bg-neutral-50 dark:bg-neutral-950"
@@ -599,7 +635,7 @@ export default function StorefrontEditorialLayout({
             {/* Product grid: 3-col desktop, 2-col tablet, 1-col mobile */}
             <TenantPaymentProvider tenantId={tenantId}>
               <EnhancedProductDisplay
-                products={products}
+                products={physicalProducts}
                 tenantId={tenantId}
                 tenantSlug={tenant.slug}
                 tenantLogo={tenant.metadata?.logo_url}
@@ -652,7 +688,7 @@ export default function StorefrontEditorialLayout({
       {/* ================================================================= */}
       {/* PRODUCTS-ONLY VIEW (when ?products_only=true)                     */}
       {/* ================================================================= */}
-      {!storefrontStatus.shouldShowPanel && isProductsOnly && products.length > 0 && (
+      {!storefrontStatus.shouldShowPanel && isProductsOnly && physicalProducts.length > 0 && (
         <section className="bg-neutral-50 dark:bg-neutral-950" aria-label="Products">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             {featured && (
@@ -666,7 +702,7 @@ export default function StorefrontEditorialLayout({
             )}
             <TenantPaymentProvider tenantId={tenantId}>
               <EnhancedProductDisplay
-                products={products}
+                products={physicalProducts}
                 tenantId={tenantId}
                 tenantSlug={tenant.slug}
                 tenantLogo={tenant.metadata?.logo_url}
@@ -701,6 +737,38 @@ export default function StorefrontEditorialLayout({
             )}
           </div>
         </section>
+      )}
+
+      {/* ================================================================= */}
+      {/* SERVICE SECTION (service product offerings)                       */}
+      {/* ================================================================= */}
+      {showServices && serviceProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <ServiceSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          services={serviceProducts}
+          layoutVariant="editorial"
+          isServiceStore={isServiceStore}
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* ================================================================= */}
+      {/* SOCIAL PROOF SECTION (platform badges, share buttons)             */}
+      {/* ================================================================= */}
+      {showSocialProof && !storefrontStatus.shouldShowPanel && (
+        <SocialProofSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          layoutVariant="editorial"
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+        />
       )}
 
       {/* ================================================================= */}

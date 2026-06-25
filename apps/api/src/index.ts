@@ -7590,6 +7590,11 @@ console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders')
 app.use('/api/tenants', shipmentRoutes);
 console.log('✅ Shipment routes mounted at /api/tenants/:tenantId/shipments');
 
+/* ------------------------------ abandoned carts ------------------------------ */
+import abandonedCartRoutes from './routes/abandoned-carts';
+app.use('/api/tenants', abandonedCartRoutes);
+console.log('✅ Abandoned cart routes mounted at /api/tenants/:tenantId/abandoned-carts');
+
 /* ------------------------------ tenant inventory transfers ------------------------------ */
 import tenantInventoryTransferRoutes from './routes/tenant-inventory-transfers';
 app.use('/api/tenant/inventory-transfers', tenantInventoryTransferRoutes); // Temporarily removed auth for testing
@@ -8103,6 +8108,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Log purge job started (daily at 2 AM UTC)');
       } catch (err) {
         logger.error('Failed to start log purge job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start abandoned cart recovery job (every 30 minutes)
+      try {
+        const { startAbandonedCartRecovery } = await import('./jobs/abandoned-cart-recovery');
+        startAbandonedCartRecovery();
+        logger.info('Abandoned cart recovery job started (every 30 minutes)');
+      } catch (err) {
+        logger.error('Failed to start abandoned cart recovery job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 
