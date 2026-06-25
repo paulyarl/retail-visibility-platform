@@ -199,6 +199,30 @@ class CrmCustomerService extends CustomerApiSingleton {
     await this.invalidateServiceCaches();
     if (!result.success) throw new Error(getErrorMessage(result.error));
   }
+
+  // --- Read State (persistent widget read tracking) ---
+  async getReadState(): Promise<Array<{ scope: string; last_read_at: string }>> {
+    const cacheKey = 'crm-customer-read-state';
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/crm/read-state',
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<Array<{ scope: string; last_read_at: string }>>(result);
+  }
+
+  async setReadState(scope: string, lastReadAt?: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/customer/crm/read-state',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ scope, last_read_at: lastReadAt }),
+      }
+    );
+    await this.invalidateCache('crm-customer-read-state');
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
 }
 
 export const crmCustomerService = CrmCustomerService.getInstance();

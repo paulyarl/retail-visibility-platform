@@ -590,13 +590,14 @@ export async function trackSearch(query: string, resultsCount: number): Promise<
 /**
  * Track storefront browsing
  */
-export async function trackStorefrontView(tenantId: string, categoriesViewed: string[] = []): Promise<void> {
+export async function trackStorefrontView(tenantId: string, categoriesViewed: string[] = [], storefrontType?: string): Promise<void> {
   await trackBehavior({
     entityType: 'store',
     entityId: tenantId,
     context: {
       categories_viewed: categoriesViewed,
-      is_storefront: true
+      is_storefront: true,
+      storefront_type: storefrontType || 'retail',
     },
     pageType: 'storefront'
   });

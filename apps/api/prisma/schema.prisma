@@ -660,6 +660,20 @@ model crm_user_read_states {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_customer_read_states {
+  id           String    @id
+  customer_id  String    @db.VarChar(255)
+  scope        String    @db.VarChar(50)
+  last_read_at DateTime  @default(now()) @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  customers    customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_customer_read_states_customer")
+
+  @@unique([customer_id, scope], map: "idx_crm_customer_read_states_unique")
+  @@index([customer_id], map: "idx_crm_customer_read_states_customer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_support_tickets {
   id                  String                @id
   tenant_id           String                @db.VarChar(255)
@@ -885,6 +899,7 @@ model customers {
   email_verification_expires        DateTime?                          @db.Timestamp(6)
   customer_key                      String?                            @unique @db.VarChar(7)
   crm_contacts                      crm_contacts[]
+  crm_customer_read_states          crm_customer_read_states[]
   crm_inquiries                     crm_inquiries[]
   crm_support_tickets               crm_support_tickets[]
   customer_addresses                customer_addresses[]
@@ -3338,6 +3353,28 @@ model shopping_carts {
   @@index([user_id, status, last_activity_at(sort: Desc)], map: "idx_shopping_carts_user_status")
 }
 
+model abandoned_carts {
+  id                     String    @id @db.VarChar(255)
+  tenant_id              String    @db.VarChar(255)
+  cart_id                String?   @db.VarChar(255)
+  customer_email         String?   @db.VarChar(255)
+  customer_name          String?   @db.VarChar(255)
+  customer_id            String?   @db.VarChar(255)
+  items                  Json      @default("[]")
+  cart_value_cents       Int       @default(0)
+  item_count             Int       @default(0)
+  recovery_email_sent    Boolean   @default(false)
+  recovery_email_sent_at DateTime? @db.Timestamptz(6)
+  converted              Boolean   @default(false)
+  converted_at           DateTime? @db.Timestamptz(6)
+  converted_order_id     String?   @db.VarChar(255)
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @db.Timestamptz(6)
+  tenants                tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_abandoned_carts_tenant")
+
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_abandoned_carts_tenant")
+}
+
 model sku_billing_policies_list {
   id                   String    @id
   scope                String    @default("global")
@@ -4250,6 +4287,7 @@ model tenants {
   gbp_secondary_categories                                                               Json?                                    @default("[]")
   gbp_categories_sync_status                                                             String?                                  @default("pending") @db.VarChar(50)
   gbp_categories_last_synced_at                                                          DateTime?                                @db.Timestamptz(6)
+  abandoned_carts                                                                        abandoned_carts[]
   bot_configurations                                                                     bot_configurations?
   bot_conversations                                                                      bot_conversations[]
   bot_faq_embeddings                                                                     bot_faq_embeddings[]

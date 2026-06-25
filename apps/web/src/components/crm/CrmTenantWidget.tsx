@@ -176,12 +176,9 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
 
     if (newUnread > prevUnread) {
       const delta = newUnread - prevUnread;
+      // Alert toasts are now handled globally by CrmAlertToastWatcher in the tenant layout
       if (newAlertItems.length > 0) {
-        toast({
-          title: newAlertItems[0].title,
-          description: newAlertItems[0].body || 'New alert',
-          variant: newAlertItems[0].type === 'warning' ? 'warning' : 'info',
-        });
+        // skip — watcher fires the toast
       } else if (newTicketItems.length > 0) {
         toast({
           title: 'New Support Ticket',

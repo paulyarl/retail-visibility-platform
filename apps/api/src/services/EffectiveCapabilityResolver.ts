@@ -169,15 +169,16 @@ export async function resolveEffectiveCapabilities(
       merchantBundle.directoryEntry
     ),
     resolveFaqOptions(
-      rawCaps.capabilities.faq_options?.features || {}
+      rawCaps.capabilities.faq_options?.features || {},
+      merchantBundle.faqOptions
     ),
     resolveCrmOptions(
       rawCaps.capabilities.crm_options?.features || {},
-      rawCaps.capabilities.crm_options?.capability_enabled
+      merchantBundle.crmOptions
     ),
     resolveChatbotOptions(
       rawCaps.capabilities.chatbot_options?.features || {},
-      rawCaps.capabilities.chatbot_options?.capability_enabled
+      merchantBundle.chatbotOptions
     ),
     resolveOrgOptions(
       rawCaps.capabilities.organization_options?.features || {},

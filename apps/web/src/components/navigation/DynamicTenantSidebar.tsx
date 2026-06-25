@@ -764,8 +764,10 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
         metadata: link.metadata || {},
         children: link.children || [],
       }));
+    } else {
+      processedItems = buildTenantNav(tenantId, tenantId, slug, isPublished, directorySlug);
     }
-    
+
     return filterByCapability(filterNavItems(processedItems));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished, chatbotEnabled, barcodeScanEnabled, quickstartEnabled]);

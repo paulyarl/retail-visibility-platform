@@ -870,6 +870,15 @@ router.post('/orders', async (req: Request, res: Response) => {
     const userAgent = req.headers['user-agent'] || undefined;
     const pageUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 
+    // Mark abandoned carts as converted (async, non-blocking)
+    if (customerEmail && tenant_id) {
+      import('../services/AbandonedCartService')
+        .then(({ abandonedCartService }) => {
+          abandonedCartService.markCartConvertedByEmail(customerEmail, tenant_id, order.id);
+        })
+        .catch(() => {});
+    }
+
     socialPixelService.sendMetaConversionEvent(tenant_id, {
       eventName: 'Purchase',
       eventId: order.id,

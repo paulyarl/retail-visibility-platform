@@ -16,6 +16,8 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import LastViewed from '@/components/directory/LastViewed';
 import { StorefrontRecommendations } from './StorefrontClient';
+import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
+import { SocialProofSection } from '@/components/storefront/sections/SocialProofSection';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { useStorefrontState } from './layouts/hooks/useStorefrontState';
@@ -64,6 +66,8 @@ export default function StorefrontImmersiveLayout({
   initialStorefrontTypeSettings,
   initialFaqFlags,
   initialCrmFlags,
+  initialProductOptionFlags,
+  initialSocialCommerceFlags,
   layoutVariant,
 }: StorefrontLayoutProps) {
   const {
@@ -78,6 +82,7 @@ export default function StorefrontImmersiveLayout({
     isRetailStore,
     isOnlineStore,
     isServiceStore,
+    isSocialStore,
     optFlags,
     showsHours,
     showsMap,
@@ -103,6 +108,9 @@ export default function StorefrontImmersiveLayout({
     faqEnabled,
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
+    showServices,
+    showSocialProof,
+    socialCommerceFlags,
     contactInfo,
     featuredData,
     getFeaturedTypeName,
@@ -120,6 +128,8 @@ export default function StorefrontImmersiveLayout({
     initialStorefrontTypeSettings,
     initialFaqFlags,
     initialCrmFlags,
+    initialProductOptionFlags,
+    initialSocialCommerceFlags,
   });
 
   const searchParams = useSearchParams();
@@ -152,8 +162,32 @@ export default function StorefrontImmersiveLayout({
     return chips;
   }, [productCategories]);
 
+  // ---- Derived: filter products by product_type (switch-based for extensibility) ----
+  const { physicalProducts, serviceProducts } = useMemo(() => {
+    const buckets: Record<string, any[]> = { physical: [], service: [], digital: [], hybrid: [] };
+    for (const p of products) {
+      const pt = p.productType || p.product_type || 'physical';
+      switch (pt) {
+        case 'service':
+          buckets.service.push(p);
+          break;
+        case 'digital':
+          buckets.digital.push(p);
+          break;
+        case 'hybrid':
+          buckets.hybrid.push(p);
+          break;
+        case 'physical':
+        default:
+          buckets.physical.push(p);
+          break;
+      }
+    }
+    return { physicalProducts: buckets.physical, serviceProducts: buckets.service };
+  }, [products]);
+
   const sortedProducts = useMemo(() => {
-    const list = [...products];
+    const list = [...physicalProducts];
     switch (sortBy) {
       case 'price-asc':
         return list.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
@@ -164,9 +198,9 @@ export default function StorefrontImmersiveLayout({
       default:
         return list;
     }
-  }, [products, sortBy]);
+  }, [physicalProducts, sortBy]);
 
-  const heroProducts = useMemo(() => products.slice(0, 8), [products]);
+  const heroProducts = useMemo(() => physicalProducts.slice(0, 8), [physicalProducts]);
 
   const primaryColor =
     tenant?.metadata?.primary_color || tenant?.branding?.primaryColor || '#6366f1';
@@ -457,6 +491,34 @@ export default function StorefrontImmersiveLayout({
       </main>
 
       {!isProductsOnly && <SectionDivider variant="gradient" />}
+
+      {/* SERVICE SECTION */}
+      {showServices && serviceProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <ServiceSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          services={serviceProducts}
+          layoutVariant="immersive"
+          isServiceStore={isServiceStore}
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* SOCIAL PROOF SECTION */}
+      {showSocialProof && !storefrontStatus.shouldShowPanel && (
+        <SocialProofSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          layoutVariant="immersive"
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+        />
+      )}
 
       {/* TABBED FEATURED SECTIONS */}
       {!isProductsOnly && featuredData && featuredData.buckets && featuredData.buckets.length > 0 && (

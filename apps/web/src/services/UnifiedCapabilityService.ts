@@ -318,6 +318,7 @@ interface BackendEffectiveFaq {
   allowed_kb_types: FaqKnowledgeBaseType[];
   is_flexible: boolean;
   faq_available: boolean;
+  merchant_preferences: { faq_enabled?: boolean | null } | null;
 }
 
 interface BackendEffectiveDirectoryEntry {
@@ -365,6 +366,7 @@ interface BackendEffectiveCrm {
   allowed_dashboard_types: CrmDashboardType[];
   is_flexible: boolean;
   crm_available: boolean;
+  merchant_preferences: { crm_enabled?: boolean | null } | null;
 }
 
 interface BackendEffectiveChatbot {
@@ -380,6 +382,20 @@ interface BackendEffectiveChatbot {
   allowed_widget_types: ChatbotWidgetType[];
   is_flexible: boolean;
   chatbot_available: boolean;
+  can_use_widget_custom_theme: boolean;
+  can_use_widget_skill_cards: boolean;
+  can_use_widget_after_hours: boolean;
+  merchant_preferences: {
+    chatbot_enabled?: boolean | null;
+    chatbot_static_enabled?: boolean | null;
+    chatbot_dynamic_enabled?: boolean | null;
+    chatbot_skills_enabled?: boolean | null;
+    chatbot_kb_enabled?: boolean | null;
+    chatbot_widget_enabled?: boolean | null;
+    chatbot_widget_custom_theme?: boolean | null;
+    chatbot_widget_skill_cards?: boolean | null;
+    chatbot_widget_after_hours?: boolean | null;
+  } | null;
 }
 
 interface BackendEffectiveSocialCommerceOptions {
@@ -687,6 +703,7 @@ function mapFaq(b: BackendEffectiveFaq): FaqOptionsState {
     allowedKbTypes: b.allowed_kb_types,
     isFlexible: b.is_flexible,
     faqAvailable: b.faq_available,
+    merchantPreferences: b.merchant_preferences ?? null,
     features: {},
   };
 }
@@ -710,6 +727,7 @@ function mapCrm(b: BackendEffectiveCrm): CrmOptionsState {
     allowedDashboardTypes: b.allowed_dashboard_types,
     isFlexible: b.is_flexible,
     crmAvailable: b.crm_available,
+    merchantPreferences: b.merchant_preferences ?? null,
     features: {},
   };
 }
@@ -728,6 +746,10 @@ function mapChatbot(b: BackendEffectiveChatbot): ChatbotOptionsState {
     allowedKbTypes: b.allowed_kb_types,
     allowedWidgetTypes: b.allowed_widget_types,
     chatbotAvailable: b.chatbot_available,
+    canUseWidgetCustomTheme: b.can_use_widget_custom_theme,
+    canUseWidgetSkillCards: b.can_use_widget_skill_cards,
+    canUseWidgetAfterHours: b.can_use_widget_after_hours,
+    merchantPreferences: b.merchant_preferences ?? null,
     features: {},
   };
 }

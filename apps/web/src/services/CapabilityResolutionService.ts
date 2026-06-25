@@ -610,6 +610,7 @@ export interface FaqOptionsState {
   allowedKbTypes: FaqKnowledgeBaseType[];
   isFlexible: boolean;
   faqAvailable: boolean;
+  merchantPreferences: { faq_enabled?: boolean | null } | null;
   features: Record<string, boolean>;
 }
 
@@ -669,6 +670,7 @@ export interface CrmOptionsState {
   allowedDashboardTypes: CrmDashboardType[];
   isFlexible: boolean;
   crmAvailable: boolean;
+  merchantPreferences: { crm_enabled?: boolean | null } | null;
   features: Record<string, boolean>;
 }
 
@@ -761,6 +763,20 @@ export interface ChatbotOptionsState {
   allowedKbTypes: ChatbotKnowledgeBaseType[];
   allowedWidgetTypes: ChatbotWidgetType[];
   chatbotAvailable: boolean;
+  canUseWidgetCustomTheme: boolean;
+  canUseWidgetSkillCards: boolean;
+  canUseWidgetAfterHours: boolean;
+  merchantPreferences: {
+    chatbot_enabled?: boolean | null;
+    chatbot_static_enabled?: boolean | null;
+    chatbot_dynamic_enabled?: boolean | null;
+    chatbot_skills_enabled?: boolean | null;
+    chatbot_kb_enabled?: boolean | null;
+    chatbot_widget_enabled?: boolean | null;
+    chatbot_widget_custom_theme?: boolean | null;
+    chatbot_widget_skill_cards?: boolean | null;
+    chatbot_widget_after_hours?: boolean | null;
+  } | null;
   features: Record<string, boolean>;
 }
 
@@ -2162,6 +2178,7 @@ export function resolveFaqOptionsState(
     allowedKbTypes,
     isFlexible: flexible,
     faqAvailable: enabled && !disabled && allTypes.length > 0,
+    merchantPreferences: null,
     features,
   };
 }
@@ -2268,6 +2285,7 @@ export function resolveCrmOptionsState(
     allowedDashboardTypes: allDashboard,
     isFlexible: flexible,
     crmAvailable: enabled && !disabled && allTypes.length > 0,
+    merchantPreferences: null,
     features: cleanFeatures,
   };
 }

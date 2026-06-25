@@ -19,7 +19,7 @@ const router = Router();
 router.get('/:tenantId/products', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { category, search, page = '1', limit = '12' } = req.query;
+    const { category, search, page = '1', limit = '12', product_type } = req.query;
     
     if (!tenantId) {
       return res.status(400).json({ error: 'tenant_required' });
@@ -54,6 +54,13 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     if (search && typeof search === 'string') {
       conditions.push(`(name ILIKE $${paramIndex} OR sku ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
+      paramIndex++;
+    }
+    
+    // Product type filter (physical, service, digital, hybrid)
+    if (product_type && typeof product_type === 'string') {
+      conditions.push(`sp.product_type = $${paramIndex}`);
+      params.push(product_type);
       paramIndex++;
     }
     

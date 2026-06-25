@@ -250,19 +250,31 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
+  let storefrontType: string | undefined;
+  try {
+    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId);
+    storefrontType = storefrontState.effectiveType;
+  } catch (e) {
+    // Non-critical — default to undefined
+  }
+
   // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
 
   // Basic metadata — always emitted
   const basicDescription = product.description || `Buy ${product.title} from ${businessName}`;
+  const ogVerb = storefrontType === 'service' ? 'Book' : storefrontType === 'social' ? 'Discover' : 'Buy';
+  const basicTitle = storefrontType === 'social'
+    ? `${product.title} | ${businessName}`
+    : `${product.title} - ${businessName}`;
 
   if (!showEnhancedSEO) {
     return {
-      title: `${product.title} - ${businessName}`,
+      title: basicTitle,
       description: basicDescription,
       openGraph: {
         title: product.title,
-        description: basicDescription,
+        description: `${ogVerb} ${product.title} from ${businessName}`,
         images: product.images?.map(img => img.url) || [],
         type: 'website',
       },
@@ -313,7 +325,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 
   return {
-    title: `${product.title} - ${businessName}`,
+    title: basicTitle,
     description: enhancedDescription,
     keywords: seoTags.join(", "),
     openGraph: {
@@ -354,6 +366,28 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
   const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
   const platformSettings = await platformSettingsService.getPlatformSettings();
+
+  // Fetch storefront type for social behavior overlay
+  let storefrontType: string | undefined;
+  try {
+    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId);
+    storefrontType = storefrontState.effectiveType;
+  } catch (e) {
+    console.error('Failed to fetch storefront type:', e);
+  }
+
+  // Fetch social commerce flags for share buttons + social proof gating
+  let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
+  try {
+    const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId);
+    socialCommerceFlags = {
+      enabled: socialCommerceState.enabled,
+      canUseShareButtons: socialCommerceState.canUseShareButtons,
+      canUseSocialProof: socialCommerceState.canUseSocialProof,
+    };
+  } catch (e) {
+    console.error('Failed to fetch social commerce options:', e);
+  }
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
   // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
@@ -493,6 +527,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           currentUrl={currentUrl}
           optFlags={optFlags}
           layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          storefrontType={storefrontType}
+          socialCommerceFlags={socialCommerceFlags}
         />
 
         {/* Alert for non-public products (only shown to authenticated users) */}
@@ -601,6 +637,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
+                storefrontType={storefrontType}
+                socialCommerceFlags={socialCommerceFlags}
               />
             </TenantPaymentProvider>
           </div>
@@ -682,6 +720,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
+                storefrontType={storefrontType}
+                socialCommerceFlags={socialCommerceFlags}
               />
             </TenantPaymentProvider>
           </div>
@@ -857,6 +897,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             tenantSlug={product.tenant?.slug || ''}
             productOptFlags={productOptFlags}
             layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+            storefrontType={storefrontType}
           />
 
           {/* Product FAQs */}

@@ -13,6 +13,7 @@ import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmOptionsService from '../../../services/CrmOptionsService';
 import { CrmAlertService } from '../../../services/CrmAlertService';
+import CrmCustomerReadStateService from '../../../services/CrmCustomerReadStateService';
 import { audit } from '../../../audit';
 import { prisma } from '../../../prisma';
 
@@ -36,6 +37,7 @@ const messageService = CrmTicketMessageService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
 const alertService = CrmAlertService.getInstance();
+const customerReadStateService = CrmCustomerReadStateService.getInstance();
 
 /**
  * Get the set of tenant IDs and order IDs belonging to a customer (by email).
@@ -46,7 +48,17 @@ async function getCustomerAlertScope(customerEmail: string): Promise<{ tenantIds
     where: { customer_email: customerEmail },
     select: { id: true, tenant_id: true },
   });
-  const tenantIds = [...new Set(orders.map(o => o.tenant_id))];
+  const orderTenantIds = orders.map(o => o.tenant_id);
+
+  // Also include tenants from customer-tenant relationships (e.g., customers who
+  // abandoned a cart but haven't placed an order yet, but have a relationship)
+  const relationships = await prisma.customer_tenant_relationships.findMany({
+    where: { customers: { email: customerEmail } },
+    select: { tenant_id: true },
+  });
+  const relationshipTenantIds = relationships.map(r => r.tenant_id);
+
+  const tenantIds = [...new Set([...orderTenantIds, ...relationshipTenantIds])];
   const orderIds = orders.map(o => o.id);
   return { tenantIds, orderIds };
 }
@@ -378,10 +390,15 @@ router.get('/alerts', async (req: Request, res: Response) => {
     });
 
     // Scope order alerts to only those matching customer's own order IDs
+    // Scope abandoned_cart alerts to only those matching customer's email
     const filtered = alerts.filter((a: any) => {
       if (a.type === 'order') {
         const metaOrderId = a.metadata?.order_id;
         return metaOrderId && orderIds.includes(metaOrderId);
+      }
+      if (a.type === 'abandoned_cart') {
+        const metaEmail = a.metadata?.customer_email;
+        return metaEmail && metaEmail === customerEmail;
       }
       return true; // info, warning, subscription, etc. are tenant-scoped
     });
@@ -416,6 +433,13 @@ router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
     if (alert.type === 'order') {
       const metaOrderId = (alert.metadata as any)?.order_id;
       if (!metaOrderId || !orderIds.includes(metaOrderId)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+      }
+    }
+    // For abandoned_cart alerts, verify the customer email matches
+    if (alert.type === 'abandoned_cart') {
+      const metaEmail = (alert.metadata as any)?.customer_email;
+      if (!metaEmail || metaEmail !== customerEmail) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
       }
     }
@@ -487,12 +511,59 @@ router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
       }
     }
+    // For abandoned_cart alerts, verify the customer email matches
+    if (alert.type === 'abandoned_cart') {
+      const metaEmail = (alert.metadata as any)?.customer_email;
+      if (!metaEmail || metaEmail !== customerEmail) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this alert' });
+      }
+    }
 
     await alertService.dismiss(req.params.alertId);
     res.json({ success: true });
   } catch (error) {
     console.error('[CRM Customer] Error dismissing alert:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
+  }
+});
+
+// ====================
+// User Read State (persistent widget read tracking)
+// ====================
+
+// GET /api/customer/crm/read-state
+router.get('/read-state', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    if (!customerId) return res.status(401).json({ error: 'customer_auth_required' });
+
+    const states = await customerReadStateService.getReadStates(customerId);
+    res.json({ success: true, data: states });
+  } catch (error) {
+    console.error('[CRM Customer] Error fetching read state:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch read state' });
+  }
+});
+
+// PUT /api/customer/crm/read-state
+// Body: { scope: string, last_read_at?: ISO string }
+router.put('/read-state', async (req: Request, res: Response) => {
+  try {
+    const customerId = req.customer?.id;
+    if (!customerId) return res.status(401).json({ error: 'customer_auth_required' });
+
+    const { scope, last_read_at } = req.body;
+    if (!scope || typeof scope !== 'string') {
+      return res.status(400).json({ error: 'scope_required', message: 'scope is required' });
+    }
+
+    const lastReadAt = last_read_at ? new Date(last_read_at) : new Date();
+
+    await customerReadStateService.setLastReadAt(customerId, scope, lastReadAt);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CRM Customer] Error updating read state:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update read state' });
   }
 });
 

@@ -1,10 +1,10 @@
 /**
  * CRM Options Resolver
  *
- * Resolves effective CRM options state from tier features.
+ * Resolves effective CRM options state from tier features and merchant preferences.
  */
 
-import type { EffectiveCrm } from './types';
+import type { EffectiveCrm, CrmOptionsMerchantSettings } from './types';
 
 export type CrmInquiryType =
   | 'crm_inquiry_product_enabled' | 'crm_inquiry_storefront_enabled'
@@ -19,7 +19,7 @@ export type CrmDashboardType = 'crm_dashboard_analytics' | 'crm_requests_hub';
 
 export function resolveCrmOptions(
   features: Record<string, boolean>,
-  capabilityEnabled?: boolean
+  merchantPrefs?: CrmOptionsMerchantSettings | null
 ): EffectiveCrm {
   const cleanFeatures: Record<string, boolean> = {};
   for (const [key, val] of Object.entries(features)) {
@@ -27,7 +27,8 @@ export function resolveCrmOptions(
   }
   const feat = cleanFeatures;
 
-  const enabled = capabilityEnabled ?? !!feat.crm_enabled;
+  const tierEnabled = !!feat.crm_enabled;
+  const enabled = tierEnabled && (merchantPrefs?.crm_enabled !== false);
   const flexible = !!feat.crm_flexible;
 
   const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
@@ -118,5 +119,6 @@ export function resolveCrmOptions(
     allowed_dashboard_types: allowedDashboard,
     is_flexible: flexible,
     crm_available: enabled && allTypes.length > 0,
+    merchant_preferences: merchantPrefs ?? null,
   };
 }

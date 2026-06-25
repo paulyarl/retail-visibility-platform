@@ -162,6 +162,42 @@ export class CrmAlertService extends BaseService {
       where: { tenant_id: tenantId, is_read: false, is_dismissed: false },
     });
   }
+
+  /**
+   * Create an abandoned cart recovery alert.
+   * Visible to the customer in their CRM support portal.
+   * Fire-and-forget — errors are logged, never thrown.
+   */
+  async createAbandonedCartAlert(params: {
+    tenantId: string;
+    abandonedCartId: string;
+    customerEmail: string;
+    customerName?: string;
+    cartValueCents: number;
+    itemCount: number;
+    recoveryUrl?: string;
+  }): Promise<void> {
+    try {
+      const amountFormatted = `$${(params.cartValueCents / 100).toFixed(2)}`;
+
+      await this.create({
+        tenant_id: params.tenantId,
+        type: 'abandoned_cart',
+        title: `Your cart at ${amountFormatted} is waiting for you`,
+        body: `You left ${params.itemCount} item${params.itemCount !== 1 ? 's' : ''} in your cart. Complete your purchase before it's gone!`,
+        icon: '🛒',
+        metadata: {
+          abandoned_cart_id: params.abandonedCartId,
+          customer_email: params.customerEmail,
+          cart_value_cents: params.cartValueCents,
+          item_count: params.itemCount,
+          recovery_url: params.recoveryUrl,
+        },
+      });
+    } catch (error) {
+      console.error('[CrmAlertService] Failed to create abandoned cart alert:', error);
+    }
+  }
 }
 
 export default CrmAlertService;

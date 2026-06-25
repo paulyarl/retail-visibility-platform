@@ -21,6 +21,7 @@ import {
   Users,
   MapPin,
   Bot,
+  Share2,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 
@@ -134,7 +135,9 @@ export default function CapabilityShowcase({
       (so?.allowedAdvancedTypes.length ?? 0) > ((so?.canUseEnhancedSEO ? 1 : 0) + (so?.canUseStorefrontActions ? 1 : 0))
     );
 
-    // --- FAQ Options (no merchant prefs in state yet) ---
+    // --- FAQ Options ---
+    // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
+    // So there is no per-feature merchant gating — badge is either Enabled or Off.
     const faq = cap.faqOptions;
     const faqTier = faq?.enabled ?? false;
     const faqMerchantGated = false;
@@ -142,9 +145,9 @@ export default function CapabilityShowcase({
     // --- Directory Entry ---
     const de = cap.directoryEntryOptions;
     const deTier = de?.enabled ?? false;
-    const deMerchantGated = deTier && (
-      (de?.allowedLayouts.length ?? 0) > 0 && de?.effectiveLayout === 'classic' && de?.merchantPreferences?.directory_entry_layout !== 'classic'
-    );
+    const deAllowedCount = (de?.allowedLayouts.length ?? 0) + (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0);
+    const deEffectiveCount = (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0);
+    const deMerchantGated = deTier && deEffectiveCount < deAllowedCount;
     const deDetailParts: string[] = [];
     if (de?.hoursEnabled) deDetailParts.push('Hours');
     if (de?.mapEnabled) deDetailParts.push('Map');
@@ -155,26 +158,48 @@ export default function CapabilityShowcase({
     if (de?.seoEnabled) deDetailParts.push('SEO');
 
     // --- CRM Options ---
+    // CRM only has a master toggle merchant pref (crm_enabled), no per-feature merchant prefs.
+    // So there is no per-feature merchant gating — badge is either Enabled or Off.
     const crm = cap.crmOptions;
-    const crmTier = crm?.crmAvailable ?? false;
+    const crmTier = crm?.enabled ?? false;
     const crmMerchantGated = false;
     const crmDetailParts: string[] = [];
     if (crm?.allowedInquiryTypes.length) crmDetailParts.push('Inquiries');
-    if (crm?.contactsEnabled) crmDetailParts.push('Contacts');
-    if (crm?.ticketFeaturesEnabled) crmDetailParts.push('Tickets');
-    if (crm?.customerTicketsEnabled) crmDetailParts.push('Customer Portal');
-    if (crm?.dashboardEnabled) crmDetailParts.push('Dashboard');
+    if (crm?.allowedContactTypes.length) crmDetailParts.push('Contacts');
+    if (crm?.allowedTicketTypes.length) crmDetailParts.push('Tickets');
+    if (crm?.allowedMessageTypes.length) crmDetailParts.push('Messages');
+    if (crm?.allowedCustomerTicketTypes.length) crmDetailParts.push('Customer Portal');
+    if (crm?.allowedDashboardTypes.length) crmDetailParts.push('Dashboard');
 
     // --- Chatbot Options ---
+    // Chatbot has per-feature merchant prefs (chatbot_static_enabled, etc.).
+    // Effective flags (staticEnabled, dynamicEnabled, etc.) already incorporate merchant prefs.
+    // Compare group-level allowed vs effective to detect merchant gating.
     const cb = cap.chatbotOptions;
-    const cbTier = cb?.chatbotAvailable ?? false;
-    const cbMerchantGated = false;
+    const cbTier = cb?.enabled ?? false;
+    const cbAllowedCount = (cb?.allowedResponseEngines.length > 0 ? 2 : 0) + (cb?.allowedSkillTypes.length > 0 ? 1 : 0) + (cb?.allowedKbTypes.length > 0 ? 1 : 0) + (cb?.allowedWidgetTypes.length > 0 ? 1 : 0);
+    const cbEffectiveCount = (cb?.staticEnabled ? 1 : 0) + (cb?.dynamicEnabled ? 1 : 0) + (cb?.skillsEnabled ? 1 : 0) + (cb?.kbEnabled ? 1 : 0) + (cb?.widgetEnabled ? 1 : 0);
+    const cbMerchantGated = cbTier && cbEffectiveCount < cbAllowedCount;
     const cbDetailParts: string[] = [];
-    if (cb?.staticEnabled) cbDetailParts.push('Static FAQ');
-    if (cb?.dynamicEnabled) cbDetailParts.push('Dynamic AI');
-    if (cb?.skillsEnabled) cbDetailParts.push('Skills');
-    if (cb?.kbEnabled) cbDetailParts.push('Knowledge Base');
-    if (cb?.widgetEnabled) cbDetailParts.push('Widget');
+    if (cb?.allowedResponseEngines.length) { cbDetailParts.push('Static FAQ'); cbDetailParts.push('Dynamic AI'); }
+    if (cb?.allowedSkillTypes.length) cbDetailParts.push('Skills');
+    if (cb?.allowedKbTypes.length) cbDetailParts.push('Knowledge Base');
+    if (cb?.allowedWidgetTypes.length) cbDetailParts.push('Widget');
+
+    // --- Social Commerce Options ---
+    const scc = cap.socialCommerceOptions;
+    const sccTier = scc?.enabled ?? false;
+    const sccMerchantGated = sccTier && (
+      (scc?.allowedMetaTypes.length ?? 0) > 0 && !scc?.canUseMetaCatalog && !scc?.canUseMetaShop && !scc?.canUseMetaPixel && !scc?.metaEnabled ||
+      (scc?.allowedTikTokTypes.length ?? 0) > 0 && !scc?.canUseTikTokCatalog && !scc?.canUseTikTokShop && !scc?.canUseTikTokPixel && !scc?.tiktokEnabled ||
+      (scc?.allowedExperienceTypes.length ?? 0) > 0 && !scc?.canUseShareButtons && !scc?.canUseSocialProof && !scc?.canUseAbandonedCart
+    );
+    const sccDetailParts: string[] = [];
+    if ((scc?.allowedMetaTypes.length ?? 0) > 0) sccDetailParts.push('Meta');
+    if ((scc?.allowedTikTokTypes.length ?? 0) > 0) sccDetailParts.push('TikTok');
+    if (scc?.canUseShareButtons) sccDetailParts.push('Share');
+    if (scc?.canUseSocialProof) sccDetailParts.push('Social Proof');
+    if (scc?.canUseAbandonedCart) sccDetailParts.push('Abandoned Cart');
 
     return [
       {
@@ -288,11 +313,15 @@ export default function CapabilityShowcase({
         icon: <HelpCircle className="w-4 h-4" />,
         enabled: faqTier,
         status: getStatus(faqTier, faqMerchantGated),
-        detail: faq?.faqAvailable
+        detail: faqTier
           ? `${[
             faq?.storefrontEnabled && 'Storefront',
             faq?.productEnabled && 'Product',
             faq?.templatesEnabled && 'Templates',
+            faq?.allowedManagementTypes.length && 'Management',
+            faq?.allowedPreviewTypes.length && 'Preview',
+            faq?.allowedDisplayTypes.length && 'Display',
+            faq?.allowedKbTypes.length && 'KB',
           ].filter(Boolean).join(', ') || 'Basic'} FAQs`
           : "Not available",
         settingsLink: `/t/${tenantId}/faq/options`,
@@ -329,6 +358,17 @@ export default function CapabilityShowcase({
           ? (cbDetailParts.length > 0 ? cbDetailParts.join(', ') : 'AI Assistant')
           : "Not available",
         settingsLink: `/t/${tenantId}/bot/options`,
+      },
+      {
+        key: "socialCommerceOptions",
+        label: "Social Commerce",
+        icon: <Share2 className="w-4 h-4" />,
+        enabled: sccTier,
+        status: getStatus(sccTier, sccMerchantGated),
+        detail: sccTier
+          ? (sccDetailParts.length > 0 ? sccDetailParts.join(', ') : 'Social Commerce')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/social-commerce`,
       },
     ];
   }, [capabilities, tenantId]);

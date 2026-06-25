@@ -29,6 +29,8 @@ interface ProductQuickCommerceLayoutProps {
   disableQRCode?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
   productOptFlags?: ProductOptionFlags | null;
+  storefrontType?: string;
+  socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
 }
 
 export default function ProductQuickCommerceLayout({
@@ -41,6 +43,8 @@ export default function ProductQuickCommerceLayout({
   disableQRCode,
   initialOptFlags,
   productOptFlags,
+  storefrontType,
+  socialCommerceFlags,
 }: ProductQuickCommerceLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
 
@@ -125,6 +129,7 @@ export default function ProductQuickCommerceLayout({
             videoPlayer={videoPlayer}
             onGalleryClick={s.handleGalleryImageClick}
             layoutVariant="quick-commerce"
+            storefrontType={storefrontType}
           />
 
           <ProductPurchasePanel
@@ -170,6 +175,8 @@ export default function ProductQuickCommerceLayout({
             disableQRCode={disableQRCode}
             productSlug={productSlug}
             slugType={slugType}
+            storefrontType={storefrontType}
+            socialCommerceFlags={socialCommerceFlags}
           />
         </div>
 

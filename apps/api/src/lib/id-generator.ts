@@ -964,6 +964,16 @@ export function generateCrmUserReadStateId(): string {
 }
 
 /**
+ * Generate CRM customer read state ID
+ * Format: crmcrs-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmCustomerReadStateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmcrs-${nanoid()}`;
+}
+
+/**
  * Generate CRM Alert ID
  * Format: crmalt-{tenantKey}-{nanoid} (20 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1191,4 +1201,14 @@ export function generateMetaOAuthTokenId(tenantId: string): string {
 export function generateSocialPixelId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `spx-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate abandoned cart ID
+ * Format: acart-{tenantKey}-{nanoid} (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateAbandonedCartId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `acart-${generateTenantKey(tenantId)}-${nanoid()}`;
 }

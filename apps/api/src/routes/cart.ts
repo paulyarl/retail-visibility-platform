@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { abandonedCartService } from '../services/AbandonedCartService';
 
 const router = Router();
 
@@ -244,6 +245,43 @@ router.delete('/', async (req, res) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to clear cart'
+    });
+  }
+});
+
+/**
+ * POST /api/cart/track
+ * Track cart for abandoned cart recovery
+ * Called by frontend when cart is updated (items added/removed/quantity changed)
+ */
+router.post('/track', async (req, res) => {
+  try {
+    const { tenantId, cartId, customerEmail, customerName, customerId, items } = req.body;
+
+    if (!tenantId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'validation_error',
+        message: 'tenantId and items array are required'
+      });
+    }
+
+    await abandonedCartService.trackCart({
+      cartId,
+      tenantId,
+      customerEmail,
+      customerName,
+      customerId,
+      items,
+    });
+
+    res.json({ success: true, message: 'Cart tracked' });
+  } catch (error) {
+    console.error('[Track Cart Error]', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to track cart'
     });
   }
 });
