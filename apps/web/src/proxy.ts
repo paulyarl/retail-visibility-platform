@@ -84,23 +84,20 @@ export async function proxy(req: NextRequest) {
   
   // Log auth route attempts with cookies
   if (pathname.startsWith('/auth/')) {
-    const hasSession = req.cookies.has('auth0-session') || req.cookies.has('appSession');
+    const hasSession = req.cookies.has('__session');
     console.log('[Proxy] Auth route detected:', pathname, 'Has session cookie:', hasSession);
   }
-  
-  // First, let Auth0 handle authentication routes
+
+  // First, let Auth0 handle authentication routes. The SDK middleware always returns a
+  // NextResponse: a redirect/response for /auth/* routes and NextResponse.next() for all
+  // other routes. Only short-circuit for actual auth routes; otherwise continue with the
+  // custom proxy logic below.
   const authResponse = await auth0.middleware(req);
-  
-  // If Auth0 handled the request (auth routes), return the response
-  if (authResponse) {
-    const location = authResponse.headers.get('location');
-    console.log('[Proxy] Auth0 handled request:', pathname, 'Status:', authResponse.status, 'Location:', location);
-    return authResponse;
-  }
-  
-  // Log if auth route was not handled
+
   if (pathname.startsWith('/auth/')) {
-    console.log('[Proxy] WARNING: Auth route not handled by Auth0 middleware:', pathname);
+    const location = authResponse.headers.get('location');
+    console.log('[Proxy] Auth0 handled auth route:', pathname, 'Status:', authResponse.status, 'Location:', location);
+    return authResponse;
   }
 
   // Continue with existing proxy logic for non-auth routes
