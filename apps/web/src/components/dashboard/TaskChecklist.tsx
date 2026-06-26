@@ -1,163 +1,36 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
-import { CheckCircle2, ArrowRight } from "lucide-react";
-import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { useNextSteps } from "@/hooks/dashboard/useNextSteps";
 
 interface TaskChecklistProps {
   tenantId: string;
-  hasProducts: boolean;
-  hasStorefront: boolean;
-  hasPublishedDirectory: boolean;
-  hasFeaturedProducts: boolean;
-  hasFAQs: boolean;
-  locationStatus?: string;
-  subscriptionStatus?: string;
-  hasHours?: boolean;
-  hasMap?: boolean;
-  hasStoreCategory?: boolean;
-  hasSlug?: boolean;
-  hasLogo?: boolean;
-  canManageFaq?: boolean;
 }
 
-interface TaskItem {
-  id: string;
-  label: string;
-  done: boolean;
-  link: string;
-}
-
-export default function TaskChecklist({
-  tenantId,
-  hasProducts,
-  hasStorefront,
-  hasPublishedDirectory,
-  hasFeaturedProducts,
-  hasFAQs,
-  locationStatus,
-  subscriptionStatus,
-  hasHours = false,
-  hasMap = false,
-  hasStoreCategory = false,
-  hasSlug = false,
-  hasLogo = false,
-  canManageFaq = false,
-}: TaskChecklistProps) {
-  const allCaps = useAllCapabilities(tenantId);
-
-  const tasks: TaskItem[] = useMemo(() => {
-    const caps = allCaps.data;
-    // Check capability states for feature availability
-    const canSetupPayments = caps?.commerce?.enabled ?? true;
-    const canManageInventory = caps?.productOptions?.enabled ?? true;
-    const canManageShipping = caps?.fulfillment?.enabled ?? true;
-    const canManageDiscounts = caps?.commerce?.enabled ?? true;
-    const canManageFAQs = caps?.faqOptions?.enabled ?? true;
-
-    return [
-      {
-        id: "location",
-        label: "Verify your business location",
-        done: locationStatus === "active",
-        link: `/t/${tenantId}/settings/location-status`,
-      },
-      {
-        id: "logo",
-        label: "Upload your store logo",
-        done: hasLogo,
-        link: `/t/${tenantId}/settings/tenant`,
-      },
-      {
-        id: "slug",
-        label: "Add your shop URL slug",
-        done: hasSlug,
-        link: `/t/${tenantId}/settings/tenant`,
-      },
-      {
-        id: "map",
-        label: "Add your map coordinates",
-        done: hasMap,
-        link: `/t/${tenantId}/settings/tenant`,
-      },
-      {
-        id: "category",
-        label: "Add your store category",
-        done: hasStoreCategory,
-        link: `/t/${tenantId}/settings/gbp-category`,
-      },
-      {
-        id: "hours",
-        label: "Add your business hours",
-        done: hasHours,
-        link: `/t/${tenantId}/settings/hours`,
-      },
-      {
-        id: "products",
-        label: "Add your first product",
-        done: hasProducts,
-        link: `/t/${tenantId}/items/create`,
-      },
-      {
-        id: "inventory",
-        label: "Manage inventory",
-        done: canManageInventory,
-        link: `/t/${tenantId}/items`,
-      },
-      {
-        id: "featured products",
-        label: "Feature your first product",
-        done: hasFeaturedProducts,
-        link: `/t/${tenantId}/settings/featured-products`,
-      },
-      {
-        id: "payments",
-        label: "Connect payment providers",
-        done: canSetupPayments,
-        link: `/t/${tenantId}/settings/payment-gateways`,
-      },
-      {
-        id: "shipping",
-        label: "Set up shipping rates",
-        done: canManageShipping,
-        link: `/t/${tenantId}/settings/fulfillment`,
-      },
-      {
-        id: "discounts",
-        label: "Create your first discount",
-        done: canManageDiscounts,
-        link: `/t/${tenantId}/settings/commerce`,
-      },
-      {
-        id: "FAQs",
-        label: (canManageFAQs && canManageFaq) ? `Add your first FAQs` : canManageFAQs ? `Switch Toggle ON to Manage FAQs` : `FAQs are not available`,
-        done: hasFAQs || (!canManageFAQs && !canManageFaq),
-        link: (canManageFAQs && canManageFaq) ? `/t/${tenantId}/faq` : canManageFAQs ? `/t/${tenantId}/faq/options` : [] as any,
-      },
-      {
-        id: "subscription",
-        label: "Activate your subscription",
-        done: subscriptionStatus === "active",
-        link: `/t/${tenantId}/settings/subscription`,
-      },
-      {
-        id: "directory",
-        label: "Publish your directory listing",
-        done: hasPublishedDirectory,
-        link: `/t/${tenantId}/settings/directory`,
-      },
-    ];
-  }, [allCaps.data, hasProducts, hasStorefront, hasPublishedDirectory, locationStatus, subscriptionStatus, tenantId]);
+export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
+  const { tasks, loading } = useNextSteps(tenantId);
 
   const completed = tasks.filter((t) => t.done).length;
-  const percent = Math.round((completed / tasks.length) * 100);
+  const total = tasks.length;
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  if (loading && tasks.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <h3 className="font-semibold text-gray-900 mb-1">Next Steps</h3>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
       <h3 className="font-semibold text-gray-900 mb-1">Next Steps</h3>
       <p className="text-sm text-gray-500 mb-4">
-        {completed} of {tasks.length} completed
+        {completed} of {total} completed
       </p>
 
       {/* Progress ring */}

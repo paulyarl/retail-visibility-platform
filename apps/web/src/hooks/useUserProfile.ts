@@ -53,10 +53,14 @@ export interface UseUserProfileReturn {
  * Falls back to auth context if profile endpoint not available yet
  */
 export function useUserProfile(): UseUserProfileReturn {
-  const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user, isLoading: authLoading } = useAuth();
+
+  // Initialize synchronously from auth user if available — no need to wait for useEffect
+  const [profile, setProfile] = useState<UserProfileData | null>(
+    () => user ? createFallbackProfile(user) : null
+  );
+  const [loading, setLoading] = useState(!user && authLoading);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Wait for auth to finish loading

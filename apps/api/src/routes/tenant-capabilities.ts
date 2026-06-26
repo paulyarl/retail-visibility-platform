@@ -13,6 +13,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { deriveInternalStatus } from '../utils/subscription-status';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router({ mergeParams: true });
@@ -38,16 +39,14 @@ const CAPABILITY_TYPE_PREFIXES: Record<string, string> = {
  * No dependency on directory_listings_list — works even if directory is unpublished.
  */
 async function resolveTenantIdentifier(identifier: string): Promise<{ id: string; slug: string | null } | null> {
-  // If it starts with 'tid-', it's already a tenant ID
-  if (identifier.startsWith('tid-')) {
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: identifier },
-      select: { id: true, slug: true },
-    });
-    return tenant;
-  }
+  // Try ID lookup first (works for any tenant ID format: tid-*, tenant-*, etc.)
+  const byId = await prisma.tenants.findUnique({
+    where: { id: identifier },
+    select: { id: true, slug: true },
+  });
+  if (byId) return byId;
 
-  // Otherwise, look up by slug in the tenants table
+  // Fall back to slug lookup
   const tenant = await prisma.tenants.findFirst({
     where: { slug: identifier },
     select: { id: true, slug: true },
@@ -318,6 +317,341 @@ router.get('/capabilities/tiers-by-capability', authenticateToken, async (req: R
 });
 
 /**
+ * Build a complete effective-capabilities response for a tenant that exists
+ * but has no resolvable tier data (e.g. expired/canceled subscription with
+ * no matching tier in subscription_tiers_list).
+ *
+ * All capabilities are disabled. The subscription_context reflects the
+ * tenant's actual subscription status so the frontend can show appropriate
+ * read-only / expired messaging.
+ */
+function buildExpiredCapabilitiesResponse(tenant: {
+  id: string;
+  subscription_status: string | null;
+  subscription_tier: string | null;
+  trial_ends_at: Date | null;
+  subscription_ends_at: Date | null;
+}) {
+  const internalStatus = deriveInternalStatus({
+    subscription_status: tenant.subscription_status,
+    subscription_tier: tenant.subscription_tier,
+    trialEndsAt: tenant.trial_ends_at,
+    subscription_ends_at: tenant.subscription_ends_at,
+  });
+  const isReadOnly = internalStatus === 'frozen' || internalStatus === 'canceled' || internalStatus === 'expired';
+
+  return {
+    tenant_id: tenant.id,
+    tier: {
+      key: tenant.subscription_tier || 'unknown',
+      name: tenant.subscription_tier || 'Unknown',
+      description: '',
+    },
+    subscription_context: {
+      internalStatus,
+      maintenanceState: null,
+      isReadOnly,
+      isLimited: false,
+      writable: !isReadOnly,
+    },
+    effective: {
+      commerce: {
+        enabled: false,
+        cart_visible: false,
+        payment_type: 'none' as const,
+        effective_payment_type: 'none' as const,
+        effective_cart_visible: false,
+        checkout_available: false,
+        checkout_mode: { mode: 'disabled' as const },
+        merchant_preferences: { deposit_enabled: false, full_payment_enabled: false },
+        is_flexible: false,
+      },
+      payment_gateway: {
+        enabled: false,
+        allowed_gateways: [],
+        effective_gateways: [],
+        checkout_available: false,
+        merchant_preferences: { gateway_enabled: false, stripe_enabled: false, paypal_enabled: false, square_enabled: false, clover_enabled: false },
+        is_flexible: false,
+      },
+      storefront: {
+        enabled: false,
+        type: 'none' as const,
+        effective_type: 'none' as const,
+        is_flexible: false,
+        allowed_types: [],
+        has_merchant_selection: false,
+        merchant_preferences: { storefront_type_enabled: false, selected_storefront_type: 'none' as const },
+      },
+      fulfillment: {
+        enabled: false,
+        shows_pickup: false,
+        shows_delivery: false,
+        shows_shipping: false,
+        shows_service: false,
+        effective_shows_pickup: false,
+        effective_shows_delivery: false,
+        effective_shows_shipping: false,
+        merchant_preferences: { pickup_enabled: false, delivery_enabled: false, shipping_enabled: false },
+        is_flexible: false,
+        delivery_radius_miles: null,
+        delivery_fee_cents: 0,
+        delivery_min_free_cents: null,
+        delivery_time_hours: 0,
+        shipping_flat_rate_cents: null,
+        shipping_min_free_cents: null,
+        shipping_handling_days: 0,
+        pickup_ready_time_minutes: 0,
+        pickup_instructions: null,
+      },
+      product_options: {
+        enabled: false,
+        allowed_types: [],
+        effective_types: [],
+        shows_variants: false,
+        shows_gallery: false,
+        shows_video: false,
+        effective_shows_variants: false,
+        effective_shows_gallery: false,
+        effective_shows_video: false,
+        layout_enabled: false,
+        allowed_layouts: [],
+        effective_layout: 'classic' as const,
+        can_use_layout_classic: false,
+        can_use_layout_editorial: false,
+        can_use_layout_immersive: false,
+        shows_recently_viewed: false,
+        shows_qr_codes: false,
+        shows_recommended: false,
+        shows_map_display: false,
+        shows_location_display: false,
+        shows_hours_display: false,
+        shows_enhanced_seo: false,
+        shows_reviews: false,
+        shows_fulfillment: false,
+        shows_categories: false,
+        shows_location_availability: false,
+        merchant_preferences: {},
+        is_flexible: false,
+      },
+      featured: {
+        enabled: false,
+        tenant_enabled: false,
+        platform_enabled: false,
+        allowed_tenant_types: [],
+        allowed_platform_types: [],
+        allowed_types: [],
+        effective_tenant_types: [],
+        effective_platform_types: [],
+        effective_types: [],
+        featured_available: false,
+        effective_featured_available: false,
+        expiry_monitor_enabled: false,
+        merchant_preferences: {},
+        is_flexible: false,
+      },
+      integrations: {
+        enabled: false,
+        pos_enabled: false,
+        google_enabled: false,
+        allowed_pos_types: [],
+        allowed_google_types: [],
+        allowed_types: [],
+        effective_pos_types: [],
+        effective_google_types: [],
+        effective_types: [],
+        integrations_available: false,
+        effective_integrations_available: false,
+        merchant_preferences: {},
+        is_flexible: false,
+      },
+      quickstart: {
+        enabled: false,
+        is_flexible: false,
+        product_enabled: false,
+        allowed_product_types: [],
+        category_enabled: false,
+        allowed_category_types: [],
+        ai_enabled: false,
+        allowed_ai_types: [],
+        can_use_wizard: false,
+        can_use_ai_wizard: false,
+        can_use_category_generator: false,
+        can_generate_images: false,
+        can_use_openai: false,
+        can_use_gemini: false,
+        can_use_hd_images: false,
+        merchant_preferences: {},
+      },
+      storefront_options: {
+        enabled: false,
+        is_flexible: false,
+        hours_enabled: false,
+        allowed_hours_types: [],
+        category_enabled: false,
+        allowed_category_types: [],
+        recommend_enabled: false,
+        allowed_recommend_types: [],
+        recently_viewed_enabled: false,
+        info_enabled: false,
+        allowed_info_types: [],
+        qr_enabled: false,
+        allowed_qr_resolutions: [],
+        allowed_qr_content_types: [],
+        gallery_enabled: false,
+        allowed_gallery_types: [],
+        advanced_enabled: false,
+        allowed_advanced_types: [],
+        layout_enabled: false,
+        allowed_layouts: [],
+        effective_layout: 'classic' as const,
+        can_show_hours_display: false,
+        can_use_animated_hours: false,
+        can_show_hours_status: false,
+        can_show_map_display: false,
+        can_show_location_display: false,
+        can_use_category_store: false,
+        can_use_category_product: false,
+        can_use_recommend_store: false,
+        can_use_recommend_products: false,
+        can_use_recently_viewed: false,
+        can_use_social_media: false,
+        can_use_contact: false,
+        can_use_interactive_maps: false,
+        can_use_qr_codes: false,
+        can_use_enhanced_seo: false,
+        can_use_storefront_actions: false,
+        can_use_layout_classic: false,
+        can_use_layout_editorial: false,
+        can_use_layout_immersive: false,
+        merchant_preferences: {},
+      },
+      directory_entry: {
+        enabled: false,
+        is_flexible: false,
+        layout_enabled: false,
+        allowed_layouts: [],
+        effective_layout: 'classic' as const,
+        can_use_layout_classic: false,
+        can_use_layout_editorial: false,
+        can_use_layout_immersive: false,
+        can_use_layout_premium: false,
+        hours_enabled: false,
+        map_enabled: false,
+        contact_enabled: false,
+        gallery_enabled: false,
+        qr_enabled: false,
+        social_enabled: false,
+        seo_enabled: false,
+        can_show_hours: false,
+        can_show_map: false,
+        can_show_contact: false,
+        can_show_gallery: false,
+        can_show_qr: false,
+        can_show_social: false,
+        can_show_seo: false,
+        merchant_preferences: {},
+      },
+      faq: {
+        enabled: false,
+        storefront_enabled: false,
+        product_enabled: false,
+        templates_enabled: false,
+        management_enabled: false,
+        preview_enabled: false,
+        display_enabled: false,
+        kb_enabled: false,
+        allowed_management_types: [],
+        allowed_preview_types: [],
+        allowed_display_types: [],
+        allowed_kb_types: [],
+        is_flexible: false,
+        faq_available: false,
+        merchant_preferences: null,
+      },
+      crm: {
+        enabled: false,
+        inquiry_product_enabled: false,
+        inquiry_storefront_enabled: false,
+        inquiry_directory_enabled: false,
+        contacts_enabled: false,
+        ticket_features_enabled: false,
+        message_features_enabled: false,
+        customer_tickets_enabled: false,
+        dashboard_enabled: false,
+        allowed_inquiry_types: [],
+        allowed_contact_types: [],
+        allowed_ticket_types: [],
+        allowed_message_types: [],
+        allowed_customer_ticket_types: [],
+        allowed_dashboard_types: [],
+        is_flexible: false,
+        crm_available: false,
+        merchant_preferences: null,
+      },
+      chatbot: {
+        enabled: false,
+        static_enabled: false,
+        dynamic_enabled: false,
+        skills_enabled: false,
+        kb_enabled: false,
+        widget_enabled: false,
+        allowed_response_engines: [],
+        allowed_skill_types: [],
+        allowed_kb_types: [],
+        allowed_widget_types: [],
+        is_flexible: false,
+        chatbot_available: false,
+        can_use_widget_custom_theme: false,
+        can_use_widget_skill_cards: false,
+        can_use_widget_after_hours: false,
+        merchant_preferences: null,
+      },
+      barcode_scan: {
+        enabled: false,
+        allowed_modes: [],
+        effective_modes: [],
+        is_flexible: false,
+        scan_available: false,
+        effective_scan_available: false,
+        merchant_preferences: { barcode_scan_enabled: false, barcode_manual_enabled: false, barcode_usb_enabled: false, barcode_camera_enabled: false },
+      },
+      org_options: {
+        enabled: false,
+        is_flexible: false,
+        allowed_tabs: [],
+        allowed_panels: [],
+        allowed_propagation_types: [],
+        org_available: false,
+      },
+      social_commerce_options: {
+        enabled: false,
+        is_flexible: false,
+        meta_enabled: false,
+        allowed_meta_types: [],
+        tiktok_enabled: false,
+        allowed_tiktok_types: [],
+        experience_enabled: false,
+        allowed_experience_types: [],
+        can_use_meta_catalog: false,
+        can_use_meta_shop: false,
+        can_use_meta_pixel: false,
+        can_use_tiktok_catalog: false,
+        can_use_tiktok_shop: false,
+        can_use_tiktok_pixel: false,
+        can_use_share_buttons: false,
+        can_use_social_proof: false,
+        can_use_abandoned_cart: false,
+        social_commerce_available: false,
+        merchant_preferences: {},
+      },
+    },
+    uncategorized_features: [],
+    purchased_feature_keys: [],
+  };
+}
+
+/**
  * GET /api/tenants/:tenantId/effective-capabilities
  *
  * Unified capabilities endpoint — returns a flat "effective capability manifest"
@@ -334,6 +668,24 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
     const result = await resolveEffectiveCapabilities(tenantId, { detail });
 
     if (!result) {
+      // Tenant not resolved by the service — check if it exists but has no resolvable
+      // capabilities (e.g. expired subscription with no tier data).
+      // Try ID first, then slug fallback.
+      const tenantData = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { id: true, subscription_status: true, subscription_tier: true, trial_ends_at: true, subscription_ends_at: true },
+      }) ?? await prisma.tenants.findFirst({
+        where: { slug: tenantId },
+        select: { id: true, subscription_status: true, subscription_tier: true, trial_ends_at: true, subscription_ends_at: true },
+      });
+
+      if (tenantData) {
+        return res.status(200).json({
+          success: true,
+          data: buildExpiredCapabilitiesResponse(tenantData),
+        });
+      }
+
       return res.status(404).json({
         success: false,
         error: 'tenant_not_found',
@@ -353,6 +705,120 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
       success: false,
       error: 'internal_error',
       message: 'Failed to resolve effective capabilities',
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/system-status
+ *
+ * Returns a capability-aware system status summary.
+ * All detection logic runs server-side via EffectiveCapabilityResolver
+ * + business state queries in a single round-trip.
+ */
+router.get('/:tenantId/system-status', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const { resolveSystemStatus } = await import('../services/SystemStatusService');
+    const result = await resolveSystemStatus(tenantId);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=30, s-maxage=30');
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[GET /system-status] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve system status',
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/next-steps
+ *
+ * Returns a tier-and-capability-aware onboarding task list.
+ * All detection logic runs server-side in a single round-trip.
+ */
+router.get('/:tenantId/next-steps', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const { resolveNextSteps } = await import('../services/NextStepsService');
+    const tasks = await resolveNextSteps(tenantId);
+
+    if (tasks === null) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=30, s-maxage=30');
+    res.json({
+      success: true,
+      data: tasks,
+    });
+  } catch (error) {
+    console.error('[GET /next-steps] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve next steps',
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/growth-tips
+ *
+ * Returns tier-and-capability-aware growth tips.
+ * Multi-dimensional: tier level, capabilities, usage, subscription status,
+ * location status, visibility status, and growth path.
+ *
+ * Query params:
+ *   ?limit=N  — max tips to return (default 5)
+ */
+router.get('/:tenantId/growth-tips', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
+
+    const { resolveGrowthTips } = await import('../services/GrowthTipService');
+    const tips = await resolveGrowthTips(tenantId, limit);
+
+    if (tips === null) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=30, s-maxage=30');
+    res.json({
+      success: true,
+      data: tips,
+    });
+  } catch (error) {
+    console.error('[GET /growth-tips] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve growth tips',
     });
   }
 });

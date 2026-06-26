@@ -42,6 +42,7 @@ import TaskChecklist from "./TaskChecklist";
 import GrowthTipCard from "./GrowthTipCard";
 import CapabilityShowcase from "./CapabilityShowcase";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
+import type { TipContext } from "@/lib/growth-tips/tipEngine";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 import { botService } from '@/services/BotService';
@@ -62,6 +63,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
     usage,
     organizationTenants,
     loading: completeLoading,
+    primaryLoading,
     error: completeError,
     refresh: refreshTenantData,
   } = useTenantComplete(tenantId, true);
@@ -129,7 +131,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
     ],
   });
 
-  const loading = completeLoading || profileLoading;
+  const loading = primaryLoading;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const error = completeError;
   const { status: hoursStatus } = useStoreStatus(tenantId || tenantData?.id || "", false);
@@ -185,6 +187,46 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   const hasStoreCategory = !!(businessProfile as any)?.gbpCategoryId;
   const hasSlug = !!businessProfile?.slug;
   const hasLogo = !!businessProfile?.logo_url;
+
+  // ─── Growth Tip Context ───
+  const subscriptionStatus = tenantData?.subscriptionStatus || 'active';
+  const isTrial = subscriptionStatus === 'trialing' || subscriptionStatus === 'trial';
+  const trialEndsAt = (tenantData as any)?.effectiveExpiresAt;
+  const trialDaysLeft = isTrial && trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  const tipContext: TipContext = {
+    tierLevel: tier?.effective?.level || 'discovery',
+    tierName: tier?.effective?.name || 'Discovery',
+    canUpgrade: tier?.canUpgrade ?? false,
+    upgradeOptions: tier?.upgradeOptions ?? [],
+    capabilities: allCaps.data ?? null,
+    usage: {
+      totalItems: usage?.totalItems ?? 0,
+      activeItems: usage?.activeItems ?? 0,
+      orders: usage?.orders ?? 0,
+    },
+    businessState: {
+      hasProducts,
+      hasStorefront: !!hasStorefront,
+      hasPublishedDirectory: !!hasPublishedDirectory,
+      hasFAQs: faqSize > 0,
+      hasHours,
+      hasLogo,
+      hasMap,
+      hasStoreCategory,
+      hasSlug,
+    },
+    subscriptionStatus,
+    isTrial,
+    trialDaysLeft,
+    isReadOnly: !isWritable,
+    isPastDue: subscriptionStatus === 'past_due',
+    locationStatus: tenantData?.locationStatus || 'active',
+    reopeningDate: (tenantData?.statusInfo as any)?.reopeningDate ?? null,
+    tenantId,
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -420,22 +462,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
             {/* Task Checklist */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.36 }}>
-              <TaskChecklist
-                tenantId={tenantId}
-                hasProducts={hasProducts}
-                hasStorefront={!!hasStorefront}
-                hasPublishedDirectory={!!hasPublishedDirectory}
-                hasFeaturedProducts={!!hasFeaturedProducts}
-                hasFAQs={faqSize > 0}
-                canManageFaq={canManageFaq}
-                locationStatus={tenantData?.locationStatus}
-                subscriptionStatus={tenantData?.subscriptionStatus}
-                hasHours={hasHours}
-                hasMap={hasMap}
-                hasStoreCategory={hasStoreCategory}
-                hasSlug={hasSlug}
-                hasLogo={hasLogo}
-              />
+              <TaskChecklist tenantId={tenantId} />
             </motion.div>
           </div>
 
@@ -520,11 +547,11 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
-              <SystemStatusCard hoursStatus={hoursStatus} syncIssues={0} tenantId={tenantId} />
+              <SystemStatusCard tenantId={tenantId} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-              <GrowthTipCard />
+              <GrowthTipCard tipContext={tipContext} />
             </motion.div>
 
             {/* Hours Status */}
@@ -541,51 +568,50 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
         </div>
 
         {/* ── Bottom: Subscription Full Card ── */}
-        {tier && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="mt-8">
-            <SubscriptionDisplayCard
-              tenantId={tenantId}
-              tierData={{
-                tier: tier.effective?.id || "starter",
-                subscriptionStatus: tenantData?.subscriptionStatus || "active",
-                trialEndsAt: null,
-                subscriptionEndsAt: null,
-                isChain: tier.isChain,
-                organizationId: tier.organizationId,
-                organizationName: tier.organizationName,
-                organizationTenants,
-                organizationTier: tier.organization
-                  ? {
-                    tier_key: tier.organization.id,
-                    display_name: tier.organization.name,
-                    price_monthly: tier.organization.limits?.maxProducts ? 299.99 : 0,
-                    max_skus: tier.organization.limits?.maxProducts || 0,
-                    max_locations: tier.organization.limits?.maxLocations || 0,
-                    features: tier.organization.features?.map((f) => ({
-                      feature_key: f.id,
-                      feature_name: f.name,
-                      is_enabled: f.enabled !== false,
-                    })),
-                  }
-                  : undefined,
-                tenantTier: tier.tenant
-                  ? {
-                    tier_key: tier.tenant.id,
-                    display_name: tier.tenant.name,
-                    price_monthly: tier.tenant.limits?.maxProducts ? 49 : 0,
-                    max_skus: tier.tenant.limits?.maxProducts || 0,
-                    max_locations: tier.tenant.limits?.maxLocations || 0,
-                    features: tier.tenant.features?.map((f) => ({
-                      feature_key: f.id,
-                      feature_name: f.name,
-                      is_enabled: f.enabled !== false,
-                    })),
-                  }
-                  : undefined,
-              }}
-            />
-          </motion.div>
-        )}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="mt-8">
+          <SubscriptionDisplayCard
+            tenantId={tenantId}
+            capabilities={allCaps.data}
+            tierData={{
+              tier: tier?.effective?.id || allCaps.data?.tierKey || tenantData?.subscriptionTier || "starter",
+              subscriptionStatus: tenantData?.subscriptionStatus || "active",
+              trialEndsAt: (tenantData as any)?.effectiveExpiresAt || null,
+              subscriptionEndsAt: tenantData?.subscriptionEndsAt || null,
+              isChain: tier?.isChain || false,
+              organizationId: tier?.organizationId || tenantData?.organizationId || undefined,
+              organizationName: tier?.organizationName || undefined,
+              organizationTenants,
+              organizationTier: tier?.organization
+                ? {
+                  tier_key: tier.organization.id,
+                  display_name: tier.organization.name,
+                  price_monthly: tier.organization.limits?.maxProducts ? 299.99 : 0,
+                  max_skus: tier.organization.limits?.maxProducts || 0,
+                  max_locations: tier.organization.limits?.maxLocations || 0,
+                  features: tier.organization.features?.map((f) => ({
+                    feature_key: f.id,
+                    feature_name: f.name,
+                    is_enabled: f.enabled !== false,
+                  })),
+                }
+                : undefined,
+              tenantTier: tier?.tenant
+                ? {
+                  tier_key: tier.tenant.id,
+                  display_name: tier.tenant.name,
+                  price_monthly: tier.tenant.limits?.maxProducts ? 49 : 0,
+                  max_skus: tier.tenant.limits?.maxProducts || 0,
+                  max_locations: tier.tenant.limits?.maxLocations || 0,
+                  features: tier.tenant.features?.map((f) => ({
+                    feature_key: f.id,
+                    feature_name: f.name,
+                    is_enabled: f.enabled !== false,
+                  })),
+                }
+                : undefined,
+            }}
+          />
+        </motion.div>
       </main>
 
     </div>

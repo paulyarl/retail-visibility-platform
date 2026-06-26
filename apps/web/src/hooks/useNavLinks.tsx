@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePathname } from 'next/navigation';
 import { navigationLinksService, NavLink, NavTemplateParser } from '@/services/NavigationLinksService';
@@ -239,10 +239,6 @@ export function useNavLinks(): UseNavLinksResult {
     pathname?.startsWith('/tenants') ||
     pathname?.startsWith('/onboarding')
   );
-  
-  // console.log(`useNavLinks - isAuthenticated:`, isAuthenticated);
-  // console.log(`useNavLinks - _cache:`, _cache);
-  // console.log(`useNavLinks - links:`, links);
 
   const load = useCallback(() => {
     // Only fetch if authenticated and on a tenant/admin page
@@ -250,8 +246,14 @@ export function useNavLinks(): UseNavLinksResult {
       setLoading(false);
       return;
     }
-    // Skip if we already have data loaded (prevents re-fetch on auth state changes)
-    if (hasLoadedRef.current && links.length > 0) {
+    // Skip if the shared cache already has data (prevents re-fetch on mount/remount)
+    if (_cache && _cache.length > 0) {
+      setLinks(_cache);
+      setLoading(false);
+      return;
+    }
+    // Skip if we already have a fetch in flight or finished for this session
+    if (hasLoadedRef.current) {
       return;
     }
     setLoading(true);
@@ -267,7 +269,7 @@ export function useNavLinks(): UseNavLinksResult {
         setError(err.message);
         setLoading(false);
       });
-  }, [isAuthenticated, isTenantOrAdminPage, links.length]);
+  }, [isAuthenticated, isTenantOrAdminPage]);
 
   useEffect(() => {
     // Skip entirely if not authenticated or not on tenant/admin page
@@ -279,26 +281,23 @@ export function useNavLinks(): UseNavLinksResult {
 
   // Ensure links is always an array
   const linksArray = Array.isArray(links) ? links : [];
-  // console.log('useNavLinks - linksArray:', linksArray);
-  
-  const enabled = linksArray.filter(l => l.enabled);
-  // console.log('useNavLinks - enabled links:', enabled);
+  const enabled = useMemo(() => linksArray.filter(l => l.enabled), [linksArray]);
+  const adminLinks = useMemo(() => enabled.filter(l => l.targets.includes('admin')), [enabled]);
+  const allLinks = useMemo(() => enabled.filter(l => l.targets.includes('all')), [enabled]);
+  const tenantLinks = useMemo(() => enabled.filter(l => l.targets.includes('tenant')), [enabled]);
 
-  const adminLinks = enabled.filter(l => l.targets.includes('admin'));
-  const allLinks = enabled.filter(l => l.targets.includes('all'));
-  const tenantLinks = enabled.filter(l => l.targets.includes('tenant'));
-  
-  // console.log('useNavLinks - filtered adminLinks:', adminLinks);
-  // console.log('useNavLinks - filtered allLinks:', allLinks);
-  // console.log('useNavLinks - filtered tenantLinks:', tenantLinks);
+  const refresh = useCallback(() => {
+    invalidateNavLinksCache();
+    load();
+  }, [load]);
 
-  return {
+  return useMemo(() => ({
     links,
     allLinks,
     tenantLinks,
     adminLinks,
     loading,
     error,
-    refresh: () => { invalidateNavLinksCache(); load(); },
-  };
+    refresh,
+  }), [links, allLinks, tenantLinks, adminLinks, loading, error, refresh]);
 }

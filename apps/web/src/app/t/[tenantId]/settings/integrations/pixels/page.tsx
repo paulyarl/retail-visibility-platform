@@ -13,14 +13,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { API_BASE_URL } from '@/lib/api';
-
-interface PixelConfig {
-  metaPixelId: string | null;
-  metaAccessToken: string | null;
-  tiktokPixelId: string | null;
-  tiktokAccessToken: string | null;
-}
+import { socialPixelsService } from '@/services/SocialPixelsService';
+import type { PixelConfig } from '@/services/SocialPixelsService';
 
 export default function SocialPixelsSettingsPage() {
   const params = useParams();
@@ -45,16 +39,13 @@ export default function SocialPixelsSettingsPage() {
   async function fetchConfig() {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/social-pixels/${tenantId}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setConfig(data.data);
-        setMetaPixelId(data.data?.metaPixelId || '');
-        setMetaAccessToken(data.data?.metaAccessToken || '');
-        setTiktokPixelId(data.data?.tiktokPixelId || '');
-        setTiktokAccessToken(data.data?.tiktokAccessToken || '');
+      const data = await socialPixelsService.getPixelConfig(tenantId);
+      if (data) {
+        setConfig(data);
+        setMetaPixelId(data.metaPixelId || '');
+        setMetaAccessToken(data.metaAccessToken || '');
+        setTiktokPixelId(data.tiktokPixelId || '');
+        setTiktokAccessToken(data.tiktokAccessToken || '');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch config');
@@ -69,26 +60,16 @@ export default function SocialPixelsSettingsPage() {
       setError(null);
       setSuccess(false);
 
-      const res = await fetch(`${API_BASE_URL}/api/social-pixels/${tenantId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          metaPixelId: metaPixelId || null,
-          metaAccessToken: metaAccessToken || null,
-          tiktokPixelId: tiktokPixelId || null,
-          tiktokAccessToken: tiktokAccessToken || null,
-        }),
+      const data = await socialPixelsService.updatePixelConfig(tenantId, {
+        metaPixelId: metaPixelId || null,
+        metaAccessToken: metaAccessToken || null,
+        tiktokPixelId: tiktokPixelId || null,
+        tiktokAccessToken: tiktokAccessToken || null,
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setConfig(data.data);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 5000);
-      } else {
-        setError(data.message || 'Failed to save');
-      }
+      setConfig(data);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {

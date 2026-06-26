@@ -358,6 +358,51 @@ class CheckoutService extends PublicApiSingleton {
       return null;
     }
   }
+
+  async calculateTax(payload: {
+    tenant_id: string;
+    subtotal_cents: number;
+    shipping_cents: number;
+    shipping_address: {
+      line1: string;
+      line2?: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+    };
+    line_items: { amountCents: number; reference: string }[];
+  }): Promise<number> {
+    try {
+      const result = await this.makeDefaultRequest<{ success: boolean; tax?: { tax_cents: number } }>(
+        `/api/tax/calculate`,
+        { method: 'POST', body: JSON.stringify(payload) },
+      );
+      if (!result.success) return 0;
+      if (!result.data?.success) return 0;
+      return result.data.tax?.tax_cents || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async trackCart(payload: {
+    tenantId: string;
+    cartId: string;
+    customerEmail?: string;
+    customerName?: string;
+    customerId?: string;
+    items: any[];
+  }): Promise<void> {
+    try {
+      await this.makeDefaultRequest<any>(
+        `/api/cart/track`,
+        { method: 'POST', body: JSON.stringify(payload) },
+      );
+    } catch {
+      // Silent fail — tracking is best-effort
+    }
+  }
 }
 
 // Export singleton instance

@@ -18,35 +18,9 @@ import {
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { API_BASE_URL } from '@/lib/api';
+import { metaIntegrationService } from '@/services/MetaIntegrationService';
+import type { MetaStatus, MetaSyncStatus, MetaBusiness } from '@/services/MetaIntegrationService';
 
-interface MetaStatus {
-  isConnected: boolean;
-  isExpired: boolean;
-  hasTokens: boolean;
-  email: string | null;
-  displayName: string | null;
-  businessId: string | null;
-  catalogId: string | null;
-  instagramAccountId: string | null;
-  scopes: string[] | null;
-  tokenExpiry: string | null;
-  message: string;
-}
-
-interface SyncStatus {
-  total: number;
-  active: number;
-  syncing: number;
-  notSyncing: number;
-  catalogId: string | null;
-  lastSyncAt: string | null;
-}
-
-interface MetaBusiness {
-  id: string;
-  name: string;
-  instagram_business_account?: { id: string; username: string };
-}
 
 function MetaIntegrationContent() {
   const params = useParams();
@@ -61,7 +35,7 @@ function MetaIntegrationContent() {
   );
 
   const [status, setStatus] = useState<MetaStatus | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncStatus, setSyncStatus] = useState<MetaSyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -75,15 +49,8 @@ function MetaIntegrationContent() {
   async function fetchStatus() {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/meta/oauth/status?tenantId=${tenantId}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStatus(data.data);
-      } else {
-        setError(data.message || 'Failed to fetch status');
-      }
+      const data = await metaIntegrationService.getOAuthStatus(tenantId);
+      setStatus(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -93,13 +60,8 @@ function MetaIntegrationContent() {
 
   async function fetchSyncStatus() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/meta/catalog/sync-status?tenantId=${tenantId}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSyncStatus(data.data);
-      }
+      const data = await metaIntegrationService.getCatalogSyncStatus(tenantId);
+      setSyncStatus(data);
     } catch (err) {
       console.error('Failed to fetch sync status:', err);
     }
@@ -108,13 +70,8 @@ function MetaIntegrationContent() {
   async function fetchBusinesses() {
     try {
       setLoadingBusinesses(true);
-      const res = await fetch(`${API_BASE_URL}/api/meta/oauth/businesses?tenantId=${tenantId}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBusinesses(data.data?.businesses || []);
-      }
+      const data = await metaIntegrationService.getBusinesses(tenantId);
+      setBusinesses(data);
     } catch (err) {
       console.error('Failed to fetch businesses:', err);
     } finally {
@@ -132,19 +89,9 @@ function MetaIntegrationContent() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/meta/oauth/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tenantId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchStatus();
-        await fetchSyncStatus();
-      } else {
-        setError(data.message || 'Failed to disconnect');
-      }
+      await metaIntegrationService.disconnectOAuth(tenantId);
+      await fetchStatus();
+      await fetchSyncStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to disconnect');
     }
@@ -157,25 +104,14 @@ function MetaIntegrationContent() {
     }
     try {
       setLinkingCatalog(true);
-      const res = await fetch(`${API_BASE_URL}/api/meta/oauth/link-catalog`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          tenantId,
-          businessId: selectedBusiness?.id || null,
-          catalogId: catalogIdInput,
-          instagramAccountId: selectedBusiness?.instagram_business_account?.id || null,
-        }),
+      await metaIntegrationService.linkCatalog(tenantId, {
+        businessId: selectedBusiness?.id || null,
+        catalogId: catalogIdInput,
+        instagramAccountId: selectedBusiness?.instagram_business_account?.id || null,
       });
-      const data = await res.json();
-      if (data.success) {
-        await fetchStatus();
-        await fetchSyncStatus();
-        setCatalogIdInput('');
-      } else {
-        setError(data.message || 'Failed to link catalog');
-      }
+      await fetchStatus();
+      await fetchSyncStatus();
+      setCatalogIdInput('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to link catalog');
     } finally {
@@ -186,19 +122,9 @@ function MetaIntegrationContent() {
   async function handleSync() {
     try {
       setSyncing(true);
-      const res = await fetch(`${API_BASE_URL}/api/meta/catalog/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tenantId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setError(null);
-        setTimeout(() => fetchSyncStatus(), 3000);
-      } else {
-        setError(data.message || 'Failed to start sync');
-      }
+      await metaIntegrationService.syncCatalog(tenantId);
+      setError(null);
+      setTimeout(() => fetchSyncStatus(), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start sync');
     } finally {

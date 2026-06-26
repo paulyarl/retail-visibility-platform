@@ -334,7 +334,7 @@ app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-correlation-id'],
+  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-correlation-id', 'cache-control', 'x-platform-cache', 'x-service-admin'],
 }));
 
 // Client error reporting — mounted BEFORE auth middleware (errors can occur pre-login)
@@ -5166,7 +5166,7 @@ const createItemSchema = baseItemSchema.extend({
 
 const updateItemSchema = baseItemSchema.partial();
 
-app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubscriptionLimits, */ async (req, res) => {
+app.post(["/api/items", "/api/inventory", "/items", "/inventory"], requireWritableSubscription, async (req, res) => {
   console.log('[POST /items] Raw request body:', JSON.stringify(req.body, null, 2));
 
   const parsed = createItemSchema.safeParse(req.body ?? {});
@@ -5429,7 +5429,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
   }
 });
 
-app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], /* enforcePolicyCompliance, */ async (req, res) => {
+app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], requireWritableSubscription, async (req, res) => {
   console.log('[PUT /items/:id] Received body:', JSON.stringify(req.body));
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -5702,7 +5702,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
 });
 
 // Soft delete - move item to trash (with capacity check)
-app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, async (req, res) => {
+app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     // Get item to find tenant
     const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
@@ -5818,7 +5818,7 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
 });
 
 // Permanent delete (purge) - only works on trashed items
-app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, async (req, res) => {
+app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     // First check if item is trashed
     const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
@@ -6841,7 +6841,7 @@ app.patch('/api/v1/tenants/:tenant_id/items/:itemId/category', async (req, res) 
 // Update an item (general updates, not category assignment)
 // PUT /api/items/:itemId
 // Update an item (general updates, not category assignment)
-app.put('/api/items/:itemId', authenticateToken, async (req, res) => {
+app.put('/api/items/:itemId', authenticateToken, requireWritableSubscription, async (req, res) => {
   try {
     const { itemId } = req.params;
     const updateData = req.body;

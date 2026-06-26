@@ -4,18 +4,20 @@ import { Modal, Button, Checkbox, Radio, Group, Stack, Text, Title, Paper, Divid
 import { useSubscriptionDisplay, FIELD_METADATA, type SubscriptionDisplayField } from '@/hooks/useSubscriptionDisplay';
 import { useState, useEffect } from 'react';
 import { IconRotateClockwise, IconCheck } from '@tabler/icons-react';
+import type { AllCapabilitiesState } from '@/services/CapabilityResolutionService';
 
 interface SubscriptionDisplayOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   tenantId: string;
+  capabilities?: AllCapabilitiesState | null;
 }
 
 // Group fields by category
 const FIELD_CATEGORIES = {
   subscription: {
     label: 'Subscription',
-    fields: ['effectiveTier', 'subscriptionStatus', 'pricing', 'features', 'trialInfo'] as SubscriptionDisplayField[],
+    fields: ['effectiveTier', 'subscriptionStatus', 'pricing', 'capabilities', 'trialInfo'] as SubscriptionDisplayField[],
   },
   limits: {
     label: 'Limits',
@@ -33,24 +35,36 @@ const LAYOUT_OPTIONS = [
   { value: 'expanded', label: 'Expanded', description: 'Multi-column, detailed view' },
 ] as const;
 
+const TOTAL_CAPABILITY_DOMAINS = 16;
+
+function countEnabledCapabilities(caps: AllCapabilitiesState): number {
+  const domains = [
+    caps.commerce, caps.paymentGateway, caps.storefront, caps.barcodeScan,
+    caps.fulfillment, caps.productOptions, caps.featuredOptions, caps.integrationOptions,
+    caps.quickstartOptions, caps.storefrontOptions, caps.directoryEntryOptions,
+    caps.faqOptions, caps.crmOptions, caps.chatbotOptions, caps.socialCommerceOptions,
+  ];
+  return domains.filter(d => d?.enabled).length;
+}
+
 export function SubscriptionDisplayOptionsModal({
   isOpen,
   onClose,
   tenantId,
+  capabilities,
 }: SubscriptionDisplayOptionsModalProps) {
   const { 
     config, 
     isLoading, 
-    toggleField, 
     setVisibleFields, 
     setLayout, 
-    resetToDefaults,
-    toggleUpgradePrompt,
+    setShowUpgradePrompt,
   } = useSubscriptionDisplay(tenantId);
 
   // Local state for unsaved changes
   const [localVisibleFields, setLocalVisibleFields] = useState<SubscriptionDisplayField[]>([]);
   const [localLayout, setLocalLayout] = useState<typeof config.layout>('compact');
+  const [localShowUpgradePrompt, setLocalShowUpgradePrompt] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Sync local state with config when modal opens
@@ -58,9 +72,10 @@ export function SubscriptionDisplayOptionsModal({
     if (isOpen && !isLoading) {
       setLocalVisibleFields([...config.visibleFields]);
       setLocalLayout(config.layout);
+      setLocalShowUpgradePrompt(config.showUpgradePrompt);
       setHasChanges(false);
     }
-  }, [isOpen, isLoading, config]);
+  }, [isOpen, isLoading, config.visibleFields, config.layout, config.showUpgradePrompt]);
 
   // Check for changes
   useEffect(() => {
@@ -68,8 +83,9 @@ export function SubscriptionDisplayOptionsModal({
       localVisibleFields.length !== config.visibleFields.length ||
       localVisibleFields.some(f => !config.visibleFields.includes(f));
     const layoutChanged = localLayout !== config.layout;
-    setHasChanges(fieldsChanged || layoutChanged);
-  }, [localVisibleFields, localLayout, config]);
+    const upgradeChanged = localShowUpgradePrompt !== config.showUpgradePrompt;
+    setHasChanges(fieldsChanged || layoutChanged || upgradeChanged);
+  }, [localVisibleFields, localLayout, localShowUpgradePrompt, config.visibleFields, config.layout, config.showUpgradePrompt]);
 
   // Toggle field in local state
   const handleToggleField = (field: SubscriptionDisplayField) => {
@@ -106,17 +122,15 @@ export function SubscriptionDisplayOptionsModal({
   const handleSave = () => {
     setVisibleFields(localVisibleFields);
     setLayout(localLayout);
+    setShowUpgradePrompt(localShowUpgradePrompt);
     onClose();
-    // Small delay to ensure localStorage sync completes before reload
-    setTimeout(() => {
-      window.location.reload();
-    }, 50);
   };
 
   // Reset to defaults
   const handleReset = () => {
-    setLocalVisibleFields(['effectiveTier', 'subscriptionStatus', 'skuLimit', 'locationLimit']);
+    setLocalVisibleFields(['effectiveTier', 'subscriptionStatus', 'skuLimit', 'locationLimit', 'capabilities']);
     setLocalLayout('compact');
+    setLocalShowUpgradePrompt(true);
   };
 
   // Check if field is selected
@@ -175,7 +189,12 @@ export function SubscriptionDisplayOptionsModal({
                       />
                       <Box>
                         <Text size="sm" fw={500}>{meta.label}</Text>
-                        <Text size="xs" c="dimmed">{meta.description}</Text>
+                        <Text size="xs" c="dimmed">
+                          {meta.description}
+                          {field === 'capabilities' && capabilities && (
+                            <> &middot; {countEnabledCapabilities(capabilities)}/{TOTAL_CAPABILITY_DOMAINS} active</>
+                          )}
+                        </Text>
                       </Box>
                     </Group>
                   </Paper>
@@ -233,8 +252,8 @@ export function SubscriptionDisplayOptionsModal({
               </Text>
             </Box>
             <Checkbox
-              checked={config.showUpgradePrompt}
-              onChange={() => toggleUpgradePrompt()}
+              checked={localShowUpgradePrompt}
+              onChange={() => setLocalShowUpgradePrompt(!localShowUpgradePrompt)}
             />
           </Group>
         </Paper>
@@ -259,7 +278,6 @@ export function SubscriptionDisplayOptionsModal({
             leftSection={<IconCheck size={16} />}
             onClick={handleSave}
             disabled={!hasChanges}
-            style={{ color: '#9ca3af' }}
           >
             Save Changes
           </Button>

@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useServerAuth } from "@/components/tenant/ServerResolvedContextProvider";
 import { Spinner } from "@/components/ui";
 
 interface TenantAuthGateProps {
@@ -11,8 +12,8 @@ interface TenantAuthGateProps {
 
 /**
  * Client-side authentication gate for tenant-scoped pages.
- * Mirrors the pattern used in /tenants/layout.tsx and /settings/layout.tsx:
- * - Checks useAuth() state
+ * Trusts server-resolved auth state from ServerResolvedContextProvider when available.
+ * Falls back to useAuth() (client-side API call) when server state is not present.
  * - Redirects to Auth0 login with returnTo if not authenticated
  * - Shows a spinner while auth is loading
  */
@@ -20,21 +21,25 @@ export default function TenantAuthGate({ children }: TenantAuthGateProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const renderCount = useRef(0);
+  const serverAuth = useServerAuth();
   const hasRedirectedRef = useRef(false);
-  renderCount.current++;
-  const timestamp = new Date().toISOString();
-  console.log(`[TenantAuthGate] render #${renderCount.current} at ${timestamp} authLoading=${authLoading} isAuthenticated=${isAuthenticated} pathname=${pathname}`);
+
+  // If server already confirmed authentication, trust it immediately — no redirect, no spinner
+  const serverConfirmed = serverAuth?.isAuthenticated === true;
 
   useEffect(() => {
-    const effectTimestamp = new Date().toISOString();
-    console.log(`[TenantAuthGate] effect at ${effectTimestamp} authLoading=${authLoading} isAuthenticated=${isAuthenticated}`);
+    // Skip redirect logic if server already confirmed auth
+    if (serverConfirmed) return;
     if (!authLoading && !isAuthenticated && !hasRedirectedRef.current) {
-      console.log(`[TenantAuthGate] redirecting to login at ${effectTimestamp}`);
       hasRedirectedRef.current = true;
+      console.log('[TenantAuthGate] REDIRECT to login — not authenticated');
       router.push(`/auth/login?returnTo=${encodeURIComponent(pathname)}`);
     }
-  }, [authLoading, isAuthenticated, router, pathname]);
+  }, [authLoading, isAuthenticated, router, pathname, serverConfirmed]);
+
+  if (serverConfirmed) {
+    return <>{children}</>;
+  }
 
   if (authLoading || !isAuthenticated) {
     return (

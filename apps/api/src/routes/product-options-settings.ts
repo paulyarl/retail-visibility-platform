@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import ProductOptionsService, { ProductType } from '../services/ProductOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -171,7 +172,7 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
 });
 
 // Update product options settings for a tenant
-router.put('/:tenantId/product-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/product-options', authenticateToken, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

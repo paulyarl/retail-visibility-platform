@@ -1,12 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
 import { clientLogger } from '@/lib/client-logger';
 import { clearCorrelationId } from '@/lib/correlation-id';
+import type { ServerResolvedAuth } from '@/components/tenant/ServerResolvedContextProvider';
 
 // User type
 
@@ -91,9 +92,13 @@ class AuthContextSingleton extends ApiSystemSingleton {
 // Create singleton instance
 const authContextSingleton = AuthContextSingleton.getInstance();
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({ children, initialUser }: { children: React.ReactNode; initialUser?: ServerResolvedAuth['user'] | null }) {
+  // Initialize from server-resolved state if provided via prop (from root layout)
+  const serverUser = initialUser ?? null;
+
+  // Initialize from server-resolved state if available — skips redundant API call
+  const [user, setUser] = useState<User | null>(serverUser as User | null);
+  const [isLoading, setIsLoading] = useState(!serverUser); // false if server provided state
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
 
   // Track fetch errors to prevent infinite retry loops
@@ -118,9 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          document.cookie.includes('auth0_id=') ||
          document.cookie.includes('auth0.')); // Also check for auth0 session cookies
 
-      // Skip auth check if no auth cookies present - prevents 401 errors
-      // This applies to all contexts, not just public pages
-      if (!hasAuthCookies && !forceRefresh) {
+      // Skip auth check if no auth cookies present - prevents 401 errors on public pages.
+      // On protected pages, always check via API because the Auth0 session cookie
+      // (appSession / auth0-session) is httpOnly and invisible to document.cookie.
+      const isProtectedContext = isAdminContext || isTenantContext;
+      if (!hasAuthCookies && !forceRefresh && !isProtectedContext) {
         setUser(null);
         setIsLoading(false);
         return;
@@ -173,21 +180,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // Remove currentTenantId - it's only used for setting, not fetching
 
   // Login - redirects to Auth0 login
-  const login = () => {
+  const login = useCallback(() => {
     if (typeof window !== 'undefined') {
       window.location.href = '/auth/login';
     }
-  };
+  }, []);
 
   // Register - redirects to Auth0 signup
-  const register = () => {
+  const register = useCallback(() => {
     if (typeof window !== 'undefined') {
       window.location.href = '/auth/signup';
     }
-  };
+  }, []);
 
   // Logout - redirects to Auth0 logout
-  const logout = () => {
+  const logout = useCallback(() => {
     try {
       // Clear local state
       setUser(null);
@@ -220,29 +227,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.href = '/auth/logout';
       }
     }
-  };
+  }, []);
 
   // Switch tenant
-  const switchTenant = (tenantId: string) => {
+  const switchTenant = useCallback((tenantId: string) => {
     if (user?.tenants.find(t => t.id === tenantId)) {
       setCurrentTenantId(tenantId);
       localStorage.setItem('current_tenant_id', tenantId);
     }
-  };
+  }, [user?.tenants]);
 
-  // Load user on mount
+  // Load user on mount — skip if server already provided auth state
   const hasFetchedRef = React.useRef(false);
+  const serverProvidedRef = React.useRef(!!serverUser);
   
   useEffect(() => {
+    // If server already resolved auth, skip the initial API fetch
+    if (serverProvidedRef.current) {
+      hasFetchedRef.current = true;
+      console.log('[AuthProvider] mount — skipping fetchUser (server provided)');
+      return;
+    }
     // Only fetch once on mount
     if (!hasFetchedRef.current) {
       hasFetchedRef.current = true;
+      console.log('[AuthProvider] mount — calling fetchUser (no server state)');
       fetchUser();
     }
   }, [fetchUser]);
 
   // Re-fetch auth state when navigating to a protected page
+  // Uses a separate ref to avoid double-fetching on initial mount (the mount effect above handles the first fetch)
   const pathname = usePathname();
+  const hasReFetchedRef = React.useRef(false);
   
   useEffect(() => {
     if (!pathname) return;
@@ -254,8 +271,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       pathname.startsWith('/settings') ||
       pathname.startsWith('/onboarding');
     
-    // Only fetch if protected, no user, and no previous fetch error (prevents infinite loop on auth failure)
-    if (isProtected && !user && hasFetchedRef.current && !fetchErrorRef.current) {
+    // Only re-fetch if: protected page, no user, initial mount fetch already ran,
+    // no previous fetch error, and we haven't already re-fetched for this pathname.
+    // This prevents both infinite loops and double-fetching on initial mount.
+    // Also skip if server provided auth state (no need to re-fetch what server already resolved).
+    if (isProtected && !user && hasFetchedRef.current && !fetchErrorRef.current && !hasReFetchedRef.current && !serverProvidedRef.current) {
+      hasReFetchedRef.current = true;
+      console.log('[AuthProvider] protected-page refetch — calling fetchUser');
       fetchUser();
     }
   }, [pathname, user, fetchUser]);
@@ -266,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clientLogger.setUserId(user?.id);
   }, [currentTenantId, user?.id]);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     isLoading,
     isAuthenticated: !!user,
@@ -275,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     currentTenantId,
     switchTenant,
-  };
+  }), [user, isLoading, currentTenantId, login, register, logout, switchTenant]);
 
   const AuthContext = authContextSingleton.getContext();
 

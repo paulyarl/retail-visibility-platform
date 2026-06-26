@@ -17,41 +17,24 @@ import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { CommandPalette } from "@/components/app-shell/CommandPalette";
 import { Notifications } from "@mantine/notifications";
 import { Toaster } from "@/components/ui/Toaster";
+import type { ServerResolvedAuth } from "@/components/tenant/ServerResolvedContextProvider";
+
+const ThemeProvider = dynamic(
+  () => import("@/components/ThemeProvider").then((mod) => mod.ThemeProvider),
+  { ssr: false }
+);
 
 interface ClientRootLayoutProps {
   children: React.ReactNode;
+  initialUser?: ServerResolvedAuth['user'] | null;
 }
 
-export function ClientRootLayout({ children }: ClientRootLayoutProps) {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <QueryClientWrapper>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading...</p>
-          </div>
-        </div>
-      </QueryClientWrapper>
-    );
-  }
-
-  const ThemeProvider = dynamic(
-    () => import("@/components/ThemeProvider").then((mod) => mod.ThemeProvider),
-    { ssr: false }
-  );
-
+export function ClientRootLayout({ children, initialUser }: ClientRootLayoutProps) {
   return (
     <QueryClientWrapper>
       <ThemeProvider>
         <PlatformThemeProvider>
-          <CustomAuthProvider>
+          <CustomAuthProvider initialUser={initialUser}>
             <PlatformSettingsProvider>
               <CartWidgetProvider>
                 <ProductLayoutProvider>

@@ -406,6 +406,29 @@ class BotService extends TenantApiSingleton {
     if (!result.data.success) throw new Error(result.data.error || 'Failed to get platform guide');
     return result.data.guide;
   }
+
+  async getChatbotOptions(tenantId: string): Promise<Record<string, boolean>> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/chatbot-options`,
+      { method: 'GET' },
+      `bot-options-${tenantId}`,
+      this.cacheTTL
+    );
+    if (!result.success) return {};
+    if (!result.data?.success) return {};
+    return result.data.settings ?? {};
+  }
+
+  async updateChatbotOptions(tenantId: string, settings: Record<string, boolean>): Promise<Record<string, boolean>> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/chatbot-options`,
+      { method: 'PUT', body: JSON.stringify(settings) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.message || 'Failed to save');
+    await this.invalidateCache(`bot-options-${tenantId}`);
+    return result.data.settings ?? settings;
+  }
 }
 
 export const botService = BotService.getInstance();

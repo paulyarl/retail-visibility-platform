@@ -123,7 +123,9 @@ class StoreProviderSingleton {
     this.metrics.apiCalls++;
 
     try {
-      const response = await fetch(url, requestOptions);
+      // Intentionally using raw fetch() — this provider manages its own auth context
+    // (Bearer token, X-Tenant-ID from AuthContext) and caching. Not a base singleton subclass.
+    const response = await fetch(url, requestOptions);
 
       if (!response.ok) {
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);

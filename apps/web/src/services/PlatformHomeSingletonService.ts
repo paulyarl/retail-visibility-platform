@@ -691,25 +691,14 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    */
   private async invalidateApiCache(tenantId?: string): Promise<void> {
     try {
-      // console.log(`[PlatformHomeSingletonService] 🌐 Invalidating API cache for:`, tenantId || 'all tenants');
-      
-      const response = await fetch('/api/cache/invalidate/tenants', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache', // Ensure this request isn't cached
+      await this.makeDefaultRequest<any>(
+        '/api/cache/invalidate/tenants',
+        {
+          method: 'POST',
+          headers: { 'Cache-Control': 'no-cache' },
+          body: JSON.stringify({ tenantId }),
         },
-        body: JSON.stringify({ tenantId })
-      });
-      
-      if (!response.ok) {
-        console.warn(`[PlatformHomeSingletonService] API cache invalidation failed:`, response.status);
-        return;
-      }
-      
-      const result = await response.json();
-      // console.log(`[PlatformHomeSingletonService] ✅ API cache invalidated:`, result);
-      
+      );
     } catch (error) {
       console.warn(`[PlatformHomeSingletonService] API cache invalidation error:`, error);
       // Don't throw - client cache invalidation is still valuable

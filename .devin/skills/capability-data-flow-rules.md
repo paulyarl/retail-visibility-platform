@@ -256,6 +256,17 @@ Capabilities with only a master toggle merchant pref (e.g., FAQ, CRM) have no pe
 ### R12: CapabilityShowcase Counting Must Be Group-Level
 When computing `merchantGated` for per-feature capabilities, compare group-level allowed count vs effective count. Do NOT use individual type array lengths as the allowed count — this over-counts and always produces `merchantGated = true`.
 
+### R13: Expired/Inactive Tenants Must Return 200 with Disabled Capabilities
+When `resolveEffectiveCapabilities` returns null (tenant exists but has no resolvable tier data — e.g., expired/canceled subscription with no matching tier in `subscription_tiers_list`), the `GET /:tenantId/effective-capabilities` route in `tenant-capabilities.ts` MUST:
+
+1. Check if the tenant exists in the `tenants` table (by ID, then slug fallback)
+2. If found: return **200** with `buildExpiredCapabilitiesResponse(tenant)` — a complete disabled `effective` manifest with the tenant's actual `subscription_context` (e.g., `internalStatus: 'expired'`, `isReadOnly: true`, `writable: false`)
+3. If not found: return **404** `tenant_not_found`
+
+**`buildExpiredCapabilitiesResponse` MUST include every capability domain** with all fields set to disabled/falsy values. When adding a new capability domain, add a disabled entry to this function matching the `EffectiveXxx` interface. A missing domain will cause frontend mappers (`mapAll()` in `UnifiedCapabilityService.ts`) to crash on `undefined` fields.
+
+**`resolveTenantIdentifier` MUST try ID lookup first** for any identifier format (not just `tid-*`). Tenant IDs like `tenant-*` are valid and must be resolved via `prisma.tenants.findUnique({ where: { id: identifier } })` before falling back to slug lookup.
+
 ## File Reference
 
 ### Backend
@@ -264,6 +275,7 @@ When computing `merchantGated` for per-feature capabilities, compare group-level
 - Orchestrator: `apps/api/src/services/EffectiveCapabilityResolver.ts`
 - API Routes: `apps/api/src/routes/xxx-options-settings.ts`
 - Unified endpoint: `apps/api/src/routes/tenant-capabilities.ts` → `GET /:tenantId/effective-capabilities`
+- Expired fallback: `apps/api/src/routes/tenant-capabilities.ts` → `buildExpiredCapabilitiesResponse()`
 
 ### Frontend
 - State types: `apps/web/src/services/CapabilityResolutionService.ts`

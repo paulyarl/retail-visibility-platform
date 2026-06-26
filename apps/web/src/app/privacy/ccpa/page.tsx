@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { ccpaService } from '@/services/CcpaService';
 
 export default function CcpaPage() {
   const { settings } = usePlatformSettings();
@@ -21,20 +22,14 @@ export default function CcpaPage() {
     setResult(null);
 
     try {
-      const res = await fetch('/api/ccpa/opt-out-sale', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, notes }),
-      });
+      const result = await ccpaService.submitOptOutSale(email, notes);
 
-      const data = await res.json();
-
-      if (data.success) {
-        setResult({ success: true, message: data.message });
+      if (result.success) {
+        setResult({ success: true, message: result.message });
         setEmail('');
         setNotes('');
       } else {
-        setResult({ success: false, message: data.message || 'Failed to submit request. Please try again.' });
+        setResult({ success: false, message: result.message });
       }
     } catch {
       setResult({ success: false, message: 'Network error. Please try again or contact support.' });

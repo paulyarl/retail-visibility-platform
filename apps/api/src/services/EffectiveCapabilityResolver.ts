@@ -316,14 +316,14 @@ export async function resolveEffectiveCapabilities(
 // ====================
 
 async function resolveTenantIdentifier(identifier: string): Promise<{ id: string; slug: string | null } | null> {
-  if (identifier.startsWith('tid-')) {
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: identifier },
-      select: { id: true, slug: true },
-    });
-    return tenant;
-  }
+  // Try ID lookup first (works for any tenant ID format: tid-*, tenant-*, etc.)
+  const byId = await prisma.tenants.findUnique({
+    where: { id: identifier },
+    select: { id: true, slug: true },
+  });
+  if (byId) return byId;
 
+  // Fall back to slug lookup
   const tenant = await prisma.tenants.findFirst({
     where: { slug: identifier },
     select: { id: true, slug: true },

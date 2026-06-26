@@ -11,7 +11,8 @@
  * - useAllCapabilities: Combined hook for all three
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { faqService } from '@/services/FaqService';
@@ -527,28 +528,30 @@ export function useAllCapabilities(
   tenantId: string | null,
   options?: { forTenant?: boolean }
 ): CapabilityHookState<AllCapabilitiesState> {
-  const [data, setData] = useState<AllCapabilitiesState | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const service = getService(!!options?.forTenant);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['tenant', 'capabilities', 'all', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      return service.getAllCapabilities(tenantId);
+    },
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 0,
+    throwOnError: false,
+  });
 
-  const fetch = useCallback(async () => {
-    if (!tenantId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getAllCapabilities(tenantId);
-      setData(state);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch capabilities');
-    } finally {
-      setLoading(false);
-    }
-  }, [tenantId, options?.forTenant]);
+  const refetchCb = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => { fetch(); }, [fetch]);
-
-  return { data, loading, error, refetch: fetch };
+  return useMemo(() => ({
+    data: data ?? null,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : 'Failed to fetch capabilities') : null,
+    refetch: refetchCb,
+  }), [data, isLoading, error, refetchCb]);
 }
 
 // ====================

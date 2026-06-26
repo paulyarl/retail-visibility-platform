@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/Switch';
 import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/hooks/use-toast';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { botService } from '@/services/BotService';
 
 interface BotOptionsPageProps {
   tenantId: string;
@@ -86,15 +87,8 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await fetch(`/api/tenants/${tenantId}/chatbot-options`, {
-        credentials: 'include',
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success && data.settings) {
-          setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-        }
-      }
+      const settings = await botService.getChatbotOptions(tenantId);
+      setSettings({ ...DEFAULT_SETTINGS, ...settings });
     } catch (err) {
       // Use defaults
     } finally {
@@ -113,25 +107,9 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const resp = await fetch(`/api/tenants/${tenantId}/chatbot-options`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(settings),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success) {
-          toast({ title: 'Settings saved' });
-          if (data.settings) {
-            setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-          }
-        } else {
-          toast({ title: data.message || 'Failed to save', variant: 'destructive' });
-        }
-      } else {
-        toast({ title: 'Failed to save settings', variant: 'destructive' });
-      }
+      const updated = await botService.updateChatbotOptions(tenantId, settings as unknown as Record<string, boolean>);
+      toast({ title: 'Settings saved' });
+      setSettings({ ...DEFAULT_SETTINGS, ...updated });
     } catch (err) {
       toast({ title: 'Failed to save settings', variant: 'destructive' });
     } finally {

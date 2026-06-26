@@ -1,6 +1,7 @@
-import React, { useMemo, useCallback } from 'react';
-import { useQuery, useQueries } from '@tanstack/react-query';
+import React, { useMemo, useCallback, useEffect } from 'react';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useServerTenant } from '@/components/tenant/ServerResolvedContextProvider';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { organizationService } from '@/services/OrganizationService';
@@ -114,6 +115,8 @@ export interface UseTenantCompleteReturn {
 
   loading: boolean;
   isLoading: boolean; // Alias for loading
+  primaryLoading: boolean; // true only while primary tenant fetch is in-flight
+  secondaryLoading: boolean; // true while tier/usage/org are in-flight
   error: string | null;
   refresh: () => Promise<void>;
 
@@ -141,6 +144,17 @@ export interface UseTenantCompleteReturn {
 export function useTenantComplete(tenantId: string | null, loadSecondary: boolean = true): UseTenantCompleteReturn {
   const { user } = useAuth();
   const authUser = user;
+  const serverTenant = useServerTenant();
+  const queryClient = useQueryClient();
+
+  // Seed React Query cache with server-resolved tenant info before the query fires
+  const hasSeededRef = React.useRef(false);
+  useEffect(() => {
+    if (serverTenant?.tenantInfo && tenantId && !hasSeededRef.current) {
+      hasSeededRef.current = true;
+      queryClient.setQueryData(['tenant', 'info', tenantId], serverTenant.tenantInfo);
+    }
+  }, [serverTenant, tenantId, queryClient]);
 
   // Primary query - critical tenant data only (fast, essential)
   const { data: tenantData, isLoading: tenantLoading, refetch: refetchTenant } = useQuery({
@@ -249,6 +263,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
 
   // Combined loading state
   const isLoading = tenantLoading || (loadSecondary && secondaryLoading);
+  const primaryLoading = tenantLoading;
   
   // Clear cache function for debugging
   const clearCacheAndRefresh = useCallback(async () => {
@@ -454,6 +469,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     organizationTenants,
     loading,
     isLoading: loading,
+    primaryLoading,
+    secondaryLoading: loadSecondary && secondaryLoading,
     error: queryError,
     refresh: clearCacheAndRefresh,
 
@@ -467,7 +484,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     getAccessDeniedReason,
     getFeatureBadgeWithPermission,
   }), [
-    tenant, tier, usage, organizationTenants, loading, queryError,
+    tenant, tier, usage, organizationTenants, loading, primaryLoading, secondaryLoading, queryError,
     clearCacheAndRefresh, hasTierFeature, getTierFeatures, checkLimitReached,
     getUsagePercent, getBadge, canAccess, getAccessDeniedReason, getFeatureBadgeWithPermission,
   ]);

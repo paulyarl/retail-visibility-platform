@@ -204,6 +204,20 @@ class PublicBotService extends PublicApiSingleton {
       `bot-feedback-${messageId}`
     );
   }
+
+  async previewBot(tenantId: string, message: string, pageContext?: string): Promise<{ reply: string; responseType: string; matchedFaqId: string | null }> {
+    const result = await this.makePublicRequest<ApiEnvelope<any>>(
+      `/api/public/bot/preview`,
+      { method: 'POST', body: JSON.stringify({ tenantId, message, pageContext: pageContext || 'storefront' }) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.message || 'Preview failed');
+    return {
+      reply: result.data.reply!,
+      responseType: result.data.responseType!,
+      matchedFaqId: result.data.matchedFaqId ?? null,
+    };
+  }
 }
 
 export const publicBotService = PublicBotService.getInstance();

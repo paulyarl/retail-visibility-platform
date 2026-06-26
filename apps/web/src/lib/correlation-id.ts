@@ -6,10 +6,13 @@
  * via the `x-correlation-id` header. The server's `X-Correlation-Id` response
  * header is adopted as the new authoritative ID.
  *
- * Format: corr-CL-{nanoid} (CL = client, distinguishes from server-generated IDs)
+ * Format: corr-CL-{tenantKey}-{nanoid} when tenantId is available, corr-CL-{nanoid} otherwise.
+ * (CL = client, distinguishes from server-generated IDs)
  */
+import { generateTenantKey } from '@/lib/sku-generator';
 
 const STORAGE_KEY = 'vs_correlation_id';
+const TENANT_KEY_STORAGE = 'vs_correlation_tenant_key';
 const HEADER_NAME = 'x-correlation-id';
 const RESPONSE_HEADER_NAME = 'x-correlation-id';
 
@@ -30,7 +33,10 @@ function generateNanoid(length: number = 8): string {
   return id;
 }
 
-function generateCorrelationId(): string {
+function generateCorrelationId(tenantKey?: string): string {
+  if (tenantKey) {
+    return `corr-CL-${tenantKey}-${generateNanoid(8)}`;
+  }
   return `corr-CL-${generateNanoid(8)}`;
 }
 
@@ -38,18 +44,26 @@ function generateCorrelationId(): string {
  * Get the current correlation ID from sessionStorage, or generate a new one.
  * Safe to call during SSR — returns undefined on the server.
  */
-export function getOrCreateCorrelationId(): string | undefined {
+export function getOrCreateCorrelationId(tenantId?: string): string | undefined {
   if (typeof window === 'undefined') return undefined;
 
+  const tenantKey = tenantId ? generateTenantKey(tenantId) : undefined;
+
   try {
+    const storedTenantKey = sessionStorage.getItem(TENANT_KEY_STORAGE);
     let id = sessionStorage.getItem(STORAGE_KEY);
-    if (!id) {
-      id = generateCorrelationId();
+
+    // Regenerate if tenant changed or no existing ID
+    if (!id || (tenantKey && storedTenantKey !== tenantKey)) {
+      id = generateCorrelationId(tenantKey);
       sessionStorage.setItem(STORAGE_KEY, id);
+      if (tenantKey) {
+        sessionStorage.setItem(TENANT_KEY_STORAGE, tenantKey);
+      }
     }
     return id;
   } catch {
-    return generateCorrelationId();
+    return generateCorrelationId(tenantKey);
   }
 }
 
@@ -85,6 +99,7 @@ export function clearCorrelationId(): void {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(TENANT_KEY_STORAGE);
   } catch {
     // ignore
   }

@@ -1565,7 +1565,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
 
     // Inject correlation ID header for request tracing
-    const correlationId = getOrCreateCorrelationId();
+    const tenantId = await this.getCurrentTenantId();
+    const correlationId = getOrCreateCorrelationId(tenantId || undefined);
     const headers = new Headers(options.headers);
     if (correlationId && !headers.has(CORRELATION_ID_HEADER)) {
       headers.set(CORRELATION_ID_HEADER, correlationId);

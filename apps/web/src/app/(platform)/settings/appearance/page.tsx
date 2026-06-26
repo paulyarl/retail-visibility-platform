@@ -4,13 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { Card, Button, ColorInput, Select, Slider, TextInput, Badge, Switch, Group, Text, Divider, Tabs, TabsList, TabsTab, TabsPanel } from '@mantine/core';
+import { Card, Button, ColorInput, Select, Slider, TextInput, Badge, Group, Text, Divider, Tabs, TabsList, TabsTab, TabsPanel } from '@mantine/core';
 import { useMantineTheme } from '@mantine/core';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { tenantBrandingSettingsService } from '@/services/TenantBrandingSettingsSingletonService';
-import { CheckCircle, Palette, Type, Layout, Eye, Save, RefreshCw, Navigation } from 'lucide-react';
-import { adminPlatformFlagsService } from '@/services/AdminPlatformFlagsService';
-import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
+import { CheckCircle, Palette, Type, Layout, Eye, Save, RefreshCw } from 'lucide-react';
 
 
 // Theme presets
@@ -94,8 +92,6 @@ export default function ThemeSettingsPage() {
   const [spacing, setSpacing] = useState(16);
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [useDatabaseNav, setUseDatabaseNav] = useState(true);
-  const [navSourceLoading, setNavSourceLoading] = useState(false);
 
   // Detect tenant context based on URL path, not localStorage
   const [isTenantContext, setIsTenantContext] = useState(false);
@@ -196,33 +192,6 @@ export default function ThemeSettingsPage() {
     loadCurrentTheme();
   }, [isTenantContext, tenantId]);
 
-  // Load navigation source flag
-  useEffect(() => {
-    adminPlatformFlagsService.getEffectiveFlags().then(flags => {
-      const flag = flags['use_file_based_navigation'];
-      setUseDatabaseNav(!flag?.effectiveOn);
-    }).catch(() => {});
-  }, []);
-
-  const handleToggleNavSource = async () => {
-    setNavSourceLoading(true);
-    try {
-      const newDbNav = !useDatabaseNav;
-      await adminPlatformFlagsService.updatePlatformFlag('use_file_based_navigation', {
-        enabled: !newDbNav,
-        description: 'When enabled, sidebars use hardcoded file-based fallback arrays instead of database navigation_links.',
-        rollout: 'platform',
-        allowTenantOverride: false,
-      });
-      setUseDatabaseNav(newDbNav);
-      invalidateNavLinksCache();
-    } catch (err) {
-      console.error('Failed to toggle navigation source:', err);
-    } finally {
-      setNavSourceLoading(false);
-    }
-  };
-
   const handlePresetSelect = (preset: string) => {
     setSelectedPreset(preset);
     if (preset !== 'custom') {
@@ -310,33 +279,6 @@ export default function ThemeSettingsPage() {
         />
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-          {/* Navigation Source Toggle */}
-          <Card withBorder padding="lg" radius="md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-start gap-3">
-                <div className="h-3 w-3 rounded-full bg-indigo-500 mt-2"></div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Navigation className="w-5 h-5" />
-                    Sidebar Navigation Source
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {useDatabaseNav
-                      ? 'Database-driven navigation is active. Sidebar links are managed via the Navigation Control panel.'
-                      : 'File-based navigation is active. Sidebar links come from hardcoded fallback arrays. Database links are ignored.'}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={useDatabaseNav}
-                onChange={() => handleToggleNavSource()}
-                disabled={navSourceLoading}
-                size="md"
-                label={useDatabaseNav ? 'Database' : 'File-based'}
-              />
-            </div>
-          </Card>
-
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTab value="basic" leftSection={<Palette className="w-4 h-4" />}>

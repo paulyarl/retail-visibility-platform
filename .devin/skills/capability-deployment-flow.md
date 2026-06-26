@@ -164,6 +164,8 @@ resolveXxxOptions(
 
 **Special case — BSaaS (purchasable) features**: Use `add-bsaas-feature.md`. The resolver is source-agnostic — purchased features auto-merge into the same `mergedFeatures` map. No resolver changes needed for most BSaaS features.
 
+**Special case — Expired/inactive tenants**: When `resolveEffectiveCapabilities` returns null (tenant exists but has no resolvable tier data), the route handler in `tenant-capabilities.ts` falls back to `buildExpiredCapabilitiesResponse()`. This function MUST include an entry for every capability domain with all fields set to disabled/falsy values. When adding a new capability domain, add it to `buildExpiredCapabilitiesResponse` with a complete disabled object matching the `EffectiveXxx` interface. See R13 in `capability-data-flow-rules.md`.
+
 ---
 
 ## Phase 5: Create the API Route
@@ -379,5 +381,7 @@ When deploying a capability change, verify ALL of these:
 - [ ] `PlanSummaryPanel` has entry in `CAPABILITY_DISPLAY` + summary block in `resolveCapabilitySummaries()`
 - [ ] `CapabilityShowcase` has row in `rows` array with correct `merchantGated` computation
 - [ ] Settings page gates toggles by tier state
+- [ ] Expired/inactive tenant returns 200 with disabled capabilities (not 404) — see R13 in `capability-data-flow-rules.md`
+- [ ] `buildExpiredCapabilitiesResponse` includes the new capability domain with all fields disabled
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors

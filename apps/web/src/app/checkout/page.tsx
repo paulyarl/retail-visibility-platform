@@ -23,6 +23,7 @@ import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tena
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { customerAuthService } from '@/services/CustomerAuthService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
+import { checkoutService } from '@/services/CheckoutService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -412,35 +413,25 @@ function CheckoutPageContent() {
       }
 
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-        const response = await fetch(`${API_BASE}/api/tax/calculate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenant_id: tenantId,
-            subtotal_cents: subtotal,
-            shipping_cents: fulfillmentFee,
-            shipping_address: {
-              line1: shippingAddress.addressLine1,
-              line2: shippingAddress.addressLine2,
-              city: shippingAddress.city,
-              state: shippingAddress.state,
-              postalCode: shippingAddress.postalCode,
-              country: shippingAddress.country || 'US',
-            },
-            line_items: cartItems.map(item => ({
-              amountCents: item.price_cents * item.quantity,
-              reference: item.product_sku || item.product_id,
-            })),
-          }),
+        const taxCents = await checkoutService.calculateTax({
+          tenant_id: tenantId,
+          subtotal_cents: subtotal,
+          shipping_cents: fulfillmentFee,
+          shipping_address: {
+            line1: shippingAddress.addressLine1,
+            line2: shippingAddress.addressLine2,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            postalCode: shippingAddress.postalCode,
+            country: shippingAddress.country || 'US',
+          },
+          line_items: cartItems.map(item => ({
+            amountCents: item.price_cents * item.quantity,
+            reference: item.product_sku || item.product_id,
+          })),
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.tax) {
-            setTaxAmount(data.tax.tax_cents || 0);
-          }
-        }
+        setTaxAmount(taxCents);
       } catch {
         // Tax calculation failed — proceed with zero tax
       }
