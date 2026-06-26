@@ -71,14 +71,14 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
                                user.role === 'PLATFORM_VIEWER';
 
         // Check if user has access to this tenant (or is a platform user)
-        console.log(`User Role: ${user.role}`);
+        
         const hasTenantAccess = isPlatformUser || user.tenants?.some(t => t.id === tenantId);
-        console.log('Tenant access check:', {
-          tenantId,
-          userTenants: user.tenants?.map(t => ({ id: t.id, name: t.name })),
-          hasAccess: hasTenantAccess,
-          isPlatformUser
-        });
+        // console.log('Tenant access check:', {
+        //   tenantId,
+        //   userTenants: user.tenants?.map(t => ({ id: t.id, name: t.name })),
+        //   hasAccess: hasTenantAccess,
+        //   isPlatformUser
+        // });
 
         if (!hasTenantAccess) {
           console.warn('User does not have access to tenant:', tenantId);
