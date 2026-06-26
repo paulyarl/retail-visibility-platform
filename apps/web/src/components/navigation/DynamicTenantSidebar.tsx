@@ -13,6 +13,7 @@ import { useNavLinks } from '@/hooks/useNavLinks';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
 import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
+import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
 
 // Types are imported from NavItemRow component
 type NavItemWithRBAC = NavItem & RBACNavGates;
@@ -405,6 +406,7 @@ function MobileDrawer({
   onToggle,
   tenantName,
   user,
+  tenantId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -414,6 +416,7 @@ function MobileDrawer({
   onToggle: (key: string) => void;
   tenantName: string;
   user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
+  tenantId?: string;
 }) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -459,6 +462,7 @@ function MobileDrawer({
             <Icon.X />
           </button>
         </div>
+        <ScopeSwitcher scope="tenant" tenantId={tenantId} />
         <SidebarNav
           items={items}
           pathname={pathname}
@@ -480,6 +484,7 @@ function DesktopSidebar({
   onToggle,
   tenantName,
   user,
+  tenantId,
 }: {
   items: NavItem[];
   pathname: string;
@@ -487,6 +492,7 @@ function DesktopSidebar({
   onToggle: (key: string) => void;
   tenantName: string;
   user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
+  tenantId?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   
@@ -522,6 +528,9 @@ function DesktopSidebar({
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
+
+      {/* Scope switcher */}
+      <ScopeSwitcher scope="tenant" collapsed={collapsed} tenantId={tenantId} />
 
       {/* User identity strip */}
       <div className={cn('flex items-center gap-3 px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'justify-center px-2')}>
@@ -803,6 +812,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
           onToggle={toggleExpanded}
           tenantName={tenantName}
           user={user}
+          tenantId={tenantId}
         />
       )}
 
@@ -816,6 +826,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
         onToggle={toggleExpanded}
         tenantName={tenantName}
         user={user}
+        tenantId={tenantId}
       />
 
       {/* Content area */}

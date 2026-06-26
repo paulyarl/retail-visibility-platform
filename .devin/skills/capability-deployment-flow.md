@@ -42,6 +42,8 @@ Each phase below specifies: **what to do**, **which skill to reference**, and **
 
 **Rules**:
 - Feature keys MUST be `snake_case` with domain prefix (e.g., `crm_inquiry_auto_response`, `faq_kb_rag_retrieval`)
+- Feature keys MUST follow the canonical naming convention (R15 in `capability-data-flow-rules.md`): `<capability_key>_enabled`, `<capability_key>_<group>_<feature>`
+- For options capabilities, features MUST be organized into groups with group gates (R16): `<capability_key>_<group>_enabled` / `_disabled`
 - The `key` field is the machine identifier; `name` is human-readable
 - `category` is optional — Admin UI sends `NULL`
 
@@ -103,12 +105,17 @@ WHERE stl.tier_key IN ('commitment', 'professional');
 
 | Capability Type | Merchant Gate Table |
 |---|---|
+| `storefront_types` | `tenant_storefront_type_settings` |
+| `storefront_options` | `tenant_storefront_options_settings` |
+| `product_types` | `tenant_product_types_settings` |
+| `product_options` | `tenant_product_options_settings` |
 | `crm_options` | `tenant_crm_options_settings` |
 | `faq_options` | `tenant_faq_options_settings` |
 | `chatbot_options` | `tenant_chatbot_options_settings` |
-| `storefront_options` | `tenant_storefront_options_settings` |
 | `social_commerce_options` | `tenant_social_commerce_options_settings` |
 | `directory_entry` | `tenant_storefront_options_settings` (page_type = 'directory_entry') |
+
+**Types/Options split pattern** (R14 in `capability-data-flow-rules.md`): Domains that have both entity-type gating and display/behavior features MUST be split into `<domain>_types` and `<domain>_options`. Each gets its own capability type, resolver, service, API route, and settings table. See `docs/CAPABILITY_TYPES_TARGET_ARCHITECTURE.md` for the canonical design.
 
 **Decision point**: Is this a master toggle or a per-feature toggle?
 - **Master toggle** (e.g., `crm_enabled`, `faq_enabled`): Single boolean column. When `enabled` is true, ALL tier-allowed features are effectively on. No per-feature merchant gating. See R11 in `capability-data-flow-rules.md`.
@@ -364,10 +371,14 @@ Starting point: "I need to add or fix a capability"
 When deploying a capability change, verify ALL of these:
 
 - [ ] Feature key exists in `features_list`
+- [ ] Feature key follows canonical naming convention (R15): `<capability_key>_<group>_<feature>`
+- [ ] For options capabilities, group gates exist (R16): `<capability_key>_<group>_enabled` / `_disabled`
 - [ ] Feature linked to capability type in `capability_features_list`
 - [ ] Feature enabled for appropriate tiers in `tier_features_list`
+- [ ] If new domain with types + options: both capability types created (R14)
 - [ ] Merchant pref column exists in `tenant_*_options_settings` + Prisma schema
 - [ ] Resolver accepts `merchantPrefs` and computes `allowed_*` + `can_use_*` / `effective_*`
+- [ ] Resolver follows enablement precedence (R17): `*_disabled` > `*_enabled` > `*_flexible` > features
 - [ ] Resolver returns `merchant_preferences` field
 - [ ] Orchestrator passes `merchantBundle.xxx` to resolver
 - [ ] API GET returns `{ success, settings, tierState }` with tier-filtered settings
