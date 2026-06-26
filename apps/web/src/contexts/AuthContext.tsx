@@ -97,8 +97,11 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
   const serverUser = initialUser ?? null;
 
   // Initialize from server-resolved state if available — skips redundant API call
+  // Server-resolved auth from the root layout only contains the Auth0 profile (no DB role).
+  // If the role is missing, treat the server state as incomplete and fetch the full user.
+  const isServerUserComplete = !!serverUser?.role;
   const [user, setUser] = useState<User | null>(serverUser as User | null);
-  const [isLoading, setIsLoading] = useState(!serverUser); // false if server provided state
+  const [isLoading, setIsLoading] = useState(!serverUser || !isServerUserComplete);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
 
   // Track fetch errors to prevent infinite retry loops
@@ -237,21 +240,21 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
     }
   }, [user?.tenants]);
 
-  // Load user on mount — skip if server already provided auth state
+  // Load user on mount — skip if server already provided complete auth state
   const hasFetchedRef = React.useRef(false);
-  const serverProvidedRef = React.useRef(!!serverUser);
+  const serverProvidedRef = React.useRef(isServerUserComplete);
   
   useEffect(() => {
-    // If server already resolved auth, skip the initial API fetch
+    // If server already resolved auth with a complete user, skip the initial API fetch
     if (serverProvidedRef.current) {
       hasFetchedRef.current = true;
-      console.log('[AuthProvider] mount — skipping fetchUser (server provided)');
+      console.log('[AuthProvider] mount — skipping fetchUser (server provided complete user)');
       return;
     }
     // Only fetch once on mount
     if (!hasFetchedRef.current) {
       hasFetchedRef.current = true;
-      console.log('[AuthProvider] mount — calling fetchUser (no server state)');
+      console.log('[AuthProvider] mount — calling fetchUser (no complete server state)');
       fetchUser();
     }
   }, [fetchUser]);
