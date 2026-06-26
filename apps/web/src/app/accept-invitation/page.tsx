@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -38,7 +38,6 @@ interface InvitationData {
 }
 
 function AcceptInvitationContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -169,7 +168,7 @@ function AcceptInvitationContent() {
       // Redirect to login or dashboard after a delay
       setTimeout(() => {
         if (acceptedInvitation.status === 'accepted') {
-          router.push('/auth/login?message=Invitation accepted. Please log in to access your account.');
+          window.location.href = '/auth/login?message=Invitation accepted. Please log in to access your account.';
         }
       }, 2000);
       
@@ -209,7 +208,7 @@ function AcceptInvitationContent() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
             <Button 
-              onClick={() => router.push('/auth/login')} 
+              onClick={() => { window.location.href = '/auth/login'; }} 
               className="w-full mt-4"
               variant="secondary"
             >
@@ -352,7 +351,7 @@ function AcceptInvitationContent() {
           <div className="mt-4 text-center">
             <Button 
               variant="ghost" 
-              onClick={() => router.push('/auth/login')}
+              onClick={() => { window.location.href = '/auth/login'; }}
               className="text-sm"
             >
               Already have an account? Sign in

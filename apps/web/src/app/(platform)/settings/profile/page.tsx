@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Spinner } from '@/components/ui';
@@ -30,14 +29,15 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
       return;
     }
 
@@ -56,7 +56,7 @@ export default function ProfilePage() {
       });
       setIsLoading(false);
     }
-  }, [user, isAuthenticated, authLoading, router]);
+  }, [user, isAuthenticated, authLoading]);
 
   if (authLoading || isLoading) {
     return (
