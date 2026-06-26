@@ -1,54 +1,127 @@
 "use client";
 
-import { CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, AlertTriangle, ArrowRight, MinusCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import {
+  systemStatusService,
+  type SystemStatusData,
+  type SystemStatusItem,
+} from "@/services/SystemStatusSingletonService";
 
 interface SystemStatusCardProps {
-  hoursStatus?: {
-    isOpen?: boolean;
-    label?: string;
-  } | null;
-  syncIssues?: number;
   tenantId: string;
 }
 
-function StatusRow({ label, status }: { label: string; status: "ok" | "warning" | "error" }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-600">{label}</span>
-      {status === "ok" ? (
-        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-      ) : status === "warning" ? (
-        <AlertTriangle className="w-4 h-4 text-amber-500" />
-      ) : (
-        <AlertTriangle className="w-4 h-4 text-rose-500" />
+function StatusRow({ item }: { item: SystemStatusItem }) {
+  const icon = (() => {
+    switch (item.status) {
+      case "ok":
+        return <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />;
+      case "warning":
+        return <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />;
+      case "error":
+        return <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0" />;
+      case "inactive":
+        return <MinusCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />;
+    }
+  })();
+
+  const content = (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        {icon}
+        <span className={`text-sm ${item.status === "inactive" ? "text-gray-400" : "text-gray-600"}`}>
+          {item.label}
+        </span>
+      </div>
+      {item.detail && (
+        <span className="text-xs text-gray-400 truncate">{item.detail}</span>
       )}
     </div>
   );
+
+  if (item.link) {
+    return (
+      <Link href={item.link} className="block hover:bg-gray-50 -mx-1 px-1 py-0.5 rounded transition-colors">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
-export default function SystemStatusCard({ hoursStatus, syncIssues = 0, tenantId }: SystemStatusCardProps) {
-  const allGood = hoursStatus?.isOpen !== false && syncIssues === 0;
+export default function SystemStatusCard({ tenantId }: SystemStatusCardProps) {
+  const [data, setData] = useState<SystemStatusData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tenantId) return;
+
+    let mounted = true;
+    setLoading(true);
+
+    systemStatusService.getSystemStatus(tenantId).then((result) => {
+      if (mounted) {
+        setData(result);
+        setLoading(false);
+      }
+    });
+
+    return () => { mounted = false; };
+  }, [tenantId]);
+
+  const overall = data?.overall ?? "operational";
+  const visibleItems = data?.items.filter((i) => i.status !== "inactive") ?? [];
+
+  const headerColor =
+    overall === "operational" ? "bg-emerald-500" :
+    overall === "attention" ? "bg-amber-500" :
+    "bg-rose-500";
+
+  const headerText =
+    overall === "operational" ? "All Systems Operational" :
+    overall === "attention" ? "Attention Needed" :
+    "Critical Issues";
+
+  const subText =
+    overall === "operational"
+      ? "Everything is running smoothly. Your store is live and visible."
+      : overall === "attention"
+      ? "Some systems require your attention."
+      : "Immediate action required.";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <div className={`w-2 h-2 rounded-full ${allGood ? "bg-emerald-500" : "bg-amber-500"}`} />
+        {loading ? (
+          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+        ) : (
+          <div className={`w-2 h-2 rounded-full ${headerColor}`} />
+        )}
         <h3 className="font-semibold text-gray-900">
-          {allGood ? "All Systems Operational" : "Attention Needed"}
+          {loading ? "Checking systems…" : headerText}
         </h3>
       </div>
-      <p className="text-sm text-gray-500 mb-4">
-        {allGood
-          ? "Everything is running smoothly. Your store is live and visible."
-          : "Some systems require your attention."}
-      </p>
+      {!loading && (
+        <p className="text-sm text-gray-500 mb-4">{subText}</p>
+      )}
       <div className="space-y-2.5">
-        <StatusRow label="Store" status={hoursStatus?.isOpen !== false ? "ok" : "warning"} />
-        <StatusRow label="Payments" status="ok" />
-        <StatusRow label="Inventory" status={syncIssues === 0 ? "ok" : "warning"} />
-        <StatusRow label="Integrations" status="ok" />
-        <StatusRow label="Automations" status="ok" />
+        {loading ? (
+          <>
+            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+          </>
+        ) : visibleItems.length > 0 ? (
+          visibleItems.map((item) => (
+            <StatusRow key={item.key} item={item} />
+          ))
+        ) : (
+          <p className="text-sm text-gray-400">No status data available.</p>
+        )}
       </div>
       <Link
         href={`/t/${tenantId}/settings`}

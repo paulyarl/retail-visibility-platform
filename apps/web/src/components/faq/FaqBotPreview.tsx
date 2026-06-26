@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { MessageSquare, Send, Loader2, HelpCircle, AlertTriangle, PlusCircle } from 'lucide-react';
 import { getContrastColor } from '@/lib/color-utils';
+import { publicBotService } from '@/services/PublicBotService';
 
 interface PreviewResult {
   reply: string;
@@ -38,33 +39,22 @@ export default function FaqBotPreview({ tenantId }: FaqBotPreviewProps) {
     setLoading(true);
 
     try {
-      const resp = await fetch('/api/public/bot/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, message: question, pageContext: 'storefront' }),
-      });
+      const result = await publicBotService.previewBot(tenantId, question, 'storefront');
 
-      if (!resp.ok) throw new Error('Preview request failed');
-      const data = await resp.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Preview failed');
-      }
-
-      const result: PreviewResult = {
-        reply: data.reply,
-        responseType: data.responseType,
-        matchedFaqId: data.matchedFaqId,
+      const previewResult: PreviewResult = {
+        reply: result.reply,
+        responseType: result.responseType,
+        matchedFaqId: result.matchedFaqId,
       };
 
-      const isNoMatch = result.responseType === 'fallback';
+      const isNoMatch = previewResult.responseType === 'fallback';
 
       setMessages((prev) => [
         ...prev,
         {
           role: 'bot',
-          content: result.reply,
-          result,
+          content: previewResult.reply,
+          result: previewResult,
           noMatch: isNoMatch,
         },
       ]);

@@ -266,7 +266,7 @@ export async function requireWritableSubscription(
   next: NextFunction
 ) {
   try {
-    const tenantId = req.query.tenantId as string || req.body?.tenantId;
+    const tenantId = req.query.tenantId as string || req.query.tenant_id as string || req.body?.tenantId || req.body?.tenant_id || req.params?.tenantId || req.params?.tenantId;
     console.log('[requireWritableSubscription] Method:', req.method, 'Path:', req.path, 'tenantId found:', !!tenantId, 'value:', tenantId);
 
     if (!tenantId) {

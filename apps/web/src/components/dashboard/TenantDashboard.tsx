@@ -422,6 +422,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         {tier && (
           <SubscriptionDisplayCard
             tenantId={tenantId}
+            capabilities={allCaps.data}
             tierData={{
               tier: tier.effective?.id || 'starter',
               subscriptionStatus: tenantData?.subscriptionStatus || 'active',

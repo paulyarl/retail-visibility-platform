@@ -15,25 +15,22 @@ async function trackCartWithServer(tenantId: string, cart: Cart): Promise<void> 
     const customerName = localStorage.getItem('customer_name') || undefined;
     const customerId = localStorage.getItem('customer_id') || undefined;
 
-    await fetch('/api/cart/track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId,
-        cartId,
-        customerEmail,
-        customerName,
-        customerId,
-        items: cart.items.map(item => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          price_cents: item.price_cents,
-          product_image: item.product_image,
-          variant_id: item.variant_id,
-          variant_name: item.variant_name,
-        })),
-      }),
+    const { checkoutService } = await import('@/services/CheckoutService');
+    await checkoutService.trackCart({
+      tenantId,
+      cartId,
+      customerEmail,
+      customerName,
+      customerId,
+      items: cart.items.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        price_cents: item.price_cents,
+        product_image: item.product_image,
+        variant_id: item.variant_id,
+        variant_name: item.variant_name,
+      })),
     });
   } catch {
     // Silent fail — tracking is best-effort

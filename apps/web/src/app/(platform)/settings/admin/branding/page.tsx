@@ -7,11 +7,15 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { Upload, Palette, Type, Image as ImageIcon, Settings, Save, Loader2 } from 'lucide-react';
+import { Upload, Palette, Type, Image as ImageIcon, Settings, Save, Loader2, Navigation } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 import Image from 'next/image';
 import { brandingSettingsService } from '@/services/BrandingSettingsSingletonService';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { Switch } from '@/components/ui/Switch';
+import { adminPlatformFlagsService } from '@/services/AdminPlatformFlagsService';
+import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
 
 interface PlatformBranding {
   platformName: string;
@@ -67,12 +71,40 @@ export default function PlatformBrandingPage() {
   const [socialInstagram, setSocialInstagram] = useState<string>('');
   const [socialLinkedIn, setSocialLinkedIn] = useState<string>('');
   const [socialYoutube, setSocialYoutube] = useState<string>('');
+  const [useDatabaseNav, setUseDatabaseNav] = useState(true);
+  const [navSourceLoading, setNavSourceLoading] = useState(false);
   
   const { toast } = useToast();
 
   useEffect(() => {
     fetchBranding();
   }, []);
+
+  useEffect(() => {
+    adminPlatformFlagsService.getEffectiveFlags().then(flags => {
+      const flag = flags['use_file_based_navigation'];
+      setUseDatabaseNav(!flag?.effectiveOn);
+    }).catch(() => {});
+  }, []);
+
+  const handleToggleNavSource = async () => {
+    setNavSourceLoading(true);
+    try {
+      const newDbNav = !useDatabaseNav;
+      await adminPlatformFlagsService.updatePlatformFlag('use_file_based_navigation', {
+        enabled: !newDbNav,
+        description: 'When enabled, sidebars use hardcoded file-based fallback arrays instead of database navigation_links.',
+        rollout: 'platform',
+        allowTenantOverride: false,
+      });
+      setUseDatabaseNav(newDbNav);
+      invalidateNavLinksCache();
+    } catch (err) {
+      console.error('Failed to toggle navigation source:', err);
+    } finally {
+      setNavSourceLoading(false);
+    }
+  };
 
   const fetchBranding = async () => {
     try {
@@ -323,7 +355,17 @@ export default function PlatformBrandingPage() {
         icon={<ImageIcon className="h-6 w-6" />}
       />
 
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="social">Social Media</TabsTrigger>
+          <TabsTrigger value="visual">Visual Assets</TabsTrigger>
+          <TabsTrigger value="theme">Theme</TabsTrigger>
+          <TabsTrigger value="navigation">Navigation</TabsTrigger>
+        </TabsList>
+
       {/* Basic Information */}
+      <TabsContent value="general" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -413,8 +455,10 @@ export default function PlatformBrandingPage() {
           </div>
         </CardContent>
       </Card>
+      </TabsContent>
 
       {/* Social Media */}
+      <TabsContent value="social" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -480,8 +524,10 @@ export default function PlatformBrandingPage() {
           </div>
         </CardContent>
       </Card>
+      </TabsContent>
 
       {/* Visual Assets */}
+      <TabsContent value="visual" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -602,8 +648,10 @@ export default function PlatformBrandingPage() {
           </div>
         </CardContent>
       </Card>
+      </TabsContent>
 
       {/* Theme Configuration */}
+      <TabsContent value="theme" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -747,6 +795,50 @@ export default function PlatformBrandingPage() {
           </div>
         </CardContent>
       </Card>
+      </TabsContent>
+
+      {/* Navigation Source */}
+      <TabsContent value="navigation" className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="h-5 w-5" />
+              Sidebar Navigation Source
+            </CardTitle>
+            <CardDescription>
+              Control whether sidebar links come from the database or hardcoded fallback arrays
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">
+                  {useDatabaseNav
+                    ? 'Database-driven navigation is active. Sidebar links are managed via the Navigation Control panel.'
+                    : 'File-based navigation is active. Sidebar links come from hardcoded fallback arrays. Database links are ignored.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 ml-4">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {useDatabaseNav ? 'Database' : 'File-based'}
+                </span>
+                <Switch
+                  checked={useDatabaseNav}
+                  onCheckedChange={() => handleToggleNavSource()}
+                  disabled={navSourceLoading}
+                />
+              </div>
+            </div>
+            {navSourceLoading && (
+              <div className="flex items-center gap-2 text-blue-600 mt-3">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Updating navigation source...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+      </Tabs>
 
       {/* Actions */}
       <div className="flex justify-end">

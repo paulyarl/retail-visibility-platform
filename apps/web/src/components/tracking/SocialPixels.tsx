@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { API_BASE_URL } from '@/lib/api';
+import { publicSocialPixelsService } from '@/services/PublicSocialPixelsService';
 
 interface PixelConfig {
   metaPixelId: string | null;
@@ -39,10 +39,9 @@ export function SocialPixels({ tenantId }: SocialPixelsProps) {
 
     async function fetchConfig() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/social-pixels/public/${tenantId}`);
-        const data = await res.json();
-        if (data.success) {
-          setConfig(data.data);
+        const data = await publicSocialPixelsService.getPublicPixelConfig(tenantId);
+        if (data) {
+          setConfig(data);
         }
       } catch {
         // Silent fail — pixels are optional

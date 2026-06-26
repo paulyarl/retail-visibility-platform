@@ -89,7 +89,7 @@ function buildReport(
     error_name: err.name,
     tenant_id: currentTenantId,
     user_id: currentUserId,
-    correlation_id: getCorrelationId() || getOrCreateCorrelationId(),
+    correlation_id: getCorrelationId() || getOrCreateCorrelationId(currentTenantId || undefined),
     url: typeof window !== 'undefined' ? window.location.href : '',
     user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     timestamp: new Date().toISOString(),
@@ -118,6 +118,8 @@ async function flush(): Promise<void> {
       if (sent) return;
     }
 
+    // Intentionally using raw fetch() here instead of apiRequest or a singleton service.
+    // Error reporting must work even when services fail, and needs keepalive for page unload.
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

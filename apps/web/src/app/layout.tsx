@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 // import { Analytics } from "@vercel/analytics/react"; // Disabled - not configured in Vercel
 import "./globals.css";
 import { ClientRootLayout } from "@/components/ClientRootLayout";
+import { auth0 } from "@/lib/auth0";
+import type { ServerResolvedAuth } from "@/components/tenant/ServerResolvedContextProvider";
 
 // Prevent static generation for all routes (Mantine requires dynamic rendering)
 export const dynamic = 'force-dynamic';
@@ -102,15 +104,35 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolve Auth0 session on the server — just reads the session cookie (JWT decode, no network call)
+  let serverUser: ServerResolvedAuth['user'] | null = null;
+  try {
+    const session = await auth0.getSession();
+    if (session?.user) {
+      serverUser = {
+        id: session.user.sub,
+        email: session.user.email || '',
+        emailVerified: session.user.email_verified,
+        name: session.user.name,
+        picture: session.user.picture,
+        auth0Id: session.user.sub,
+        firstName: session.user.given_name,
+        lastName: session.user.family_name,
+      };
+    }
+  } catch {
+    // Session read failed (expired/malformed cookies) — treat as unauthenticated
+  }
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`} suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <ClientRootLayout>{children}</ClientRootLayout>
+        <ClientRootLayout initialUser={serverUser}>{children}</ClientRootLayout>
         {/* <Analytics /> */}
       </body>
     </html>

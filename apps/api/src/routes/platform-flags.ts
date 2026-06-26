@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth'
 
@@ -25,15 +26,18 @@ router.put('/platform-flags/:flag', requirePlatformAdmin, async (req, res) => {
       enabled: !!enabled,
       description: description ?? null,
       rollout: rollout ?? null,
-      ...(allowTenantOverride !== undefined && { allowTenantOverride: !!allowTenantOverride })
+      ...(allowTenantOverride !== undefined && { allow_tenant_override: !!allowTenantOverride })
     },
     create: { 
+      id: randomUUID(),
       flag, 
       enabled: !!enabled,
       description: description ?? null,
       rollout: rollout ?? null,
-      allowTenantOverride: !!allowTenantOverride
-    } as any,
+      allow_tenant_override: !!allowTenantOverride,
+      updated_at: new Date(),
+      created_at: new Date()
+    },
   })
   res.json({ success: true, data: row })
 })
@@ -59,12 +63,15 @@ router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, 
       where: { flag },
       update: { enabled: !!value },
       create: { 
+        id: randomUUID(),
         flag, 
         enabled: !!value,
         description: null,
         rollout: null,
-        allowTenantOverride: false
-      } as any,
+        allow_tenant_override: false,
+        updated_at: new Date(),
+        created_at: new Date()
+      },
     })
     
     res.json({ success: true, data: row, message: `Flag forced to ${value}` })

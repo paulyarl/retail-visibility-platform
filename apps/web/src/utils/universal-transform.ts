@@ -89,6 +89,8 @@ export const universalFetch = async (url: string, options?: RequestInit): Promis
     }
   }
   
+  // Intentionally using raw fetch() — this is a generic proxy utility that wraps ANY URL,
+  // not a service calling a specific API endpoint. Not a singleton service candidate.
   const response = await fetch(url, options);
   
   // Create enhanced response with transformed json method

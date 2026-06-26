@@ -15,7 +15,7 @@ export type SubscriptionDisplayField =
   | 'pricing'            // Monthly price
   | 'skuLimit'           // Max SKUs
   | 'locationLimit'      // Max locations
-  | 'features'           // Feature count summary
+  | 'capabilities'       // Effective capability domains summary
   | 'trialInfo'          // Trial end date if applicable
   | 'organizationTenants'; // Organization's tenant list
 
@@ -27,7 +27,7 @@ export interface SubscriptionDisplayConfig {
 
 // Default configuration
 const DEFAULT_CONFIG: SubscriptionDisplayConfig = {
-  visibleFields: ['effectiveTier', 'subscriptionStatus', 'skuLimit', 'locationLimit'],
+  visibleFields: ['effectiveTier', 'subscriptionStatus', 'skuLimit', 'locationLimit', 'capabilities'],
   layout: 'compact',
   showUpgradePrompt: true,
 };
@@ -81,10 +81,10 @@ export const FIELD_METADATA: Record<SubscriptionDisplayField, {
     icon: 'MapPin',
     category: 'limits',
   },
-  features: {
-    label: 'Features',
-    description: 'Available feature count',
-    icon: 'Layers',
+  capabilities: {
+    label: 'Capabilities',
+    description: 'Active platform capability domains',
+    icon: 'Shield',
     category: 'subscription',
   },
   trialInfo: {
@@ -122,12 +122,14 @@ export function useSubscriptionDisplay(tenantId?: string) {
       // console.log('[useSubscriptionDisplay] Loading from localStorage:', { storageKey, saved });
       if (saved) {
         const parsed = JSON.parse(saved);
-        // console.log('[useSubscriptionDisplay] Parsed config:', parsed);
+        // Migrate old 'features' field to 'capabilities'
+        const migratedFields = (parsed.visibleFields || DEFAULT_CONFIG.visibleFields)
+          .map((f: string) => f === 'features' ? 'capabilities' : f);
         // Merge with defaults to handle new fields
         setConfig({
           ...DEFAULT_CONFIG,
           ...parsed,
-          visibleFields: parsed.visibleFields || DEFAULT_CONFIG.visibleFields,
+          visibleFields: migratedFields as SubscriptionDisplayField[],
         });
       }
     } catch (error) {
@@ -142,7 +144,6 @@ export function useSubscriptionDisplay(tenantId?: string) {
     if (typeof window === 'undefined') return;
 
     try {
-      // console.log('[useSubscriptionDisplay] Saving config:', { storageKey, newConfig });
       localStorage.setItem(storageKey, JSON.stringify(newConfig));
       setConfig(newConfig);
     } catch (error) {
@@ -161,11 +162,9 @@ export function useSubscriptionDisplay(tenantId?: string) {
 
   // Set all visible fields at once
   const setVisibleFields = useCallback((fields: SubscriptionDisplayField[]) => {
-    // Use functional update to avoid stale config closure
     setConfig(prev => {
       const newConfig = { ...prev, visibleFields: fields };
       if (typeof window !== 'undefined') {
-        console.log('[useSubscriptionDisplay] setVisibleFields saving:', { storageKey, newConfig });
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
       }
       return newConfig;
@@ -174,11 +173,9 @@ export function useSubscriptionDisplay(tenantId?: string) {
 
   // Set layout mode
   const setLayout = useCallback((layout: SubscriptionDisplayConfig['layout']) => {
-    // Use functional update to avoid stale config closure
     setConfig(prev => {
       const newConfig = { ...prev, layout };
       if (typeof window !== 'undefined') {
-        console.log('[useSubscriptionDisplay] setLayout saving:', { storageKey, newConfig });
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
       }
       return newConfig;
@@ -187,8 +184,25 @@ export function useSubscriptionDisplay(tenantId?: string) {
 
   // Toggle upgrade prompt visibility
   const toggleUpgradePrompt = useCallback(() => {
-    saveConfig({ ...config, showUpgradePrompt: !config.showUpgradePrompt });
-  }, [config, saveConfig]);
+    setConfig(prev => {
+      const newConfig = { ...prev, showUpgradePrompt: !prev.showUpgradePrompt };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, JSON.stringify(newConfig));
+      }
+      return newConfig;
+    });
+  }, [storageKey]);
+
+  // Set upgrade prompt visibility directly (for batch save)
+  const setShowUpgradePrompt = useCallback((show: boolean) => {
+    setConfig(prev => {
+      const newConfig = { ...prev, showUpgradePrompt: show };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, JSON.stringify(newConfig));
+      }
+      return newConfig;
+    });
+  }, [storageKey]);
 
   // Reset to defaults
   const resetToDefaults = useCallback(() => {
@@ -207,6 +221,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
     setVisibleFields,
     setLayout,
     toggleUpgradePrompt,
+    setShowUpgradePrompt,
     resetToDefaults,
     isFieldVisible,
   };

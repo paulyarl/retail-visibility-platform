@@ -3,14 +3,14 @@ import SetTenantId from "@/components/client/SetTenantId";
 import DynamicTenantSidebar from "@/components/navigation/DynamicTenantSidebar";
 import CrmAlertToastWatcher from '@/components/crm/CrmAlertToastWatcher';
 import TenantContextProvider from '@/components/tenant/TenantContextProvider';
+import ServerResolvedContextProvider from '@/components/tenant/ServerResolvedContextProvider';
 import { getTenantContext } from '@/lib/tenantContext';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { auth0 } from '@/lib/auth0';
+import type { ServerResolvedAuth, ServerResolvedTenant } from '@/components/tenant/ServerResolvedContextProvider';
 
-export default async function TenantPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
-  const timestamp = new Date().toISOString();
-  console.log(`[dashboard/layout] render start at ${timestamp}`);
+export default async function TenantPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> }) {
   // Get Auth0 session for authentication (wrapped in try/catch for robustness)
   let session = null;
   try {
@@ -20,11 +20,8 @@ export default async function TenantPageLayout({ children, params }: { children:
     session = null;
   }
   const isAuthenticated = !!session?.user;
-  console.log(`[dashboard/layout] isAuthenticated=${isAuthenticated} at ${timestamp}`);
 
-  const resolvedParams = (params && typeof params === 'object' && 'then' in (params as any))
-    ? await (params as Promise<{ tenantId: string }>)
-    : (params as { tenantId: string });
+  const resolvedParams = await params;
 
   const tenantId = resolvedParams?.tenantId;
 
@@ -33,7 +30,7 @@ export default async function TenantPageLayout({ children, params }: { children:
   // After successful login the user is returned to the tenant dashboard.
   if (!isAuthenticated) {
     const returnPath = `/t/${tenantId}/dashboard`;
-    console.log(`[dashboard/layout] redirecting to login, returnPath=${returnPath}`);
+    // Redirect to login
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnPath)}`);
   }
 
@@ -41,42 +38,54 @@ export default async function TenantPageLayout({ children, params }: { children:
     notFound();
   }
 
-  // Resolve server tenant context (from tcx cookie or headers)
-  const tenantCtx = await getTenantContext();
-  // console.log(`[TenantPageLayout] tenantCtx:`, tenantCtx);
-
-  // Get Auth0 user info for SSR authentication headers
+  // Resolve tenant context and tenant info in parallel to minimize server render time
   const auth0Email = session?.user?.email;
   const auth0Id = session?.user?.sub;
-  // console.log(`[TenantPageLayout] auth0Email:`, auth0Email);
-  // console.log(`[TenantPageLayout] auth0Id:`, auth0Id);
 
-  // Fetch tenant info using singleton service with SSR auth headers
-  const tenantInfo = await tenantInfoService.getTenantInfo(tenantId, { auth0Email, auth0Id });
-  // console.log(`[TenantPageLayout] tenantInfo:`, tenantInfo);
+  const [tenantCtx, tenantInfo] = await Promise.all([
+    getTenantContext(),
+    tenantInfoService.getTenantInfo(tenantId, { auth0Email, auth0Id }),
+  ]);
+
   const tenantSlug = tenantInfo?.slug;
-  // console.log(`[TenantPageLayout] tenantSlug:`, tenantSlug);
   const hasPublishedDirectory = tenantInfo?.hasPublishedDirectory ?? tenantInfo?.has_published_directory;
-  // console.log(`[TenantPageLayout] hasPublishedDirectory:`, hasPublishedDirectory);
 
-  // console.log(`[TenantPageLayout] Tenant info:`, {
-  //   tenantId,
-  //   tenantSlug,
-  //   hasPublishedDirectory,
-  //   isAuthenticated
-  // });
+  // Build server-resolved auth state for client consumption (single source of truth)
+  const serverAuth: ServerResolvedAuth = {
+    isAuthenticated: true,
+    user: session?.user ? {
+      id: session.user.sub,
+      email: session.user.email || '',
+      emailVerified: session.user.email_verified,
+      name: session.user.name,
+      picture: session.user.picture,
+      auth0Id: session.user.sub,
+      firstName: session.user.given_name,
+      lastName: session.user.family_name,
+    } : null,
+  };
 
-  console.log(`[dashboard/layout] rendering children tenantId=${tenantId}`);
+  // Build server-resolved tenant state
+  const serverTenant: ServerResolvedTenant = {
+    tenantId: tenantId ?? tenantCtx.tenantId ?? '',
+    tenantSlug: tenantSlug ?? tenantCtx.tenantSlug ?? null,
+    hasPublishedDirectory: !!hasPublishedDirectory,
+    aud: tenantCtx.aud ?? null,
+    tenantInfo: tenantInfo ?? null,
+  };
+
   return (
     <>
       {/* Persist last visited tenant route for restore-after-login UX */}
       <RememberTenantRoute tenantId={tenantId} />
-      <TenantContextProvider value={{ tenantId: tenantId ?? tenantCtx.tenantId, tenantSlug: tenantSlug ?? tenantCtx.tenantSlug, aud: tenantCtx.aud, hasPublishedDirectory: hasPublishedDirectory }}>
-        <CrmAlertToastWatcher tenantId={tenantId} />
-        <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug} hasPublishedDirectory={hasPublishedDirectory}>
-          {children}
-        </DynamicTenantSidebar>
-      </TenantContextProvider>
+      <ServerResolvedContextProvider auth={serverAuth} tenant={serverTenant}>
+        <TenantContextProvider value={{ tenantId: tenantId ?? tenantCtx.tenantId, tenantSlug: tenantSlug ?? tenantCtx.tenantSlug, aud: tenantCtx.aud, hasPublishedDirectory: hasPublishedDirectory }}>
+          <CrmAlertToastWatcher tenantId={tenantId} />
+          <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug} hasPublishedDirectory={hasPublishedDirectory}>
+            {children}
+          </DynamicTenantSidebar>
+        </TenantContextProvider>
+      </ServerResolvedContextProvider>
     </>
   );
 }

@@ -14,6 +14,7 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react';
+import { faqService } from '@/services/FaqService';
 
 interface CoverageMetrics {
   totalFaqs: number;
@@ -46,13 +47,8 @@ export default function FaqControlPanel({ tenantId }: FaqControlPanelProps) {
   useEffect(() => {
     async function fetchCoverage() {
       try {
-        const res = await fetch(`/api/tenants/${tenantId}/faqs/coverage`);
-        const data = await res.json();
-        if (data.success) {
-          setMetrics(data.data);
-        } else {
-          setError(data.error || 'Failed to load coverage');
-        }
+        const data = await faqService.getCoverage(tenantId);
+        setMetrics(data);
       } catch (err: any) {
         setError(err?.message || 'Network error');
       } finally {

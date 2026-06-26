@@ -5,6 +5,8 @@
  * Safe to use in middleware, SSR, and client code.
  */
 
+import { api } from './api';
+
 export interface TenantDirectorySlugResponse {
   slug: string | null;
   tenantId?: string;
@@ -20,18 +22,25 @@ export async function fetchTenantDirectorySlug(
   tenantId: string,
   apiBaseUrl: string
 ): Promise<string | null> {
-  const res = await fetch(`${apiBaseUrl}/api/directory/tenant/${tenantId}`);
+  try {
+    const res = await api.get(`${apiBaseUrl}/api/directory/tenant/${tenantId}`, {
+      skipAuthRedirect: true,
+    });
 
-  if (!res.ok) {
-    console.warn(`[fetchTenantDirectorySlug] HTTP ${res.status} for tenant ${tenantId}`);
+    if (!res.ok) {
+      console.warn(`[fetchTenantDirectorySlug] HTTP ${res.status} for tenant ${tenantId}`);
+      return null;
+    }
+
+    const data: TenantDirectorySlugResponse = await res.json();
+
+    if (data.slug === null || data.slug === undefined) {
+      return null;
+    }
+
+    return data.slug;
+  } catch (err) {
+    console.warn(`[fetchTenantDirectorySlug] Error for tenant ${tenantId}:`, err);
     return null;
   }
-
-  const data: TenantDirectorySlugResponse = await res.json();
-
-  if (data.slug === null || data.slug === undefined) {
-    return null;
-  }
-
-  return data.slug;
 }

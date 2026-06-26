@@ -3,7 +3,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { Badge } from '@/components/ui';
 import { 
-  Crown, Activity, Building2, Tag, DollarSign, Package, MapPin, Layers, Clock,
+  Crown, Activity, Building2, Tag, DollarSign, Package, MapPin, Shield, Clock,
   Settings, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useState } from 'react';
@@ -14,8 +14,8 @@ import {
 } from '@/hooks/useSubscriptionDisplay';
 import { SubscriptionDisplayOptionsModal } from './SubscriptionDisplayOptionsModal';
 import { deriveInternalStatus, getStatusLabel, type InternalStatus } from '@/lib/subscription-status';
+import type { AllCapabilitiesState } from '@/services/CapabilityResolutionService';
 
-// Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Crown,
   Activity,
@@ -24,7 +24,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   DollarSign,
   Package,
   MapPin,
-  Layers,
+  Shield,
   Clock,
 };
 
@@ -63,12 +63,26 @@ interface TierData {
 interface SubscriptionDisplayCardProps {
   tenantId: string;
   tierData: TierData;
+  capabilities?: AllCapabilitiesState | null;
   className?: string;
+}
+
+const TOTAL_CAPABILITY_DOMAINS = 16;
+
+function countEnabledCapabilities(caps: AllCapabilitiesState): number {
+  const domains = [
+    caps.commerce, caps.paymentGateway, caps.storefront, caps.barcodeScan,
+    caps.fulfillment, caps.productOptions, caps.featuredOptions, caps.integrationOptions,
+    caps.quickstartOptions, caps.storefrontOptions, caps.directoryEntryOptions,
+    caps.faqOptions, caps.crmOptions, caps.chatbotOptions, caps.socialCommerceOptions,
+  ];
+  return domains.filter(d => d?.enabled).length;
 }
 
 export function SubscriptionDisplayCard({ 
   tenantId, 
   tierData, 
+  capabilities,
   className = '' 
 }: SubscriptionDisplayCardProps) {
   const { config, isLoading, isFieldVisible } = useSubscriptionDisplay(tenantId);
@@ -81,8 +95,9 @@ export function SubscriptionDisplayCard({
 
   // Calculate derived values
   const effectiveTier = tierData.organizationTier || tierData.tenantTier;
-  const featureCount = effectiveTier?.features?.filter(f => f.is_enabled).length || 0;
-  
+  const enabledCapabilityCount = capabilities ? countEnabledCapabilities(capabilities) : 0;
+  // console.log(` TIER: ${JSON.stringify(tierData)}`);
+  // console.log(` capabilities: ${JSON.stringify(capabilities)}`);
   // Trial days remaining
   let trialDaysRemaining: number | null = null;
   if (tierData.trialEndsAt) {
@@ -139,7 +154,9 @@ export function SubscriptionDisplayCard({
   // Render individual field
   const renderField = (field: SubscriptionDisplayField) => {
     const meta = FIELD_METADATA[field];
+    if (!meta) return null;
     const Icon = ICON_MAP[meta.icon];
+    if (!Icon) return null;
 
     switch (field) {
       case 'effectiveTier':
@@ -226,13 +243,14 @@ export function SubscriptionDisplayCard({
           </div>
         );
 
-      case 'features':
+      case 'capabilities':
+        if (!capabilities) return null;
         return (
           <div key={field} className="flex items-center gap-2">
             <Icon className="w-4 h-4 text-primary-600" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Features:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Capabilities:</span>
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {featureCount} enabled
+              {enabledCapabilityCount}/{TOTAL_CAPABILITY_DOMAINS} active
             </span>
           </div>
         );
@@ -339,6 +357,7 @@ export function SubscriptionDisplayCard({
         isOpen={showOptions}
         onClose={() => setShowOptions(false)}
         tenantId={tenantId}
+        capabilities={capabilities}
       />
     </>
   );
