@@ -165,7 +165,7 @@ function buildStatusItems(
       label: 'Payments',
       status: 'ok',
       detail: effectiveGateways.map(capitalize).join(', '),
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   } else if (pgEnabled && effectiveGateways.length === 0) {
     items.push({
@@ -173,7 +173,7 @@ function buildStatusItems(
       label: 'Payments',
       status: 'warning',
       detail: 'No gateways configured',
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   } else {
     items.push({
@@ -181,7 +181,7 @@ function buildStatusItems(
       label: 'Payments',
       status: isReadOnly ? 'error' : 'inactive',
       detail: 'Not enabled',
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   }
 
