@@ -267,6 +267,84 @@ When `resolveEffectiveCapabilities` returns null (tenant exists but has no resol
 
 **`resolveTenantIdentifier` MUST try ID lookup first** for any identifier format (not just `tid-*`). Tenant IDs like `tenant-*` are valid and must be resolved via `prisma.tenants.findUnique({ where: { id: identifier } })` before falling back to slug lookup.
 
+### R14: One Capability = One Concern (Types/Options Split)
+A capability type MUST represent a single concern. Domain capabilities that mix entity-type gating with display/behavior features MUST be split into two capability types:
+
+- **`<domain>_types`**: Gates which entity kinds are available (e.g., `storefront_types`, `product_types`). Resolved by a `XxxTypeResolver` that produces `EffectiveXxxType` with `allowed_types`, `effective_type`, and `has_merchant_selection`. Merchant prefs stored in `tenant_<domain>_type_settings`.
+- **`<domain>_options`**: Gates display/behavior/creation features (e.g., `storefront_options`, `product_options`). Resolved by a `XxxOptionsResolver` that produces `EffectiveXxxOptions` with group-based `allowed_*_types` and `can_use_*` flags. Merchant prefs stored in `tenant_<domain>_options_settings`.
+
+**Current canonical pairs**:
+| Types Capability | Options Capability |
+|---|---|
+| `storefront_types` | `storefront_options` |
+| `product_types` | `product_options` |
+
+When adding a new domain (e.g., `loyalty`), create both `loyalty_types` and `loyalty_options` if the domain has both entity-type and display-feature gating. If the domain has only display features (e.g., `faq_options`, `crm_options`), a single `_options` capability is sufficient.
+
+### R15: Feature Key Naming Convention
+Feature keys MUST follow this canonical pattern:
+
+```
+<capability_key>_enabled            # master ON gate
+<capability_key>_disabled           # master OFF gate
+<capability_key>_flexible           # unlock all features in this capability
+
+<capability_key>_<group>_enabled    # group ON gate (options capabilities only)
+<capability_key>_<group>_disabled   # group OFF gate (options capabilities only)
+
+<capability_key>_<group>_<feature>  # individual feature within a group
+```
+
+**Examples**:
+- `product_types_enabled`, `product_types_physical`, `product_types_flexible`
+- `product_options_sections_enabled`, `product_options_sections_reviews`
+- `storefront_options_qr_enabled`, `storefront_options_qr_codes_512`
+
+**Forbidden patterns**:
+- Mixing prefixes within a capability (e.g., `product_opt_*` in `product_options` — use `product_options_*`)
+- Abbreviated prefixes (e.g., `storefront_opt_*` — use `storefront_options_*`)
+- Flat keys without group prefix in an options capability (e.g., `product_variant` — use `product_options_creation_variants`)
+
+**Backward compatibility**: Legacy keys MAY be retained as aliases during migration. Resolvers check new keys first, then fall back to legacy keys. See `docs/CAPABILITY_TYPES_TARGET_ARCHITECTURE.md` §5 for the complete alias mapping.
+
+### R16: Group Gates Required for Options Capabilities
+Options capabilities MUST use group gates to organize features into logical clusters. A group gate is a pair of feature keys:
+
+- `<capability_key>_<group>_enabled` — when true, all features in the group are tier-allowed
+- `<capability_key>_<group>_disabled` — when true, all features in the group are tier-blocked (overrides individual features)
+
+**Resolver pattern for each group**:
+```ts
+const groupEnabled = !!features[`${capKey}_${group}_enabled`];
+const groupDisabled = !!features[`${capKey}_${group}_disabled`];
+const allowedTypes: Type[] = [];
+if (flexible || (groupEnabled && !groupDisabled)) {
+  allowedTypes.push(...allTypesInGroup);
+} else if (!groupDisabled) {
+  if (features[`${capKey}_${group}_${feature}`]) allowedTypes.push(feature);
+  // ... other features
+}
+```
+
+**Canonical groups**:
+| Capability | Groups |
+|---|---|
+| `storefront_options` | hours, category, recommend, info, qr, gallery, advanced, layout |
+| `product_options` | creation, layout, sections |
+
+When adding a new feature to an options capability, add it to an existing group or create a new group. Do NOT add flat feature keys outside of a group.
+
+### R17: Enablement Precedence (Canonical Order)
+All resolvers MUST determine the `enabled` state using this precedence:
+
+1. If `*_disabled` is true → **OFF** (hard disable, highest priority)
+2. Else if `*_enabled` is true → **ON** (explicit enable)
+3. Else if `*_flexible` is true → **ON** (flexible implies enabled)
+4. Else if any individual feature or group gate is enabled → **ON** (implicit enable)
+5. Else → **OFF** (no features, no master gate)
+
+This replaces ad-hoc enablement logic. The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
+
 ## File Reference
 
 ### Backend

@@ -12,6 +12,7 @@ import { DynamicNavTemplates } from '@/services/DynamicNavTemplates';
 import { getIconComponent } from './NavItemRow';
 import { type NavLink, type DynamicTemplate } from '@/services/NavigationLinksService';
 import { type ProcessedNavLink } from '@/hooks/useNavLinks';
+import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -552,6 +553,7 @@ function MobileDrawer({
           </button>
         </div>
 
+        <ScopeSwitcher scope="universal" />
         <div className="flex-1 overflow-y-auto">
           <SidebarContent
             items={items}
@@ -631,6 +633,9 @@ function DesktopSidebar({
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
+
+      {/* Scope switcher */}
+      <ScopeSwitcher scope="universal" collapsed={collapsed} />
 
       {/* Header */}
       <div className={cn('px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'px-2')}>
