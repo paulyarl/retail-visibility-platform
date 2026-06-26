@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onboardingStateService } from '@/services/OnboardingStateService';
 import { tenantManagementService } from '@/services/TenantManagementService';
@@ -913,9 +912,9 @@ export default function SignupWizardPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-neutral-600">
                 Already have an account?{' '}
-                <Link href="/auth/login" className="text-primary-600 hover:text-primary-700 font-medium">
+                <a href="/auth/login" className="text-primary-600 hover:text-primary-700 font-medium">
                   Sign in
-                </Link>
+                </a>
               </p>
             </div>
           </>

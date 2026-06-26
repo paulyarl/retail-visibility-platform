@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -39,7 +39,6 @@ interface SubdomainStatus {
 
 export default function SubdomainVerificationPage() {
   const params = useParams();
-  const router = useRouter();
   const tenantId = params?.tenantId as string;
 
   const { hasAccess, loading: accessLoading } = useAccessControl(
@@ -54,7 +53,9 @@ export default function SubdomainVerificationPage() {
   useEffect(() => {
     if (tenantId && !accessLoading) {
       if (!hasAccess) {
-        router.push('/auth/login');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login';
+        }
         return;
       }
       loadVerificationStatus();

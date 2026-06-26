@@ -111,10 +111,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     variant='gradient' style={{ color: 'white' }}
                     size="sm"
                     className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
-                    onClick={async () => {
-                      try { await logout(); } catch { }
-                      if (typeof window !== 'undefined') window.location.href = '/';
-                    }}
+                    onClick={() => { logout(); }}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -123,7 +120,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </Button>
                 </>
               ) : (
-                <Link href="/auth/login">
+                <a href="/auth/login">
                   <Button
                     variant='gradient' style={{ color: 'white' }}
                     size="sm"
@@ -134,7 +131,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </svg>
                     Sign In
                   </Button>
-                </Link>
+                </a>
               )}
             </div>
 
@@ -199,10 +196,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         variant='gradient' style={{ color: 'white' }}
                         className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                         size="md"
-                        onClick={async () => {
+                        onClick={() => {
                           setMobileMenuOpen(false);
-                          try { await logout(); } catch { }
-                          if (typeof window !== 'undefined') window.location.href = '/';
+                          logout();
                         }}
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -212,7 +208,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       </Button>
                     </>
                   ) : (
-                    <Link href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                    <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
                       <Button
                         variant='gradient' style={{ color: 'white' }}
                         className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
@@ -223,7 +219,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         </svg>
                         Sign In
                       </Button>
-                    </Link>
+                    </a>
                   )}
                 </div>
               </div>

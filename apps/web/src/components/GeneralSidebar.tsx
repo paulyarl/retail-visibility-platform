@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 
@@ -171,16 +171,14 @@ export default function GeneralSidebar({
   onMobileNavClick?: () => void
 }) {
   const pathname = usePathname()
-  const router = useRouter()
   const { logout } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/auth/login')
+  const handleLogout = () => {
+    logout()
   }
 
   const handleCollapseToggle = useCallback(() => {

@@ -17,8 +17,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Redirect to login if not authenticated
-      router.push('/auth/login');
+      // Redirect to login if not authenticated — use full-page navigation so the Auth0 proxy handles it
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
     }
   }, [isLoading, isAuthenticated, router]);
 
