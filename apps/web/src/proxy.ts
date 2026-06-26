@@ -69,7 +69,7 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
 
     // Check if user has PLATFORM_ADMIN role
     const isAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'SUPER_ADMIN';
-    
+    console.log(`isAdmin: ${isAdmin}`);
     console.log('[Proxy] User role check:', user.email, 'role:', user.role, 'isAdmin:', isAdmin);
     
     return isAdmin;
