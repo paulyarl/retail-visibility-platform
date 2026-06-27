@@ -203,6 +203,12 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
 import metaOAuthRoutes from './routes/meta-oauth';
+import metaWebhookRoutes from './routes/meta-webhooks';
+import tiktokOAuthRoutes from './routes/tiktok-oauth';
+import tiktokWebhookRoutes from './routes/tiktok-webhooks';
+import socialProofRoutes from './routes/social-proof';
+import shippingRateRoutes from './routes/shipping-rates';
+import returnsRoutes from './routes/returns';
 import socialPixelRoutes from './routes/social-pixels';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
@@ -7511,6 +7517,16 @@ app.use('/api/tenants', featuredOptionsSettingsRoutes);
 app.use('/api', featuredOptionsSettingsRoutes);
 console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options and /api/public/tenant/:tenantId/featured-options');
 
+/* ------------------------------ badge registry ------------------------------ */
+import badgeRegistryRoutes from './routes/badge-registry';
+app.use('/api', badgeRegistryRoutes);
+console.log('✅ Badge registry routes mounted at /api/public/badge-registry and /api/tenants/:tenantId/badge-registry');
+
+/* ------------------------------ badge analytics ------------------------------ */
+import badgeAnalyticsRoutes from './routes/badge-analytics';
+app.use('/api', badgeAnalyticsRoutes);
+console.log('✅ Badge analytics routes mounted at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events');
+
 /* ------------------------------ faq options settings ------------------------------ */
 app.use('/api/tenants', faqOptionsSettingsRoutes);
 app.use('/api', faqOptionsSettingsRoutes);
@@ -7998,6 +8014,32 @@ console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oaut
 app.use('/api', metaOAuthRoutes);
 console.log('✅ Meta Commerce OAuth routes mounted at /api/meta/oauth');
 
+/* ------------------------------ Meta Commerce Webhooks ------------------------------ */
+app.use('/api', metaWebhookRoutes);
+console.log('✅ Meta Commerce webhooks mounted at /api/meta/webhooks');
+
+/* ------------------------------ TikTok Shop OAuth ------------------------------ */
+app.use('/api', tiktokOAuthRoutes);
+console.log('✅ TikTok Shop OAuth routes mounted at /api/tiktok/oauth');
+
+/* ------------------------------ TikTok Shop Webhooks ------------------------------ */
+app.use('/api', tiktokWebhookRoutes);
+console.log('✅ TikTok Shop webhooks mounted at /api/tiktok/webhooks');
+
+/* ------------------------------ Social Proof / UGC ------------------------------ */
+app.use('/api', socialProofRoutes);
+app.use('/api/tenants', socialProofRoutes);
+console.log('✅ Social Proof / UGC routes mounted at /api/public/social-proof and /api/tenants/:tenantId/social-proof');
+
+/* ------------------------------ Shipping Rates ------------------------------ */
+app.use('/api', shippingRateRoutes);
+console.log('✅ Shipping rates routes mounted at /api/shipping/rates');
+
+/* ------------------------------ Returns Portal ------------------------------ */
+app.use('/api', returnsRoutes);
+app.use('/api/tenants', returnsRoutes);
+console.log('✅ Returns portal routes mounted at /api/public/returns and /api/tenants/:tenantId/returns');
+
 /* ------------------------------ Social Pixels ------------------------------ */
 app.use('/api', socialPixelRoutes);
 console.log('✅ Social Pixels routes mounted at /api/social-pixels');
@@ -8107,6 +8149,33 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start bot product embedding sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start platform badge sync (every 6 hours) — syncs trending/bestseller/recommended to featured_products
+      try {
+        const { startPlatformBadgeSync } = await import('./jobs/platform-badge-sync');
+        await startPlatformBadgeSync();
+        logger.info('Platform badge sync started');
+      } catch (err) {
+        logger.error('Failed to start platform badge sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start badge rule auto-assign sync (every 4 hours) — evaluates sale/new_arrival/clearance rules
+      try {
+        const { startBadgeRuleSync } = await import('./jobs/badge-rule-sync');
+        await startBadgeRuleSync();
+        logger.info('Badge rule sync started');
+      } catch (err) {
+        logger.error('Failed to start badge rule sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start badge analytics aggregation (every 6 hours) — aggregates badge_events into badge_analytics
+      try {
+        const { startBadgeAnalyticsSync } = await import('./jobs/badge-analytics-sync');
+        await startBadgeAnalyticsSync();
+        logger.info('Badge analytics sync started');
+      } catch (err) {
+        logger.error('Failed to start badge analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start log purge job (daily at 2 AM UTC)
       try {
         const { startLogPurgeJob } = await import('./jobs/log-purge');
@@ -8123,6 +8192,24 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Abandoned cart recovery job started (every 30 minutes)');
       } catch (err) {
         logger.error('Failed to start abandoned cart recovery job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start Meta catalog sync job (every 6 hours)
+      try {
+        const { startMetaCatalogSync } = await import('./jobs/meta-catalog-sync');
+        startMetaCatalogSync();
+        logger.info('Meta catalog sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start Meta catalog sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start TikTok catalog sync job (every 6 hours)
+      try {
+        const { startTikTokCatalogSync } = await import('./jobs/tiktok-catalog-sync');
+        startTikTokCatalogSync();
+        logger.info('TikTok catalog sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start TikTok catalog sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 

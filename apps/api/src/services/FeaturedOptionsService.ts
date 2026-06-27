@@ -12,6 +12,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { getSystemBadges, getBadgesByGroup, type BadgeTypeMeta } from './BadgeRegistryService';
 
 // ====================
 // TYPES
@@ -48,6 +49,7 @@ export interface FeaturedOptionsState {
   isFlexible: boolean;
   featuredAvailable: boolean;
   expiryMonitorEnabled: boolean;
+  customBadgeSlotsEnabled: boolean;
   features: Record<string, boolean>;
 }
 
@@ -223,6 +225,7 @@ class FeaturedOptionsService {
       isFlexible: flexible,
       featuredAvailable: enabled && !disabled && allTypes.length > 0,
       expiryMonitorEnabled: !!features.featured_expiry_monitor,
+      customBadgeSlotsEnabled: !!features.featured_custom_badge_slots,
       features,
     };
   }
@@ -280,8 +283,28 @@ class FeaturedOptionsService {
       isFlexible: false,
       featuredAvailable: false,
       expiryMonitorEnabled: false,
+      customBadgeSlotsEnabled: false,
       features: {},
     };
+  }
+
+  // ====================
+  // REGISTRY-BACKED METHODS (Phase 0: Badge Registry)
+  // ====================
+
+  /**
+   * Get all active badge types from the registry (system badges).
+   * Falls back to static arrays if DB unavailable.
+   */
+  async getAllBadgeTypes(): Promise<BadgeTypeMeta[]> {
+    return getSystemBadges();
+  }
+
+  /**
+   * Get badge types by group from the registry.
+   */
+  async getBadgeTypesByGroup(group: 'tenant' | 'platform'): Promise<BadgeTypeMeta[]> {
+    return getBadgesByGroup(group);
   }
 }
 

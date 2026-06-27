@@ -362,6 +362,24 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
     (p.featuredTypes && p.featuredTypes.includes(type))
   ).slice(0, maxProducts);
 
+  // Group products by productType for type-segmented display
+  const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+  const productTypeLabels: Record<string, string> = {
+    physical: 'Physical Products',
+    digital: 'Digital Products',
+    service: 'Service Products',
+    hybrid: 'Hybrid Products',
+  };
+  const groupedProducts = productTypeOrder.reduce((acc, pt) => {
+    acc[pt] = typeProducts.filter(p => (p.productType || 'physical') === pt);
+    return acc;
+  }, {} as Record<string, FeaturedProduct[]>);
+  const otherProducts = typeProducts.filter(p => {
+    const pt = p.productType || 'physical';
+    return !productTypeOrder.includes(pt as any);
+  });
+  const hasMultipleTypes = Object.values(groupedProducts).filter(g => g.length > 0).length + (otherProducts.length > 0 ? 1 : 0) > 1;
+
   if (loading) {
     return (
       <div className="animate-pulse">
@@ -428,347 +446,168 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
           </div>
         </div>
 
-        {/* Products Display */}
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <SmartProductCard
-                key={`${instanceId}-${type}-${product.id}`}
-                tenantId={tenantId}
-                product={{
-                  // Basic fields
-                  id: product.id,
-                  sku: product.sku || product.id,
-                  name: product.name,
-                  title: product.title,
-                  brand: product.brand,
-                  description: product.description,
-                  priceCents: product.listPriceCents || product.priceCents,
-                  salePriceCents: product.salePriceCents,
-                  listPriceCents: product.listPriceCents,
-                  stock: product.stock,
-                  imageUrl: product.imageUrl,
-                  tenantId: tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.defaultGatewayType,
-                  tenantCategory: product.tenantCategory || product.shopCategory,
-                  isFeatured: product.isFeatured,
-
-                  // Enhanced fields for rich display
-                  averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
-                  reviewCount: product.reviewCount,
-                  viewCount: product.viewCount,
-                  wishlistCount: product.wishlistCount,
-                  shareCount: product.shareCount,
-                  isOnSale: product.isOnSale,
-                  discountPercentage: product.discountPercentage,
-                  currency: product.currency,
-
-                  // NEW LIVE REVIEW AGGREGATIONS
-                  productRatingLive: typeof product.productRatingLive === 'string' ? parseFloat(product.productRatingLive) : product.productRatingLive,
-                  productReviewsCountLive: product.productReviewsCountLive,
-                  productHelpfulCountLive: product.productHelpfulCountLive,
-                  productReviewsApprovedLive: product.productReviewsApprovedLive,
-
-                  // Media fields
-                  hasGallery: product.hasGallery,
-                  videoUrl: product.videoUrl,
-                  imageUrls: product.imageUrls,
-                  galleryUrls: product.galleryUrls,
-                  thumbnailUrl: product.thumbnailUrl,
-                  featuredImageUrl: product.featuredImageUrl,
-
-                  // Product details
-                  manufacturer: product.manufacturer,
-                  condition: product.condition,
-                  gtin: product.gtin,
-                  mpn: product.mpn,
-                  specifications: product.specifications,
-                  attributes: product.attributes,
-                  customFields: product.customFields,
-                  searchKeywords: product.searchKeywords,
-                  tags: product.tags,
-
-                  // SEO fields
-                  seoTitle: product.seoTitle,
-                  seoDescription: product.seoDescription,
-                  seoKeywords: product.seoKeywords,
-
-                  // Physical properties
-                  weight: product.weight,
-                  dimensions: product.dimensions,
-                  weightUnit: product.weightUnit,
-                  length: product.length,
-                  width: product.width,
-                  height: product.height,
-                  dimensionUnit: product.dimensionUnit,
-
-                  // Categories
-                  categoryName: product.categoryName || product.productCategory,
-                  categorySlug: product.categorySlug || product.productCategorySlug,
-                  productCategory: product.productCategory || product.categoryName,
-                  productCategorySlug: product.productCategorySlug || product.categorySlug,
-                  googleCategoryId: product.googleCategoryId,
-                  productParentCategoryId: product.productParentCategoryId,
-
-                  // Variants
-                  has_variants: product.hasVariants,
-                  variantId: product.variantId,
-                  variantName: product.variantName,
-                  variantSku: product.variantSku,
-                  variantColor: product.variantColor,
-                  variantSize: product.variantSize,
-                  variantMaterial: product.variantMaterial,
-                  variantStyle: product.variantStyle,
-
-                  // Product types
-                  productType: product.productType,
-                  isDigitalProduct: product.isDigitalProduct,
-                  isPhysicalProduct: product.isPhysicalProduct,
-                  isService: product.isService,
-                  isBundle: product.isBundle,
-                  isCustomizable: product.isCustomizable,
-                  isTrackable: product.isTrackable,
-
-                  // Rich descriptions
-                  marketingDescription: product.marketingDescription,
-
-                  // Shop info
-                  tenantName: product.tenantName,
-                  tenantLogoUrl: product.tenantLogoUrl,
-                  shopCategory: product.shopCategory,
-                  shopCategoryId: product.shopCategoryId,
-                  shopGoogleCategoryId: product.shopGoogleCategoryId,
-
-                  // Location
-                  tenantCity: product.tenantCity,
-                  tenantState: product.tenantState,
-                  tenantCountry: product.tenantCountry,
-                  tenantZip: product.tenantZip,
-                  tenantAddress: product.tenantAddress,
-                  tenantLatitude: product.tenantLatitude,
-                  tenantLongitude: product.tenantLongitude,
-                  timezone: product.timezone,
-
-                  // Business info
-                  businessType: product.businessType,
-                  businessCategory: product.businessCategory,
-                  businessSize: product.businessSize,
-                  establishedYear: product.establishedYear,
-
-                  // Status indicators
-                  inStock: product.inStock,
-                  stockStatus: product.stockStatus,
-                  priceStatus: product.priceStatus,
-
-                  // Analytics
-                  bucketPriority: product.bucketPriority,
-                  trendingScore: product.trendingScore,
-
-                  // Timestamps
-                  createdAt: product.createdAt,
-                  updatedAt: product.updatedAt,
-                  publishedAt: product.publishedAt,
-
-                  // Featured system
-                  featuredType: product.featuredType || type || undefined,
+        {/* Products Display — grouped by productType */}
+        {(() => {
+          const renderProductCard = (product: FeaturedProduct, listMode: boolean) => (
+            <SmartProductCard
+              key={`${instanceId}-${type}-${product.id}`}
+              tenantId={tenantId}
+              product={{
+                id: product.id,
+                sku: product.sku || product.id,
+                name: product.name,
+                title: product.title,
+                brand: product.brand,
+                description: product.description,
+                priceCents: product.listPriceCents || product.priceCents,
+                salePriceCents: product.salePriceCents,
+                listPriceCents: product.listPriceCents,
+                stock: product.stock,
+                imageUrl: product.imageUrl,
+                tenantId: tenantId,
+                availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                has_active_payment_gateway: product.hasActivePaymentGateway,
+                payment_gateway_type: product.defaultGatewayType,
+                tenantCategory: product.tenantCategory || product.shopCategory,
+                isFeatured: product.isFeatured,
+                averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
+                reviewCount: product.reviewCount,
+                viewCount: product.viewCount,
+                wishlistCount: product.wishlistCount,
+                shareCount: product.shareCount,
+                isOnSale: product.isOnSale,
+                discountPercentage: product.discountPercentage,
+                currency: product.currency,
+                productRatingLive: typeof product.productRatingLive === 'string' ? parseFloat(product.productRatingLive) : product.productRatingLive,
+                productReviewsCountLive: product.productReviewsCountLive,
+                productHelpfulCountLive: product.productHelpfulCountLive,
+                productReviewsApprovedLive: product.productReviewsApprovedLive,
+                hasGallery: product.hasGallery,
+                videoUrl: product.videoUrl,
+                imageUrls: product.imageUrls,
+                galleryUrls: product.galleryUrls,
+                thumbnailUrl: product.thumbnailUrl,
+                featuredImageUrl: product.featuredImageUrl,
+                manufacturer: product.manufacturer,
+                condition: product.condition,
+                gtin: product.gtin,
+                mpn: product.mpn,
+                specifications: product.specifications,
+                attributes: product.attributes,
+                customFields: product.customFields,
+                searchKeywords: product.searchKeywords,
+                tags: product.tags,
+                seoTitle: product.seoTitle,
+                seoDescription: product.seoDescription,
+                seoKeywords: product.seoKeywords,
+                weight: product.weight,
+                dimensions: product.dimensions,
+                weightUnit: product.weightUnit,
+                length: product.length,
+                width: product.width,
+                height: product.height,
+                dimensionUnit: product.dimensionUnit,
+                categoryName: product.categoryName || product.productCategory,
+                categorySlug: product.categorySlug || product.productCategorySlug,
+                productCategory: product.productCategory || product.categoryName,
+                productCategorySlug: product.productCategorySlug || product.categorySlug,
+                googleCategoryId: product.googleCategoryId,
+                productParentCategoryId: product.productParentCategoryId,
+                has_variants: product.hasVariants,
+                variantId: product.variantId,
+                variantName: product.variantName,
+                variantSku: product.variantSku,
+                variantColor: product.variantColor,
+                variantSize: product.variantSize,
+                variantMaterial: product.variantMaterial,
+                variantStyle: product.variantStyle,
+                productType: product.productType,
+                isDigitalProduct: product.isDigitalProduct,
+                isPhysicalProduct: product.isPhysicalProduct,
+                isService: product.isService,
+                isBundle: product.isBundle,
+                isCustomizable: product.isCustomizable,
+                isTrackable: product.isTrackable,
+                marketingDescription: product.marketingDescription,
+                tenantName: product.tenantName,
+                tenantLogoUrl: product.tenantLogoUrl,
+                shopCategory: product.shopCategory,
+                shopCategoryId: product.shopCategoryId,
+                shopGoogleCategoryId: product.shopGoogleCategoryId,
+                tenantCity: product.tenantCity,
+                tenantState: product.tenantState,
+                tenantCountry: product.tenantCountry,
+                tenantZip: product.tenantZip,
+                tenantAddress: product.tenantAddress,
+                tenantLatitude: product.tenantLatitude,
+                tenantLongitude: product.tenantLongitude,
+                timezone: product.timezone,
+                businessType: product.businessType,
+                businessCategory: product.businessCategory,
+                businessSize: product.businessSize,
+                establishedYear: product.establishedYear,
+                inStock: product.inStock,
+                stockStatus: product.stockStatus,
+                priceStatus: product.priceStatus,
+                bucketPriority: product.bucketPriority,
+                trendingScore: product.trendingScore,
+                createdAt: product.createdAt,
+                updatedAt: product.updatedAt,
+                publishedAt: product.publishedAt,
+                featuredType: product.featuredType || type || undefined,
+                featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
+                  .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
+                featuredPriority: product.featuredPriority,
+                featuredAt: product.featuredAt,
+                featuredExpiresAt: product.featuredExpiresAt,
+                isFeaturedActive: product.isFeaturedActive,
+                daysUntilExpiration: product.daysUntilExpiration,
+                isExpired: product.isExpired,
+                isExpiringSoon: product.isExpiringSoon,
+                autoUnfeature: product.autoUnfeature,
+                metadata: {
                   featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
-                    .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
-                  featuredPriority: product.featuredPriority,
-                  featuredAt: product.featuredAt,
-                  featuredExpiresAt: product.featuredExpiresAt,
-                  isFeaturedActive: product.isFeaturedActive,
-                  daysUntilExpiration: product.daysUntilExpiration,
-                  isExpired: product.isExpired,
-                  isExpiringSoon: product.isExpiringSoon,
-                  autoUnfeature: product.autoUnfeature,
+                    .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
+                }
+              }}
+              variant={listMode ? 'list' : 'featured'}
+              defaultGatewayType={defaultGatewayType}
+              showCategory={true}
+              showDescription={true}
+              className={listMode ? '' : 'h-full'}
+              buttonLayout="stacked"
+            />
+          );
 
-                  // Legacy metadata
-                  metadata: {
-                    featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
-                      .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
-                  }
-                }}
-                variant="featured"
-                defaultGatewayType={defaultGatewayType}
-                showCategory={true}
-                showDescription={true}
-                className="h-full"
-                buttonLayout="stacked"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {products.map((product) => (
-              <SmartProductCard
-                key={`${instanceId}-${type}-${product.id}`}
-                tenantId={tenantId}
-                product={{
-                  // Basic fields
-                  id: product.id,
-                  sku: product.sku || product.id,
-                  name: product.name,
-                  title: product.title,
-                  brand: product.brand,
-                  description: product.description,
-                  priceCents: product.listPriceCents || product.priceCents,
-                  salePriceCents: product.salePriceCents,
-                  listPriceCents: product.listPriceCents,
-                  stock: product.stock,
-                  imageUrl: product.imageUrl,
-                  tenantId: tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.defaultGatewayType,
-                  tenantCategory: product.tenantCategory || product.shopCategory,
-                  isFeatured: product.isFeatured,
+          const renderGroup = (label: string, groupProducts: FeaturedProduct[]) => {
+            if (!groupProducts || groupProducts.length === 0) return null;
+            return (
+              <div key={label}>
+                {hasMultipleTypes && (
+                  <h3 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">
+                    {label}
+                  </h3>
+                )}
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {groupProducts.map(p => renderProductCard(p, false))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {groupProducts.map(p => renderProductCard(p, true))}
+                  </div>
+                )}
+              </div>
+            );
+          };
 
-                  // Enhanced fields for rich display
-                  averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
-                  reviewCount: product.reviewCount,
-                  viewCount: product.viewCount,
-                  wishlistCount: product.wishlistCount,
-                  shareCount: product.shareCount,
-                  isOnSale: product.isOnSale,
-                  discountPercentage: product.discountPercentage,
-                  currency: product.currency,
-
-                  // NEW LIVE REVIEW AGGREGATIONS
-                  productRatingLive: typeof product.productRatingLive === 'string' ? parseFloat(product.productRatingLive) : product.productRatingLive,
-                  productReviewsCountLive: product.productReviewsCountLive,
-                  productHelpfulCountLive: product.productHelpfulCountLive,
-                  productReviewsApprovedLive: product.productReviewsApprovedLive,
-
-                  // Media fields
-                  hasGallery: product.hasGallery,
-                  videoUrl: product.videoUrl,
-                  imageUrls: product.imageUrls,
-                  galleryUrls: product.galleryUrls,
-                  thumbnailUrl: product.thumbnailUrl,
-                  featuredImageUrl: product.featuredImageUrl,
-
-                  // Product details
-                  manufacturer: product.manufacturer,
-                  condition: product.condition,
-                  gtin: product.gtin,
-                  mpn: product.mpn,
-                  specifications: product.specifications,
-                  attributes: product.attributes,
-                  customFields: product.customFields,
-                  searchKeywords: product.searchKeywords,
-                  tags: product.tags,
-
-                  // SEO fields
-                  seoTitle: product.seoTitle,
-                  seoDescription: product.seoDescription,
-                  seoKeywords: product.seoKeywords,
-
-                  // Physical properties
-                  weight: product.weight,
-                  dimensions: product.dimensions,
-                  weightUnit: product.weightUnit,
-                  length: product.length,
-                  width: product.width,
-                  height: product.height,
-                  dimensionUnit: product.dimensionUnit,
-
-                  // Categories
-                  categoryName: product.categoryName,
-                  categorySlug: product.categorySlug,
-                  productCategory: product.productCategory,
-                  productCategorySlug: product.productCategorySlug,
-                  googleCategoryId: product.googleCategoryId,
-                  productParentCategoryId: product.productParentCategoryId,
-
-                  // Variants
-                  has_variants: product.hasVariants,
-                  variantId: product.variantId,
-                  variantName: product.variantName,
-                  variantSku: product.variantSku,
-                  variantColor: product.variantColor,
-                  variantSize: product.variantSize,
-                  variantMaterial: product.variantMaterial,
-                  variantStyle: product.variantStyle,
-
-                  // Product types
-                  productType: product.productType,
-                  isDigitalProduct: product.isDigitalProduct,
-                  isPhysicalProduct: product.isPhysicalProduct,
-                  isService: product.isService,
-                  isBundle: product.isBundle,
-                  isCustomizable: product.isCustomizable,
-                  isTrackable: product.isTrackable,
-
-                  // Rich descriptions
-                  marketingDescription: product.marketingDescription,
-
-                  // Shop info
-                  tenantName: product.tenantName,
-                  tenantLogoUrl: product.tenantLogoUrl,
-                  shopCategory: product.shopCategory,
-                  shopCategoryId: product.shopCategoryId,
-                  shopGoogleCategoryId: product.shopGoogleCategoryId,
-
-                  // Location
-                  tenantCity: product.tenantCity,
-                  tenantState: product.tenantState,
-                  tenantCountry: product.tenantCountry,
-                  tenantZip: product.tenantZip,
-                  tenantAddress: product.tenantAddress,
-                  tenantLatitude: product.tenantLatitude,
-                  tenantLongitude: product.tenantLongitude,
-                  timezone: product.timezone,
-
-                  // Business info
-                  businessType: product.businessType,
-                  businessCategory: product.businessCategory,
-                  businessSize: product.businessSize,
-                  establishedYear: product.establishedYear,
-
-                  // Status indicators
-                  inStock: product.inStock,
-                  stockStatus: product.stockStatus,
-                  priceStatus: product.priceStatus,
-
-                  // Analytics
-                  bucketPriority: product.bucketPriority,
-                  trendingScore: product.trendingScore,
-
-                  // Timestamps
-                  createdAt: product.createdAt,
-                  updatedAt: product.updatedAt,
-                  publishedAt: product.publishedAt,
-
-                  // Featured system
-                  featuredType: product.featuredType || type || undefined,
-                  featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
-                    .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
-                  featuredPriority: product.featuredPriority,
-                  featuredAt: product.featuredAt,
-                  featuredExpiresAt: product.featuredExpiresAt,
-                  isFeaturedActive: product.isFeaturedActive,
-                  daysUntilExpiration: product.daysUntilExpiration,
-                  isExpired: product.isExpired,
-                  isExpiringSoon: product.isExpiringSoon,
-                  autoUnfeature: product.autoUnfeature,
-
-                  // Legacy metadata
-                  metadata: {
-                    featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (type ? [type] : [])))
-                      .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t))
-                  }
-                }}
-                variant="list"
-                defaultGatewayType={defaultGatewayType}
-                showCategory={true}
-                showDescription={true}
-                buttonLayout="stacked"
-              />
-            ))}
-          </div>
-        )}
+          return (
+            <div className="space-y-8">
+              {productTypeOrder.map(pt => renderGroup(productTypeLabels[pt], groupedProducts[pt]))}
+              {otherProducts.length > 0 && renderGroup('Other Products', otherProducts)}
+            </div>
+          );
+        })()}
       </div>
     </section>
   );

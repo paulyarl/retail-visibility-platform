@@ -225,6 +225,8 @@ export function useStorefrontState({
     initialProductOptionFlags ?? null,
   );
   const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled) || isServiceStore;
+  const showDigital = !!(productOptionFlags?.merchantPreferences?.product_digital_enabled);
+  const showHybrid = !!(productOptionFlags?.merchantPreferences?.product_hybrid_enabled);
 
   // ---- Social commerce flags ----
   const [socialCommerceFlags] = useState<SocialCommerceFlags | null>(
@@ -398,6 +400,8 @@ export function useStorefrontState({
     // Product options
     productOptionFlags,
     showServices,
+    showDigital,
+    showHybrid,
 
     // Social commerce
     socialCommerceFlags,

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt, Edit, ChevronDown, ChevronUp, Plus, Minus, CreditCard } from 'lucide-react';
+import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt, Edit, ChevronDown, ChevronUp, Plus, Minus, CreditCard, Download, Calendar, Globe } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
@@ -47,6 +47,40 @@ export default function MultiCartPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const productTypeBadge = (productType?: string) => {
+    const type = productType || 'physical';
+    if (type === 'physical') return null;
+    const configs: Record<string, { icon: typeof Download; label: string; className: string }> = {
+      digital: { icon: Download, label: 'Digital', className: 'bg-blue-100 text-blue-700' },
+      service: { icon: Calendar, label: 'Service', className: 'bg-purple-100 text-purple-700' },
+      hybrid: { icon: Globe, label: 'Hybrid', className: 'bg-teal-100 text-teal-700' },
+    };
+    const config = configs[type];
+    if (!config) return null;
+    const Icon = config.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </span>
+    );
+  };
+
+  const getFulfillmentLabel = (productType?: string) => {
+    const type = productType || 'physical';
+    switch (type) {
+      case 'digital': return 'Digital Download';
+      case 'service': return 'Service Booking';
+      case 'hybrid': return 'Shipping + Download';
+      default: return null;
+    }
+  };
+
+  const shouldShowStockInCart = (productType?: string) => {
+    const type = productType || 'physical';
+    return type === 'physical' || type === 'hybrid';
   };
 
   const getStatusBadge = (status: string) => {
@@ -326,7 +360,11 @@ export default function MultiCartPage() {
                     {/* Expandable Cart Items */}
                     {isExpanded && (
                       <div className="mt-3 space-y-2">
-                        {cart.items.map((item) => (
+                        {cart.items.map((item) => {
+                          const itemProductType = item.productType;
+                          const showItemStock = shouldShowStockInCart(itemProductType);
+                          const fulfillmentLabel = getFulfillmentLabel(itemProductType);
+                          return (
                           <div key={`${item.product_id}-${item.variant_id || 'default'}`} className="flex items-center gap-3 bg-white p-3 rounded border">
                             <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
                               {item.product_image ? (
@@ -336,11 +374,19 @@ export default function MultiCartPage() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{item.product_name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-gray-900 truncate">{item.product_name}</p>
+                                {productTypeBadge(itemProductType)}
+                              </div>
                               {item.variant_name && (
                                 <p className="text-xs text-gray-500">{item.variant_name}</p>
                               )}
-                              <p className="text-xs text-gray-600">{formatCurrency(item.price_cents)} each</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-gray-600">{formatCurrency(item.price_cents)} each</p>
+                                {fulfillmentLabel && (
+                                  <span className="text-xs text-gray-400">· {fulfillmentLabel}</span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-1">
                               <Button
@@ -353,21 +399,21 @@ export default function MultiCartPage() {
                                 <Minus className="h-3 w-3" />
                               </Button>
                               <span className="w-6 text-center text-sm">{item.quantity}</span>
-                              {item.stock !== undefined && item.stock > 0 && (
+                              {showItemStock && item.stock !== undefined && item.stock > 0 && (
                                 <span className="text-xs text-gray-400">/{item.stock}</span>
                               )}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  const maxStock = item.stock ?? Infinity;
+                                  const maxStock = showItemStock ? (item.stock ?? Infinity) : Infinity;
                                   if (item.quantity >= maxStock) {
                                     alert(`Cannot add more. Only ${maxStock} available in stock.`);
                                     return;
                                   }
                                   updateQuantity(cart.tenant_id, item.product_id, item.quantity + 1, item.variant_id);
                                 }}
-                                disabled={item.stock !== undefined && item.quantity >= item.stock}
+                                disabled={showItemStock && item.stock !== undefined && item.quantity >= item.stock}
                                 className="h-7 w-7 p-0"
                               >
                                 <Plus className="h-3 w-3" />
@@ -383,7 +429,8 @@ export default function MultiCartPage() {
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
-                        ))}
+                          );
+                        })}
                         <Button
                           variant="outline"
                           size="sm"

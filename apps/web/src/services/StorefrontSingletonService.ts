@@ -167,6 +167,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       search?: string;
       category?: string;
       productType?: string;
+      badge?: string;
     } = {}
   ): Promise<{
     items: StorefrontProduct[];
@@ -187,6 +188,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       if (options.search) queryParams.append('search', options.search);
       if (options.category) queryParams.append('category', options.category);
       if (options.productType) queryParams.append('product_type', options.productType);
+      if (options.badge) queryParams.append('badge', options.badge);
       // console.log(`[StorefrontSingleton] getStorefrontProducts query params:`, queryParams.toString());
 
       const endpoint = `/api/storefront/${tenantId}/products?${queryParams.toString()}`;

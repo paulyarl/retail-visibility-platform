@@ -8,6 +8,7 @@
 
 import { prisma } from '../prisma';
 import { generateSocialPixelId } from '../lib/id-generator';
+import { logger } from '../logger';
 import crypto from 'crypto';
 
 export interface PixelConfig {
@@ -41,7 +42,7 @@ class SocialPixelService {
         tiktokAccessToken: record.tiktok_access_token,
       };
     } catch (error) {
-      console.error(`[SocialPixel] Error getting config for tenant ${tenantId}:`, error);
+      logger.error('SocialPixel: Error getting config', undefined, { tenantId, error: String(error) });
       return null;
     }
   }
@@ -66,7 +67,7 @@ class SocialPixelService {
         tiktokPixelId: record.tiktok_pixel_id,
       };
     } catch (error) {
-      console.error(`[SocialPixel] Error getting public config for tenant ${tenantId}:`, error);
+      logger.error('SocialPixel: Error getting public config', undefined, { tenantId, error: String(error) });
       return null;
     }
   }
@@ -122,7 +123,7 @@ class SocialPixelService {
         };
       }
     } catch (error) {
-      console.error(`[SocialPixel] Error upserting config for tenant ${tenantId}:`, error);
+      logger.error('SocialPixel: Error upserting config', undefined, { tenantId, error: String(error) });
       return null;
     }
   }
@@ -179,14 +180,14 @@ class SocialPixelService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[SocialPixel] Meta Conversions API error for tenant ${tenantId}:`, errorText);
+        logger.error('SocialPixel: Meta Conversions API error', undefined, { tenantId, error: errorText });
         return false;
       }
 
-      console.log(`[SocialPixel] Meta conversion event "${event.eventName}" sent for tenant ${tenantId}`);
+      logger.info('SocialPixel: Meta conversion event sent', undefined, { tenantId, eventName: event.eventName });
       return true;
     } catch (error) {
-      console.error(`[SocialPixel] Meta conversion error for tenant ${tenantId}:`, error);
+      logger.error('SocialPixel: Meta conversion error', undefined, { tenantId, error: String(error) });
       return false;
     }
   }
@@ -245,14 +246,14 @@ class SocialPixelService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[SocialPixel] TikTok Events API error for tenant ${tenantId}:`, errorText);
+        logger.error('SocialPixel: TikTok Events API error', undefined, { tenantId, error: errorText });
         return false;
       }
 
-      console.log(`[SocialPixel] TikTok conversion event "${event.eventName}" sent for tenant ${tenantId}`);
+      logger.info('SocialPixel: TikTok conversion event sent', undefined, { tenantId, eventName: event.eventName });
       return true;
     } catch (error) {
-      console.error(`[SocialPixel] TikTok conversion error for tenant ${tenantId}:`, error);
+      logger.error('SocialPixel: TikTok conversion error', undefined, { tenantId, error: String(error) });
       return false;
     }
   }

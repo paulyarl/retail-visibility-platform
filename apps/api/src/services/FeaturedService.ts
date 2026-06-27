@@ -80,6 +80,8 @@ export interface FeaturedProduct {
     longitude?: number;
   };
 
+  productType?: string;
+
   distance?: number;
 }
 
@@ -317,6 +319,9 @@ export class FeaturedService {
       // Timestamps
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
+
+      // Product Type
+      productType: row.product_type || 'physical',
 
       // Tenant Info
       tenant,

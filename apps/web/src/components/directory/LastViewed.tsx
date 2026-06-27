@@ -76,6 +76,7 @@ interface LastViewedProduct {
   featuredPriority?: number;
   featuredAt?: string;
   isFeaturedActive?: boolean;
+  productType?: string;
   storeName?: string;
   storeSlug?: string;
   storeLogo?: string;
@@ -224,6 +225,7 @@ export default function LastViewed({
                 featuredPriority: item.featuredPriority,
                 featuredAt: item.featuredAt,
                 isFeaturedActive: item.isFeaturedActive,
+                productType: item.productType,
                 storeName: item.businessName,
                 storeSlug: item.slug,
                 storeLogo: item.tenantLogoUrl,
@@ -331,7 +333,7 @@ export default function LastViewed({
         ) : (
           // Group items by type for better visual balance
           <div className="space-y-8">
-            {/* Products Section */}
+            {/* Products Section — grouped by product type */}
             {(() => {
               const products = items
                 .filter(item => item.type === 'product')
@@ -339,131 +341,232 @@ export default function LastViewed({
                   const productData = item.data as LastViewedProduct;
                   return productData.productId !== currentProductId;
                 });
-              return products.length > 0 && (
+
+              const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+              const productTypeLabels: Record<string, string> = {
+                physical: 'Physical Products',
+                digital: 'Digital Products',
+                service: 'Service Products',
+                hybrid: 'Hybrid Products',
+              };
+
+              const grouped = productTypeOrder.reduce((acc, pt) => {
+                acc[pt] = products.filter(item => {
+                  const pd = item.data as LastViewedProduct;
+                  return (pd.productType || 'physical') === pt;
+                });
+                return acc;
+              }, {} as Record<string, typeof products>);
+
+              const otherProducts = products.filter(item => {
+                const pt = (item.data as LastViewedProduct).productType || 'physical';
+                return !productTypeOrder.includes(pt as any);
+              });
+
+              return (products.length > 0) && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recently Viewed Products</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {products.map((item, index) => {
-                      const productData = item.data as LastViewedProduct;
+                  <div className="space-y-6">
+                    {productTypeOrder.map(pt => {
+                      const group = grouped[pt];
+                      if (!group || group.length === 0) return null;
                       return (
-                        <SmartProductCard
-                          key={`product-${productData.productId}-${index}`}
-                          tenantId={productData.tenantId}
-                          product={{
-                            id: productData.productId,
-                            sku: productData.productSku || productData.productId,
-                            name: productData.productName,
-                            title: productData.productTitle || productData.productName,
-                            brand: productData.productBrand || productData.businessName,
-                            description: productData.productDescription,
-                            priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
-                            salePriceCents: productData.productSalePriceCents,
-                            listPriceCents: productData.productPriceCents,
-                            stock: productData.productStock || 999,
-                            imageUrl: productData.productImage || productData.productImageUrl,
-                            tenantId: productData.tenantId,
-                            availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                            // Don't pass stale payment gateway data - let SmartProductCard use context or fetch fresh data
-                            has_active_payment_gateway: undefined,
-                            payment_gateway_type: undefined,
-                            tenantCategory: productData.tenantCategory ? {
-                              id: productData.tenantCategory,
-                              name: productData.tenantCategory,
-                              slug: productData.tenantCategory
-                            } : undefined,
-                            isFeatured: productData.isFeatured,
-                            
-                            // Enhanced fields for rich display
-                            averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
-                            reviewCount: productData.productReviewCount,
-                            viewCount: productData.viewCount,
-                            wishlistCount: productData.wishlistCount,
-                            shareCount: productData.shareCount,
-                            isOnSale: productData.productSalePriceCents ? true : false,
-                            discountPercentage: productData.productPriceCents && productData.productSalePriceCents ? 
-                              Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
-                            currency: productData.productCurrency || "USD",
-                            
-                            // Media fields
-                            hasGallery: productData.hasGallery,
-                            videoUrl: undefined, // Not available in last viewed data
-                            imageUrls: undefined, // Not available in last viewed data
-                            galleryUrls: undefined, // Not available in last viewed data
-                            thumbnailUrl: undefined, // Not available in last viewed data
-                            featuredImageUrl: undefined, // Not available in last viewed data
-                            
-                            // Product details
-                            manufacturer: undefined, // Not available in last viewed data
-                            condition: undefined, // Not available in last viewed data
-                            gtin: undefined, // Not available in last viewed data
-                            mpn: undefined, // Not available in last viewed data
-                            specifications: undefined, // Not available in last viewed data
-                            attributes: undefined, // Not available in last viewed data
-                            customFields: undefined, // Not available in last viewed data
-                            searchKeywords: undefined, // Not available in last viewed data
-                            seoTitle: undefined, // Not available in last viewed data
-                            seoDescription: undefined, // Not available in last viewed data
-                            seoKeywords: undefined, // Not available in last viewed data
-                            tags: undefined, // Not available in last viewed data
-                            
-                            // NEW LIVE REVIEW AGGREGATIONS
-                            productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
-                            productReviewsCountLive: productData.productReviewsCountLive,
-                            productHelpfulCountLive: productData.productHelpfulCountLive,
-                            productReviewsApprovedLive: productData.productReviewsApprovedLive,
-                            
-                            // Featured data
-                            featuredType: productData.featuredType,
-                            featuredTypes: productData.featuredTypes || (productData.featuredType ? [productData.featuredType] : []),
-                            featuredPriority: productData.featuredPriority,
-                            featuredAt: productData.featuredAt,
-                            isFeaturedActive: productData.isFeaturedActive,
-                            
-                            // Analytics
-                            uniqueViewers: productData.uniqueViewers,
-                            engagementCount: productData.engagementCount,
-                            conversionCount: productData.conversionCount,
-                            revenueCents: productData.revenueCents,
-                            unitsSold: productData.unitsSold,
-                            trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
-                            
-                            // Status fields
-                            priceStatus: productData.priceStatus,
-                            stockStatus: productData.stockStatus,
-                            hasDescription: productData.hasDescription,
-                            hasBrand: productData.hasBrand,
-                            hasPrice: productData.hasPrice,
-                            inStock: productData.inStock,
-
-                            // Payment Gateway
-                            hasActivePaymentGateway: productData.hasActivePaymentGateway,
-                            defaultGatewayType: productData.defaultGatewayType,
-                            
-                            // Categories
-                            productCategory: productData.productCategory,
-                            productCategorySlug: productData.productCategorySlug,
-                            
-                            // Variant-aware fields
-                            has_variants: productData.has_variants,
-                            variants: productData.variants,
-                            price_range: productData.price_range ? {
-                              min_cents: productData.price_range.minCents,
-                              max_cents: productData.price_range.maxCents
-                            } : undefined
-                          }}
-                          tenantName={productData.businessName || productData.storeName}
-                          tenantLogo={productData.tenantLogo || productData.storeLogo}
-
-                          defaultGatewayType={productData.defaultGatewayType}
-
-                          variant={productData.isFeatured ? 'featured' : 'grid'}
-                          showCategory={true}
-                          showDescription={true}
-                          buttonLayout="stacked"
-                          className="h-full"
-                        />
+                        <div key={pt}>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">{productTypeLabels[pt]}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {group.map((item, index) => {
+                              const productData = item.data as LastViewedProduct;
+                              return (
+                                <SmartProductCard
+                                  key={`product-${productData.productId}-${index}`}
+                                  tenantId={productData.tenantId}
+                                  product={{
+                                    id: productData.productId,
+                                    sku: productData.productSku || productData.productId,
+                                    name: productData.productName,
+                                    title: productData.productTitle || productData.productName,
+                                    brand: productData.productBrand || productData.businessName,
+                                    description: productData.productDescription,
+                                    priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                                    salePriceCents: productData.productSalePriceCents,
+                                    listPriceCents: productData.productPriceCents,
+                                    stock: productData.productStock || 999,
+                                    imageUrl: productData.productImage || productData.productImageUrl,
+                                    tenantId: productData.tenantId,
+                                    availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                                    has_active_payment_gateway: undefined,
+                                    payment_gateway_type: undefined,
+                                    tenantCategory: productData.tenantCategory ? {
+                                      id: productData.tenantCategory,
+                                      name: productData.tenantCategory,
+                                      slug: productData.tenantCategory
+                                    } : undefined,
+                                    isFeatured: productData.isFeatured,
+                                    averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
+                                    reviewCount: productData.productReviewCount,
+                                    viewCount: productData.viewCount,
+                                    wishlistCount: productData.wishlistCount,
+                                    shareCount: productData.shareCount,
+                                    isOnSale: productData.productSalePriceCents ? true : false,
+                                    discountPercentage: productData.productPriceCents && productData.productSalePriceCents ?
+                                      Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
+                                    currency: productData.productCurrency || "USD",
+                                    hasGallery: productData.hasGallery,
+                                    videoUrl: undefined,
+                                    imageUrls: undefined,
+                                    galleryUrls: undefined,
+                                    thumbnailUrl: undefined,
+                                    featuredImageUrl: undefined,
+                                    manufacturer: undefined,
+                                    condition: undefined,
+                                    gtin: undefined,
+                                    mpn: undefined,
+                                    specifications: undefined,
+                                    attributes: undefined,
+                                    customFields: undefined,
+                                    searchKeywords: undefined,
+                                    seoTitle: undefined,
+                                    seoDescription: undefined,
+                                    seoKeywords: undefined,
+                                    tags: undefined,
+                                    productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
+                                    productReviewsCountLive: productData.productReviewsCountLive,
+                                    productHelpfulCountLive: productData.productHelpfulCountLive,
+                                    productReviewsApprovedLive: productData.productReviewsApprovedLive,
+                                    featuredType: productData.featuredType,
+                                    featuredTypes: productData.featuredTypes || (productData.featuredType ? [productData.featuredType] : []),
+                                    featuredPriority: productData.featuredPriority,
+                                    featuredAt: productData.featuredAt,
+                                    isFeaturedActive: productData.isFeaturedActive,
+                                    productType: productData.productType || 'physical',
+                                    uniqueViewers: productData.uniqueViewers,
+                                    engagementCount: productData.engagementCount,
+                                    conversionCount: productData.conversionCount,
+                                    revenueCents: productData.revenueCents,
+                                    unitsSold: productData.unitsSold,
+                                    trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
+                                    priceStatus: productData.priceStatus,
+                                    stockStatus: productData.stockStatus,
+                                    hasDescription: productData.hasDescription,
+                                    hasBrand: productData.hasBrand,
+                                    hasPrice: productData.hasPrice,
+                                    inStock: productData.inStock,
+                                    hasActivePaymentGateway: productData.hasActivePaymentGateway,
+                                    defaultGatewayType: productData.defaultGatewayType,
+                                    productCategory: productData.productCategory,
+                                    productCategorySlug: productData.productCategorySlug,
+                                    has_variants: productData.has_variants,
+                                    variants: productData.variants,
+                                    price_range: productData.price_range ? {
+                                      min_cents: productData.price_range.minCents,
+                                      max_cents: productData.price_range.maxCents
+                                    } : undefined
+                                  }}
+                                  tenantName={productData.businessName || productData.storeName}
+                                  tenantLogo={productData.tenantLogo || productData.storeLogo}
+                                  defaultGatewayType={productData.defaultGatewayType}
+                                  variant={productData.isFeatured ? 'featured' : 'grid'}
+                                  showCategory={true}
+                                  showDescription={true}
+                                  buttonLayout="stacked"
+                                  className="h-full"
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
                     })}
+
+                    {otherProducts.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Other Products</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {otherProducts.map((item, index) => {
+                            const productData = item.data as LastViewedProduct;
+                            return (
+                              <SmartProductCard
+                                key={`product-other-${productData.productId}-${index}`}
+                                tenantId={productData.tenantId}
+                                product={{
+                                  id: productData.productId,
+                                  sku: productData.productSku || productData.productId,
+                                  name: productData.productName,
+                                  title: productData.productTitle || productData.productName,
+                                  brand: productData.productBrand || productData.businessName,
+                                  description: productData.productDescription,
+                                  priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                                  salePriceCents: productData.productSalePriceCents,
+                                  listPriceCents: productData.productPriceCents,
+                                  stock: productData.productStock || 999,
+                                  imageUrl: productData.productImage || productData.productImageUrl,
+                                  tenantId: productData.tenantId,
+                                  availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                                  has_active_payment_gateway: undefined,
+                                  payment_gateway_type: undefined,
+                                  tenantCategory: productData.tenantCategory ? {
+                                    id: productData.tenantCategory,
+                                    name: productData.tenantCategory,
+                                    slug: productData.tenantCategory
+                                  } : undefined,
+                                  isFeatured: productData.isFeatured,
+                                  averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
+                                  reviewCount: productData.productReviewCount,
+                                  viewCount: productData.viewCount,
+                                  wishlistCount: productData.wishlistCount,
+                                  shareCount: productData.shareCount,
+                                  isOnSale: productData.productSalePriceCents ? true : false,
+                                  discountPercentage: productData.productPriceCents && productData.productSalePriceCents ?
+                                    Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
+                                  currency: productData.productCurrency || "USD",
+                                  hasGallery: productData.hasGallery,
+                                  productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
+                                  productReviewsCountLive: productData.productReviewsCountLive,
+                                  productHelpfulCountLive: productData.productHelpfulCountLive,
+                                  productReviewsApprovedLive: productData.productReviewsApprovedLive,
+                                  featuredType: productData.featuredType,
+                                  featuredTypes: productData.featuredTypes || (productData.featuredType ? [productData.featuredType] : []),
+                                  featuredPriority: productData.featuredPriority,
+                                  featuredAt: productData.featuredAt,
+                                  isFeaturedActive: productData.isFeaturedActive,
+                                  productType: productData.productType || 'physical',
+                                  uniqueViewers: productData.uniqueViewers,
+                                  engagementCount: productData.engagementCount,
+                                  conversionCount: productData.conversionCount,
+                                  revenueCents: productData.revenueCents,
+                                  unitsSold: productData.unitsSold,
+                                  trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
+                                  priceStatus: productData.priceStatus,
+                                  stockStatus: productData.stockStatus,
+                                  hasDescription: productData.hasDescription,
+                                  hasBrand: productData.hasBrand,
+                                  hasPrice: productData.hasPrice,
+                                  inStock: productData.inStock,
+                                  hasActivePaymentGateway: productData.hasActivePaymentGateway,
+                                  defaultGatewayType: productData.defaultGatewayType,
+                                  productCategory: productData.productCategory,
+                                  productCategorySlug: productData.productCategorySlug,
+                                  has_variants: productData.has_variants,
+                                  variants: productData.variants,
+                                  price_range: productData.price_range ? {
+                                    min_cents: productData.price_range.minCents,
+                                    max_cents: productData.price_range.maxCents
+                                  } : undefined
+                                }}
+                                tenantName={productData.businessName || productData.storeName}
+                                tenantLogo={productData.tenantLogo || productData.storeLogo}
+                                defaultGatewayType={productData.defaultGatewayType}
+                                variant={productData.isFeatured ? 'featured' : 'grid'}
+                                showCategory={true}
+                                showDescription={true}
+                                buttonLayout="stacked"
+                                className="h-full"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

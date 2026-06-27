@@ -6,6 +6,7 @@ import TenantContextProvider from '@/components/tenant/TenantContextProvider';
 import ServerResolvedContextProvider from '@/components/tenant/ServerResolvedContextProvider';
 import { getTenantContext } from '@/lib/tenantContext';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { auth0 } from '@/lib/auth0';
 import type { ServerResolvedAuth, ServerResolvedTenant } from '@/components/tenant/ServerResolvedContextProvider';
@@ -81,6 +82,7 @@ export default async function TenantPageLayout({ children, params }: { children:
       <ServerResolvedContextProvider auth={serverAuth} tenant={serverTenant}>
         <TenantContextProvider value={{ tenantId: tenantId ?? tenantCtx.tenantId, tenantSlug: tenantSlug ?? tenantCtx.tenantSlug, aud: tenantCtx.aud, hasPublishedDirectory: hasPublishedDirectory }}>
           <CrmAlertToastWatcher tenantId={tenantId} />
+          <SocialPixels tenantId={tenantId} />
           <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug} hasPublishedDirectory={hasPublishedDirectory}>
             {children}
           </DynamicTenantSidebar>

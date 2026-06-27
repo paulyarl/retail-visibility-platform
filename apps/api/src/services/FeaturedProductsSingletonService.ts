@@ -19,6 +19,7 @@ export interface FeaturedProduct {
   isActive: boolean;
   tenantName?: string;
   tenantLogoUrl?: string;
+  productType?: string;
 }
 
 export interface FeaturedProductFilter {
@@ -485,7 +486,8 @@ class FeaturedProductsSingletonService extends UniversalSingleton {
       isActive: true, // MVs only return active products
       // Add tenant information for display
       tenantName: mvProduct.tenant_name,
-      tenantLogoUrl: mvProduct.tenant_logo_url
+      tenantLogoUrl: mvProduct.tenant_logo_url,
+      productType: mvProduct.product_type || 'physical'
     };
   }
 

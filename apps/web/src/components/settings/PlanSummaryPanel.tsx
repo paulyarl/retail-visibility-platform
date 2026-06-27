@@ -431,7 +431,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     pt.allowedTypes.forEach(t => {
       const label = PRODUCT_TYPE_LABELS[t] || t;
       specifics.push(label);
-      const isEnabled = pt.effectiveType === t || pt.effectiveType === 'flexible';
+      const isEnabled = pt.effectiveTypes.includes(t) || pt.effectiveType === 'flexible';
       statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
     });
     summaries.push({

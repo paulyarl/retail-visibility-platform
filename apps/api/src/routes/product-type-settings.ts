@@ -14,12 +14,14 @@ const router = Router();
 const productTypeSettingsSchema = z.object({
   product_types_enabled: z.boolean().optional(),
   selected_product_type: z.enum(['physical', 'digital', 'hybrid', 'service']).nullable().optional(),
+  selected_product_types: z.array(z.enum(['physical', 'digital', 'hybrid', 'service'])).optional(),
 });
 
-// Default settings (selected_product_type defaults to 'physical')
+// Default settings
 const DEFAULT_SETTINGS = {
   product_types_enabled: true,
   selected_product_type: 'physical' as string | null,
+  selected_product_types: ['physical'] as string[],
 };
 
 // Get product type settings for a tenant
@@ -38,6 +40,7 @@ router.get('/:tenantId/product-type', authenticateToken, async (req, res) => {
         settings: {
           product_types_enabled: false,
           selected_product_type: null,
+          selected_product_types: [],
         },
         tierState,
       });
@@ -53,8 +56,10 @@ router.get('/:tenantId/product-type', authenticateToken, async (req, res) => {
     // Enforce tier gates on merchant preferences:
     // - product_types_enabled: if tier hard-gate says enabled, merchant can toggle; if not, force false
     // - selected_product_type: must be in tier's allowedTypes (or null)
+    // - selected_product_types: each must be in tier's allowedTypes
     const productTypesEnabled = tierState.enabled && (rawSettings.product_types_enabled !== false);
     let selectedProductType = rawSettings.selected_product_type;
+    let selectedProductTypes = rawSettings.selected_product_types || [];
 
     // Validate selected_product_type against tier allowed types
     const allowedTypes = tierState.allowedTypes.filter((t): t is 'physical' | 'digital' | 'hybrid' | 'service' =>
@@ -65,11 +70,17 @@ router.get('/:tenantId/product-type', authenticateToken, async (req, res) => {
       selectedProductType = tierState.type === 'flexible' ? null : (tierState.type !== 'none' ? tierState.type : null);
     }
 
+    // Validate selected_product_types against tier allowed types
+    selectedProductTypes = selectedProductTypes.filter(t =>
+      allowedTypes.includes(t as 'physical' | 'digital' | 'hybrid' | 'service')
+    );
+
     res.json({
       success: true,
       settings: {
         product_types_enabled: productTypesEnabled,
         selected_product_type: selectedProductType,
+        selected_product_types: selectedProductTypes,
       },
       tierState,
     });
@@ -127,12 +138,28 @@ router.put('/:tenantId/product-type', authenticateToken, requireWritableSubscrip
       });
     }
 
+    // Type gate: validate each selected_product_types entry against tier allowed types
+    if (data.selected_product_types) {
+      const invalid = data.selected_product_types.filter(t => !allowedTypes.includes(t));
+      if (invalid.length > 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'tier_restricted',
+          message: `Product type(s) '${invalid.join(', ')}' not available on your current plan`,
+          allowed_types: allowedTypes,
+        });
+      }
+    }
+
     // Cross-capability constraint validation (CCL write-time check, Rule R22)
-    if (data.selected_product_type) {
+    const typesToValidate = data.selected_product_types || (data.selected_product_type ? [data.selected_product_type] : []);
+    if (typesToValidate.length > 0) {
       const currentCaps = await resolveEffectiveCapabilities(tenantId);
       if (currentCaps) {
         const simulated = JSON.parse(JSON.stringify(currentCaps.effective));
-        simulated.product_types.effective_type = data.selected_product_type;
+        simulated.product_types.effective_types = typesToValidate;
+        // Backward compat: set effective_type for legacy constraints
+        simulated.product_types.effective_type = typesToValidate.length === 1 ? typesToValidate[0] : 'flexible';
         const blockViolations = await validateProposedChange(simulated);
         if (blockViolations.length > 0) {
           return res.status(403).json({
@@ -187,6 +214,7 @@ router.put('/:tenantId/product-type', authenticateToken, requireWritableSubscrip
       settings: {
         product_types_enabled: settings.product_types_enabled,
         selected_product_type: settings.selected_product_type,
+        selected_product_types: settings.selected_product_types,
       },
     });
   } catch (error) {
@@ -240,6 +268,7 @@ router.get('/public/tenant/:tenantId/product-type', async (req, res) => {
         settings: {
           product_types_enabled: false,
           selected_product_type: null,
+          selected_product_types: [],
         },
         tierState,
       });
@@ -255,6 +284,7 @@ router.get('/public/tenant/:tenantId/product-type', async (req, res) => {
     // Enforce tier gates on merchant preferences
     const productTypesEnabled = tierState.enabled && (rawSettings.product_types_enabled !== false);
     let selectedProductType = rawSettings.selected_product_type;
+    let selectedProductTypes = rawSettings.selected_product_types || [];
 
     // Validate selected_product_type against tier allowed types
     const allowedTypes = tierState.allowedTypes.filter((t): t is 'physical' | 'digital' | 'hybrid' | 'service' =>
@@ -264,11 +294,17 @@ router.get('/public/tenant/:tenantId/product-type', async (req, res) => {
       selectedProductType = tierState.type === 'flexible' ? null : (tierState.type !== 'none' ? tierState.type : null);
     }
 
+    // Validate selected_product_types against tier allowed types
+    selectedProductTypes = selectedProductTypes.filter(t =>
+      allowedTypes.includes(t as 'physical' | 'digital' | 'hybrid' | 'service')
+    );
+
     res.json({
       success: true,
       settings: {
         product_types_enabled: productTypesEnabled,
         selected_product_type: selectedProductType,
+        selected_product_types: selectedProductTypes,
       },
       tierState,
     });

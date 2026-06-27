@@ -20,6 +20,7 @@ import {
   Tag,
   Store,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -293,6 +294,7 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
               {META_GROUP.features.map(feature => {
                 const isAllowed = isTierAllowed(feature.key);
                 const isChecked = isAllowed && settings[feature.key];
+                const hasConfigLink = feature.key === 'social_commerce_meta_pixel' && isChecked;
                 return (
                   <div key={feature.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-3">
@@ -303,6 +305,15 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {hasConfigLink && (
+                        <Link
+                          href={`/t/${tenantId}/settings/integrations/pixels`}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          Configure
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      )}
                       {!isAllowed && (
                         <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                       )}
@@ -370,6 +381,7 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
               {TIKTOK_GROUP.features.map(feature => {
                 const isAllowed = isTierAllowed(feature.key);
                 const isChecked = isAllowed && settings[feature.key];
+                const hasConfigLink = feature.key === 'social_commerce_tiktok_pixel' && isChecked;
                 return (
                   <div key={feature.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-3">
@@ -380,6 +392,15 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {hasConfigLink && (
+                        <Link
+                          href={`/t/${tenantId}/settings/integrations/pixels`}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          Configure
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      )}
                       {!isAllowed && (
                         <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
                       )}

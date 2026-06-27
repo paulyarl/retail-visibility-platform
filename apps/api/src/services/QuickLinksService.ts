@@ -101,6 +101,10 @@ function hasIntegrations(ctx: LinkContext): boolean {
   return ctx.capabilities?.effective.integrations.enabled ?? false;
 }
 
+function hasSocialCommerce(ctx: LinkContext): boolean {
+  return ctx.capabilities?.effective.social_commerce_options.enabled ?? false;
+}
+
 function hasDirectoryEntry(ctx: LinkContext): boolean {
   return ctx.capabilities?.effective.directory_entry.enabled ?? false;
 }
@@ -326,6 +330,25 @@ const LINKS: LinkDefinition[] = [
     category: 'visibility',
     condition: (ctx) => hasIntegrations(ctx),
     score: () => 45,
+  },
+
+  {
+    id: 'social-commerce',
+    label: () => 'Social Commerce',
+    description: (ctx) => {
+      const scc = ctx.capabilities?.effective.social_commerce_options;
+      const parts: string[] = [];
+      if (scc?.meta_enabled) parts.push('Meta');
+      if (scc?.tiktok_enabled) parts.push('TikTok');
+      if (scc?.can_use_share_buttons) parts.push('Share');
+      if (scc?.can_use_social_proof) parts.push('Social Proof');
+      return parts.length > 0 ? parts.join(', ') : 'Meta & TikTok integrations';
+    },
+    href: (ctx) => `/t/${ctx.tenantId}/settings/social-commerce`,
+    icon: 'Share2',
+    category: 'visibility',
+    condition: (ctx) => hasSocialCommerce(ctx),
+    score: () => 43,
   },
 
   {

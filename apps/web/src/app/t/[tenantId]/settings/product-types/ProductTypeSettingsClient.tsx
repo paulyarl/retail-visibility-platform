@@ -13,6 +13,7 @@ import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 interface ProductTypeSettings {
   product_types_enabled: boolean;
   selected_product_type: 'physical' | 'digital' | 'hybrid' | 'service' | 'none' | null;
+  selected_product_types: ('physical' | 'digital' | 'hybrid' | 'service')[];
 }
 
 interface ProductTypeSettingsClientProps {
@@ -28,12 +29,12 @@ interface QuickAction {
   variant: 'general' | 'product';
 }
 
-function getQuickActions(settings: ProductTypeSettings, tenantId: string, effectiveType: string): QuickAction[] {
+function getQuickActions(settings: ProductTypeSettings, tenantId: string, effectiveTypes: string[]): QuickAction[] {
   const actions: QuickAction[] = [];
 
   if (!settings.product_types_enabled) return actions;
 
-  if (effectiveType !== 'none') {
+  if (effectiveTypes.length > 0) {
     actions.push({
       id: 'items',
       label: 'Browse Items',
@@ -77,6 +78,7 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
   const [settings, setSettings] = useState<ProductTypeSettings>({
     product_types_enabled: true,
     selected_product_type: null,
+    selected_product_types: [],
   });
 
   const [loading, setLoading] = useState(true);
@@ -92,9 +94,11 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
       setLoading(true);
       const data = await platformHomeService.getTenantProductTypeSettings(tenantId);
       if (data) {
+        const types = data.selected_product_types ?? (data.selected_product_type && data.selected_product_type !== 'none' ? [data.selected_product_type] : []);
         setSettings({
           product_types_enabled: data.product_types_enabled ?? true,
           selected_product_type: data.selected_product_type ?? null,
+          selected_product_types: types,
         });
       }
     } catch (err) {
@@ -127,8 +131,25 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
-    setSettings(prev => ({ ...prev, selected_product_type: type }));
+  const handleTypeToggle = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
+    setSettings(prev => {
+      const isSelected = prev.selected_product_types.includes(type);
+      if (isSelected) {
+        const newTypes = prev.selected_product_types.filter(t => t !== type);
+        return {
+          ...prev,
+          selected_product_types: newTypes,
+          selected_product_type: newTypes.length === 1 ? newTypes[0] : (newTypes.length === 0 ? null : prev.selected_product_type),
+        };
+      } else {
+        const newTypes = [...prev.selected_product_types, type];
+        return {
+          ...prev,
+          selected_product_types: newTypes,
+          selected_product_type: newTypes.length === 1 ? newTypes[0] : prev.selected_product_type,
+        };
+      }
+    });
   };
 
   const typeOptions: { value: 'physical' | 'digital' | 'hybrid' | 'service'; label: string; description: string; icon: typeof Package }[] = [
@@ -138,10 +159,12 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
     { value: 'service', label: 'Service', description: 'Bookable services, appointments, and consultations', icon: Wrench },
   ];
 
-  const selectedType = settings.selected_product_type;
-  const effectiveType = settings.product_types_enabled && selectedType && selectedType !== 'none' && allowedTypes.includes(selectedType)
-    ? selectedType
-    : (allowedTypes.length === 1 ? allowedTypes[0] : tierType);
+  const effectiveTypes = settings.product_types_enabled
+    ? settings.selected_product_types.filter(t => allowedTypes.includes(t))
+    : [];
+  const effectiveType = effectiveTypes.length === 1
+    ? effectiveTypes[0]
+    : (effectiveTypes.length > 1 ? 'multiple' : (allowedTypes.length === 1 ? allowedTypes[0] : tierType));
 
   if (loading) {
     return (
@@ -208,26 +231,25 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-primary-600" />
-            Product Type
+            Product Types
           </CardTitle>
           <p className="text-sm text-neutral-600 mt-1">
             {allowedTypes.length > 1
-              ? 'Your plan supports multiple product types. Select the one that best fits your business.'
-              : 'Your current plan determines your product type. Upgrade to switch between types.'}
+              ? 'Your plan supports multiple product types. Select all the types you want to offer in your catalog.'
+              : 'Your current plan determines your product type. Upgrade to access more types.'}
           </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {typeOptions.map(({ value, label, description, icon: IconComp }) => {
               const isAllowed = allowedTypes.includes(value);
-              const activeSelection = settings.selected_product_type ?? (tierType !== 'flexible' && tierType !== 'none' ? tierType : null);
-              const isSelected = activeSelection === value;
+              const isSelected = settings.selected_product_types.includes(value);
               const canSelect = settings.product_types_enabled && isAllowed;
 
               return (
                 <div
                   key={value}
-                  onClick={() => canSelect && handleTypeChange(value)}
+                  onClick={() => canSelect && handleTypeToggle(value)}
                   className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${isSelected && canSelect
                     ? 'bg-primary-50 border-primary-300 ring-1 ring-primary-300'
                     : 'bg-gray-50 border-gray-200'
@@ -250,11 +272,15 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
                     </div>
                     <p className="text-sm text-neutral-600">{description}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected && canSelect
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${isSelected && canSelect
                     ? 'border-primary-500 bg-primary-500'
                     : 'border-gray-300'
                   }`}>
-                    {isSelected && canSelect && <div className="w-2 h-2 rounded-full bg-white" />}
+                    {isSelected && canSelect && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
                   </div>
                 </div>
               );
@@ -287,7 +313,7 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
           <CardContent>
             <div className="p-4 bg-gray-50 rounded-lg border">
               <p className="text-sm text-neutral-600">
-                Your product type is currently configured as: <strong className="text-neutral-900 capitalize">{effectiveType}</strong>
+                Your store is configured to offer: <strong className="text-neutral-900 capitalize">{effectiveTypes.length > 0 ? effectiveTypes.join(', ') : 'No types selected'}</strong>
               </p>
             </div>
           </CardContent>
@@ -304,7 +330,7 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
 
       {/* Next Steps */}
       {(() => {
-        const actions = getQuickActions(settings, tenantId, effectiveType);
+        const actions = getQuickActions(settings, tenantId, effectiveTypes);
         if (actions.length === 0) return null;
         return (
           <Card>

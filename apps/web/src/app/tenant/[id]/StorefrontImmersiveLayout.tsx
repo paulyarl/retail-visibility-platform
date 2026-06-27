@@ -15,8 +15,11 @@ import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShow
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import LastViewed from '@/components/directory/LastViewed';
+import StorefrontBadgeFilter from '@/components/storefront/StorefrontBadgeFilter';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
+import { DigitalSection } from '@/components/storefront/sections/DigitalSection';
+import { HybridSection } from '@/components/storefront/sections/HybridSection';
 import { SocialProofSection } from '@/components/storefront/sections/SocialProofSection';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
@@ -109,6 +112,8 @@ export default function StorefrontImmersiveLayout({
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
     showServices,
+    showDigital,
+    showHybrid,
     showSocialProof,
     socialCommerceFlags,
     contactInfo,
@@ -163,7 +168,7 @@ export default function StorefrontImmersiveLayout({
   }, [productCategories]);
 
   // ---- Derived: filter products by product_type (switch-based for extensibility) ----
-  const { physicalProducts, serviceProducts } = useMemo(() => {
+  const { physicalProducts, serviceProducts, digitalProducts, hybridProducts } = useMemo(() => {
     const buckets: Record<string, any[]> = { physical: [], service: [], digital: [], hybrid: [] };
     for (const p of products) {
       const pt = p.productType || p.product_type || 'physical';
@@ -183,7 +188,7 @@ export default function StorefrontImmersiveLayout({
           break;
       }
     }
-    return { physicalProducts: buckets.physical, serviceProducts: buckets.service };
+    return { physicalProducts: buckets.physical, serviceProducts: buckets.service, digitalProducts: buckets.digital, hybridProducts: buckets.hybrid };
   }, [products]);
 
   const sortedProducts = useMemo(() => {
@@ -401,6 +406,11 @@ export default function StorefrontImmersiveLayout({
         </div>
       </div>
 
+      {/* BADGE FILTER */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3">
+        <StorefrontBadgeFilter tenantId={tenantId} />
+      </div>
+
       {/* PRODUCT GRID */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
         {isProductsOnly && featured && (
@@ -501,6 +511,36 @@ export default function StorefrontImmersiveLayout({
           services={serviceProducts}
           layoutVariant="immersive"
           isServiceStore={isServiceStore}
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* DIGITAL SECTION */}
+      {showDigital && digitalProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <DigitalSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          digitalProducts={digitalProducts}
+          layoutVariant="immersive"
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* HYBRID SECTION */}
+      {showHybrid && hybridProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <HybridSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          hybridProducts={hybridProducts}
+          layoutVariant="immersive"
           hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
           isSocialStore={isSocialStore}
           socialCommerceFlags={socialCommerceFlags}

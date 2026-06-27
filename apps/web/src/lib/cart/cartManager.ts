@@ -55,6 +55,8 @@ export interface CartItem {
   variant_attributes?: Record<string, string>; // Attributes like {size: "Large", color: "Blue"}
   // Stock info for validation
   stock?: number; // Available stock for this item/variant
+  // Product type for type-aware cart display
+  productType?: string; // 'physical' | 'digital' | 'service' | 'hybrid'
 }
 
 export interface Cart {

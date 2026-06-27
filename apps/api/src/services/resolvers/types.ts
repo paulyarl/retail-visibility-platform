@@ -101,6 +101,7 @@ export interface FulfillmentMerchantSettings {
 export interface ProductTypeMerchantSettings {
   product_types_enabled?: boolean | null;
   selected_product_type?: string | null;
+  selected_product_types?: string[] | null;
 }
 
 export interface ProductOptionsMerchantSettings {
@@ -334,12 +335,14 @@ export interface EffectiveProductType {
   enabled: boolean;
   type: ProductTypeValue;
   effective_type: ProductTypeValue;
+  effective_types: ProductType[];
   is_flexible: boolean;
   allowed_types: ProductType[];
   has_merchant_selection: boolean;
   merchant_preferences: {
     product_types_enabled: boolean;
     selected_product_type: ProductTypeValue;
+    selected_product_types: ProductType[];
   };
 }
 

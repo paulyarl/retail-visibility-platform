@@ -255,6 +255,7 @@ function buildTenantNav(
         { label: 'Quick Start', href: `/t/${currentTenantId}/quick-start` },
         { label: 'Categories', href: `/t/${currentTenantId}/categories` },
         { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products` },
+        { label: 'Custom Badges', href: `/t/${currentTenantId}/settings/products/badges` },
       ],
     },
     {

@@ -19,7 +19,7 @@ const router = Router();
 router.get('/:tenantId/products', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { category, search, page = '1', limit = '12', product_type } = req.query;
+    const { category, search, page = '1', limit = '12', product_type, badge } = req.query;
     
     if (!tenantId) {
       return res.status(400).json({ error: 'tenant_required' });
@@ -62,6 +62,22 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       conditions.push(`sp.product_type = $${paramIndex}`);
       params.push(product_type);
       paramIndex++;
+    }
+
+    // Badge filter (multi-select, comma-separated: ?badge=sale,new_arrival)
+    if (badge && typeof badge === 'string') {
+      const badgeTypes = badge.split(',').map(b => b.trim()).filter(Boolean);
+      if (badgeTypes.length > 0) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM featured_products fp
+          WHERE fp.inventory_item_id = sp.id
+            AND fp.tenant_id = sp.tenant_id
+            AND fp.is_active = true
+            AND fp.featured_type = ANY($${paramIndex})
+        )`);
+        params.push(badgeTypes);
+        paramIndex++;
+      }
     }
     
     const whereClause = conditions.join(' AND ');

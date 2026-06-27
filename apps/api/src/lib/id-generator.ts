@@ -1225,3 +1225,57 @@ export function generateAbandonedCartId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `acart-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate TikTok OAuth account ID
+ * Format: ttoa-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateTikTokOAuthAccountId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ttoa-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate TikTok OAuth token ID
+ * Format: ttot-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateTikTokOAuthTokenId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ttot-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate social mention ID
+ * Format: smnt-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateSocialMentionId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `smnt-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate return request ID
+ * Format: rtrn-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateReturnRequestId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `rtrn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate badge analytics aggregate ID
+ * Format: bdga-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateBadgeAnalyticsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bdga-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate badge event ID
+ * Format: bdge-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateBadgeEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bdge-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

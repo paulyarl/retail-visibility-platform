@@ -144,8 +144,8 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     severity: 'warn',
     source: {
       capability: 'product_types',
-      field: 'effective_type',
-      operator: 'equals',
+      field: 'effective_types',
+      operator: 'includes',
       value: 'service',
     },
     target: {
@@ -165,8 +165,8 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     severity: 'warn',
     source: {
       capability: 'product_types',
-      field: 'effective_type',
-      operator: 'equals',
+      field: 'effective_types',
+      operator: 'includes',
       value: 'digital',
     },
     target: {

@@ -73,6 +73,7 @@ export interface Recommendation {
   featuredPriority?: number;
   featuredAt?: string;
   isFeaturedActive?: boolean;
+  productType?: string;
 }
 
 export interface RecommendationResponse {
@@ -570,6 +571,7 @@ export async function getProductsViewedBySameUsers(
         mgd.featured_priority,
         mgd.featured_at,
         mgd.featured_is_active,
+        mgd.product_type,
         mgd.tenant_id,
         mgd.tenant_name as business_name,
         mgd.tenant_slug as slug,
@@ -649,6 +651,7 @@ export async function getProductsViewedBySameUsers(
       featuredPriority: row.featured_priority,
       featuredAt: row.featured_at,
       isFeaturedActive: row.featured_is_active,
+      productType: row.product_type || 'physical',
 
       // Store location data
       address: row.address,
@@ -1060,6 +1063,7 @@ export async function getLastViewedItems(
               'tenantId', sp.tenant_id,
               'hasActivePaymentGateway', mgd.has_active_payment_gateway,
               'defaultGatewayType', mgd.default_gateway_type,
+              'productType', mgd.product_type,
               'tenantCategory', CASE 
                 WHEN sp.tenant_category_id IS NOT NULL THEN
                   json_build_object(
@@ -1159,6 +1163,7 @@ export async function getLastViewedItems(
             tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
             defaultGatewayType: data.defaultGatewayType,
+            productType: data.productType || 'physical',
             // Variant-aware fields
             has_variants: data.has_variants,
             variants: data.variants,

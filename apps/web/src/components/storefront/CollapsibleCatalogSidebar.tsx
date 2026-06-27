@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
+import StorefrontBadgeFilter from '@/components/storefront/StorefrontBadgeFilter';
 
 interface CollapsibleCatalogSidebarProps {
   tenantId: string;
@@ -256,6 +257,9 @@ export default function CollapsibleCatalogSidebar({
             <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-3">Search Products</h4>
             <ProductSearch tenantId={tenantId} />
           </div>
+
+          {/* Badge Filter */}
+          <StorefrontBadgeFilter tenantId={tenantId} />
 
           {/* Product Categories */}
           {categories.length > 0 && (

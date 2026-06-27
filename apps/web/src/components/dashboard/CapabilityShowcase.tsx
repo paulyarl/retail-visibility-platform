@@ -116,7 +116,7 @@ export default function CapabilityShowcase({
     // --- Product Types ---
     const pt = cap.productType;
     const ptTier = pt?.enabled ?? false;
-    const ptMerchantGated = ptTier && pt?.effectiveType === 'none';
+    const ptMerchantGated = ptTier && (pt?.effectiveTypes.length ?? 0) === 0;
 
     // --- Product Options (creation features) ---
     const po = cap.productOptions;
@@ -300,11 +300,11 @@ export default function CapabilityShowcase({
         key: "productTypes",
         label: "Product Types",
         icon: <Package className="w-4 h-4" />,
-        enabled: ptTier && pt?.effectiveType !== 'none' && pt?.effectiveType !== 'flexible',
+        enabled: ptTier && (pt?.effectiveTypes.length ?? 0) > 0,
         status: getStatus(ptTier, ptMerchantGated),
         detail:
-          pt?.effectiveType && pt.effectiveType !== 'none' && pt.effectiveType !== 'flexible'
-            ? pt.effectiveType
+          (pt?.effectiveTypes.length ?? 0) > 0
+            ? pt!.effectiveTypes.join(", ")
             : pt?.allowedTypes.length
               ? `${pt!.allowedTypes.join(", ")} (merchant off)`
               : "Standard",
