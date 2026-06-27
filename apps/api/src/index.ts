@@ -175,6 +175,7 @@ import quickstartOptionsSettingsRoutes from './routes/quickstart-options-setting
 import storefrontOptionsSettingsRoutes from './routes/storefront-options-settings';
 import directoryEntryOptionsSettingsRoutes from './routes/directory-entry-options-settings';
 import storefrontTypeSettingsRoutes from './routes/storefront-type-settings';
+import productTypeSettingsRoutes from './routes/product-type-settings';
 import storefrontPolicyRoutes from './routes/storefront-policies';
 import faqOptionsSettingsRoutes from './routes/faq-options-settings';
 import crmOptionsSettingsRoutes from './routes/crm-options-settings';
@@ -5118,7 +5119,7 @@ const baseItemSchema = z.object({
     message: "Either 'name' or 'variant_name' must be provided"
   })).optional(),
   // Digital product fields
-  product_type: z.enum(['physical', 'digital', 'hybrid']).optional(),
+  product_type: z.enum(['physical', 'digital', 'hybrid', 'service']).optional(),
   digital_delivery_method: z.string().nullable().optional(),
   digital_assets: z.array(z.any()).nullable().optional(),
   license_type: z.string().nullable().optional(),
@@ -5228,7 +5229,7 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], requireWritab
       // Auto-generate SKU if not provided
       sku: itemData.sku || generateSKU({
         tenantKey: generateTenantKey(itemData.tenant_id || ''),
-        productType: (product_type || 'physical') as 'physical' | 'digital' | 'hybrid',
+        productType: (product_type || 'physical') as 'physical' | 'digital' | 'hybrid' | 'service',
       }),
       // Price logic: prioritize price (dollars) over price_cents (cents)
       // Ensure price is never undefined since it's required in the schema
@@ -7554,6 +7555,11 @@ console.log('✅ Directory entry options settings routes mounted at /api/tenants
 app.use('/api/tenants', storefrontTypeSettingsRoutes);
 app.use('/api', storefrontTypeSettingsRoutes);
 console.log('✅ Storefront type settings routes mounted at /api/tenants/:tenantId/storefront-type and /api/public/tenant/:tenantId/storefront-type');
+
+/* ------------------------------ product type settings ------------------------------ */
+app.use('/api/tenants', productTypeSettingsRoutes);
+app.use('/api', productTypeSettingsRoutes);
+console.log('✅ Product type settings routes mounted at /api/tenants/:tenantId/product-type and /api/public/tenant/:tenantId/product-type');
 
 /* ------------------------------ storefront policies ------------------------------ */
 app.use('/api/tenants', storefrontPolicyRoutes);

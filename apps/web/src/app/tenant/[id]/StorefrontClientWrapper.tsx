@@ -214,7 +214,7 @@ export default function StorefrontClientWrapper({
 
   // Product option flags — for service product gating
   const [productOptionFlags] = useState<ProductOptionFlags | null>(initialProductOptionFlags ?? null);
-  const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled);
+  const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled) || isServiceStore;
 
   // Social commerce flags — for social proof gating
   const [socialCommerceFlags] = useState<{ enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null>(

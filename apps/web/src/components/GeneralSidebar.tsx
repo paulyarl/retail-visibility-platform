@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher'
 
 type NavItem = { 
   label: string
@@ -162,12 +163,14 @@ export default function GeneralSidebar({
   isMobile = false,
   collapsible = false,
   scope = 'workspace',
+  showScopeSwitcher = false,
   onMobileNavClick
 }: { 
   nav: NavItem[]
   isMobile?: boolean
   collapsible?: boolean
   scope?: 'workspace' | 'tenant' | 'admin' | 'platform'
+  showScopeSwitcher?: boolean
   onMobileNavClick?: () => void
 }) {
   const pathname = usePathname()
@@ -268,6 +271,10 @@ export default function GeneralSidebar({
           </button>
         )}
       </div>
+
+      {showScopeSwitcher && (
+        <ScopeSwitcher scope="universal" collapsed={isCollapsed && !isMobile} />
+      )}
 
       {/* Navigation */}
       <nav className={cn(

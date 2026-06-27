@@ -345,6 +345,56 @@ All resolvers MUST determine the `enabled` state using this precedence:
 
 This replaces ad-hoc enablement logic. The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
 
+### R18: Cross-Capability Constraints Are Post-Resolution
+Cross-capability constraints MUST run as a post-resolution pass, never inside individual resolvers. Individual resolvers remain pure functions of `(features, merchantPrefs)`. The Cross-Capability Constraint Layer (CCL) operates on the assembled `effective` manifest after all resolvers complete.
+
+**Rationale**: Keeping individual resolvers isolated preserves their testability, reusability, and parallel execution. The CCL is a separate concern — it's about relationships between capabilities, not about individual capability resolution.
+
+**Implementation**: `applyCrossCapabilityConstraints()` in `CapabilityConstraintResolver.ts` runs after the `Promise.all` of individual resolvers in `EffectiveCapabilityResolver.ts` (Step 5.5).
+
+### R19: Constraint Violations Are Surfaced, Not Silently Applied
+When a `block` constraint is violated, the CCL MUST:
+1. Add the violation to `constraint_violations` array in the response
+2. Mark the affected type in the source capability's `constraint_status.blocked_types`
+3. NOT silently change the `effective_type` or `enabled` field
+
+**Rationale**: Silently changing effective states would be confusing. The frontend uses `blocked_types` to prevent selection in the UI and show constraint messages.
+
+### R20: Constraint Registry Is the Single Source of Truth
+All cross-capability constraints MUST be defined in the `capability_constraints_list` DB table (admin-managed via `/api/admin/capability-constraints`). The static `CAPABILITY_CONSTRAINTS` array in `CapabilityConstraintRegistry.ts` serves as a fallback when the DB is unavailable or empty. No ad-hoc constraint checks in individual resolvers, routes, or frontend components.
+
+**DB-driven loading**: `CapabilityConstraintService.getActiveConstraints()` loads from the DB with a 60-second in-memory cache. Admin CRUD operations call `invalidateConstraintCache()` to ensure immediate propagation. The `applyCrossCapabilityConstraints()` and `validateProposedChange()` functions in `CapabilityConstraintResolver.ts` are async — they load constraints via `getActiveConstraints()` rather than reading the static array directly.
+
+### R21: Constraints Are Declarative
+Constraints are declared as data (source target, target target, type, severity), not as imperative code. The `CapabilityConstraintResolver` evaluates all constraints uniformly. Constraints are stored in the `capability_constraints_list` DB table and managed via the admin API at `/api/admin/capability-constraints` (GET, POST, PUT, DELETE). The static `CAPABILITY_CONSTRAINTS` array in `CapabilityConstraintRegistry.ts` is the seed/fallback only.
+
+### R22: Write-Time Validation Mirrors Read-Time Evaluation
+PUT handlers in settings routes MUST use `validateProposedChange()` from `CapabilityConstraintResolver.ts` to validate settings changes before persisting. The function is **async** — it loads constraints from the DB via `getActiveConstraints()`. The evaluation logic is identical to read-time — the only difference is the input (simulated effective state vs. current effective state).
+
+**Pattern** (see `storefront-type-settings.ts` and `product-type-settings.ts`):
+```ts
+// 1. Resolve current effective capabilities
+const currentCaps = await resolveEffectiveCapabilities(tenantId);
+if (currentCaps) {
+  // 2. Deep-clone and simulate the proposed change
+  const simulated = JSON.parse(JSON.stringify(currentCaps.effective));
+  simulated.<capability>.effective_type = data.selected_type;
+  // 3. Validate — returns only 'block' severity violations
+  const blockViolations = await validateProposedChange(simulated);
+  if (blockViolations.length > 0) {
+    return res.status(403).json({
+      success: false,
+      error: 'constraint_violation',
+      message: blockViolations[0].message,
+      resolution_hint: blockViolations[0].resolution_hint,
+      violations: blockViolations,
+    });
+  }
+}
+```
+
+**When to add write-time validation**: Add CCL validation to PUT handlers that change a capability's `effective_type` or `enabled` state. Only `block` severity constraints are enforced at write-time — `warn` and `info` severity constraints surface in the UI only (read-time).
+
 ## File Reference
 
 ### Backend
@@ -354,6 +404,10 @@ This replaces ad-hoc enablement logic. The same precedence applies at the group 
 - API Routes: `apps/api/src/routes/xxx-options-settings.ts`
 - Unified endpoint: `apps/api/src/routes/tenant-capabilities.ts` → `GET /:tenantId/effective-capabilities`
 - Expired fallback: `apps/api/src/routes/tenant-capabilities.ts` → `buildExpiredCapabilitiesResponse()`
+- CCL Registry (static fallback): `apps/api/src/services/resolvers/CapabilityConstraintRegistry.ts`
+- CCL Resolver (evaluation engine): `apps/api/src/services/resolvers/CapabilityConstraintResolver.ts`
+- CCL Service (DB loader + cache): `apps/api/src/services/resolvers/CapabilityConstraintService.ts`
+- CCL Admin API: `apps/api/src/routes/admin/capability-constraints.ts` → `/api/admin/capability-constraints`
 
 ### Frontend
 - State types: `apps/web/src/services/CapabilityResolutionService.ts`

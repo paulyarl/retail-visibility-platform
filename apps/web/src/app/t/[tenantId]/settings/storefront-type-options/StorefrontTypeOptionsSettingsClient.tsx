@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/Switch';
 import { Store, Globe, Building2, Wrench, Share2, Save, AlertCircle, ArrowRight, Zap, Settings, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import type { ConstraintViolationState } from '@/services/CapabilityResolutionService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
@@ -82,6 +83,13 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
   const storefrontCap = useStorefrontCapability(tenantId);
   const allCaps = useAllCapabilities(tenantId);
   const resolvedState = storefrontCap.data;
+
+  // Cross-capability constraint status for storefront
+  const storefrontConstraintStatus = allCaps.data?.constraintStatus?.['storefront'];
+  const storefrontBlockedTypes = storefrontConstraintStatus?.blockedTypes ?? [];
+  const storefrontWarningTypes = storefrontConstraintStatus?.warningTypes ?? [];
+  const allViolations = allCaps.data?.constraintViolations ?? [];
+  const storefrontViolations = allViolations.filter((v: ConstraintViolationState) => v.sourceCapability === 'storefront');
   // Distinguish tier-gated from merchant-gated:
   // - enabled=true → fully enabled
   // - enabled=false + merchantPrefs.storefront_type_enabled=false → merchant-gated (tier allows, merchant disabled)
@@ -146,6 +154,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
   };
 
   const handleTypeChange = (type: 'online' | 'retail' | 'service' | 'social') => {
+    if (storefrontBlockedTypes.includes(type)) return;
     setSettings(prev => ({ ...prev, selected_storefront_type: type }));
   };
 
@@ -238,9 +247,12 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
           <div className="space-y-3">
             {typeOptions.map(({ value, label, description, icon: IconComp }) => {
               const isAllowed = allowedTypes.includes(value);
+              const isBlocked = storefrontBlockedTypes.includes(value);
+              const isWarning = storefrontWarningTypes.includes(value);
               const activeSelection = settings.selected_storefront_type ?? (tierType !== 'flexible' && tierType !== 'none' ? tierType : null);
               const isSelected = activeSelection === value;
-              const canSelect = settings.storefront_type_enabled && isAllowed;
+              const canSelect = settings.storefront_type_enabled && isAllowed && !isBlocked;
+              const violation = storefrontViolations.find(v => v.sourceType === value);
 
               return (
                 <div
@@ -248,12 +260,14 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                   onClick={() => canSelect && handleTypeChange(value)}
                   className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${isSelected && canSelect
                       ? 'bg-primary-50 border-primary-300 ring-1 ring-primary-300'
-                      : 'bg-gray-50 border-gray-200'
+                      : isBlocked
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200'
                     } ${canSelect ? 'cursor-pointer hover:border-gray-300' : 'opacity-60 cursor-not-allowed'}`}
                 >
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${isSelected && canSelect ? 'bg-primary-100' : 'bg-gray-200'
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${isSelected && canSelect ? 'bg-primary-100' : isBlocked ? 'bg-red-100' : 'bg-gray-200'
                     }`}>
-                    <IconComp className={`h-5 w-5 ${isSelected && canSelect ? 'text-primary-600' : 'text-neutral-500'}`} />
+                    <IconComp className={`h-5 w-5 ${isSelected && canSelect ? 'text-primary-600' : isBlocked ? 'text-red-500' : 'text-neutral-500'}`} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -266,8 +280,21 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                       {!isAllowed && (
                         <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
                       )}
+                      {isBlocked && violation && (
+                        <span className="text-xs text-red-600 font-medium" title={violation.resolutionHint}>
+                          {violation.message}
+                        </span>
+                      )}
+                      {isWarning && !isBlocked && violation && (
+                        <span className="text-xs text-amber-600 font-medium" title={violation.resolutionHint}>
+                          {violation.message}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-neutral-600">{description}</p>
+                    {isBlocked && violation && (
+                      <p className="text-xs text-red-500 mt-1">{violation.resolutionHint}</p>
+                    )}
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected && canSelect
                       ? 'border-primary-500 bg-primary-500'

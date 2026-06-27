@@ -31,7 +31,9 @@ import {
   DollarSign,
   Settings,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Wrench,
+  MapPin
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -332,7 +334,7 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
     // }
 
     // Product Type Validation
-    if (data.productType.hasVariants && data.productType.variants.length === 0) {
+    if (data.productType.type !== 'service' && data.productType.hasVariants && data.productType.variants.length === 0) {
       errors.push('At least one variant is required when variants are enabled');
     }
 
@@ -455,7 +457,9 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
     if (data.basicInfo.brand) score += 5;
 
     // Product Type (15 points)
-    if (data.productType.hasVariants) {
+    if (data.productType.type === 'service') {
+      score += 15;
+    } else if (data.productType.hasVariants) {
       score += 10;
       if (data.productType.variants.length > 0) score += 5;
     } else {
@@ -625,18 +629,55 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center space-x-2">
-                <Package className="h-4 w-4" />
-                <span>Product Type & Inventory</span>
+                {data.productType.type === 'service' ? (
+                  <Wrench className="h-4 w-4" />
+                ) : (
+                  <Package className="h-4 w-4" />
+                )}
+                <span>{data.productType.type === 'service' ? 'Service Details' : 'Product Type & Inventory'}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Type:</span>
-                <span className="text-sm font-medium">
-                  {data.productType.hasVariants ? 'With Variants' : 'Simple Product'}
-                </span>
-              </div>
-              {data.productType.hasVariants ? (
+              {data.productType.type === 'service' ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Type:</span>
+                    <span className="text-sm font-medium">Service</span>
+                  </div>
+                  {data.productType.serviceProduct && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Booking:</span>
+                        <span className="text-sm font-medium">{data.productType.serviceProduct.bookingMethod.replace(/_/g, ' ')}</span>
+                      </div>
+                      {data.productType.serviceProduct.durationMinutes != null && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Duration:</span>
+                          <span className="text-sm font-medium">
+                            {data.productType.serviceProduct.durationMinutes < 60
+                              ? `${data.productType.serviceProduct.durationMinutes} min`
+                              : `${Math.floor(data.productType.serviceProduct.durationMinutes / 60)}h${data.productType.serviceProduct.durationMinutes % 60 > 0 ? ` ${data.productType.serviceProduct.durationMinutes % 60}m` : ''}`}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Location:</span>
+                        <span className="text-sm font-medium">{data.productType.serviceProduct.serviceLocation.replace(/_/g, ' ')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Pricing:</span>
+                        <span className="text-sm font-medium">{data.productType.serviceProduct.pricingModel.replace(/_/g, ' ')}</span>
+                      </div>
+                      {data.productType.serviceProduct.requiresDeposit && data.productType.serviceProduct.depositAmount != null && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Deposit:</span>
+                          <span className="text-sm font-medium text-amber-600">${(data.productType.serviceProduct.depositAmount).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : data.productType.hasVariants ? (
                 <>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Variants:</span>

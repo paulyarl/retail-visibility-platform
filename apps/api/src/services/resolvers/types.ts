@@ -40,6 +40,7 @@ export interface MerchantSettingsBundle {
   paymentGateway: PaymentGatewayMerchantSettings | null;
   storefrontType: StorefrontTypeMerchantSettings | null;
   fulfillment: FulfillmentMerchantSettings | null;
+  productType: ProductTypeMerchantSettings | null;
   productOptions: ProductOptionsMerchantSettings | null;
   featuredOptions: FeaturedOptionsMerchantSettings | null;
   integrationOptions: IntegrationOptionsMerchantSettings | null;
@@ -97,6 +98,11 @@ export interface FulfillmentMerchantSettings {
   shipping_handling_days?: number | null;
 }
 
+export interface ProductTypeMerchantSettings {
+  product_types_enabled?: boolean | null;
+  selected_product_type?: string | null;
+}
+
 export interface ProductOptionsMerchantSettings {
   product_physical_enabled?: boolean | null;
   product_digital_enabled?: boolean | null;
@@ -108,6 +114,7 @@ export interface ProductOptionsMerchantSettings {
   product_layout?: string | null;
   product_opt_recently_viewed?: boolean | null;
   product_opt_qr_codes?: boolean | null;
+  product_opt_qr_logo?: boolean | null;
   product_opt_recommended?: boolean | null;
   product_opt_map_display?: boolean | null;
   product_opt_location_display?: boolean | null;
@@ -117,6 +124,9 @@ export interface ProductOptionsMerchantSettings {
   product_opt_fulfillment?: boolean | null;
   product_opt_categories?: boolean | null;
   product_opt_location_availability?: boolean | null;
+  product_options_enabled?: boolean | null;
+  product_options_disabled?: boolean | null;
+  page_type?: string | null;
 }
 
 export interface FeaturedOptionsMerchantSettings {
@@ -317,26 +327,47 @@ export interface EffectiveFulfillment {
 }
 
 export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
+export type ProductTypeValue = ProductType | 'flexible' | 'none';
 export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
+
+export interface EffectiveProductType {
+  enabled: boolean;
+  type: ProductTypeValue;
+  effective_type: ProductTypeValue;
+  is_flexible: boolean;
+  allowed_types: ProductType[];
+  has_merchant_selection: boolean;
+  merchant_preferences: {
+    product_types_enabled: boolean;
+    selected_product_type: ProductTypeValue;
+  };
+}
 
 export interface EffectiveProductOptions {
   enabled: boolean;
+  // ── Type fields (legacy, kept for backward compat — now sourced from product_types capability) ──
   allowed_types: ProductType[];
   effective_types: ProductType[];
+  // ── Creation group ──
+  creation_enabled: boolean;
   shows_variants: boolean;
   shows_gallery: boolean;
   shows_video: boolean;
   effective_shows_variants: boolean;
   effective_shows_gallery: boolean;
   effective_shows_video: boolean;
+  // ── Layout group ──
   layout_enabled: boolean;
   allowed_layouts: ProductLayoutType[];
   effective_layout: ProductLayoutType;
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
+  // ── Sections group ──
+  sections_enabled: boolean;
   shows_recently_viewed: boolean;
   shows_qr_codes: boolean;
+  shows_qr_logo: boolean;
   shows_recommended: boolean;
   shows_map_display: boolean;
   shows_location_display: boolean;
@@ -346,6 +377,19 @@ export interface EffectiveProductOptions {
   shows_fulfillment: boolean;
   shows_categories: boolean;
   shows_location_availability: boolean;
+  // ── Effective section flags (tier-allowed AND merchant-enabled) ──
+  effective_shows_recently_viewed: boolean;
+  effective_shows_qr_codes: boolean;
+  effective_shows_qr_logo: boolean;
+  effective_shows_recommended: boolean;
+  effective_shows_map_display: boolean;
+  effective_shows_location_display: boolean;
+  effective_shows_hours_display: boolean;
+  effective_shows_enhanced_seo: boolean;
+  effective_shows_reviews: boolean;
+  effective_shows_fulfillment: boolean;
+  effective_shows_categories: boolean;
+  effective_shows_location_availability: boolean;
   merchant_preferences: Record<string, any>;
   is_flexible: boolean;
 }
@@ -666,6 +710,33 @@ export interface EffectiveOrgOptions {
 }
 
 // ====================
+// CROSS-CAPABILITY CONSTRAINTS (CCL)
+// ====================
+
+export type ConstraintType = 'requires' | 'recommends' | 'excludes' | 'implies';
+export type ConstraintSeverity = 'block' | 'warn' | 'info';
+
+export interface ConstraintViolation {
+  constraint_id: string;
+  type: ConstraintType;
+  severity: ConstraintSeverity;
+  source_capability: string;
+  source_type: string;
+  target_capability: string;
+  target_type: string;
+  message: string;
+  resolution_hint: string;
+}
+
+export interface ConstraintStatus {
+  blocked_types: string[];
+  warning_types: string[];
+  active_violations: string[];
+}
+
+export type ConstraintStatusMap = Record<string, ConstraintStatus>;
+
+// ====================
 // SUBSCRIPTION CONTEXT
 // ====================
 
@@ -690,6 +761,7 @@ export interface EffectiveCapabilities {
     payment_gateway: EffectivePaymentGateway;
     storefront: EffectiveStorefront;
     fulfillment: EffectiveFulfillment;
+    product_types: EffectiveProductType;
     product_options: EffectiveProductOptions;
     featured: EffectiveFeatured;
     integrations: EffectiveIntegrations;
@@ -703,6 +775,8 @@ export interface EffectiveCapabilities {
     org_options: EffectiveOrgOptions;
     social_commerce_options: EffectiveSocialCommerceOptions;
   };
+  constraint_violations: ConstraintViolation[];
+  constraint_status: ConstraintStatusMap;
   gates?: {
     tier_hard: Record<string, CapabilityGroup>;
     merchant_soft: Record<string, Record<string, boolean>>;

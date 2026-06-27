@@ -16,6 +16,7 @@ import {
   StorefrontState,
   BarcodeScanState,
   FulfillmentState,
+  ProductTypeState,
   ProductOptionsState,
   FeaturedOptionsState,
   IntegrationOptionsState,
@@ -70,6 +71,9 @@ import {
   ChatbotSkillType,
   ChatbotKnowledgeBaseType,
   ChatbotWidgetType,
+  ConstraintViolationState,
+  ConstraintStatusState,
+  ConstraintStatusMapState,
 } from './CapabilityResolutionService';
 
 // ====================
@@ -84,6 +88,24 @@ interface BackendSubscriptionContext {
   writable: boolean;
 }
 
+interface BackendConstraintViolation {
+  constraint_id: string;
+  type: 'requires' | 'recommends' | 'excludes' | 'implies';
+  severity: 'block' | 'warn' | 'info';
+  source_capability: string;
+  source_type: string;
+  target_capability: string;
+  target_type: string;
+  message: string;
+  resolution_hint: string;
+}
+
+interface BackendConstraintStatus {
+  blocked_types: string[];
+  warning_types: string[];
+  active_violations: string[];
+}
+
 interface BackendEffectiveCapabilities {
   tenant_id: string;
   tier: { key: string; name: string; description: string };
@@ -94,6 +116,7 @@ interface BackendEffectiveCapabilities {
     storefront: BackendEffectiveStorefront;
     fulfillment: BackendEffectiveFulfillment;
     product_options: BackendEffectiveProductOptions;
+    product_types: BackendEffectiveProductTypes;
     featured: BackendEffectiveFeatured;
     integrations: BackendEffectiveIntegrations;
     quickstart: BackendEffectiveQuickstart;
@@ -105,6 +128,8 @@ interface BackendEffectiveCapabilities {
     barcode_scan: BackendEffectiveBarcodeScan;
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
   };
+  constraint_violations: BackendConstraintViolation[];
+  constraint_status: Record<string, BackendConstraintStatus>;
   gates?: {
     tier_hard: Record<string, { capability_enabled: boolean; is_highlighted: boolean; features: Record<string, boolean> }>;
     merchant_soft: Record<string, Record<string, boolean>>;
@@ -176,6 +201,16 @@ interface BackendEffectiveFulfillment {
   pickup_instructions: string | null;
 }
 
+interface BackendEffectiveProductTypes {
+  enabled: boolean;
+  type: string;
+  effective_type: string;
+  is_flexible: boolean;
+  allowed_types: ProductType[];
+  has_merchant_selection: boolean;
+  merchant_preferences: { product_types_enabled: boolean; selected_product_type: string };
+}
+
 interface BackendEffectiveProductOptions {
   enabled: boolean;
   allowed_types: ProductType[];
@@ -203,6 +238,8 @@ interface BackendEffectiveProductOptions {
   shows_fulfillment: boolean;
   shows_categories: boolean;
   shows_location_availability: boolean;
+  creation_enabled: boolean;
+  sections_enabled: boolean;
   merchant_preferences: Record<string, any>;
   is_flexible: boolean;
 }
@@ -502,11 +539,28 @@ function mapFulfillment(b: BackendEffectiveFulfillment): FulfillmentState {
   };
 }
 
+function mapProductType(b: BackendEffectiveProductTypes): ProductTypeState {
+  return {
+    enabled: b.enabled,
+    type: b.type as ProductTypeState['type'],
+    effectiveType: b.effective_type as ProductTypeState['effectiveType'],
+    isFlexible: b.is_flexible,
+    allowedTypes: b.allowed_types,
+    hasMerchantSelection: b.has_merchant_selection,
+    merchantPreferences: {
+      product_types_enabled: b.merchant_preferences?.product_types_enabled ?? true,
+      selected_product_type: (b.merchant_preferences?.selected_product_type as ProductType | 'none') || 'none',
+    },
+    features: {},
+  };
+}
+
 function mapProductOptions(b: BackendEffectiveProductOptions): ProductOptionsState {
   return {
     enabled: b.enabled,
     allowedTypes: b.allowed_types,
     effectiveTypes: b.effective_types,
+    creationEnabled: b.creation_enabled ?? true,
     showsVariants: b.shows_variants,
     showsGallery: b.shows_gallery,
     showsVideo: b.shows_video,
@@ -531,6 +585,7 @@ function mapProductOptions(b: BackendEffectiveProductOptions): ProductOptionsSta
     showsFulfillment: b.shows_fulfillment,
     showsCategories: b.shows_categories,
     showsLocationAvailability: b.shows_location_availability,
+    sectionsEnabled: b.sections_enabled ?? true,
     effectiveShowsRecentlyViewed: b.shows_recently_viewed,
     effectiveShowsQRCodes: b.shows_qr_codes,
     effectiveShowsQRLogo: b.merchant_preferences?.product_opt_qr_logo ?? true,
@@ -779,6 +834,32 @@ function mapSocialCommerceOptions(b: BackendEffectiveSocialCommerceOptions): Soc
   };
 }
 
+function mapConstraintViolations(violations: BackendConstraintViolation[]): ConstraintViolationState[] {
+  return (violations || []).map(v => ({
+    constraintId: v.constraint_id,
+    type: v.type,
+    severity: v.severity,
+    sourceCapability: v.source_capability,
+    sourceType: v.source_type,
+    targetCapability: v.target_capability,
+    targetType: v.target_type,
+    message: v.message,
+    resolutionHint: v.resolution_hint,
+  }));
+}
+
+function mapConstraintStatus(status: Record<string, BackendConstraintStatus>): ConstraintStatusMapState {
+  const result: ConstraintStatusMapState = {};
+  for (const [key, value] of Object.entries(status || {})) {
+    result[key] = {
+      blockedTypes: value.blocked_types || [],
+      warningTypes: value.warning_types || [],
+      activeViolations: value.active_violations || [],
+    };
+  }
+  return result;
+}
+
 function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
@@ -803,6 +884,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     barcodeScan: mapBarcodeScan(b.effective.barcode_scan),
     fulfillment: mapFulfillment(b.effective.fulfillment),
     productOptions: mapProductOptions(b.effective.product_options),
+    productType: mapProductType(b.effective.product_types),
     featuredOptions: mapFeatured(b.effective.featured),
     integrationOptions: mapIntegrations(b.effective.integrations),
     quickstartOptions: mapQuickstart(b.effective.quickstart),
@@ -812,6 +894,8 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     crmOptions: mapCrm(b.effective.crm),
     chatbotOptions: mapChatbot(b.effective.chatbot),
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
+    constraintViolations: mapConstraintViolations(b.constraint_violations),
+    constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
   };
 }
@@ -934,6 +1018,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
   async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
     return all.productOptions;
+  }
+
+  async getProductTypeState(tenantId: string): Promise<ProductTypeState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.productType;
   }
 
   /** Alias for backward compatibility with old PublicProductOptionsService */

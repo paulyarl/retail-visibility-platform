@@ -3,22 +3,26 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
-import ProductOptionsService, { ProductType } from '../services/ProductOptionsService';
+import ProductOptionsService, { ProductLayoutType } from '../services/ProductOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateProductOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
-// Validation schema
+// Validation schema — type fields kept for backward compat but gated by product-type-settings route
 const productOptionsSettingsSchema = z.object({
+  // Legacy type fields (still stored here for backward compat, but gating is via ProductTypeService)
   product_physical_enabled: z.boolean().optional(),
   product_digital_enabled: z.boolean().optional(),
   product_hybrid_enabled: z.boolean().optional(),
   product_service_enabled: z.boolean().optional(),
+  // Creation group
   product_variant_enabled: z.boolean().optional(),
   product_gallery_enabled: z.boolean().optional(),
   product_video_enabled: z.boolean().optional(),
+  // Layout group
   product_layout: z.enum(['classic', 'editorial', 'immersive']).optional(),
+  // Sections group
   product_opt_recently_viewed: z.boolean().optional(),
   product_opt_qr_codes: z.boolean().optional(),
   product_opt_qr_logo: z.boolean().optional(),
@@ -57,23 +61,15 @@ const DEFAULT_SETTINGS = {
   product_opt_location_availability: true,
 };
 
-// Map feature key (DB column) to ProductType
-const FEATURE_KEY_TO_TYPE: Record<string, ProductType> = {
-  product_physical_enabled: 'physical',
-  product_digital_enabled: 'digital',
-  product_hybrid_enabled: 'hybrid',
-  product_service_enabled: 'service',
-};
-
-// Feature keys that are toggles (not types) — gated by tier showsVariants/showsGallery/showsVideo
-const FEATURE_KEY_TO_TIER_FLAG: Record<string, keyof Pick<import('../services/ProductOptionsService').ProductOptionsState, 'showsVariants' | 'showsGallery' | 'showsVideo'>> = {
+// Creation group feature keys gated by tier showsVariants/showsGallery/showsVideo
+const CREATION_FEATURE_KEYS: Record<string, string> = {
   product_variant_enabled: 'showsVariants',
   product_gallery_enabled: 'showsGallery',
   product_video_enabled: 'showsVideo',
 };
 
 // Section feature keys gated by tier section flags
-const SECTION_FEATURE_KEYS: Record<string, keyof import('../services/ProductOptionsService').ProductOptionsState> = {
+const SECTION_FEATURE_KEYS: Record<string, string> = {
   product_opt_recently_viewed: 'showsRecentlyViewed',
   product_opt_qr_codes: 'showsQRCodes',
   product_opt_qr_logo: 'showsQRLogo',
@@ -134,24 +130,30 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
 
     const rawSettings = merchantPrefs || DEFAULT_SETTINGS;
 
-    // Enforce tier gates: force off any type not in tier's allowedTypes, force off toggles not allowed by tier
+    // Enforce tier gates using group-based structure
     const tierFilteredSettings: Record<string, boolean | string> = {};
-    for (const [key, type] of Object.entries(FEATURE_KEY_TO_TYPE)) {
-      const isAllowed = tierState.allowedTypes.includes(type);
-      tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
-    }
-    for (const [key, tierFlag] of Object.entries(FEATURE_KEY_TO_TIER_FLAG)) {
-      const isAllowed = tierState[tierFlag];
-      tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
-    }
-    for (const [key, tierFlag] of Object.entries(SECTION_FEATURE_KEYS)) {
-      const isAllowed = tierState[tierFlag as keyof typeof tierState];
+
+    // Legacy type fields — pass through without tier gating (types now gated by ProductTypeService)
+    tierFilteredSettings.product_physical_enabled = !!(rawSettings as any).product_physical_enabled;
+    tierFilteredSettings.product_digital_enabled = !!(rawSettings as any).product_digital_enabled;
+    tierFilteredSettings.product_hybrid_enabled = !!(rawSettings as any).product_hybrid_enabled;
+    tierFilteredSettings.product_service_enabled = !!(rawSettings as any).product_service_enabled;
+
+    // Creation group: gated by tier showsVariants/showsGallery/showsVideo
+    for (const [key, tierFlag] of Object.entries(CREATION_FEATURE_KEYS)) {
+      const isAllowed = (tierState as any)[tierFlag] as boolean;
       tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
     }
 
-    // Enforce product page layout tier gate
+    // Sections group: gated by tier section flags
+    for (const [key, tierFlag] of Object.entries(SECTION_FEATURE_KEYS)) {
+      const isAllowed = (tierState as any)[tierFlag] as boolean;
+      tierFilteredSettings[key] = isAllowed ? !!(rawSettings as any)[key] : false;
+    }
+
+    // Layout group: enforce tier gate
     const allowedLayouts = tierState.enabled ? tierState.allowedLayouts : [];
-    const effectiveLayout = allowedLayouts.includes((rawSettings as any).product_layout)
+    const effectiveLayout = allowedLayouts.includes((rawSettings as any).product_layout as ProductLayoutType)
       ? (rawSettings as any).product_layout
       : (allowedLayouts[0] || 'classic');
     tierFilteredSettings.product_layout = effectiveLayout;
@@ -213,37 +215,24 @@ router.put('/:tenantId/product-options', authenticateToken, requireWritableSubsc
       }
     }
 
-    // Type gate: validate each feature toggle against tier capabilities
+    // Group-gated validation: validate each feature toggle against tier group flags
     const filteredData: Record<string, boolean | string> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key === 'product_layout') {
         filteredData[key] = value;
         continue;
       }
-      // Check product type gates
-      const type = FEATURE_KEY_TO_TYPE[key];
-      if (type) {
-        if (tierState.allowedTypes.includes(type)) {
-          filteredData[key] = value;
-        } else if (value === true) {
-          // Only reject if user is trying to enable a disallowed type
-          return res.status(403).json({
-            success: false,
-            error: 'tier_restricted',
-            message: `Product type '${type}' is not available on your current plan`,
-            feature_key: key,
-          });
-        }
-        // If value is false, silently skip (disabled UI control may send false)
+      // Legacy type fields — pass through without tier gating (types now gated by ProductTypeService)
+      if (['product_physical_enabled', 'product_digital_enabled', 'product_hybrid_enabled', 'product_service_enabled'].includes(key)) {
+        filteredData[key] = value as boolean;
         continue;
       }
-      // Check toggle gates (variant, gallery, video)
-      const tierFlag = FEATURE_KEY_TO_TIER_FLAG[key];
-      if (tierFlag) {
-        if (tierState[tierFlag]) {
+      // Creation group gates (variant, gallery, video)
+      const creationFlag = CREATION_FEATURE_KEYS[key];
+      if (creationFlag) {
+        if ((tierState as any)[creationFlag]) {
           filteredData[key] = value;
         } else if (value === true) {
-          // Only reject if user is trying to enable a disallowed toggle
           return res.status(403).json({
             success: false,
             error: 'tier_restricted',
@@ -251,13 +240,12 @@ router.put('/:tenantId/product-options', authenticateToken, requireWritableSubsc
             feature_key: key,
           });
         }
-        // If value is false, silently skip
         continue;
       }
-      // Check section feature gates
+      // Section group gates
       const sectionFlag = SECTION_FEATURE_KEYS[key];
       if (sectionFlag) {
-        if (tierState[sectionFlag]) {
+        if ((tierState as any)[sectionFlag]) {
           filteredData[key] = value;
         } else if (value === true) {
           return res.status(403).json({

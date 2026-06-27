@@ -155,19 +155,25 @@ After adding to `features_list`, the feature is **not automatically available to
    invalidateEffectiveCapabilities(tenantId);
    ```
 
-7. **Update the frontend mapper** in `apps/web/src/services/UnifiedCapabilityService.ts`:
+7. **Add cross-capability constraint** (if the new capability depends on another capability's type or state):
+   - Insert a row into the `capability_constraints_list` DB table (via SQL migration or admin API at `/api/admin/capability-constraints`)
+   - Also add a static fallback entry in `CapabilityConstraintRegistry.ts`
+   - If the constraint is `block` severity, add `await validateProposedChange()` to the PUT handler after the tier gate
+   - See `capability-deployment-flow.md` Phase 4.5 and `capability-data-flow-rules.md` Rules R18-R22 for full details
+
+8. **Update the frontend mapper** in `apps/web/src/services/UnifiedCapabilityService.ts`:
    - Add the new field to the `BackendEffective{Domain}` interface.
    - Map it in the `map{Domain}` function.
    - If a new domain entirely, add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` (types only) and `mapAll` in `UnifiedCapabilityService.ts`.
 
-8. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
+9. **Add a toggle** on the merchant settings page if this feature should be merchant-configurable.
 
-9. **Update the PlanSummaryPanel** in `apps/web/src/components/settings/PlanSummaryPanel.tsx`:
+10. **Update the PlanSummaryPanel** in `apps/web/src/components/settings/PlanSummaryPanel.tsx`:
    - Add the capability type key to the `CAPABILITY_DISPLAY` map with a label, icon, and `settingsPath`.
    - Add a summary block in `resolveCapabilitySummaries()` that reads from the mapped state (e.g. `caps.chatbotOptions`) and pushes feature labels + statuses.
-   - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 7).
+   - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 8).
 
-10. **Update the CapabilityShowcase** in `apps/web/src/components/dashboard/CapabilityShowcase.tsx`:
+11. **Update the CapabilityShowcase** in `apps/web/src/components/dashboard/CapabilityShowcase.tsx`:
     - Add a row to the `rows` array in the `useMemo` block for the new capability.
     - Extract the state from `cap.<domain>Options` and compute `tier` / `merchantGated` status.
     - Provide a `label`, `icon` (from lucide-react), `detail` string (list active sub-features or "Not available"), and `settingsLink` (e.g. `/t/${tenantId}/bot/options`).
@@ -246,3 +252,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the Zod validation schema** — when adding a new enum value to a capability's type union (e.g. `'social'` in `StorefrontTypeValue`), the `z.enum([...])` in the route file must be updated to include it. TypeScript will not catch this because Zod enums are runtime constructs. A missing value causes the PUT endpoint to 400-reject the new value before it reaches the tier gate, even though the resolver, service, and frontend all accept it.
 - **Do not forget the PlanSummaryPanel** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear in the tenant's plan summary card, even though it works functionally.
 - **Do not forget the CapabilityShowcase** — a capability missing from the `rows` array in `CapabilityShowcase.tsx` will not appear in the "Your Capabilities" card on the tenant dashboard, even though it works functionally.
+- **Do not forget CCL write-time validation** — if a `block` severity constraint references the new capability, the PUT handler MUST call `await validateProposedChange()` with a simulated effective state before persisting. Forgetting this allows invalid configurations to be saved. See R22 in `capability-data-flow-rules.md`.

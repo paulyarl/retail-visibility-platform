@@ -413,7 +413,9 @@ For options resolvers, return group-level arrays:
 
 ## 7. Phased Implementation Plan
 
-### Phase 0 — Inventory & Alignment (read-only)
+> **Status**: Phases 1–8 complete. `product_types` and `product_options` are fully split. Legacy aliases retained for backward compatibility.
+
+### Phase 0 — Inventory & Alignment (read-only) ✅
 
 **Goal**: Complete the picture before changing code.
 
@@ -429,7 +431,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Low (read-only).
 
-### Phase 1 — Design & Rule Finalization
+### Phase 1 — Design & Rule Finalization ✅
 
 **Goal**: Lock the canonical rules and target architecture.
 
@@ -446,7 +448,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Medium; requires product/business sign-off on tier packaging.
 
-### Phase 2 — Database Migration
+### Phase 2 — Database Migration ✅
 
 **Goal**: Create new capability types and feature keys without breaking existing code.
 
@@ -468,7 +470,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: High; data migration must be reversible.
 
-### Phase 3 — Backend Resolvers & Services
+### Phase 3 — Backend Resolvers & Services ✅
 
 **Goal**: Build the new resolvers and refactor existing ones.
 
@@ -485,7 +487,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Medium; must maintain backward compatibility.
 
-### Phase 4 — API Routes
+### Phase 4 — API Routes ✅
 
 **Goal**: Add new routes and refactor existing ones.
 
@@ -505,7 +507,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Medium; frontend must be updated in tandem.
 
-### Phase 5 — Frontend Resolution & State
+### Phase 5 — Frontend Resolution & State ✅
 
 **Goal**: Align frontend types and mapping.
 
@@ -524,7 +526,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Medium; many UI components depend on these shapes.
 
-### Phase 6 — Frontend Settings UI
+### Phase 6 — Frontend Settings UI ✅
 
 **Goal**: Update settings pages and shared utilities.
 
@@ -541,7 +543,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: Medium; user-facing settings page must remain usable.
 
-### Phase 7 — Public / Consumer Surfaces
+### Phase 7 — Public / Consumer Surfaces ✅
 
 **Goal**: Update every place that reads product options.
 
@@ -557,7 +559,7 @@ For options resolvers, return group-level arrays:
 
 **Risk**: High; many surface areas.
 
-### Phase 8 — Cleanup & Verification
+### Phase 8 — Cleanup & Verification ✅
 
 **Goal**: Remove legacy aliases and verify correctness.
 

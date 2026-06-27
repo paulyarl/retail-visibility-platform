@@ -166,6 +166,70 @@ await invalidateEffectiveCapabilities(tenantId);
 
 This ensures the unified endpoint serves fresh data on the next request.
 
+### 4.5 Cross-Capability Constraint Layer (If Applicable)
+
+If the new capability has a dependency on another capability's type or state (e.g., "service storefront requires service product type"), add a cross-capability constraint.
+
+**DB-driven** (primary): Insert into `capability_constraints_list` table via SQL migration or admin API at `/api/admin/capability-constraints`:
+
+```sql
+INSERT INTO capability_constraints_list
+  (constraint_id, type, severity, source_capability, source_field, source_operator, source_value,
+   target_capability, target_field, target_operator, target_value, message, resolution_hint, sort_order)
+VALUES
+  ('my_constraint_id', 'requires', 'block',
+   'my_capability', 'effective_type', 'equals', 'my_type',
+   'other_capability', 'allowed_types', 'includes', 'my_type',
+   'My capability requires Other capability type',
+   'Enable Other capability type or select a different type',
+   10)
+ON CONFLICT (constraint_id) DO NOTHING;
+```
+
+**Static fallback** (also add to `CapabilityConstraintRegistry.ts`):
+```ts
+{
+  id: 'my_constraint_id',
+  type: 'requires',
+  severity: 'block',
+  source: { capability: 'my_capability', field: 'effective_type', operator: 'equals', value: 'my_type' },
+  target: { capability: 'other_capability', field: 'allowed_types', operator: 'includes', value: 'my_type' },
+  message: 'My capability requires Other capability type',
+  resolution_hint: 'Enable Other capability type or select a different type',
+}
+```
+
+**Write-time validation** (for `block` severity constraints): Add to the PUT handler after the tier gate:
+```ts
+import { validateProposedChange } from '../services/resolvers';
+import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+
+// After tier gate passes, before persisting:
+if (data.selected_type) {
+  const currentCaps = await resolveEffectiveCapabilities(tenantId);
+  if (currentCaps) {
+    const simulated = JSON.parse(JSON.stringify(currentCaps.effective));
+    simulated.my_capability.effective_type = data.selected_type;
+    const blockViolations = await validateProposedChange(simulated);
+    if (blockViolations.length > 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'constraint_violation',
+        message: blockViolations[0].message,
+        resolution_hint: blockViolations[0].resolution_hint,
+        violations: blockViolations,
+      });
+    }
+  }
+}
+```
+
+**Key points**:
+- `validateProposedChange()` is **async** — it loads constraints from DB via `getActiveConstraints()`
+- Only `block` severity constraints are enforced at write-time; `warn` and `info` surface in the UI only
+- See `capability-data-flow-rules.md` Rules R18-R22 for full details
+- See `capability-deployment-flow.md` Phase 4.5 for the complete workflow
+
 ### 5. Frontend Layer
 
 **Settings page**: `apps/web/src/app/t/[tenantId]/settings/<capability>-options/`
@@ -262,6 +326,7 @@ This ensures the job respects both the tier gate AND the merchant's toggle prefe
 | Payment Gateway | `PaymentGatewayResolver.ts` | `tenant_payment_gateway_settings` | `payment-gateway-settings.ts` | `mapPaymentGateway` |
 | Storefront Type | `StorefrontTypeResolver.ts` | `tenant_storefront_type_settings` | `storefront-type-settings.ts` | `mapStorefront` |
 | Fulfillment | `FulfillmentResolver.ts` | `tenant_fulfillment_settings` | `fulfillment-settings.ts` | `mapFulfillment` |
+| Product Type | `ProductTypeResolver.ts` | `tenant_product_types_settings` | `product-type-settings.ts` | `mapProductType` |
 | Product Options | `ProductOptionsResolver.ts` | `tenant_product_options_settings` | `product-options-settings.ts` | `mapProductOptions` |
 | Featured Options | `FeaturedOptionsResolver.ts` | `tenant_featured_options_settings` | `featured-options-settings.ts` | `mapFeatured` |
 | Storefront Options | `StorefrontOptionsResolver.ts` | `tenant_storefront_options_settings` | `storefront-options-settings.ts` | `mapStorefrontOptions` |

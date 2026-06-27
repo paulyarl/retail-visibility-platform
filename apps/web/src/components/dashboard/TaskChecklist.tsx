@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { useNextSteps } from "@/hooks/dashboard/useNextSteps";
 
 interface TaskChecklistProps {
@@ -62,7 +62,15 @@ export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
 
       <div className="space-y-3">
         {tasks.map((task) => (
-          <Link key={task.id} href={task.link} className="flex items-center gap-3 group">
+          <Link
+            key={task.id}
+            href={task.link}
+            className={`flex items-center gap-3 group ${
+              !task.done && task.priority === "critical"
+                ? "p-2 -mx-2 rounded-lg bg-rose-50 border border-rose-100 hover:bg-rose-100"
+                : ""
+            }`}
+          >
             <div
               className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${task.done ? "bg-emerald-500" : "border-2 border-gray-200 group-hover:border-blue-400"
                 }`}
@@ -77,6 +85,9 @@ export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
             >
               {task.label}
             </span>
+            {!task.done && task.priority === "critical" && (
+              <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 ml-auto" />
+            )}
           </Link>
         ))}
       </div>

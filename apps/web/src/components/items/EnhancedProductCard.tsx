@@ -27,7 +27,8 @@ import {
   CheckCircle,
   Clock,
   Archive,
-  MoreVertical
+  MoreVertical,
+  Wrench
 } from 'lucide-react';
 import { Item } from '@/services/itemsDataService';
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
@@ -88,6 +89,7 @@ export default function EnhancedProductCard({
   analytics,
 }: EnhancedProductCardProps) {
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const isService = (item as any).productType === 'service' || (item as any).product_type === 'service';
 
   // Status configuration
   const getStatusConfig = (status: string) => {
@@ -147,7 +149,7 @@ export default function EnhancedProductCard({
     return { status: 'good', color: 'text-green-600 bg-green-50', label: 'In Stock' };
   };
 
-  const stockStatus = getStockStatus(item.stock);
+  const stockStatus = isService ? null : getStockStatus(item.stock);
 
   // Generate product URL
   const productUrl = `/products/${item.id}`;
@@ -220,10 +222,18 @@ export default function EnhancedProductCard({
             </div>
           )}
 
-          {/* Stock Status Badge */}
-          <div className={`absolute top-2 right-2 ${stockStatus.color} text-xs px-2 py-1 rounded-full font-medium`}>
-            {stockStatus.label}
-          </div>
+          {/* Stock Status Badge (hidden for services) */}
+          {stockStatus && (
+            <div className={`absolute top-2 right-2 ${stockStatus.color} text-xs px-2 py-1 rounded-full font-medium`}>
+              {stockStatus.label}
+            </div>
+          )}
+          {isService && (
+            <div className="absolute top-2 right-2 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1">
+              <Wrench className="w-3 h-3" />
+              Service
+            </div>
+          )}
         </div>
 
         {/* Product Information */}
@@ -325,8 +335,8 @@ export default function EnhancedProductCard({
           </div>
         )}
 
-        {/* Quick Stock Editor */}
-        {onStockUpdate && (
+        {/* Quick Stock Editor (hidden for services) */}
+        {onStockUpdate && !isService && (
           <div className="mb-3">
             <QuickStockEditor
               itemId={item.id}

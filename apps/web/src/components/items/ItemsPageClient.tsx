@@ -8,7 +8,7 @@ import { useItemsViewMode } from "@/hooks/useItemsViewMode";
 import { useItemsModals } from "@/hooks/useItemsModals";
 import { useItemsActions } from "@/hooks/useItemsActions";
 import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
-import { useProductOptionsCapability } from "@/hooks/tenant-access/useCapabilityAccess";
+import { useProductTypeCapability } from "@/hooks/tenant-access/useCapabilityAccess";
 import StoreInventoryHeader from "@/components/items/StoreInventoryHeader";
 import ItemsPagination from "@/components/items/ItemsPagination";
 import ItemsGrid from "@/components/items/ItemsGrid";
@@ -433,9 +433,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     }
   };
 
-  // Product options capability gating
-  const productOptionsCap = useProductOptionsCapability(tenantId);
-  const isProductEnabled = productOptionsCap.data?.enabled ?? true;
+  // Product type capability gating
+  const productTypeCap = useProductTypeCapability(tenantId);
+  const isProductEnabled = productTypeCap.data?.enabled ?? true;
 
   const handleCreateClick = () => {
     if (!isProductEnabled) return;

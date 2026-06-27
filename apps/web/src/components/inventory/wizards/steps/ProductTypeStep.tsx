@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Package, Download, Layers, Settings, Plus, Trash2, Copy, AlertTriangle, AlertCircle, Wand2, CheckCircle, Upload, Image, Loader2, X, Wrench } from 'lucide-react';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
-import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useProductOptionsCapability, useProductTypeCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 import { Label } from '@/components/ui/Label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
@@ -85,25 +85,27 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
   const variantImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Product options capability gating (effective = tier allows AND merchant enabled)
+  // Product type capability gating (allowed types from tier + merchant prefs)
+  const productTypeCap = useProductTypeCapability(tenantId || null);
+  const allowedTypes = productTypeCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
+  const isProductEnabled = productTypeCap.data?.enabled ?? true;
+
+  // Product options capability gating (creation features)
   const productOptionsCap = useProductOptionsCapability(tenantId || null);
-  const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
-  const effectiveTypes = productOptionsCap.data?.effectiveTypes ?? allowedTypes;
   const showsVariants = productOptionsCap.data?.effectiveShowsVariants ?? productOptionsCap.data?.showsVariants ?? true;
   const showsGallery = productOptionsCap.data?.effectiveShowsGallery ?? productOptionsCap.data?.showsGallery ?? true;
   const showsVideo = productOptionsCap.data?.effectiveShowsVideo ?? productOptionsCap.data?.showsVideo ?? true;
-  const isProductEnabled = productOptionsCap.data?.enabled ?? true;
 
   // Auto-switch to physical if current type is not effectively available
   useEffect(() => {
-    if (data.type === 'digital' && !effectiveTypes.includes('digital')) {
+    if (data.type === 'digital' && !allowedTypes.includes('digital')) {
       handleTypeChange('physical');
-    } else if (data.type === 'hybrid' && !effectiveTypes.includes('hybrid')) {
+    } else if (data.type === 'hybrid' && !allowedTypes.includes('hybrid')) {
       handleTypeChange('physical');
-    } else if (data.type === 'service' && !effectiveTypes.includes('service')) {
+    } else if (data.type === 'service' && !allowedTypes.includes('service')) {
       handleTypeChange('physical');
     }
-  }, [data.type, effectiveTypes]);
+  }, [data.type, allowedTypes]);
 
   const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
     // Auto-adjust stock quantity based on product type
@@ -473,7 +475,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </CardContent>
           </Card>
 
-          {/* Digital Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {/* Digital Product Type - Gated by allowedTypes (tier) and isProductEnabled (merchant) */}
           {!allowedTypes.includes('digital') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
@@ -492,7 +494,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </p>
               </CardContent>
             </Card>
-          ) : !effectiveTypes.includes('digital') ? (
+          ) : !isProductEnabled ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -506,7 +508,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
-                  Digital products are disabled in your product options settings
+                  Digital products are disabled in your product types settings
                 </p>
               </CardContent>
             </Card>
@@ -530,7 +532,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </Card>
           )}
 
-          {/* Hybrid Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {/* Hybrid Product Type - Gated by allowedTypes (tier) and isProductEnabled (merchant) */}
           {!allowedTypes.includes('hybrid') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
@@ -549,7 +551,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </p>
               </CardContent>
             </Card>
-          ) : !effectiveTypes.includes('hybrid') ? (
+          ) : !isProductEnabled ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -563,7 +565,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
-                  Hybrid products are disabled in your product options settings
+                  Hybrid products are disabled in your product types settings
                 </p>
               </CardContent>
             </Card>
@@ -587,7 +589,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </Card>
           )}
 
-          {/* Service Product Type - Gated by effectiveTypes (tier allows AND merchant enabled) */}
+          {/* Service Product Type - Gated by allowedTypes (tier) and isProductEnabled (merchant) */}
           {!allowedTypes.includes('service') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
@@ -606,7 +608,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </p>
               </CardContent>
             </Card>
-          ) : !effectiveTypes.includes('service') ? (
+          ) : !isProductEnabled ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -620,7 +622,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
-                  Service products are disabled in your product options settings
+                  Service products are disabled in your product types settings
                 </p>
               </CardContent>
             </Card>

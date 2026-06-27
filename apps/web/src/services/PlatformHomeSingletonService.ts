@@ -2054,6 +2054,47 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get tenant product type settings
+   */
+  async getTenantProductTypeSettings(tenantId: string): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/product-type`,
+      {},
+      `platform-tenant-product-type-settings-${tenantId}`,
+      this.cacheTTL
+    );
+
+    return result.data?.settings || null;
+  }
+
+  /**
+   * Update tenant product type settings
+   */
+  async updateTenantProductTypeSettings(tenantId: string, settings: any): Promise<any | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/product-type`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      },
+      `platform-tenant-product-type-settings-${tenantId}`
+    );
+
+    await this.invalidateTenantCaches(tenantId);
+    await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+
+    return result.data?.settings || null;
+  }
+
+  /**
    * Get consolidated dashboard data for tenant
    */
   async getDashboardConsolidated(tenantId: string): Promise<any> {

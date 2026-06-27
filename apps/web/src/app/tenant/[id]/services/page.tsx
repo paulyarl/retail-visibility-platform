@@ -88,7 +88,7 @@ export default async function TenantServicesPage({ params }: ServicesPageProps) 
 
   const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled);
 
-  if (!showServices || services.length === 0) {
+  if (services.length === 0) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-8 text-center">

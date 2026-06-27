@@ -56,9 +56,11 @@ interface PricingStepProps {
   onChange: (data: any) => void;
   variants?: any[]; // Receive variants from ProductTypeStep
   tenantId?: string; // Add tenantId for fetching gateways
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
 }
 
-export default function PricingStep({ data, errors, onChange, variants = [], tenantId }: PricingStepProps) {
+export default function PricingStep({ data, errors, onChange, variants = [], tenantId, productType }: PricingStepProps) {
+  const isService = productType === 'service';
   const [priceError, setPriceError] = useState<string>('');
   const [salePriceError, setSalePriceError] = useState<string>('');
 
@@ -199,9 +201,11 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
             <div>
               <h4 className="font-medium text-blue-900">Pricing Strategy</h4>
               <p className="text-sm text-blue-700 mt-1">
-                {hasVariantsWithPricing 
-                  ? 'Variant pricing is managed on each variant card in Step 2. Configure payment gateway below.'
-                  : 'Set competitive pricing with sale options, variant pricing strategies, and payment gateway selection.'}
+                {isService
+                  ? 'Set the price for your service. The pricing model (per session, per hour, fixed, deposit) was configured in Step 2.'
+                  : hasVariantsWithPricing 
+                    ? 'Variant pricing is managed on each variant card in Step 2. Configure payment gateway below.'
+                    : 'Set competitive pricing with sale options, variant pricing strategies, and payment gateway selection.'}
               </p>
             </div>
           </div>
@@ -344,8 +348,8 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
         </>
       )}
 
-      {/* Variant Pricing - Only show if no variants with pricing from step 2 */}
-      {!hasVariantsWithPricing && (
+      {/* Variant Pricing - Only show if no variants with pricing from step 2 and not a service */}
+      {!hasVariantsWithPricing && !isService && (
         <>
         <div className="space-y-4">
           <div className="flex items-center justify-between">

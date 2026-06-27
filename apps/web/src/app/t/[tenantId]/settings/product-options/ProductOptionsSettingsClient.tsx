@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Image, Video, Copy, ArrowRight, Zap, Plus, List, LayoutGrid, Eye, QrCode, ThumbsUp, MapPin, Map, Clock, Search, MessageSquare, Truck, Tag, Store } from 'lucide-react';
+import { Package, Save, AlertCircle, Settings, Image, Video, Copy, ArrowRight, Zap, List, LayoutGrid, Eye, QrCode, ThumbsUp, MapPin, Map, Clock, Search, MessageSquare, Truck, Tag, Store } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { useProductOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -11,10 +11,6 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
 interface ProductOptionsSettings {
-  product_physical_enabled: boolean;
-  product_digital_enabled: boolean;
-  product_hybrid_enabled: boolean;
-  product_service_enabled: boolean;
   product_variant_enabled: boolean;
   product_gallery_enabled: boolean;
   product_video_enabled: boolean;
@@ -45,28 +41,25 @@ interface QuickAction {
   variant: 'general' | 'product';
 }
 
-function getQuickActions(settings: ProductOptionsSettings, tenantId: string): QuickAction[] {
+function getQuickActions(tenantId: string): QuickAction[] {
   const actions: QuickAction[] = [];
-  const anyTypeEnabled = settings.product_physical_enabled || settings.product_digital_enabled || settings.product_hybrid_enabled || settings.product_service_enabled;
 
-  if (anyTypeEnabled) {
-    actions.push({
-      id: 'items',
-      label: 'Browse Items',
-      description: 'View and manage your product catalog',
-      href: `/t/${tenantId}/items`,
-      icon: List,
-      variant: 'product',
-    });
-    actions.push({
-      id: 'create-item',
-      label: 'Create New Item',
-      description: 'Add a new product to your catalog',
-      href: `/t/${tenantId}/items/create`,
-      icon: Plus,
-      variant: 'product',
-    });
-  }
+  actions.push({
+    id: 'items',
+    label: 'Browse Items',
+    description: 'View and manage your product catalog',
+    href: `/t/${tenantId}/items`,
+    icon: List,
+    variant: 'product',
+  });
+  actions.push({
+    id: 'product-types',
+    label: 'Product Types',
+    description: 'Configure which product types are available',
+    href: `/t/${tenantId}/settings/product-types`,
+    icon: Package,
+    variant: 'general',
+  });
 
   return actions;
 }
@@ -76,7 +69,8 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
   const productOptionsCap = useProductOptionsCapability(tenantId);
   const allCaps = useAllCapabilities(tenantId);
   const isProductOptionsEnabled = productOptionsCap.data?.enabled ?? true;
-  const allowedTypes = productOptionsCap.data?.allowedTypes ?? ['physical', 'digital', 'hybrid', 'service'];
+  const creationEnabled = productOptionsCap.data?.creationEnabled ?? true;
+  const sectionsEnabled = productOptionsCap.data?.sectionsEnabled ?? true;
   const showsVariants = productOptionsCap.data?.showsVariants ?? true;
   const showsGallery = productOptionsCap.data?.showsGallery ?? true;
   const showsVideo = productOptionsCap.data?.showsVideo ?? true;
@@ -97,10 +91,6 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
   const showsLocationAvailability = productOptionsCap.data?.showsLocationAvailability ?? true;
 
   const [settings, setSettings] = useState<ProductOptionsSettings>({
-    product_physical_enabled: true,
-    product_digital_enabled: true,
-    product_hybrid_enabled: true,
-    product_service_enabled: false,
     product_variant_enabled: true,
     product_gallery_enabled: true,
     product_video_enabled: true,
@@ -133,10 +123,6 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
       const settings = await platformHomeService.getTenantProductOptionsSettings(tenantId);
       if (settings) {
         setSettings({
-          product_physical_enabled: settings.product_physical_enabled ?? true,
-          product_digital_enabled: settings.product_digital_enabled ?? true,
-          product_hybrid_enabled: settings.product_hybrid_enabled ?? true,
-          product_service_enabled: settings.product_service_enabled ?? false,
           product_variant_enabled: settings.product_variant_enabled ?? true,
           product_gallery_enabled: settings.product_gallery_enabled ?? true,
           product_video_enabled: settings.product_video_enabled ?? true,
@@ -208,111 +194,8 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
         </div>
       )}
 
-      {/* Product Types */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary-600" />
-            Product Types
-          </CardTitle>
-          <p className="text-sm text-neutral-600 mt-1">
-            Choose which product types are available when creating new items. Customers will only see the types you enable.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Physical */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Package className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium text-neutral-900">Physical Products</p>
-                  <p className="text-sm text-neutral-600">Tangible items that require shipping or pickup</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {!allowedTypes.includes('physical') && (
-                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
-                )}
-                <Switch
-                  id="physical-toggle"
-                  checked={allowedTypes.includes('physical') && settings.product_physical_enabled}
-                  onCheckedChange={() => handleToggle('product_physical_enabled')}
-                  disabled={!allowedTypes.includes('physical')}
-                />
-              </div>
-            </div>
-
-            {/* Digital */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Download className="h-5 w-5 text-purple-600" />
-                <div>
-                  <p className="font-medium text-neutral-900">Digital Products</p>
-                  <p className="text-sm text-neutral-600">Downloadable files, licenses, and online content</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {!allowedTypes.includes('digital') && (
-                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
-                )}
-                <Switch
-                  id="digital-toggle"
-                  checked={allowedTypes.includes('digital') && settings.product_digital_enabled}
-                  onCheckedChange={() => handleToggle('product_digital_enabled')}
-                  disabled={!allowedTypes.includes('digital')}
-                />
-              </div>
-            </div>
-
-            {/* Hybrid */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Layers className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-neutral-900">Hybrid Products</p>
-                  <p className="text-sm text-neutral-600">Products with both physical and digital components</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {!allowedTypes.includes('hybrid') && (
-                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
-                )}
-                <Switch
-                  id="hybrid-toggle"
-                  checked={allowedTypes.includes('hybrid') && settings.product_hybrid_enabled}
-                  onCheckedChange={() => handleToggle('product_hybrid_enabled')}
-                  disabled={!allowedTypes.includes('hybrid')}
-                />
-              </div>
-            </div>
-
-            {/* Service */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Wrench className="h-5 w-5 text-orange-600" />
-                <div>
-                  <p className="font-medium text-neutral-900">Service Products</p>
-                  <p className="text-sm text-neutral-600">Bookable services, appointments, and consultations</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {!allowedTypes.includes('service') && (
-                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
-                )}
-                <Switch
-                  id="service-toggle"
-                  checked={allowedTypes.includes('service') && settings.product_service_enabled}
-                  onCheckedChange={() => handleToggle('product_service_enabled')}
-                  disabled={!allowedTypes.includes('service')}
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Creation Features */}
+      {creationEnabled && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -393,6 +276,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Product Page Layout */}
       <Card>
@@ -490,6 +374,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
       </Card>
 
       {/* Product Page Sections */}
+      {sectionsEnabled && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -746,6 +631,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Save Button */}
       <div className="flex justify-end">
@@ -757,7 +643,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
 
       {/* Next Steps — contextual destinations based on saved preferences */}
       {(() => {
-        const actions = getQuickActions(settings, tenantId);
+        const actions = getQuickActions(tenantId);
         if (actions.length === 0) return null;
         return (
           <Card>
@@ -767,7 +653,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                 What's Next
               </CardTitle>
               <p className="text-sm text-neutral-600 mt-1">
-                Continue managing the product types you just enabled
+                Continue configuring your product options
               </p>
             </CardHeader>
             <CardContent>

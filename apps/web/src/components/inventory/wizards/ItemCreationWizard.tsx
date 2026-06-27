@@ -48,6 +48,7 @@ import ContentStep from './steps/ContentStep';
 import MediaStep from './steps/MediaStep';
 import OrganizationStep from './steps/OrganizationStep';
 import ReviewStep from './steps/ReviewStep';
+import ServiceDetailsStep from './steps/ServiceDetailsStep';
 
 interface ItemCreationWizardProps {
   tenantId: string;
@@ -72,7 +73,7 @@ interface WizardData {
   
   // Step 2: Product Type & Variants
   productType: {
-    type: 'physical' | 'digital' | 'hybrid';
+    type: 'physical' | 'digital' | 'hybrid' | 'service';
     sku: string;
     hasVariants: boolean;
     stockQuantity: number;
@@ -91,6 +92,20 @@ interface WizardData {
       externalUrl?: string;
       assetName?: string;
       accessInstructions?: string;
+    };
+    serviceProduct?: {
+      bookingMethod: 'external_url' | 'phone' | 'in_store' | 'contact_only';
+      bookingUrl?: string;
+      bookingPhone?: string;
+      durationMinutes?: number | null;
+      sessionLength?: string;
+      availabilitySchedule?: string;
+      serviceLocation: 'on_site' | 'remote' | 'customer_location';
+      serviceArea?: string;
+      travelRadius?: number | null;
+      pricingModel: 'per_session' | 'per_hour' | 'fixed' | 'deposit';
+      depositAmount?: number | null;
+      requiresDeposit: boolean;
     };
   };
   
@@ -214,6 +229,20 @@ const INITIAL_DATA: WizardData = {
       externalUrl: '',
       assetName: '',
       accessInstructions: ''
+    },
+    serviceProduct: {
+      bookingMethod: 'contact_only',
+      bookingUrl: '',
+      bookingPhone: '',
+      durationMinutes: null,
+      sessionLength: '',
+      availabilitySchedule: '',
+      serviceLocation: 'on_site',
+      serviceArea: '',
+      travelRadius: null,
+      pricingModel: 'fixed',
+      depositAmount: null,
+      requiresDeposit: false
     }
   },
   pricing: {
@@ -435,6 +464,20 @@ export default function ItemCreationWizard({
             externalUrl: '',
             assetName: '',
             accessInstructions: ''
+          },
+          serviceProduct: {
+            bookingMethod: (metadata.bookingMethod || metadata.booking_method || 'contact_only') as 'external_url' | 'phone' | 'in_store' | 'contact_only',
+            bookingUrl: metadata.bookingUrl || metadata.booking_url || '',
+            bookingPhone: metadata.bookingPhone || metadata.booking_phone || '',
+            durationMinutes: metadata.durationMinutes ?? metadata.duration_minutes ?? null,
+            sessionLength: metadata.sessionLength || metadata.session_length || '',
+            availabilitySchedule: metadata.availabilitySchedule || metadata.availability_schedule || '',
+            serviceLocation: (metadata.serviceLocation || metadata.service_location || 'on_site') as 'on_site' | 'remote' | 'customer_location',
+            serviceArea: metadata.serviceArea || metadata.service_area || '',
+            travelRadius: metadata.travelRadius ?? metadata.travel_radius ?? null,
+            pricingModel: (metadata.pricingModel || metadata.pricing_model || 'fixed') as 'per_session' | 'per_hour' | 'fixed' | 'deposit',
+            depositAmount: metadata.depositAmount ?? metadata.deposit_amount ?? null,
+            requiresDeposit: metadata.requiresDeposit ?? metadata.requires_deposit ?? false
           }
         },
         pricing: {
@@ -735,6 +778,26 @@ export default function ItemCreationWizard({
           license_type: wizardData.productType.digitalProduct?.licenseType,
           access_duration_days: wizardData.productType.digitalProduct?.accessDurationDays,
           download_limit: wizardData.productType.digitalProduct?.downloadLimit,
+        } : {}),
+        // Include service product metadata if product type is service
+        ...(wizardData.productType.type === 'service' ? {
+          metadata: {
+            bookingMethod: wizardData.productType.serviceProduct?.bookingMethod,
+            bookingUrl: wizardData.productType.serviceProduct?.bookingUrl,
+            bookingPhone: wizardData.productType.serviceProduct?.bookingPhone,
+            durationMinutes: wizardData.productType.serviceProduct?.durationMinutes,
+            sessionLength: wizardData.productType.serviceProduct?.sessionLength,
+            availabilitySchedule: wizardData.productType.serviceProduct?.availabilitySchedule,
+            serviceLocation: wizardData.productType.serviceProduct?.serviceLocation,
+            serviceArea: wizardData.productType.serviceProduct?.serviceArea,
+            travelRadius: wizardData.productType.serviceProduct?.travelRadius,
+            pricingModel: wizardData.productType.serviceProduct?.pricingModel,
+            depositAmount: wizardData.productType.serviceProduct?.depositAmount,
+            requiresDeposit: wizardData.productType.serviceProduct?.requiresDeposit,
+          },
+          // Services have unlimited stock
+          stock: 9999,
+          track_inventory: false,
         } : {})
       };
 
@@ -779,13 +842,29 @@ export default function ItemCreationWizard({
         );
       case 1:
         return (
-          <ProductTypeStep
-            data={wizardData.productType}
-            errors={errors}
-            onChange={(data) => handleStepData({ productType: data })}
-            tenantId={tenantId}
-            parentSku={wizardData.productType.sku}
-          />
+          <div className="space-y-6">
+            <ProductTypeStep
+              data={wizardData.productType}
+              errors={errors}
+              onChange={(data) => handleStepData({ productType: data })}
+              tenantId={tenantId}
+              parentSku={wizardData.productType.sku}
+            />
+            {wizardData.productType.type === 'service' && wizardData.productType.serviceProduct && (
+              <ServiceDetailsStep
+                data={wizardData.productType.serviceProduct}
+                errors={errors}
+                onChange={(serviceProduct) =>
+                  handleStepData({
+                    productType: {
+                      ...wizardData.productType,
+                      serviceProduct,
+                    },
+                  })
+                }
+              />
+            )}
+          </div>
         );
       case 2:
         return (
@@ -794,6 +873,7 @@ export default function ItemCreationWizard({
             errors={errors}
             variants={wizardData.productType.variants}
             tenantId={tenantId}
+            productType={wizardData.productType.type}
             onChange={(data) => handleStepData({ pricing: data })}
           />
         );
@@ -822,6 +902,7 @@ export default function ItemCreationWizard({
             errors={errors}
             onChange={(data) => handleStepData({ organization: data })}
             tenantId={tenantId}
+            productType={wizardData.productType.type}
           />
         );
       case 6:

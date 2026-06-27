@@ -149,12 +149,14 @@ interface OrganizationStepProps {
   errors: Record<string, string>;
   onChange: (data: any) => void;
   tenantId?: string;
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
 }
 
 // Removed mock CATEGORIES, GOOGLE_CATEGORIES, and SHOP_CATEGORIES
 // TenantCategorySelector handles all category needs and aligns with platform standard (directory_category_id + category_path)
 
-export default function OrganizationStep({ data, errors, onChange, tenantId }: OrganizationStepProps) {
+export default function OrganizationStep({ data, errors, onChange, tenantId, productType }: OrganizationStepProps) {
+  const isService = productType === 'service';
   const [newSeoKeyword, setNewSeoKeyword] = useState('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
@@ -421,7 +423,8 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
 
       <Separator />
 
-      {/* Inventory Settings */}
+      {/* Inventory Settings - Hidden for services (no stock tracking needed) */}
+      {!isService && (
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
           <TrendingUp className="h-4 w-4 text-orange-600" />
@@ -467,6 +470,7 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
           </div>
         </div>
       </div>
+      )}
 
       <Separator />
 

@@ -166,4 +166,12 @@ export const QUICK_START_SCENARIOS: Scenario[] = [
     categoryCount: 5,
     sampleProductCount: 35,
   },
+  {
+    id: 'service_business',
+    name: 'Service Business',
+    description: 'Bookable services, appointments, and consultations',
+    icon: '🔧',
+    categoryCount: 4,
+    sampleProductCount: 15,
+  },
 ];
