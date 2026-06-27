@@ -59,10 +59,12 @@ function ServiceCard({
   layoutVariant: StorefrontLayoutKey;
 }) {
   const metadata = service.metadata || {};
-  const durationMinutes = metadata.duration_minutes || service.durationMinutes;
-  const serviceArea = metadata.service_area || service.serviceArea;
-  const providerName = metadata.provider_name || service.providerName;
-  const serviceCategory = metadata.service_category || service.serviceCategory;
+  const durationMinutes = metadata.durationMinutes || metadata.duration_minutes || service.durationMinutes;
+  const serviceArea = metadata.serviceArea || metadata.service_area || service.serviceArea;
+  const serviceLocation = metadata.serviceLocation || metadata.service_location || service.serviceLocation;
+  const providerName = metadata.providerName || metadata.provider_name || service.providerName;
+  const serviceCategory = metadata.serviceCategory || metadata.service_category || service.serviceCategory;
+  const pricingModel = metadata.pricingModel || metadata.pricing_model || service.pricingModel;
   const imageUrl = service.imageUrl || service.image_url;
   const slug = service.slug || service.id;
 
@@ -110,6 +112,15 @@ function ServiceCard({
               {durationMinutes} min
             </span>
           )}
+          {serviceLocation && (
+            <span className="flex items-center gap-1 capitalize">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+              {serviceLocation.replace(/_/g, ' ')}
+            </span>
+          )}
           {serviceArea && (
             <span className="flex items-center gap-1">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -130,11 +141,18 @@ function ServiceCard({
         </div>
 
         <div className="flex items-center justify-between">
-          {service.price != null && (
-            <span className="text-lg font-bold text-neutral-900 dark:text-white">
-              {typeof service.price === 'number' ? `$${service.price.toFixed(2)}` : service.price}
-            </span>
-          )}
+          <div className="flex flex-col">
+            {service.price != null && (
+              <span className="text-lg font-bold text-neutral-900 dark:text-white">
+                {typeof service.price === 'number' ? `$${service.price.toFixed(2)}` : service.price}
+              </span>
+            )}
+            {pricingModel && (
+              <span className="text-xs text-neutral-500 dark:text-neutral-400 capitalize">
+                {pricingModel.replace(/_/g, ' ')}
+              </span>
+            )}
+          </div>
           <BookingCTA service={service} tenantId={tenantId} layoutVariant={layoutVariant} />
         </div>
       </div>

@@ -442,7 +442,7 @@ export function generateVariantSku(parentItemSku: string, variantIndex?: number)
 // SKU Generation interfaces and codes (ported from frontend)
 export interface SKUGenerationParams {
   tenantKey?: string; // 4-character tenant identifier
-  productType: 'physical' | 'digital' | 'hybrid';
+  productType: 'physical' | 'digital' | 'hybrid' | 'service';
   deliveryMethod?: 'direct_download' | 'external_link' | 'email_delivery' | 'license_key' | 'access_grant' | 'shipping' | 'pickup' | 'delivery';
   accessControl?: 'personal' | 'commercial' | 'enterprise' | 'educational' | 'public' | 'subscription';
 }
@@ -451,6 +451,7 @@ const PRODUCT_TYPE_CODES: Record<string, string> = {
   physical: 'PHYS',
   digital: 'DIGI',
   hybrid: 'HYBR',
+  service: 'SVC',
 };
 
 const DELIVERY_METHOD_CODES: Record<string, string> = {
@@ -636,6 +637,8 @@ export function generateSKU(params: SKUGenerationParams): string {
       deliveryMethod = 'direct_download';
     } else if (params.productType === 'physical') {
       deliveryMethod = 'shipping';
+    } else if (params.productType === 'service') {
+      deliveryMethod = 'pickup';
     } else {
       deliveryMethod = 'direct_download'; // hybrid defaults to digital delivery
     }
@@ -663,7 +666,7 @@ export function generateSKU(params: SKUGenerationParams): string {
 export function generateVariantSkuFromParent(
   parentItemSku: string, 
   variantIndex: number,
-  productType?: 'physical' | 'digital' | 'hybrid'
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service'
 ): string {
   // Use nanoid to generate unique suffix - guarantees uniqueness regardless of timing
   const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 4);
@@ -1110,6 +1113,16 @@ export function generateStorefrontOptionsSettingsId(tenantId: string): string {
 export function generateStorefrontTypeSettingsId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `sts-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a unique ID for tenant_product_types_settings.
+ * Format: pts-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateProductTypeSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pts-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**

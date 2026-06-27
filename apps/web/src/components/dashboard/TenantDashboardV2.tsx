@@ -13,8 +13,6 @@ import {
   Store,
   RefreshCw,
   Sparkles,
-  MessageSquare,
-  MapPin,
   Bot,
   Lock,
 } from "lucide-react";
@@ -41,6 +39,8 @@ import SystemStatusCard from "./SystemStatusCard";
 import TaskChecklist from "./TaskChecklist";
 import GrowthTipCard from "./GrowthTipCard";
 import CapabilityShowcase from "./CapabilityShowcase";
+import ConstraintAlertBanner from "./ConstraintAlertBanner";
+import QuickLinksCard from "./QuickLinksCard";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import type { TipContext } from "@/lib/growth-tips/tipEngine";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
@@ -305,6 +305,9 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
           </button>
         </div>
 
+        {/* ── Constraint Alert Banner ── */}
+        <ConstraintAlertBanner capabilities={allCaps.data} tenantId={tenantId} />
+
         {/* ── KPIs ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -471,72 +474,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
             {/* Quick Links */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.39 }}>
-              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4">Quick Links</h3>
-                <div className="space-y-2">
-                  <Link href={`/tenant/${tenantId}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                      <Store className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Storefront</p>
-                      <p className="text-xs text-gray-500 truncate">View your public store</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                  </Link>
-
-                  <Link
-                    href={hasPublishedDirectory ? `/directory/${tenantData?.slug || tenantId}` : `/t/${tenantId}/settings/directory`}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
-                  >
-                    <div className={`p-2 rounded-lg transition-colors ${hasPublishedDirectory ? "bg-emerald-50 group-hover:bg-emerald-100" : "bg-gray-50 group-hover:bg-gray-100"}`}>
-                      <MapPin className={`w-4 h-4 ${hasPublishedDirectory ? "text-emerald-600" : "text-gray-500"}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Directory Entry</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {hasPublishedDirectory ? "Your public directory listing" : "Publish your directory listing"}
-                      </p>
-                    </div>
-                    <ArrowRight className={`w-4 h-4 transition-colors ${hasPublishedDirectory ? "text-gray-400 group-hover:text-emerald-600" : "text-gray-400 group-hover:text-gray-600"}`} />
-                  </Link>
-
-                  <Link href={`/t/${tenantId}/settings/users`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                      <MessageSquare className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Team</p>
-                      <p className="text-xs text-gray-500 truncate">Manage your team</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
-                  </Link>
-
-                  <Link href={`/t/${tenantId}/reviews`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                      <MessageSquare className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Reviews</p>
-                      <p className="text-xs text-gray-500 truncate">Manage customer reviews</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
-                  </Link>
-
-                  <Link href={`/t/${tenantId}/support`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <div className="p-2 bg-orange-50 rounded-lg group-hover:bg-orange-100 transition-colors">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-orange-600">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Support Hub</p>
-                      <p className="text-xs text-gray-500 truncate">Tickets, tasks & help</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
-                  </Link>
-                </div>
-              </div>
+              <QuickLinksCard tenantId={tenantId} />
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
               <CapabilityShowcase

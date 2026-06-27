@@ -25,6 +25,7 @@ import {
   StorefrontState,
   BarcodeScanState,
   FulfillmentState,
+  ProductTypeState,
   ProductOptionsState,
   FeaturedOptionsState,
   IntegrationOptionsState,
@@ -35,6 +36,8 @@ import {
   ChatbotOptionsState,
   SocialCommerceOptionsState,
   AllCapabilitiesState,
+  ConstraintViolationState,
+  ConstraintStatusMapState,
   resolveCommerceState,
   resolvePaymentGatewayState,
   resolveStorefrontState,
@@ -222,6 +225,38 @@ export function useFulfillmentCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch fulfillment capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useProductTypeCapability
+// ====================
+
+export function useProductTypeCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<ProductTypeState> {
+  const [data, setData] = useState<ProductTypeState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getProductTypeState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch product type capability');
     } finally {
       setLoading(false);
     }
@@ -680,4 +715,88 @@ export function useMerchantGates(
   }, [tenantId, options?.forTenant]);
 
   return { gates, loading };
+}
+
+// ====================
+// useConstraintViolations
+// ====================
+
+/**
+ * Fetches cross-capability constraint violations for a tenant.
+ * Returns violations array + loading/error state.
+ *
+ * Uses the unified capabilities endpoint (same as useAllCapabilities).
+ * Constraint violations are computed server-side by the CCL post-resolution pass.
+ */
+export function useConstraintViolations(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<ConstraintViolationState[]> {
+  const service = getService(!!options?.forTenant);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['tenant', 'capabilities', 'constraints', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const caps = await service.getAllCapabilities(tenantId);
+      return caps.constraintViolations;
+    },
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 0,
+    throwOnError: false,
+  });
+
+  const refetchCb = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  return useMemo(() => ({
+    data: data ?? null,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : 'Failed to fetch constraint violations') : null,
+    refetch: refetchCb,
+  }), [data, isLoading, error, refetchCb]);
+}
+
+// ====================
+// useConstraintStatus
+// ====================
+
+/**
+ * Fetches cross-capability constraint status for a tenant.
+ * Returns a map of capability key → { blockedTypes, warningTypes, activeViolations }.
+ *
+ * Settings pages use blockedTypes to disable selection controls.
+ * Dashboard uses warningTypes to show amber warnings.
+ */
+export function useConstraintStatus(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<ConstraintStatusMapState> {
+  const service = getService(!!options?.forTenant);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['tenant', 'capabilities', 'constraint-status', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const caps = await service.getAllCapabilities(tenantId);
+      return caps.constraintStatus;
+    },
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 0,
+    throwOnError: false,
+  });
+
+  const refetchCb = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  return useMemo(() => ({
+    data: data ?? null,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : 'Failed to fetch constraint status') : null,
+    refetch: refetchCb,
+  }), [data, isLoading, error, refetchCb]);
 }

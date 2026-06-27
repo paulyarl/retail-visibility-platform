@@ -22,8 +22,10 @@ import {
   MapPin,
   Bot,
   Share2,
+  Layers,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 
 interface CapabilityShowcaseProps {
   capabilities: AllCapabilitiesState | null;
@@ -33,6 +35,12 @@ interface CapabilityShowcaseProps {
 
 type CapabilityStatus = 'enabled' | 'merchant-gated' | 'tier-gated';
 
+interface ConstraintWarning {
+  message: string;
+  severity: 'block' | 'warn' | 'info';
+  resolutionHint?: string;
+}
+
 interface CapabilityRow {
   key: string;
   label: string;
@@ -41,6 +49,7 @@ interface CapabilityRow {
   status: CapabilityStatus;
   detail: string;
   settingsLink: string;
+  constraintWarning?: ConstraintWarning;
 }
 
 export default function CapabilityShowcase({
@@ -58,6 +67,22 @@ export default function CapabilityShowcase({
     };
 
     const cap = capabilities;
+
+    // Helper: find constraint violations for a capability (as source or target)
+    const getConstraintWarning = (capabilityKey: string): ConstraintWarning | undefined => {
+      const violations = cap.constraintViolations?.filter(
+        v => v.sourceCapability === capabilityKey || v.targetCapability === capabilityKey
+      );
+      if (!violations || violations.length === 0) return undefined;
+      // Prioritize block severity
+      const block = violations.find(v => v.severity === 'block');
+      const chosen = block || violations[0];
+      return {
+        message: chosen.message,
+        severity: chosen.severity,
+        resolutionHint: chosen.resolutionHint,
+      };
+    };
 
     // --- Commerce ---
     const c = cap.commerce;
@@ -88,11 +113,15 @@ export default function CapabilityShowcase({
     const bcTier = bc?.enabled ?? false;
     const bcMerchantGated = bcTier && (bc?.effectiveModes.length ?? 0) < (bc?.allowedModes.length ?? 0);
 
-    // --- Product Options ---
+    // --- Product Types ---
+    const pt = cap.productType;
+    const ptTier = pt?.enabled ?? false;
+    const ptMerchantGated = ptTier && pt?.effectiveType === 'none';
+
+    // --- Product Options (creation features) ---
     const po = cap.productOptions;
     const poTier = po?.enabled ?? false;
     const poMerchantGated = poTier && (
-      (po?.effectiveTypes.length ?? 0) < (po?.allowedTypes.length ?? 0) ||
       po?.effectiveShowsVariants !== po?.showsVariants ||
       po?.effectiveShowsGallery !== po?.showsGallery ||
       po?.effectiveShowsVideo !== po?.showsVideo
@@ -210,6 +239,7 @@ export default function CapabilityShowcase({
         status: getStatus(cTier, cMerchantGated),
         detail: c?.effectivePaymentType === "none" ? "Disabled" : `Payments: ${c?.effectivePaymentType ?? c?.paymentType}`,
         settingsLink: `/t/${tenantId}/settings/commerce`,
+        constraintWarning: getConstraintWarning('commerce'),
       },
       {
         key: "paymentGateway",
@@ -224,6 +254,7 @@ export default function CapabilityShowcase({
               ? `${pg!.allowedGateways.join(", ")} (merchant off)`
               : "None connected",
         settingsLink: `/t/${tenantId}/settings/payment-gateways`,
+        constraintWarning: getConstraintWarning('payment_gateway'),
       },
       {
         key: "storefront",
@@ -237,6 +268,7 @@ export default function CapabilityShowcase({
             ? `Type: ${sf.type} (merchant off)`
             : "Not configured",
         settingsLink: `/t/${tenantId}/settings/tenant`,
+        constraintWarning: getConstraintWarning('storefront'),
       },
       {
         key: "fulfillment",
@@ -252,6 +284,7 @@ export default function CapabilityShowcase({
             ].filter(Boolean).join(', ') || 'Shipping / Pickup'
           : 'Not configured',
         settingsLink: `/t/${tenantId}/settings/fulfillment`,
+        constraintWarning: getConstraintWarning('fulfillment'),
       },
       {
         key: "barcodeScan",
@@ -261,20 +294,38 @@ export default function CapabilityShowcase({
         status: getStatus(bcTier, bcMerchantGated),
         detail: bc?.effectiveModes.length ? `Modes: ${bc.effectiveModes.join(', ')}` : "Not available",
         settingsLink: `/t/${tenantId}/scan`,
+        constraintWarning: getConstraintWarning('barcode_scan'),
+      },
+      {
+        key: "productTypes",
+        label: "Product Types",
+        icon: <Package className="w-4 h-4" />,
+        enabled: ptTier && pt?.effectiveType !== 'none' && pt?.effectiveType !== 'flexible',
+        status: getStatus(ptTier, ptMerchantGated),
+        detail:
+          pt?.effectiveType && pt.effectiveType !== 'none' && pt.effectiveType !== 'flexible'
+            ? pt.effectiveType
+            : pt?.allowedTypes.length
+              ? `${pt!.allowedTypes.join(", ")} (merchant off)`
+              : "Standard",
+        settingsLink: `/t/${tenantId}/settings/product-types`,
+        constraintWarning: getConstraintWarning('product_types'),
       },
       {
         key: "productOptions",
-        label: "Product Types",
-        icon: <Package className="w-4 h-4" />,
-        enabled: poTier && (po?.effectiveTypes.length ?? 0) > 0,
+        label: "Creation Features",
+        icon: <Layers className="w-4 h-4" />,
+        enabled: poTier,
         status: getStatus(poTier, poMerchantGated),
-        detail:
-          (po?.effectiveTypes ?? []).length > 0
-            ? po!.effectiveTypes.join(", ")
-            : (po?.allowedTypes ?? []).length > 0
-              ? `${po!.allowedTypes.join(", ")} (merchant off)`
-              : "Standard",
-        settingsLink: `/t/${tenantId}/items/create`,
+        detail: poTier
+          ? [
+              ...(po?.effectiveShowsVariants ? ["Variants"] : []),
+              ...(po?.effectiveShowsGallery ? ["Gallery"] : []),
+              ...(po?.effectiveShowsVideo ? ["Video"] : []),
+            ].join(", ") || "Basic"
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/product-options`,
+        constraintWarning: getConstraintWarning('product_options'),
       },
       {
         key: "integrationOptions",
@@ -288,6 +339,7 @@ export default function CapabilityShowcase({
             ? `${io!.allowedTypes.join(", ")} (merchant off)`
             : "Not configured",
         settingsLink: `/t/${tenantId}/settings/integrations`,
+        constraintWarning: getConstraintWarning('integration_options'),
       },
       {
         key: "storefrontOptions",
@@ -297,6 +349,7 @@ export default function CapabilityShowcase({
         status: getStatus(soTier, soMerchantGated),
         detail: soTier && !soMerchantGated ? "Customizable" : soTier ? "Partially disabled" : "Default",
         settingsLink: `/t/${tenantId}/settings/tenant`,
+        constraintWarning: getConstraintWarning('storefront_options'),
       },
       {
         key: "quickstartOptions",
@@ -306,6 +359,7 @@ export default function CapabilityShowcase({
         status: getStatus(qoTier, qoMerchantGated),
         detail: qoTier && !qoMerchantGated ? "Active" : qoTier ? "Partially disabled" : "Not available",
         settingsLink: `/t/${tenantId}/quick-start`,
+        constraintWarning: getConstraintWarning('quickstart'),
       },
       {
         key: "faqOptions",
@@ -325,6 +379,7 @@ export default function CapabilityShowcase({
           ].filter(Boolean).join(', ') || 'Basic'} FAQs`
           : "Not available",
         settingsLink: `/t/${tenantId}/faq/options`,
+        constraintWarning: getConstraintWarning('faq'),
       },
       {
         key: "directoryEntry",
@@ -336,6 +391,7 @@ export default function CapabilityShowcase({
           ? `${de?.effectiveLayout ?? 'classic'} layout${deDetailParts.length > 0 ? ` · ${deDetailParts.join(', ')}` : ''}`
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/directory`,
+        constraintWarning: getConstraintWarning('directory_entry'),
       },
       {
         key: "crmOptions",
@@ -347,6 +403,7 @@ export default function CapabilityShowcase({
           ? (crmDetailParts.length > 0 ? crmDetailParts.join(', ') : 'Support Hub')
           : "Not available",
         settingsLink: `/t/${tenantId}/support`,
+        constraintWarning: getConstraintWarning('crm'),
       },
       {
         key: "chatbotOptions",
@@ -358,6 +415,7 @@ export default function CapabilityShowcase({
           ? (cbDetailParts.length > 0 ? cbDetailParts.join(', ') : 'AI Assistant')
           : "Not available",
         settingsLink: `/t/${tenantId}/bot/options`,
+        constraintWarning: getConstraintWarning('chatbot'),
       },
       {
         key: "socialCommerceOptions",
@@ -369,6 +427,7 @@ export default function CapabilityShowcase({
           ? (sccDetailParts.length > 0 ? sccDetailParts.join(', ') : 'Social Commerce')
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/social-commerce`,
+        constraintWarning: getConstraintWarning('social_commerce_options'),
       },
     ];
   }, [capabilities, tenantId]);
@@ -454,8 +513,18 @@ export default function CapabilityShowcase({
                   ) : (
                     <XCircle className="w-3.5 h-3.5 text-gray-300" />
                   )}
+                  {row.constraintWarning && (
+                    row.constraintWarning.severity === 'block'
+                      ? <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+                      : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 truncate">{row.detail}</p>
+                {row.constraintWarning && (
+                  <p className={`text-xs truncate ${row.constraintWarning.severity === 'block' ? 'text-red-600' : 'text-amber-600'}`}>
+                    {row.constraintWarning.message}
+                  </p>
+                )}
               </div>
 
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />

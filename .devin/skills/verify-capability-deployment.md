@@ -144,11 +144,37 @@ Two components on the tenant dashboard display capability status. A capability m
 - [ ] The row reads from `cap.<domain>Options` (e.g. `cap.chatbotOptions`)
 - [ ] `label`, `icon`, `detail`, and `settingsLink` are provided
 - [ ] The row appears in the "Your Capabilities" card on the tenant dashboard
+- [ ] If the capability has active constraint violations, an `AlertTriangle` icon + amber warning text is shown
 
 **PlanSummaryPanel** (`apps/web/src/components/settings/PlanSummaryPanel.tsx`):
 - [ ] The capability type key is in the `CAPABILITY_DISPLAY` map
 - [ ] A summary block exists in `resolveCapabilitySummaries()` that reads from the mapped state
 - [ ] The capability appears in the plan summary card
+- [ ] If the capability has constraint violations, a constraint warnings section appears with color-coded severity (red for block, amber for warn)
+
+### 9. Check Cross-Capability Constraints (CCL)
+
+If the capability has cross-capability dependencies (e.g., "service storefront requires service product type"), verify the CCL integration:
+
+**Verify DB constraint**:
+```sql
+SELECT * FROM capability_constraints_list
+WHERE source_capability = '<capability_key>' OR target_capability = '<capability_key>'
+ORDER BY sort_order;
+```
+- [ ] Constraint exists in `capability_constraints_list` DB table with `is_active = true`
+- [ ] Static fallback entry also exists in `CapabilityConstraintRegistry.ts`
+
+**Verify write-time validation** (for `block` severity constraints):
+- [ ] PUT handler calls `await validateProposedChange()` with simulated effective state before persisting
+- [ ] Returns 403 with `error: 'constraint_violation'` when block violations are found
+- [ ] Response includes `message`, `resolution_hint`, and `violations` array
+
+**Verify read-time surfacing**:
+- [ ] `constraint_violations` array appears in the unified endpoint response
+- [ ] `constraint_status` map includes `blocked_types` and `warning_types` for the source capability
+- [ ] Frontend settings page disables blocked types (red background, blocked icon)
+- [ ] Frontend settings page shows warning messages for `warn` severity types
 
 ## Capability Type Key → Resolver Mapping
 
@@ -189,3 +215,7 @@ All resolution happens in the backend resolver. The frontend `UnifiedCapabilityS
 8. **Wrong property name on state object**: Backend routes or other consumers using incorrect property names (e.g., `customerTickets` instead of `customerTicketsEnabled`). Fix: check the `*OptionsState` interface in `CapabilityResolutionService.ts` (type source) for exact property names.
 
 9. **Zod schema enum out of sync with type union**: When adding a new value to a capability's type enum (e.g. adding `'social'` to `StorefrontTypeValue`), the Zod validation schema in the route file (`z.enum([...])`) must be updated to include the new value. Otherwise the PUT endpoint will 400-reject the new value before it reaches the tier gate, even though the resolver, service, and frontend all accept it. This is a silent gap — TypeScript won't catch it because the Zod schema is a runtime construct, not a type-level constraint. Fix: grep for `z.enum(` in the route file and ensure all enum values match the type union.
+
+10. **Missing CCL write-time validation**: If a `block` severity constraint references the capability, the PUT handler MUST call `await validateProposedChange()` before persisting. Forgetting this allows invalid configurations (e.g., service storefront without service product type) to be saved. Fix: add the validation pattern from R22 in `capability-data-flow-rules.md` — resolve current caps, simulate the proposed change, validate, reject if block violations exist.
+
+11. **CCL constraint not in DB table**: Constraints added only to the static `CAPABILITY_CONSTRAINTS` array in `CapabilityConstraintRegistry.ts` will work as a fallback, but won't be manageable via the admin API at `/api/admin/capability-constraints`. Fix: also insert the constraint into the `capability_constraints_list` DB table via SQL migration or admin API.

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, Check, X, Crown, ExternalLink, Lock } from 'lucide-react';
+import { Shield, Check, X, Crown, ExternalLink, Lock, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   AllCapabilitiesState,
@@ -244,6 +244,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_types: { label: 'Storefront', icon: '🏪', settingsPath: '/settings/storefront-type-options' },
   barcode_scan_options: { label: 'Barcode Scanning', icon: '📱', settingsPath: '/settings/barcode-scan-options' },
   fulfillment_options: { label: 'Fulfillment', icon: '📦', settingsPath: '/settings/fulfillment' },
+  product_types: { label: 'Product Types', icon: '📦', settingsPath: '/settings/product-types' },
   product_options: { label: 'Product Options', icon: '🏷️', settingsPath: '/settings/product-options' },
   featured_options: { label: 'Featured Options', icon: '⭐', settingsPath: '/settings/featured-options' },
   integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
@@ -422,16 +423,35 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     });
   }
 
+  // Product Types
+  const pt = caps.productType;
+  if (pt.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    pt.allowedTypes.forEach(t => {
+      const label = PRODUCT_TYPE_LABELS[t] || t;
+      specifics.push(label);
+      const isEnabled = pt.effectiveType === t || pt.effectiveType === 'flexible';
+      statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
+    });
+    summaries.push({
+      key: 'product_types',
+      label: CAPABILITY_DISPLAY.product_types.label,
+      icon: CAPABILITY_DISPLAY.product_types.icon,
+      enabled: pt.enabled,
+      merchantGated: merchantGates?.['product_types'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'product_types',
+      settingsPath: CAPABILITY_DISPLAY.product_types.settingsPath ?? null,
+    });
+  }
+
   // Product Options
   const po = caps.productOptions;
   if (po.enabled) {
     const specifics: string[] = [];
     const statuses: FeatureItem[] = [];
-    po.allowedTypes.forEach(t => {
-      const label = PRODUCT_TYPE_LABELS[t] || t;
-      specifics.push(label);
-      statuses.push({ label, status: po.effectiveTypes.includes(t) ? 'enabled' : 'merchant-gated' });
-    });
     const addPo = (tier: boolean, label: string, eff: boolean) => {
       if (tier) { specifics.push(label); statuses.push({ label, status: eff ? 'enabled' : 'merchant-gated' }); }
     };
@@ -927,6 +947,28 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
             );
           })}
         </div>
+
+        {/* Cross-capability constraint warnings */}
+        {capabilities?.constraintViolations && capabilities.constraintViolations.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {capabilities.constraintViolations.map(v => (
+              <div
+                key={v.constraintId}
+                className={`flex items-start gap-2 p-2 rounded-lg border text-xs ${
+                  v.severity === 'block'
+                    ? 'bg-red-50 border-red-200 text-red-800'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}
+              >
+                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-medium">{v.message}</span>
+                  <span className="block text-[11px] opacity-80 mt-0.5">{v.resolutionHint}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
       )}
     </Card>

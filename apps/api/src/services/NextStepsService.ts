@@ -116,6 +116,24 @@ function isReadOnly(ctx: TaskContext): boolean {
   return ctx.capabilities?.subscription_context.isReadOnly ?? false;
 }
 
+// ── Capability selection helpers ──
+
+function needsStorefrontTypeSelection(ctx: TaskContext): boolean {
+  const sf = ctx.capabilities?.effective.storefront;
+  return !!sf && sf.enabled && sf.is_flexible && !sf.has_merchant_selection;
+}
+
+function needsProductTypeSelection(ctx: TaskContext): boolean {
+  const pt = ctx.capabilities?.effective.product_types;
+  return !!pt && pt.enabled && pt.is_flexible && !pt.has_merchant_selection;
+}
+
+function needsFulfillmentMethodSelection(ctx: TaskContext): boolean {
+  const f = ctx.capabilities?.effective.fulfillment;
+  if (!f || !f.enabled) return false;
+  return !f.effective_shows_pickup && !f.effective_shows_delivery && !f.effective_shows_shipping;
+}
+
 // ====================
 // TIER HELPERS
 // ====================
@@ -148,6 +166,41 @@ function isCommitmentOrAbove(key: string): boolean {
 // ====================
 
 const TASKS: TaskDefinition[] = [
+
+  // ── CAPABILITY SELECTIONS: Highest priority — tier enables feature but merchant hasn't chosen ──
+
+  {
+    id: 'storefront-type-selection',
+    label: () => 'Select your storefront type',
+    link: (ctx) => `/t/${ctx.tenantId}/settings/storefront-options`,
+    category: 'visibility',
+    priority: 'critical',
+    condition: (ctx) => needsStorefrontTypeSelection(ctx),
+    isDone: (ctx) => !needsStorefrontTypeSelection(ctx),
+    score: () => 120,
+  },
+
+  {
+    id: 'product-type-selection',
+    label: () => 'Select your product type',
+    link: (ctx) => `/t/${ctx.tenantId}/settings/product-options`,
+    category: 'visibility',
+    priority: 'critical',
+    condition: (ctx) => needsProductTypeSelection(ctx),
+    isDone: (ctx) => !needsProductTypeSelection(ctx),
+    score: () => 115,
+  },
+
+  {
+    id: 'fulfillment-method-selection',
+    label: () => 'Choose your fulfillment methods',
+    link: (ctx) => `/t/${ctx.tenantId}/settings/fulfillment`,
+    category: 'commerce',
+    priority: 'critical',
+    condition: (ctx) => needsFulfillmentMethodSelection(ctx),
+    isDone: (ctx) => !needsFulfillmentMethodSelection(ctx),
+    score: () => 110,
+  },
 
   // ── PROFILE: Business identity setup ──
 
@@ -375,8 +428,8 @@ const TASKS: TaskDefinition[] = [
     link: (ctx) => `/t/${ctx.tenantId}/settings/storefront-options`,
     category: 'visibility',
     priority: 'high',
-    condition: (ctx) => hasStorefront(ctx) && !isDiscoveryOrBelow(ctx.tierKey),
-    isDone: (ctx) => hasStorefront(ctx),
+    condition: (ctx) => hasStorefront(ctx) && !isDiscoveryOrBelow(ctx.tierKey) && !needsStorefrontTypeSelection(ctx),
+    isDone: (ctx) => hasStorefront(ctx) && !needsStorefrontTypeSelection(ctx),
     score: () => 78,
   },
 ];

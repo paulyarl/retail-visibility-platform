@@ -88,11 +88,20 @@ function buildStatusItems(
 
   const items: SystemStatusItem[] = [];
 
-  // 1. Store — storefront capability + hours
+  // 1. Store — storefront capability + hours + type selection
   const storefrontEnabled = eff?.storefront.enabled ?? false;
   const storefrontType = eff?.storefront.effective_type ?? 'none';
+  const storefrontNeedsSelection = storefrontEnabled && (eff?.storefront.is_flexible ?? false) && !(eff?.storefront.has_merchant_selection ?? false);
   if (storefrontEnabled) {
-    if (state.locationStatus === 'temporarily_closed') {
+    if (storefrontNeedsSelection) {
+      items.push({
+        key: 'store',
+        label: 'Store',
+        status: 'warning',
+        detail: 'Storefront type selection required',
+        link: `/t/${tenantId}/settings/storefront-options`,
+      });
+    } else if (state.locationStatus === 'temporarily_closed') {
       items.push({
         key: 'store',
         label: 'Store',
@@ -125,6 +134,30 @@ function buildStatusItems(
       detail: 'Storefront disabled',
       link: `/t/${tenantId}/settings`,
     });
+  }
+
+  // 1b. Product type — selection required check
+  const productTypeEnabled = eff?.product_types.enabled ?? false;
+  const productTypeNeedsSelection = productTypeEnabled && (eff?.product_types.is_flexible ?? false) && !(eff?.product_types.has_merchant_selection ?? false);
+  if (productTypeEnabled) {
+    if (productTypeNeedsSelection) {
+      items.push({
+        key: 'product-type',
+        label: 'Product Type',
+        status: 'warning',
+        detail: 'Selection required',
+        link: `/t/${tenantId}/settings/product-types`,
+      });
+    } else {
+      const pt = eff?.product_types.effective_type ?? 'none';
+      items.push({
+        key: 'product-type',
+        label: 'Product Type',
+        status: 'ok',
+        detail: pt !== 'none' && pt !== 'flexible' ? capitalize(pt) : undefined,
+        link: `/t/${tenantId}/settings/product-types`,
+      });
+    }
   }
 
   // 2. Commerce — checkout availability
@@ -165,7 +198,7 @@ function buildStatusItems(
       label: 'Payments',
       status: 'ok',
       detail: effectiveGateways.map(capitalize).join(', '),
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   } else if (pgEnabled && effectiveGateways.length === 0) {
     items.push({
@@ -173,7 +206,7 @@ function buildStatusItems(
       label: 'Payments',
       status: 'warning',
       detail: 'No gateways configured',
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   } else {
     items.push({
@@ -181,11 +214,11 @@ function buildStatusItems(
       label: 'Payments',
       status: isReadOnly ? 'error' : 'inactive',
       detail: 'Not enabled',
-      link: `/t/${tenantId}/settings/payment-gateway`,
+      link: `/t/${tenantId}/settings/payment-gateways`,
     });
   }
 
-  // 4. Fulfillment — effective methods
+  // 4. Fulfillment — effective methods + selection required check
   const fulfillmentEnabled = eff?.fulfillment.enabled ?? false;
   const methods: string[] = [];
   if (eff?.fulfillment.effective_shows_pickup) methods.push('Pickup');
@@ -204,7 +237,7 @@ function buildStatusItems(
       key: 'fulfillment',
       label: 'Fulfillment',
       status: 'warning',
-      detail: 'No methods configured',
+      detail: 'No methods selected',
       link: `/t/${tenantId}/settings/fulfillment`,
     });
   } else {

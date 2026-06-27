@@ -404,10 +404,23 @@ function buildExpiredCapabilitiesResponse(tenant: {
         pickup_ready_time_minutes: 0,
         pickup_instructions: null,
       },
+      product_types: {
+        enabled: false,
+        type: 'none' as const,
+        effective_type: 'none' as const,
+        is_flexible: false,
+        allowed_types: [],
+        has_merchant_selection: false,
+        merchant_preferences: {
+          product_types_enabled: false,
+          selected_product_type: 'none' as const,
+        },
+      },
       product_options: {
         enabled: false,
         allowed_types: [],
         effective_types: [],
+        creation_enabled: false,
         shows_variants: false,
         shows_gallery: false,
         shows_video: false,
@@ -420,8 +433,10 @@ function buildExpiredCapabilitiesResponse(tenant: {
         can_use_layout_classic: false,
         can_use_layout_editorial: false,
         can_use_layout_immersive: false,
+        sections_enabled: false,
         shows_recently_viewed: false,
         shows_qr_codes: false,
+        shows_qr_logo: false,
         shows_recommended: false,
         shows_map_display: false,
         shows_location_display: false,
@@ -431,6 +446,18 @@ function buildExpiredCapabilitiesResponse(tenant: {
         shows_fulfillment: false,
         shows_categories: false,
         shows_location_availability: false,
+        effective_shows_recently_viewed: false,
+        effective_shows_qr_codes: false,
+        effective_shows_qr_logo: false,
+        effective_shows_recommended: false,
+        effective_shows_map_display: false,
+        effective_shows_location_display: false,
+        effective_shows_hours_display: false,
+        effective_shows_enhanced_seo: false,
+        effective_shows_reviews: false,
+        effective_shows_fulfillment: false,
+        effective_shows_categories: false,
+        effective_shows_location_availability: false,
         merchant_preferences: {},
         is_flexible: false,
       },
@@ -646,6 +673,8 @@ function buildExpiredCapabilitiesResponse(tenant: {
         merchant_preferences: {},
       },
     },
+    constraint_violations: [],
+    constraint_status: {},
     uncategorized_features: [],
     purchased_feature_keys: [],
   };
@@ -819,6 +848,43 @@ router.get('/:tenantId/growth-tips', async (req: Request, res: Response) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to resolve growth tips',
+    });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/quick-links
+ *
+ * Returns a tier-and-capability-aware quick links list for the dashboard.
+ * All detection logic runs server-side via EffectiveCapabilityResolver
+ * + business state queries in a single round-trip.
+ */
+router.get('/:tenantId/quick-links', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const { resolveQuickLinks } = await import('../services/QuickLinksService');
+    const links = await resolveQuickLinks(tenantId);
+
+    if (links === null) {
+      return res.status(404).json({
+        success: false,
+        error: 'tenant_not_found',
+        message: 'Tenant not found',
+      });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=30, s-maxage=30');
+    res.json({
+      success: true,
+      data: links,
+    });
+  } catch (error) {
+    console.error('[GET /quick-links] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve quick links',
     });
   }
 });

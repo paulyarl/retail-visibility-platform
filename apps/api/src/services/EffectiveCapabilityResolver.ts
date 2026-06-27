@@ -20,6 +20,7 @@ import {
   resolveStorefrontType,
   resolveFulfillment,
   resolveBarcodeScan,
+  resolveProductType,
   resolveProductOptions,
   resolveFeaturedOptions,
   resolveIntegrationOptions,
@@ -31,6 +32,7 @@ import {
   resolveChatbotOptions,
   resolveOrgOptions,
   resolveSocialCommerceOptions,
+  applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
   EffectiveCapabilities,
@@ -143,6 +145,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.barcode_scan_options?.features || {},
       merchantBundle.barcodeScan
     ),
+    resolveProductType(
+      rawCaps.capabilities.product_types?.features || {},
+      merchantBundle.productType
+    ),
     resolveProductOptions(
       rawCaps.capabilities.product_options?.features || {},
       merchantBundle.productOptions
@@ -206,21 +212,29 @@ export async function resolveEffectiveCapabilities(
       storefront: effective[2],
       fulfillment: effective[3],
       barcode_scan: effective[4],
-      product_options: effective[5],
-      featured: effective[6],
-      integrations: effective[7],
-      quickstart: effective[8],
-      storefront_options: effective[9],
-      directory_entry: effective[10],
-      faq: effective[11],
-      crm: effective[12],
-      chatbot: effective[13],
-      org_options: effective[14],
-      social_commerce_options: effective[15],
+      product_types: effective[5],
+      product_options: effective[6],
+      featured: effective[7],
+      integrations: effective[8],
+      quickstart: effective[9],
+      storefront_options: effective[10],
+      directory_entry: effective[11],
+      faq: effective[12],
+      crm: effective[13],
+      chatbot: effective[14],
+      org_options: effective[15],
+      social_commerce_options: effective[16],
     },
+    constraint_violations: [],
+    constraint_status: {},
     uncategorized_features: rawCaps.uncategorized_features,
     purchased_feature_keys: rawCaps.purchased_feature_keys || [],
   };
+
+  // 5.5. Apply cross-capability constraints (post-resolution pass)
+  const { violations, constraint_status } = await applyCrossCapabilityConstraints(result.effective);
+  result.constraint_violations = violations;
+  result.constraint_status = constraint_status;
 
   // 6. Apply subscription-status-aware capability override
   const internalStatus = deriveInternalStatus({
@@ -475,6 +489,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     paymentGateway,
     storefrontType,
     fulfillment,
+    productType,
     productOptions,
     featuredOptions,
     integrationOptions,
@@ -491,6 +506,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_type_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_fulfillment_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_product_types_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_product_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_featured_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_integration_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -509,6 +525,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     paymentGateway: paymentGateway as any,
     storefrontType: storefrontType as any,
     fulfillment: fulfillment as any,
+    productType: productType as any,
     productOptions: productOptions as any,
     featuredOptions: featuredOptions as any,
     integrationOptions: integrationOptions as any,

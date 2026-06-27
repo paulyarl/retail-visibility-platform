@@ -21,7 +21,8 @@ Phase 1: Define          → canonical-features.ts + tier-hierarchies.ts
 Phase 2: Seed DB         → features_list + capability_features_list + tier_features_list
 Phase 3: Store Prefs     → tenant_*_options_settings table + Prisma schema
 Phase 4: Resolve         → XxxResolver.ts + types.ts + EffectiveCapabilityResolver.ts
-Phase 5: Route           → xxx-options-settings.ts (GET + PUT + tier filtering + cache invalidation)
+Phase 4.5: Constraints   → capability_constraints_list DB table + CapabilityConstraintRegistry.ts fallback (if cross-capability deps)
+Phase 5: Route           → xxx-options-settings.ts (GET + PUT + tier filtering + cache invalidation + constraint validation)
 Phase 6: Map             → UnifiedCapabilityService.ts + CapabilityResolutionService.ts
 Phase 7: Display         → PlanSummaryPanel.tsx + CapabilityShowcase.tsx + settings page
 Phase 8: Verify          → verify-capability-deployment.md checklist + pnpm checkapi/checkweb
@@ -172,6 +173,89 @@ resolveXxxOptions(
 **Special case — BSaaS (purchasable) features**: Use `add-bsaas-feature.md`. The resolver is source-agnostic — purchased features auto-merge into the same `mergedFeatures` map. No resolver changes needed for most BSaaS features.
 
 **Special case — Expired/inactive tenants**: When `resolveEffectiveCapabilities` returns null (tenant exists but has no resolvable tier data), the route handler in `tenant-capabilities.ts` falls back to `buildExpiredCapabilitiesResponse()`. This function MUST include an entry for every capability domain with all fields set to disabled/falsy values. When adding a new capability domain, add it to `buildExpiredCapabilitiesResponse` with a complete disabled object matching the `EffectiveXxx` interface. See R13 in `capability-data-flow-rules.md`.
+
+---
+
+## Phase 4.5: Add Cross-Capability Constraints (If Applicable)
+
+**Skill**: `capability-data-flow-rules.md` (Rules R18-R22)
+
+**When**: Add a constraint when the new capability has a dependency on another capability's type or state (e.g., "service storefront requires service product type"). Skip this phase if no cross-capability dependency exists.
+
+**What**:
+1. Insert a row into the `capability_constraints_list` DB table (via SQL migration or admin API)
+2. Also add a static fallback entry in `CapabilityConstraintRegistry.ts` (used when DB is unavailable)
+3. If the constraint is `block` severity, add write-time validation to the PUT handler (Phase 5)
+
+**Method A: SQL Migration** (recommended for initial seeding):
+```sql
+INSERT INTO capability_constraints_list
+  (constraint_id, type, severity, source_capability, source_field, source_operator, source_value,
+   target_capability, target_field, target_operator, target_value, message, resolution_hint, sort_order)
+VALUES
+  ('my_constraint_id', 'requires', 'block',
+   'my_capability', 'effective_type', 'equals', 'my_type',
+   'other_capability', 'allowed_types', 'includes', 'my_type',
+   'My capability requires Other capability type',
+   'Enable Other capability type or select a different type',
+   10)
+ON CONFLICT (constraint_id) DO NOTHING;
+```
+
+**Method B: Admin API** (for runtime management):
+```bash
+curl -X POST /api/admin/capability-constraints \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "constraint_id": "my_constraint_id",
+    "type": "requires",
+    "severity": "block",
+    "source_capability": "my_capability",
+    "source_field": "effective_type",
+    "source_operator": "equals",
+    "source_value": "my_type",
+    "target_capability": "other_capability",
+    "target_field": "allowed_types",
+    "target_operator": "includes",
+    "target_value": "my_type",
+    "message": "My capability requires Other capability type",
+    "resolution_hint": "Enable Other capability type or select a different type"
+  }'
+```
+
+**Static fallback** in `CapabilityConstraintRegistry.ts`:
+```ts
+export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
+  // ... existing constraints
+  {
+    id: 'my_constraint_id',
+    type: 'requires',
+    severity: 'block',
+    source: { capability: 'my_capability', field: 'effective_type', operator: 'equals', value: 'my_type' },
+    target: { capability: 'other_capability', field: 'allowed_types', operator: 'includes', value: 'my_type' },
+    message: 'My capability requires Other capability type',
+    resolution_hint: 'Enable Other capability type or select a different type',
+  },
+];
+```
+
+**Rules**:
+- R18: Constraints run as a post-resolution pass (Step 5.5 in `EffectiveCapabilityResolver.ts`) — never inside individual resolvers
+- R19: Violations are surfaced in `constraint_violations` + `constraint_status`, not silently applied
+- R20: All constraints MUST be in the DB table — the static array is fallback only
+- R21: Constraints are declarative data, not imperative code
+- R22: PUT handlers with `block` constraints MUST call `await validateProposedChange()` before persisting
+
+**Constraint fields reference**:
+| Field | Description | Valid Values |
+|---|---|---|
+| `type` | Constraint type | `requires`, `recommends`, `excludes`, `implies` |
+| `severity` | Violation severity | `block` (enforced at write-time), `warn` (UI only), `info` (UI only) |
+| `source_capability` | Key in `effective` object | `storefront`, `product_types`, `fulfillment`, etc. |
+| `source_field` | Field on the source capability | `effective_type`, `enabled`, etc. |
+| `source_operator` | Comparison operator | `equals`, `includes`, `not_includes`, `is_true`, `is_false` |
+| `source_value` | Value to compare | String or boolean (stored as text, `true`/`false` for booleans) |
+| `target_*` | Same fields for the target capability | Same as above |
 
 ---
 
@@ -381,6 +465,11 @@ When deploying a capability change, verify ALL of these:
 - [ ] Resolver follows enablement precedence (R17): `*_disabled` > `*_enabled` > `*_flexible` > features
 - [ ] Resolver returns `merchant_preferences` field
 - [ ] Orchestrator passes `merchantBundle.xxx` to resolver
+- [ ] If cross-capability dependency exists: insert constraint into `capability_constraints_list` DB table (R20)
+- [ ] Also add static fallback entry in `CapabilityConstraintRegistry.ts` (used when DB is unavailable)
+- [ ] Constraint is declarative (source target, target target, type, severity) — no imperative logic (R21)
+- [ ] If constraint is `block` severity: add `validateProposedChange()` call to PUT handler (R22)
+- [ ] `validateProposedChange()` call is awaited (async — loads from DB via `getActiveConstraints()`)
 - [ ] API GET returns `{ success, settings, tierState }` with tier-filtered settings
 - [ ] API PUT validates against tier (403 tier_restricted / capability_disabled)
 - [ ] API PUT calls `invalidateEffectiveCapabilities(tenantId)`
@@ -394,5 +483,7 @@ When deploying a capability change, verify ALL of these:
 - [ ] Settings page gates toggles by tier state
 - [ ] Expired/inactive tenant returns 200 with disabled capabilities (not 404) — see R13 in `capability-data-flow-rules.md`
 - [ ] `buildExpiredCapabilitiesResponse` includes the new capability domain with all fields disabled
+- [ ] `buildExpiredCapabilitiesResponse` includes `constraint_violations: []` and `constraint_status: {}`
+- [ ] If adding a cross-capability constraint: insert into `capability_constraints_list` DB table + add static fallback in `CapabilityConstraintRegistry.ts` (R20)
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors

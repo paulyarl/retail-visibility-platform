@@ -224,7 +224,7 @@ export function useStorefrontState({
   const [productOptionFlags] = useState<ProductOptionFlags | null>(
     initialProductOptionFlags ?? null,
   );
-  const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled);
+  const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled) || isServiceStore;
 
   // ---- Social commerce flags ----
   const [socialCommerceFlags] = useState<SocialCommerceFlags | null>(

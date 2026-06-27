@@ -7,7 +7,7 @@
 
 export interface SKUGenerationParams {
   tenantId: string; // Full tenant ID to generate key from
-  productType?: 'physical' | 'digital' | 'hybrid';
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
   deliveryMethod?: 'direct_download' | 'external_link' | 'email_delivery' | 'shipping' | 'pickup' | 'delivery';
   accessControl?: 'personal' | 'commercial' | 'enterprise' | 'public' | 'subscription';
 }
@@ -16,6 +16,7 @@ const PRODUCT_TYPE_CODES: Record<string, string> = {
   physical: 'PHYS',
   digital: 'DIGI',
   hybrid: 'HYBR',
+  service: 'SVC',
 };
 
 const DELIVERY_METHOD_CODES: Record<string, string> = {

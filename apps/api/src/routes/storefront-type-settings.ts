@@ -4,7 +4,8 @@ import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import StorefrontTypeService, { StorefrontType } from '../services/StorefrontTypeService';
-import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { validateProposedChange } from '../services/resolvers';
 import { generateStorefrontTypeSettingsId } from '../lib/id-generator';
 
 const router = Router();
@@ -124,6 +125,25 @@ router.put('/:tenantId/storefront-type', authenticateToken, requireWritableSubsc
         message: `Storefront type '${data.selected_storefront_type}' is not available on your current plan`,
         allowed_types: tierState.allowedTypes,
       });
+    }
+
+    // Cross-capability constraint validation (CCL write-time check, Rule R22)
+    if (data.selected_storefront_type) {
+      const currentCaps = await resolveEffectiveCapabilities(tenantId);
+      if (currentCaps) {
+        const simulated = JSON.parse(JSON.stringify(currentCaps.effective));
+        simulated.storefront.effective_type = data.selected_storefront_type;
+        const blockViolations = await validateProposedChange(simulated);
+        if (blockViolations.length > 0) {
+          return res.status(403).json({
+            success: false,
+            error: 'constraint_violation',
+            message: blockViolations[0].message,
+            resolution_hint: blockViolations[0].resolution_hint,
+            violations: blockViolations,
+          });
+        }
+      }
     }
 
     // Force storefront_type_enabled to false if tier doesn't allow it

@@ -1,7 +1,7 @@
 import { Badge, Card, CardContent, Tooltip } from '@/components/ui';
 import { Button } from '@mantine/core';
 import { Item } from '@/services/itemsDataService';
-import { Copy } from 'lucide-react';
+import { Copy, Wrench } from 'lucide-react';
 import SyncStatusIndicator from './SyncStatusIndicator';
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
 import VariantIndicator from './VariantIndicator';
@@ -145,10 +145,24 @@ export default function ItemsList({
                   </div>
                 )}
                 
-                {/* Stock Status Badge */}
-                <div className={`absolute -bottom-1 -right-1 ${getStockStatus(item.stock).color} text-xs px-1.5 py-0.5 rounded-full font-medium`}>
-                  {getStockStatus(item.stock).label}
-                </div>
+                {/* Stock Status Badge (hidden for services) */}
+                {(() => {
+                  const isSvc = (item as any).productType === 'service' || (item as any).product_type === 'service';
+                  if (isSvc) {
+                    return (
+                      <div className="absolute -bottom-1 -right-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-xs px-1.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                        <Wrench className="w-3 h-3" />
+                        Service
+                      </div>
+                    );
+                  }
+                  const ss = getStockStatus(item.stock);
+                  return (
+                    <div className={`absolute -bottom-1 -right-1 ${ss.color} text-xs px-1.5 py-0.5 rounded-full font-medium`}>
+                      {ss.label}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Details */}
@@ -234,29 +248,34 @@ export default function ItemsList({
                       {item.price && item.price > 0 ? `$${item.price.toFixed(2)}` : ''}
                     </p>
                   </div>
-                  <div>
-                    {onStockUpdate ? (
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs text-neutral-500">Stock</p>
-                        <QuickStockEditor
-                          itemId={item.id}
-                          itemName={item.name}
-                          currentStock={item.stock}
-                          onUpdate={onStockUpdate}
-                          className="text-lg font-semibold"
-                          compact={false}
-                          showStatus={true}
-                        />
-                      </div>
-                    ) : (
+                  {(() => {
+                    const isSvc = (item as any).productType === 'service' || (item as any).product_type === 'service';
+                    if (isSvc) return null;
+                    if (onStockUpdate) {
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <p className="text-xs text-neutral-500">Stock</p>
+                          <QuickStockEditor
+                            itemId={item.id}
+                            itemName={item.name}
+                            currentStock={item.stock}
+                            onUpdate={onStockUpdate}
+                            className="text-lg font-semibold"
+                            compact={false}
+                            showStatus={true}
+                          />
+                        </div>
+                      );
+                    }
+                    return (
                       <>
                         <p className="text-xs text-neutral-500">Stock</p>
                         <p className={`text-lg font-semibold ${item.stock < 10 ? 'text-warning' : 'text-success'}`}>
                           {item.stock}
                         </p>
                       </>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Variant Information */}

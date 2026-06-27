@@ -12,6 +12,7 @@ export type {
   StorefrontState,
   BarcodeScanState,
   FulfillmentState,
+  ProductTypeState,
   ProductOptionsState,
   FeaturedOptionsState,
   IntegrationOptionsState,

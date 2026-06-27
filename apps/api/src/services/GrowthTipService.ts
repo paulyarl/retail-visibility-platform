@@ -985,7 +985,7 @@ async function fetchBusinessState(tenantId: string): Promise<TipContext['busines
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
 
-  const reopeningDate = tenant?.reopening_date ?? null;
+  const reopeningDate = tenant?.reopening_date ? new Date(tenant.reopening_date).toISOString() : null;
 
   return {
     hasProducts: totalItems > 0,

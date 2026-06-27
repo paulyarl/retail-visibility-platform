@@ -35,7 +35,7 @@ interface BasicInfoStepProps {
   };
   errors: Record<string, string>;
   onChange: (data: any) => void;
-  productType?: 'physical' | 'digital' | 'hybrid';
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
 }
 
 export default function BasicInfoStep({ data, errors, onChange, productType = 'physical' }: BasicInfoStepProps) {

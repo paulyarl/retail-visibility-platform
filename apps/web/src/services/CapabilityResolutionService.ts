@@ -231,12 +231,36 @@ export interface FeaturedOptionsState {
 export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
 export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
 
+// --- Product Types ---
+
+export interface ProductTypeState {
+  enabled: boolean;
+  /** Type determined by tier features (physical/digital/hybrid/service/flexible/none) */
+  type: ProductType | 'flexible' | 'none';
+  /** Type effectively used after applying merchant preferences */
+  effectiveType: ProductType | 'flexible' | 'none';
+  isFlexible: boolean;
+  /** Which individual product types are allowed by the tier */
+  allowedTypes: ProductType[];
+  /** Whether the merchant has selected a specific type when multiple are available */
+  hasMerchantSelection: boolean;
+  /** Merchant preference for product type */
+  merchantPreferences: {
+    product_types_enabled: boolean;
+    selected_product_type: ProductType | 'none';
+  };
+  /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
 export interface ProductOptionsState {
   enabled: boolean;
   /** Available product types based on capability features (tier-allowed, hard gate) */
   allowedTypes: ProductType[];
   /** Product types effectively enabled after applying merchant preferences (tier allows AND merchant enabled) */
   effectiveTypes: ProductType[];
+  /** Creation group enabled */
+  creationEnabled: boolean;
   /** Whether variants are available during creation (tier-allowed) */
   showsVariants: boolean;
   /** Whether image gallery is available during creation (tier-allowed) */
@@ -274,6 +298,8 @@ export interface ProductOptionsState {
   showsFulfillment: boolean;
   showsCategories: boolean;
   showsLocationAvailability: boolean;
+  /** Sections group enabled */
+  sectionsEnabled: boolean;
   /** Effective section gates after applying merchant preferences */
   effectiveShowsRecentlyViewed: boolean;
   effectiveShowsQRCodes: boolean;
@@ -844,6 +870,29 @@ export interface SubscriptionContextState {
   writable: boolean;
 }
 
+export type ConstraintType = 'requires' | 'recommends' | 'excludes' | 'implies';
+export type ConstraintSeverity = 'block' | 'warn' | 'info';
+
+export interface ConstraintViolationState {
+  constraintId: string;
+  type: ConstraintType;
+  severity: ConstraintSeverity;
+  sourceCapability: string;
+  sourceType: string;
+  targetCapability: string;
+  targetType: string;
+  message: string;
+  resolutionHint: string;
+}
+
+export interface ConstraintStatusState {
+  blockedTypes: string[];
+  warningTypes: string[];
+  activeViolations: string[];
+}
+
+export type ConstraintStatusMapState = Record<string, ConstraintStatusState>;
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -854,6 +903,7 @@ export interface AllCapabilitiesState {
   storefront: StorefrontState;
   barcodeScan: BarcodeScanState;
   fulfillment: FulfillmentState;
+  productType: ProductTypeState;
   productOptions: ProductOptionsState;
   featuredOptions: FeaturedOptionsState;
   integrationOptions: IntegrationOptionsState;
@@ -864,6 +914,8 @@ export interface AllCapabilitiesState {
   crmOptions: CrmOptionsState;
   chatbotOptions: ChatbotOptionsState;
   socialCommerceOptions: SocialCommerceOptionsState;
+  constraintViolations: ConstraintViolationState[];
+  constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
 }
 
@@ -877,6 +929,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
   fulfillment_: 'fulfillment_options',
+  product_types_: 'product_types',
+  product_options_: 'product_options',
   product_: 'product_options',
   featured_: 'featured_options',
   integration_: 'integration_options',
@@ -1149,6 +1203,93 @@ export function resolveFulfillmentState(
 }
 
 /**
+ * Resolve product type state from raw capability features
+ */
+export function resolveProductTypeState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    product_types_enabled?: boolean;
+    selected_product_type?: string | null;
+  } | null
+): ProductTypeState {
+  const masterActivate = !!features.product_types_enabled;
+  const masterDeactivate = !!features.product_types_disabled;
+  const flexible = !!features.product_types_flexible;
+  const physical = !!features.product_types_physical;
+  const digital = !!features.product_types_digital;
+  const hybrid = !!features.product_types_hybrid;
+  const service = !!features.product_types_service;
+
+  const hasAnyFeatureGate = physical || digital || hybrid || service;
+
+  // R17: disabled > enabled > flexible > features
+  const isEnabled = masterDeactivate
+    ? false
+    : masterActivate
+      ? true
+      : hasAnyFeatureGate;
+
+  // Determine type from feature gates
+  let type: ProductType | 'flexible' | 'none' = 'none';
+  if (!isEnabled) {
+    type = 'none';
+  } else if (flexible || (physical && digital) || (physical && hybrid) || (physical && service) || (digital && hybrid) || (digital && service) || (hybrid && service)) {
+    type = 'flexible';
+  } else if (physical) {
+    type = 'physical';
+  } else if (digital) {
+    type = 'digital';
+  } else if (hybrid) {
+    type = 'hybrid';
+  } else if (service) {
+    type = 'service';
+  }
+
+  // Compute allowed types from actual feature gates
+  const allowedTypes: ProductType[] = [];
+  if (isEnabled) {
+    if (flexible) {
+      allowedTypes.push('physical', 'digital', 'hybrid', 'service');
+    } else {
+      if (physical) allowedTypes.push('physical');
+      if (digital) allowedTypes.push('digital');
+      if (hybrid) allowedTypes.push('hybrid');
+      if (service) allowedTypes.push('service');
+    }
+  }
+
+  // Merchant preferences
+  const prefs = {
+    product_types_enabled: merchantPrefs?.product_types_enabled !== false,
+    selected_product_type: (merchantPrefs?.selected_product_type as ProductType | 'none') || 'none',
+  };
+
+  // Compute effective type
+  let effectiveType: ProductType | 'flexible' | 'none' = type;
+  let hasMerchantSelection = false;
+
+  if (type === 'flexible' && prefs.product_types_enabled) {
+    if (prefs.selected_product_type !== 'none' && allowedTypes.includes(prefs.selected_product_type)) {
+      effectiveType = prefs.selected_product_type;
+      hasMerchantSelection = true;
+    }
+  } else if (!prefs.product_types_enabled) {
+    effectiveType = 'none';
+  }
+
+  return {
+    enabled: isEnabled,
+    type,
+    effectiveType,
+    isFlexible: flexible,
+    allowedTypes,
+    hasMerchantSelection,
+    merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
  * Resolve product options state from raw capability features
  */
 export function resolveProductOptionsState(
@@ -1176,16 +1317,19 @@ export function resolveProductOptionsState(
     product_opt_location_availability?: boolean;
   } | null
 ): ProductOptionsState {
-  const enabled = !!features.product_enabled;
-  const disabled = !!features.product_disabled;
-  const flexible = !!features.product_flexible;
-  const physical = !!features.product_physical;
-  const digital = !!features.product_digital;
-  const hybrid = !!features.product_hybrid;
-  const service = !!features.product_service;
-  const variant = !!features.product_variant;
-  const gallery = !!features.product_gallery;
-  const video = !!features.product_video;
+  const enabled = !!features.product_options_enabled || !!features.product_enabled;
+  const disabled = !!features.product_options_disabled || !!features.product_disabled;
+  const flexible = !!features.product_options_flexible || !!features.product_flexible;
+  // Legacy type fields kept for backward compat (types now resolved by resolveProductTypeState)
+  const physical = !!features.product_options_physical || !!features.product_physical;
+  const digital = !!features.product_options_digital || !!features.product_digital;
+  const hybrid = !!features.product_options_hybrid || !!features.product_hybrid;
+  const service = !!features.product_options_service || !!features.product_service;
+  // Creation group gates
+  const creationGroupEnabled = !!features.product_options_creation_enabled || flexible;
+  const variant = !!features.product_options_variants || !!features.product_variant;
+  const gallery = !!features.product_options_gallery || !!features.product_gallery;
+  const video = !!features.product_options_video || !!features.product_video;
 
   // If flexible, all options are available regardless of individual flags
   const allowedTypes: ProductType[] = [];
@@ -1194,29 +1338,32 @@ export function resolveProductOptionsState(
   if (flexible || hybrid) allowedTypes.push('hybrid');
   if (flexible || service) allowedTypes.push('service');
 
-  // Product page layout feature gates
-  const layoutClassic = !!features.product_layout_classic;
-  const layoutEditorial = !!features.product_layout_editorial;
-  const layoutImmersive = !!features.product_layout_immersive;
+  // Product page layout feature gates (canonical + legacy fallback)
+  const layoutClassic = !!features.product_options_layout_classic || !!features.product_layout_classic;
+  const layoutEditorial = !!features.product_options_layout_editorial || !!features.product_layout_editorial;
+  const layoutImmersive = !!features.product_options_layout_immersive || !!features.product_layout_immersive;
 
   const allowedLayouts: ProductLayoutType[] = [];
   if (flexible || layoutClassic) allowedLayouts.push('classic');
   if (flexible || layoutEditorial) allowedLayouts.push('editorial');
   if (flexible || layoutImmersive) allowedLayouts.push('immersive');
 
-  // Product page section feature gates
-  const showsRecentlyViewed = flexible || !!features.product_opt_recently_viewed;
-  const showsQRCodes = flexible || !!features.product_opt_qr_codes;
-  const showsQRLogo = flexible || !!features.product_opt_qr_logo;
-  const showsRecommended = flexible || !!features.product_opt_recommended;
-  const showsMapDisplay = flexible || !!features.product_opt_map_display;
-  const showsLocationDisplay = flexible || !!features.product_opt_location_display;
-  const showsHoursDisplay = flexible || !!features.product_opt_hours_display;
-  const showsEnhancedSEO = flexible || !!features.product_opt_enhanced_seo;
-  const showsReviews = flexible || !!features.product_opt_reviews;
-  const showsFulfillment = flexible || !!features.product_opt_fulfillment;
-  const showsCategories = flexible || !!features.product_opt_categories;
-  const showsLocationAvailability = flexible || !!features.product_opt_location_availability;
+  // Sections group gate
+  const sectionsGroupEnabled = !!features.product_options_sections_enabled || flexible;
+
+  // Product page section feature gates (canonical + legacy fallback)
+  const showsRecentlyViewed = sectionsGroupEnabled && (flexible || !!features.product_options_recently_viewed || !!features.product_opt_recently_viewed);
+  const showsQRCodes = sectionsGroupEnabled && (flexible || !!features.product_options_qr_codes || !!features.product_opt_qr_codes);
+  const showsQRLogo = sectionsGroupEnabled && (flexible || !!features.product_options_qr_logo || !!features.product_opt_qr_logo);
+  const showsRecommended = sectionsGroupEnabled && (flexible || !!features.product_options_recommended || !!features.product_opt_recommended);
+  const showsMapDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_map_display || !!features.product_opt_map_display);
+  const showsLocationDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_location_display || !!features.product_opt_location_display);
+  const showsHoursDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_hours_display || !!features.product_opt_hours_display);
+  const showsEnhancedSEO = sectionsGroupEnabled && (flexible || !!features.product_options_enhanced_seo || !!features.product_opt_enhanced_seo);
+  const showsReviews = sectionsGroupEnabled && (flexible || !!features.product_options_reviews || !!features.product_opt_reviews);
+  const showsFulfillment = sectionsGroupEnabled && (flexible || !!features.product_options_fulfillment || !!features.product_opt_fulfillment);
+  const showsCategories = sectionsGroupEnabled && (flexible || !!features.product_options_categories || !!features.product_opt_categories);
+  const showsLocationAvailability = sectionsGroupEnabled && (flexible || !!features.product_options_location_availability || !!features.product_opt_location_availability);
 
   // Merchant preferences (soft toggle, defaults to true if not set)
   const prefs = {
@@ -1273,9 +1420,10 @@ export function resolveProductOptionsState(
     enabled: enabled && !disabled,
     allowedTypes,
     effectiveTypes,
-    showsVariants: flexible || variant,
-    showsGallery: flexible || gallery,
-    showsVideo: flexible || video,
+    creationEnabled: creationGroupEnabled,
+    showsVariants: creationGroupEnabled && (flexible || variant),
+    showsGallery: creationGroupEnabled && (flexible || gallery),
+    showsVideo: creationGroupEnabled && (flexible || video),
     effectiveShowsVariants,
     effectiveShowsGallery,
     effectiveShowsVideo,
@@ -1297,6 +1445,7 @@ export function resolveProductOptionsState(
     showsFulfillment,
     showsCategories,
     showsLocationAvailability,
+    sectionsEnabled: sectionsGroupEnabled,
     effectiveShowsRecentlyViewed,
     effectiveShowsQRCodes,
     effectiveShowsQRLogo,
