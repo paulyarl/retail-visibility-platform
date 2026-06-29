@@ -64,6 +64,7 @@ export interface FeaturedType {
   maxProducts: number;
   isMerchantControlled?: boolean;
   isPayToPlay?: boolean;
+  requiresTenantAccess?: boolean;
 }
 
 export interface FeaturedProductsState {
@@ -205,7 +206,8 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       icon: null,
       color: 'indigo',
       maxProducts: 8,
-      isPayToPlay: true
+      isPayToPlay: true,
+      requiresTenantAccess: true
     }
   ];
 

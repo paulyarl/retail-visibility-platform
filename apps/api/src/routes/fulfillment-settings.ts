@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = Router();
 
@@ -204,6 +205,9 @@ router.put('/:tenantId/fulfillment-settings', authenticateToken, async (req, res
     }
 
     invalidateEffectiveCapabilities(tenantId);
+
+    // Refresh fulfillment embeddings (fire-and-forget)
+    BotKnowledgeEmbeddingService.getInstance().refreshFulfillmentEmbeddings(tenantId).catch(() => {});
 
     res.json({
       success: true,

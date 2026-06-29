@@ -18,6 +18,7 @@ import {
   Download
 } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
+import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
 
 interface OrderDetails {
   orderId: string;
@@ -59,6 +60,9 @@ interface OrderDetails {
     quantity: number;
     unitPrice: number;
     imageUrl: string | null;
+    productType?: 'physical' | 'digital' | 'hybrid' | 'service';
+    digitalDeliveryStatus?: string;
+    digitalDeliveredAt?: string;
   }>;
   itemCount: number;
   refunds?: Array<{
@@ -102,6 +106,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [digitalDownloads, setDigitalDownloads] = useState<any[]>([]);
   const [loadingDownloads, setLoadingDownloads] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -151,14 +158,28 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
       const downloads = await customerOrderService.getOrderDownloads(order.orderId);
       
       if (downloads && downloads.length > 0) {
-        // Open the first download link in a new window
-        const downloadUrl = downloads[0].url || `/api/download/${accessToken}`;
-        window.open(downloadUrl, '_blank');
+        const downloadUrl = downloads[0].url;
+        if (downloadUrl) {
+          window.open(downloadUrl, '_blank');
+        } else {
+          setDownloading(true);
+          setDownloadError(null);
+          setDownloadProgress(0);
+          await publicDownloadService.validateAndDownloadWithProgress(
+            accessToken,
+            downloads[0].productName || undefined,
+            (prog) => setDownloadProgress(prog)
+          );
+        }
       } else {
         console.error('No downloads available for this order');
       }
     } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Download failed';
+      setDownloadError(msg);
       console.error('Failed to get order downloads:', error);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -394,6 +415,24 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {downloadError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                      {downloadError}
+                    </div>
+                  )}
+                  {downloading && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Downloading... {Math.round(downloadProgress)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${downloadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   {digitalDownloads.map((download: any) => {
                     const daysRemaining = getDaysRemaining(download.expiresAt);
                     const isExpiringSoon = daysRemaining !== null && daysRemaining <= 7;

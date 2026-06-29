@@ -42,9 +42,13 @@ import OrgEmployeeDistribution from "./OrgEmployeeDistribution";
 import OrgLockedTab from "./OrgLockedTab";
 import OrgPlanSummaryPanel from "./OrgPlanSummaryPanel";
 import OrgCapabilityRollup from "./OrgCapabilityRollup";
+import OrgProductMixCard from "./OrgProductMixCard";
+import OrgProductTypeRollup from "./OrgProductTypeRollup";
 import OrgBotStatusCard from "./OrgBotStatusCard";
 import OrgBotWidget from "./OrgBotWidget";
 import { useOrgCapabilityRollup } from "@/hooks/organization/useOrgCapabilityRollup";
+import { useOrgProductTypeRollup } from "@/hooks/organization/useOrgProductTypeRollup";
+import { useOrgProductMix } from "@/hooks/organization/useOrgProductMix";
 import { useOrgBotStatus } from "@/hooks/organization/useOrgBotStatus";
 
 const TABS: TabDef[] = [
@@ -108,6 +112,12 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
 
   // Capability rollup across all locations
   const { data: rollupData, isLoading: rollupLoading } = useOrgCapabilityRollup(organizationId);
+
+  // Product type rollup across all locations
+  const { data: productTypeRollupData, isLoading: productTypeRollupLoading } = useOrgProductTypeRollup(organizationId);
+
+  // Product mix across all locations
+  const { data: productMixData, isLoading: productMixLoading } = useOrgProductMix(organizationId);
 
   // Bot status across all locations
   const { data: botStatusData, isLoading: botStatusLoading } = useOrgBotStatus(organizationId);
@@ -258,6 +268,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
           <div className="space-y-6">
             <OrgHeroLocationBanner heroLocation={heroLocation} onChangeHero={() => setShowHeroModal(true)} />
             <OrgKpiGrid billingCounters={billingCounters} orgData={orgData} />
+            <OrgProductMixCard data={productMixData} loading={productMixLoading} />
             <OrgQuickActionsBar
               organizationId={organizationId}
               heroLocation={heroLocation}
@@ -273,6 +284,8 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                     orgData={orgData}
                     heroLocation={heroLocation}
                     onNavigate={setActiveTab}
+                    productTypeRollup={productTypeRollupData}
+                    productMix={productMixData}
                   />
                 )}
                 <OrgBillingCard billingCounters={billingCounters} />
@@ -321,6 +334,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
             currentPage={currentPage}
             locationsPerPage={5}
             onPageChange={setCurrentPage}
+            productMix={productMixData}
           />
         )}
 
@@ -336,6 +350,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               categorySyncResult={categorySyncResult}
               onSyncFromHero={() => setShowConfirmSync(true)}
               onOpenCategorySync={() => setShowCategorySyncModal(true)}
+              productTypeRollup={productTypeRollupData}
             />
           </ProtectedCard>
         )}
@@ -352,6 +367,10 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               data={rollupData}
               loading={rollupLoading}
             />
+            <OrgProductTypeRollup
+              data={productTypeRollupData}
+              loading={productTypeRollupLoading}
+            />
             <OrgBotStatusCard
               data={botStatusData}
               loading={botStatusLoading}
@@ -362,6 +381,8 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                 orgData={orgData}
                 heroLocation={heroLocation}
                 onNavigate={setActiveTab}
+                productTypeRollup={productTypeRollupData}
+                productMix={productMixData}
               />
               <OrgCrmSummaryCard
                 organizationId={organizationId}

@@ -28,6 +28,7 @@ export interface DiscoveryQuery {
     timezone?: string;
     offset?: number;
   };
+  badgeWeighted?: boolean;
 }
 
 export interface DiscoveryResult {
@@ -110,6 +111,11 @@ export class DiscoveryService {
         break;
       default:
         throw new Error(`Invalid bucket type: ${bucketType}`);
+    }
+
+    // Apply badge-weighted re-sort if requested
+    if (query.badgeWeighted) {
+      products = this.applyBadgeWeightedSort(products);
     }
 
     const result: DiscoveryResult = {
@@ -1414,6 +1420,29 @@ export class DiscoveryService {
     return result.rows.map(row => this.transformDiscoveryProduct(row));
   }
 
+  /**
+   * Re-sort products to boost those with active badges.
+   * Products with badges rank higher; within badged products, higher featured_priority wins.
+   * Non-badged products retain their original relative order after badged ones.
+   */
+  private applyBadgeWeightedSort(products: any[]): any[] {
+    const badgeScore = (p: any): number => {
+      if (!p.isActivelyFeatured && !p.featuredType) return 0;
+      const priority = p.featuredPriority ?? 0;
+      const hasBadge = p.featuredType ? 1 : 0;
+      return hasBadge * 1000 + priority;
+    };
+
+    // Stable sort: preserve original order for equal scores
+    return products
+      .map((p, originalIndex) => ({ p, originalIndex, score: badgeScore(p) }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.originalIndex - b.originalIndex;
+      })
+      .map(entry => entry.p);
+  }
+
   private addScopeConditions(conditions: string[], params: any[], query: DiscoveryQuery): void {
     let paramIndex = params.length;
 
@@ -1535,7 +1564,8 @@ export class DiscoveryService {
       `sort:${query.sortBy || 'priority'}-${query.sortOrder || 'desc'}`,
       `location:${JSON.stringify(query.location || {})}`,
       `category:${JSON.stringify(query.category || {})}`,
-      `timezone:${JSON.stringify(query.timezone || {})}`
+      `timezone:${JSON.stringify(query.timezone || {})}`,
+      `badgeWeighted:${query.badgeWeighted || false}`
     ];
     return keyParts.join('|');
   }

@@ -1279,3 +1279,32 @@ export function generateBadgeEventId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `bdge-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate service booking ID
+ * Format: booking-{nanoid} (16 chars)
+ */
+export function generateBookingId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `booking-${nanoid()}`;
+}
+
+/**
+ * Generate featured placement purchase ID
+ * Format: fpp-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePlacementPurchaseId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fpp-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate featured placement catalog ID
+ * Format: fpc-{nanoid} (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generatePlacementCatalogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fpc-${nanoid()}`;
+}

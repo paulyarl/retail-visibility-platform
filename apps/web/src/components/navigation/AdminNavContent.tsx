@@ -13,6 +13,7 @@ import { getIconComponent } from './NavItemRow';
 import { type NavLink, type DynamicTemplate } from '@/services/NavigationLinksService';
 import { type ProcessedNavLink } from '@/hooks/useNavLinks';
 import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
+import { SidebarAuthButton } from '@/components/navigation/SidebarAuthButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -578,11 +579,12 @@ function SidebarContent({
       </nav>
 
       {/* Footer */}
-      {!collapsed && (
-        <div className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800">
-          <p className="text-xs text-neutral-400">Platform Administration</p>
-        </div>
-      )}
+      <div className="px-2 py-3 border-t border-neutral-100 dark:border-neutral-800">
+        <SidebarAuthButton collapsed={collapsed} />
+        {!collapsed && (
+          <p className="text-xs text-neutral-400 mt-2 px-3">Platform Administration</p>
+        )}
+      </div>
     </div>
   );
 }

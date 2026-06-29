@@ -77,12 +77,16 @@ class BotProductCatalogService {
       limit?: number;
       badge?: ProductBadge;
       inStockOnly?: boolean;
+      productTypes?: string[];
     }
   ): Promise<BotProductSearchResult> {
     const limit = Math.min(options?.limit || 5, 20);
     const searchPattern = `%${query.toLowerCase()}%`;
     const badgeArray = options?.badge ? JSON.stringify([options.badge]) : null;
     const inStockOnly = options?.inStockOnly ?? true;
+    const productTypes = options?.productTypes && options.productTypes.length > 0
+      ? options.productTypes
+      : null;
 
     const results = await prisma.$queryRaw<any[]>`
       SELECT
@@ -124,6 +128,7 @@ class BotProductCatalogService {
         )
         AND (${badgeArray}::jsonb IS NULL OR featured_type_array @> ${badgeArray}::jsonb)
         AND (${inStockOnly} = false OR stock_status IN ('in_stock', 'low_stock'))
+        AND (${productTypes} IS NULL OR product_type = ANY(${productTypes}))
       ORDER BY
         CASE
           WHEN LOWER(product_name) LIKE ${searchPattern} THEN 1
@@ -332,6 +337,55 @@ class BotProductCatalogService {
       name: r.product_category,
       productCount: parseInt(r.product_count),
     }));
+  }
+
+  /**
+   * Detect badge intent from a natural language query.
+   * Maps phrases like "what's on sale?", "show me new arrivals", "any clearance items?"
+   * to the corresponding ProductBadge type.
+   */
+  detectBadgeIntent(query: string): ProductBadge | null {
+    const q = query.toLowerCase().trim();
+
+    const intentMap: { patterns: string[]; badge: ProductBadge }[] = [
+      { patterns: ['sale', 'on sale', 'discount', 'deal', 'deals', 'markdown', 'clearance sale'], badge: 'sale' },
+      { patterns: ['new arrival', 'new arrivals', 'new product', 'new items', 'just in', 'newly added', 'new stock'], badge: 'new_arrival' },
+      { patterns: ['clearance', 'closeout', 'final sale', 'while supplies last', 'liquidation'], badge: 'clearance' },
+      { patterns: ['seasonal', 'holiday', 'christmas', 'thanksgiving', 'halloween', 'easter', 'summer', 'winter', 'spring', 'fall'], badge: 'seasonal' },
+      { patterns: ['staff pick', 'staff picks', 'staff favorite', 'recommended by staff', 'our pick', 'our picks'], badge: 'staff_pick' },
+      { patterns: ['trending', 'popular right now', 'hot right now', 'gaining popularity', 'buzz', 'viral'], badge: 'trending' },
+      { patterns: ['bestseller', 'best seller', 'best-selling', 'top seller', 'top selling', 'most sold', 'most popular'], badge: 'bestseller' },
+      { patterns: ['featured', 'spotlight', 'highlighted', 'showcase'], badge: 'featured' },
+      { patterns: ['store selection', 'store pick', 'curated', 'hand-picked', 'hand picked', 'our selection'], badge: 'store_selection' },
+      { patterns: ['recommended', 'recommendation', 'for you', 'suggested', 'you might like'], badge: 'recommended' },
+    ];
+
+    for (const entry of intentMap) {
+      for (const pattern of entry.patterns) {
+        if (q.includes(pattern)) {
+          return entry.badge;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Handle a natural language badge query.
+   * Detects badge intent and returns matching products.
+   * If no badge intent is detected, returns null.
+   */
+  async handleBadgeQuery(
+    tenantId: string,
+    query: string,
+    limit: number = 5
+  ): Promise<{ badge: ProductBadge; products: BotProductSummary[] } | null> {
+    const badge = this.detectBadgeIntent(query);
+    if (!badge) return null;
+
+    const products = await this.getProductsByBadge(tenantId, badge, limit);
+    return { badge, products };
   }
 
   /**

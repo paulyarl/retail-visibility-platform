@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
-import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useQuickstartOptionsCapability, useProductTypeCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Button } from '@mantine/core';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -96,6 +96,7 @@ export default function QuickStartPage() {
     { id: 'hardware_tools', name: 'Hardware & Tools', categoryCount: 5, sampleProductCount: 18 },
     { id: 'furniture', name: 'Furniture', categoryCount: 5, sampleProductCount: 15 },
     { id: 'restaurant', name: 'Restaurant', categoryCount: 4, sampleProductCount: 20 },
+    { id: 'service_business', name: 'Service Business', categoryCount: 4, sampleProductCount: 16 },
     { id: 'general', name: 'General Store', categoryCount: 6, sampleProductCount: 20 },
   ];
 
@@ -108,6 +109,11 @@ export default function QuickStartPage() {
   // Default to first available AI model based on capability
   const [textModel, setTextModel] = useState<'openai' | 'google' | 'anthropic' | 'mistral'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
   const [imageModel, setImageModel] = useState<'openai' | 'google'>(canUseOpenAI ? 'openai' : canUseGemini ? 'google' : 'openai');
+  const [productType, setProductType] = useState<'physical' | 'digital' | 'hybrid' | 'service'>('physical');
+
+  // Product type capability
+  const productTypeCap = useProductTypeCapability(tenantId);
+  const allowedProductTypes = productTypeCap.data?.allowedTypes ?? ['physical'];
   
   // Check if any Google model is selected (for warning display)
   const usesGoogle = textModel === 'google' || (generateImages && imageModel === 'google');
@@ -122,6 +128,10 @@ export default function QuickStartPage() {
     const scenario = scenarios.find(s => s.id === scenarioId);
     if (scenario) {
       setProductCount(scenario.sampleProductCount);
+    }
+    // Auto-force service product type for service_business scenario
+    if (scenarioId === 'service_business') {
+      setProductType('service');
     }
   };
 
@@ -158,6 +168,7 @@ export default function QuickStartPage() {
         imageQuality,
         textModel,
         imageModel,
+        productType,
       });
 
       if (!data) {
@@ -558,6 +569,42 @@ export default function QuickStartPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Product Type Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              What type of products do you sell?
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {([
+                { value: 'physical', label: '📦 Physical', sub: 'Shipped items' },
+                { value: 'digital', label: '💾 Digital', sub: 'Downloadable' },
+                { value: 'hybrid', label: '🔀 Hybrid', sub: 'Physical + digital' },
+                { value: 'service', label: '🛎️ Service', sub: 'Bookable services' },
+              ] as { value: 'physical' | 'digital' | 'hybrid' | 'service'; label: string; sub: string }[])
+                .filter(t => allowedProductTypes.includes(t.value as any))
+                .map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => setProductType(t.value)}
+                    disabled={selectedScenario === 'service_business' && t.value !== 'service'}
+                    className={`p-4 rounded-lg border-2 transition-all text-center ${
+                      productType === t.value
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    } ${selectedScenario === 'service_business' && t.value !== 'service' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white">{t.label}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t.sub}</div>
+                  </button>
+                ))}
+            </div>
+            {allowedProductTypes.length < 4 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Your plan allows: {allowedProductTypes.join(', ')}. Upgrade to unlock more types.
+              </p>
+            )}
           </div>
 
           {/* Product Count Slider */}

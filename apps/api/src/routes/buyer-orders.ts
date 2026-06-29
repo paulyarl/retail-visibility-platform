@@ -53,6 +53,7 @@ router.get('/buyer', async (req, res) => {
                 name: true,
                 sku: true,
                 image_url: true,
+                product_type: true,
               },
             },
           },
@@ -161,6 +162,8 @@ router.get('/buyer', async (req, res) => {
             quantity: item.quantity,
             unitPrice: item.unit_price_cents,
             imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+            productType: item.product_type || item.inventory_items?.product_type || 'physical',
+            digitalDeliveryStatus: item.digital_delivery_status || undefined,
           };
         }),
         itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
@@ -250,7 +253,7 @@ router.get('/customer/:email', async (req, res) => {
           order_items: {
             include: {
               inventory_items: {
-                select: { name: true, sku: true, image_url: true },
+                select: { name: true, sku: true, image_url: true, product_type: true },
               },
             },
           },
@@ -335,6 +338,8 @@ router.get('/customer/:email', async (req, res) => {
             quantity: item.quantity,
             unitPrice: item.unit_price_cents,
             imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+            productType: item.product_type || item.inventory_items?.product_type || 'physical',
+            digitalDeliveryStatus: item.digital_delivery_status || undefined,
           };
         }),
         itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
@@ -394,6 +399,7 @@ router.get('/:orderId', async (req, res) => {
                 name: true,
                 sku: true,
                 image_url: true,
+                product_type: true,
               },
             },
           },
@@ -528,6 +534,9 @@ router.get('/:orderId', async (req, res) => {
           quantity: item.quantity,
           unitPrice: item.unit_price_cents,
           imageUrl: variant?.image_url || item.inventory_items?.image_url || item.image_url || null,
+          productType: item.product_type || item.inventory_items?.product_type || 'physical',
+          digitalDeliveryStatus: item.digital_delivery_status || undefined,
+          digitalDeliveredAt: item.digital_delivered_at || undefined,
         };
       }),
       itemCount: order.order_items.reduce((sum: number, item) => sum + item.quantity, 0),
@@ -691,6 +700,14 @@ router.patch('/:orderId/pickup', async (req, res) => {
       trackingUrl: orderShipment?.tracking_url || undefined,
     }).catch((err: any) => console.error('[Buyer Orders] Failed to send fulfillment notification:', err));
 
+    // B7.4: Check hybrid fulfillment completion after customer confirms physical fulfillment
+    try {
+      const { hybridFulfillmentCoordinator } = await import('../services/HybridFulfillmentCoordinator');
+      await hybridFulfillmentCoordinator.checkHybridFulfillmentComplete(orderId);
+    } catch (hybridError) {
+      console.error('[Buyer Orders] Hybrid fulfillment check failed:', hybridError);
+    }
+
     res.json({
       success: true,
       message: 'Order marked as picked up',
@@ -806,6 +823,28 @@ router.patch('/:orderId/cancel', async (req, res) => {
       // Don't fail the cancellation if stock restoration fails
     }
 
+    // Revoke digital access grants for cancelled orders
+    try {
+      const revokedCount = await prisma.digital_access_grants.updateMany({
+        where: {
+          order_id: orderId,
+          status: 'active',
+        },
+        data: {
+          status: 'revoked',
+          revoked_at: new Date(),
+          revoked_reason: 'Order cancelled by buyer',
+          updated_at: new Date(),
+        },
+      });
+      if (revokedCount.count > 0) {
+        console.log(`[Buyer Orders] Revoked ${revokedCount.count} digital access grants for cancelled order: ${orderId}`);
+      }
+    } catch (digitalError) {
+      console.error(`[Buyer Orders] Failed to revoke digital access for cancelled order ${orderId}:`, digitalError);
+      // Don't fail the cancellation if digital revocation fails
+    }
+
     // Send order cancelled notification (async, don't wait) 
     getOrderNotificationService().notifyOrderCancelled({
       tenantId: order.tenant_id,
@@ -866,6 +905,119 @@ router.patch('/:orderId/cancel', async (req, res) => {
       success: false,
       error: 'cancel_failed',
       message: 'Failed to cancel order',
+    });
+  }
+});
+
+// Get digital downloads for a customer by email
+// api/orders/downloads/:email
+router.get('/downloads/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const grants = await prisma.digital_access_grants.findMany({
+      where: {
+        customer_email: email.toLowerCase(),
+        status: 'active',
+      },
+      include: {
+        inventory_items: {
+          select: {
+            name: true,
+            sku: true,
+            image_url: true,
+          },
+        },
+        orders: {
+          select: {
+            id: true,
+            order_number: true,
+            created_at: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    const downloads = grants.map(grant => ({
+      grantId: grant.id,
+      orderId: grant.order_id,
+      orderNumber: grant.orders?.order_number || null,
+      orderDate: grant.orders?.created_at || null,
+      productName: grant.inventory_items?.name || null,
+      productSku: grant.inventory_items?.sku || null,
+      productImage: grant.inventory_items?.image_url || null,
+      accessToken: grant.access_token,
+      downloadCount: grant.download_count,
+      maxDownloads: grant.max_downloads,
+      downloadsRemaining: grant.max_downloads !== null
+        ? Math.max(0, grant.max_downloads - grant.download_count)
+        : null,
+      accessExpiresAt: grant.access_expires_at || null,
+      firstAccessedAt: grant.first_accessed_at || null,
+      lastAccessedAt: grant.last_accessed_at || null,
+      licenseKey: grant.license_key || null,
+      status: grant.status,
+      createdAt: grant.created_at,
+    }));
+
+    res.json({
+      success: true,
+      downloads,
+      count: downloads.length,
+    });
+  } catch (error) {
+    console.error('[Buyer Orders] Error fetching downloads:', error);
+    res.status(500).json({
+      success: false,
+      error: 'fetch_failed',
+      message: 'Failed to fetch digital downloads',
+    });
+  }
+});
+
+// GET /api/orders/customer/:email/service-bookings - Get all service bookings for a customer
+router.get('/customer/:email/service-bookings', async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const { serviceFulfillmentService } = await import('../services/ServiceFulfillmentService');
+    const bookings = await serviceFulfillmentService.getCustomerBookings(email);
+
+    res.json({
+      success: true,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error('[Buyer Orders] Error fetching service bookings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'fetch_failed',
+      message: 'Failed to fetch service bookings',
+    });
+  }
+});
+
+// GET /api/orders/:orderId/service-bookings - Get service bookings for an order
+router.get('/:orderId/service-bookings', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const { serviceFulfillmentService } = await import('../services/ServiceFulfillmentService');
+    const bookings = await serviceFulfillmentService.getOrderBookings(orderId);
+
+    res.json({
+      success: true,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error('[Buyer Orders] Error fetching order service bookings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'fetch_failed',
+      message: 'Failed to fetch service bookings',
     });
   }
 });

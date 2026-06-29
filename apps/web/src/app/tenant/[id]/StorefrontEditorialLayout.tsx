@@ -150,6 +150,7 @@ export default function StorefrontEditorialLayout({
     contactInfo,
     featuredData,
     featuredCounts,
+    activeFeatured,
     getFeaturedTypeName,
     getCategoryUrl,
   } = useStorefrontState({
@@ -204,11 +205,14 @@ export default function StorefrontEditorialLayout({
     return { physicalProducts: buckets.physical, serviceProducts: buckets.service, digitalProducts: buckets.digital, hybridProducts: buckets.hybrid };
   }, [products]);
 
-  // ---- Derived: first 3 featured products for spotlight ----
+  // ---- Derived: first 3 featured products for spotlight (prefer active featured) ----
   const spotlightProducts = useMemo(() => {
+    if (activeFeatured?.hasActive && activeFeatured.products.length > 0) {
+      return activeFeatured.products.slice(0, 3);
+    }
     if (!featuredData?.buckets?.[0]?.products) return [];
     return featuredData.buckets[0].products.slice(0, 3);
-  }, [featuredData]);
+  }, [activeFeatured, featuredData]);
 
   // ---- Derived: social links ----
   const socialLinks = useMemo(() => {

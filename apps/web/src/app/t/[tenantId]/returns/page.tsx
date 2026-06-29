@@ -12,33 +12,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { API_BASE_URL } from '@/lib/api';
-
-interface ReturnRequest {
-  id: string;
-  order_id: string;
-  customer_email: string;
-  customer_name: string | null;
-  reason: string;
-  reason_detail: string | null;
-  items: Array<{ product_id: string; product_name: string; quantity: number; price_cents: number }>;
-  refund_amount_cents: number;
-  status: string;
-  customer_notes: string | null;
-  admin_notes: string | null;
-  created_at: string;
-  approved_at: string | null;
-  completed_at: string | null;
-}
-
-interface ReturnSummary {
-  requested: number;
-  approved: number;
-  rejected: number;
-  completed: number;
-  total: number;
-  totalRefundCents: number;
-}
+import { ReturnsService, type ReturnRequest, type ReturnSummary } from '@/services/ReturnsService';
 
 const STATUS_COLORS: Record<string, string> = {
   requested: 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400',
@@ -75,15 +49,8 @@ export default function ReturnsPortalPage() {
   const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const statusParam = filterStatus ? `&status=${filterStatus}` : '';
-      const res = await fetch(
-        `${API_BASE_URL}/api/tenants/${tenantId}/returns?limit=50${statusParam}`,
-        { credentials: 'include', headers: { 'X-Tenant-ID': tenantId } }
-      );
-      const data = await res.json();
-      if (data.success) {
-        setRequests(data.data.requests);
-      }
+      const data = await ReturnsService.listReturns(tenantId, filterStatus || undefined);
+      setRequests(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch returns');
     } finally {
@@ -93,14 +60,8 @@ export default function ReturnsPortalPage() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/tenants/${tenantId}/returns/summary`,
-        { credentials: 'include', headers: { 'X-Tenant-ID': tenantId } }
-      );
-      const data = await res.json();
-      if (data.success) {
-        setSummary(data.data);
-      }
+      const data = await ReturnsService.getSummary(tenantId);
+      setSummary(data);
     } catch (err) {
       console.error('Failed to fetch summary:', err);
     }
@@ -116,21 +77,9 @@ export default function ReturnsPortalPage() {
   async function handleAction(id: string, action: 'approve' | 'reject' | 'complete') {
     try {
       setActionLoading(`${id}-${action}`);
-      const res = await fetch(
-        `${API_BASE_URL}/api/tenants/${tenantId}/returns/${id}/${action}`,
-        {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': tenantId },
-        }
-      );
-      const data = await res.json();
-      if (data.success) {
-        await fetchRequests();
-        await fetchSummary();
-      } else {
-        setError(data.message || `Failed to ${action} return`);
-      }
+      await ReturnsService.actionReturn(tenantId, id, action);
+      await fetchRequests();
+      await fetchSummary();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${action} return`);
     } finally {

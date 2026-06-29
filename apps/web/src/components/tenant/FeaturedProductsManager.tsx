@@ -463,12 +463,12 @@ export default function FeaturedProductsManager({
   };
 
   const handleProductFeatureAllTypes = async (product: any) => {
-    // Check if tenant has featured access (only for "featured" type)
-    if (selectedType === 'featured' && !hasFeaturedAccess) {
+    // Check if tenant has featured access (only for types requiring tenant access)
+    if (currentType?.requiresTenantAccess && !hasFeaturedAccess) {
       alert('Featured access requires approval. Please contact support to request access.');
       return;
     }
-    
+
     if (!confirm(`Are you sure you want to feature "${product.name}" in the current type (${currentType?.name})?`)) {
       return;
     }
@@ -591,7 +591,7 @@ export default function FeaturedProductsManager({
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Featured Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {featuredTypes.map((type) => {
-            const isPayToPlay = type.id === 'featured' && (type as any).isPayToPlay;
+            const isPayToPlay = !!type.requiresTenantAccess;
             const isLocked = isPayToPlay && !hasFeaturedAccess;
             const isPlatformControlled = ['trending', 'recommended'].includes(type.id);
             
@@ -1150,25 +1150,25 @@ export default function FeaturedProductsManager({
                           return;
                         }
                         
-                        // Check if tenant has featured access (only for "featured" type)
-                        if (selectedType === 'featured' && !hasFeaturedAccess) {
+                        // Check if tenant has featured access (only for types requiring tenant access)
+                        if (currentType?.requiresTenantAccess && !hasFeaturedAccess) {
                           alert('Featured access requires approval. Please contact support to request access.');
                           return;
                         }
                         
                         handleError(() => featureProduct(product.id!), 'Failed to feature product');
                       }}
-                      disabled={processing || !product.id || isCurrentTypeAtLimit || (selectedType === 'featured' && !hasFeaturedAccess)}
+                      disabled={processing || !product.id || isCurrentTypeAtLimit || (currentType?.requiresTenantAccess && !hasFeaturedAccess)}
                       className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                         isCurrentTypeAtLimit 
                           ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                          : (selectedType === 'featured' && !hasFeaturedAccess)
+                          : (currentType?.requiresTenantAccess && !hasFeaturedAccess)
                           ? 'bg-orange-400 text-orange-100 cursor-not-allowed'
                           : 'bg-blue-600 text-white'
                       }`}
-                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Featured access requires approval' : `Add to ${currentType?.name}`}
+                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : (currentType?.requiresTenantAccess && !hasFeaturedAccess) ? 'Featured access requires approval' : `Add to ${currentType?.name}`}
                     >
-                      {isCurrentTypeAtLimit ? 'Limit Reached' : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Approval Required' : `Add to ${currentType?.name}`}
+                      {isCurrentTypeAtLimit ? 'Limit Reached' : (currentType?.requiresTenantAccess && !hasFeaturedAccess) ? 'Approval Required' : `Add to ${currentType?.name}`}
                     </button>
                   )}
                   </div>

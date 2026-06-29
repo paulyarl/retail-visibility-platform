@@ -1627,7 +1627,7 @@ export function resolveFeaturedOptionsState(
     isFlexible: flexible,
     featuredAvailable: isEnabled && allTypes.length > 0,
     effectiveFeaturedAvailable: isEnabled && effectiveTypes.length > 0,
-    expiryMonitorEnabled: !!features.featured_expiry_monitor,
+    expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor,
     features,
   };
 }

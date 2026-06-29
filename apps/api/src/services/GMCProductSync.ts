@@ -40,6 +40,11 @@ interface ProductData {
   googleProductCategory?: string;
   productType?: string;
   identifierExists?: boolean;
+  customLabel0?: string;
+  customLabel1?: string;
+  customLabel2?: string;
+  customLabel3?: string;
+  customLabel4?: string;
 }
 
 interface SyncResult {
@@ -210,6 +215,16 @@ function convertToGoogleProduct(
     googleProduct.identifierExists = false;
   }
 
+  // Map badge types to GMC custom labels (custom_label_0 through custom_label_4)
+  // This enables badge-based filtering and reporting in Google Shopping campaigns
+  const badgeTypes: string[] = item.featured_type_array || (item.featured_type ? [item.featured_type] : []);
+  if (badgeTypes.length > 0) {
+    const labelFields = ['customLabel0', 'customLabel1', 'customLabel2', 'customLabel3', 'customLabel4'] as const;
+    for (let i = 0; i < Math.min(badgeTypes.length, 5); i++) {
+      googleProduct[labelFields[i]] = badgeTypes[i];
+    }
+  }
+
   return googleProduct;
 }
 
@@ -234,6 +249,16 @@ export async function syncProduct(
     if (!item) {
       return { success: false, productId: itemId, offerId: '', error: 'Item not found' };
     }
+
+    // Fetch active badge assignments for GMC custom_label mapping
+    const badges = await prisma.featured_products.findMany({
+      where: {
+        inventory_item_id: itemId,
+        is_active: true,
+      },
+      select: { featured_type: true },
+    });
+    (item as any).featured_type_array = badges.map(b => b.featured_type);
 
     // Check if item is public (visibility = 'public')
     if (item.visibility !== 'public') {
@@ -371,6 +396,25 @@ export async function batchSyncProducts(
 
     if (items.length === 0) {
       return { success: true, total: 0, synced: 0, failed: 0, results: [] };
+    }
+
+    // Fetch active badge assignments for all items (for GMC custom_label mapping)
+    const itemIdsList = items.map(i => i.id);
+    const allBadges = await prisma.featured_products.findMany({
+      where: {
+        inventory_item_id: { in: itemIdsList },
+        is_active: true,
+      },
+      select: { inventory_item_id: true, featured_type: true },
+    });
+    const badgesByItem = new Map<string, string[]>();
+    for (const b of allBadges) {
+      const arr = badgesByItem.get(b.inventory_item_id) || [];
+      arr.push(b.featured_type);
+      badgesByItem.set(b.inventory_item_id, arr);
+    }
+    for (const item of items) {
+      (item as any).featured_type_array = badgesByItem.get(item.id) || [];
     }
 
     // Get tenant business profile for website and subdomain

@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
-import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Receipt, CheckCircle, XCircle, AlertTriangle, CreditCard } from 'lucide-react';
+import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Receipt, CheckCircle, XCircle, AlertTriangle, CreditCard, Calendar } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
+import DigitalDownloadsCard from '@/components/downloads/DigitalDownloadsCard';
+import ProductTypeBadge from '@/components/products/ProductTypeBadge';
 
 export default function OrdersPage() {
   const { customer } = useCustomerAuth();
@@ -303,6 +305,11 @@ export default function OrdersPage() {
             </div>
           )}
           
+          {/* Digital Downloads */}
+          {selectedOrder.items?.some((item: any) => item.productType === 'digital' || item.productType === 'hybrid') && (
+            <DigitalDownloadsCard orderId={selectedOrder.orderId} />
+          )}
+
           <OrderReceipt
             statusHistory={selectedOrder.statusHistory}
             cart={{
@@ -315,6 +322,7 @@ export default function OrdersPage() {
                 sku: item.sku,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice * 100,
+                productType: item.productType,
               })),
               subtotal: selectedOrder.subtotal * 100,
               status: selectedOrder.orderStatus,
@@ -536,9 +544,22 @@ export default function OrdersPage() {
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-600">
-                          {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-600">
+                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                          </p>
+                          {(() => {
+                            const types = order.items.map(i => i.productType || 'physical');
+                            const unique = [...new Set(types)];
+                            if (unique.length === 1 && unique[0] !== 'physical') {
+                              return <ProductTypeBadge productType={unique[0] as any} size="sm" />;
+                            }
+                            if (unique.length > 1) {
+                              return <ProductTypeBadge productType="hybrid" size="sm" />;
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <p className="text-xs text-gray-500 truncate">
                           {order.items.map(i => i.name).join(', ')}
                         </p>
@@ -636,6 +657,22 @@ export default function OrdersPage() {
                             >
                               <Receipt className="w-4 h-4 mr-1" />
                               View Receipt
+                            </Button>
+                          )}
+
+                          {order.items?.some(i => i.productType === 'service' || i.productType === 'hybrid') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.location.href = '/account/appointments';
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <Calendar className="w-3 h-3" />
+                              View Appointment
                             </Button>
                           )}
                         </div>

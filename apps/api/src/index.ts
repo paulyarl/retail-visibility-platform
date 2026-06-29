@@ -7199,7 +7199,7 @@ app.use('/api/rate-limit', rateLimitingRoutes);
 console.log('✅ Rate Limiting routes mounted at /api/rate-limit (UniversalSingleton)');
 
 import behaviorTrackingRoutes from './routes/behavior-tracking';
-app.use('/api/behavior', authenticateToken, behaviorTrackingRoutes);
+app.use('/api/behavior', behaviorTrackingRoutes);
 console.log('✅ Behavior Tracking routes mounted at /api/behavior (UniversalSingleton)');
 
 import tenantProfileRoutes from './routes/tenant-profile';
@@ -7526,6 +7526,16 @@ console.log('✅ Badge registry routes mounted at /api/public/badge-registry and
 import badgeAnalyticsRoutes from './routes/badge-analytics';
 app.use('/api', badgeAnalyticsRoutes);
 console.log('✅ Badge analytics routes mounted at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events');
+
+/* ------------------------------ active featured resolver ------------------------------ */
+import activeFeaturedRoutes from './routes/active-featured';
+app.use('/api', activeFeaturedRoutes);
+console.log('✅ Active featured resolver routes mounted at /api/active-featured and /api/tenants/:tenantId/active-featured');
+
+/* ------------------------------ featured placement (monetization) ------------------------------ */
+import featuredPlacementRoutes from './routes/featured-placements';
+app.use('/api', featuredPlacementRoutes);
+console.log('✅ Featured placement routes mounted at /api/admin/featured-placement and /api/tenants/:tenantId/featured-placements');
 
 /* ------------------------------ faq options settings ------------------------------ */
 app.use('/api/tenants', faqOptionsSettingsRoutes);
@@ -8132,6 +8142,24 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Featured products expiry monitor started (daily at midnight)');
       } catch (err) {
         logger.error('Failed to start featured products expiry monitor', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start featured expiration enforcer (every 5 minutes) — deactivates expired featured_products
+      try {
+        const { startFeaturedExpirationEnforcer } = await import('./jobs/featured-expiration-enforcer');
+        startFeaturedExpirationEnforcer();
+        logger.info('Featured expiration enforcer started (every 5 minutes)');
+      } catch (err) {
+        logger.error('Failed to start featured expiration enforcer', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start featured placement renewal job (daily) — auto-renew, grace period, trial support
+      try {
+        const { startPlacementRenewalJob } = await import('./jobs/featured-placement-renewal');
+        startPlacementRenewalJob();
+        logger.info('Featured placement renewal job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start featured placement renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start bot product embedding sync (every 12 hours) — gated by platform settings

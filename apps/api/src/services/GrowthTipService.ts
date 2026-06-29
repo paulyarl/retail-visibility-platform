@@ -653,7 +653,7 @@ const TIPS: TipDefinition[] = [
     title: 'Connect your social commerce channels',
     body: 'Sync your product catalog to Instagram Shopping, Facebook Shop, and TikTok Shop. Reach shoppers where they discover products on social media.',
     cta: 'Set up social',
-    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/integrations`,
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/social-commerce`,
     icon: 'Share2',
     gradient: 'from-pink-500 to-rose-600',
     condition: (ctx) => hasSocialCommerce(ctx) && ctx.businessState.hasProducts,

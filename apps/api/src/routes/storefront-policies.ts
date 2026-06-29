@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
 import storefrontPolicyService, { PolicyType } from '../services/StorefrontPolicyService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = Router();
 
@@ -84,6 +85,9 @@ router.put('/:tenantId/storefront-policies', authenticateToken, async (req, res)
     const updated = await storefrontPolicyService.upsertPolicies(tenantId, validation.data);
     invalidateEffectiveCapabilities(tenantId);
     res.json({ success: true, policies: updated });
+
+    // Refresh policy knowledge embeddings
+    BotKnowledgeEmbeddingService.getInstance().refreshPolicyEmbeddings(tenantId).catch(() => {});
   } catch (error) {
     console.error('Error updating storefront policies:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update policies' });

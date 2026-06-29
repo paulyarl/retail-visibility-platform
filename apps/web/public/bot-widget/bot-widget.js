@@ -167,10 +167,16 @@
 
   async function sendMessage(sessionId, message) {
     var url = apiBase() + '/api/public/bot/conversations/' + sessionId + '/messages';
+    var body = { message: message, pageContext: state.pageContext };
+    if (state.embedKey) {
+      body.embedKey = state.embedKey;
+    } else {
+      body.tenantId = state.tenantId;
+    }
     var resp = await fetch(url, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ message: message }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error('Failed to send message');
     var json = await resp.json();

@@ -35,6 +35,7 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
@@ -621,9 +622,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   }
   const totalPages = Math.ceil(total / limit);
 
-  // API base URL for additional calls
-  // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
   // Fetch directory publish status and actual slug using singleton services
   let directoryPublished = tenant?.hasDirectory || false;
   let tenantSlug = tenant?.slug || id;
@@ -746,6 +744,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
+      <SocialPixels tenantId={resolvedTenantId || tenant.id || id} usePublic />
       <TenantPaymentProvider
         tenantId={resolvedTenantId || tenant.id || id}
         initialCommerceSettings={commerceSettings}

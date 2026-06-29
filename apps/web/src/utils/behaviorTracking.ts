@@ -80,7 +80,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
     const sessionId = this.getSessionIdFromContext();
     
     const response = await this.makeSystemRequest<any>(
-      '/api/analytics/track',
+      '/api/behavior/events',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,7 +89,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
           userId,
           sessionId,
           eventData,
-          timestamp: Date.now(),
+          url: typeof window !== 'undefined' ? window.location.href : '',
           referrer: typeof window !== 'undefined' ? document.referrer : '',
           userAgent: typeof window !== 'undefined' ? navigator.userAgent : ''
         })

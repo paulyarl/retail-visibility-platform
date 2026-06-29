@@ -224,8 +224,8 @@ class FeaturedOptionsService {
       allowedTypes: allTypes,
       isFlexible: flexible,
       featuredAvailable: enabled && !disabled && allTypes.length > 0,
-      expiryMonitorEnabled: !!features.featured_expiry_monitor,
-      customBadgeSlotsEnabled: !!features.featured_custom_badge_slots,
+      expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor,
+      customBadgeSlotsEnabled: flexible || !!features.featured_custom_badge_slots,
       features,
     };
   }

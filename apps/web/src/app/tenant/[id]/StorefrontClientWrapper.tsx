@@ -17,6 +17,7 @@ import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilit
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
 import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
 // Product Discovery & Navigation
 // import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
@@ -160,6 +161,7 @@ export default function StorefrontClientWrapper({
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
+  const { data: activeFeatured } = useActiveFeatured(tenantId, 'storefront_spotlight', { limit: 8 });
   const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
 
@@ -487,6 +489,7 @@ export default function StorefrontClientWrapper({
         showsVariants={showsVariants}
         allowedFeaturedTypes={allowedFeaturedTypes}
         featuredData={featuredData}
+        activeFeatured={activeFeatured ?? undefined}
         featuredCounts={featuredCounts}
         hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
         defaultGatewayType={tenant.metadata?.defaultGatewayType}

@@ -17,6 +17,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { StorefrontLayoutKey } from '@/app/products/[id]/layouts/types';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { SocialShareButtons } from '@/components/storefront/SocialShareButtons';
+import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 interface ProductSectionProps {
   tenantId: string;
@@ -42,6 +43,7 @@ interface ProductSectionProps {
   showsVariants: boolean;
   allowedFeaturedTypes: string[];
   featuredData: any;
+  activeFeatured?: ActiveFeaturedResult;
   featuredCounts: Record<string, number>;
   hasActivePaymentGateway: boolean;
   defaultGatewayType: string;
@@ -113,6 +115,7 @@ function ClassicProductSection({
   showsVariants,
   allowedFeaturedTypes,
   featuredData,
+  activeFeatured,
   hasActivePaymentGateway,
   defaultGatewayType,
   currentUrl,
@@ -175,6 +178,26 @@ function ClassicProductSection({
 
                 {/* Main Content Area */}
                 <div className="flex-1">
+                  {/* Active Featured Carousel (prepended above product grid) */}
+                  {activeFeatured?.hasActive && activeFeatured.products.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-3">Featured</h3>
+                      <EnhancedProductDisplay
+                        products={activeFeatured.products as any}
+                        tenantId={tenantId}
+                        tenantSlug={tenant.slug}
+                        tenantLogo={tenant.metadata?.logo_url}
+                        hasActivePaymentGateway={hasActivePaymentGateway}
+                        defaultGatewayType={defaultGatewayType}
+                        displayMode="carousel"
+                        carouselItemsVisible={4}
+                        variant="grid"
+                        showGallery={showsGallery}
+                        showVariants={showsVariants}
+                        allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
+                      />
+                    </div>
+                  )}
                   <div className="mb-6">
                     <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">Store Inventory</h2>
                     <p className="text-lg text-neutral-600 dark:text-neutral-400">

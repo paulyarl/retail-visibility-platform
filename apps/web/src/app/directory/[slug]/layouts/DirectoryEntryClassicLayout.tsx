@@ -14,6 +14,7 @@ import ContactInformationCollapsible from '@/components/directory/ContactInforma
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
+import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
@@ -35,6 +36,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     businessHours,
     storefrontCategories,
     featuredProducts,
+    activeFeatured,
     tenantInfo,
     slugForRelated,
     optFlags,
@@ -165,6 +167,22 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Active Featured Products (from ActiveFeaturedResolver) */}
+              {!showStatusPanel && activeFeatured?.hasActive && activeFeatured.products.length > 0 && (
+                <TenantPaymentProvider tenantId={listing.tenantId}>
+                  <div className="mb-6">
+                    <h2 className="text-lg font-bold text-neutral-900 dark:text-white mb-3">Featured</h2>
+                    <EnhancedProductDisplay
+                      products={activeFeatured.products as any}
+                      tenantId={listing.tenantId}
+                      displayMode="carousel"
+                      carouselItemsVisible={4}
+                      variant="grid"
+                    />
+                  </div>
+                </TenantPaymentProvider>
               )}
 
               {/* Featured Products */}

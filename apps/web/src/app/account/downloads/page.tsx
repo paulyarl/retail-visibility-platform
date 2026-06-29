@@ -18,7 +18,7 @@ interface DigitalDownload {
   tenantName: string;
   itemId: string;
   productName: string;
-  productType: 'digital' | 'hybrid' | 'physical';
+  productType: 'digital' | 'hybrid' | 'service';
   accessToken: string;
   downloadCount: number;
   downloadLimit: number | null;
@@ -42,6 +42,9 @@ export default function DigitalDownloadsPage() {
   const [downloads, setDownloads] = useState<DigitalDownload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     if (customer?.email) {
@@ -56,58 +59,26 @@ export default function DigitalDownloadsPage() {
       setLoading(true);
       setError(null);
 
-      // Get all customer orders
-      const ordersResult = await customerOrderService.getCustomerOrders(customer.email, 1, 100);
-      
-      if (!ordersResult.orders) {
-        setDownloads([]);
-        return;
-      }
+      const customerDownloads = await customerOrderService.getCustomerDownloads(customer.email);
 
-      // Filter for orders with digital/hybrid products and get downloads
-      const digitalDownloads: DigitalDownload[] = [];
-      
-      for (const order of ordersResult.orders) {
-        // Check if order has digital/hybrid items
-        const digitalItems = order.items?.filter(
-          (item: any) => item.productType === 'digital' || item.productType === 'hybrid'
-        );
-
-        if (digitalItems && digitalItems.length > 0) {
-          // Get downloads for this order
-          const downloadsResult = await customerOrderService.getOrderDownloads(order.orderId);
-          
-          if (downloadsResult?.success && downloadsResult?.downloads) {
-            for (const download of downloadsResult.downloads) {
-              // Find matching item to get product details
-              const matchingItem = digitalItems.find(
-                (item: any) => item.itemId === download.inventoryItemId
-              );
-
-              if (matchingItem) {
-                digitalDownloads.push({
-                  orderId: order.orderId,
-                  orderNumber: order.orderNumber,
-                  orderDate: order.createdAt,
-                  tenantId: order.tenantId,
-                  tenantName: order.tenantName || 'Store',
-                  itemId: download.inventoryItemId,
-                  productName: matchingItem.name,
-                  productType: matchingItem.productType || 'digital',
-                  accessToken: download.accessToken,
-                  downloadCount: download.downloadCount,
-                  downloadLimit: download.downloadLimit,
-                  downloadsRemaining: download.downloadsRemaining,
-                  expiresAt: download.expiresAt,
-                  isExpired: download.isExpired,
-                  isRevoked: download.isRevoked,
-                  asset: download.asset,
-                });
-              }
-            }
-          }
-        }
-      }
+      const digitalDownloads: DigitalDownload[] = customerDownloads.map((dl) => ({
+        orderId: dl.orderId,
+        orderNumber: dl.orderNumber || '',
+        orderDate: dl.orderDate || dl.createdAt,
+        tenantId: '',
+        tenantName: '',
+        itemId: '',
+        productName: dl.productName || 'Digital Product',
+        productType: 'digital',
+        accessToken: dl.accessToken,
+        downloadCount: dl.downloadCount,
+        downloadLimit: dl.maxDownloads,
+        downloadsRemaining: dl.downloadsRemaining,
+        expiresAt: dl.accessExpiresAt,
+        isExpired: dl.status === 'expired' || (dl.accessExpiresAt ? new Date(dl.accessExpiresAt) < new Date() : false),
+        isRevoked: dl.status === 'revoked',
+        asset: dl.productSku ? undefined : undefined,
+      }));
 
       // Sort by order date (newest first)
       digitalDownloads.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
@@ -121,14 +92,24 @@ export default function DigitalDownloadsPage() {
     }
   };
 
-  const handleDownload = (accessToken: string, asset?: any) => {
+  const handleDownload = async (accessToken: string, asset?: any) => {
+    setDownloadError(null);
     if (asset?.assetType === 'link' && asset.externalUrl) {
       window.open(asset.externalUrl, '_blank');
-    } else if (asset?.requiresLicenseKey) {
-      // For license keys, we'll need to implement license key retrieval
-      window.open(`/api/download/${accessToken}`, '_blank');
     } else {
-      window.open(`/api/download/${accessToken}`, '_blank');
+      try {
+        setDownloading(true);
+        setDownloadProgress(0);
+        await publicDownloadService.validateAndDownloadWithProgress(
+          accessToken,
+          asset?.name,
+          (prog) => setDownloadProgress(prog)
+        );
+      } catch (err) {
+        setDownloadError(err instanceof Error ? err.message : 'Download failed');
+      } finally {
+        setDownloading(false);
+      }
     }
   };
 
@@ -211,6 +192,26 @@ export default function DigitalDownloadsPage() {
           <Button onClick={loadDownloads} className="mt-2" size="sm">
             Try Again
           </Button>
+        </div>
+      )}
+
+      {downloadError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 text-sm">{downloadError}</p>
+        </div>
+      )}
+
+      {downloading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Downloading... {Math.round(downloadProgress)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${downloadProgress}%` }}
+            />
+          </div>
         </div>
       )}
 

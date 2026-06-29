@@ -3,6 +3,7 @@ import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart, generateSpecialHoursId } from '../lib/id-generator'
 import CacheService, { CacheKeys } from '../lib/cache-service';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 // Cache TTL constants
 const CACHE_TTL = {
@@ -67,6 +68,9 @@ router.put('/tenant/:tenantId/business-hours',
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
   await updateBusinessProfileHours(tenantId);
 
+  // Refresh hours embeddings (fire-and-forget)
+  BotKnowledgeEmbeddingService.getInstance().refreshHoursEmbeddings(tenantId).catch(() => {});
+
   res.json({ success: true })
 })
 
@@ -113,6 +117,9 @@ router.put('/tenant/:tenantId/business-hours/special',
   // Update business profile hours
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
   await updateBusinessProfileHours(tenantId);
+
+  // Refresh hours embeddings (fire-and-forget)
+  BotKnowledgeEmbeddingService.getInstance().refreshHoursEmbeddings(tenantId).catch(() => {});
 
   // Invalidate cache for this tenant's business hours status
   const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)

@@ -22,6 +22,7 @@ import StoreResults from '../StoreResults';
 import { Pagination } from '@/components/ui';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
+import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import type { DirectoryLayoutProps } from '../types';
@@ -160,6 +161,7 @@ export default function DirectoryImmersiveLayout({ data }: DirectoryLayoutProps)
 
       {/* Random featured products — merchant visibility */}
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8 space-y-12">
+        <ActiveFeaturedSection activeFeatured={data.activeFeatured} />
         <ProductSingletonProvider>
           <RandomFeaturedProducts />
         </ProductSingletonProvider>

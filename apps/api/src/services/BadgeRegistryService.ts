@@ -34,6 +34,10 @@ export interface BadgeTypeMeta {
   autoAssignRule: any | null;
   autoRemoveRule: any | null;
   conflictWith: string[] | null;
+  requiresTenantAccess: boolean;
+  requiresAdminApproval: boolean;
+  isPromotional: boolean;
+  promotionalPriority: number;
 }
 
 // ====================
@@ -43,17 +47,17 @@ export interface BadgeTypeMeta {
 // Matches the seed data in 060_featured_type_registry.sql.
 
 const STATIC_BADGE_TYPES: BadgeTypeMeta[] = [
-  { id: 'static-store_selection', tenantId: null, key: 'store_selection', label: 'Store Selection', description: 'Hand-picked by the store owner', group: 'tenant', icon: '🏪', color: 'blue', priority: 50, sortOrder: 1, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-new_arrival', tenantId: null, key: 'new_arrival', label: 'New Arrival', description: 'Recently added products', group: 'tenant', icon: '🆕', color: 'green', priority: 50, sortOrder: 2, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-seasonal', tenantId: null, key: 'seasonal', label: 'Seasonal', description: 'Seasonal or holiday products', group: 'tenant', icon: '🎄', color: 'orange', priority: 50, sortOrder: 3, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-sale', tenantId: null, key: 'sale', label: 'Sale', description: 'Products currently on sale', group: 'tenant', icon: '🏷️', color: 'red', priority: 50, sortOrder: 4, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-staff_pick', tenantId: null, key: 'staff_pick', label: 'Staff Pick', description: 'Recommended by store staff', group: 'tenant', icon: '👍', color: 'purple', priority: 50, sortOrder: 5, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-clearance', tenantId: null, key: 'clearance', label: 'Clearance', description: 'Final sale, while supplies last', group: 'tenant', icon: '🧹', color: 'amber', priority: 50, sortOrder: 6, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-featured', tenantId: null, key: 'featured', label: 'Featured', description: 'General featured products', group: 'tenant', icon: '⭐', color: 'yellow', priority: 50, sortOrder: 7, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-bestseller', tenantId: null, key: 'bestseller', label: 'Bestseller', description: 'Top-selling products across the platform', group: 'platform', icon: '🏆', color: 'gold', priority: 50, sortOrder: 8, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-trending', tenantId: null, key: 'trending', label: 'Trending', description: 'Gaining popularity right now', group: 'platform', icon: '📈', color: 'teal', priority: 50, sortOrder: 9, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-recommended', tenantId: null, key: 'recommended', label: 'Recommended', description: 'Personalized recommendations', group: 'platform', icon: '💡', color: 'indigo', priority: 50, sortOrder: 10, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
-  { id: 'static-random_featured', tenantId: null, key: 'random_featured', label: 'Random Featured', description: 'Randomly selected featured products', group: 'platform', icon: '🎲', color: 'pink', priority: 50, sortOrder: 11, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null },
+  { id: 'static-store_selection', tenantId: null, key: 'store_selection', label: 'Store Selection', description: 'Hand-picked by the store owner', group: 'tenant', icon: '🏪', color: 'blue', priority: 50, sortOrder: 1, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-new_arrival', tenantId: null, key: 'new_arrival', label: 'New Arrival', description: 'Recently added products', group: 'tenant', icon: '🆕', color: 'green', priority: 50, sortOrder: 2, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-seasonal', tenantId: null, key: 'seasonal', label: 'Seasonal', description: 'Seasonal or holiday products', group: 'tenant', icon: '🎄', color: 'orange', priority: 50, sortOrder: 3, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-sale', tenantId: null, key: 'sale', label: 'Sale', description: 'Products currently on sale', group: 'tenant', icon: '🏷️', color: 'red', priority: 50, sortOrder: 4, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-staff_pick', tenantId: null, key: 'staff_pick', label: 'Staff Pick', description: 'Recommended by store staff', group: 'tenant', icon: '👍', color: 'purple', priority: 50, sortOrder: 5, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-clearance', tenantId: null, key: 'clearance', label: 'Clearance', description: 'Final sale, while supplies last', group: 'tenant', icon: '🧹', color: 'amber', priority: 50, sortOrder: 6, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-featured', tenantId: null, key: 'featured', label: 'Featured', description: 'General featured products', group: 'tenant', icon: '⭐', color: 'yellow', priority: 50, sortOrder: 7, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: true, requiresAdminApproval: true, isPromotional: true, promotionalPriority: 100 },
+  { id: 'static-bestseller', tenantId: null, key: 'bestseller', label: 'Bestseller', description: 'Top-selling products across the platform', group: 'platform', icon: '🏆', color: 'gold', priority: 50, sortOrder: 8, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-trending', tenantId: null, key: 'trending', label: 'Trending', description: 'Gaining popularity right now', group: 'platform', icon: '📈', color: 'teal', priority: 50, sortOrder: 9, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-recommended', tenantId: null, key: 'recommended', label: 'Recommended', description: 'Personalized recommendations', group: 'platform', icon: '💡', color: 'indigo', priority: 50, sortOrder: 10, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
+  { id: 'static-random_featured', tenantId: null, key: 'random_featured', label: 'Random Featured', description: 'Randomly selected featured products', group: 'platform', icon: '🎲', color: 'pink', priority: 50, sortOrder: 11, isSystem: true, isActive: true, autoAssignRule: null, autoRemoveRule: null, conflictWith: null, requiresTenantAccess: false, requiresAdminApproval: false, isPromotional: false, promotionalPriority: 0 },
 ];
 
 // ====================
@@ -87,6 +91,10 @@ function dbRowToMeta(row: any): BadgeTypeMeta {
     autoAssignRule: row.auto_assign_rule ?? null,
     autoRemoveRule: row.auto_remove_rule ?? null,
     conflictWith: row.conflict_with ?? null,
+    requiresTenantAccess: row.requires_tenant_access ?? false,
+    requiresAdminApproval: row.requires_admin_approval ?? false,
+    isPromotional: row.is_promotional ?? false,
+    promotionalPriority: row.promotional_priority ?? 0,
   };
 }
 

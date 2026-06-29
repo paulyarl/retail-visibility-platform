@@ -9,12 +9,14 @@ import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Star, Sparkles, Calendar, Tag, Award, Download, Globe, Package } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
+import { ProductTypeBadge } from './ProductTypeBadge';
 import type { PriceRange, AvailableAttributes } from '@/types/variants';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { distanceUtils } from '@/lib/utils';
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
+import { PromotedBadge, promotedCardClass } from './PromotedBadge';
 
 // Type-aware CTA: renders the correct button based on productType
 function TypeAwareCTA({
@@ -93,31 +95,6 @@ function TypeAwareCTA({
       commerceDisabled={commerceDisabled}
       className={className}
     />
-  );
-}
-
-// Product type badge: small pill with icon + label for non-physical types
-function ProductTypeBadge({ productType, size = 'sm' }: { productType: string; size?: 'xs' | 'sm' }) {
-  const type = productType || 'physical';
-  if (type === 'physical') return null; // No badge for default physical type
-
-  const badgeConfig: Record<string, { icon: typeof Download; label: string; className: string }> = {
-    digital: { icon: Download, label: 'Digital', className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
-    service: { icon: Calendar, label: 'Service', className: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
-    hybrid: { icon: Globe, label: 'Hybrid', className: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' },
-  };
-
-  const config = badgeConfig[type];
-  if (!config) return null;
-
-  const Icon = config.icon;
-  const sizeClasses = size === 'xs' ? 'px-1.5 py-0.5 text-[0.625rem]' : 'px-2 py-0.5 text-xs';
-
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full font-medium ${sizeClasses} ${config.className}`}>
-      <Icon className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
-      {config.label}
-    </span>
   );
 }
 
@@ -586,6 +563,7 @@ interface ProductData {
   
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  promotional_priority?: number;
 }
 
 interface SmartProductCardProps {
@@ -1441,7 +1419,7 @@ export default function SmartProductCard({
   // Grid variant (default)
   const aspectClass = aspectRatioClasses[imageAspectRatio] || 'aspect-square';
   return (
-    <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
+    <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${product.promotional_priority ? promotedCardClass() : ''} ${className}`}>
       {/* Grid Image */}
       <div className={`block relative ${aspectClass} bg-neutral-100 dark:bg-neutral-700 overflow-hidden`}>
         <Link href={`/products/${product.id}`} className="absolute inset-0">
@@ -1471,6 +1449,11 @@ export default function SmartProductCard({
               <FeaturedTypeIcon key={index} type={type} />
             ))}
           </div>
+        )}
+
+        {/* Promoted Badge */}
+        {product.promotional_priority && product.promotional_priority > 0 && (
+          <PromotedBadge priority={product.promotional_priority} />
         )}
 
         {/* Availability badges */}

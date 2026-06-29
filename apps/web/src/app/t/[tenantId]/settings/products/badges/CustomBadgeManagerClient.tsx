@@ -8,7 +8,8 @@ import {
   useDeleteCustomBadge,
 } from '@/hooks/useBadgeRegistry';
 import { BadgeTypeMeta } from '@/services/BadgeRegistryService';
-import { Tag, Plus, Pencil, Trash2, X, AlertCircle, Check } from 'lucide-react';
+import { Tag, Plus, Pencil, Trash2, X, AlertCircle, Check, BarChart3, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 
 interface CustomBadgeManagerClientProps {
   tenantId: string;
@@ -177,6 +178,22 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
           <Plus className="w-4 h-4" />
           New Badge
         </button>
+      </div>
+
+      {/* Sub-page links */}
+      <div className="flex items-center gap-3 text-sm">
+        <Link
+          href={`/t/${tenantId}/settings/products/badges/analytics`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-gray-600 border rounded-lg hover:bg-gray-50"
+        >
+          <BarChart3 className="w-4 h-4" /> Analytics
+        </Link>
+        <Link
+          href={`/t/${tenantId}/settings/products/badges/suggestions`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-gray-600 border rounded-lg hover:bg-gray-50"
+        >
+          <Sparkles className="w-4 h-4" /> Suggestions
+        </Link>
       </div>
 
       {/* Slot usage indicator */}

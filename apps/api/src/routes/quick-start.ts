@@ -16,6 +16,7 @@ import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-sta
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
 import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
+import ProductTypeService from '../services/ProductTypeService';
 
 const router = Router();
 
@@ -107,6 +108,7 @@ const quickStartSchema = z.object({
     'hardware_tools',
     'furniture',
     'restaurant',
+    'service_business',
     'general'
   ]),
   productCount: z.number().int().min(5).max(200).default(50),
@@ -116,6 +118,7 @@ const quickStartSchema = z.object({
   imageQuality: z.enum(['standard', 'hd']).optional().default('standard'), // NEW: Image quality
   textModel: z.enum(['openai', 'google', 'anthropic', 'mistral']).optional().default('openai'), // NEW: AI model for text/product generation
   imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
+  productType: z.enum(['physical', 'digital', 'hybrid', 'service']).optional().default('physical'),
 });
 
 router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quickstart_enabled'), validateSKULimits, async (req, res) => {
@@ -233,6 +236,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       imageQuality: parsedBody.imageQuality || parsedBody.image_quality,
       textModel: parsedBody.textModel || parsedBody.text_model,
       imageModel: parsedBody.imageModel || parsedBody.image_model,
+      productType: parsedBody.productType || parsedBody.product_type,
     };
     
     console.log('[Quick Start] Normalized body:', normalizedBody);
@@ -246,7 +250,10 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       });
     }
 
-    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality, textModel, imageModel } = quickStartSchema.parse(normalizedBody);
+    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality, textModel, imageModel, productType } = quickStartSchema.parse(normalizedBody);
+
+    // Auto-force service product type for service_business scenario
+    const effectiveProductType = scenario === 'service_business' ? 'service' as const : productType;
 
     // Check rate limit (platform support bypasses - they're helping multiple customers)
     // Tenant owners/admins are subject to rate limits on their own tenant
@@ -272,8 +279,23 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       console.warn(`[Quick Start] Tenant ${tenantId} already has ${existingProductCount} products`);
     }
 
+    // Check if tenant's tier allows the requested product type
+    try {
+      const productTypeService = ProductTypeService.getInstance();
+      const allowed = await productTypeService.isProductTypeAllowed(tenantId, effectiveProductType as any);
+      if (!allowed) {
+        return res.status(403).json({
+          error: 'Product type not allowed',
+          message: `Your tier does not allow ${effectiveProductType} products. Please upgrade your plan or choose a different product type.`,
+        });
+      }
+    } catch (capError: any) {
+      console.error('[Quick Start] Product type capability check failed:', capError);
+      // Continue with generation — fail open
+    }
+
     // Generate products
-    console.log(`[Quick Start] Generating ${productCount} ${scenario} products for tenant ${tenantId}`);
+    console.log(`[Quick Start] Generating ${productCount} ${scenario} products (${effectiveProductType}) for tenant ${tenantId}`);
     if (generateImages) {
       console.log(`[Quick Start] ⏳ This may take 2-3 minutes. AI is generating products with images (${imageQuality} quality)...`);
       console.log(`[Quick Start] 💡 Images: Using ${imageModel === 'google' ? 'Google Imagen 3' : 'OpenAI DALL-E 3'} for professional product photography`);
@@ -293,6 +315,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       imageQuality,
       textModel,
       imageModel,
+      productType: effectiveProductType,
     }, prisma);
 
     console.log(`[Quick Start] Success:`, result);

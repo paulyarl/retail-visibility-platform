@@ -22,6 +22,7 @@ import BotStaticResponseService from '../services/BotStaticResponseService';
 import BotIntentService from '../services/BotIntentService';
 import BotSkillService from '../services/BotSkillService';
 import OrgBotService from '../services/OrgBotService';
+import OrgProductTypeService from '../services/OrgProductTypeService';
 import { logger } from '../logger';
 import { generateCorrelationId } from '../lib/id-generator';
 
@@ -31,7 +32,7 @@ router.use(authenticateToken);
 
 const CAPABILITY_DOMAINS = [
   'commerce', 'payment_gateway', 'storefront', 'fulfillment', 'product_options',
-  'featured', 'integrations', 'quickstart', 'storefront_options',
+  'product_types', 'featured', 'integrations', 'quickstart', 'storefront_options',
   'directory_entry', 'faq', 'crm', 'chatbot', 'barcode_scan',
 ] as const;
 
@@ -41,6 +42,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   storefront: 'Storefront',
   fulfillment: 'Fulfillment',
   product_options: 'Product Options',
+  product_types: 'Product Types',
   featured: 'Featured Options',
   integrations: 'Integrations',
   quickstart: 'Quickstart',
@@ -360,6 +362,66 @@ router.get('/:orgId/capability-rollup', async (req: Request, res: Response) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to resolve capability rollup',
+    });
+  }
+});
+
+/**
+ * GET /api/organizations/:orgId/product-type-rollup
+ * Returns per-tenant product type capability state across all locations.
+ */
+router.get('/:orgId/product-type-rollup', async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.params;
+    if (!orgId) {
+      return res.status(400).json({ success: false, error: 'orgId required' });
+    }
+
+    const orgProductTypeService = OrgProductTypeService.getInstance();
+    const rollup = await orgProductTypeService.getProductTypeRollup(orgId);
+
+    if (!rollup) {
+      return res.status(404).json({ success: false, error: 'organization_not_found' });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.json({ success: true, data: rollup });
+  } catch (error: any) {
+    console.error('[GET /api/organizations/:orgId/product-type-rollup] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve product type rollup',
+    });
+  }
+});
+
+/**
+ * GET /api/organizations/:orgId/product-mix
+ * Returns SKU counts grouped by product_type across all locations.
+ */
+router.get('/:orgId/product-mix', async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.params;
+    if (!orgId) {
+      return res.status(400).json({ success: false, error: 'orgId required' });
+    }
+
+    const orgProductTypeService = OrgProductTypeService.getInstance();
+    const mix = await orgProductTypeService.getProductMix(orgId);
+
+    if (!mix) {
+      return res.status(404).json({ success: false, error: 'organization_not_found' });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.json({ success: true, data: mix });
+  } catch (error: any) {
+    console.error('[GET /api/organizations/:orgId/product-mix] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve product mix',
     });
   }
 });

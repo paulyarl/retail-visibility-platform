@@ -86,8 +86,30 @@ export interface CustomerOrderItem {
   quantity: number;
   unitPrice: number;
   imageUrl: string | null;
-  productType?: 'physical' | 'digital' | 'hybrid';
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
+  digitalDeliveryStatus?: string;
+  digitalDeliveredAt?: string;
   itemId?: string;
+}
+
+export interface CustomerDownload {
+  grantId: string;
+  orderId: string;
+  orderNumber: string | null;
+  orderDate: string | null;
+  productName: string | null;
+  productSku: string | null;
+  productImage: string | null;
+  accessToken: string;
+  downloadCount: number;
+  maxDownloads: number | null;
+  downloadsRemaining: number | null;
+  accessExpiresAt: string | null;
+  firstAccessedAt: string | null;
+  lastAccessedAt: string | null;
+  licenseKey: string | null;
+  status: string;
+  createdAt: string;
 }
 
 export interface PaymentGateway {
@@ -248,6 +270,9 @@ class CustomerOrderService extends CustomerApiSingleton {
         sku: item.sku || item.inventory_items?.sku,
         imageUrl: item.imageUrl || item.image_url || item.inventory_items?.image_url,
         unitPrice: (item.unitPrice ?? item.unit_price_cents ?? 0) / 100,
+        productType: item.productType || item.product_type || item.inventory_items?.product_type || 'physical',
+        digitalDeliveryStatus: item.digitalDeliveryStatus || item.digital_delivery_status || undefined,
+        digitalDeliveredAt: item.digitalDeliveredAt || item.digital_delivered_at || undefined,
       })),
       shippingAddress: o.shippingAddress || (o.shipping_address_line1 ? {
         addressLine1: o.shipping_address_line1,
@@ -325,7 +350,9 @@ class CustomerOrderService extends CustomerApiSingleton {
           sku: item.sku || item.inventory_items?.sku,
           imageUrl: item.imageUrl || item.image_url || item.inventory_items?.image_url,
           unitPrice: (item.unitPrice ?? item.unit_price_cents ?? 0) / 100,
-          productType: item.inventory_items?.product_type,
+          productType: item.productType || item.product_type || item.inventory_items?.product_type || 'physical',
+          digitalDeliveryStatus: item.digitalDeliveryStatus || item.digital_delivery_status || undefined,
+          digitalDeliveredAt: item.digitalDeliveredAt || item.digital_delivered_at || undefined,
           itemId: item.inventory_items?.id || item.itemId,
         })),
         shippingAddress: o.shippingAddress || (o.shipping_address_line1 ? {
@@ -652,6 +679,34 @@ class CustomerOrderService extends CustomerApiSingleton {
   }
 
   /**
+   * Get customer's digital downloads
+   * Public endpoint for retrieving active digital access grants
+   */
+  async getCustomerDownloads(email: string): Promise<CustomerDownload[]> {
+    try {
+      const response = await this.makeDefaultRequest<{
+        success: boolean;
+        downloads: CustomerDownload[];
+        count: number;
+      }>(
+        `/api/orders/downloads/${encodeURIComponent(email)}`,
+        {},
+        `customer-downloads-${email}`
+      );
+
+      if (!response.success) {
+        console.error('[CustomerOrderService] Failed to get customer downloads:', response.error);
+        return [];
+      }
+
+      return response.data?.downloads || [];
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to get customer downloads:', error);
+      return [];
+    }
+  }
+
+  /**
    * Confirm order fulfillment (pickup, delivery, or shipping)
    * Public endpoint for buyers to confirm they received the order
    */
@@ -705,6 +760,60 @@ class CustomerOrderService extends CustomerApiSingleton {
       return false;
     }
   }
+
+  /**
+   * Get service bookings for a specific order
+   */
+  async getOrderServiceBookings(orderId: string): Promise<ServiceBooking[]> {
+    try {
+      const response = await this.makeDefaultRequest<{ success: boolean; data: ServiceBooking[] }>(
+        `/api/orders/${orderId}/service-bookings`,
+        {},
+        `order-service-bookings-${orderId}`
+      );
+      return response.data?.data || [];
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to fetch order service bookings:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all service bookings for a customer across all orders
+   */
+  async getCustomerServiceBookings(email: string): Promise<ServiceBooking[]> {
+    try {
+      const response = await this.makeDefaultRequest<{ success: boolean; data: ServiceBooking[] }>(
+        `/api/orders/customer/${encodeURIComponent(email)}/service-bookings`,
+        {},
+        `customer-service-bookings-${email}`
+      );
+      return response.data?.data || [];
+    } catch (error) {
+      console.error('[CustomerOrderService] Failed to fetch customer service bookings:', error);
+      return [];
+    }
+  }
+}
+
+export interface ServiceBooking {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  tenant_id: string;
+  customer_email: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  duration_minutes: number;
+  provider_id: string | null;
+  provider_name: string | null;
+  service_location: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // Export singleton instance

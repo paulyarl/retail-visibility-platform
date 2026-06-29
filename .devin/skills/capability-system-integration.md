@@ -113,7 +113,7 @@ export function resolveFeaturedOptions(
     effective_types: allowedTypes.filter(t =>
       t !== 'expiry_monitor' ? prefs[`featured_${t}`] !== false : prefs.featured_expiry_monitor !== false
     ),
-    expiry_monitor_enabled: !!features.featured_expiry_monitor,  // NEW
+    expiry_monitor_enabled: flexible || !!features.featured_expiry_monitor,  // NEW — MUST prefix with flexible (R23)
     merchant_preferences: {
       featured_enabled: !!prefs.featured_enabled,
       featured_expiry_monitor: !!prefs.featured_expiry_monitor,  // NEW
@@ -345,24 +345,32 @@ The chatbot capability introduced several patterns that future capabilities shou
 
 ### Flexible-Tier Pattern (`*_flexible` feature key)
 
-Organization tiers (`chain_starter`, `chain_professional`, `organization`) get a `*_flexible` feature key (e.g., `chatbot_flexible`) instead of individual feature flags. When `flexible` is true, the resolver unlocks all sub-types without checking each individually:
+Organization tiers (`chain_starter`, `chain_professional`, `organization`) get a `*_flexible` feature key (e.g., `chatbot_flexible`) instead of individual feature flags. When `flexible` is true, the resolver unlocks all sub-types without checking each individually. This allows admins to grant a tier full access to a capability without individually seeding every feature key into `tier_features_list`.
+
+**R23 (mandatory)**: The `flexible ||` prefix MUST be applied to EVERY individual feature check in the resolver — not just group-level allowed-type arrays. Standalone boolean flags (e.g., `featured_expiry_monitor`, `featured_custom_badge_slots`) are the most commonly missed because they don't follow the `if (flexible) { push(...all) } else { ... }` array pattern.
 
 ```ts
 // In ChatbotOptionsResolver.ts
 const flexible = !!feat.chatbot_flexible;
+
+// Group flags — flexible unlocks all groups:
 const staticEnabled = flexible || !!feat.chatbot_static_enabled;
 const dynamicEnabled = flexible || !!feat.chatbot_dynamic_enabled;
 
-// Allowed arrays: flexible unlocks everything
+// Allowed arrays — flexible unlocks everything:
 if (flexible) {
   allowedResponseEngines.push('chatbot_static_lookup', 'chatbot_shared_dynamic', 'chatbot_lora_finetuned', 'chatbot_dedicated');
 } else {
   if (feat.chatbot_static_lookup) allowedResponseEngines.push('chatbot_static_lookup');
   // ... per-feature gating
 }
+
+// Standalone flags — MUST also prefix with flexible:
+expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor,
+customBadgeSlotsEnabled: flexible || !!features.featured_custom_badge_slots,
 ```
 
-This pattern is used by CRM, FAQ, and Chatbot. Any new capability that needs org-tier full access should define a `<domain>_flexible` feature key and follow the same pattern.
+This pattern is used by CRM, FAQ, Chatbot, Featured Options, Storefront Options, Product Options, Directory Entry, and Social Commerce. Any new capability that needs org-tier full access should define a `<domain>_flexible` feature key and follow the same pattern. See R23 in `capability-data-flow-rules.md` for the full rule.
 
 ### Sub-Category Allowed Arrays
 

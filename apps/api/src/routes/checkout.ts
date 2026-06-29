@@ -240,6 +240,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       variant_id?: string;
       inventory_item_id: string;
       total_price_cents: number;
+      product_type: 'physical' | 'digital' | 'hybrid' | 'service';
     }> = [];
 
     for (const item of items) {
@@ -283,7 +284,11 @@ router.post('/orders', async (req: Request, res: Response) => {
 
       if (variant) {
         // Variant found - use variant data
-        if (variant.stock < item.quantity) {
+        // Skip stock check for digital and service products
+        const variantProductType = variant.inventory_items?.product_type || 'physical';
+        if ((variantProductType === 'digital' || variantProductType === 'service') && variant.stock < item.quantity) {
+          console.log(`[Checkout] Skipping stock check for ${variantProductType} item ${variant.sku}`);
+        } else if (variant.stock < item.quantity) {
           return res.status(400).json({
             success: false,
             error: 'insufficient_stock',
@@ -315,6 +320,7 @@ router.post('/orders', async (req: Request, res: Response) => {
           variant_id: variant.id,
           inventory_item_id: variant.parent_item_id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
+          product_type: variantProductType as 'physical' | 'digital' | 'hybrid' | 'service',
         };
         validatedItems.push(itemData);
       } else {
@@ -332,7 +338,11 @@ router.post('/orders', async (req: Request, res: Response) => {
           });
         }
 
-        if (inventoryItem.stock < item.quantity) {
+        // Skip stock check for digital and service products
+        const inventoryProductType = inventoryItem.product_type || 'physical';
+        if ((inventoryProductType === 'digital' || inventoryProductType === 'service') && inventoryItem.stock < item.quantity) {
+          console.log(`[Checkout] Skipping stock check for ${inventoryProductType} item ${inventoryItem.sku}`);
+        } else if (inventoryItem.stock < item.quantity) {
           return res.status(400).json({
             success: false,
             error: 'insufficient_stock',
@@ -359,11 +369,31 @@ router.post('/orders', async (req: Request, res: Response) => {
           image_url: inventoryItem.image_url ?? undefined,
           inventory_item_id: inventoryItem.id, // For order_items FK constraint
           total_price_cents: unitPriceCents * item.quantity,
+          product_type: inventoryProductType as 'physical' | 'digital' | 'hybrid' | 'service',
         };
         validatedItems.push(itemData);
       }
       
     
+    }
+
+    // Validate fulfillment_method compatibility with product types
+    const orderProductTypes = validatedItems.map(i => i.product_type);
+    const isDigitalOnly = orderProductTypes.length > 0 && orderProductTypes.every(t => t === 'digital');
+    const isServiceOnly = orderProductTypes.length > 0 && orderProductTypes.every(t => t === 'service');
+    if (isDigitalOnly && fulfillment_method && ['pickup', 'delivery', 'shipping'].includes(fulfillment_method)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_fulfillment_method',
+        message: 'Digital-only orders do not require a physical fulfillment method',
+      });
+    }
+    if (isServiceOnly && fulfillment_method === 'shipping') {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_fulfillment_method',
+        message: 'Service-only orders cannot use shipping fulfillment',
+      });
     }
 
     // Check stock availability before creating order
@@ -785,6 +815,7 @@ router.post('/orders', async (req: Request, res: Response) => {
             total_cents: item.total_cents,
             variant_id: validatedItems[index]?.variant_id || null,
             inventory_item_id: validatedItems[index]?.inventory_item_id || validatedItems[index]?.id, // Link to inventory item (or parent for variants)
+            product_type: validatedItems[index]?.product_type || 'physical',
             updated_at: new Date(),
           })),
         },

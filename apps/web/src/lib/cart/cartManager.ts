@@ -208,19 +208,28 @@ export function addToCart(
     cart.tenant_logo = tenantLogo;
   }
   
+  // Normalize productType to a known value
+  const validProductTypes = ['physical', 'digital', 'service', 'hybrid'];
+  const normalizedItem = {
+    ...item,
+    productType: validProductTypes.includes(item.productType as string)
+      ? item.productType
+      : 'physical',
+  };
+
   // Check if item already exists
   // Match by product_id AND variant_id to allow multiple variants of same product
   const existingIndex = cart.items.findIndex(
-    i => i.product_id === item.product_id && 
-         i.variant_id === item.variant_id
+    i => i.product_id === normalizedItem.product_id && 
+         i.variant_id === normalizedItem.variant_id
   );
   
   if (existingIndex >= 0) {
     // Update quantity
-    cart.items[existingIndex].quantity += item.quantity;
+    cart.items[existingIndex].quantity += normalizedItem.quantity;
   } else {
     // Add new item
-    cart.items.push(item);
+    cart.items.push(normalizedItem);
   }
   
   saveCart(cart);
@@ -432,4 +441,24 @@ export function migrateOldCarts(): void {
       console.log(`[Cart] Created tenant-wrapped cart for ${cart.tenant_id} with ${cart.items.length} items`);
     }
   });
+}
+
+export function validateFulfillmentMethod(
+  items: CartItem[],
+  fulfillmentMethod: string
+): { valid: boolean; reason?: string } {
+  if (!items.length || !fulfillmentMethod) return { valid: true };
+
+  const types = items.map(i => i.productType || 'physical');
+  const isDigitalOnly = types.length > 0 && types.every(t => t === 'digital');
+  const isServiceOnly = types.length > 0 && types.every(t => t === 'service');
+
+  if (isDigitalOnly && ['pickup', 'delivery', 'shipping'].includes(fulfillmentMethod)) {
+    return { valid: false, reason: 'Digital-only orders do not require a physical fulfillment method' };
+  }
+  if (isServiceOnly && fulfillmentMethod === 'shipping') {
+    return { valid: false, reason: 'Service-only orders cannot use shipping fulfillment' };
+  }
+
+  return { valid: true };
 }

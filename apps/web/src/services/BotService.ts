@@ -429,6 +429,71 @@ class BotService extends TenantApiSingleton {
     await this.invalidateCache(`bot-options-${tenantId}`);
     return result.data.settings ?? settings;
   }
+
+  async getEmbeddingsStatus(tenantId: string): Promise<{
+    hasFaqEmbeddings: boolean;
+    hasProductEmbeddings: boolean;
+    productTypeBreakdown?: { productType: string; count: number }[];
+    hasBadgeRegistryEmbeddings: boolean;
+    hasPolicyEmbeddings: boolean;
+    hasBusinessInfoEmbeddings: boolean;
+    hasHoursEmbeddings: boolean;
+    hasFulfillmentEmbeddings: boolean;
+    knowledgeEmbeddingCounts?: { sourceType: string; count: number }[];
+  }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/embeddings/status`,
+      { method: 'GET' },
+      `bot-embeddings-status-${tenantId}`,
+      30 * 1000,
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.error || 'Failed to get embeddings status');
+    return {
+      hasFaqEmbeddings: result.data.hasFaqEmbeddings ?? false,
+      hasProductEmbeddings: result.data.hasProductEmbeddings ?? false,
+      productTypeBreakdown: result.data.productTypeBreakdown ?? [],
+      hasBadgeRegistryEmbeddings: result.data.hasBadgeRegistryEmbeddings ?? false,
+      hasPolicyEmbeddings: result.data.hasPolicyEmbeddings ?? false,
+      hasBusinessInfoEmbeddings: result.data.hasBusinessInfoEmbeddings ?? false,
+      hasHoursEmbeddings: result.data.hasHoursEmbeddings ?? false,
+      hasFulfillmentEmbeddings: result.data.hasFulfillmentEmbeddings ?? false,
+      knowledgeEmbeddingCounts: result.data.knowledgeEmbeddingCounts ?? [],
+    };
+  }
+
+  async refreshFaqEmbeddings(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/embeddings/refresh`,
+      { method: 'POST' },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.error || 'Failed to refresh FAQ embeddings');
+    await this.invalidateCache(`bot-embeddings-status-${tenantId}`);
+    return result.data;
+  }
+
+  async refreshProductEmbeddings(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/product-embeddings/refresh`,
+      { method: 'POST' },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.error || 'Failed to refresh product embeddings');
+    await this.invalidateCache(`bot-embeddings-status-${tenantId}`);
+    return result.data;
+  }
+
+  async refreshKnowledgeEmbeddings(tenantId: string, sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment'): Promise<any> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/bot/embeddings/knowledge/refresh`,
+      { method: 'POST', body: JSON.stringify({ sourceType }) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.error || 'Failed to refresh knowledge embeddings');
+    await this.invalidateCache(`bot-embeddings-status-${tenantId}`);
+    return result.data;
+  }
 }
 
 export const botService = BotService.getInstance();

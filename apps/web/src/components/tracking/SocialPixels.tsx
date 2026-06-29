@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { socialPixelsService } from '@/services/SocialPixelsService';
 import { publicSocialPixelsService } from '@/services/PublicSocialPixelsService';
 
 interface PixelConfig {
@@ -11,6 +12,7 @@ interface PixelConfig {
 
 interface SocialPixelsProps {
   tenantId: string;
+  usePublic?: boolean;
 }
 
 declare global {
@@ -29,7 +31,7 @@ declare global {
  * AddToCart on cart updates, InitiateCheckout on checkout page,
  * and Purchase on checkout success page.
  */
-export function SocialPixels({ tenantId }: SocialPixelsProps) {
+export function SocialPixels({ tenantId, usePublic }: SocialPixelsProps) {
   const pathname = usePathname();
   const [config, setConfig] = useState<PixelConfig | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -39,7 +41,9 @@ export function SocialPixels({ tenantId }: SocialPixelsProps) {
 
     async function fetchConfig() {
       try {
-        const data = await publicSocialPixelsService.getPublicPixelConfig(tenantId);
+        const data = usePublic
+          ? await publicSocialPixelsService.getPublicPixelConfig(tenantId)
+          : await socialPixelsService.getPixelConfig(tenantId);
         if (data) {
           setConfig(data);
         }

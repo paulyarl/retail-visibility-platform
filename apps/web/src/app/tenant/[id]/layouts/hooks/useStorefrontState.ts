@@ -22,6 +22,8 @@ import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
+import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 export interface SocialCommerceFlags {
   enabled?: boolean;
@@ -257,6 +259,9 @@ export function useStorefrontState({
   >({});
   const [featuredData, setFeaturedData] = useState<any>(null);
 
+  // ---- Active featured (from ActiveFeaturedResolver) ----
+  const { data: activeFeatured } = useActiveFeatured(tenantId, 'storefront_spotlight', { limit: 8 });
+
   useEffect(() => {
     let cancelled = false;
     const loadFeaturedCounts = async () => {
@@ -413,6 +418,7 @@ export function useStorefrontState({
     // Featured
     featuredCounts,
     featuredData,
+    activeFeatured: activeFeatured ?? undefined,
     getFeaturedTypeName,
     getCategoryUrl,
   };

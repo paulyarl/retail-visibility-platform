@@ -1096,3 +1096,650 @@ This section analyzes the customer-facing order dashboard components to identify
 - **32.28** Show split fulfillment timeline in order detail: digital milestones + physical milestones
 - **32.29** Include both digital download links and physical shipping info in receipt for hybrid orders
 - **32.30** Add "Partially Fulfilled" badge for hybrid orders where digital is delivered but physical is pending
+
+---
+
+## Phased Implementation Plan for Parts 2 & 3
+
+This plan covers backend order/receipt handling (Part 2, §11–§24) and customer dashboard order views (Part 3, §25–§32). Part 1 (frontend display, §1–§10) is already in flight and is a prerequisite for some phases here.
+
+Phases are numbered B1–B7 (backend) and F1–F6 (frontend/customer dashboard). Backend phases generally precede corresponding frontend phases since the frontend depends on backend data.
+
+### Dependencies
+
+```
+Part 1 Phase 0 (backend product_type in API responses)
+  └─→ B1 (stock + checkout fixes) — independent, can start immediately
+  └─→ B2 (digital fulfillment fixes) — independent, can start immediately
+       └─→ F2 (customer dashboard digital downloads) — depends on B2
+  └─→ B3 (order status + fulfillment status) — independent
+       └─→ F3 (adaptive fulfillment timeline) — depends on B3
+  └─→ B4 (notifications + receipt emails) — depends on B2, B3
+  └─→ B5 (API responses: product_type in order items) — independent
+       └─→ F1 (customer dashboard data flow) — depends on B5
+  └─→ B6 (service fulfillment) — independent, can start immediately
+       └─→ F5 (service appointment UI) — depends on B6
+  └─→ B7 (hybrid fulfillment) — depends on B2, B6
+       └─→ F6 (hybrid order views) — depends on B7
+```
+
+### Phase B1: Stock & Checkout Product-Type Fixes (§11, §12)
+**Goal:** Stop blocking digital/service orders with physical-stock logic
+**Effort:** Medium
+**Risk:** Medium (touches checkout flow + stock service)
+**Priority:** P0 — blocking correct behavior
+
+**Backend changes:**
+
+- **B1.1** `StockService.ts` — Skip `decrementStockForOrder` for items where `product_type` is `digital` or `service`. Query `inventory_items.product_type` for each order item before decrementing.
+- **B1.2** `StockService.ts` — Skip `restoreStockForOrder` for items where `product_type` is `digital` or `service`.
+- **B1.3** `checkout.ts` — Skip stock validation (`variant.stock < item.quantity` / `inventoryItem.stock < item.quantity`) for items where `product_type` is `digital` or `service`. Look up `product_type` from `inventory_items` or `product_variants` during validation.
+- **B1.4** `checkout.ts` — Validate `fulfillment_method` compatibility with product types: reject `pickup`/`delivery`/`shipping` for digital-only orders; reject `shipping` for service-only orders (unless service has a physical location component).
+- **B1.5** `checkout.ts` — Store `product_type` on each `order_items` record during order creation (add to `itemData` object). If schema doesn't have a `product_type` column on `order_items`, store it in `metadata` JSON as a fallback.
+
+**Files touched:** `StockService.ts`, `checkout.ts`, possibly `schema.prisma` (if adding column)
+**Testing:**
+- Create a digital product with `stock = 0`, verify checkout succeeds
+- Create a service product with `stock = 0`, verify checkout succeeds
+- Cancel a digital order, verify stock is NOT restored (no error)
+- Create a physical product order, verify stock IS decremented and restored on cancel
+- Attempt checkout with `fulfillment_method: 'pickup'` for digital-only cart, verify rejection
+**Acceptance criteria:**
+- [ ] Digital products with `stock = 0` can be ordered
+- [ ] Service products with `stock = 0` can be ordered
+- [ ] Stock is not decremented for digital/service items
+- [ ] Stock is not restored for digital/service items on cancellation
+- [ ] `fulfillment_method` is validated against product types
+- [ ] `checkapi` passes
+
+---
+
+### Phase B2: Digital Fulfillment Fixes (§16, §17, §22)
+**Goal:** Complete the digital fulfillment pipeline — status updates, email wiring, access revocation
+**Effort:** Medium
+**Risk:** Low-Medium
+**Priority:** P0 — blocking correct behavior
+
+**Backend changes:**
+
+- **B2.1** `DigitalFulfillmentService.ts` — After `fulfillOrder` completes for a digital-only order, update the order's `fulfillment_status` to `fulfilled` and `order_status` to `delivered`. For hybrid orders, set `fulfillment_status` to `partially_fulfilled`.
+- **B2.2** `DigitalDownloadEmailService.ts` — Wire `sendDownloadReceipt` to the actual email service (remove TODO stub). Use the existing `emailService` or `Resend`/`SendGrid` integration used by `OrderNotificationService`.
+- **B2.3** `buyer-orders.ts` — In the cancel endpoint, after restoring stock, check if the order has digital products. If so, revoke all active digital access grants for that order (set `is_revoked = true` on `digital_access_grants`).
+- **B2.4** `tenant-orders.ts` — In the fulfillment cancel endpoint, same digital access revocation as B2.3.
+- **B2.5** `StripeWebhookHandler.ts` — Add `StockService.decrementStockForOrder` call after successful payment (currently only in checkout payment routes, not webhook handler). Or: extract stock decrement into a shared post-payment function and call from all 4 places (webhook + 3 checkout routes).
+- **B2.6** Extract digital fulfillment logic from `checkout/stripe.ts`, `checkout/paypal.ts`, `checkout/square.ts` into a shared `postPaymentFulfillment(orderId, tenantId)` function to eliminate duplication. Call from all 3 checkout routes + webhook handler.
+
+**Files touched:** `DigitalFulfillmentService.ts`, `DigitalDownloadEmailService.ts`, `buyer-orders.ts`, `tenant-orders.ts`, `StripeWebhookHandler.ts`, `checkout/stripe.ts`, `checkout/paypal.ts`, `checkout/square.ts`
+**Testing:**
+- Place a digital-only order, verify `fulfillment_status` becomes `fulfilled` after payment
+- Place a hybrid order, verify `fulfillment_status` becomes `partially_fulfilled` after digital component is delivered
+- Verify digital download email is actually sent (check email service logs)
+- Cancel a digital order, verify `digital_access_grants.is_revoked = true` for all grants
+- Verify stock is decremented for orders paid via Stripe webhook
+**Acceptance criteria:**
+- [ ] Digital-only orders auto-fulfill after payment (`fulfillment_status = fulfilled`)
+- [ ] Hybrid orders show `partially_fulfilled` after digital component delivery
+- [ ] `DigitalDownloadEmailService.sendDownloadReceipt` sends actual emails
+- [ ] Cancelling a digital order revokes access grants
+- [ ] Stock is decremented regardless of payment path (direct vs webhook)
+- [ ] `checkapi` passes
+
+---
+
+### Phase B3: Order Status & Fulfillment Status Enums (§13, §14)
+**Goal:** Add product-type-specific statuses so order state reflects actual fulfillment state
+**Effort:** Medium
+**Risk:** Medium (schema migration + enum changes affect existing code)
+**Priority:** P1 — correct semantics
+
+**Backend changes:**
+
+- **B3.1** `schema.prisma` — Add to `order_status` enum: `access_granted` (digital delivered), `scheduled` (service booked), `in_progress` (service being performed). Add to `fulfillment_status` enum: `digitally_delivered` (digital component complete, physical pending in hybrid).
+- **B3.2** Create migration SQL for the enum additions. Use `ALTER TYPE ... ADD VALUE` for PostgreSQL enums.
+- **B3.3** `OrderManagementService.ts` — Add product-type-aware status validation in `updateOrderStatus`: reject `shipped` for digital-only orders, reject `delivered` for service orders unless `in_progress` was set first, etc. Add a `getValidStatusTransitions(orderId)` method that returns valid next statuses based on order item product types.
+- **B3.4** `OrderManagementService.ts` — Include `product_type` for order items in the `OrderLocationInfo` response (query `inventory_items.product_type` and include in returned data).
+- **B3.5** `buyer-orders.ts` and `tenant-orders.ts` — Add `product_type` to order item mappings in all API responses (list, detail, etc.).
+
+**Files touched:** `schema.prisma`, new migration SQL, `OrderManagementService.ts`, `buyer-orders.ts`, `tenant-orders.ts`
+**Testing:**
+- Verify new enum values are accepted by the database
+- Attempt to set `shipped` on a digital-only order, verify rejection
+- Verify `product_type` appears in order item API responses for both buyer and tenant endpoints
+**Acceptance criteria:**
+- [ ] `order_status` enum includes `access_granted`, `scheduled`, `in_progress`
+- [ ] `fulfillment_status` enum includes `digitally_delivered`
+- [ ] Status transitions are validated against product types
+- [ ] `product_type` is included in all order item API responses
+- [ ] `checkapi` passes
+
+---
+
+### Phase B4: Notifications & Receipt Emails (§19, §22)
+**Goal:** Send product-type-appropriate notifications and receipts
+**Effort:** Large
+**Risk:** Medium
+**Priority:** P1 — correct UX
+
+**Backend changes:**
+
+- **B4.1** `OrderNotificationService.ts` — Add new notification types: `digital_delivered`, `service_scheduled`, `service_completed`. Add template branches in `buildCustomerEmailPayload` for each type.
+  - `digital_delivered`: "Your digital products are ready to download" + download links
+  - `service_scheduled`: "Your service is confirmed" + appointment details
+  - `service_completed`: "Your service has been completed" + summary
+- **B4.2** `OrderNotificationService.ts` — In `order_fulfilled` notification, check order item product types. If digital-only, use `digital_delivered` template instead of physical pickup/shipping template. If service, use `service_completed` template. If hybrid, send both digital and physical info.
+- **B4.3** Create `OrderReceiptEmailService.ts` — New service for sending customer order receipt emails with itemized products, prices, totals, and type-specific information (download links for digital, appointment details for service, shipping info for physical). Triggered after successful payment.
+- **B4.4** Wire `OrderReceiptEmailService` into the post-payment flow (call from the shared `postPaymentFulfillment` function created in B2.6).
+- **B4.5** `OrderNotificationService.ts` — Integrate with `DigitalDownloadEmailService` so digital delivery notifications are logged in `notification_logs` and tracked in CRM alerts (currently `DigitalDownloadEmailService` operates independently).
+
+**Files touched:** `OrderNotificationService.ts`, new `OrderReceiptEmailService.ts`, `checkout/stripe.ts`, `checkout/paypal.ts`, `checkout/square.ts`, `StripeWebhookHandler.ts`
+**Testing:**
+- Place a digital order, verify customer receives "digital_delivered" email (not "order ready for pickup")
+- Place a service order, verify customer receives "service_scheduled" email
+- Place a physical order, verify existing notification behavior unchanged
+- Verify receipt email includes itemized products with correct type-specific info
+**Acceptance criteria:**
+- [ ] Digital orders send `digital_delivered` notification (not physical template)
+- [ ] Service orders send `service_scheduled` notification
+- [ ] Customer order receipt email is sent after payment with itemized products
+- [ ] Digital delivery notifications are logged in `notification_logs`
+- [ ] `checkapi` passes
+
+---
+
+### Phase B5: Order API Response Enrichment (§20, §21)
+**Goal:** Include `product_type` and digital access info in all order API responses
+**Effort:** Small-Medium
+**Risk:** Low
+**Priority:** P0 — frontend depends on this
+
+**Backend changes:**
+
+- **B5.1** `buyer-orders.ts` — Add `product_type` to order item mapping in all response paths (list, detail, etc.). Include `productType: item.inventory_items?.product_type` in the item object.
+- **B5.2** `buyer-orders.ts` — In the order detail response, include digital access grant information: download URLs, access expiry, download count, download limit, revoked status. Query `digital_access_grants` for orders with digital items.
+- **B5.3** `tenant-orders.ts` — Add `product_type` to order item mapping in all response paths.
+- **B5.4** `buyer-orders.ts` — Add a `PATCH /:orderId/fulfill` endpoint for digital orders (or extend the existing pickup endpoint to accept digital fulfillment confirmation). This allows customers to confirm digital delivery without requiring a physical fulfillment method.
+- **B5.5** Create a dedicated `GET /api/orders/customer/:email/downloads` endpoint that returns all digital downloads for a customer across all orders (eliminates the N+1 problem in the frontend downloads page).
+
+**Files touched:** `buyer-orders.ts`, `tenant-orders.ts`
+**Testing:**
+- GET order detail for a digital order, verify `productType` and `downloadUrl`/`accessExpiry` in response
+- GET order list, verify `productType` on each item
+- GET customer downloads endpoint, verify all digital downloads returned in single call
+**Acceptance criteria:**
+- [ ] `product_type` is in all order item API responses (buyer + tenant)
+- [ ] Digital access grant info is included in order detail responses
+- [ ] Dedicated customer downloads endpoint exists (no N+1)
+- [ ] `checkapi` passes
+
+---
+
+### Phase B6: Service Fulfillment Service (§15, §16, §17)
+**Goal:** Create the service product fulfillment pipeline — booking, scheduling, notifications
+**Effort:** Large
+**Risk:** Medium
+**Priority:** P2 — service product support
+
+**Backend changes:**
+
+- **B6.1** Create `ServiceFulfillmentService.ts` — New service for service product fulfillment. Methods: `hasServiceProducts(orderId)`, `fulfillOrder(orderId)` (creates booking record, assigns provider if specified, sends confirmation), `cancelBooking(orderId)`.
+- **B6.2** Create `service_bookings` table (migration + Prisma model) — Fields: `id`, `order_id`, `order_item_id`, `tenant_id`, `customer_email`, `customer_name`, `customer_phone`, `scheduled_date`, `scheduled_time`, `duration_minutes`, `provider_id` (nullable), `provider_name` (nullable), `service_location` (nullable), `status` (`pending` | `confirmed` | `in_progress` | `completed` | `cancelled`), `notes`, `created_at`, `updated_at`.
+- **B6.3** `checkout.ts` — Add service booking fields to the order creation request: `service_booking` object with `preferred_date`, `preferred_time`, `service_location`, `provider_id` (optional). Store in order metadata or create `service_bookings` record during checkout.
+- **B6.4** Wire `ServiceFulfillmentService.fulfillOrder` into the shared `postPaymentFulfillment` function (B2.6). After successful payment, if order has service products, create booking record and send confirmation notification.
+- **B6.5** `tenant-orders.ts` — Add endpoints for service fulfillment management: `PUT /fulfillment` with service-specific fields (`providerId`, `scheduledDate`, `scheduledTime`, `serviceLocation`, `serviceStatus`). Add `POST /:orderId/service/assign-provider` endpoint.
+- **B6.6** `OrderNotificationService.ts` — Add `service_scheduled` and `service_reminder` notification types. Send reminder 24h before appointment (requires a scheduled job).
+
+**Files touched:** new `ServiceFulfillmentService.ts`, new migration SQL, `schema.prisma`, `checkout.ts`, `tenant-orders.ts`, `OrderNotificationService.ts`
+**Testing:**
+- Place a service order with preferred date/time, verify booking record is created after payment
+- Verify service confirmation email is sent with appointment details
+- Merchant updates service status to `in_progress` then `completed`, verify status transitions
+- Cancel a service order, verify booking is cancelled
+**Acceptance criteria:**
+- [ ] `ServiceFulfillmentService` creates bookings after payment
+- [ ] Service bookings table exists with correct schema
+- [ ] Service confirmation notifications are sent
+- [ ] Merchants can manage service fulfillment status
+- [ ] `checkapi` passes
+
+---
+
+### Phase B7: Hybrid Fulfillment Coordination (§16, §17)
+**Goal:** Coordinate digital + physical fulfillment for hybrid orders
+**Effort:** Medium
+**Risk:** Medium
+**Priority:** P2 — hybrid product support
+**Depends on:** B2 (digital fulfillment), B6 (service fulfillment if hybrid includes service component)
+
+**Backend changes:**
+
+- **B7.1** `DigitalFulfillmentService.ts` — After fulfilling the digital component of a hybrid order, set `fulfillment_status` to `partially_fulfilled` (not `fulfilled`). Only set `fulfilled` when both digital and physical components are complete.
+- **B7.2** Create `HybridFulfillmentCoordinator.ts` (or add to `FulfillmentService.ts`) — Method `checkHybridFulfillmentComplete(orderId)`: checks if all digital items have `digital_delivery_status = 'delivered'` AND all physical items have `fulfillment_status = 'fulfilled'`. If both complete, set order `fulfillment_status = fulfilled` and `order_status = delivered`.
+- **B7.3** `tenant-orders.ts` — When merchant marks physical fulfillment as complete for a hybrid order, call `checkHybridFulfillmentComplete` to determine if the order is fully fulfilled.
+- **B7.4** `buyer-orders.ts` — When customer confirms physical pickup/delivery for a hybrid order, call `checkHybridFulfillmentComplete`.
+- **B7.5** `OrderNotificationService.ts` — For hybrid order `order_fulfilled` notification, include both digital download links and physical fulfillment confirmation in the same email.
+
+**Files touched:** `DigitalFulfillmentService.ts`, new `HybridFulfillmentCoordinator.ts` or `FulfillmentService.ts`, `tenant-orders.ts`, `buyer-orders.ts`, `OrderNotificationService.ts`
+**Testing:**
+- Place a hybrid order, verify digital component is delivered immediately and `fulfillment_status = partially_fulfilled`
+- Complete physical fulfillment, verify `fulfillment_status = fulfilled` and `order_status = delivered`
+- Verify notification includes both digital and physical info
+**Acceptance criteria:**
+- [ ] Hybrid orders use `partially_fulfilled` after digital delivery
+- [ ] Hybrid orders auto-transition to `fulfilled` when both components complete
+- [ ] Notifications include both digital and physical info for hybrid orders
+- [ ] `checkapi` passes
+
+---
+
+### Phase F1: Customer Dashboard Data Flow (§25)
+**Goal:** Fix the frontend service layer to carry `productType` to all customer dashboard components
+**Effort:** Small
+**Risk:** Low
+**Priority:** P0 — all frontend phases depend on this
+**Depends on:** B5 (backend returns `product_type` in order responses)
+
+**Frontend changes:**
+
+- **F1.1** `CustomerOrderService.ts` — Add `'service'` to `CustomerOrderItem.productType` union type (line 89): `'physical' | 'digital' | 'hybrid' | 'service'`.
+- **F1.2** `CustomerOrderService.ts` — In `getOrder()` (lines 229-260), add `productType: item.inventory_items?.product_type || item.productType` to the item mapping. Currently only `getCustomerOrders()` maps this.
+- **F1.3** `CustomerOrderService.ts` — In `getBuyerOrders()` (lines 628-652), map the raw API response to include `productType` on items, similar to `getCustomerOrders()`. Or: update `BuyerOrderHistory.tsx` to use `CustomerOrder` type instead of its own `BuyerOrder` type.
+- **F1.4** `CustomerOrderService.ts` — Add `OrderRequest.fulfillmentMethod` to include `'digital'` and `'service'` options (mirror backend changes from B1.4).
+- **F1.5** `CustomerOrderService.ts` — Add `getCustomerDownloads(email)` method that calls the new dedicated downloads endpoint from B5.5 (eliminates N+1 in downloads page).
+
+**Files touched:** `CustomerOrderService.ts`
+**Testing:**
+- Call `getOrder(orderId)` for a digital order, verify `items[0].productType === 'digital'`
+- Call `getOrder(orderId)` for a service order, verify `items[0].productType === 'service'`
+- Call `getBuyerOrders()`, verify `productType` on items
+- Call `getCustomerDownloads()`, verify single API call returns all downloads
+**Acceptance criteria:**
+- [ ] `CustomerOrderItem.productType` includes `'service'`
+- [ ] `getOrder()` maps `productType` on items
+- [ ] `getBuyerOrders()` returns items with `productType`
+- [ ] `getCustomerDownloads()` method exists
+- [ ] `checkweb` passes
+
+---
+
+### Phase F2: Digital Downloads in Order Views (§26, §27, §28, §30)
+**Goal:** Surface digital download links in all order views, not just the guest detail modal
+**Effort:** Medium
+**Risk:** Low
+**Depends on:** F1 (data flow), B2 (digital fulfillment fixes)
+
+**Frontend changes:**
+
+- **F2.1** `BuyerOrderHistory.tsx` — Add "Has Downloads" badge on order list cards for orders containing digital products. Derive from `items.some(i => i.productType === 'digital' || i.productType === 'hybrid')`.
+- **F2.2** `account/orders/page.tsx` — Add digital downloads section to the receipt view (lines 233-407). Fetch downloads using `customerOrderService.getOrderDownloads(orderId)` and render the same download card UI as `BuyerOrderHistory.tsx` (lines 717-833). Extract the download card UI into a shared `DigitalDownloadsCard` component.
+- **F2.3** `account/orders/[orderId]/page.tsx` — Add digital downloads section below the order items card. Include "Go to Downloads" link to `/account/downloads`.
+- **F2.4** Create shared `DigitalDownloadsCard.tsx` component — Extract from `BuyerOrderHistory.tsx` lines 717-833. Reusable component that takes `orderId` and renders download cards with access status, download limits, and download buttons.
+- **F2.5** `account/downloads/page.tsx` — Replace the N+1 fetch loop (lines 59-110) with `customerOrderService.getCustomerDownloads(email)` single call from F1.5.
+- **F2.6** `account/downloads/page.tsx` — Add `'service'` to `DigitalDownload.productType` type (line 22) and remove `'physical'` (not applicable).
+
+**Files touched:** `BuyerOrderHistory.tsx`, `account/orders/page.tsx`, `account/orders/[orderId]/page.tsx`, new `DigitalDownloadsCard.tsx`, `account/downloads/page.tsx`
+**Testing:**
+- View order list, verify "Has Downloads" badge on digital orders
+- View account order detail, verify digital downloads section appears for digital orders
+- View `/account/downloads`, verify single API call loads all downloads
+- Verify `DigitalDownloadsCard` renders correctly in all 3 locations
+**Acceptance criteria:**
+- [ ] Order list shows "Has Downloads" badge for digital/hybrid orders
+- [ ] `account/orders/page.tsx` receipt view includes digital downloads section
+- [ ] `account/orders/[orderId]/page.tsx` includes digital downloads + link to downloads page
+- [ ] `DigitalDownloadsCard` is a reusable shared component
+- [ ] Downloads page uses single API call (no N+1)
+- [ ] `checkweb` passes
+
+---
+
+### Phase F3: Adaptive Fulfillment Timeline (§28)
+**Goal:** Order detail fulfillment timeline adapts based on product type
+**Effort:** Medium
+**Risk:** Low
+**Depends on:** B3 (new order statuses), F1 (data flow)
+
+**Frontend changes:**
+
+- **F3.1** `account/orders/[orderId]/page.tsx` — Replace hardcoded `getFulfillmentSteps()` (lines 85-96) with a product-type-aware function:
+  - Detect order's primary product type from `order.items` (if all items same type, use that; if mixed, use `hybrid`)
+  - Physical: Order Placed → Processing → Shipped → Delivered
+  - Digital: Order Placed → Payment Confirmed → Access Granted → Downloaded
+  - Service: Order Placed → Payment Confirmed → Scheduled → In Progress → Completed
+  - Hybrid: Order Placed → Payment Confirmed → Digital Delivered → Physical Shipped → Delivered
+- **F3.2** Create `FulfillmentTimeline.tsx` component — Reusable timeline that takes `order` + `productType` and renders the correct steps with icons, labels, completion states. Use Lucide icons: `CheckCircle`, `CreditCard`, `Download`, `Calendar`, `Clock`, `Package`, `Truck`.
+- **F3.3** `BuyerOrderHistory.tsx` — In the order detail view, replace the implicit status display with `FulfillmentTimeline` component for consistency.
+- **F3.4** `account/orders/page.tsx` — In the receipt view, show a compact timeline indicator (optional — may just use status badge).
+
+**Files touched:** `account/orders/[orderId]/page.tsx`, new `FulfillmentTimeline.tsx`, `BuyerOrderHistory.tsx`, `account/orders/page.tsx`
+**Testing:**
+- View a physical order detail, verify 4-step physical timeline
+- View a digital order detail, verify 4-step digital timeline (no "Shipped" step)
+- View a service order detail, verify 5-step service timeline
+- View a hybrid order detail, verify 5-step hybrid timeline
+**Acceptance criteria:**
+- [ ] Fulfillment timeline adapts based on product type
+- [ ] `FulfillmentTimeline` is a reusable component
+- [ ] Digital orders don't show "Shipped" step
+- [ ] Service orders show "Scheduled" and "In Progress" steps
+- [ ] `checkweb` passes
+
+---
+
+### Phase F4: Product-Type-Centric Order List & Receipt (§26, §27, §29)
+**Goal:** Order list cards and receipts show product type indicators and type-specific info
+**Effort:** Medium-Large
+**Risk:** Low
+**Depends on:** F1 (data flow), F2 (downloads)
+
+**Frontend changes:**
+
+- **F4.1** Create `ProductTypeBadge.tsx` component — Small badge showing product type with icon + color + label. Variants: `physical` (Package, blue), `digital` (Download, purple), `service` (Calendar, green), `hybrid` (Layers, orange). Reusable across order list, order detail, and receipt.
+- **F4.2** `BuyerOrderHistory.tsx` — Add `ProductTypeBadge` to order list cards (derive primary type from items). Add type-specific icons to `getFulfillmentIcon`: `Download` for digital, `Calendar` for service. Add type-specific labels to `getFulfillmentLabel`: "Instant Download" for digital, "Scheduled Service" for service.
+- **F4.3** `BuyerOrderHistory.tsx` — Add type-specific CTAs to order detail: "Download Digital Products" button for digital orders (scrolls to downloads section or links to `/account/downloads`), "View Appointment" button for service orders.
+- **F4.4** `account/orders/page.tsx` — Add `ProductTypeBadge` to order list items. Add type filter to status filter dropdown: "Digital", "Service", "Has Downloads". Add type-specific CTAs to receipt actions.
+- **F4.5** `OrderReceipt.tsx` — Add `productType` to `cart.items` interface. Display `ProductTypeBadge` next to each item name. Add digital delivery section to fulfillment method area (download links, access expiry). Add service appointment section (date, time, provider, location). Hide store hours/QR directions for digital-only orders.
+- **F4.6** `OrderReceipt.tsx` — Update `getStatusBadge` to handle `access_granted`, `scheduled`, `in_progress`, `digitally_delivered` statuses. Update receipt visibility check (line 311) to include new statuses.
+- **F4.7** All three `OrderReceipt` call sites (`BuyerOrderHistory.tsx`, `account/orders/page.tsx`, `account/orders/[orderId]/page.tsx`) — Pass `productType` when constructing cart item props.
+- **F4.8** `BuyerOrderHistory.tsx` — Update `canConfirmFulfillment` check (lines 359-362) to allow digital orders (no fulfillment method required). Add "Confirm Download" action for digital orders.
+- **F4.9** `account/orders/[orderId]/page.tsx` — Hide or de-emphasize shipping address card for digital-only orders. Show "Billing Address" label instead of "Shipping Address" for digital orders.
+
+**Files touched:** new `ProductTypeBadge.tsx`, `BuyerOrderHistory.tsx`, `account/orders/page.tsx`, `OrderReceipt.tsx`, `account/orders/[orderId]/page.tsx`
+**Testing:**
+- View order list with mixed types, verify type badges on each card
+- View digital order receipt, verify download links in fulfillment section
+- View service order receipt, verify appointment details in fulfillment section
+- View digital order receipt, verify store hours/QR are hidden
+- Filter order list by "Digital", verify only digital orders shown
+- Verify `ProductTypeBadge` renders correctly for all 4 types
+**Acceptance criteria:**
+- [ ] `ProductTypeBadge` component exists and is used in order list, detail, and receipt
+- [ ] Order list shows type badges and type-specific icons/labels
+- [ ] Order list has type filter options
+- [ ] `OrderReceipt` shows digital delivery section for digital orders
+- [ ] `OrderReceipt` shows service appointment section for service orders
+- [ ] `OrderReceipt` hides store info for digital-only orders
+- [ ] `OrderReceipt` items show `ProductTypeBadge`
+- [ ] `checkweb` passes
+
+---
+
+### Phase F5: Service Appointment UI (§26, §28, §30)
+**Goal:** Service customers can view and manage appointments from the dashboard
+**Effort:** Large
+**Risk:** Medium
+**Depends on:** B6 (service fulfillment backend), F1 (data flow)
+
+**Frontend changes:**
+
+- **F5.1** Create `ServiceAppointmentCard.tsx` component — Displays service appointment details: date, time, duration, provider name, service location, status badge, and action buttons (Reschedule, Cancel). Fetches data from order item's service booking info.
+- **F5.2** Create `/account/appointments` page — Dedicated page for service bookings (mirrors `/account/downloads` pattern). Fetches all service bookings for the customer. Shows list of `ServiceAppointmentCard` components sorted by upcoming date.
+- **F5.3** `BuyerOrderHistory.tsx` — In order detail view, add `ServiceAppointmentCard` section for orders containing service products (alongside digital downloads and shipping sections).
+- **F5.4** `account/orders/[orderId]/page.tsx` — Add `ServiceAppointmentCard` section for service orders.
+- **F5.5** `account/orders/page.tsx` — Add "View Appointment" CTA on order list cards for service orders. Links to `/account/appointments` or opens appointment detail.
+- **F5.6** Add navigation link to `/account/appointments` in the customer dashboard sidebar (via database `navigation_links` table — follow the platform's database-driven navigation pattern).
+
+**Files touched:** new `ServiceAppointmentCard.tsx`, new `account/appointments/page.tsx`, `BuyerOrderHistory.tsx`, `account/orders/[orderId]/page.tsx`, `account/orders/page.tsx`, database `navigation_links` (SQL insert)
+**Testing:**
+- Place a service order, verify appointment card appears in order detail
+- Navigate to `/account/appointments`, verify all service bookings listed
+- Verify appointment card shows correct date, time, provider, location, status
+- Verify "Reschedule" and "Cancel" buttons appear (functionality may be future phase)
+**Acceptance criteria:**
+- [ ] `ServiceAppointmentCard` component exists
+- [ ] `/account/appointments` page exists and shows all service bookings
+- [ ] Service appointment info appears in order detail views
+- [ ] "View Appointment" CTA appears on service order list cards
+- [ ] Navigation link to appointments page exists in sidebar
+- [ ] `checkweb` passes
+
+---
+
+### Phase F6: Hybrid Order Views (§26, §28, §29)
+**Goal:** Hybrid orders show split fulfillment status and combined info
+**Effort:** Medium
+**Risk:** Low-Medium
+**Depends on:** B7 (hybrid fulfillment backend), F2 (downloads), F3 (timeline), F4 (receipt)
+
+**Frontend changes:**
+
+- **F6.1** `BuyerOrderHistory.tsx` — For hybrid orders, show split fulfillment status badge: "Digital: Delivered, Physical: Shipped" (or similar compact representation). Use `partially_fulfilled` status to trigger this display.
+- **F6.2** `FulfillmentTimeline.tsx` — For hybrid orders, render a split timeline showing both digital milestones (Access Granted) and physical milestones (Shipped, Delivered) as parallel tracks or a combined sequence.
+- **F6.3** `OrderReceipt.tsx` — For hybrid orders, fulfillment method section shows both: digital download links (from F4.5) AND physical shipping/pickup info. Both sections rendered, clearly labeled.
+- **F6.4** `account/orders/[orderId]/page.tsx` — For hybrid orders, show both digital downloads section and shipping/pickup info. Add "Partially Fulfilled" badge when digital is delivered but physical is pending.
+- **F6.5** `BuyerOrderHistory.tsx` — Update `canConfirmFulfillment` to handle hybrid orders: allow physical fulfillment confirmation even when digital is already delivered.
+
+**Files touched:** `BuyerOrderHistory.tsx`, `FulfillmentTimeline.tsx`, `OrderReceipt.tsx`, `account/orders/[orderId]/page.tsx`
+**Testing:**
+- Place a hybrid order, verify split fulfillment status on order list
+- View hybrid order detail, verify split timeline with both digital and physical milestones
+- View hybrid order receipt, verify both download links and shipping info
+- Verify "Partially Fulfilled" badge shows when digital is delivered but physical is pending
+**Acceptance criteria:**
+- [ ] Hybrid orders show split fulfillment status on order list
+- [ ] `FulfillmentTimeline` shows combined digital + physical milestones for hybrid orders
+- [ ] `OrderReceipt` shows both digital downloads and shipping info for hybrid orders
+- [ ] "Partially Fulfilled" badge appears for partially completed hybrid orders
+- [ ] `checkweb` passes
+
+---
+
+### Phase Sequencing Summary
+
+| Phase | Domain | Effort | Priority | Depends On |
+|-------|--------|--------|----------|------------|
+| B1 | Backend: Stock & Checkout | Medium | P0 | Part 1 Phase 0 |
+| B2 | Backend: Digital Fulfillment | Medium | P0 | — |
+| B3 | Backend: Status Enums | Medium | P1 | — |
+| B4 | Backend: Notifications & Receipts | Large | P1 | B2, B3 |
+| B5 | Backend: API Response Enrichment | Small-Med | P0 | — |
+| B6 | Backend: Service Fulfillment | Large | P2 | — |
+| B7 | Backend: Hybrid Coordination | Medium | P2 | B2, B6 |
+| F1 | Frontend: Data Flow | Small | P0 | B5 |
+| F2 | Frontend: Digital Downloads | Medium | P0 | F1, B2 |
+| F3 | Frontend: Adaptive Timeline | Medium | P1 | B3, F1 |
+| F4 | Frontend: Order List & Receipt | Med-Large | P1 | F1, F2 |
+| F5 | Frontend: Service Appointments | Large | P2 | B6, F1 |
+| F6 | Frontend: Hybrid Views | Medium | P2 | B7, F2, F3, F4 |
+
+### Recommended Execution Order
+
+**Sprint 1 (P0 — unblock everything):**
+1. B1 (stock & checkout fixes) + B5 (API enrichment) + B2 (digital fulfillment) — all independent, can be done in parallel
+2. F1 (frontend data flow) — immediately after B5
+
+**Sprint 2 (P0/P1 — customer-facing improvements):**
+3. F2 (digital downloads in order views) — after F1 + B2
+4. B3 (status enums) — independent
+
+**Sprint 3 (P1 — correct semantics & UX):**
+5. B4 (notifications & receipts) — after B2 + B3
+6. F3 (adaptive timeline) — after B3 + F1
+7. F4 (order list & receipt) — after F1 + F2
+
+**Sprint 4 (P2 — service & hybrid):**
+8. B6 (service fulfillment) — independent
+9. B7 (hybrid coordination) — after B2 + B6
+10. F5 (service appointments) — after B6 + F1
+11. F6 (hybrid views) — after B7 + F2 + F3 + F4
+
+### Cross-Cutting Acceptance Criteria
+
+- [ ] `checkapi` passes after all backend phases
+- [ ] `checkweb` passes after all frontend phases
+- [ ] Digital product with `stock = 0` can be ordered, fulfilled, and downloaded
+- [ ] Service product with `stock = 0` can be ordered, booked, and managed
+- [ ] Hybrid product delivers digital component immediately, physical component follows normal fulfillment
+- [ ] Customer order list shows product type badges and type-specific CTAs
+- [ ] Customer order detail shows adaptive fulfillment timeline
+- [ ] Customer receipt shows type-specific info (download links, appointment details, shipping)
+- [ ] Cancelled digital orders have access revoked
+- [ ] Customer receives product-type-appropriate email notifications
+- [ ] No regressions in physical product order flow
+
+---
+
+## Additional Gaps Discovered During Part 1 Implementation
+
+**Date:** 2026-06-27 (post Part 1 Phases 1–7)
+**Context:** While implementing type-aware display across `SmartProductCard`, `StorefrontFeaturedProducts`, shopping cart, and variant selector, the following additional gaps were identified for Part 2 (backend) and Part 3 (customer dashboard).
+
+---
+
+### Part 2 (Backend) — New Gaps
+
+#### GAP-B8: `productType` Not Persisted on `order_items` at Checkout
+**Found during:** Phase 6 (cart type awareness)
+**Problem:** `AddToCartButton` now passes `productType` to the cart, but when checkout creates `order_items`, there is no `product_type` column on the `order_items` table. The `productType` is lost at order creation time. Backend phases B1.5 and B5.1 mention storing/mapping `product_type`, but no migration adds the column.
+**Impact:** All downstream customer dashboard features (F1–F6) depend on `product_type` being available in order responses. Without a persisted column, the backend must do an N+1 join to `inventory_items.product_type` for every order query.
+**Recommendation:** Add `product_type` column to `order_items` table in a new migration. Populate during checkout from the cart item's `productType` or from `inventory_items.product_type`. This eliminates the need for joins in B5.1/B5.3 and makes the data resilient to product deletion.
+
+#### GAP-B9: Cart Manager Does Not Validate `productType` on Add
+**Found during:** Phase 6.1 (CartItem interface)
+**Problem:** `cartManager.ts` now accepts `productType?: string` on `CartItem` but performs no validation. A malformed or unknown `productType` value (e.g., `"subscription"`, empty string) would flow through to the cart display and potentially to checkout.
+**Impact:** Low — current callers (`AddToCartButton`, `SmartProductCard`) always pass valid values or omit the field. But if future code paths add items directly to `cartManager`, invalid values could cause UI glitches.
+**Recommendation:** Add a validation check in `addToCartManager` that normalizes `productType` to one of `physical | digital | service | hybrid` (defaulting to `physical` if missing or unrecognized).
+
+#### GAP-B10: `ProductPurchasePanel` Availability Status Uses Physical-Only Labels
+**Found during:** Phase 7 (variant selector)
+**Problem:** `ProductPurchasePanel.tsx` (lines 238–268) shows "In Stock" / "Out of Stock" for all product types. For digital products, "Out of Stock" is misleading (should be "Unavailable"). For service products, "Out of Stock" should be "Fully Booked". The `effectiveAvailability` variable is derived from stock count, which is physical-centric.
+**Impact:** Customers see "Out of Stock" for digital/service products that are actually available but have `stock = 0` in the database (common for digital/service products where stock is not meaningful).
+**Recommendation:** In `ProductPurchasePanel`, derive availability label from `product.productType`:
+- `digital`: "Available" / "Unavailable" (ignore stock)
+- `service`: "Open Slots" / "Fully Booked" (ignore stock or use booking slot count)
+- `hybrid`: Show physical stock + "Digital Available"
+- `physical`: Keep existing stock-based logic
+
+#### GAP-B11: `TierBasedLandingPage` Variant Selector Lacks `productType` Prop
+**Found during:** Phase 7.3
+**Problem:** Fixed in Part 1 — `TierBasedLandingPage.tsx` now passes `productType` to `ProductVariantSelector`. However, the landing page's availability status display (similar to GAP-B10) also uses physical-only "In Stock" / "Out of Stock" labels.
+**Impact:** Same as GAP-B10 but on landing pages.
+**Recommendation:** Apply the same type-aware availability labels to `TierBasedLandingPage`'s product display.
+
+#### GAP-B12: Checkout `fulfillment_method` Validation Does Not Consider `productType`
+**Found during:** Phase 6 (cart type awareness)
+**Problem:** The cart now knows each item's `productType`, but checkout validation does not use this information. A customer could select "pickup" for a digital-only cart or "shipping" for a service-only cart. B1.4 mentions this but does not specify how `productType` reaches the checkout validation layer.
+**Impact:** Customers may be charged shipping for digital products or asked to pick up service bookings.
+**Recommendation:** Thread `productType` from cart items into checkout request payload. Validate `fulfillment_method` against cart item types before processing payment.
+
+---
+
+### Part 3 (Customer Dashboard) — New Gaps
+
+#### GAP-F7: `ProductTypeBadge` Component Duplication
+**Found during:** Phases 3, 6, 7
+**Problem:** Type badge rendering logic now exists in 3 places:
+1. `SmartProductCard.tsx` — `ProductTypeBadge` helper (Phase 3)
+2. `carts/page.tsx` — `productTypeBadge` helper (Phase 6)
+3. `VariantInfoCard.tsx` — inline `typeBadge` IIFE (Phase 7)
+**Impact:** Styling inconsistency risk, maintenance burden. The F4.1 phase plans to create a shared `ProductTypeBadge.tsx` for the customer dashboard, but it should also be used by the cart and variant components.
+**Recommendation:** Extract a single shared `ProductTypeBadge` component (in `components/products/` or `components/common/`) and refactor all 3 current implementations to use it. The F4.1 component should be this shared component, not a new one.
+
+#### GAP-F8: Cart `productType` Not Passed to Checkout — Customer Dashboard Cannot Show Type
+**Found during:** Phase 6 (cart type awareness)
+**Problem:** The cart now displays `productType` badges and fulfillment labels, but when the customer proceeds to checkout, `productType` is not included in the checkout request payload. The order is created without `product_type` on `order_items` (see GAP-B8). This means the customer dashboard's order history will not have `productType` available unless the backend does a join to `inventory_items`.
+**Impact:** Customer dashboard phases F1–F6 all depend on `productType` being in order responses. Without checkout passing it through, there's a gap in the data chain.
+**Recommendation:** Include `productType` in the checkout line items payload (from cart items). Backend should persist it on `order_items` (GAP-B8).
+
+#### GAP-F9: `VariantPopupModal` Does Not Show Type Badge or Type-Aware Availability
+**Found during:** Phase 7 (variant selector)
+**Problem:** `VariantPopupModal.tsx` now passes `productType` to `ProductVariantSelector`, but the modal itself does not show a type badge next to the product name, and its price/availability display does not adapt to product type.
+**Impact:** Customers opening the variant modal for a digital product see physical-style availability labels.
+**Recommendation:** Add `ProductTypeBadge` to the modal header (next to product name). Update the modal's availability display to use type-aware labels (same logic as GAP-B10).
+
+#### GAP-F10: `ProductPurchasePanel` Quantity Selector Not Type-Aware
+**Found during:** Phase 7 (variant selector)
+**Problem:** `ProductPurchasePanel.tsx` (lines 357–392) shows a quantity selector with `max={maxQuantity}` derived from stock. For digital products, quantity should default to 1 (or allow multiple license purchases without stock limit). For service products, quantity should be 1 (one booking per order). The quantity selector is only hidden for service products (via `isServiceProduct` check routing to "Book This Service" panel), but digital products still show the stock-limited quantity selector.
+**Impact:** Digital products show "max 0" or "max 999" depending on stock value, which is confusing.
+**Recommendation:** For `digital` products: hide stock-based max, allow quantity > 1 (for multi-license), remove "max X" label. For `hybrid` products: show stock-based max only for the physical component. For `physical`: keep existing behavior.
+
+#### GAP-F11: Featured Products Grouping Does Not Handle Missing `productType` Gracefully
+**Found during:** Phase 5 (featured products segmentation)
+**Problem:** `StorefrontFeaturedProducts.tsx` groups products by `productType` with fallback to `'physical'`. Products with an unexpected `productType` value (not in `productTypeOrder`) are grouped into "Other Products". This is functional but could confuse users if the backend returns a type that doesn't match the 4 known types.
+**Impact:** Low — backend should only return valid types. But if a new type is added (e.g., `"subscription"`), it would silently group into "Other" without any indication.
+**Recommendation:** Add a console warning in dev mode when an unknown `productType` is encountered. Consider a fallback to `SmartProductCard`'s default (physical) rendering instead of a separate "Other" group.
+
+---
+
+### Updated Phase Integration
+
+These new gaps integrate into the existing phase plan as follows:
+
+| Gap | Phase | Priority | Effort | Notes |
+|-----|-------|----------|--------|-------|
+| GAP-B8 | B1 (or new B1.5) | P0 | Small | Migration + checkout change |
+| GAP-B9 | B1 | P2 | Trivial | Validation in cartManager |
+| GAP-B10 | B1 or F4 | P1 | Small | Label change in ProductPurchasePanel |
+| GAP-B11 | F4 | P2 | Small | Same fix as B10 for landing page |
+| GAP-B12 | B1 | P0 | Small | Checkout validation |
+| GAP-F7 | F4 | P1 | Small | Extract shared component |
+| GAP-F8 | B1 / F1 | P0 | Small | Checkout payload + persistence |
+| GAP-F9 | F4 | P2 | Small | Modal type badge + labels |
+| GAP-F10 | F4 | P1 | Small | Quantity selector type-awareness |
+| GAP-F11 | — | P2 | Trivial | Dev warning + fallback |
+
+**Revised Sprint 1 (P0):** Add GAP-B8 (migration + column), GAP-B12 (checkout validation), GAP-F8 (checkout payload) to Sprint 1 alongside B1, B5, B2, F1.
+
+**Revised Sprint 2 (P0/P1):** Add GAP-B10 (availability labels), GAP-F7 (shared badge component), GAP-F10 (quantity selector) to Sprint 2 alongside F2, B3.
+
+---
+
+## Audit: Part 2 & Part 3 Implementation Status
+
+**Date:** 2026-06-28
+**Context:** Full codebase audit to confirm whether Part 2 (backend phases B1–B7) and Part 3 (frontend phases F1–F6, plus GAP-B8–B12 and GAP-F7–F11) have already been implemented.
+
+---
+
+### Part 2 (Backend) — Audit Results
+
+| Phase / Gap | Description | Status | Evidence |
+|-------------|-------------|--------|----------|
+| **B1** | Stock decrement skips digital/service items | ✅ **DONE** | `StockService.ts:31-36` — checks `product_type`, skips `digital` and `service`. Also `restoreStockForOrder:112-117` and `checkStockAvailability:207-211` skip digital/service. |
+| **B2** | Digital fulfillment: access grants, auto-fulfill, order status | ✅ **DONE** | `DigitalFulfillmentService.ts` — creates access grants, sets `digital_delivery_status`, marks digital-only orders as `fulfilled/delivered`, hybrid as `partially_fulfilled`. `DigitalAccessService.ts:186` — `revokeAccess()` for cancellations. |
+| **B3** | Order status enum includes type-specific values | ✅ **DONE** | `OrderManagementService.ts:271-319` — `getValidStatusTransitions` removes `shipped` for digital-only and service-only orders. `updateOrderStatus:353-366` rejects `shipped` for digital/service-only. Statuses include `access_granted`, `scheduled`, `in_progress`. |
+| **B4** | Notifications: digital_delivered, service_scheduled, service_completed | ✅ **DONE** | `OrderNotificationService.ts:16-28` — `OrderNotificationType` includes `digital_delivered`, `service_scheduled`, `service_completed`. Email templates at lines 376–453. Helper methods `notifyDigitalDelivered`, `notifyServiceScheduled`, `notifyServiceCompleted` at lines 716–791. |
+| **B5** | API responses include `productType` on order items | ✅ **DONE** | `buyer-orders.ts:165,341,537` — `productType: item.product_type \|\| item.inventory_items?.product_type \|\| 'physical'`. `tenant-orders.ts:238,400` — same mapping. `DownloadAccessService.ts:165,201` — includes `productType`. |
+| **B6** | Service fulfillment: bookings, scheduling, merchant management | ✅ **DONE** | `ServiceFulfillmentService.ts` — `fulfillOrder` creates `service_bookings`, sends `service_scheduled` notification, sets order to `scheduled`. `cancelBookings`, `updateBooking`, `assignProvider` methods. `tenant-orders.ts:845-906` — merchant PUT endpoint for booking updates with notification on `completed`. |
+| **B7** | Hybrid fulfillment coordinator | ✅ **DONE** | `HybridFulfillmentCoordinator.ts` — checks digital delivered + physical fulfilled + service completed, transitions to `fulfilled/delivered` when all complete. `PostPaymentFulfillment.ts` — orchestrates stock + digital + service + receipt in sequence. |
+| **GAP-B8** | `product_type` column on `order_items` | ✅ **DONE** | `schema.prisma:2608` — `product_type product_type @default(physical)` on `order_items`. Index at line 2622. Checkout at `checkout.ts:243,323,372` sets `product_type` on validated items. |
+| **GAP-B9** | Cart manager validates/normalizes `productType` | ✅ **DONE** | `cartManager.ts:211-218` — `addToCart` normalizes `productType` to `physical \| digital \| service \| hybrid`, defaults to `physical` if missing or unrecognized. |
+| **GAP-B10** | `ProductPurchasePanel` type-aware availability labels | ✅ **DONE** | `ProductPurchasePanel.tsx:115-118,250-267` — `isDigitalProduct`/`isServiceProduct`/`isHybridProduct` flags. Labels: "Available"/"Unavailable" (digital), "Open Slots"/"Fully Booked" (service), "Digital Available" hint (hybrid). |
+| **GAP-B11** | `TierBasedLandingPage` type-aware availability labels | ✅ **DONE** | `TierBasedLandingPage.tsx:1445,1465` — availability labels adapt to product type: "Available"/"Unavailable" (digital), "Open Slots"/"Fully Booked" (service), "In Stock"/"Out of Stock" (physical/hybrid). Also passes `productType` to `ProductVariantSelector` at line 1707. |
+| **GAP-B12** | Checkout `fulfillment_method` validation vs product types | ✅ **DONE** | `checkout.ts:380-397` — validates `fulfillment_method` against product types. Rejects pickup/delivery/shipping for digital-only orders. Rejects shipping for service-only orders. |
+
+**Part 2 Summary:** All 12 items complete.
+
+---
+
+### Part 3 (Customer Dashboard) — Audit Results
+
+| Phase / Gap | Description | Status | Evidence |
+|-------------|-------------|--------|----------|
+| **F1** | `CustomerOrderService` includes `productType` in order item types | ✅ **DONE** | `CustomerOrderService.ts:89` — `productType?: 'physical' \| 'digital' \| 'hybrid' \| 'service'` on `CustomerOrderItem`. `getCustomerDownloads` method at line 685. `getCustomerServiceBookings` used in appointments page. |
+| **F2** | Order list shows type badges and type-specific indicators | ✅ **DONE** | `BuyerOrderHistory.tsx:1084-1093` — `ProductTypeBadge` for single-type orders, `hybrid` badge for mixed. `account/orders/page.tsx:552-560` — same logic. "DOWNLOADS" badge for digital items at line 1032. Service booking links at line 663. |
+| **F3** | Order detail shows adaptive fulfillment timeline | ✅ **DONE** | `FulfillmentTimeline.tsx` — type-specific step sequences for `digital` (Order Placed → Payment → Access Granted → Downloaded), `service` (→ Scheduled → Completed), `hybrid` (→ Digital Access → Shipped → Delivered), `physical` (→ Processing → Shipped → Delivered). Used in `account/orders/[orderId]/page.tsx:150-158` with `getDominantProductType()`. |
+| **F4** | Receipt shows type-specific info (download links, appointment details, shipping) | ✅ **DONE** | `OrderReceipt.tsx:7,24,769-824` — imports `ProductTypeBadge`, `productType` on item interface, groups hybrid orders by type with labels "Physical Products", "Digital Downloads", "Service Appointments", "Hybrid Products". Badges on individual items. |
+| **F5** | Digital downloads card on order detail and downloads page | ✅ **DONE** | `DigitalDownloadsCard.tsx` component exists. Used in `account/orders/[orderId]/page.tsx:350-352`, `account/orders/page.tsx:309-311`, `BuyerOrderHistory.tsx:723`. Dedicated downloads page at `account/downloads/`. |
+| **F6** | Service appointments card and appointments page | ✅ **DONE** | `ServiceAppointmentCard.tsx` component exists. Used in `account/orders/[orderId]/page.tsx:362-366`. Dedicated appointments page at `account/appointments/page.tsx` — fetches `getCustomerServiceBookings`, shows upcoming/past with `ServiceAppointmentCard`. |
+| **GAP-F7** | Shared `ProductTypeBadge` component | ✅ **DONE** | `ProductTypeBadge.tsx` — shared component in `components/products/`. Used across 9 files: `SmartProductCard`, `carts/page.tsx`, `VariantInfoCard`, `VariantPopupModal`, `BuyerOrderHistory`, `account/orders/page.tsx`, `account/orders/[orderId]/page.tsx`, `OrderReceipt.tsx`. |
+| **GAP-F8** | Checkout payload includes `productType` | ✅ **DONE** | `checkout.ts:243,323,372` — `product_type` set on validated items from `inventory_items.product_type` or variant's parent item. Persisted to `order_items.product_type` column (GAP-B8). |
+| **GAP-F9** | `VariantPopupModal` shows type badge | ✅ **DONE** | `VariantPopupModal.tsx:7,151-153` — imports `ProductTypeBadge`, renders it next to product name with `showPhysical` prop. |
+| **GAP-F10** | `ProductPurchasePanel` quantity selector type-aware | ✅ **DONE** | `ProductPurchasePanel.tsx:388,396,403-411` — digital: `max={undefined}`, no stock limit, shows "multi-license" label. Hybrid: shows "physical max {stock}". Physical: shows "max {stock}". Service: routes to "Book This Service" panel (no quantity selector). |
+| **GAP-F11** | Featured products grouping handles unknown types gracefully | ✅ **DONE** | `StorefrontFeaturedProducts.tsx:381-383` — `console.warn` in dev mode for unknown `productType` values. Unknown types grouped under "Other Products" at line 610. |
+
+**Part 3 Summary:** All 11 items complete.
+
+---
+
+### Overall Audit Summary
+
+| Part | Total Items | Complete | Not Done | Partial |
+|------|-------------|----------|----------|---------|
+| Part 2 (Backend) | 12 | 12 | 0 | 0 |
+| Part 3 (Frontend) | 11 | 11 | 0 | 0 |
+| **Total** | **23** | **23** | **0** | **0** |
+
+### Remaining Work
+
+All 23 items across Part 2 (backend) and Part 3 (frontend) are now complete. No remaining work.
+

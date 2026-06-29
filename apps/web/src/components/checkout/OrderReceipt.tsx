@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package, AlertTriangle, XCircle } from 'lucide-react';
+import ProductTypeBadge from '@/components/products/ProductTypeBadge';
 import TenantQRCode from '@/components/public/TenantQRCode';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { customerOrderService } from '@/services/CustomerOrderService';
@@ -20,6 +21,7 @@ interface OrderReceiptProps {
       sku: string;
       quantity: number;
       unitPrice: number;
+      productType?: 'physical' | 'digital' | 'hybrid' | 'service';
     }>;
     subtotal: number;
     status: string;
@@ -759,26 +761,78 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
             </div>
           </div>
 
-          {/* Order Items */}
+          {/* Order Items — grouped by product type for hybrid orders */}
           <div className="mb-6">
             <h4 className="font-semibold text-gray-900 mb-3">Order Items</h4>
             <div className="space-y-3">
-              {cart.items.map((item) => {
-                const itemTotal = item.unitPrice * item.quantity;
-                //  console.log(`Cart gateway 3: ${cart.gatewayType}`);
-                return (
-                  <div key={item.id} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">SKU: {item.sku}</p>
-                    </div>
-                    <div className="text-right ml-4">
-                      <p className="font-medium">{formatCurrency(itemTotal)}</p>
-                      <p className="text-sm text-gray-600">{item.quantity} × {formatCurrency(item.unitPrice)}</p>
-                    </div>
-                  </div>
+              {(() => {
+                const hasMultipleTypes = new Set(cart.items.map(i => i.productType || 'physical')).size > 1;
+
+                if (!hasMultipleTypes) {
+                  return cart.items.map((item) => {
+                    const itemTotal = item.unitPrice * item.quantity;
+                    return (
+                      <div key={item.id} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">{item.name}</p>
+                            {item.productType && item.productType !== 'physical' && (
+                              <ProductTypeBadge productType={item.productType} size="sm" />
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="font-medium">{formatCurrency(itemTotal)}</p>
+                          <p className="text-sm text-gray-600">{item.quantity} × {formatCurrency(item.unitPrice)}</p>
+                        </div>
+                      </div>
+                    );
+                  });
+                }
+
+                // Hybrid order: group items by product type
+                const typeLabels: Record<string, string> = {
+                  physical: 'Physical Products',
+                  digital: 'Digital Downloads',
+                  service: 'Service Appointments',
+                  hybrid: 'Hybrid Products',
+                };
+                const typeOrder = ['physical', 'digital', 'service', 'hybrid'];
+                const presentTypes = typeOrder.filter(t =>
+                  cart.items.some(i => (i.productType || 'physical') === t)
                 );
-              })}
+
+                return presentTypes.map(type => (
+                  <div key={type}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">
+                      {typeLabels[type] || type}
+                    </p>
+                    {cart.items
+                      .filter(i => (i.productType || 'physical') === type)
+                      .map((item) => {
+                        const itemTotal = item.unitPrice * item.quantity;
+                        return (
+                          <div key={item.id} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-900">{item.name}</p>
+                                {item.productType && item.productType !== 'physical' && (
+                                  <ProductTypeBadge productType={item.productType} size="sm" />
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <p className="font-medium">{formatCurrency(itemTotal)}</p>
+                              <p className="text-sm text-gray-600">{item.quantity} × {formatCurrency(item.unitPrice)}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ));
+              })()}
             </div>
           </div>
 

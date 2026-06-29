@@ -13,6 +13,7 @@ import ContactInformationCollapsible from '@/components/directory/ContactInforma
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
+import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
@@ -28,7 +29,7 @@ import type { DirectoryEntryLayoutProps } from './types';
 export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayoutProps) {
   const {
     tenantId, listing, tenantLogo, businessProfile, businessHours,
-    storefrontCategories, featuredProducts, tenantInfo, slugForRelated,
+    storefrontCategories, featuredProducts, activeFeatured, tenantInfo, slugForRelated,
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
@@ -109,6 +110,22 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
 
               {/* Gallery */}
               {!showStatusPanel && <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />}
+
+              {/* Active Featured Products (from ActiveFeaturedResolver) */}
+              {!showStatusPanel && activeFeatured?.hasActive && activeFeatured.products.length > 0 && (
+                <TenantPaymentProvider tenantId={listing.tenantId}>
+                  <div className="mb-6">
+                    <h2 className="text-lg font-bold text-neutral-900 dark:text-white mb-3">Featured</h2>
+                    <EnhancedProductDisplay
+                      products={activeFeatured.products as any}
+                      tenantId={listing.tenantId}
+                      displayMode="carousel"
+                      carouselItemsVisible={4}
+                      variant="grid"
+                    />
+                  </div>
+                </TenantPaymentProvider>
+              )}
 
               {/* Featured Products */}
               {!showStatusPanel && featuredProducts.length > 0 && (

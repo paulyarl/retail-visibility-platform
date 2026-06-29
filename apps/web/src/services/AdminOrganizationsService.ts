@@ -383,6 +383,44 @@ export class AdminOrganizationsService extends AdminApiSingleton {
   }
 
   /**
+   * Get product type summary for all organizations
+   */
+  async getProductTypeSummary(): Promise<Record<string, {
+    orgId: string;
+    orgName: string;
+    productTypes: Array<{ type: string; count: number }>;
+    totalItems: number;
+  }>> {
+    const result = await this.makeDefaultRequest<{
+      organizations: Array<{
+        orgId: string;
+        orgName: string;
+        productTypes: Array<{ type: string; count: number }>;
+        totalItems: number;
+      }>;
+    }>(
+      '/api/organizations/product-type-summary',
+      {},
+      'admin-organizations-product-type-summary'
+    );
+
+    if (!result.success || !result.data) {
+      return {};
+    }
+
+    const map: Record<string, {
+      orgId: string;
+      orgName: string;
+      productTypes: Array<{ type: string; count: number }>;
+      totalItems: number;
+    }> = {};
+    for (const org of result.data.organizations || []) {
+      map[org.orgId] = org;
+    }
+    return map;
+  }
+
+  /**
    * Get organization statistics
    */
   async getOrganizationStats(organizationId?: string): Promise<{

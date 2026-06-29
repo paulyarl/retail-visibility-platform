@@ -75,7 +75,7 @@ export function resolveFeaturedOptions(
     effective_types: [...effectiveTenantTypes, ...effectivePlatformTypes],
     featured_available: isEnabled && (allowedTenantTypes.length + allowedPlatformTypes.length) > 0,
     effective_featured_available: isEnabled && (effectiveTenantTypes.length + effectivePlatformTypes.length) > 0,
-    expiry_monitor_enabled: !!features.featured_expiry_monitor,
+    expiry_monitor_enabled: flexible || !!features.featured_expiry_monitor,
     merchant_preferences: prefs,
     is_flexible: flexible,
   };

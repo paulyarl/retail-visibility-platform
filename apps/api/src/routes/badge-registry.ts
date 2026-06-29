@@ -22,6 +22,7 @@ import {
 import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
 import { authenticateToken } from '../middleware/auth';
 import FeaturedOptionsService from '../services/FeaturedOptionsService';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = express.Router();
 
@@ -147,6 +148,9 @@ router.post('/tenants/:tenantId/badge-registry/custom', authenticateToken, async
     });
 
     res.status(201).json({ badge });
+
+    // Refresh badge registry knowledge embeddings
+    BotKnowledgeEmbeddingService.getInstance().refreshBadgeRegistryEmbeddings(tenantId).catch(() => {});
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return res.status(409).json({ error: 'A badge with this key already exists for your tenant' });
@@ -181,6 +185,9 @@ router.put('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToke
     }
 
     res.json({ badge });
+
+    // Refresh badge registry knowledge embeddings
+    BotKnowledgeEmbeddingService.getInstance().refreshBadgeRegistryEmbeddings(tenantId).catch(() => {});
   } catch (error) {
     console.error('[badge-registry] Failed to update custom badge:', error);
     res.status(500).json({ error: 'Failed to update custom badge' });
@@ -202,9 +209,45 @@ router.delete('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateT
     }
 
     res.json({ success: true });
+
+    // Refresh badge registry knowledge embeddings
+    BotKnowledgeEmbeddingService.getInstance().refreshBadgeRegistryEmbeddings(tenantId).catch(() => {});
   } catch (error) {
     console.error('[badge-registry] Failed to delete custom badge:', error);
     res.status(500).json({ error: 'Failed to delete custom badge' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/badge-suggestions
+ * Returns auto-promotion suggestions based on badge rule evaluation.
+ * Lists products that should be assigned or removed badges based on declarative rules.
+ */
+router.get('/tenants/:tenantId/badge-suggestions', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Ensure the authenticated user belongs to this tenant
+    if (req.user?.tenantIds && !req.user.tenantIds.includes(tenantId) && req.user.role !== 'PLATFORM_ADMIN') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const result = await evaluateBadgeRulesForTenant(tenantId);
+
+    res.json({
+      toAssign: result.toAssign,
+      toRemove: result.toRemove,
+      conflicts: result.conflicts,
+      summary: {
+        totalSuggestions: result.toAssign.length + result.toRemove.length,
+        assignCount: result.toAssign.length,
+        removeCount: result.toRemove.length,
+        conflictCount: result.conflicts.length,
+      },
+    });
+  } catch (error) {
+    console.error('[badge-registry] Failed to get badge suggestions:', error);
+    res.status(500).json({ error: 'Failed to get badge suggestions' });
   }
 });
 

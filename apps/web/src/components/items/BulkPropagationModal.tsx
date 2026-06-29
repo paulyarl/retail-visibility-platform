@@ -14,6 +14,7 @@ interface BulkPropagationModalProps {
   onClose: () => void;
   itemIds: string[];
   itemNames: string[];
+  itemProductTypes?: string[];
   currentTenantId: string;
   organizationId: string;
   onSuccess?: () => void;
@@ -36,6 +37,7 @@ export default function BulkPropagationModal({
   onClose,
   itemIds,
   itemNames,
+  itemProductTypes,
   currentTenantId,
   organizationId,
   onSuccess,
@@ -137,6 +139,24 @@ export default function BulkPropagationModal({
           <p className="text-sm text-blue-700 dark:text-blue-300">
             <strong>{itemIds.length} item(s)</strong> selected for propagation
           </p>
+          {itemProductTypes && itemProductTypes.some(pt => pt && pt !== 'physical') && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {Array.from(new Set(itemProductTypes.filter(pt => pt && pt !== 'physical'))).map(pt => (
+                <span key={pt} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  pt === 'digital'
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                    : pt === 'service'
+                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                }`}>
+                  {pt.charAt(0).toUpperCase() + pt.slice(1)}
+                </span>
+              ))}
+              <span className="text-xs text-blue-600 dark:text-blue-400 self-center">
+                Only locations with matching tier capabilities will receive these items.
+              </span>
+            </div>
+          )}
           {itemNames.length <= 5 && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
               {itemNames.join(', ')}

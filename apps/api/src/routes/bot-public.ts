@@ -136,6 +136,12 @@ const startConversationSchema = z.object({
 
 const sendMessageSchema = z.object({
   message: z.string().min(1).max(1000),
+  tenantId: z.string().min(1).optional(),
+  embedKey: z.string().min(1).optional(),
+  pageContext: z.string().max(100).optional(),
+  contextEntityName: z.string().max(200).optional(),
+  customerEmail: z.string().email().optional(),
+  customerPhone: z.string().max(50).optional(),
 });
 
 const feedbackSchema = z.object({
@@ -194,19 +200,12 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
       isOpen = hoursResult.isOpen;
     }
 
-    const { conversation, greeting } = await conversationService.createConversation({
-      tenantId,
-      customerEmail,
-      customerPhone,
-      pageContext,
-      contextEntityName,
-      source: 'widget',
-    });
+    const { sessionId, greeting } = await conversationService.prepareConversation({ tenantId });
 
     // Use context-aware greeting
     const contextualGreeting = configService.getContextualGreeting(config, pageContext, isOpen, contextEntityName);
 
-    res.json({ success: true, sessionId: conversation.sessionId, greeting: contextualGreeting || greeting });
+    res.json({ success: true, sessionId, greeting: contextualGreeting || greeting });
   } catch (error) {
     console.error('Error starting conversation:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to start conversation' });
@@ -233,17 +232,28 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       return res.status(403).json({ success: false, error: 'session_expired', message: 'Session is expired or closed' });
     }
 
-    const conversation = await conversationService.getConversationBySession(sessionId);
-    if (!conversation) {
-      return res.status(404).json({ success: false, error: 'not_found', message: 'Conversation not found' });
+    let conversation = await conversationService.getConversationBySession(sessionId);
+
+    // Resolve tenantId — from existing conversation, or from request body for lazy creation
+    let tenantId: string | undefined = conversation?.tenantId;
+    if (!tenantId) {
+      tenantId = validation.data.embedKey
+        ? res.locals.embedTenantId
+        : validation.data.tenantId;
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required for the first message' });
+      }
     }
 
-    const config = await configService.getOrCreate(conversation.tenantId);
+    const config = await configService.getOrCreate(tenantId);
 
     const { message } = validation.data;
 
-    // 1. Guardrail check
-    const guardrailResult = await guardrailService.checkMessage(conversation.tenantId, message);
+    // 1. Guardrail check — run BEFORE lazy conversation creation.
+    // If the first message is blocked and no conversation exists yet,
+    // return the block response without persisting anything.
+    // This prevents spam/abuse from creating conversation records.
+    const guardrailResult = await guardrailService.checkMessage(tenantId, message);
 
     if (guardrailResult.action === 'block') {
       const blockMessage = guardrailService.getBlockResponse(
@@ -251,28 +261,60 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
         config.fallbackMessage
       );
 
-      // Store user message + blocked response
-      await conversationService.appendMessage({
-        conversationId: conversation.id,
-        role: 'user',
-        content: message,
-        guardrailResult: 'blocked',
-      });
-      const botMsg = await conversationService.appendMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: blockMessage,
-        responseType: 'fallback',
-        guardrailResult: 'blocked',
-      });
+      // Only persist blocked messages if the conversation already exists
+      // (audit trail for an active conversation). Skip persistence for
+      // first-message blocks to avoid spamming the conversation list.
+      if (conversation) {
+        await conversationService.appendMessage({
+          conversationId: conversation.id,
+          role: 'user',
+          content: message,
+          guardrailResult: 'blocked',
+        });
+        const botMsg = await conversationService.appendMessage({
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: blockMessage,
+          responseType: 'fallback',
+          guardrailResult: 'blocked',
+        });
 
+        return res.json({
+          success: true,
+          reply: blockMessage,
+          responseType: 'fallback',
+          guardrailResult: 'blocked',
+          messageId: botMsg.id,
+        });
+      }
+
+      // No conversation exists — return block response without persisting
       return res.json({
         success: true,
         reply: blockMessage,
         responseType: 'fallback',
         guardrailResult: 'blocked',
-        messageId: botMsg.id,
+        messageId: null,
       });
+    }
+
+    // Message passed guardrails — now create the conversation if it doesn't exist yet
+    if (!conversation) {
+      const caps = await resolveEffectiveCapabilities(tenantId);
+      if (!caps || !caps.effective.chatbot.enabled) {
+        return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
+      }
+
+      const result = await conversationService.createConversation({
+        tenantId,
+        sessionId,
+        customerEmail: validation.data.customerEmail,
+        customerPhone: validation.data.customerPhone,
+        pageContext: validation.data.pageContext,
+        contextEntityName: validation.data.contextEntityName,
+        source: 'widget',
+      });
+      conversation = result.conversation;
     }
 
     // Store user message (possibly masked)

@@ -171,10 +171,17 @@ router.post('/webhooks', async (req: Request, res: Response) => {
 
 /**
  * Handle checkout.session.completed
- * Initial subscription creation from checkout
+ * Routes to featured placement handler or subscription handler based on metadata.type
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('[Stripe Webhooks] Processing checkout.session.completed:', session.id);
+
+  // Check if this is a featured placement purchase
+  const metadataType = session.metadata?.type;
+  if (metadataType === 'featured_placement' || metadataType === 'featured_placement_renewal') {
+    await handleFeaturedPlacementCheckout(session);
+    return;
+  }
 
   const tenantId = session.metadata?.tenantId || session.client_reference_id;
 
@@ -200,6 +207,30 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   });
 
   console.log(`[Stripe Webhooks] Updated tenant ${tenantId} with Stripe IDs`);
+}
+
+/**
+ * Handle featured placement checkout completion
+ * Activates the placement purchase and creates the featured_products row
+ */
+async function handleFeaturedPlacementCheckout(session: Stripe.Checkout.Session) {
+  console.log('[Stripe Webhooks] Processing featured placement checkout:', session.id);
+
+  const purchaseId = session.metadata?.purchaseId;
+  if (!purchaseId) {
+    console.error('[Stripe Webhooks] No purchaseId in featured placement session metadata');
+    return;
+  }
+
+  const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : undefined;
+
+  try {
+    const { default: FeaturedPlacementService } = await import('../services/FeaturedPlacementService');
+    await FeaturedPlacementService.getInstance().activatePurchase(purchaseId, paymentIntentId);
+    console.log(`[Stripe Webhooks] Featured placement ${purchaseId} activated`);
+  } catch (error) {
+    console.error(`[Stripe Webhooks] Failed to activate featured placement ${purchaseId}:`, error);
+  }
 }
 
 /**

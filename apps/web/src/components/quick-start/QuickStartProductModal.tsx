@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BusinessTypeSelector, BUSINESS_TYPES, getBusinessType, getDefaultCount } from './BusinessTypeSelector';
 
 export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
+export type QuickStartProductType = 'physical' | 'digital' | 'hybrid' | 'service';
 
 export interface QuickStartProductConfig {
   businessType: string;
@@ -12,6 +13,7 @@ export interface QuickStartProductConfig {
   imageQuality: 'standard' | 'hd';
   textModel: QuickStartTextProvider;
   imageModel: 'openai' | 'google';
+  productType: QuickStartProductType;
 }
 
 interface QuickStartProductModalProps {
@@ -22,6 +24,8 @@ interface QuickStartProductModalProps {
   description?: string;
   minProducts?: number;
   maxProducts?: number;
+  tenantId?: string | null;
+  allowedProductTypes?: QuickStartProductType[];
 }
 
 /**
@@ -36,6 +40,8 @@ export function QuickStartProductModal({
   description = 'Generate AI-powered products for your business type',
   minProducts = 5,
   maxProducts = 25,
+  tenantId = null,
+  allowedProductTypes,
 }: QuickStartProductModalProps) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [productCount, setProductCount] = useState<number>(15);
@@ -43,6 +49,7 @@ export function QuickStartProductModal({
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
   const [textModel, setTextModel] = useState<QuickStartTextProvider>('openai');
   const [imageModel, setImageModel] = useState<'openai' | 'google'>('openai');
+  const [productType, setProductType] = useState<QuickStartProductType>('physical');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleTypeChange = (typeId: string) => {
@@ -62,6 +69,7 @@ export function QuickStartProductModal({
         imageQuality,
         textModel,
         imageModel,
+        productType,
       });
       onClose();
       // Reset state
@@ -71,6 +79,7 @@ export function QuickStartProductModal({
       setImageQuality('standard');
       setTextModel('openai');
       setImageModel('openai');
+      setProductType('physical');
     } catch (error) {
       console.error('[QuickStartProductModal] Error:', error);
     } finally {
@@ -101,7 +110,43 @@ export function QuickStartProductModal({
             />
           </div>
 
-          {/* Product Count Slider */}
+          {/* Product Type Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Product Type
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {([
+              { value: 'physical', label: '📦 Physical', sub: 'Shipped items' },
+              { value: 'digital', label: '💾 Digital', sub: 'Downloadable' },
+              { value: 'hybrid', label: '🔀 Hybrid', sub: 'Physical + digital' },
+              { value: 'service', label: '🛎️ Service', sub: 'Bookable services' },
+            ] as { value: QuickStartProductType; label: string; sub: string }[])
+              .filter(t => !allowedProductTypes || allowedProductTypes.includes(t.value))
+              .map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setProductType(t.value)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    productType === t.value
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-1">{t.label}</span>
+                  <span className="text-xs opacity-75 mt-1 block">{t.sub}</span>
+                </button>
+              ))}
+          </div>
+          {allowedProductTypes && allowedProductTypes.length < 4 && (
+            <p className="text-xs text-gray-500 mt-2">
+              Your plan allows: {allowedProductTypes.join(', ')}. Upgrade to unlock more types.
+            </p>
+          )}
+        </div>
+
+        {/* Product Count Slider */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">

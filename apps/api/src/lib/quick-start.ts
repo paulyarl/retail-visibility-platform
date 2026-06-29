@@ -39,6 +39,26 @@ const baseItemSchema = z.object({
   // Tenant category assignment
   directory_category_id: z.string().nullable().optional(),
   tenantCategoryId: z.string().nullable().optional(), // Accept camelCase from frontend
+  // Product type and digital fields
+  product_type: z.enum(['physical', 'digital', 'hybrid', 'service']).optional(),
+  digital_delivery_method: z.string().nullable().optional(),
+  digital_assets: z.any().nullable().optional(),
+  access_duration_days: z.number().int().nullable().optional(),
+  download_limit: z.number().int().nullable().optional(),
+  license_type: z.string().nullable().optional(),
+  // Enriched content fields
+  features: z.any().optional(),
+  specifications: z.any().optional(),
+  enhanced_description: z.string().nullable().optional(),
+  // Enrichment tracking
+  source: z.string().optional(),
+  enrichment_status: z.string().optional(),
+  enriched_at: z.date().nullable().optional(),
+  enriched_by: z.string().nullable().optional(),
+  missing_images: z.boolean().optional(),
+  missing_description: z.boolean().optional(),
+  missing_specs: z.boolean().optional(),
+  missing_brand: z.boolean().optional(),
 });
 
 const createItemSchema = baseItemSchema.extend({
@@ -657,6 +677,33 @@ const SCENARIOS = {
       { name: 'House Wine (Glass)', price: 799, category: 'Beverages', brand: 'House Selection' },
     ],
   },
+  service_business: {
+    name: 'Service Business',
+    categories: [
+      { name: 'Consultations', slug: 'consultations', searchTerm: 'consulting professional advisory services' },
+      { name: 'Repairs & Maintenance', slug: 'repairs-maintenance', searchTerm: 'repair maintenance fix installation services' },
+      { name: 'Appointments', slug: 'appointments', searchTerm: 'appointment booking scheduling services' },
+      { name: 'Subscriptions', slug: 'subscriptions', searchTerm: 'subscription recurring service plans' },
+    ],
+    products: [
+      { name: '1-Hour Consulting Session', price: 15000, category: 'Consultations', brand: 'Professional' },
+      { name: 'Strategy Planning Workshop', price: 35000, category: 'Consultations', brand: 'Professional' },
+      { name: 'Financial Review Session', price: 20000, category: 'Consultations', brand: 'Professional' },
+      { name: 'Legal Consultation (30 min)', price: 17500, category: 'Consultations', brand: 'Professional' },
+      { name: 'Device Diagnostic & Repair', price: 7500, category: 'Repairs & Maintenance', brand: 'TechFix' },
+      { name: 'Appliance Repair Service', price: 12000, category: 'Repairs & Maintenance', brand: 'FixIt Pro' },
+      { name: 'HVAC Maintenance Check', price: 9900, category: 'Repairs & Maintenance', brand: 'ComfortCare' },
+      { name: 'Plumbing Service Call', price: 8500, category: 'Repairs & Maintenance', brand: 'Reliable Plumbing' },
+      { name: 'Electrical Inspection', price: 11000, category: 'Repairs & Maintenance', brand: 'SafeWire' },
+      { name: 'Haircut & Styling', price: 4500, category: 'Appointments', brand: 'Salon' },
+      { name: 'Massage Therapy (60 min)', price: 8000, category: 'Appointments', brand: 'Wellness Spa' },
+      { name: 'Personal Training Session', price: 6000, category: 'Appointments', brand: 'FitPro' },
+      { name: 'Dental Cleaning', price: 9500, category: 'Appointments', brand: 'BrightSmile' },
+      { name: 'Monthly Service Plan', price: 4900, category: 'Subscriptions', brand: 'ServicePro' },
+      { name: 'Annual Maintenance Contract', price: 29900, category: 'Subscriptions', brand: 'ServicePro' },
+      { name: 'Premium Support Subscription', price: 9900, category: 'Subscriptions', brand: 'ExpertCare' },
+    ],
+  },
 };
 
 export type QuickStartScenario = keyof typeof SCENARIOS;
@@ -667,10 +714,11 @@ export interface QuickStartOptions {
   productCount: number;
   assignCategories?: boolean;
   createAsDrafts?: boolean;
-  generateImages?: boolean; // NEW: Generate AI images for products
-  imageQuality?: 'standard' | 'hd'; // NEW: Image quality
-  textModel?: 'openai' | 'google' | 'anthropic' | 'mistral'; // NEW: AI model for text/product generation
-  imageModel?: 'openai' | 'google'; // NEW: AI model for image generation
+  generateImages?: boolean;
+  imageQuality?: 'standard' | 'hd';
+  textModel?: 'openai' | 'google' | 'anthropic' | 'mistral';
+  imageModel?: 'openai' | 'google';
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
 }
 
 export interface QuickStartResult {
@@ -698,6 +746,7 @@ export async function generateQuickStartProducts(
     imageQuality = 'standard',
     textModel = 'openai',
     imageModel = 'openai',
+    productType = 'physical',
   } = options;
 
   // Validate tenant exists
@@ -876,8 +925,12 @@ export async function generateQuickStartProducts(
         }
       }
       
-      const availability = Math.random() > 0.25 ? 'in_stock' as const : 'out_of_stock' as const;
-      const stock = availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0;
+      const availability = productType === 'digital' || productType === 'service'
+        ? 'in_stock' as const
+        : (Math.random() > 0.25 ? 'in_stock' as const : 'out_of_stock' as const);
+      const stock = (productType === 'digital' || productType === 'service')
+        ? 9999
+        : (availability === 'in_stock' ? Math.floor(Math.random() * 96) + 5 : 0);
 
       // Assign category if enabled
       let categoryAssignment: { directory_category_id?: string; category_path?: string[] } = {};
@@ -908,8 +961,8 @@ export async function generateQuickStartProducts(
         tenant_id: tenant_id,
         sku: generateAutoSKU({
           tenantId: tenant_id,
-          productType: 'physical', // Quick-start defaults to physical products
-          deliveryMethod: 'shipping',
+          productType,
+          deliveryMethod: productType === 'digital' ? 'direct_download' : productType === 'service' ? 'pickup' : 'shipping',
           accessControl: 'public',
         }),
         name: product.name,
@@ -920,10 +973,13 @@ export async function generateQuickStartProducts(
         features: enrichedProduct.features || [],
         specifications: enrichedProduct.specifications || {},
         enhanced_description: enrichedProduct.enhancedDescription || null,
-        // Digital product fields (null for physical quick-start products)
-        license_type: null,
-        access_duration_days: null,
-        download_limit: null,
+        // Product type and digital product fields
+        product_type: productType,
+        digital_delivery_method: productType === 'digital' || productType === 'hybrid' ? 'direct_download' : null,
+        digital_assets: null,
+        access_duration_days: productType === 'digital' || productType === 'hybrid' ? 365 : null,
+        download_limit: productType === 'digital' || productType === 'hybrid' ? 5 : null,
+        license_type: productType === 'digital' || productType === 'hybrid' ? 'personal' : null,
         metadata: null, // Keep metadata clean, enriched data is now in direct fields
         price_cents: Math.round(Number(product.price)), // Ensure integer
         price: Number(product.price) / 100, // Ensure decimal
@@ -935,7 +991,7 @@ export async function generateQuickStartProducts(
         // Attach cached photo if available
         image_url: (product as any).imageUrl || null,
         // Enrichment tracking (following scanner enrichment pattern)
-        source: 'MANUAL' as const,
+        source: 'QUICK_START_WIZARD' as const,
         enrichment_status: 'COMPLETE' as const,
         enriched_at: new Date(),
         enriched_by: 'ai_quick_start',

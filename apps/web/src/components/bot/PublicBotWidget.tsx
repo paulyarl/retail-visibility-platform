@@ -172,7 +172,13 @@ export default function PublicBotWidget({
     setLoading(true);
     setError(null);
     try {
-      const result = await publicBotService.sendMessage(sessionId, msgText);
+      const result = await publicBotService.sendMessage(sessionId, msgText, {
+        tenantId,
+        pageContext,
+        contextEntityName,
+        customerEmail: preChatEmail || undefined,
+        customerPhone: preChatPhone || undefined,
+      });
       setMessages(prev => [...prev, {
         id: result.messageId,
         role: 'assistant',
@@ -194,7 +200,7 @@ export default function PublicBotWidget({
     } finally {
       setLoading(false);
     }
-  }, [sessionId, inputValue]);
+  }, [sessionId, inputValue, tenantId, pageContext, contextEntityName, preChatEmail, preChatPhone]);
 
   const handleFeedback = useCallback(async (messageId: string, rating: 'positive' | 'negative') => {
     if (!sessionId || messageId === 'greeting') return;

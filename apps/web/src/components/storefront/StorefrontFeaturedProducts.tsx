@@ -378,6 +378,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
     const pt = p.productType || 'physical';
     return !productTypeOrder.includes(pt as any);
   });
+  if (otherProducts.length > 0 && process.env.NODE_ENV === 'development') {
+    console.warn(`[StorefrontFeaturedProducts] Unknown productType(s) detected: ${[...new Set(otherProducts.map(p => p.productType))].join(', ')}. These will be grouped under "Other Products".`);
+  }
   const hasMultipleTypes = Object.values(groupedProducts).filter(g => g.length > 0).length + (otherProducts.length > 0 ? 1 : 0) > 1;
 
   if (loading) {

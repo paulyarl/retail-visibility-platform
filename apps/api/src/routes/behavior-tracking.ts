@@ -119,6 +119,47 @@ router.post('/events/batch', async (req, res) => {
 });
 
 /**
+ * Save session data
+ * POST /api/behavior/sessions
+ *
+ * Auth0: User identity extracted server-side from session
+ */
+router.post('/sessions', async (req, res) => {
+  try {
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+
+    const sessionData = {
+      ...req.body,
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      isAuthenticated: identity.isAuthenticated
+    };
+
+    const session = await behaviorService.saveSession(sessionData);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        session,
+        identity: {
+          userId: identity.userId,
+          isAuthenticated: identity.isAuthenticated
+        },
+        timestamp: new Date().toISOString()
+      },
+      message: 'Session data saved successfully'
+    });
+  } catch (error) {
+    console.error('Session save failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save session data',
+      error: (error as Error).message
+    });
+  }
+});
+
+/**
  * Get behavior analytics
  * GET /api/behavior/analytics
  */

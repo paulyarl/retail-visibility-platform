@@ -118,6 +118,7 @@ export default function StorefrontImmersiveLayout({
     socialCommerceFlags,
     contactInfo,
     featuredData,
+    activeFeatured,
     getFeaturedTypeName,
     getCategoryUrl,
   } = useStorefrontState({
@@ -205,7 +206,12 @@ export default function StorefrontImmersiveLayout({
     }
   }, [physicalProducts, sortBy]);
 
-  const heroProducts = useMemo(() => physicalProducts.slice(0, 8), [physicalProducts]);
+  const heroProducts = useMemo(() => {
+    if (activeFeatured?.hasActive && activeFeatured.products.length > 0) {
+      return activeFeatured.products.slice(0, 8);
+    }
+    return physicalProducts.slice(0, 8);
+  }, [activeFeatured, physicalProducts]);
 
   const primaryColor =
     tenant?.metadata?.primary_color || tenant?.branding?.primaryColor || '#6366f1';
@@ -340,7 +346,7 @@ export default function StorefrontImmersiveLayout({
         <section className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-800">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">Trending Now</h2>
+              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">{activeFeatured?.hasActive ? 'Featured' : 'Trending Now'}</h2>
               <Link href={`/tenant/${tenantId}?featured=true&products_only=true`} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
             </div>
             <EnhancedProductDisplay

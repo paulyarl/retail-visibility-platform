@@ -30,6 +30,7 @@ export interface OrderLocationInfo {
   updatedAt: Date;
   fulfillmentMethod?: string;
   metadata?: any;
+  productTypes?: string[];
 }
 
 export interface LocationOrderStats {
@@ -268,6 +269,56 @@ export class OrderManagementService {
   }
 
   /**
+   * Get valid status transitions based on order item product types
+   */
+  async getValidStatusTransitions(orderId: string): Promise<{ validStatuses: string[]; productTypes: string[] }> {
+    const order = await prisma.orders.findUnique({
+      where: { id: orderId },
+      include: {
+        order_items: {
+          include: {
+            inventory_items: {
+              select: { product_type: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const productTypes = order.order_items.map(item =>
+      item.product_type || (item.inventory_items as any)?.product_type || 'physical'
+    );
+    const uniqueTypes = [...new Set(productTypes)];
+    const hasDigital = uniqueTypes.includes('digital');
+    const hasService = uniqueTypes.includes('service');
+    const hasPhysical = uniqueTypes.includes('physical');
+    const hasHybrid = uniqueTypes.includes('hybrid');
+    const isDigitalOnly = hasDigital && !hasPhysical && !hasService && !hasHybrid;
+    const isServiceOnly = hasService && !hasPhysical && !hasDigital && !hasHybrid;
+
+    const allStatuses = ['draft', 'confirmed', 'paid', 'processing', 'shipped', 'delivered', 'access_granted', 'scheduled', 'in_progress', 'cancelled', 'refunded'];
+    const valid = new Set<string>(allStatuses);
+
+    if (isDigitalOnly) {
+      valid.delete('shipped');
+      valid.delete('processing');
+    }
+
+    if (isServiceOnly) {
+      valid.delete('shipped');
+    }
+
+    return {
+      validStatuses: Array.from(valid),
+      productTypes: uniqueTypes,
+    };
+  }
+
+  /**
    * Update order status with location-specific logic
    */
   async updateOrderStatus(
@@ -279,6 +330,13 @@ export class OrderManagementService {
     const order = await prisma.orders.findUnique({
       where: { id: orderId },
       include: {
+        order_items: {
+          include: {
+            inventory_items: {
+              select: { product_type: true },
+            },
+          },
+        },
         tenants: {
           select: {
             id: true,
@@ -290,6 +348,21 @@ export class OrderManagementService {
 
     if (!order) {
       throw new Error('Order not found');
+    }
+
+    // Product-type-aware status validation
+    const productTypes = order.order_items.map(item =>
+      item.product_type || (item.inventory_items as any)?.product_type || 'physical'
+    );
+    const uniqueTypes = [...new Set(productTypes)];
+    const isDigitalOnly = uniqueTypes.length === 1 && uniqueTypes[0] === 'digital';
+    const isServiceOnly = uniqueTypes.length === 1 && uniqueTypes[0] === 'service';
+
+    if (isDigitalOnly && newStatus === 'shipped') {
+      throw new Error('Cannot set status to "shipped" for a digital-only order. Use "access_granted" or "delivered" instead.');
+    }
+    if (isServiceOnly && newStatus === 'shipped') {
+      throw new Error('Cannot set status to "shipped" for a service-only order. Use "scheduled", "in_progress", or "delivered" instead.');
     }
 
     const metadata = order.metadata as any || {};
@@ -350,6 +423,7 @@ export class OrderManagementService {
       updatedAt: updatedOrder.updated_at || updatedOrder.created_at,
       fulfillmentMethod: metadata.fulfillment_method,
       metadata: updatedOrder.metadata,
+      productTypes: uniqueTypes,
     };
   }
 

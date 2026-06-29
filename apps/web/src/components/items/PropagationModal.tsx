@@ -14,6 +14,7 @@ interface PropagationModalProps {
   onClose: () => void;
   itemId: string;
   itemName: string;
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';
   currentTenantId: string;
   organizationId: string;
   onSuccess?: () => void;
@@ -24,6 +25,7 @@ export default function PropagationModal({
   onClose,
   itemId,
   itemName,
+  productType,
   currentTenantId,
   organizationId,
   onSuccess,
@@ -130,6 +132,25 @@ export default function PropagationModal({
       size="lg"
     >
       <div className="space-y-6">
+        {/* Product Type Badge */}
+        {productType && productType !== 'physical' && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 dark:text-gray-400">Product type:</span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              productType === 'digital'
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                : productType === 'service'
+                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+            }`}>
+              {productType.charAt(0).toUpperCase() + productType.slice(1)}
+            </span>
+            <span className="text-gray-400 dark:text-gray-500 text-xs">
+              Only locations with matching tier capabilities will receive this item.
+            </span>
+          </div>
+        )}
+
         {/* Mode Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

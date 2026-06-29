@@ -35,6 +35,7 @@ import { Badge as MantineBadge } from '@mantine/core';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import LastViewed from '@/components/directory/LastViewed';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
 
 interface Shop {
@@ -577,6 +578,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
   const { tenantId, isInTenantContext, isFromUrl } = usePublicPageTenantContext();
   const { branding: platformBranding } = usePublicBranding();
   const { totalItems: cartTotalItems } = useMultiCart();
+  const { data: activeFeatured } = useActiveFeatured(null, 'shops_page', { limit: 8 });
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -1070,6 +1072,22 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
             trend={{ value: 12, isPositive: true }}
           />
         </div>
+
+        {/* Active Featured Products (from ActiveFeaturedResolver) */}
+        {activeFeatured?.hasActive && activeFeatured.products.length > 0 && (
+          <FeaturedSection
+            title="Promoted Products"
+            items={activeFeatured.products as any}
+            renderItem={(product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                tenantId={product.tenantId || id}
+                onProductClick={handleProductClick}
+              />
+            )}
+          />
+        )}
 
         {/* Featured Products */}
         {featuredProducts.length > 0 && (

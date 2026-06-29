@@ -56,6 +56,14 @@ export function useBadgeMeta(key: string | null | undefined): BadgeTypeMeta | nu
 }
 
 /**
+ * Convenience hook: check if a badge type is promotional.
+ */
+export function useIsPromotional(key: string | null | undefined): boolean {
+  const badge = useBadgeMeta(key);
+  return badge?.isPromotional ?? false;
+}
+
+/**
  * Convenience hook: get badge color CSS class by key.
  */
 export function useBadgeColorClass(key: string | null | undefined): string {

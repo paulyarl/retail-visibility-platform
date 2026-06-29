@@ -3,14 +3,17 @@
 import { motion } from "framer-motion";
 import {
   Zap, Users, Sparkles, ShoppingCart, FileQuestion, CreditCard,
-  ArrowRight, type LucideIcon,
+  ArrowRight, Package, Download, Wrench, Layers, type LucideIcon,
 } from "lucide-react";
 import type { OrganizationData } from "./types";
+import type { OrgProductTypeRollup, OrgProductMix } from "@/services/OrgCapabilityService";
 
 interface OrgRecommendationsCardProps {
   orgData: OrganizationData;
   heroLocation?: OrganizationData["locationBreakdown"][0];
   onNavigate?: (tab: string) => void;
+  productTypeRollup?: OrgProductTypeRollup | null;
+  productMix?: OrgProductMix | null;
 }
 
 interface Recommendation {
@@ -28,6 +31,8 @@ export default function OrgRecommendationsCard({
   orgData,
   heroLocation,
   onNavigate,
+  productTypeRollup,
+  productMix,
 }: OrgRecommendationsCardProps) {
   const heroId = heroLocation?.tenantId;
   const nonHero = orgData.locationBreakdown.filter((l) => l.tenantId !== heroId);
@@ -36,6 +41,92 @@ export default function OrgRecommendationsCard({
   const skuPct = (orgData.current.totalSKUs / orgData.limits.maxTotalSKUs) * 100;
 
   const recs: Recommendation[] = [];
+
+  // --- Product type-aware recommendations ---
+  if (productTypeRollup && productMix) {
+    const mixTypes = new Set(productMix.mix.map((m) => m.productType));
+    const rollupLocations = productTypeRollup.locations;
+
+    // 1. Hero has product types that other locations don't support
+    if (heroLocation && heroLocation.skuCount > 0) {
+      const heroRollup = rollupLocations.find((l) => l.tenantId === heroLocation.tenantId);
+      if (heroRollup && heroRollup.enabled && heroRollup.selectedTypes.length > 0) {
+        const heroTypes = heroRollup.selectedTypes;
+        const unsupportedLocations = rollupLocations.filter(
+          (l) => l.tenantId !== heroLocation.tenantId &&
+                 l.enabled &&
+                 !heroTypes.every((t: string) => l.allowedTypes.includes(t) || l.isFlexible)
+        );
+        if (unsupportedLocations.length > 0) {
+          recs.push({
+            icon: Package, iconBg: "bg-blue-50 dark:bg-blue-900/20", iconColor: "text-blue-600",
+            title: "Product type mismatch across locations",
+            description: `Your hero location has ${heroRollup.selectedTypes.join(", ")} products but ${unsupportedLocations.length} location${unsupportedLocations.length !== 1 ? "s" : ""} don't support ${heroRollup.selectedTypes.length > 1 ? "all types" : "that type"}. Update their product type settings.`,
+            cta: "View locations", tab: "locations",
+          });
+        }
+      }
+    }
+
+    // 2. Has digital products but no delivery method configured
+    if (mixTypes.has("digital")) {
+      const digitalLocations = rollupLocations.filter(
+        (l) => l.enabled && (l.selectedTypes.includes("digital") || l.isFlexible)
+      );
+      if (digitalLocations.length > 0) {
+        recs.push({
+          icon: Download, iconBg: "bg-violet-50 dark:bg-violet-900/20", iconColor: "text-violet-600",
+          title: "Configure digital product delivery",
+          description: `You have digital products across ${digitalLocations.length} location${digitalLocations.length !== 1 ? "s" : ""}. Set up download links or email delivery in commerce settings.`,
+          cta: "Configure delivery", tab: "commerce",
+        });
+      }
+    }
+
+    // 3. Has service products but no booking flow
+    if (mixTypes.has("service")) {
+      const serviceLocations = rollupLocations.filter(
+        (l) => l.enabled && (l.selectedTypes.includes("service") || l.isFlexible)
+      );
+      if (serviceLocations.length > 0) {
+        recs.push({
+          icon: Wrench, iconBg: "bg-amber-50 dark:bg-amber-900/20", iconColor: "text-amber-600",
+          title: "Set up service booking flow",
+          description: `You have service products across ${serviceLocations.length} location${serviceLocations.length !== 1 ? "s" : ""}. Configure booking lead time and cancellation policy in commerce settings.`,
+          cta: "Configure booking", tab: "commerce",
+        });
+      }
+    }
+
+    // 4. Has physical products but no shipping rates
+    if (mixTypes.has("physical")) {
+      const physicalLocations = rollupLocations.filter(
+        (l) => l.enabled && (l.selectedTypes.includes("physical") || l.isFlexible)
+      );
+      if (physicalLocations.length > 0) {
+        recs.push({
+          icon: Layers, iconBg: "bg-cyan-50 dark:bg-cyan-900/20", iconColor: "text-cyan-600",
+          title: "Configure shipping rates",
+          description: `You have physical products across ${physicalLocations.length} location${physicalLocations.length !== 1 ? "s" : ""}. Set up default shipping rates and pickup options in commerce settings.`,
+          cta: "Configure shipping", tab: "commerce",
+        });
+      }
+    }
+
+    // 5. Product types disabled on some locations that have those products
+    const disabledWithProducts = productMix.perLocation.filter((loc) => {
+      const rollupLoc = rollupLocations.find((l) => l.tenantId === loc.tenantId);
+      return rollupLoc && !rollupLoc.enabled && loc.totalItems > 0;
+    });
+    if (disabledWithProducts.length > 0) {
+      recs.push({
+        icon: Zap, iconBg: "bg-red-50 dark:bg-red-900/20", iconColor: "text-red-600",
+        title: "Product types disabled on locations with products",
+        description: `${disabledWithProducts.length} location${disabledWithProducts.length !== 1 ? "s" : ""} have products but product types are disabled. Enable product types to ensure proper commerce behavior.`,
+        cta: "View locations", tab: "locations",
+      });
+    }
+  }
 
   if (heroLocation && heroLocation.skuCount > 0 && locationsWithoutSkus > 0) {
     recs.push({

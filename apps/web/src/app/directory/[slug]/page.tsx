@@ -49,6 +49,8 @@ import {
   DirectoryEntryPremiumLayout,
 } from './layouts';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
 // Merchant gate helper for client-side filtering
 function filterFeaturedProductsByMerchantPreferences(
@@ -404,6 +406,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   // Storefront capability-driven content control
   const storefrontCap = useStorefrontCapability(consolidatedData?.listing?.tenantId || null);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
+
+  // Active featured products (from ActiveFeaturedResolver)
+  const { data: activeFeatured } = useActiveFeatured(
+    consolidatedData?.listing?.tenantId || null,
+    'directory_entry',
+    { limit: 6 }
+  );
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
   const isServiceStore = storefrontCap.data?.type === 'service' || storefrontCap.data?.type === 'flexible';
@@ -624,6 +633,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     businessHours,
     storefrontCategories,
     featuredProducts,
+    activeFeatured: activeFeatured ?? undefined,
     relatedProducts,
     tenantInfo,
     slugForRelated,
@@ -651,6 +661,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'editorial':
       return (
         <>
+          <SocialPixels tenantId={listing.tenantId} usePublic />
           <SubscriptionStatusPanel
             subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
             subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
@@ -668,6 +679,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'immersive':
       return (
         <>
+          <SocialPixels tenantId={listing.tenantId} usePublic />
           <SubscriptionStatusPanel
             subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
             subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
@@ -685,6 +697,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     case 'premium':
       return (
         <>
+          <SocialPixels tenantId={listing.tenantId} usePublic />
           <SubscriptionStatusPanel
             subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
             subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}
@@ -703,6 +716,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     default:
       return (
         <>
+          <SocialPixels tenantId={listing.tenantId} usePublic />
           <SubscriptionStatusPanel
             subscriptionStatus={tenantInfo?.subscriptionStatus || 'active'}
             subscriptionTier={tenantInfo?.subscriptionTier || 'starter'}

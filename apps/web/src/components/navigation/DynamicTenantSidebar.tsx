@@ -14,6 +14,7 @@ import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
 import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
 import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
+import { SidebarAuthButton } from '@/components/navigation/SidebarAuthButton';
 
 // Types are imported from NavItemRow component
 type NavItemWithRBAC = NavItem & RBACNavGates;
@@ -255,6 +256,7 @@ function buildTenantNav(
         { label: 'Quick Start', href: `/t/${currentTenantId}/quick-start` },
         { label: 'Categories', href: `/t/${currentTenantId}/categories` },
         { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products` },
+        { label: 'Featured Store', href: `/t/${currentTenantId}/settings/featured-store` },
         { label: 'Custom Badges', href: `/t/${currentTenantId}/settings/products/badges` },
       ],
     },
@@ -314,7 +316,7 @@ function buildTenantNav(
       icon: <Icon.Integrations />,
       requiredGroup: 'IS_TENANT_ADMIN',
       children: [
-        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integrations/options` },
+        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integration-options` },
         { label: 'Google Merchant Center', href: `/t/${currentTenantId}/settings/integrations/google` },
         { label: 'Feed Validation', href: `/t/${currentTenantId}/feed-validation` },
         { label: 'Clover POS', href: `/t/${currentTenantId}/settings/integrations/clover` },
@@ -464,13 +466,18 @@ function MobileDrawer({
           </button>
         </div>
         <ScopeSwitcher scope="tenant" tenantId={tenantId} />
-        <SidebarNav
-          items={items}
-          pathname={pathname}
-          expanded={expanded}
-          onToggle={onToggle}
-          onNavigate={onClose}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <SidebarNav
+            items={items}
+            pathname={pathname}
+            expanded={expanded}
+            onToggle={onToggle}
+            onNavigate={onClose}
+          />
+        </div>
+        <div className="px-2 py-3 border-t border-neutral-100 dark:border-neutral-800">
+          <SidebarAuthButton />
+        </div>
       </div>
     </>
   );
@@ -557,13 +564,20 @@ function DesktopSidebar({
         )}
       </div>
 
-      <SidebarNav
-        items={items}
-        pathname={pathname}
-        expanded={expanded}
-        onToggle={onToggle}
-        onNavigate={() => {}}
-      />
+      <div className="flex-1 overflow-y-auto">
+        <SidebarNav
+          items={items}
+          pathname={pathname}
+          expanded={expanded}
+          onToggle={onToggle}
+          onNavigate={() => {}}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="px-2 py-3 border-t border-neutral-100 dark:border-neutral-800">
+        <SidebarAuthButton collapsed={collapsed} />
+      </div>
     </aside>
   );
 }

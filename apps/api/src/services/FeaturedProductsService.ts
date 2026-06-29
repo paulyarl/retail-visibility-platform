@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { triggerRevalidate } from '../utils/revalidate';
-import { isValidBadgeKey, isPlatformControlledKey } from './BadgeRegistryService';
+import { isValidBadgeKey, isPlatformControlledKey, getBadgeByKey } from './BadgeRegistryService';
 
 // Dynamic featured type validation
 const VALID_FEATURED_TYPES = [
@@ -626,7 +626,10 @@ export class FeaturedProductsService {
     }
   ): Promise<FeaturedProduct> {
     try {
-      // console.log(`[addFeaturedType] Adding product ${inventoryItemId} as ${featuredType} for tenant ${tenantId}`);
+      // Look up badge type from registry to determine approval behavior
+      const badgeType = await getBadgeByKey(featuredType);
+      const requiresAdminApproval = badgeType?.requiresAdminApproval ?? false;
+      const adminApproved = !requiresAdminApproval;
       
       const featuredProduct = await prisma.featured_products.upsert({
         where: {
@@ -640,6 +643,7 @@ export class FeaturedProductsService {
           featured_expires_at: options?.featured_expires_at ? new Date(options.featured_expires_at) : null,
           auto_unfeature: options?.auto_unfeature !== undefined ? options.auto_unfeature : true,
           is_active: true,
+          admin_approved: adminApproved,
           assignment_source: options?.assignment_source || 'manual',
         },
         create: {
@@ -651,6 +655,7 @@ export class FeaturedProductsService {
           featured_expires_at: options?.featured_expires_at ? new Date(options.featured_expires_at) : null,
           auto_unfeature: options?.auto_unfeature !== undefined ? options.auto_unfeature : true,
           is_active: true,
+          admin_approved: adminApproved,
           assignment_source: options?.assignment_source || 'manual',
         }
       });

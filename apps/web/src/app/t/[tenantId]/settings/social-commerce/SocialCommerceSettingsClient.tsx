@@ -21,6 +21,8 @@ import {
   Store,
   Sparkles,
   ArrowRight,
+  Zap,
+  Globe,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -469,6 +471,75 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
           {saving ? 'Saving...' : 'Save Social Commerce Options'}
         </Button>
       </div>
+
+      {/* What's Next */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-600" />
+            What's Next
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Continue setup for the social commerce features you just enabled
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(settings.social_commerce_meta_pixel || settings.social_commerce_tiktok_pixel) && (
+              <Link
+                href={`/t/${tenantId}/settings/integrations/pixels`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 hover:border-blue-300 text-blue-900 transition-colors"
+              >
+                <BarChart3 className="h-5 w-5 shrink-0 text-blue-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Configure Pixels</p>
+                  <p className="text-xs opacity-80 truncate">Enter your Meta and TikTok Pixel IDs and access tokens</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {(settings.social_commerce_meta_catalog || settings.social_commerce_tiktok_catalog) && (
+              <Link
+                href={`/t/${tenantId}/settings/integrations`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-green-200 bg-green-50 hover:border-green-300 text-green-900 transition-colors"
+              >
+                <Globe className="h-5 w-5 shrink-0 text-green-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Catalog Sync</p>
+                  <p className="text-xs opacity-80 truncate">Set up Meta and TikTok product catalog feeds</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.social_commerce_share_buttons && (
+              <Link
+                href={`/t/${tenantId}/settings/tenant`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-purple-200 bg-purple-50 hover:border-purple-300 text-purple-900 transition-colors"
+              >
+                <Share2 className="h-5 w-5 shrink-0 text-purple-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Social Links</p>
+                  <p className="text-xs opacity-80 truncate">Add your social media profiles to your store profile</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.social_commerce_abandoned_cart && (
+              <Link
+                href={`/t/${tenantId}/settings/integrations`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50 hover:border-amber-300 text-amber-900 transition-colors"
+              >
+                <ShoppingCart className="h-5 w-5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Abandoned Cart</p>
+                  <p className="text-xs opacity-80 truncate">Configure recovery messages for abandoned carts</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

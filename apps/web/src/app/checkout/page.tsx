@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin, Globe } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
-import { getCart, clearCart } from '@/lib/cart/cartManager';
+import { getCart, clearCart, validateFulfillmentMethod } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -518,6 +518,12 @@ function CheckoutPageContent() {
   };
 
   const handleFulfillmentSubmit = (method: FulfillmentMethod, fee: number) => {
+    const validation = validateFulfillmentMethod(cartItems, method);
+    if (!validation.valid) {
+      alert(validation.reason);
+      return;
+    }
+
     setFulfillmentMethod(method);
     setFulfillmentFee(fee);
 

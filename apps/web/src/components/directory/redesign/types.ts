@@ -9,6 +9,7 @@
  */
 
 import type { DirectoryStore, DirectoryCategory } from '@/services/DirectorySingletonService';
+import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 export type { DirectoryCategory };
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,9 @@ export interface DirectoryData {
   activeSort: string;
   hasLocation: boolean;
   hasActiveQuery: boolean;
+
+  // Active featured products (from ActiveFeaturedResolver)
+  activeFeatured?: ActiveFeaturedResult;
 
   // Handlers
   setViewMode: (mode: DirectoryViewMode) => void;
