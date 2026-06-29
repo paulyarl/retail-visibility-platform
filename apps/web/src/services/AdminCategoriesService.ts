@@ -343,14 +343,14 @@ class AdminCategoriesService extends AdminApiSingleton {
   /**
    * Get categories for quick start
    */
-  async getQuickStartCategories(businessType: string, categoryCount: number): Promise<AdminCategory[]> {
+  async getQuickStartCategories(businessType: string, categoryCount: number, storefrontType?: string): Promise<AdminCategory[]> {
     const response = await this.makeDefaultRequest<{
       categories: AdminCategory[];
     }>(
       '/api/platform/categories/quick-start',
       {
         method: 'POST',
-        body: JSON.stringify({ businessType, categoryCount })
+        body: JSON.stringify({ businessType, categoryCount, storefrontType })
       },
       `admin-quick-start-${businessType}-${categoryCount}`,
       this.CATEGORIES_TTL

@@ -125,8 +125,11 @@ router.get('/meta/oauth/authorize', async (req, res) => {
     }
 
     const authUrl = getAuthorizationUrl(tenantId);
-    console.log(`[Meta OAuth] Redirecting tenant ${tenantId} to Meta OAuth`);
-    res.redirect(authUrl);
+    console.log(`[Meta OAuth] Returning OAuth URL for tenant ${tenantId}`);
+    return res.json({
+      success: true,
+      data: { url: authUrl }
+    });
   } catch (error) {
     console.error('[Meta OAuth] Error initiating OAuth:', error);
     res.status(500).json({

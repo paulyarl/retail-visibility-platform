@@ -120,8 +120,11 @@ router.get('/tiktok/oauth/authorize', async (req, res) => {
     }
 
     const authUrl = getAuthorizationUrl(tenantId);
-    logger.info('TikTok OAuth: redirecting tenant', undefined, { tenantId });
-    res.redirect(authUrl);
+    logger.info('TikTok OAuth: returning OAuth URL for tenant', undefined, { tenantId });
+    return res.json({
+      success: true,
+      data: { url: authUrl }
+    });
   } catch (error) {
     logger.error('TikTok OAuth authorize error', undefined, { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({

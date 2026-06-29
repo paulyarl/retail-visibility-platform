@@ -136,6 +136,21 @@ class MetaIntegrationService extends TenantApiSingleton {
     if (!result.data?.success) throw new Error(result.data?.message || 'Failed to start sync');
     await this.invalidateCache(`meta-sync-status-${tenantId}`);
   }
+
+  /**
+   * Get Meta OAuth authorize URL from backend.
+   * Backend constructs the URL with state token, scopes, and redirect URI.
+   * Frontend then navigates browser to the returned URL.
+   */
+  async getOAuthAuthorizeUrl(tenantId: string): Promise<string> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ url: string }>>(
+      `/api/meta/oauth/authorize?tenantId=${tenantId}`,
+      { method: 'GET' },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data?.success) throw new Error(result.data?.message || 'Failed to get OAuth URL');
+    return result.data.data!.url;
+  }
 }
 
 export const metaIntegrationService = MetaIntegrationService.getInstance();

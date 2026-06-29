@@ -5,184 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
-import { useQuickstartOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useQuickstartOptionsCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { adminCategoriesService } from '@/services/AdminCategoriesService';
+import { BUSINESS_TYPES } from '@/components/quick-start/BusinessTypeSelector';
+import { type StorefrontType } from '@/lib/storefront-business-mapping';
 
-type BusinessType = 
-  | 'grocery' 
-  | 'fashion' 
-  | 'electronics'
-  | 'home_garden'
-  | 'health_beauty'
-  | 'sports_outdoors'
-  | 'toys_games'
-  | 'automotive'
-  | 'books_media'
-  | 'pet_supplies'
-  | 'office_supplies'
-  | 'jewelry'
-  | 'baby_kids'
-  | 'arts_crafts'
-  | 'hardware_tools'
-  | 'furniture'
-  | 'restaurant'
-  | 'pharmacy'
-  | 'general';
-
-const businessTypes = [
-  {
-    id: 'grocery' as BusinessType,
-    name: 'Grocery Store',
-    icon: '🛒',
-    description: 'Fresh produce, dairy, meat, bakery, beverages',
-    categoryCount: 15,
-    examples: ['Fresh Fruits', 'Dairy Products', 'Meat & Seafood', 'Bakery Items', 'Beverages'],
-  },
-  {
-    id: 'fashion' as BusinessType,
-    name: 'Fashion Retail',
-    icon: '👗',
-    description: 'Clothing, shoes, accessories, jewelry',
-    categoryCount: 12,
-    examples: ['Women\'s Clothing', 'Men\'s Clothing', 'Shoes', 'Accessories', 'Jewelry'],
-  },
-  {
-    id: 'electronics' as BusinessType,
-    name: 'Electronics Store',
-    icon: '📱',
-    description: 'Phones, computers, audio, gaming, accessories',
-    categoryCount: 12,
-    examples: ['Mobile Phones', 'Computers', 'Audio Equipment', 'Gaming', 'Smart Home'],
-  },
-  {
-    id: 'home_garden' as BusinessType,
-    name: 'Home & Garden',
-    icon: '🏡',
-    description: 'Home decor, kitchen, furniture, lawn & garden',
-    categoryCount: 15,
-    examples: ['Home Decor', 'Kitchen & Dining', 'Furniture', 'Lawn & Garden', 'Bedding'],
-  },
-  {
-    id: 'health_beauty' as BusinessType,
-    name: 'Health & Beauty',
-    icon: '💄',
-    description: 'Personal care, cosmetics, skincare, wellness',
-    categoryCount: 12,
-    examples: ['Personal Care', 'Cosmetics', 'Skincare', 'Hair Care', 'Bath & Body'],
-  },
-  {
-    id: 'sports_outdoors' as BusinessType,
-    name: 'Sports & Outdoors',
-    icon: '⚽',
-    description: 'Exercise, fitness, outdoor recreation, athletics',
-    categoryCount: 12,
-    examples: ['Exercise Equipment', 'Outdoor Recreation', 'Team Sports', 'Camping', 'Cycling'],
-  },
-  {
-    id: 'toys_games' as BusinessType,
-    name: 'Toys & Games',
-    icon: '🧸',
-    description: 'Toys, games, puzzles, educational items',
-    categoryCount: 10,
-    examples: ['Action Figures', 'Board Games', 'Puzzles', 'Educational Toys', 'Outdoor Toys'],
-  },
-  {
-    id: 'automotive' as BusinessType,
-    name: 'Automotive',
-    icon: '🚗',
-    description: 'Vehicle parts, accessories, car care',
-    categoryCount: 10,
-    examples: ['Vehicle Parts', 'Car Accessories', 'Car Care', 'Tools', 'Electronics'],
-  },
-  {
-    id: 'books_media' as BusinessType,
-    name: 'Books & Media',
-    icon: '📚',
-    description: 'Books, music, movies, magazines',
-    categoryCount: 10,
-    examples: ['Books', 'Music', 'Movies & TV', 'Magazines', 'E-Books'],
-  },
-  {
-    id: 'pet_supplies' as BusinessType,
-    name: 'Pet Supplies',
-    icon: '🐾',
-    description: 'Pet food, toys, accessories, care products',
-    categoryCount: 10,
-    examples: ['Dog Supplies', 'Cat Supplies', 'Pet Food', 'Pet Toys', 'Pet Care'],
-  },
-  {
-    id: 'office_supplies' as BusinessType,
-    name: 'Office Supplies',
-    icon: '📎',
-    description: 'Stationery, paper, office equipment',
-    categoryCount: 10,
-    examples: ['Writing Supplies', 'Paper Products', 'Office Equipment', 'Filing', 'Presentation'],
-  },
-  {
-    id: 'jewelry' as BusinessType,
-    name: 'Jewelry Store',
-    icon: '💍',
-    description: 'Fine jewelry, watches, accessories',
-    categoryCount: 8,
-    examples: ['Rings', 'Necklaces', 'Earrings', 'Bracelets', 'Watches'],
-  },
-  {
-    id: 'baby_kids' as BusinessType,
-    name: 'Baby & Kids',
-    icon: '👶',
-    description: 'Baby care, toys, clothing, equipment',
-    categoryCount: 12,
-    examples: ['Baby Care', 'Baby Toys', 'Baby Transport', 'Diapering', 'Feeding'],
-  },
-  {
-    id: 'arts_crafts' as BusinessType,
-    name: 'Arts & Crafts',
-    icon: '🎨',
-    description: 'Art supplies, craft materials, hobbies',
-    categoryCount: 10,
-    examples: ['Art Supplies', 'Craft Materials', 'Sewing', 'Scrapbooking', 'Party Supplies'],
-  },
-  {
-    id: 'hardware_tools' as BusinessType,
-    name: 'Hardware & Tools',
-    icon: '🔨',
-    description: 'Building materials, power tools, plumbing',
-    categoryCount: 12,
-    examples: ['Power Tools', 'Hand Tools', 'Building Materials', 'Plumbing', 'Electrical'],
-  },
-  {
-    id: 'furniture' as BusinessType,
-    name: 'Furniture Store',
-    icon: '🛋️',
-    description: 'Living room, bedroom, office furniture',
-    categoryCount: 10,
-    examples: ['Living Room', 'Bedroom', 'Office Furniture', 'Outdoor Furniture', 'Storage'],
-  },
-  {
-    id: 'restaurant' as BusinessType,
-    name: 'Restaurant/Cafe',
-    icon: '🍽️',
-    description: 'Prepared foods, beverages, catering',
-    categoryCount: 10,
-    examples: ['Appetizers', 'Main Courses', 'Desserts', 'Beverages', 'Catering'],
-  },
-  {
-    id: 'pharmacy' as BusinessType,
-    name: 'Pharmacy',
-    icon: '💊',
-    description: 'Health care, personal care, vitamins',
-    categoryCount: 12,
-    examples: ['Medications', 'Vitamins', 'Personal Care', 'First Aid', 'Health Devices'],
-  },
-  {
-    id: 'general' as BusinessType,
-    name: 'General Retail',
-    icon: '🏪',
-    description: 'Mixed merchandise, variety store',
-    categoryCount: 20,
-    examples: ['Home & Garden', 'Health & Beauty', 'Sports', 'Toys', 'Books'],
-  },
-];
+const businessTypes = BUSINESS_TYPES;
 
 
 
@@ -199,7 +27,11 @@ export default function CategoryQuickStartPage() {
   const { data: quickstartState, loading: capabilityLoading } = useQuickstartOptionsCapability(tenantId);
   const hasCategoryQuickStart = quickstartState?.canUseCategoryGenerator ?? false;
 
-  const [selectedType, setSelectedType] = useState<BusinessType | null>(null);
+  // Storefront type for category alignment
+  const { data: storefrontCap } = useStorefrontCapability(tenantId);
+  const storefrontType: StorefrontType = storefrontCap?.effectiveType ?? 'none';
+
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [categoryCount, setCategoryCount] = useState<number>(15);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,11 +41,11 @@ export default function CategoryQuickStartPage() {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   // Update category count when business type changes
-  const handleTypeChange = (typeId: BusinessType) => {
+  const handleTypeChange = (typeId: string) => {
     setSelectedType(typeId);
     const type = businessTypes.find(t => t.id === typeId);
     if (type) {
-      setCategoryCount(type.categoryCount);
+      setCategoryCount(type.defaultCategoryCount);
     }
   };
 
@@ -224,7 +56,7 @@ export default function CategoryQuickStartPage() {
     setError(null);
 
     try {
-      const categories = await adminCategoriesService.getQuickStartCategories(selectedType, categoryCount);
+      const categories = await adminCategoriesService.getQuickStartCategories(selectedType, categoryCount, storefrontType !== 'none' ? storefrontType : undefined);
       setGeneratedCount(categories.length);
       setDuplicatesSkipped(0); // Would need to be tracked by service
       setResultMessage(`Successfully generated ${categories.length} categories`);
@@ -426,6 +258,13 @@ export default function CategoryQuickStartPage() {
           <Badge className="mb-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
             Category Quick Start
           </Badge>
+          {storefrontType !== 'none' && storefrontType !== 'flexible' && (
+            <div className="mb-4">
+              <Badge className="bg-purple-100 text-purple-800">
+                Storefront: {storefrontType.charAt(0).toUpperCase() + storefrontType.slice(1)}
+              </Badge>
+            </div>
+          )}
           <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-4">
             Generate Product Categories
             <br />
@@ -469,11 +308,11 @@ export default function CategoryQuickStartPage() {
                     </p>
                     <div className="flex items-center gap-2 mb-3">
                       <Badge className="text-xs bg-purple-100 text-purple-800">
-                        {type.categoryCount} categories
+                        {type.defaultCategoryCount} categories
                       </Badge>
                     </div>
                     <div className="text-xs text-neutral-500">
-                      <strong>Examples:</strong> {type.examples.join(', ')}
+                      {type.examples && <><strong>Examples:</strong> {type.examples.join(', ')}</>}
                     </div>
                   </div>
                   {selectedType === type.id && (

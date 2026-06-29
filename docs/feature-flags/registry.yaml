@@ -447,6 +447,34 @@ flags:
       - uptime_pct
     documentation: /docs/observability/synthetic-monitoring.md
 
+  # Supplier Catalog Import (v2.6)
+  - key: FF_SUPPLIER_CATALOG_IMPORT
+    owner: api_team
+    created: 2026-06-29
+    expires: 2026-12-29
+    status: pilot
+    default: false
+    pilot: true
+    production: staged
+    description: "Enables supplier catalog import — browse open-source product catalogs (Open Food Facts, UPC Database, Open Beauty Facts) and bulk import items into tenant inventory"
+    rollout_percentage: 20
+    environments:
+      staging: true
+      pilot: true
+      production: false
+    dependencies: []
+    metrics:
+      - supplier_catalog_items_imported
+      - supplier_catalog_search_usage
+      - import_wizard_completion_rate
+      - gtin_dedup_hit_rate
+      - supplier_connector_health
+    documentation: /docs/SUPPLIER_CATALOG_SPRINT_PLAN.md
+    pilot_cohort:
+      - tenant_id: "cmhe0edxg0002g8s8bba4j2s0"
+      - tenant_id: "tenant_002"
+      - tenant_id: "tenant_003"
+
 # Cleanup Schedule
 cleanup_schedule:
   next_review: 2026-01-01

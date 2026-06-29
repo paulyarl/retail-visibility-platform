@@ -4,16 +4,22 @@
  * Admin CRUD:   /api/admin/featured-placement/catalog
  * Tenant:       /api/tenants/:tenantId/featured-placements
  * Revenue:      /api/admin/featured-placement/revenue
+ * Analytics:    /api/tenants/:tenantId/featured-placements/analytics
+ *               /api/tenants/:tenantId/featured-placements/store-analytics
+ *               /api/admin/featured-placements/analytics
+ *               /api/admin/featured-placements/revenue-analytics
  *
- * Design doc: docs/FEATURED_VISIBILITY_CHANNELS_DESIGN.md (Phase 4)
+ * Design doc: docs/FEATURED_VISIBILITY_CHANNELS_DESIGN.md (Phase 4 + Sprint 6)
  */
 
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import FeaturedPlacementService from '../services/FeaturedPlacementService';
+import FeaturedPlacementAnalyticsService from '../services/FeaturedPlacementAnalyticsService';
 
 const router = Router();
 const service = FeaturedPlacementService.getInstance();
+const analyticsService = FeaturedPlacementAnalyticsService;
 
 // ====================
 // ADMIN: CATALOG CRUD
@@ -201,6 +207,71 @@ router.get('/tenants/:tenantId/featured-placements/:purchaseId', authenticateTok
   } catch (error) {
     console.error('[featured-placement] Failed to get purchase:', error);
     res.status(500).json({ error: 'failed_to_get_purchase' });
+  }
+});
+
+// ====================
+// TENANT: PLACEMENT ANALYTICS (per-placement ROI + lift)
+// ====================
+
+router.get('/tenants/:tenantId/featured-placements/analytics', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const status = req.query.status as string | undefined;
+    const result = await analyticsService.getTenantPlacementAnalytics(tenantId, { status });
+    res.json(result);
+  } catch (error) {
+    console.error('[featured-placement] Failed to get analytics:', error);
+    res.status(500).json({ error: 'failed_to_get_analytics' });
+  }
+});
+
+// ====================
+// TENANT: STORE ANALYTICS (purchase history, spend, renewal)
+// ====================
+
+router.get('/tenants/:tenantId/featured-placements/store-analytics', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const result = await analyticsService.getStoreAnalytics(tenantId);
+    res.json(result);
+  } catch (error) {
+    console.error('[featured-placement] Failed to get store analytics:', error);
+    res.status(500).json({ error: 'failed_to_get_store_analytics' });
+  }
+});
+
+// ====================
+// ADMIN: PLATFORM REVENUE ANALYTICS
+// ====================
+
+router.get('/admin/featured-placements/analytics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const options: { startDate?: Date; endDate?: Date } = {};
+    if (req.query.startDate) options.startDate = new Date(req.query.startDate as string);
+    if (req.query.endDate) options.endDate = new Date(req.query.endDate as string);
+    const result = await analyticsService.getPlatformRevenueAnalytics(options);
+    res.json(result);
+  } catch (error) {
+    console.error('[featured-placement] Failed to get platform analytics:', error);
+    res.status(500).json({ error: 'failed_to_get_platform_analytics' });
+  }
+});
+
+// ====================
+// ADMIN: REVENUE ANALYTICS (alias for revenue-analytics)
+// ====================
+
+router.get('/admin/featured-placements/revenue-analytics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const options: { startDate?: Date; endDate?: Date } = {};
+    if (req.query.startDate) options.startDate = new Date(req.query.startDate as string);
+    if (req.query.endDate) options.endDate = new Date(req.query.endDate as string);
+    const result = await analyticsService.getPlatformRevenueAnalytics(options);
+    res.json(result);
+  } catch (error) {
+    console.error('[featured-placement] Failed to get revenue analytics:', error);
+    res.status(500).json({ error: 'failed_to_get_revenue_analytics' });
   }
 });
 

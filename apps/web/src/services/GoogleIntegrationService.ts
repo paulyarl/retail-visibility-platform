@@ -253,7 +253,42 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       throw new Error('Failed to respond to Google review');
     }
   }
-}
 
-// Export the singleton instance
+  /**
+   * Get Google OAuth authorize URL from backend.
+   * Backend constructs the URL with state token, scopes, and redirect URI.
+   * Frontend then navigates browser to the returned URL.
+   */
+  async getOAuthAuthorizeUrl(tenantId: string): Promise<string> {
+    const result = await this.makeDefaultRequest<{ url: string }>(
+      `/api/google/oauth/authorize?tenantId=${tenantId}`,
+      {},
+      `google-oauth-authorize-${tenantId}`
+    );
+
+    if (!result.success || !result.data?.url) {
+      throw new Error('Failed to get Google OAuth URL');
+    }
+
+    return result.data.url;
+  }
+
+  /**
+   * Get Google Business Profile OAuth authorize URL from backend.
+   * Separate OAuth flow for GBP access.
+   */
+  async getGBPAuthorizeUrl(tenantId: string): Promise<string> {
+    const result = await this.makeDefaultRequest<{ url: string }>(
+      `/api/google/business?tenantId=${tenantId}`,
+      {},
+      `google-gbp-authorize-${tenantId}`
+    );
+
+    if (!result.success || !result.data?.url) {
+      throw new Error('Failed to get Google Business Profile OAuth URL');
+    }
+
+    return result.data.url;
+  }
+}
 export const googleIntegrationService = GoogleIntegrationService.getInstance();

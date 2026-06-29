@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import {
   CheckCircle,
@@ -19,7 +20,6 @@ import {
   Lock,
   Star
 } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/api';
 
 interface SetupStep {
   id: string;
@@ -111,7 +111,8 @@ export default function GoogleIntegrationsPage() {
       // If no OAuth account, redirect to connect flow
       if (err?.error === 'no_oauth_account' || err?.status === 404) {
         // Redirect to Google OAuth to connect account for Merchant Center
-        window.location.href = `/api/google/oauth/authorize?tenantId=${tenantId}`;
+        const url = await googleIntegrationService.getOAuthAuthorizeUrl(tenantId);
+        window.location.href = url;
         return;
       }
       setError(err instanceof Error ? err.message : 'Failed to fetch merchant accounts');
@@ -144,7 +145,8 @@ export default function GoogleIntegrationsPage() {
     setConnecting(true);
     try {
       // Redirect to Google OAuth flow
-      window.location.href = `${API_BASE_URL}/api/google/oauth/authorize?tenantId=${tenantId}`;
+      const url = await googleIntegrationService.getOAuthAuthorizeUrl(tenantId);
+      window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start connection');
       setConnecting(false);
@@ -155,7 +157,8 @@ export default function GoogleIntegrationsPage() {
     setConnectingGBP(true);
     try {
       // Redirect to Google Business Profile OAuth flow
-      window.location.href = `${API_BASE_URL}/api/google/business?tenantId=${tenantId}`;
+      const url = await googleIntegrationService.getGBPAuthorizeUrl(tenantId);
+      window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start connection');
       setConnectingGBP(false);

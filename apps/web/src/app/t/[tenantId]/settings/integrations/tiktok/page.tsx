@@ -13,7 +13,6 @@ import {
   Music,
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { API_BASE_URL } from '@/lib/api';
 import { tiktokIntegrationService } from '@/services/TikTokIntegrationService';
 import type { TikTokStatus, TikTokSyncStatus } from '@/services/TikTokIntegrationService';
 
@@ -59,7 +58,13 @@ function TikTokIntegrationContent() {
 
   async function handleConnect() {
     setConnecting(true);
-    window.location.href = `${API_BASE_URL}/api/tiktok/oauth/authorize?tenantId=${tenantId}`;
+    try {
+      const url = await tiktokIntegrationService.getOAuthAuthorizeUrl(tenantId);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start connection');
+      setConnecting(false);
+    }
   }
 
   async function handleDisconnect() {

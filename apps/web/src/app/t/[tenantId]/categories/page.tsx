@@ -13,6 +13,7 @@ import { tenantCategoriesService } from '@/services/TenantCategoriesService'
 import { tenantManagementService } from '@/services/TenantManagementService'
 import { tenantInfoService } from '@/services/TenantInfoService'
 import { organizationsService } from '@/services/OrganizationsSingletonService'
+import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess'
 
 interface Category {
   id: string
@@ -123,6 +124,10 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
 export default function CategoriesPage() {
   const params = useParams()
   const tenantId = params.tenantId as string
+
+  // Storefront type for quickstart category alignment
+  const { data: storefrontCap } = useStorefrontCapability(tenantId)
+  const storefrontType = storefrontCap?.effectiveType ?? 'none'
 
   const [categories, setCategories] = useState<Category[]>([])
   const [alignmentStatus, setAlignmentStatus] = useState<AlignmentStatus | null>(null)
@@ -449,7 +454,7 @@ export default function CategoriesPage() {
       // Get existing category IDs before quick start
       const existingIds = new Set(categories.map(c => c.id))
       
-      const newCategories = await tenantCategoriesService.quickStartCategories(tenantId, businessType, categoryCount)
+      const newCategories = await tenantCategoriesService.quickStartCategories(tenantId, businessType, categoryCount, storefrontType !== 'none' ? storefrontType : undefined)
       
       if (newCategories.length > 0) {
         // Add new category IDs to highlight
@@ -1340,6 +1345,7 @@ export default function CategoriesPage() {
         isOpen={showQuickStartModal}
         onClose={() => setShowQuickStartModal(false)}
         onGenerate={handleQuickStart}
+        storefrontType={storefrontType}
       />
 
       {/* Toast */}

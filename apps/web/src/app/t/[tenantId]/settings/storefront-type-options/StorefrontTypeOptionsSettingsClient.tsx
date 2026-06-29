@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Store, Globe, Building2, Wrench, Share2, Save, AlertCircle, ArrowRight, Zap, Settings, ExternalLink } from 'lucide-react';
+import { Store, Globe, Building2, Wrench, Share2, Save, AlertCircle, ArrowRight, Zap, Settings, ExternalLink, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import type { ConstraintViolationState } from '@/services/CapabilityResolutionService';
@@ -26,7 +26,7 @@ interface QuickAction {
   description: string;
   href: string;
   icon: typeof Store;
-  variant: 'general' | 'storefront';
+  variant: 'general' | 'storefront' | 'category';
 }
 
 function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, type: string): QuickAction[] {
@@ -74,6 +74,15 @@ function getQuickActions(settings: StorefrontTypeSettings, tenantId: string, typ
     href: `/t/${tenantId}/settings/storefront-options`,
     icon: Settings,
     variant: 'general',
+  });
+
+  actions.push({
+    id: 'quick-start-categories',
+    label: 'Generate Categories',
+    description: 'Quick-start categories aligned with your storefront type',
+    href: `/t/${tenantId}/categories/quick-start`,
+    icon: LayoutGrid,
+    variant: 'category',
   });
 
   return actions;
@@ -369,10 +378,12 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
                   const IconComp = action.icon;
                   const variantStyles = {
                     storefront: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    category: 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-900',
                     general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
                   };
                   const iconStyles = {
                     storefront: 'text-blue-600',
+                    category: 'text-purple-600',
                     general: 'text-neutral-600',
                   };
                   return (

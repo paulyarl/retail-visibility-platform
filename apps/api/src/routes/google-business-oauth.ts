@@ -108,8 +108,11 @@ router.get('/google/business', async (req, res) => {
       state: JSON.stringify({ tenantId }),
     });
 
-    // Redirect user to Google OAuth consent screen
-    res.redirect(authUrl);
+    // Return URL as JSON — frontend navigates browser to it
+    return res.json({
+      success: true,
+      data: { url: authUrl }
+    });
   } catch (error) {
     console.error('[Google Business OAuth] Error initiating flow:', error);
     res.status(500).json({

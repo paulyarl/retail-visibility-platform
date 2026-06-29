@@ -17,7 +17,8 @@ export type FeatureFlag =
   | 'FF_CATEGORY_QUICK_ACTIONS'
   | 'FF_ITEMS_V2_GRID'
   | 'FF_TENANT_GBP_CATEGORY_SYNC'
-  | 'FF_CATEGORY_MIRRORING';
+  | 'FF_CATEGORY_MIRRORING'
+  | 'FF_SUPPLIER_CATALOG_IMPORT';
 
 export type RolloutStrategy = 
   | 'off'           // Feature disabled for all
@@ -108,6 +109,13 @@ let FEATURE_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     strategy: 'off', // M3: Enable after UI/API tested
     percentage: 0,
     pilotTenants: [],
+    pilotRegions: [],
+  },
+  FF_SUPPLIER_CATALOG_IMPORT: {
+    flag: 'FF_SUPPLIER_CATALOG_IMPORT',
+    strategy: 'pilot',
+    percentage: 0,
+    pilotTenants: ['cmhe0edxg0002g8s8bba4j2s0'],
     pilotRegions: [],
   },
 };

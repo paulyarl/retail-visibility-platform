@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { BusinessTypeSelector, BUSINESS_TYPES, getBusinessType, getDefaultCount } from './BusinessTypeSelector';
+import { STOREFRONT_BUSINESS_PRIORITY, STOREFRONT_DEFAULT_CATEGORY_COUNT, type StorefrontType } from '@/lib/storefront-business-mapping';
 
 interface QuickStartCategoryModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface QuickStartCategoryModalProps {
   onGenerate: (businessType: string, categoryCount: number) => Promise<void>;
   title?: string;
   description?: string;
+  storefrontType?: StorefrontType;
 }
 
 /**
@@ -21,10 +23,42 @@ export function QuickStartCategoryModal({
   onGenerate,
   title = '⚡ Quick Start: Generate Categories',
   description = 'Generate Google-aligned categories for your business type',
+  storefrontType,
 }: QuickStartCategoryModalProps) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [categoryCount, setCategoryCount] = useState<number>(15);
+  const [categoryCount, setCategoryCount] = useState<number>(
+    storefrontType ? STOREFRONT_DEFAULT_CATEGORY_COUNT[storefrontType] : 15
+  );
   const [isLoading, setIsLoading] = useState(false);
+
+  // Filter and prioritize business types based on storefront type
+  const filteredTypes = useMemo(() => {
+    if (!storefrontType || storefrontType === 'flexible' || storefrontType === 'none') {
+      return BUSINESS_TYPES;
+    }
+    const priority = STOREFRONT_BUSINESS_PRIORITY[storefrontType];
+    if (!priority || priority.length === 0) return BUSINESS_TYPES;
+
+    if (storefrontType === 'service') {
+      // Service storefront: show only service_business + general
+      return BUSINESS_TYPES.filter(t => priority.includes(t.id));
+    }
+
+    // Other storefront types: prioritize recommended types, keep rest
+    const prioritySet = new Set(priority);
+    const prioritized = BUSINESS_TYPES.filter(t => prioritySet.has(t.id));
+    const rest = BUSINESS_TYPES.filter(t => !prioritySet.has(t.id));
+    return [...prioritized, ...rest];
+  }, [storefrontType]);
+
+  const storefrontBanner = useMemo(() => {
+    if (!storefrontType || storefrontType === 'flexible' || storefrontType === 'none') return null;
+    if (storefrontType === 'service') return 'Service storefronts work best with service-oriented categories';
+    if (storefrontType === 'social') return 'Social commerce works best with visually-driven categories';
+    if (storefrontType === 'online') return 'Online storefronts work best with digital-friendly categories';
+    if (storefrontType === 'retail') return 'Retail storefronts work best with physical-goods categories';
+    return null;
+  }, [storefrontType]);
 
   const handleTypeChange = (typeId: string) => {
     setSelectedType(typeId);
@@ -66,8 +100,17 @@ export function QuickStartCategoryModal({
               value={selectedType}
               onChange={(typeId) => handleTypeChange(typeId)}
               variant="dropdown"
+              types={filteredTypes}
             />
           </div>
+
+          {storefrontBanner && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <p className="text-sm text-purple-800">
+                <strong>💡 Tip:</strong> {storefrontBanner}
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -75,14 +118,14 @@ export function QuickStartCategoryModal({
             </label>
             <input
               type="range"
-              min="5"
+              min="4"
               max="30"
               value={categoryCount}
               onChange={(e) => setCategoryCount(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
             />
             <div className="flex justify-between text-xs text-neutral-500 mt-1">
-              <span>5 min</span>
+              <span>4 min</span>
               <span>30 max</span>
             </div>
           </div>

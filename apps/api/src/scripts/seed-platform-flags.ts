@@ -66,6 +66,12 @@ const DEFAULT_FLAGS = [
     rollout: 'Enable quick actions for category management',
     allow_tenant_override: true, // UX enhancement, safe to override
   },
+  {
+    flag: 'FF_SUPPLIER_CATALOG_IMPORT',
+    enabled: false, // pilot phase
+    rollout: 'Browse open-source product catalogs (Open Food Facts, UPC Database, Open Beauty Facts) and bulk import items into tenant inventory',
+    allow_tenant_override: true, // Safe for tenants to opt in
+  },
 ];
 
 async function seedPlatformFlags() {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3, TrendingUp, TrendingDown, Minus, Eye, MousePointerClick,
-  ShoppingCart, DollarSign, Package, RefreshCw, ArrowLeft, Award,
+  ShoppingCart, DollarSign, Package, RefreshCw, ArrowLeft, Award, Store,
 } from 'lucide-react';
 import Link from 'next/link';
 import BadgeAnalyticsService, {
@@ -12,6 +12,7 @@ import BadgeAnalyticsService, {
   type PeriodType,
   type BadgeTimeSeriesPoint,
 } from '@/services/BadgeAnalyticsService';
+import { FeaturedPlacementAnalyticsService, type PlacementAnalyticsResult } from '@/services/FeaturedPlacementAnalyticsService';
 
 interface BadgeAnalyticsClientProps {
   tenantId: string;
@@ -48,6 +49,10 @@ export default function BadgeAnalyticsClient({ tenantId }: BadgeAnalyticsClientP
   const [selectedBadge, setSelectedBadge] = useState<string | null>(null);
   const [timeseries, setTimeseries] = useState<BadgeTimeSeriesPoint[]>([]);
   const [timeseriesLoading, setTimeseriesLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'badges' | 'placements'>('badges');
+  const [placementAnalytics, setPlacementAnalytics] = useState<PlacementAnalyticsResult | null>(null);
+  const [placementLoading, setPlacementLoading] = useState(false);
+  const [placementError, setPlacementError] = useState<string | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -77,6 +82,25 @@ export default function BadgeAnalyticsClient({ tenantId }: BadgeAnalyticsClientP
       setAggregating(false);
     }
   };
+
+  const fetchPlacementAnalytics = useCallback(async () => {
+    setPlacementLoading(true);
+    setPlacementError(null);
+    try {
+      const data = await FeaturedPlacementAnalyticsService.getPlacementAnalytics(tenantId);
+      setPlacementAnalytics(data);
+    } catch (err: any) {
+      setPlacementError(err.message || 'Failed to load placement analytics');
+    } finally {
+      setPlacementLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (activeTab === 'placements' && !placementAnalytics && !placementLoading) {
+      fetchPlacementAnalytics();
+    }
+  }, [activeTab, placementAnalytics, placementLoading, fetchPlacementAnalytics]);
 
   const handleBadgeClick = async (badgeKey: string) => {
     if (selectedBadge === badgeKey) {
@@ -123,16 +147,44 @@ export default function BadgeAnalyticsClient({ tenantId }: BadgeAnalyticsClientP
               </p>
             </div>
             <button
-              onClick={handleAggregate}
-              disabled={aggregating}
+              onClick={activeTab === 'badges' ? handleAggregate : fetchPlacementAnalytics}
+              disabled={activeTab === 'badges' ? aggregating : placementLoading}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${aggregating ? 'animate-spin' : ''}`} />
-              {aggregating ? 'Aggregating...' : 'Refresh Data'}
+              <RefreshCw className={`w-4 h-4 ${(activeTab === 'badges' ? aggregating : placementLoading) ? 'animate-spin' : ''}`} />
+              {(activeTab === 'badges' ? aggregating : placementLoading) ? 'Loading...' : 'Refresh Data'}
             </button>
           </div>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('badges')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'badges'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            Badge Performance
+          </button>
+          <button
+            onClick={() => setActiveTab('placements')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'placements'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Store className="w-4 h-4" />
+            Placement Store
+          </button>
+        </div>
+
+        {activeTab === 'badges' && (
+        <>
         {/* Filters */}
         <div className="flex items-center gap-4 mb-6">
           <div className="flex items-center gap-2">
@@ -275,8 +327,160 @@ export default function BadgeAnalyticsClient({ tenantId }: BadgeAnalyticsClientP
             )}
           </>
         )}
+        </>
+        )}
+
+        {activeTab === 'placements' && (
+          <PlacementStoreTab
+            tenantId={tenantId}
+            analytics={placementAnalytics}
+            loading={placementLoading}
+            error={placementError}
+            onRefresh={fetchPlacementAnalytics}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+// ====================
+// Placement Store Tab
+// ====================
+
+function PlacementStoreTab({
+  tenantId, analytics, loading, error, onRefresh,
+}: {
+  tenantId: string;
+  analytics: PlacementAnalyticsResult | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  const svc = FeaturedPlacementAnalyticsService;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+        <span className="ml-2 text-gray-500">Loading placement analytics...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+        {error}
+      </div>
+    );
+  }
+
+  if (!analytics || analytics.placements.length === 0) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+        <Store className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <h3 className="text-lg font-medium text-gray-900 mb-1">No placement data yet</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Purchase featured placements from the store to see ROI and lift metrics here.
+        </p>
+        <Link
+          href={`/t/${tenantId}/settings/featured-store`}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        >
+          <Store className="w-4 h-4" />
+          Visit Featured Store
+        </Link>
+      </div>
+    );
+  }
+
+  const totals = analytics.totals;
+
+  return (
+    <>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <SummaryCard icon={<Store className="w-5 h-5" />} label="Total Placements" value={String(totals.totalPlacements)} color="indigo" />
+        <SummaryCard icon={<Package className="w-5 h-5" />} label="Active" value={String(totals.activePlacements)} color="green" />
+        <SummaryCard icon={<DollarSign className="w-5 h-5" />} label="Total Spend" value={svc.formatCurrency(totals.totalSpendCents)} color="amber" />
+        <SummaryCard icon={<DollarSign className="w-5 h-5" />} label="Attributed Revenue" value={svc.formatCurrency(totals.totalRevenueCents)} color="green" />
+        <SummaryCard icon={<TrendingUp className="w-5 h-5" />} label="Avg ROI" value={svc.formatPercent(totals.avgRoi)} color="purple" />
+        <SummaryCard icon={<TrendingUp className="w-5 h-5" />} label="Renewal Rate" value={svc.formatPercent(totals.renewalRate)} color="blue" />
+      </div>
+
+      {/* Placement Table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-8">
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Per-Placement ROI</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-gray-600">
+                <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">Surface</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium text-right">Spend</th>
+                <th className="px-4 py-3 font-medium text-right">Views</th>
+                <th className="px-4 py-3 font-medium text-right">Clicks</th>
+                <th className="px-4 py-3 font-medium text-right">CTR</th>
+                <th className="px-4 py-3 font-medium text-right">Orders</th>
+                <th className="px-4 py-3 font-medium text-right">Revenue</th>
+                <th className="px-4 py-3 font-medium text-right">Lift</th>
+                <th className="px-4 py-3 font-medium text-right">ROI</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {analytics.placements.map((p) => (
+                <tr key={p.purchaseId} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-gray-900 font-medium">{p.productName}</td>
+                  <td className="px-4 py-3 text-gray-600 capitalize">{p.surface}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      p.status === 'active' ? 'bg-green-100 text-green-700' :
+                      p.status === 'expired' ? 'bg-gray-100 text-gray-600' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-700">{svc.formatCurrency(p.priceCents)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{svc.formatNumber(p.views)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{svc.formatNumber(p.clicks)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{svc.formatPercent(p.ctr)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{svc.formatNumber(p.orderCount)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">{svc.formatCurrency(p.revenueCents)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={p.revenueLift > 0 ? 'text-green-600 font-medium' : p.revenueLift < 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                      {p.revenueLift > 0 ? '+' : ''}{svc.formatPercent(p.revenueLift)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={p.roi > 0 ? 'text-green-600 font-medium' : p.roi < 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                      {p.roi > 0 ? '+' : ''}{svc.formatPercent(p.roi)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-6 text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Want to boost your product visibility?</h3>
+        <p className="text-sm text-gray-600 mb-4">Purchase featured placements to spotlight your products across surfaces.</p>
+        <Link
+          href={`/t/${tenantId}/settings/featured-store`}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        >
+          <Store className="w-4 h-4" />
+          Visit Featured Store
+        </Link>
+      </div>
+    </>
   );
 }
 

@@ -719,6 +719,7 @@ export interface QuickStartOptions {
   textModel?: 'openai' | 'google' | 'anthropic' | 'mistral';
   imageModel?: 'openai' | 'google';
   productType?: 'physical' | 'digital' | 'hybrid' | 'service';
+  storefrontType?: 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 }
 
 export interface QuickStartResult {
@@ -747,6 +748,7 @@ export async function generateQuickStartProducts(
     textModel = 'openai',
     imageModel = 'openai',
     productType = 'physical',
+    storefrontType,
   } = options;
 
   // Validate tenant exists
@@ -756,7 +758,16 @@ export async function generateQuickStartProducts(
   }
 
   // Use fallback scenario data if not in SCENARIOS (for new business types)
-  const scenarioData = SCENARIOS[scenario] || SCENARIOS.general;
+  let scenarioData = SCENARIOS[scenario] || SCENARIOS.general;
+
+  // Storefront-type-aware adjustments
+  if (storefrontType && storefrontType !== 'flexible' && storefrontType !== 'none') {
+    console.log(`[Quick Start] Storefront type: ${storefrontType}`);
+    if (storefrontType === 'service' && scenario !== 'service_business') {
+      console.log(`[Quick Start] Service storefront: overriding scenario to service_business`);
+      scenarioData = SCENARIOS.service_business || SCENARIOS.general;
+    }
+  }
   const timestamp = Date.now();
 
   // Create categories with live Google taxonomy alignment and persist to database

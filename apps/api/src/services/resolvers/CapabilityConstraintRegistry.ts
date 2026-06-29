@@ -178,6 +178,48 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     message: 'Digital products typically do not need shipping fulfillment',
     resolution_hint: 'Consider disabling shipping fulfillment if you only sell digital products',
   },
+
+  // ── Service storefront recommends quickstart enabled ──
+  {
+    id: 'storefront_service_recommends_quickstart_service',
+    type: 'recommends',
+    severity: 'warn',
+    source: {
+      capability: 'storefront',
+      field: 'effective_type',
+      operator: 'equals',
+      value: 'service',
+    },
+    target: {
+      capability: 'quickstart',
+      field: 'enabled',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Service storefront works best with service-oriented quickstart categories',
+    resolution_hint: 'Use the Service Business type in Category Quick Start for optimal category alignment',
+  },
+
+  // ── Social storefront recommends quickstart category generator ──
+  {
+    id: 'storefront_social_recommends_quickstart_category',
+    type: 'recommends',
+    severity: 'warn',
+    source: {
+      capability: 'storefront',
+      field: 'effective_type',
+      operator: 'equals',
+      value: 'social',
+    },
+    target: {
+      capability: 'quickstart',
+      field: 'can_use_category_generator',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Social storefront benefits from quickstart categories for product discovery',
+    resolution_hint: 'Enable Category Generator in Quickstart Options and generate fashion/beauty categories',
+  },
 ];
 
 // ====================

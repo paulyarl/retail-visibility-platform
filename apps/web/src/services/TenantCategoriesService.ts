@@ -366,13 +366,13 @@ class TenantCategoriesService extends TenantApiSingleton {
    * Quick start categories setup
    * Uses the /api/v1/tenants/:tenantId/categories/quick-start endpoint
    */
-  async quickStartCategories(tenantId: string, businessType: string, categoryCount: number): Promise<Category[]> {
+  async quickStartCategories(tenantId: string, businessType: string, categoryCount: number, storefrontType?: string): Promise<Category[]> {
     try {
       const response = await this.makeDefaultRequest<{ data: Category[] }>(
         `/api/v1/tenants/${tenantId}/categories/quick-start`,
         {
           method: 'POST',
-          body: JSON.stringify({ businessType, categoryCount }),
+          body: JSON.stringify({ businessType, categoryCount, storefrontType }),
         },
         `tenant-categories-${tenantId}`
       );
