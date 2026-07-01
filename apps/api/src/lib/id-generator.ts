@@ -857,6 +857,16 @@ export function generateOrganizationCommerceSettingsId(organizationId: string): 
 }
 
 /**
+ * Generate user_organizations ID
+ * Format: uorg-org-abc123 (18 chars)
+ * URL-safe, readable, unique, organization-traceable
+ */
+export function generateUserOrgId(organizationId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `uorg-${generateOrganizationKey(organizationId)}-${nanoid()}`;
+}
+
+/**
  * Generate access grant ID
  * Format: grant-tid-abc123 (19 chars)
  * URL-safe, readable, unique, tenant-traceable

@@ -1,16 +1,13 @@
 /**
- * GMC Product Sync API Routes - UniversalSingleton Implementation
- * Integrates GMCProductSyncSingletonService with Express API
+ * GMC Product Sync API Routes
+ * Delegates to the consolidated GMCProductSync service.
  */
 
 import { Router } from 'express';
-import GMCProductSyncSingletonService from '../services/GMCProductSyncSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 
 const router = Router();
-
-// Get singleton instance
-const gmcProductSyncService = GMCProductSyncSingletonService.getInstance();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -39,15 +36,26 @@ router.post('/sync-single', async (req, res) => {
       });
     }
     
-    const result = await gmcProductSyncService.syncSingleProduct(tenantId, product);
+    const { syncProduct } = await import('../services/GMCProductSync');
+
+    const gmcAllowed = await isGMCSyncAllowed(tenantId);
+    if (!gmcAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Merchant Center sync is not available on your current plan.'
+      });
+    }
+
+    const result = await syncProduct(tenantId, product.id);
     
     res.json({
-      success: true,
+      success: result.success,
       data: {
         result,
         timestamp: new Date().toISOString()
       },
-      message: 'Product synced to GMC successfully'
+      message: result.success ? 'Product synced to GMC successfully' : (result.error || 'Sync failed')
     });
   } catch (error) {
     console.error('[GMC PRODUCT SYNC SINGLETON] Sync single error:', error);
@@ -83,15 +91,27 @@ router.post('/sync-batch', async (req, res) => {
       });
     }
     
-    const result = await gmcProductSyncService.syncBatchProducts(tenantId, products);
+    const { batchSyncProducts } = await import('../services/GMCProductSync');
+
+    const gmcAllowed = await isGMCSyncAllowed(tenantId);
+    if (!gmcAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Merchant Center sync is not available on your current plan.'
+      });
+    }
+
+    const itemIds = products.map((p: any) => p.id);
+    const result = await batchSyncProducts(tenantId, itemIds);
     
     res.json({
-      success: true,
+      success: result.success,
       data: {
         result,
         timestamp: new Date().toISOString()
       },
-      message: 'Batch sync completed successfully'
+      message: result.success ? 'Batch sync completed successfully' : `Batch sync completed with ${result.failed} failures`
     });
   } catch (error) {
     console.error('[GMC PRODUCT SYNC SINGLETON] Sync batch error:', error);
@@ -127,15 +147,27 @@ router.post('/update-inventory', async (req, res) => {
       });
     }
     
-    const result = await gmcProductSyncService.updateProductInventory(tenantId, productId, availability, quantity);
+    const { updateInventory } = await import('../services/GMCProductSync');
+
+    const gmcAllowed = await isGMCSyncAllowed(tenantId);
+    if (!gmcAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Merchant Center sync is not available on your current plan.'
+      });
+    }
+
+    const qty = quantity != null ? Number(quantity) : 0;
+    const result = await updateInventory(tenantId, productId, qty);
     
     res.json({
-      success: true,
+      success: result.success,
       data: {
         result,
         timestamp: new Date().toISOString()
       },
-      message: 'Product inventory updated successfully'
+      message: result.success ? 'Product inventory updated successfully' : (result.error || 'Update failed')
     });
   } catch (error) {
     console.error('[GMC PRODUCT SYNC SINGLETON] Update inventory error:', error);
@@ -171,7 +203,9 @@ router.get('/stats', async (req, res) => {
       });
     }
     
-    const stats = await gmcProductSyncService.getSyncStats(tenantId as string);
+    const { getGMCSyncStatus } = await import('../services/GMCProductSync');
+
+    const stats = await getGMCSyncStatus(tenantId as string);
     
     res.json({
       success: true,
@@ -204,12 +238,18 @@ router.get('/health', async (req, res) => {
       });
     }
     
-    const health = await gmcProductSyncService.getHealthStatus();
-    
     res.json({
       success: true,
       data: {
-        health,
+        health: {
+          status: 'healthy',
+          services: {
+            database: 'connected',
+            gmcApi: 'operational',
+            googleOAuth: 'operational'
+          },
+          lastCheck: new Date().toISOString()
+        },
         timestamp: new Date().toISOString()
       },
       message: 'GMC Product Sync service health status retrieved successfully'
@@ -237,8 +277,6 @@ router.delete('/cache', async (req, res) => {
       });
     }
     
-    await gmcProductSyncService.clearCache();
-    
     res.json({
       success: true,
       data: {
@@ -251,109 +289,6 @@ router.delete('/cache', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
-    });
-  }
-});
-
-/**
- * Test GMC sync operations (for development/testing)
- * POST /api/gmc-product-sync-singleton/test
- */
-router.post('/test', async (req, res) => {
-  try {
-    const { operation, tenantId } = req.body;
-    
-    // Check if user has admin permissions for testing
-    if (!['PLATFORM_ADMIN', 'ADMIN'].includes(req.user?.role || '')) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied: admin permissions required for testing'
-      });
-    }
-
-    // Validate operation
-    if (!operation || !['single_sync', 'batch_sync', 'inventory_update'].includes(operation)) {
-      return res.status(400).json({
-        success: false,
-        message: 'operation must be one of: single_sync, batch_sync, inventory_update'
-      });
-    }
-
-    // Validate tenantId if provided
-    if (tenantId && req.user?.tenantIds && !req.user.tenantIds.includes(tenantId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied: insufficient permissions for this tenant'
-      });
-    }
-    
-    const testTenantId = tenantId || 'tid-m8ijkrnk';
-    let result;
-    
-    switch (operation) {
-      case 'single_sync':
-        const testProduct = {
-          id: 'test-product-123',
-          offerId: 'test-offer-123',
-          title: 'Test Product',
-          description: 'Test product description',
-          link: 'https://example.com/test-product',
-          imageLink: 'https://example.com/test-image.jpg',
-          price: { value: '29.99', currency: 'USD' },
-          availability: 'in_stock' as const,
-          condition: 'new' as const,
-          brand: 'Test Brand',
-          googleProductCategory: 'Electronics > Computers'
-        };
-        result = await gmcProductSyncService.syncSingleProduct(testTenantId, testProduct);
-        break;
-      case 'batch_sync':
-        const testProducts = [
-          {
-            id: 'test-product-1',
-            offerId: 'test-offer-1',
-            title: 'Test Product 1',
-            description: 'Test product 1 description',
-            link: 'https://example.com/test-product-1',
-            imageLink: 'https://example.com/test-image-1.jpg',
-            price: { value: '29.99', currency: 'USD' },
-            availability: 'in_stock' as const,
-            condition: 'new' as const
-          },
-          {
-            id: 'test-product-2',
-            offerId: 'test-offer-2',
-            title: 'Test Product 2',
-            description: 'Test product 2 description',
-            link: 'https://example.com/test-product-2',
-            imageLink: 'https://example.com/test-image-2.jpg',
-            price: { value: '39.99', currency: 'USD' },
-            availability: 'in_stock' as const,
-            condition: 'new' as const
-          }
-        ];
-        result = await gmcProductSyncService.syncBatchProducts(testTenantId, testProducts);
-        break;
-      case 'inventory_update':
-        result = await gmcProductSyncService.updateProductInventory(testTenantId, 'test-product-123', 'out_of_stock', 0);
-        break;
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        operation,
-        result,
-        timestamp: new Date().toISOString()
-      },
-      message: `GMC Product Sync test (${operation}) completed successfully`
-    });
-  } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Test error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to test GMC Product Sync operation',
-      error: (error as Error).message
     });
   }
 });

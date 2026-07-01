@@ -35,6 +35,7 @@ export interface UserData {
     id?: string; // Legacy format from AuthContext
     role: UserRole;
   }>;
+  organizations?: Array<{ id: string; role: string }>;
 }
 
 export interface TenantData {
@@ -430,7 +431,47 @@ export function isTenantOwnerLegacy(user: UserData, tenantId: string): boolean {
 }
 
 /**
+ * Get the user's explicit org role for a specific organization.
+ * Returns null if the user has no explicit org role.
+ */
+export function getOrgRole(user: UserData, orgId: string): string | null {
+  const org = user.organizations?.find(o => o.id === orgId);
+  return org?.role || null;
+}
+
+/**
+ * Check if user is an org admin (explicit org role OR platform admin).
+ * Falls back to hero tenant derivation if no explicit org role exists.
+ */
+export function isOrgAdmin(user: UserData, orgId: string, organizationData?: OrganizationData): boolean {
+  if (isPlatformAdmin(user)) return true;
+  const role = getOrgRole(user, orgId);
+  if (role === 'ORG_OWNER' || role === 'ORG_ADMIN') return true;
+  // Fallback: hero tenant admin derivation for backward compat
+  if (organizationData && !role) {
+    return isOrganizationAdmin(user, organizationData);
+  }
+  return false;
+}
+
+/**
+ * Check if user is an org member (explicit org role OR platform admin).
+ * Falls back to hero tenant derivation if no explicit org role exists.
+ */
+export function isOrgMember(user: UserData, orgId: string, organizationData?: OrganizationData): boolean {
+  if (isPlatformAdmin(user)) return true;
+  const role = getOrgRole(user, orgId);
+  if (role !== null) return true;
+  // Fallback: any tenant admin in org for backward compat
+  if (organizationData && !role) {
+    return isOrganizationMember(user, organizationData);
+  }
+  return false;
+}
+
+/**
  * Check if user is owner/admin of the hero tenant in an organization
+ * (Legacy — used as fallback by isOrgAdmin)
  */
 export function isOrganizationAdmin(user: UserData, organizationData: OrganizationData): boolean {
   const heroTenant = organizationData.tenants.find(t => t.metadata?.isHeroLocation === true);
@@ -440,6 +481,7 @@ export function isOrganizationAdmin(user: UserData, organizationData: Organizati
 
 /**
  * Check if user is owner/admin of ANY tenant in an organization
+ * (Legacy — used as fallback by isOrgMember)
  */
 export function isOrganizationMember(user: UserData, organizationData: OrganizationData): boolean {
   return organizationData.tenants.some(t => isTenantOwnerOrAdmin(user, t.id));

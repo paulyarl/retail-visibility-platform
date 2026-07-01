@@ -14,6 +14,7 @@
  */
 
 import { prisma } from '../prisma';
+import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 
@@ -54,10 +55,46 @@ interface FullSyncResult {
 
 /**
  * Get valid GBP access token for a tenant
- * Handles token refresh if expired
+ * Reads from unified google_oauth_tokens_list (encrypted) with fallback to legacy tenants table columns.
+ * Handles token refresh if expired.
  */
 async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
+    // First, try the unified OAuth token store
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { google_oauth_tokens_list: true },
+    });
+
+    if (account?.google_oauth_tokens_list) {
+      const tokenRecord = account.google_oauth_tokens_list;
+      const now = new Date();
+
+      if (tokenRecord.expires_at <= now) {
+        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
+        const newTokens = await refreshAccessToken(refreshToken);
+
+        if (!newTokens) {
+          console.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}`);
+          return null;
+        }
+
+        await prisma.google_oauth_tokens_list.update({
+          where: { id: tokenRecord.id },
+          data: {
+            access_token_encrypted: encryptToken(newTokens.access_token),
+            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
+            updated_at: new Date(),
+          },
+        });
+
+        return newTokens.access_token;
+      }
+
+      return decryptToken(tokenRecord.access_token_encrypted);
+    }
+
+    // Fallback: legacy tenants table columns (plain text, unencrypted)
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
@@ -74,7 +111,6 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
 
     // Check if token is expired
     if (tenant.google_business_token_expiry && new Date(tenant.google_business_token_expiry) < new Date()) {
-      // Token expired - try to refresh
       if (tenant.google_business_refresh_token) {
         const { google } = await import('googleapis');
         const oauth2Client = new google.auth.OAuth2(
@@ -86,7 +122,6 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
         try {
           const { credentials } = await oauth2Client.refreshAccessToken();
           
-          // Update stored token
           await prisma.tenants.update({
             where: { id: tenantId },
             data: {
@@ -97,7 +132,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
           
           return credentials.access_token!;
         } catch (refreshError) {
-          console.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}:`, refreshError);
+          console.error(`[GBPBusinessInfoSync] Legacy token refresh failed for tenant ${tenantId}:`, refreshError);
           return null;
         }
       }
@@ -440,6 +475,162 @@ export async function syncCategories(
 }
 
 /**
+ * Sync regular business hours to Google Business Profile.
+ * Reads from business_hours_list table and converts to GBP regularHours format.
+ *
+ * GBP format:
+ *   regularHours: {
+ *     periods: [
+ *       { openDay: "MONDAY", openTime: "9:00", closeDay: "MONDAY", closeTime: "17:00" }
+ *     ]
+ *   }
+ */
+export async function syncBusinessHours(tenantId: string): Promise<SyncResult> {
+  try {
+    const accessToken = await getValidAccessToken(tenantId);
+    if (!accessToken) {
+      return { success: false, field: 'regularHours', error: 'No valid access token' };
+    }
+
+    const locationId = await getLinkedLocation(tenantId);
+    if (!locationId) {
+      return { success: true, field: 'regularHours', skipped: true, reason: 'No GBP location linked' };
+    }
+
+    // Read business hours from database
+    const businessHours = await prisma.business_hours_list.findUnique({
+      where: { tenant_id: tenantId },
+    });
+
+    if (!businessHours) {
+      return { success: true, field: 'regularHours', skipped: true, reason: 'No business hours configured' };
+    }
+
+    const periods = (businessHours.periods as unknown as Array<{ day: string; open: string; close: string }>) || [];
+    if (periods.length === 0) {
+      return { success: true, field: 'regularHours', skipped: true, reason: 'No hours periods set' };
+    }
+
+    // Convert to GBP format
+    const gbpPeriods = periods.map(p => ({
+      openDay: p.day.toUpperCase(),
+      openTime: p.open,
+      closeDay: p.day.toUpperCase(),
+      closeTime: p.close,
+    }));
+
+    const response = await fetch(
+      `${GBP_API_BASE}/locations/${locationId}?updateMask=regularHours`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          regularHours: { periods: gbpPeriods },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[GBPBusinessInfoSync] Failed to sync business hours:`, error);
+      return { success: false, field: 'regularHours', error: `API error: ${response.status}` };
+    }
+
+    console.log(`[GBPBusinessInfoSync] Synced regular business hours for tenant ${tenantId} (${gbpPeriods.length} periods)`);
+    return { success: true, field: 'regularHours' };
+  } catch (error: any) {
+    console.error(`[GBPBusinessInfoSync] Error syncing business hours:`, error);
+    return { success: false, field: 'regularHours', error: error.message };
+  }
+}
+
+/**
+ * Sync special business hours to Google Business Profile.
+ * Reads from business_hours_special_list table and converts to GBP specialHours format.
+ *
+ * GBP format:
+ *   specialHours: {
+ *     specialHourPeriods: [
+ *       { startDate: { year: 2024, month: 1, day: 1 }, openTime: "9:00", closeTime: "17:00" }
+ *     ]
+ *   }
+ */
+export async function syncSpecialHours(tenantId: string): Promise<SyncResult> {
+  try {
+    const accessToken = await getValidAccessToken(tenantId);
+    if (!accessToken) {
+      return { success: false, field: 'specialHours', error: 'No valid access token' };
+    }
+
+    const locationId = await getLinkedLocation(tenantId);
+    if (!locationId) {
+      return { success: true, field: 'specialHours', skipped: true, reason: 'No GBP location linked' };
+    }
+
+    // Read special hours from database
+    const specialHours = await prisma.business_hours_special_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { date: 'asc' },
+    });
+
+    if (specialHours.length === 0) {
+      return { success: true, field: 'specialHours', skipped: true, reason: 'No special hours configured' };
+    }
+
+    // Convert to GBP format
+    const gbpSpecialPeriods = specialHours.map(s => {
+      const date = new Date(s.date);
+      const period: any = {
+        startDate: {
+          year: date.getFullYear(),
+          month: date.getMonth() + 1, // GBP uses 1-based months
+          day: date.getDate(),
+        },
+      };
+
+      if (s.isClosed) {
+        // Closed for this special day
+        period.isClosed = true;
+      } else {
+        period.openTime = s.open || '00:00';
+        period.closeTime = s.close || '23:59';
+      }
+
+      return period;
+    });
+
+    const response = await fetch(
+      `${GBP_API_BASE}/locations/${locationId}?updateMask=specialHours`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          specialHours: { specialHourPeriods: gbpSpecialPeriods },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[GBPBusinessInfoSync] Failed to sync special hours:`, error);
+      return { success: false, field: 'specialHours', error: `API error: ${response.status}` };
+    }
+
+    console.log(`[GBPBusinessInfoSync] Synced special business hours for tenant ${tenantId} (${gbpSpecialPeriods.length} periods)`);
+    return { success: true, field: 'specialHours' };
+  } catch (error: any) {
+    console.error(`[GBPBusinessInfoSync] Error syncing special hours:`, error);
+    return { success: false, field: 'specialHours', error: error.message };
+  }
+}
+
+/**
  * Sync all business info to Google in one call
  * More efficient than individual calls
  */
@@ -560,12 +751,42 @@ export async function syncAllBusinessInfo(
     // Record sync timestamp
     await recordSyncTimestamp(tenantId, updateMaskParts);
 
+    // Sync business hours (gated by storefront type + hours display + GBP capability)
+    const { isGBPHoursSyncAllowed } = await import('../lib/google/capability-gate');
+    const hoursAllowed = await isGBPHoursSyncAllowed(tenantId);
+
+    if (hoursAllowed) {
+      const hoursResult = await syncBusinessHours(tenantId);
+      results.push(hoursResult);
+      if (hoursResult.success && !hoursResult.skipped) {
+        syncedFields.push('regularHours');
+      } else if (!hoursResult.success) {
+        failedFields.push('regularHours');
+      } else {
+        skippedFields.push('regularHours');
+      }
+
+      // Sync special hours (separate API call)
+      const specialResult = await syncSpecialHours(tenantId);
+      results.push(specialResult);
+      if (specialResult.success && !specialResult.skipped) {
+        syncedFields.push('specialHours');
+      } else if (!specialResult.success) {
+        failedFields.push('specialHours');
+      } else {
+        skippedFields.push('specialHours');
+      }
+    } else {
+      console.log(`[GBPBusinessInfoSync] Skipping hours sync for tenant ${tenantId} — not allowed by capability gate`);
+      skippedFields.push('regularHours', 'specialHours');
+    }
+
     return {
       success: true,
-      results: updateMaskParts.map(field => ({ success: true, field })),
-      syncedFields: updateMaskParts,
-      failedFields: [],
-      skippedFields: [],
+      results: [...updateMaskParts.map(field => ({ success: true, field })), ...results.slice(-2)],
+      syncedFields: [...updateMaskParts, ...syncedFields.filter(f => f === 'regularHours' || f === 'specialHours')],
+      failedFields: [...failedFields.filter(f => f === 'regularHours' || f === 'specialHours')],
+      skippedFields: [...skippedFields.filter(f => f === 'regularHours' || f === 'specialHours')],
     };
   } catch (error: any) {
     console.error(`[GBPBusinessInfoSync] Error syncing all business info:`, error);
@@ -608,12 +829,23 @@ export async function getSyncStatus(tenantId: string): Promise<{
   canSync: boolean;
 }> {
   try {
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: {
-        google_business_access_token: true,
-      }
+    // Check unified OAuth token store first
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { google_oauth_tokens_list: true },
     });
+
+    // Fallback to legacy tenants table
+    let hasLegacyToken = false;
+    if (!account?.google_oauth_tokens_list) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { google_business_access_token: true }
+      });
+      hasLegacyToken = !!tenant?.google_business_access_token;
+    }
+
+    const hasGBPConnection = !!(account?.google_oauth_tokens_list || hasLegacyToken);
 
     const locationId = await getLinkedLocation(tenantId);
 
@@ -625,10 +857,10 @@ export async function getSyncStatus(tenantId: string): Promise<{
     });
 
     return {
-      hasGBPConnection: !!tenant?.google_business_access_token,
+      hasGBPConnection,
       hasLinkedLocation: !!locationId,
       lastSyncedAt: businessProfile?.updated_at || null,
-      canSync: !!tenant?.google_business_access_token && !!locationId,
+      canSync: hasGBPConnection && !!locationId,
     };
   } catch (error) {
     console.error(`[GBPBusinessInfoSync] Error getting sync status:`, error);

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { generateOrganizationCommerceSettingsId } from '../lib/id-generator';
 import { getOrganizationCommerceCapabilities } from '../utils/commerce-capabilities';
@@ -107,7 +108,7 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
  * PUT /api/organizations/:organizationId/commerce-settings
  * Update organization commerce settings
  */
-router.put('/organizations/:organizationId/commerce-settings', authenticateToken, async (req: Request, res: Response) => {
+router.put('/organizations/:organizationId/commerce-settings', authenticateToken, requireOrgAdmin, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.params;
 

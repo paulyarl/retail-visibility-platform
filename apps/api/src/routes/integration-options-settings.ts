@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import IntegrationOptionsService from '../services/IntegrationOptionsService';
@@ -88,7 +89,7 @@ router.get('/:tenantId/integration-options', authenticateToken, async (req, res)
 });
 
 // Update integration options settings for a tenant
-router.put('/:tenantId/integration-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/integration-options', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

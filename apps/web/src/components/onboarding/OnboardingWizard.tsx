@@ -10,7 +10,7 @@ import BusinessHoursStep from './BusinessHoursStep';
 import BrandingSocialStep from './BrandingSocialStep';
 import AdditionalSettingsStep from './AdditionalSettingsStep';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
-import { isFeatureEnabled } from '@/lib/featureFlags';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useOnboardingSteps } from '@/hooks/useOnboardingSteps';
@@ -140,7 +140,7 @@ export default function OnboardingWizard({
   }, [currentStep]);
   
   // Feature flags
-  const [ffCategory, setFfCategory] = useState(false);
+  const ffCategory = useFeatureFlag('FF_CATEGORY_MANAGEMENT_PAGE');
   
   // Track onboarding flow start
   useEffect(() => {
@@ -158,15 +158,6 @@ export default function OnboardingWizard({
       });
     }
   }, [tenantId, currentStep]);
-  
-  useEffect(() => {
-    try {
-      const on = isFeatureEnabled('FF_CATEGORY_MANAGEMENT_PAGE' as any, tenantId as any);
-      setFfCategory(!!on);
-    } catch {
-      setFfCategory(false);
-    }
-  }, [tenantId]);
   
   // Combined error state
   const error = dataError || saveError;

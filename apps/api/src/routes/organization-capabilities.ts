@@ -9,6 +9,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgMember } from '../middleware/permissions';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { deriveInternalStatus, getMaintenanceState } from '../utils/subscription-status';
 import { resolveOrgOptions } from '../services/resolvers';
@@ -539,7 +540,7 @@ const orgSkillService = BotSkillService.getInstance();
  * POST /api/organizations/:orgId/bot/chat/start
  * Start an org-level bot conversation using the hero location's tenant as host.
  */
-router.post('/:orgId/bot/chat/start', async (req: Request, res: Response) => {
+router.post('/:orgId/bot/chat/start', authenticateToken, requireOrgMember, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {
@@ -585,7 +586,7 @@ router.post('/:orgId/bot/chat/start', async (req: Request, res: Response) => {
  * POST /api/organizations/:orgId/bot/chat/message
  * Send a message in the org-level bot conversation.
  */
-router.post('/:orgId/bot/chat/message', async (req: Request, res: Response) => {
+router.post('/:orgId/bot/chat/message', authenticateToken, requireOrgMember, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     const { sessionId, message } = req.body || {};

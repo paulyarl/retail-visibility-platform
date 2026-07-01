@@ -32,13 +32,15 @@ interface BasicInfoStepProps {
     condition: 'new' | 'used' | 'refurbished';
     mpn?: string;
     status: 'draft' | 'active';
+    gtin?: string;
   };
   errors: Record<string, string>;
   onChange: (data: any) => void;
   productType?: 'physical' | 'digital' | 'hybrid' | 'service';
+  gtinReadOnly?: boolean;
 }
 
-export default function BasicInfoStep({ data, errors, onChange, productType = 'physical' }: BasicInfoStepProps) {
+export default function BasicInfoStep({ data, errors, onChange, productType = 'physical', gtinReadOnly = false }: BasicInfoStepProps) {
   const [nameError, setNameError] = useState<string>('');
   const [brandError, setBrandError] = useState<string>('');
   const [manufacturerError, setManufacturerError] = useState<string>('');
@@ -282,6 +284,24 @@ export default function BasicInfoStep({ data, errors, onChange, productType = 'p
               </span>
             )}
           </div>
+        </div>
+
+        {/* GTIN / Barcode */}
+        <div className="space-y-2">
+          <Label htmlFor="gtin" className="text-base font-medium">
+            GTIN / Barcode <span className="text-gray-400">(Optional)</span>
+          </Label>
+          <Input
+            id="gtin"
+            value={data.gtin || ''}
+            onChange={(e) => onChange({ ...data, gtin: e.target.value })}
+            placeholder="e.g., 012345678905"
+            readOnly={gtinReadOnly}
+            className={gtinReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}
+          />
+          {gtinReadOnly && (
+            <p className="text-xs text-gray-500">Pre-filled from supplier catalog match</p>
+          )}
         </div>
 
         {/* Manufacturer - Only for Physical/Hybrid */}

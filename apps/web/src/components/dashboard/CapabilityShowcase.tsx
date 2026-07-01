@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ShoppingCart,
@@ -31,6 +32,8 @@ interface CapabilityShowcaseProps {
   capabilities: AllCapabilitiesState | null;
   tenantId: string;
   canUpgrade: boolean;
+  /** When true, capability rows render without clickable navigation links */
+  readOnly?: boolean;
 }
 
 type CapabilityStatus = 'enabled' | 'merchant-gated' | 'tier-gated';
@@ -54,9 +57,11 @@ interface CapabilityRow {
 
 export default function CapabilityShowcase({
   capabilities,
+  readOnly,
   tenantId,
   canUpgrade,
 }: CapabilityShowcaseProps) {
+  const router = useRouter();
   const rows: CapabilityRow[] = useMemo(() => {
     if (!capabilities) return [];
 
@@ -480,14 +485,15 @@ export default function CapabilityShowcase({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 + index * 0.03 }}
           >
-            <Link
-              href={row.settingsLink}
-              className={`group flex items-center gap-3 p-2.5 rounded-xl transition-colors ${row.status === 'enabled'
+            <div
+              className={`group flex items-center gap-3 p-2.5 rounded-xl ${readOnly ? '' : 'transition-colors cursor-pointer '}${row.status === 'enabled'
                 ? "hover:bg-gray-50"
                 : row.status === 'merchant-gated'
                   ? "opacity-80 hover:opacity-100 hover:bg-amber-50/50"
                   : "opacity-60 hover:opacity-80 hover:bg-gray-50"
                 }`}
+              onClick={readOnly ? undefined : () => router.push(row.settingsLink)}
+              role={readOnly ? undefined : 'link'}
             >
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -528,7 +534,7 @@ export default function CapabilityShowcase({
               </div>
 
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
-            </Link>
+            </div>
           </motion.div>
         ))}
       </div>

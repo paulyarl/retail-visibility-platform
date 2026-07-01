@@ -1,8 +1,102 @@
 import { Router } from 'express';
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
+import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { isGBPSyncAllowed } from '../lib/google/capability-gate';
 
 const router = Router();
+
+/**
+ * Get a valid GBP access token from the unified OAuth token store.
+ * Falls back to legacy tenants table columns for backward compatibility.
+ * Handles token refresh if expired.
+ */
+async function getValidGBPToken(tenantId: string): Promise<string | null> {
+  try {
+    // First, try the unified OAuth token store
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { google_oauth_tokens_list: true },
+    });
+
+    if (account?.google_oauth_tokens_list) {
+      const tokenRecord = account.google_oauth_tokens_list;
+      const now = new Date();
+
+      if (tokenRecord.expires_at <= now) {
+        // Token expired — refresh using shared OAuth credentials
+        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
+        const newTokens = await refreshAccessToken(refreshToken);
+
+        if (!newTokens) {
+          console.error(`[GBP] Token refresh failed for tenant ${tenantId}`);
+          return null;
+        }
+
+        await prisma.google_oauth_tokens_list.update({
+          where: { id: tokenRecord.id },
+          data: {
+            access_token_encrypted: encryptToken(newTokens.access_token),
+            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
+            updated_at: new Date(),
+          },
+        });
+
+        return newTokens.access_token;
+      }
+
+      return decryptToken(tokenRecord.access_token_encrypted);
+    }
+
+    // Fallback: legacy tenants table columns (plain text, unencrypted)
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        google_business_access_token: true,
+        google_business_refresh_token: true,
+        google_business_token_expiry: true,
+      },
+    });
+
+    if (!tenant?.google_business_access_token) {
+      return null;
+    }
+
+    // Check if token is expired
+    if (tenant.google_business_token_expiry && new Date(tenant.google_business_token_expiry) < new Date()) {
+      if (tenant.google_business_refresh_token) {
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_BUSINESS_CLIENT_ID,
+          process.env.GOOGLE_BUSINESS_CLIENT_SECRET
+        );
+        oauth2Client.setCredentials({ refresh_token: tenant.google_business_refresh_token });
+
+        try {
+          const { credentials } = await oauth2Client.refreshAccessToken();
+
+          await prisma.tenants.update({
+            where: { id: tenantId },
+            data: {
+              google_business_access_token: credentials.access_token,
+              google_business_token_expiry: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
+            },
+          });
+
+          return credentials.access_token!;
+        } catch (refreshError) {
+          console.error(`[GBP] Legacy token refresh failed for tenant ${tenantId}:`, refreshError);
+          return null;
+        }
+      }
+      return null;
+    }
+
+    return tenant.google_business_access_token;
+  } catch (error) {
+    console.error(`[GBP] Error getting token for tenant ${tenantId}:`, error);
+    return null;
+  }
+}
 
 /**
  * Get Google Business Profile connection status
@@ -20,16 +114,25 @@ router.get('/google/business/status', async (req, res) => {
       });
     }
 
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: {
-        google_business_access_token: true,
-        google_business_refresh_token: true,
-        google_business_token_expiry: true,
-      }
+    // Check unified OAuth token store first
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { google_oauth_tokens_list: true },
     });
 
-    if (!tenant) {
+    // Fallback to legacy tenants table columns
+    const tenant = account?.google_oauth_tokens_list
+      ? null
+      : await prisma.tenants.findUnique({
+          where: { id: tenantId },
+          select: {
+            google_business_access_token: true,
+            google_business_refresh_token: true,
+            google_business_token_expiry: true,
+          }
+        });
+
+    if (!account && !tenant) {
       return res.status(404).json({
         success: false,
         error: 'tenant_not_found',
@@ -37,19 +140,18 @@ router.get('/google/business/status', async (req, res) => {
       });
     }
 
-    const isConnected = !!(tenant.google_business_access_token && tenant.google_business_refresh_token);
-    const isExpired = tenant.google_business_token_expiry 
-      ? new Date(tenant.google_business_token_expiry) < new Date() 
-      : false;
+    const isConnected = !!(account?.google_oauth_tokens_list || (tenant?.google_business_access_token && tenant?.google_business_refresh_token));
+    const tokenExpiry = account?.google_oauth_tokens_list?.expires_at || tenant?.google_business_token_expiry || null;
+    const isExpired = tokenExpiry ? new Date(tokenExpiry) < new Date() : false;
 
     res.json({
       success: true,
       data: {
         isConnected,
         isExpired,
-        hasAccessToken: !!tenant.google_business_access_token,
-        hasRefreshToken: !!tenant.google_business_refresh_token,
-        tokenExpiry: tenant.google_business_token_expiry,
+        hasAccessToken: isConnected,
+        hasRefreshToken: isConnected,
+        tokenExpiry,
         message: isConnected 
           ? (isExpired ? 'Connected but token expired - will auto-refresh' : 'Connected to Google Business Profile')
           : 'Not connected to Google Business Profile'
@@ -184,17 +286,71 @@ router.get('/google/business/callback', async (req, res) => {
       throw new Error('Failed to obtain tokens');
     }
 
-    // Store tokens in database
+    // Store tokens in unified OAuth token store (encrypted)
+    // Check if account already exists (may have been created by GMC OAuth flow)
+    const existingAccount = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+    });
+
+    let accountId: string;
+    if (existingAccount) {
+      accountId = existingAccount.id;
+      // Update account info if needed
+      if (!existingAccount.email || existingAccount.email === 'legacy@gbp.local') {
+        await prisma.google_oauth_accounts_list.update({
+          where: { id: accountId },
+          data: { updated_at: new Date() },
+        });
+      }
+    } else {
+      // Create new OAuth account record
+      accountId = `goa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await prisma.google_oauth_accounts_list.create({
+        data: {
+          id: accountId,
+          tenant_id: tenantId,
+          google_account_id: 'gbp_oauth',
+          email: 'gbp-connected@unknown.local',
+          scopes: ['https://www.googleapis.com/auth/business.manage'],
+          updated_at: new Date(),
+        },
+      });
+    }
+
+    // Upsert tokens (encrypted)
+    const tokenId = `got_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const expiresAt = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
+
+    await prisma.google_oauth_tokens_list.upsert({
+      where: { account_id: accountId },
+      create: {
+        id: tokenId,
+        account_id: accountId,
+        access_token_encrypted: encryptToken(tokens.access_token),
+        refresh_token_encrypted: encryptToken(tokens.refresh_token),
+        expires_at: expiresAt,
+        scopes: ['https://www.googleapis.com/auth/business.manage'],
+        updated_at: new Date(),
+      },
+      update: {
+        access_token_encrypted: encryptToken(tokens.access_token),
+        refresh_token_encrypted: encryptToken(tokens.refresh_token),
+        expires_at: expiresAt,
+        updated_at: new Date(),
+      },
+    });
+
+    // Also clear legacy tenants table columns (migration step)
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        google_business_access_token: tokens.access_token,
-        google_business_refresh_token: tokens.refresh_token,
-        google_business_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-      }
+        google_business_access_token: null,
+        google_business_refresh_token: null,
+        google_business_token_expiry: null,
+      },
     });
 
-    console.log(`[Google Business OAuth] Successfully connected tenant ${tenantId}`);
+    console.log(`[Google Business OAuth] Successfully connected tenant ${tenantId} (unified token store)`);
 
     // Redirect back to frontend with success
     res.redirect(`${process.env.WEB_URL}/t/${tenantId}/settings/integrations/google?success=business_connected`);
@@ -220,7 +376,19 @@ router.post('/google/business/disconnect', async (req, res) => {
       });
     }
 
-    // Remove tokens from database
+    // Remove from unified OAuth token store
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+    });
+
+    if (account) {
+      // Delete the account (cascade will delete tokens and GBP location links)
+      await prisma.google_oauth_accounts_list.delete({
+        where: { id: account.id },
+      });
+    }
+
+    // Also clear legacy tenants table columns (if any)
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {
@@ -260,57 +428,15 @@ router.get('/google/business/locations', async (req, res) => {
       });
     }
 
-    // Get tenant with GBP tokens
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: {
-        id: true,
-        google_business_access_token: true,
-        google_business_refresh_token: true,
-        google_business_token_expiry: true,
-      }
-    });
+    // Get valid GBP access token (from unified store with legacy fallback)
+    const accessToken = await getValidGBPToken(tenantId);
 
-    if (!tenant?.google_business_access_token) {
+    if (!accessToken) {
       return res.status(404).json({
         success: false,
         error: 'not_connected',
         message: 'Google Business Profile not connected'
       });
-    }
-
-    // Check token expiry and refresh if needed
-    let accessToken = tenant.google_business_access_token;
-    if (tenant.google_business_token_expiry && new Date(tenant.google_business_token_expiry) < new Date()) {
-      // Token expired - try to refresh
-      if (tenant.google_business_refresh_token) {
-        const oauth2Client = new google.auth.OAuth2(
-          process.env.GOOGLE_BUSINESS_CLIENT_ID,
-          process.env.GOOGLE_BUSINESS_CLIENT_SECRET
-        );
-        oauth2Client.setCredentials({ refresh_token: tenant.google_business_refresh_token });
-        
-        try {
-          const { credentials } = await oauth2Client.refreshAccessToken();
-          accessToken = credentials.access_token!;
-          
-          // Update stored token
-          await prisma.tenants.update({
-            where: { id: tenantId },
-            data: {
-              google_business_access_token: accessToken,
-              google_business_token_expiry: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
-            }
-          });
-        } catch (refreshError) {
-          console.error('[GBP] Token refresh failed:', refreshError);
-          return res.status(401).json({
-            success: false,
-            error: 'token_expired',
-            message: 'Google token expired and refresh failed. Please reconnect.'
-          });
-        }
-      }
     }
 
     // First, get the accounts
@@ -473,18 +599,17 @@ router.post('/google/business/link-location', async (req, res) => {
       });
     }
 
-    // Get or create OAuth account for this tenant
+    // Get OAuth account for this tenant (from unified store)
     let account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId }
     });
 
-    // If no OAuth account exists, create one from the legacy tokens
+    // If no OAuth account exists, check if tenant has legacy GBP tokens
     if (!account) {
       const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
         select: {
           google_business_access_token: true,
-          google_business_refresh_token: true,
         }
       });
 
@@ -496,7 +621,7 @@ router.post('/google/business/link-location', async (req, res) => {
         });
       }
 
-      // Create OAuth account record
+      // Migrate legacy tokens: create unified OAuth account record
       const accountId = `goa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       account = await prisma.google_oauth_accounts_list.create({
         data: {
@@ -654,6 +779,16 @@ router.post('/google/business/sync', async (req, res) => {
     // Import sync service
     const { syncAllBusinessInfo, getSyncStatus } = await import('../services/GBPBusinessInfoSync');
 
+    // Check if tenant's tier allows GBP sync
+    const gbpAllowed = await isGBPSyncAllowed(tenantId);
+    if (!gbpAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Business Profile sync is not available on your current plan. Please upgrade to use this feature.'
+      });
+    }
+
     // Check if tenant can sync
     const status = await getSyncStatus(tenantId);
     if (!status.canSync) {
@@ -787,6 +922,16 @@ router.post('/google/business/sync/:field', async (req, res) => {
       syncCategories,
       getSyncStatus 
     } = await import('../services/GBPBusinessInfoSync');
+
+    // Check if tenant's tier allows GBP sync
+    const gbpAllowed = await isGBPSyncAllowed(tenantId);
+    if (!gbpAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Business Profile sync is not available on your current plan. Please upgrade to use this feature.'
+      });
+    }
 
     // Check if tenant can sync
     const status = await getSyncStatus(tenantId);

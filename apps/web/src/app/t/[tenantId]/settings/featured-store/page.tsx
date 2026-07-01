@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import FeaturedStoreClient from './FeaturedStoreClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Featured Store - Store Settings',
@@ -18,5 +19,9 @@ export default async function FeaturedStorePage({ params }: PageProps) {
     redirect('/');
   }
 
-  return <FeaturedStoreClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <FeaturedStoreClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { Flags } from '../config';
+import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { generateFeedPushJobId, generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
@@ -161,7 +161,8 @@ router.post('/', async (req, res) => {
     }
 
     // Optional enforcement: block feed pushes when categories are missing/unmapped
-    if (Flags.FEED_ALIGNMENT_ENFORCE === true) {
+    const enforceEff = await getEffectivePlatform('FF_FEED_ALIGNMENT_ENFORCE');
+    if (enforceEff.effectiveOn) {
       const tenantId = body.tenantId;
 
       // Build item filter: active + public items

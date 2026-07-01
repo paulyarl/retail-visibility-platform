@@ -240,13 +240,49 @@ class SupplierCatalogServiceClass {
   }
 
   /**
-   * Replay a quarantined item (mark as resolved)
+   * Replay a quarantined item — re-attempts ingestion of the raw payload.
+   * If ingestion succeeds, marks the quarantine row as replayed.
+   * If ingestion fails again, updates the error message and leaves unreplayed.
    */
-  async replayQuarantine(id: string) {
-    return prisma.catalog_quarantine.update({
-      where: { id },
-      data: { replayed_at: new Date() },
-    });
+  async replayQuarantine(id: string): Promise<{ success: boolean; error?: string }> {
+    const quarantined = await prisma.catalog_quarantine.findUnique({ where: { id } });
+    if (!quarantined) {
+      return { success: false, error: 'Quarantined item not found' };
+    }
+
+    const row = quarantined.raw_payload as unknown as BatchIngestRow;
+
+    // Validate required fields
+    if (!row.supplier_sku || !row.name) {
+      return { success: false, error: 'Missing required fields (supplier_sku, name)' };
+    }
+
+    try {
+      const result = await this.batchIngest(quarantined.supplier_id, [row]);
+
+      if (result.errors.length > 0) {
+        // Re-ingestion failed — update error message but don't mark as replayed
+        await prisma.catalog_quarantine.update({
+          where: { id },
+          data: { error_message: `Replay failed: ${result.errors[0].error}` },
+        });
+        return { success: false, error: result.errors[0].error };
+      }
+
+      // Success — mark as replayed
+      await prisma.catalog_quarantine.update({
+        where: { id },
+        data: { replayed_at: new Date() },
+      });
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      await prisma.catalog_quarantine.update({
+        where: { id },
+        data: { error_message: `Replay error: ${errorMsg}` },
+      });
+      return { success: false, error: errorMsg };
+    }
   }
 
   private toDTO(item: any): CatalogItemDTO {

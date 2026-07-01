@@ -72,6 +72,66 @@ const DEFAULT_FLAGS = [
     rollout: 'Browse open-source product catalogs (Open Food Facts, UPC Database, Open Beauty Facts) and bulk import items into tenant inventory',
     allow_tenant_override: true, // Safe for tenants to opt in
   },
+  {
+    flag: 'FF_TENANT_GBP_CATEGORY_SYNC',
+    enabled: false,
+    rollout: 'Google Business Profile category sync for tenant directory listings',
+    allow_tenant_override: true,
+  },
+  {
+    flag: 'FF_CATEGORY_MIRRORING',
+    enabled: false,
+    rollout: 'Mirror categories between platform and Google Business Profile',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_GLOBAL_TENANT_META',
+    enabled: false,
+    rollout: 'Region resolution from DB (per-request tenant metadata)',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_AUDIT_LOG',
+    enabled: false,
+    rollout: 'Audit log writes + table creation (boot fallback: env var)',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_I18N_SCAFFOLD',
+    enabled: false,
+    rollout: 'i18next translation scaffold (en-US, es-ES, fr-FR)',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_CURRENCY_RATE_STUB',
+    enabled: false,
+    rollout: 'Currency rate stub job endpoint',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_FEED_ALIGNMENT_ENFORCE',
+    enabled: false,
+    rollout: 'Block feed submission when categories unmapped',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_FEED_COVERAGE',
+    enabled: true,
+    rollout: 'Feed coverage endpoint gate',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_TENANT_PLATFORM_CATEGORY',
+    enabled: false,
+    rollout: 'Platform category mapping for tenants',
+    allow_tenant_override: false,
+  },
+  {
+    flag: 'FF_SCAN_ENRICHMENT',
+    enabled: true,
+    rollout: 'Image enrichment during barcode scan',
+    allow_tenant_override: false,
+  },
 ];
 
 async function seedPlatformFlags() {

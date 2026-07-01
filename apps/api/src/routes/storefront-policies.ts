@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import storefrontPolicyService, { PolicyType } from '../services/StorefrontPolicyService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
@@ -75,7 +76,7 @@ router.get('/:tenantId/storefront-policies', authenticateToken, async (req, res)
 });
 
 // Merchant: Update policies
-router.put('/:tenantId/storefront-policies', authenticateToken, async (req, res) => {
+router.put('/:tenantId/storefront-policies', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validation = policySchema.safeParse(req.body);

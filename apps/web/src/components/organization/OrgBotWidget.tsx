@@ -9,6 +9,7 @@ interface OrgBotWidgetProps {
   organizationId: string;
   orgName?: string;
   enabled?: boolean;
+  readOnly?: boolean;
 }
 
 interface ChatMessage {
@@ -26,7 +27,7 @@ const SUGGESTED_PROMPTS = [
   "What capabilities does my chain have?",
 ];
 
-export default function OrgBotWidget({ organizationId, orgName, enabled = true }: OrgBotWidgetProps) {
+export default function OrgBotWidget({ organizationId, orgName, enabled = true, readOnly }: OrgBotWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -121,7 +122,7 @@ export default function OrgBotWidget({ organizationId, orgName, enabled = true }
     }
   };
 
-  if (!enabled) return null;
+  if (!enabled || readOnly) return null;
 
   return (
     <>

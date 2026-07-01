@@ -128,15 +128,6 @@ class GMCProductSyncSingletonService extends UniversalSingleton {
    */
   private async getValidAccessToken(tenantId: string): Promise<{ token: string; merchantId: string } | null> {
     try {
-      // For testing purposes, return mock data if no real tokens exist
-      if (tenantId === 'tid-m8ijkrnk') {
-        this.logInfo('Using mock GMC access token for testing');
-        return {
-          token: 'mock_gmc_access_token_' + Date.now(),
-          merchantId: 'mock_merchant_id_12345'
-        };
-      }
-      
       // Get OAuth account for tenant
       const account = await prisma.google_oauth_accounts_list.findFirst({
         where: { tenant_id: tenantId },

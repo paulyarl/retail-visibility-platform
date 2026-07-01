@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { isFeatureEnabled } from "@/lib/featureFlags";
+import dynamic from "next/dynamic";
 import { Card, Button } from '@mantine/core';
 import { Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -21,6 +21,11 @@ import { computeStoreStatus } from "@/lib/hours-utils";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+
+const LandingHero = dynamic(
+  () => import("@/components/landing/LandingHero").then((m) => m.LandingHero),
+  { ssr: false }
+);
 
 
 export default function PlatformHomePage() {
@@ -238,7 +243,7 @@ function Home() {
     const override = typeof window !== 'undefined' ? localStorage.getItem('ff_tenant_urls') === 'on' : false;
     // Try to get tenantId from multiple sources
     const tenantId = selectedTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
-    const on = override || isFeatureEnabled('FF_TENANT_URLS', tenantId || undefined);
+    const on = override || process.env.NEXT_PUBLIC_FF_TENANT_URLS !== 'false';
 
     if (on && tenantId) {
       setScopedLinks({
@@ -260,10 +265,18 @@ function Home() {
   // console.log(`Selected TenantId: ${selectedTenantId}`);
   const { status: hoursStatus } = useStoreStatus(selectedTenantId || undefined, false); // Public scope
 
+  const showHero = !isAuthenticated && !authLoading;
+
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
+      {/* Animated shader hero for unauthenticated visitors */}
+      {showHero && <LandingHero />}
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
+      <main 
+        id="landing-content"
+        className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 scroll-mt-0"
+      >
         {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
         {isAuthenticated && <SubscriptionStatusGuide />}
 

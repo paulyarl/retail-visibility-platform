@@ -50,6 +50,7 @@ import { useOrgCapabilityRollup } from "@/hooks/organization/useOrgCapabilityRol
 import { useOrgProductTypeRollup } from "@/hooks/organization/useOrgProductTypeRollup";
 import { useOrgProductMix } from "@/hooks/organization/useOrgProductMix";
 import { useOrgBotStatus } from "@/hooks/organization/useOrgBotStatus";
+import { useOrgBehaviorAccess } from "@/hooks/tenant-access/useOrgBehaviorAccess";
 
 const TABS: TabDef[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -109,6 +110,10 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
     visibleTabs, lockedTabs, isTabAllowed, isTabLocked,
     isPanelAllowed, isPropagationAllowed, orgCaps, loading: capsLoading,
   } = useOrgTabAccess(TABS, organizationId || null, tenantRole, isPlatformAdmin);
+
+  // Org behavior access — readOnly when user is not org admin
+  const { isOrgAdmin } = useOrgBehaviorAccess(tenantId ?? null);
+  const readOnly = !isOrgAdmin;
 
   // Capability rollup across all locations
   const { data: rollupData, isLoading: rollupLoading } = useOrgCapabilityRollup(organizationId);
@@ -275,6 +280,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               onSyncFromHero={() => setShowConfirmSync(true)}
               syncing={syncing}
               onTabChange={setActiveTab}
+              readOnly={readOnly}
             />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
@@ -319,7 +325,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                   data={botStatusData}
                   loading={botStatusLoading}
                 />
-                <OrgCommerceCard organizationId={organizationId} />
+                <OrgCommerceCard organizationId={organizationId} readOnly={readOnly} />
               </div>
             </div>
           </div>
@@ -351,6 +357,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               onSyncFromHero={() => setShowConfirmSync(true)}
               onOpenCategorySync={() => setShowCategorySyncModal(true)}
               productTypeRollup={productTypeRollupData}
+              readOnly={readOnly}
             />
           </ProtectedCard>
         )}
@@ -362,6 +369,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               orgCaps={orgCaps}
               loading={capsLoading}
               tierName={lockedTierName}
+              readOnly={readOnly}
             />
             <OrgCapabilityRollup
               data={rollupData}
@@ -396,7 +404,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {activeTab === "team" && isTabAllowed("team") && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              <OrgTeamOverview locations={orgData.locationBreakdown} />
+              <OrgTeamOverview locations={orgData.locationBreakdown} tenantId={tenantId} />
             </div>
             <div className="space-y-6">
               <OrgEmployeeDistribution locations={orgData.locationBreakdown} />
@@ -407,7 +415,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {/* Commerce Tab */}
         {activeTab === "commerce" && isTabAllowed("commerce") && (
           <div className="space-y-6">
-            <OrgCommerceCard organizationId={organizationId} />
+            <OrgCommerceCard organizationId={organizationId} readOnly={readOnly} />
           </div>
         )}
 
@@ -428,6 +436,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         onSelect={handleSetHeroLocation}
         onClose={() => setShowHeroModal(false)}
         settingHero={settingHero}
+        readOnly={readOnly}
       />
       <OrgCategorySyncModal
         open={showCategorySyncModal}
@@ -439,6 +448,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         onSync={handleSyncCategoriesToGBP}
         onClose={() => setShowCategorySyncModal(false)}
         syncing={syncingCategories}
+        readOnly={readOnly}
       />
       <Modal
         opened={showConfirmSync}
@@ -465,6 +475,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
           organizationId={organizationId}
           orgName={orgName}
           enabled={true}
+          readOnly={readOnly}
         />
       )}
     </div>

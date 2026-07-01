@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import BarcodeScanOptionsSettingsClient from './BarcodeScanOptionsSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Barcode Scan Options - Store Settings',
@@ -18,5 +19,9 @@ export default async function BarcodeScanOptionsSettingsPage({ params }: PagePro
     redirect('/');
   }
 
-  return <BarcodeScanOptionsSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <BarcodeScanOptionsSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

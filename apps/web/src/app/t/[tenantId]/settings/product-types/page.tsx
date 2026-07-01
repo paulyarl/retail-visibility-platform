@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import ProductTypeSettingsClient from './ProductTypeSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Product Types - Store Settings',
@@ -18,5 +19,9 @@ export default async function ProductTypeSettingsPage({ params }: PageProps) {
     redirect('/');
   }
 
-  return <ProductTypeSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <ProductTypeSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

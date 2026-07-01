@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
-import { Flags } from '../config';
+import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { queueGbpCategoryMirrorJob } from '../jobs/gbpCategorySync';
 
 const router = Router();
@@ -8,7 +8,8 @@ const router = Router();
 // POST /api/categories/mirror
 // Body: { strategy: 'platform_to_gbp' | 'gbp_to_platform', tenantId?: string }
 router.post('/api/categories/mirror', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  if (!Flags.CATEGORY_MIRRORING) {
+  const eff = await getEffectivePlatform('FF_CATEGORY_MIRRORING');
+  if (!eff.effectiveOn) {
     return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_CATEGORY_MIRRORING' });
   }
 

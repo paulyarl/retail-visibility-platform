@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import ProductTypeService, { ProductType } from '../services/ProductTypeService';
@@ -95,7 +96,7 @@ router.get('/:tenantId/product-type', authenticateToken, async (req, res) => {
 });
 
 // Update product type settings for a tenant
-router.put('/:tenantId/product-type', authenticateToken, requireWritableSubscription, async (req, res) => {
+router.put('/:tenantId/product-type', authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

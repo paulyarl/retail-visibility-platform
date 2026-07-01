@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
@@ -161,7 +162,7 @@ router.get('/public/tenant/:tenantId/fulfillment-settings', async (req, res) => 
 });
 
 // Update fulfillment settings for a tenant
-router.put('/:tenantId/fulfillment-settings', authenticateToken, async (req, res) => {
+router.put('/:tenantId/fulfillment-settings', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     

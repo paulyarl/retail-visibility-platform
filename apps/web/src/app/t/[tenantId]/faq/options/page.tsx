@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import FaqOptionsPage from '@/components/faq/FaqOptionsPage';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'FAQ Options - Store Settings',
@@ -18,5 +19,9 @@ export default async function FaqOptionsSettingsPage({ params }: PageProps) {
     redirect('/');
   }
 
-  return <FaqOptionsPage tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <FaqOptionsPage tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

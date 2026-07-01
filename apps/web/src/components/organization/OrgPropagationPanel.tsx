@@ -140,6 +140,7 @@ interface OrgPropagationPanelProps {
   onSyncFromHero: () => void;
   onOpenCategorySync: () => void;
   productTypeRollup?: OrgProductTypeRollup | undefined;
+  readOnly?: boolean;
 }
 
 export default function OrgPropagationPanel({
@@ -152,6 +153,7 @@ export default function OrgPropagationPanel({
   onSyncFromHero,
   onOpenCategorySync,
   productTypeRollup,
+  readOnly,
 }: OrgPropagationPanelProps) {
   const heroId = heroLocation?.tenantId;
 
@@ -239,7 +241,7 @@ export default function OrgPropagationPanel({
               title="Categories" status="ACTIVE" statusVariant="success"
               description="Propagate product categories and Google taxonomy alignments"
               subLabel="Bulk propagation"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#categories` : undefined}
             />
@@ -249,7 +251,7 @@ export default function OrgPropagationPanel({
               title="Products/SKUs" status="ACTIVE" statusVariant="success"
               description="Propagate individual or bulk products to locations"
               subLabel="Single or bulk"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Sync All from Hero"
               onAction={onSyncFromHero}
               syncing={syncing}
@@ -260,7 +262,7 @@ export default function OrgPropagationPanel({
               title="GBP Category Sync" status="ACTIVE" statusVariant="success"
               description="Sync product categories to Google Business Profile"
               subLabel="Organization-wide sync"
-              disabled={!organizationId}
+              disabled={readOnly || !organizationId}
               actionLabel="Sync to GBP"
               onAction={onOpenCategorySync}
               syncing={syncingCategories}
@@ -281,7 +283,7 @@ export default function OrgPropagationPanel({
               title="Business Hours" status="NEW" statusVariant="default"
               description="Propagate regular and special hours to all locations"
               subLabel="Hours template"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#hours` : undefined}
             />
@@ -291,7 +293,7 @@ export default function OrgPropagationPanel({
               title="Business Profile" status="NEW" statusVariant="default"
               description="Propagate business description, attributes, and settings"
               subLabel="Profile info"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#profile` : undefined}
             />
@@ -310,7 +312,7 @@ export default function OrgPropagationPanel({
               title="Feature Flags" status="NEW" statusVariant="default"
               description="Enable or disable features across all locations"
               subLabel="Centralized control"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#flags` : undefined}
             />
@@ -320,7 +322,7 @@ export default function OrgPropagationPanel({
               title="User Roles & Permissions" status="NEW" statusVariant="default"
               description="Propagate user invitations and role assignments"
               subLabel="Team management"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#roles` : undefined}
             />
@@ -339,7 +341,7 @@ export default function OrgPropagationPanel({
               title="Brand Assets" status="NEW" statusVariant="default"
               description="Propagate logos, colors, and branding elements"
               subLabel="Brand consistency"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#brand` : undefined}
             />

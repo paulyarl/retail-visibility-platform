@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import BotConfigurationService from '../services/BotConfigurationService';
 import BotConversationService from '../services/BotConversationService';
 import BotSkillService from '../services/BotSkillService';
@@ -96,7 +97,7 @@ router.get('/config', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/tenants/:tenantId/bot/config
-router.put('/config', authenticateToken, async (req, res) => {
+router.put('/config', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validation = botConfigSchema.safeParse(req.body);

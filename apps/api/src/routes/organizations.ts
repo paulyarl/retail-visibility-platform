@@ -10,6 +10,7 @@ import { generateItemId, generateTenantItemId,generateOrganizationId, generatePh
 import { propagateVariants } from '../utils/variant-propagation';
 import { ensureGlobalCatalogEntry, hasGlobalCatalogEntry } from '../utils/global-catalog-sync';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgAdmin } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
 import ProductTypeService from '../services/ProductTypeService';
@@ -543,7 +544,7 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
 
 // PUT /organizations/:id/self-update - Update own organization
 // Permission: Organization owner can update their own organization settings
-router.put('/:id/self-update', authenticateToken, async (req, res) => {
+router.put('/:id/self-update', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -679,7 +680,7 @@ const propagateSchema = z.object({
 
 // POST /organizations/:id/items/propagate - Propagate item to tenants
 // Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
+router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -1251,7 +1252,7 @@ const propagateBulkSchema = z.object({
 
 // POST /organizations/:id/items/propagate-bulk - Bulk propagate items
 // Permission: Authenticated user with propagation rights (tier validation done inline)
-router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => {
+router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -1934,7 +1935,7 @@ const setHeroLocationSchema = z.object({
 
 // PUT /organizations/:id/hero-location - Set hero location
 // Permission: Organization member (can manage their own organization settings)
-router.put('/:id/hero-location', authenticateToken, requireSupportActions, async (req, res) => {
+router.put('/:id/hero-location', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = setHeroLocationSchema.safeParse(req.body);
     if (!parsed.success) {

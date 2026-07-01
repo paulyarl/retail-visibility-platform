@@ -34,6 +34,8 @@ import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { itemsService } from '@/services/ItemsSingletonService';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import type { TenantCatalogItem } from '@/services/SupplierImportService';
 
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
@@ -41,6 +43,7 @@ import WizardNavigation from './components/WizardNavigation';
 // import { ProductPreview } from './components/ProductPreview';
 
 // Import step components
+import CatalogSearchStep from './steps/CatalogSearchStep';
 import BasicInfoStep from './steps/BasicInfoStep';
 import ProductTypeStep from './steps/ProductTypeStep';
 import PricingStep from './steps/PricingStep';
@@ -69,6 +72,7 @@ interface WizardData {
     condition: 'new' | 'used' | 'refurbished';
     mpn?: string;
     status: 'draft' | 'active';
+    gtin?: string;
   };
   
   // Step 2: Product Type & Variants
@@ -198,6 +202,13 @@ interface WizardData {
       autoFeature: boolean;
     };
   };
+  // Catalog match metadata (from Step 0)
+  catalogMatch?: {
+    supplier_catalog_item_id: string;
+    supplier_id: string;
+    supplier_sku: string;
+    source_type: 'supplier_catalog';
+  };
 }
 
 const INITIAL_DATA: WizardData = {
@@ -318,10 +329,11 @@ const INITIAL_DATA: WizardData = {
       featuredTypes: [],
       autoFeature: false
     }
-  }
+  },
+  catalogMatch: undefined,
 };
 
-const STEPS = [
+const BASE_STEPS = [
   { id: 'basic-info', title: 'Basic Information', description: 'Core product details' },
   { id: 'product-type', title: 'Product Type & Variants', description: 'Configure product type and variants' },
   { id: 'pricing', title: 'Pricing Strategy', description: 'Set pricing and payment options' },
@@ -330,6 +342,8 @@ const STEPS = [
   { id: 'organization', title: 'Organization & Categories', description: 'Organize with categories' },
   { id: 'review', title: 'Review & Publish', description: 'Final review and publishing' }
 ];
+
+const CATALOG_STEP = { id: 'catalog-search', title: 'Catalog Search', description: 'Search supplier catalogs for a match' };
 
 export default function ItemCreationWizard({ 
   tenantId, 
@@ -349,6 +363,12 @@ export default function ItemCreationWizard({
   const [hasRecoveredData, setHasRecoveredData] = useState(false);
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const isEditing = !!productId;
+
+  // Feature flag: show catalog search step 0 when enabled
+  const ffSupplierCatalog = useFeatureFlag('FF_SUPPLIER_CATALOG_IMPORT');
+  const catalogEnabled = !isEditing && ffSupplierCatalog;
+  const STEPS = catalogEnabled ? [CATALOG_STEP, ...BASE_STEPS] : BASE_STEPS;
+  const stepOffset = catalogEnabled ? 1 : 0;
 
   // Auto-save to localStorage on data change
   useEffect(() => {
@@ -608,8 +628,15 @@ export default function ItemCreationWizard({
   const validateStep = (stepIndex: number) => {
     let isValid = true;
     const stepErrors: Record<string, string> = {};
+    const step = stepIndex - stepOffset;
 
-    switch (stepIndex) {
+    // Catalog search step (step 0 when enabled) is always valid
+    if (catalogEnabled && stepIndex === 0) {
+      setStepValidation(prev => ({ ...prev, [stepIndex]: true }));
+      return;
+    }
+
+    switch (step) {
       case 0: // Basic Information
         if (!wizardData.basicInfo.name || wizardData.basicInfo.name.trim().length < 3) {
           stepErrors.name = 'Product name must be at least 3 characters';
@@ -798,6 +825,11 @@ export default function ItemCreationWizard({
           // Services have unlimited stock
           stock: 9999,
           track_inventory: false,
+        } : {}),
+        // Include supplier catalog source info when product came from catalog match
+        ...(wizardData.catalogMatch ? {
+          source_type: 'supplier_catalog',
+          supplier_catalog_item_id: wizardData.catalogMatch.supplier_catalog_item_id,
         } : {})
       };
 
@@ -829,8 +861,67 @@ export default function ItemCreationWizard({
     setErrors({});
   };
 
+  const handleCatalogMatch = (item: TenantCatalogItem) => {
+    // Auto-populate wizard data from supplier catalog item
+    setWizardData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        name: item.name || prev.basicInfo.name,
+        brand: item.brand || prev.basicInfo.brand,
+        gtin: item.gtin || prev.basicInfo.gtin,
+      },
+      content: {
+        ...prev.content,
+        description: item.description || prev.content.description,
+        specifications: item.attrs || prev.content.specifications,
+      },
+      media: {
+        ...prev.media,
+        primaryImage: item.image_url ? {
+          id: `catalog-${item.id}`,
+          url: item.image_url,
+          path: '',
+          name: 'Catalog Image',
+          size: 0,
+          type: 'image/jpeg',
+          uploadedAt: new Date()
+        } : prev.media.primaryImage,
+      },
+      pricing: {
+        ...prev.pricing,
+        listPrice: item.msrp_cents || prev.pricing.listPrice,
+      },
+      catalogMatch: {
+        supplier_catalog_item_id: item.id,
+        supplier_id: item.supplier_id,
+        supplier_sku: item.supplier_sku,
+        source_type: 'supplier_catalog',
+      },
+    }));
+    // Jump to Review step (last step)
+    setCurrentStep(STEPS.length - 1);
+  };
+
+  const handleCatalogSkip = () => {
+    // Proceed to Basic Info step (step 1 when catalog enabled, step 0 otherwise)
+    setCurrentStep(stepOffset);
+  };
+
   const renderStep = () => {
-    switch (currentStep) {
+    // Catalog search step (step 0 when feature flag enabled)
+    if (catalogEnabled && currentStep === 0) {
+      return (
+        <CatalogSearchStep
+          tenantId={tenantId}
+          onUseProduct={handleCatalogMatch}
+          onSkip={handleCatalogSkip}
+        />
+      );
+    }
+
+    const step = currentStep - stepOffset;
+    switch (step) {
       case 0:
         return (
           <BasicInfoStep
@@ -838,6 +929,7 @@ export default function ItemCreationWizard({
             errors={errors}
             onChange={(data) => handleStepData({ basicInfo: data })}
             productType={wizardData.productType.type}
+            gtinReadOnly={!!wizardData.catalogMatch}
           />
         );
       case 1:

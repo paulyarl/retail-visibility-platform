@@ -1,0 +1,237 @@
+---
+description: Start-of-phase or sprint pre-flight checklist to run before beginning implementation — ensures skill awareness, pattern selection, ID planning, navigation strategy, and convention alignment before writing any code
+---
+
+# Start-of-Phase / Sprint Pre-Flight Checklist
+
+Run this checklist at the start of every phase, sprint, or significant work session before writing any code. It mirrors the end-of-phase checklist (`end-of-phase-sprint-checklist.md`) but focuses on **planning and awareness** rather than verification. The goal is to front-load decisions so the implementation session doesn't surface surprises.
+
+---
+
+## 0. Hard Rule — TypeScript Checks at Phase End (Non-Negotiable)
+
+**Every phase or sprint MUST end with zero new TypeScript errors on both apps. No exceptions. This is the final gate before marking work complete.**
+
+```bash
+cd apps/api && npx tsc --noEmit
+cd apps/web && npx tsc --noEmit
+```
+
+- **Zero new errors.** Pre-existing errors should not increase.
+- **Run both checks** — API and web are independent TypeScript projects.
+- **Do not skip, do not defer.** A phase with TS errors is not complete.
+- **Plan for this.** Allocate time at the end of every session to run checks and fix errors before committing.
+
+---
+
+## 1. Singleton Service Strategy
+
+**Skill**: `deploy-service-extending-base-singleton.md`
+
+- [ ] **Identify which domain base the new service(s) will extend.** Before creating any frontend service, determine the audience and pick the base:
+  | Audience | Web base | API base |
+  |---|---|---|
+  | Public-facing storefront data | `PublicApiSingleton` | `BaseService` or `UniversalSingleton` |
+  | User-specific authenticated pages | `AuthenticatedApiSingleton` | `BaseService` |
+  | Tenant admin dashboard | `TenantApiSingleton` | `BaseService` / `UniversalSingleton` |
+  | Multi-tenant org operations | `OrganizationApiSingleton` | `BaseService` |
+  | Admin platform panel | `AdminApiSingleton` | `BaseService` |
+  | Background / cron / system jobs | `ApiSystemSingleton` | `UniversalSingleton` |
+  | Third-party API wrapper | `ExternalApiSingleton` | N/A |
+  | Capability-gated feature | `TenantApiSingleton` + client-side tier check | `PermissionEnhancedBaseService` |
+
+- [ ] **Plan the cache contract.** If extending `TenantApiSingleton` or `OrganizationApiSingleton`, know upfront what cache patterns you'll need (`getServiceCachePatterns()`) and what mutations will require invalidation (`invalidateServiceCaches()`).
+
+- [ ] **Confirm no direct `fetch` will be used.** All frontend API calls must go through `makeDefaultRequest` on a singleton service. If you're tempted to use `fetch`, create a service method instead.
+
+- [ ] **Decide: singleton vs stateless.** Backend services only need `UniversalSingleton` if caching/metrics are required. Stateless CRUD → `BaseService`. Capability gates → compose `PermissionEnhancedBaseService`.
+
+---
+
+## 2. Skill Document Awareness
+
+- [ ] **Read the relevant skills before starting.** Review the skills that apply to this phase's work. Use the quick reference table below to identify which ones to read.
+
+| Phase will touch... | Read this skill first |
+|---|---|
+| Frontend API calls | `deploy-service-extending-base-singleton.md` |
+| New entity / DB table | `tenant-scoped-id-generation.md` |
+| New page / route | `database-navigation-system.md` |
+| Capability feature | `capability-deployment-flow.md` + `capability-data-flow-rules.md` |
+| Cross-capability deps | `capability-constraint-relationships.md` |
+| Bot / chatbot | `lazy-bot-conversation-creation.md` + `bot-widget-troubleshooting.md` |
+| Auth / redirect issues | `fix-auth0-redirect-loop.md` + `fix-tenant-dashboard-load-loop.md` |
+| Dashboard performance | `dashboard-performance-audit.md` |
+| Render loops | `debug-infinite-render-loops.md` |
+| Cache invalidation | `cross-context-cache-invalidation.md` |
+| Feature flags | `feature-flag-catalog.md` |
+| Badge system | `meaningful-badge-architecture.md` + `badge-architecture-insights.md` |
+
+- [ ] **Note any skills that may need updates after this phase.** If the phase will introduce a new pattern, change a convention, or add a step to an existing workflow, flag it now so the end-of-phase checklist catches it.
+
+- [ **Determine if a new skill document will be needed.** If the phase introduces a reusable multi-step workflow or a recurring pattern that doesn't fit any existing skill, plan to create one at the end. Note the proposed filename and scope.
+
+---
+
+## 3. Tenant-Scoped ID Planning
+
+**Skill**: `tenant-scoped-id-generation.md`
+
+- [ ] **List all new entities the phase will create.** For each, determine:
+  - Will it be tenant-scoped or global?
+  - What prefix will the ID generator use? (Check the catalog in `tenant-scoped-id-generation.md` §4 for collisions.)
+  - Will the DB column be `VarChar(255)` (not `@db.Uuid`)?
+
+- [ ] **Add ID generators to `id-generator.ts` before creating services.** Don't wait until the service layer — add the generator function first so it's ready when the service needs it. Follow the `{prefix}-{tenantKey}-{nanoid}` format.
+
+- [ ] **Identify any existing `randomUUID()` / `gen_random_uuid()` / `Date.now()` patterns that will be touched.** If the phase modifies existing entities, check whether they're still using raw UUIDs and plan to migrate them to tenant-scoped IDs as part of the work.
+
+- [ ] **Plan multi-key IDs if entities span domains.** If an entity connects tenant + customer, or tenant + organization, plan a dual-key format (e.g., `ctr-{tk}-{ck}-{nanoid}`).
+
+---
+
+## 4. Navigation & Page Planning
+
+**Skill**: `database-navigation-system.md`
+
+- [ ] **List all new pages/routes the phase will create.** For each:
+  - What is the route path? (e.g., `/t/[tenantId]/my-feature`)
+  - Which sidebar target? (`tenant`, `admin`, or `all`)
+  - What icon will it use? (Check available icons in `database-navigation-system.md` — must be registered in all 3 places: `useNavLinks.tsx`, `page.tsx`, `NavItemRow.tsx`)
+  - Will it be a root link or a child of an existing parent? If child, identify the parent link ID.
+
+- [ ] **Plan the SQL INSERT for `navigation_links`.** Draft the INSERT statement(s) now so they're ready to run. Use dynamic subqueries for parent IDs — never hardcode parent IDs that may differ between staging and production.
+
+- [ ] **Plan file-based fallback updates.** Even though the DB is the active system, update `buildTenantNav()` / `buildAdminNavItems()` / `buildNavItems()` for resilience and reference.
+
+- [ ] **Identify any settings cards needed.** If the page should appear on a settings landing page (e.g., `TenantSettings.tsx`), note where to add the card.
+
+- [ ] **Check for dynamic template conflicts.** If the new page is a child of a `tenant-locations` or `organization-locations` template parent, it CANNOT be a database link — those children are generated client-side by `DynamicNavTemplates.tsx`.
+
+---
+
+## 5. Backend Architecture Planning
+
+- [ ] **List all new route files.** For each, determine:
+  - Mount path in `index.ts`
+  - Auth level (public, authenticated, tenant, admin)
+  - RBAC gates (`requirePermission`, `requireRole`, `requireGroup`)
+  - Zod validation schemas needed for inputs
+
+- [ ] **List all new background jobs.** For each:
+  - Schedule (interval/cron)
+  - Which tenants it operates on (all active, specific subset)
+  - Wiring point in `index.ts` startup
+  - Error handling strategy (fire-and-forget vs retry)
+
+- [ ] **Plan logger usage.** All logger calls will use `logger.method(message, undefined, { ...meta })`. Note any webhook handlers that need `(req as any).rawBody`.
+
+- [ ] **Identify existing services that will be modified.** List each and note what changes are needed. Check for cache invalidation implications.
+
+---
+
+## 6. Database & Migration Planning
+
+- [ ] **Draft the migration file name.** Follow the numbering convention (check `database/migrations/` for the latest number). Format: `NNN_descriptive_name.sql`.
+
+- [ ] **List all new tables.** For each:
+  - Columns and types (use `VarChar(255)` for ID columns, not `UUID`)
+  - RLS policies needed
+  - `updated_at` trigger function
+  - Indexes (foreign keys, query columns, composite)
+  - Unique constraints
+  - Seed data if reference table
+
+- [ ] **Plan idempotency.** All DDL wrapped in `DO$$ BEGIN ... EXCEPTION WHEN OTHERS THEN END $$;`. All INSERTs use `INSERT ... SELECT ... WHERE NOT EXISTS`.
+
+- [ ] **Plan Prisma schema updates.** After migration, will you run `npx prisma db pull` or manually edit `schema.prisma`? Note the models, relations, and indexes to add.
+
+- [ ] **Identify any materialized views that need rebuilding.** If the migration changes tables that feed into MVs (e.g., `mv_storefront_discovery`), plan the `REFRESH MATERIALIZED VIEW` step.
+
+---
+
+## 7. Frontend Architecture Planning
+
+- [ ] **List all new components.** For each:
+  - Server component or client component?
+  - Which existing components can be reused? (Check `skill-frontend-ux-guardrails` for component patterns)
+  - Loading/empty/error/disabled states needed
+
+- [ ] **Plan React Query cache keys.** Ensure unique keys that don't collide with existing queries. Include tenant ID for tenant-scoped queries.
+
+- [ ] **Identify SSR safety needs.** Any `localStorage` / `window` access must be guarded with `typeof window !== 'undefined'`.
+
+- [ ] **Check server-resolved context impact.** If the phase changes auth or tenant state flow, verify `ServerResolvedContextProvider` remains the single source of truth. See `fix-tenant-dashboard-load-loop.md`.
+
+- [ ] **Plan the singleton service methods.** List each method the frontend service will need, with the API endpoint it maps to and the cache key pattern.
+
+---
+
+## 8. Capability System Planning
+
+**Skills**: `capability-deployment-flow.md`, `capability-data-flow-rules.md`, `capability-constraint-relationships.md`
+
+- [ ] **Identify if the phase introduces new capability features.** If yes, plan the 8-phase deployment:
+  1. Define feature key in `canonical-features.ts` + `tier-hierarchies.ts`
+  2. Seed DB (`features_list` + `capability_features_list` + `tier_features_list`)
+  3. Store prefs table + Prisma schema
+  4. Resolver (`XxxResolver.ts`) + types + `EffectiveCapabilityResolver.ts`
+  5. Route (`xxx-options-settings.ts` with GET + PUT + tier filtering + cache invalidation)
+  6. Map (`UnifiedCapabilityService.ts` + `CapabilityResolutionService.ts`)
+  7. Display (`PlanSummaryPanel.tsx` + `CapabilityShowcase.tsx` + settings page)
+  8. Verify (TS checks + `verify-capability-deployment.md`)
+
+- [ ] **Check for cross-capability constraints.** Will the new feature depend on or conflict with another capability? If yes, plan a constraint entry in `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.
+
+- [ ] **Verify naming conventions.** Feature keys must be `snake_case` with domain prefix: `<capability_key>_enabled` or `<capability_key>_<group>_<feature>`. Group gates required for options (R16 in `capability-data-flow-rules.md`).
+
+---
+
+## 9. Design Doc & Memory Planning
+
+- [ ] **Is there a design doc for this phase?** If yes, read it fully before starting. If no, consider whether one is needed (multi-phase work should have a design doc in `docs/`).
+
+- [ ] **Plan the memory entry.** At phase completion, a memory entry should summarize: what was built, key files, next steps. Note the tags you'll use (e.g., `phase-2`, `badges`, `complete`).
+
+- [ ] **Check for existing memories about this phase.** Search for related work in previous session memories to avoid re-discovering context.
+
+---
+
+## 10. Pre-Flight Summary
+
+Before writing any code, fill in this summary:
+
+```
+Phase/Sprint: _______________
+Design doc: _______________
+
+New services: _______________
+New entities: _______________
+New ID generators needed: _______________
+New pages/routes: _______________
+New sidebar links: _______________
+New migration: _______________
+New background jobs: _______________
+New capability features: _______________
+Skills to read before starting: _______________
+Skills to update after completion: _______________
+New skill to create (if any): _______________
+```
+
+---
+
+## Relationship to End-of-Phase Checklist
+
+This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`. Where the end-of-phase checklist verifies compliance, this checklist ensures awareness:
+
+| Concern | Start-of-phase | End-of-phase |
+|---|---|---|
+| Singletons | Pick the right base class | Verify no direct `fetch` was used |
+| Skills | Read relevant skills before starting | Update/create skills if patterns changed |
+| IDs | Plan generators and prefixes | Verify no raw UUIDs in new code |
+| Navigation | Plan SQL INSERTs and icon registration | Verify links appear in UI |
+| Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
+| Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
+| Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |
+| Capabilities | Plan 8-phase deployment | Verify feature keys and constraints |
+| Verification | Note TS check commands | Run `tsc --noEmit` on both apps |

@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import IntegrationOptionsSettingsClient from './IntegrationOptionsSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Integration Options - Store Settings',
@@ -18,5 +19,9 @@ export default async function IntegrationOptionsSettingsPage({ params }: PagePro
     redirect('/');
   }
 
-  return <IntegrationOptionsSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <IntegrationOptionsSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

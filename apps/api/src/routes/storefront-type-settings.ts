@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import StorefrontTypeService, { StorefrontType } from '../services/StorefrontTypeService';
@@ -87,7 +88,7 @@ router.get('/:tenantId/storefront-type', authenticateToken, async (req, res) => 
 });
 
 // Update storefront type settings for a tenant
-router.put('/:tenantId/storefront-type', authenticateToken, requireWritableSubscription, async (req, res) => {
+router.put('/:tenantId/storefront-type', authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

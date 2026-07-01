@@ -10,6 +10,7 @@ interface OrgQuickActionsBarProps {
   onSyncFromHero: () => void;
   syncing: boolean;
   onTabChange?: (tab: string) => void;
+  readOnly?: boolean;
 }
 
 export default function OrgQuickActionsBar({
@@ -18,6 +19,7 @@ export default function OrgQuickActionsBar({
   onSyncFromHero,
   syncing,
   onTabChange,
+  readOnly,
 }: OrgQuickActionsBarProps) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-sm">
@@ -27,7 +29,7 @@ export default function OrgQuickActionsBar({
           style={{ color: "white" }}
           size="sm"
           onClick={onSyncFromHero}
-          disabled={syncing || !heroLocation}
+          disabled={readOnly || syncing || !heroLocation}
           leftSection={<RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />}
         >
           {syncing ? "Syncing..." : "Sync from Hero"}
@@ -39,6 +41,7 @@ export default function OrgQuickActionsBar({
             size="sm"
             onClick={() => onTabChange("propagation")}
             leftSection={<Zap className="w-4 h-4" />}
+            disabled={readOnly}
           >
             Propagation
           </Button>
@@ -50,13 +53,14 @@ export default function OrgQuickActionsBar({
             size="sm"
             onClick={() => onTabChange("team")}
             leftSection={<Users className="w-4 h-4" />}
+            disabled={readOnly}
           >
             Team
           </Button>
         )}
 
-        <Link href={`/settings/organization/commerce?organizationId=${organizationId}`}>
-          <Button variant="light" size="sm" leftSection={<ShoppingCart className="w-4 h-4" />}>
+        <Link href={readOnly ? "#" : `/settings/organization/commerce?organizationId=${organizationId}`}>
+          <Button variant="light" size="sm" leftSection={<ShoppingCart className="w-4 h-4" />} disabled={readOnly}>
             Commerce
           </Button>
         </Link>
@@ -67,6 +71,7 @@ export default function OrgQuickActionsBar({
             size="sm"
             onClick={() => onTabChange("billing")}
             leftSection={<CreditCard className="w-4 h-4" />}
+            disabled={readOnly}
           >
             Billing
           </Button>

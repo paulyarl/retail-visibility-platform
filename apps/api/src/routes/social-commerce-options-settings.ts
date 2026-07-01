@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -113,7 +114,7 @@ router.get('/:tenantId/social-commerce-options', authenticateToken, async (req, 
 });
 
 // Update social commerce options settings for a tenant
-router.put('/:tenantId/social-commerce-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/social-commerce-options', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validationResult = socialCommerceOptionsSettingsSchema.safeParse(req.body);

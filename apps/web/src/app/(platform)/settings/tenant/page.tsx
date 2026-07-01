@@ -11,7 +11,7 @@ import GBPCategoryCard from "@/components/settings/GBPCategoryCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
 import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
 import GoogleConnectCard from "@/components/google/GoogleConnectCard";
-import { isFeatureEnabled } from "@/lib/featureFlags";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,6 +43,11 @@ type Organization = {
 export default function TenantSettingsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const ffBusinessProfile = useFeatureFlag('FF_BUSINESS_PROFILE');
+  const ffGbpCategorySync = useFeatureFlag('FF_TENANT_GBP_CATEGORY_SYNC');
+  const ffMapCard = useFeatureFlag('FF_MAP_CARD');
+  const ffSwisPreview = useFeatureFlag('FF_SWIS_PREVIEW');
+  const ffGoogleConnect = useFeatureFlag('FF_GOOGLE_CONNECT_SUITE');
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -309,7 +314,7 @@ export default function TenantSettingsPage() {
           {/* Left Column - Primary Content */}
           <div className="space-y-6 lg:col-span-2">
             {/* Business Profile moved to top */}
-            {isFeatureEnabled('FF_BUSINESS_PROFILE', tenant.id, tenant.region) && (
+            {ffBusinessProfile && (
               <BusinessProfileCard
                 profile={profile}
                 loading={profileLoading}
@@ -359,7 +364,7 @@ export default function TenantSettingsPage() {
             )}
 
             {/* GBP Business Category - Feature Flag: FF_TENANT_GBP_CATEGORY_SYNC (M3) */}
-            {isFeatureEnabled('FF_TENANT_GBP_CATEGORY_SYNC', tenant.id, tenant.region) && profile && (
+            {ffGbpCategorySync && profile && (
               <GBPCategoryCard
                 tenantId={tenant.id}
                 initialPrimary={
@@ -372,7 +377,7 @@ export default function TenantSettingsPage() {
             )}
 
             {/* Map Card Settings - Feature Flag: FF_MAP_CARD */}
-            {isFeatureEnabled('FF_MAP_CARD', tenant.id, tenant.region) && profile && (
+            {ffMapCard && profile && (
               <MapCardSettings
                 businessProfile={{
                   business_name: profile.business_name || tenant.name,
@@ -905,7 +910,7 @@ export default function TenantSettingsPage() {
         {/* Business Profile and Map Card moved to left column */}
 
         {/* SWIS Preview Settings - Feature Flag: FF_SWIS_PREVIEW */}
-        {isFeatureEnabled('FF_SWIS_PREVIEW', tenant.id, tenant.region) && (
+        {ffSwisPreview && (
           <SwisPreviewSettings
             tenantId={tenant.id}
             enabled={false} // TODO: Fetch from API
@@ -920,7 +925,7 @@ export default function TenantSettingsPage() {
         )}
 
         {/* Google Connect Suite - Feature Flag: FF_GOOGLE_CONNECT_SUITE */}
-        {isFeatureEnabled('FF_GOOGLE_CONNECT_SUITE', tenant.id, tenant.region) && (
+        {ffGoogleConnect && (
           <GoogleConnectCard
             tenantId={tenant.id}
             onConnect={() => {

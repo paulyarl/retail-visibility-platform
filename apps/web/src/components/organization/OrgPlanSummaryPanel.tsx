@@ -9,6 +9,7 @@ interface OrgPlanSummaryPanelProps {
   orgCaps: OrgCapabilitiesState | undefined;
   loading?: boolean;
   tierName?: string;
+  readOnly?: boolean;
 }
 
 const TAB_LABELS: Record<OrgTabKey, string> = {
@@ -62,7 +63,7 @@ interface SummaryItem {
   status: ItemStatus;
 }
 
-export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName }: OrgPlanSummaryPanelProps) {
+export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName, readOnly }: OrgPlanSummaryPanelProps) {
   if (loading || !orgCaps) {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
@@ -185,8 +186,9 @@ export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName }: OrgP
               </div>
             </div>
             <Link
-              href="/settings/subscription"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+              href={readOnly ? "#" : "/settings/subscription"}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${readOnly ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"}`}
+              aria-disabled={readOnly}
             >
               <ArrowUpCircle className="w-4 h-4" />
               Upgrade plan
@@ -214,8 +216,9 @@ export default function OrgPlanSummaryPanel({ orgCaps, loading, tierName }: OrgP
                 Organization features are not enabled on your current plan.
               </p>
               <Link
-                href="/settings/subscription"
-                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                href={readOnly ? "#" : "/settings/subscription"}
+                className={`ml-auto inline-flex items-center gap-1 text-sm font-medium ${readOnly ? "text-gray-400 cursor-not-allowed" : "text-blue-600 dark:text-blue-400 hover:underline"}`}
+                aria-disabled={readOnly}
               >
                 <ArrowUpCircle className="w-4 h-4" />
                 Upgrade

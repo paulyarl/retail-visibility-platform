@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import StorefrontOptionsService from '../services/StorefrontOptionsService';
@@ -202,7 +203,7 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
 // to match the frontend URL /api/public/tenant/:tenantId/storefront-options
 
 // Update storefront options settings for a tenant
-router.put('/:tenantId/storefront-options', authenticateToken, requireWritableSubscription, async (req, res) => {
+router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

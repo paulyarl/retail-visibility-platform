@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { checkTenantAccess, requireTenantOwner } from '../middleware/auth'
+import { audit } from '../audit'
 
 const router = Router()
 
@@ -58,6 +59,12 @@ router.put('/tenant-flags/:tenantId/:flag', requireTenantOwner, async (req, res)
     where: { tenant_id_flag: { tenant_id: tenantId, flag } },
     update: { enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },
     create: { tenant_id: tenantId, flag, enabled: !!enabled, description: description ?? null, rollout: rollout ?? null } as any,
+  })
+  await audit({
+    tenantId,
+    actor: req.user?.userId || req.user?.id || 'system',
+    action: 'update',
+    payload: { flag, enabled, description, rollout, entity_type: 'other', id: flag },
   })
   return res.json({ success: true, data: row })
 })

@@ -265,6 +265,7 @@ export type NavItem = {
   requiredPermission?: string;
   requiredGroup?: string;
   requiredRole?: string;
+  requiredOrgAdmin?: boolean;
   prefetch?: boolean;
   metadata?: any;
 };

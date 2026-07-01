@@ -46,6 +46,7 @@ import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, 
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
+import DemoBanner from '@/components/storefront/DemoBanner';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 
@@ -135,6 +136,8 @@ interface Tenant {
   };
 
   hasActivePaymentGateway?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -744,6 +747,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
+      {tenant.isDemo && <DemoBanner expiresAt={tenant.demoExpiresAt} />}
       <SocialPixels tenantId={resolvedTenantId || tenant.id || id} usePublic />
       <TenantPaymentProvider
         tenantId={resolvedTenantId || tenant.id || id}

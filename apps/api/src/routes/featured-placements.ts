@@ -14,6 +14,7 @@
 
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import FeaturedPlacementService from '../services/FeaturedPlacementService';
 import FeaturedPlacementAnalyticsService from '../services/FeaturedPlacementAnalyticsService';
 
@@ -150,7 +151,7 @@ router.get('/tenants/:tenantId/featured-placements', authenticateToken, async (r
 // TENANT: CREATE PURCHASE (initiate checkout)
 // ====================
 
-router.post('/tenants/:tenantId/featured-placements', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/featured-placements', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { inventoryItemId, planKey, successUrl, cancelUrl } = req.body;
@@ -173,7 +174,7 @@ router.post('/tenants/:tenantId/featured-placements', authenticateToken, async (
 // TENANT: RENEW PURCHASE
 // ====================
 
-router.post('/tenants/:tenantId/featured-placements/:purchaseId/renew', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/featured-placements/:purchaseId/renew', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId, purchaseId } = req.params;
     const { successUrl, cancelUrl } = req.body;

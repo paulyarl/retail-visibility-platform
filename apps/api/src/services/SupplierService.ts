@@ -197,6 +197,118 @@ class SupplierServiceClass {
       unreplayed_quarantine_24h: recentQuarantine,
     };
   }
+
+  /**
+   * Get health dashboard data for all suppliers.
+   * Aggregates metrics: success %, dedup %, GTIN coverage %, freshness lag, alerts.
+   */
+  async getHealthDashboard() {
+    const suppliers = await prisma.supplier.findMany({
+      include: {
+        _count: {
+          select: {
+            supplier_catalog_item: true,
+            supplier_mapping: true,
+            catalog_quarantine: true,
+          },
+        },
+      },
+      orderBy: [{ is_builtin: 'desc' }, { name: 'asc' }],
+    });
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const supplierMetrics = await Promise.all(
+      suppliers.map(async (s) => {
+        const itemsWithGtin = await prisma.supplier_catalog_item.count({
+          where: { supplier_id: s.id, gtin: { not: null } },
+        });
+
+        const unreplayedQuarantine = await prisma.catalog_quarantine.count({
+          where: { supplier_id: s.id, replayed_at: null },
+        });
+
+        const recentQuarantine = await prisma.catalog_quarantine.count({
+          where: {
+            supplier_id: s.id,
+            replayed_at: null,
+            created_at: { gt: twentyFourHoursAgo },
+          },
+        });
+
+        const recentItems = await prisma.supplier_catalog_item.count({
+          where: { supplier_id: s.id, updated_at: { gt: twentyFourHoursAgo } },
+        });
+
+        const latestItem = await prisma.supplier_catalog_item.findFirst({
+          where: { supplier_id: s.id },
+          orderBy: { updated_at: 'desc' },
+          select: { updated_at: true },
+        });
+
+        const totalCatalogItems = s._count.supplier_catalog_item;
+        const totalQuarantine = s._count.catalog_quarantine;
+        const totalAttempts = totalCatalogItems + totalQuarantine;
+        const successRate = totalAttempts > 0 ? Math.round((totalCatalogItems / totalAttempts) * 100) : 100;
+        const dedupRate = totalCatalogItems > 0 ? Math.round(((totalCatalogItems - recentItems) / totalCatalogItems) * 100) : 0;
+        const gtinCoveragePct = totalCatalogItems > 0 ? Math.round((itemsWithGtin / totalCatalogItems) * 100) : 0;
+
+        const freshnessLagHours = latestItem
+          ? Math.round((Date.now() - latestItem.updated_at.getTime()) / (1000 * 60 * 60))
+          : null;
+
+        const freshnessAlert = freshnessLagHours !== null && freshnessLagHours > 24;
+
+        return {
+          supplier_id: s.id,
+          supplier_name: s.name,
+          active: s.active,
+          is_builtin: s.is_builtin,
+          connection_type: s.connection_type,
+          total_catalog_items: totalCatalogItems,
+          total_mappings: s._count.supplier_mapping,
+          items_with_gtin: itemsWithGtin,
+          gtin_coverage_pct: gtinCoveragePct,
+          success_rate_pct: successRate,
+          dedup_rate_pct: dedupRate,
+          items_updated_24h: recentItems,
+          quarantined_items: totalQuarantine,
+          unreplayed_quarantine_24h: recentQuarantine,
+          freshness_lag_hours: freshnessLagHours,
+          freshness_alert: freshnessAlert,
+          last_updated: latestItem?.updated_at || null,
+        };
+      })
+    );
+
+    // Aggregate summary
+    const totalSuppliers = suppliers.length;
+    const activeSuppliers = suppliers.filter(s => s.active).length;
+    const totalCatalogItems = supplierMetrics.reduce((sum, m) => sum + m.total_catalog_items, 0);
+    const totalMappings = supplierMetrics.reduce((sum, m) => sum + m.total_mappings, 0);
+    const totalQuarantined = supplierMetrics.reduce((sum, m) => sum + m.quarantined_items, 0);
+    const avgGtinCoverage = totalSuppliers > 0
+      ? Math.round(supplierMetrics.reduce((sum, m) => sum + m.gtin_coverage_pct, 0) / totalSuppliers)
+      : 0;
+    const avgSuccessRate = totalSuppliers > 0
+      ? Math.round(supplierMetrics.reduce((sum, m) => sum + m.success_rate_pct, 0) / totalSuppliers)
+      : 100;
+    const alertsCount = supplierMetrics.filter(m => m.freshness_alert).length;
+
+    return {
+      summary: {
+        total_suppliers: totalSuppliers,
+        active_suppliers: activeSuppliers,
+        total_catalog_items: totalCatalogItems,
+        total_mappings: totalMappings,
+        total_quarantined: totalQuarantined,
+        avg_gtin_coverage_pct: avgGtinCoverage,
+        avg_success_rate_pct: avgSuccessRate,
+        alerts_count: alertsCount,
+      },
+      suppliers: supplierMetrics,
+    };
+  }
 }
 
 export const SupplierService = new SupplierServiceClass();

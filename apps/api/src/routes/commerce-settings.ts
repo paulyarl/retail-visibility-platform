@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
 import { getTenantCommerceCapabilities } from '../utils/commerce-capabilities';
@@ -115,7 +116,7 @@ router.get('/public/tenant/:tenantId/commerce-settings', async (req, res) => {
 });
 
 // Update commerce settings
-router.put('/:tenantId/commerce-settings', authenticateToken, async (req, res) => {
+router.put('/:tenantId/commerce-settings', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

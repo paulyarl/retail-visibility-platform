@@ -39,6 +39,17 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Health dashboard — aggregated metrics for all suppliers (must be before /:id)
+router.get('/health/dashboard', async (req, res) => {
+  try {
+    const dashboard = await SupplierService.getHealthDashboard();
+    res.json(dashboard);
+  } catch (error) {
+    console.error('[admin/suppliers] Health dashboard error:', error);
+    res.status(500).json({ error: 'Failed to get health dashboard' });
+  }
+});
+
 // Get supplier by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -171,11 +182,14 @@ router.get('/:id/quarantine', async (req, res) => {
   }
 });
 
-// Replay quarantined item
+// Replay quarantined item — re-attempts ingestion
 router.post('/:id/quarantine/:qid/replay', async (req, res) => {
   try {
-    const item = await SupplierCatalogService.replayQuarantine(req.params.qid);
-    res.json({ item });
+    const result = await SupplierCatalogService.replayQuarantine(req.params.qid);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Replay failed' });
+    }
+    res.json({ success: true });
   } catch (error) {
     console.error('[admin/suppliers] Quarantine replay error:', error);
     res.status(500).json({ error: 'Failed to replay quarantined item' });

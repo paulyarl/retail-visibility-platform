@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { isFeatureEnabled } from '@/lib/featureFlags';
 import { Modal, ModalFooter, Input, Alert, ConfirmDialog } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';

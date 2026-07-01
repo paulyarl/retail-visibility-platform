@@ -68,6 +68,26 @@ router.put('/tenant/:tenantId/business-hours',
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
   await updateBusinessProfileHours(tenantId);
 
+  // Fire-and-forget: sync hours to Google Business Profile (gated by storefront + hours + GBP capabilities)
+  import('../lib/google/capability-gate').then(({ isGBPHoursSyncAllowed }) => {
+    return isGBPHoursSyncAllowed(tenantId);
+  }).then(allowed => {
+    if (!allowed) return;
+    return import('../services/GBPBusinessInfoSync').then(({ syncBusinessHours, syncSpecialHours }) => {
+      return Promise.all([syncBusinessHours(tenantId), syncSpecialHours(tenantId)])
+        .then(([regular, special]) => {
+          console.log(`[Business Hours] GBP sync for tenant ${tenantId}: regular=${regular.success}, special=${special.success}`);
+          if (regular.success && !regular.skipped) {
+            prisma.business_hours_list.updateMany({
+              where: { tenant_id: tenantId },
+              data: { last_synced_at: new Date() } as any,
+            }).catch(() => {});
+          }
+        })
+        .catch(err => console.error(`[Business Hours] GBP sync error for tenant ${tenantId}:`, err));
+    });
+  }).catch(() => {});
+
   // Refresh hours embeddings (fire-and-forget)
   BotKnowledgeEmbeddingService.getInstance().refreshHoursEmbeddings(tenantId).catch(() => {});
 
@@ -118,6 +138,26 @@ router.put('/tenant/:tenantId/business-hours/special',
   const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
   await updateBusinessProfileHours(tenantId);
 
+  // Fire-and-forget: sync hours to Google Business Profile (gated by storefront + hours + GBP capabilities)
+  import('../lib/google/capability-gate').then(({ isGBPHoursSyncAllowed }) => {
+    return isGBPHoursSyncAllowed(tenantId);
+  }).then(allowed => {
+    if (!allowed) return;
+    return import('../services/GBPBusinessInfoSync').then(({ syncBusinessHours, syncSpecialHours }) => {
+      return Promise.all([syncBusinessHours(tenantId), syncSpecialHours(tenantId)])
+        .then(([regular, special]) => {
+          console.log(`[Business Hours] GBP sync (special update) for tenant ${tenantId}: regular=${regular.success}, special=${special.success}`);
+          if (special.success && !special.skipped) {
+            prisma.business_hours_list.updateMany({
+              where: { tenant_id: tenantId },
+              data: { last_synced_at: new Date() } as any,
+            }).catch(() => {});
+          }
+        })
+        .catch(err => console.error(`[Business Hours] GBP sync error for tenant ${tenantId}:`, err));
+    });
+  }).catch(() => {});
+
   // Refresh hours embeddings (fire-and-forget)
   BotKnowledgeEmbeddingService.getInstance().refreshHoursEmbeddings(tenantId).catch(() => {});
 
@@ -138,18 +178,49 @@ router.put('/tenant/:tenantId/business-hours/special',
 router.post('/tenant/:tenantId/gbp/hours/mirror',
   async (req, res) => {
   const { tenantId } = req.params
-  // Enqueue sync job; runner loop will process it
-  await prisma.sync_jobs.create({
-    data: {
-      id: generateGbpHoursSyncLogId(tenantId),
-      tenant_id: tenantId,
-      target: 'gbp_hours',
-      status: 'queued',
-      attempt: 0,
-      payload: { tenantId },
-    },
-  })
-  res.status(202).json({ success: true })
+
+  try {
+    // Capability gate: storefront must be retail/service + hours enabled + GBP integration
+    const { isGBPHoursSyncAllowed } = await import('../lib/google/capability-gate');
+    const allowed = await isGBPHoursSyncAllowed(tenantId);
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'GBP hours sync not allowed for this tenant (requires retail/service storefront with hours enabled and GBP integration)',
+      });
+    }
+
+    // Call syncBusinessHours and syncSpecialHours directly
+    const { syncBusinessHours, syncSpecialHours } = await import('../services/GBPBusinessInfoSync');
+
+    const [regularResult, specialResult] = await Promise.all([
+      syncBusinessHours(tenantId),
+      syncSpecialHours(tenantId),
+    ]);
+
+    // Update sync timestamp on business_hours_list
+    await prisma.business_hours_list.updateMany({
+      where: { tenant_id: tenantId },
+      data: { last_synced_at: new Date(), updated_at: new Date() } as any,
+    });
+
+    const success = regularResult.success && specialResult.success;
+    const skipped = regularResult.skipped && specialResult.skipped;
+
+    console.log(`[GBP Hours Mirror] Tenant ${tenantId}: regular=${regularResult.success}${regularResult.skipped ? ' (skipped)' : ''}, special=${specialResult.success}${specialResult.skipped ? ' (skipped)' : ''}`);
+
+    res.status(success ? 200 : 207).json({
+      success,
+      data: {
+        regularHours: regularResult,
+        specialHours: specialResult,
+        skipped,
+      },
+    });
+  } catch (error: any) {
+    console.error(`[GBP Hours Mirror] Error syncing hours for tenant ${tenantId}:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 })
 
 // GET /api/tenant/:tenantId/gbp/hours/status

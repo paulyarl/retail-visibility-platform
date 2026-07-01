@@ -2,33 +2,44 @@
  * Tenant Supplier Routes
  *
  * Tenant-scoped endpoints for catalog search, import, and mapping management.
- * All routes require authentication + tenant access.
+ * All routes require authentication + tenant access + FF_SUPPLIER_CATALOG_IMPORT enabled.
+ *
+ * RBAC:
+ *   - Read endpoints (list, search, lookup, mappings list): checkTenantAccess (any tenant member)
+ *   - Write endpoints (import, update sync mode, unlink): requireTenantOwner (OWNER/ADMIN)
  *
  * Routes:
  *   GET    /api/tenants/:tenantId/suppliers                    — list active suppliers
  *   GET    /api/tenants/:tenantId/suppliers/catalog/search     — search catalog items
  *   GET    /api/tenants/:tenantId/suppliers/catalog/lookup     — lookup by barcode/GTIN
  *   POST   /api/tenants/:tenantId/suppliers/import/check       — pre-flight conflict check
- *   POST   /api/tenants/:tenantId/suppliers/import             — execute import
+ *   POST   /api/tenants/:tenantId/suppliers/import             — execute import (emits audit_log)
  *   GET    /api/tenants/:tenantId/suppliers/mappings           — list supplier mappings
- *   PUT    /api/tenants/:tenantId/suppliers/mappings/:mid      — update sync mode
- *   DELETE /api/tenants/:tenantId/suppliers/mappings/:mid      — unlink mapping
+ *   PUT    /api/tenants/:tenantId/suppliers/mappings/:mid      — update sync mode (emits audit_log)
+ *   DELETE /api/tenants/:tenantId/suppliers/mappings/:mid      — unlink mapping (emits audit_log)
  */
 
 import express from 'express';
-import { authenticateToken, checkTenantAccess } from '../../middleware/auth';
+import { authenticateToken, checkTenantAccess, requireTenantOwner } from '../../middleware/auth';
+import { requireFlag } from '../../middleware/flags';
+import { prisma } from '../../prisma';
 import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
 import SupplierImportService from '../../services/SupplierImportService';
 
 const router = express.Router();
 
-router.use(authenticateToken, checkTenantAccess);
-
 // Helper to safely extract tenantId from route params
 function getTenantId(req: express.Request): string {
   return req.params.tenantId as string;
 }
+
+// All routes require auth + tenant access + feature flag
+router.use(
+  authenticateToken,
+  checkTenantAccess,
+  requireFlag({ flag: 'FF_SUPPLIER_CATALOG_IMPORT', scope: 'tenant', tenantParam: 'tenantId' }),
+);
 
 // List active suppliers (for tenant dropdown)
 router.get('/suppliers', async (req, res) => {
@@ -76,7 +87,7 @@ router.get('/suppliers/catalog/lookup', async (req, res) => {
   }
 });
 
-// Pre-flight conflict check
+// Pre-flight conflict check (any tenant member)
 router.post('/suppliers/import/check', async (req, res) => {
   try {
     const { selections } = req.body;
@@ -91,14 +102,46 @@ router.post('/suppliers/import/check', async (req, res) => {
   }
 });
 
-// Execute import
-router.post('/suppliers/import', async (req, res) => {
+// Execute import (OWNER/ADMIN only — emits audit_log domain event)
+router.post('/suppliers/import', requireTenantOwner, async (req, res) => {
   try {
     const { selections } = req.body;
     if (!Array.isArray(selections)) {
       return res.status(400).json({ error: 'selections array is required' });
     }
-    const result = await SupplierImportService.executeImport(getTenantId(req), selections);
+    const tenantId = getTenantId(req);
+    const result = await SupplierImportService.executeImport(tenantId, selections);
+
+    // Emit domain event: inventory.upserted_from_supplier
+    if (result.imported > 0 && req.user) {
+      try {
+        await prisma.audit_log.create({
+          data: {
+            id: `audit-supplier-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            tenant_id: tenantId,
+            actor_id: req.user.userId || req.user.id || 'system',
+            actor_type: 'user',
+            action: 'create',
+            entity_type: 'inventory_item',
+            entity_id: result.created_item_ids[0] || 'bulk',
+            diff: {
+              event: 'inventory.upserted_from_supplier',
+              imported_count: result.imported,
+              skipped_count: result.skipped,
+              created_item_ids: result.created_item_ids,
+              selection_count: selections.length,
+            },
+            metadata: {
+              source: 'supplier_catalog_import',
+              flag: 'FF_SUPPLIER_CATALOG_IMPORT',
+            },
+          },
+        });
+      } catch (auditError) {
+        console.error('[tenant/suppliers] Audit log error:', auditError);
+      }
+    }
+
     res.json(result);
   } catch (error) {
     console.error('[tenant/suppliers] Import error:', error);
@@ -118,14 +161,36 @@ router.get('/suppliers/mappings', async (req, res) => {
   }
 });
 
-// Update sync mode
-router.put('/suppliers/mappings/:mid', async (req, res) => {
+// Update sync mode (OWNER/ADMIN only — emits audit_log)
+router.put('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) => {
   try {
     const { sync_mode } = req.body;
     if (!sync_mode || !['manual', 'auto'].includes(sync_mode)) {
       return res.status(400).json({ error: 'sync_mode must be "manual" or "auto"' });
     }
     const mapping = await SupplierImportService.updateSyncMode(req.params.mid, sync_mode);
+
+    // Emit audit log
+    if (req.user) {
+      try {
+        await prisma.audit_log.create({
+          data: {
+            id: `audit-supplier-mapping-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            tenant_id: getTenantId(req),
+            actor_id: req.user.userId || req.user.id || 'system',
+            actor_type: 'user',
+            action: 'update',
+            entity_type: 'inventory_item',
+            entity_id: req.params.mid,
+            diff: { event: 'supplier_mapping_sync_mode_changed', mapping_id: req.params.mid, sync_mode },
+            metadata: { source: 'supplier_catalog_import', flag: 'FF_SUPPLIER_CATALOG_IMPORT' },
+          },
+        });
+      } catch (auditError) {
+        console.error('[tenant/suppliers] Audit log error:', auditError);
+      }
+    }
+
     res.json({ mapping });
   } catch (error) {
     console.error('[tenant/suppliers] Update mapping error:', error);
@@ -133,10 +198,32 @@ router.put('/suppliers/mappings/:mid', async (req, res) => {
   }
 });
 
-// Unlink mapping
-router.delete('/suppliers/mappings/:mid', async (req, res) => {
+// Unlink mapping (OWNER/ADMIN only — emits audit_log)
+router.delete('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) => {
   try {
     await SupplierImportService.unlinkMapping(req.params.mid);
+
+    // Emit audit log
+    if (req.user) {
+      try {
+        await prisma.audit_log.create({
+          data: {
+            id: `audit-supplier-unlink-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            tenant_id: getTenantId(req),
+            actor_id: req.user.userId || req.user.id || 'system',
+            actor_type: 'user',
+            action: 'delete',
+            entity_type: 'inventory_item',
+            entity_id: req.params.mid,
+            diff: { event: 'supplier_mapping_unlinked', mapping_id: req.params.mid },
+            metadata: { source: 'supplier_catalog_import', flag: 'FF_SUPPLIER_CATALOG_IMPORT' },
+          },
+        });
+      } catch (auditError) {
+        console.error('[tenant/suppliers] Audit log error:', auditError);
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('[tenant/suppliers] Unlink mapping error:', error);

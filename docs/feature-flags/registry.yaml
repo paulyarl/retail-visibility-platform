@@ -1,7 +1,8 @@
 # Feature Flag Registry
-# Version: v3.6.2-prep (Retrofit R4)
-# Date: 2025-10-31
+# Version: v3.7-audit (Feature Flag Audit)
+# Date: 2026-06-30
 # Description: Central registry for all feature flags with ownership and lifecycle
+# Audit: Synced with actual code state per feature-flag-catalog.md audit
 
 version: "1.0"
 platform: retail-visibility-platform
@@ -35,21 +36,11 @@ flags:
     owner: api_team
     created: 2025-08-01
     expires: 2026-02-01
-    status: active
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer — schema migration completed, flag is obsolete"
     default: false
-    pilot: true
-    production: true
     description: "Enables SWIS-ready inventory_item schema with all v3.4 fields"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies: []
-    metrics:
-      - schema_migration_success_rate
-      - data_integrity_checks
-    documentation: /docs/migrations/v3.4-schema.md
     
   # Business Profile Module
   - key: FF_BUSINESS_PROFILE
@@ -126,86 +117,46 @@ flags:
       - map_card_view_rate
       - privacy_mode_toggle_rate
 
-  # Directory Entry Layout System
+  # Directory Entry Layout System — removed (handled by capability system)
   - key: FF_DIRECTORY_ENTRY_LAYOUT
     owner: ux_team
     created: 2026-06-17
     expires: 2026-12-17
-    status: active
-    default: true
-    pilot: true
-    production: true
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer — directory entry layout handled by capability system"
+    default: false
     description: "Enables switchable directory entry page layouts (classic, editorial, immersive, premium)"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies: []
-    metrics:
-      - layout_switch_rate
-      - layout_preview_usage
-    documentation: /docs/features/directory-entry-layout.md
 
   - key: FF_DIRECTORY_ENTRY_LAYOUT_EDITORIAL
     owner: ux_team
     created: 2026-06-17
     expires: 2026-12-17
-    status: active
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer — handled by capability system"
     default: false
-    pilot: true
-    production: true
     description: "Enables editorial layout variant for directory entry pages"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies:
-      - FF_DIRECTORY_ENTRY_LAYOUT
-    metrics:
-      - editorial_layout_adoption
-    documentation: /docs/features/directory-entry-layout.md
 
   - key: FF_DIRECTORY_ENTRY_LAYOUT_IMMERSIVE
     owner: ux_team
     created: 2026-06-17
     expires: 2026-12-17
-    status: active
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer — handled by capability system"
     default: false
-    pilot: true
-    production: true
     description: "Enables immersive layout variant for directory entry pages"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies:
-      - FF_DIRECTORY_ENTRY_LAYOUT
-    metrics:
-      - immersive_layout_adoption
-    documentation: /docs/features/directory-entry-layout.md
 
   - key: FF_DIRECTORY_ENTRY_LAYOUT_PREMIUM
     owner: ux_team
     created: 2026-06-17
     expires: 2026-12-17
-    status: active
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer — handled by capability system"
     default: false
-    pilot: false
-    production: false
     description: "Enables premium layout variant for directory entry pages (hard-gated)"
-    rollout_percentage: 0
-    environments:
-      staging: true
-      pilot: false
-      production: false
-    dependencies:
-      - FF_DIRECTORY_ENTRY_LAYOUT
-    metrics:
-      - premium_layout_request_rate
-    documentation: /docs/features/directory-entry-layout.md
   
   # SWIS Preview
   - key: FF_SWIS_PREVIEW
@@ -258,55 +209,27 @@ flags:
       - alignment_drawer_open_rate
     documentation: /docs/features/category-management.md
   
-  # Tenant Category Override
+  # Tenant Category Override — removed (no code consumer)
   - key: FF_TENANT_CATEGORY_OVERRIDE
     owner: api_team
     created: 2025-09-05
     expires: 2026-02-05
-    status: pilot
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer"
     default: false
-    pilot: false
-    production: false
     description: "Allows tenant-level category mapping writes (admin override)"
-    rollout_percentage: 0
-    environments:
-      staging: true
-      pilot: false
-      production: false
-    dependencies:
-      - FF_CATEGORY_MANAGEMENT_PAGE
-    metrics:
-      - override_usage_count
-      - override_error_rate
-    documentation: /docs/features/category-override.md
-    warning: "Use with caution - allows bypassing standard validation"
   
-  # Feed Alignment Enforcement
+  # Feed Alignment Enforcement — API config.ts flag (env-only, defaults to false)
   - key: FF_FEED_ALIGNMENT_ENFORCE
     owner: api_team
     created: 2025-08-15
     expires: 2026-01-15
-    status: active
-    default: warn
-    pilot: warn
-    production: true
+    status: inactive
+    default: false
     description: "Blocks feed submission when categories unmapped (REQ-2025-911)"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies:
-      - FF_CATEGORY_MANAGEMENT_PAGE
-    metrics:
-      - feed_blocked_count
-      - category_mapping_coverage_pct
-      - feed_approval_rate
-    documentation: /docs/features/feed-alignment.md
-    values:
-      warn: "Log warning but allow feed"
-      block: "Block feed submission"
-    current_value: warn  # Will change to 'block' when coverage = 100%
+    env_var: FF_FEED_ALIGNMENT_ENFORCE
+    consumer: apps/api/src/routes/feed-jobs.ts
   
   # Category Quick Actions Footer
   - key: FF_CATEGORY_QUICK_ACTIONS
@@ -380,74 +303,40 @@ flags:
       - time_to_navigate
     documentation: /docs/features/app-shell-nav.md
   
-  # Audit Log (Retrofit)
+  # Audit Log — API config.ts flag (env-only, defaults to false)
   - key: FF_AUDIT_LOG
     owner: devops_team
     created: 2025-10-31
     expires: 2026-04-30
-    status: active
+    status: inactive
     default: false
-    pilot: true
-    production: true
     description: "Enables audit log collection for all entity changes (Retrofit R2)"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies: []
-    metrics:
-      - audit_log_write_rate
-      - audit_log_query_performance
-    documentation: /docs/features/audit-log.md
+    env_var: FF_AUDIT_LOG
+    consumer: apps/api/src/audit.ts
   
-  # Async Feed Push Jobs (Retrofit)
+  # Async Feed Push Jobs — removed (no code consumer)
   - key: FF_ASYNC_FEED_JOBS
     owner: api_team
     created: 2025-10-31
     expires: 2026-04-30
-    status: pilot
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer"
     default: false
-    pilot: true
-    production: staged
     description: "Enables async feed push job processing with retry logic (Retrofit R2)"
-    rollout_percentage: 30
-    environments:
-      staging: true
-      pilot: true
-      production: false
-    dependencies:
-      - FF_AUDIT_LOG
-    metrics:
-      - feed_push_success_rate
-      - job_queue_depth
-      - retry_distribution
-      - avg_processing_time
-    documentation: /docs/features/async-feed-jobs.md
   
-  # Synthetic Monitoring (Retrofit)
+  # Synthetic Monitoring — removed (no code consumer)
   - key: FF_SYNTHETIC_MONITORING
     owner: devops_team
     created: 2025-10-31
     expires: 2026-04-30
-    status: active
+    status: removed
+    removed_date: 2026-06-30
+    removal_reason: "No code consumer"
     default: false
-    pilot: true
-    production: true
     description: "Enables synthetic monitoring journeys for SLA tracking (Retrofit R3)"
-    rollout_percentage: 100
-    environments:
-      staging: true
-      pilot: true
-      production: true
-    dependencies: []
-    metrics:
-      - synthetic_latency_p95
-      - synthetic_success_rate
-      - uptime_pct
-    documentation: /docs/observability/synthetic-monitoring.md
 
-  # Supplier Catalog Import (v2.6)
+  # Supplier Catalog Import (v2.6) — DB hybrid flag with tenant override
   - key: FF_SUPPLIER_CATALOG_IMPORT
     owner: api_team
     created: 2026-06-29
@@ -475,15 +364,138 @@ flags:
       - tenant_id: "tenant_002"
       - tenant_id: "tenant_003"
 
+  # --- API config.ts env-only flags (not in DB, no admin UI) ---
+
+  - key: FF_GLOBAL_TENANT_META
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: inactive
+    default: false
+    description: "Enable global tenant metadata management (region resolution from DB)"
+    env_var: FF_GLOBAL_TENANT_META
+    consumer: apps/api/src/context.ts
+
+  - key: FF_I18N_SCAFFOLD
+    owner: ux_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: inactive
+    default: false
+    description: "Enable i18next translation scaffold (en-US, es-ES, fr-FR)"
+    env_var: FF_I18N_SCAFFOLD
+    consumer: apps/api/src/config.ts, apps/web/src/lib/i18n.ts
+
+  - key: FF_CURRENCY_RATE_STUB
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: inactive
+    default: false
+    description: "Enable currency rate stub job endpoint"
+    env_var: FF_CURRENCY_RATE_STUB
+    consumer: apps/api/src/jobs/rates.ts
+
+  - key: FF_FEED_COVERAGE
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: active
+    default: true
+    description: "Enable feed coverage endpoint gate"
+    env_var: FF_FEED_COVERAGE
+    consumer: apps/api/src/routes/feed-validation.ts
+
+  - key: FF_CATEGORY_MIRRORING
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: inactive
+    default: false
+    description: "Enable category mirroring between platform and Google Business Profile"
+    env_var: FF_CATEGORY_MIRRORING
+    consumer: apps/api/src/routes/categories.mirror.ts
+
+  - key: FF_TENANT_PLATFORM_CATEGORY
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: inactive
+    default: false
+    description: "Enable platform category mapping for tenants"
+    env_var: FF_TENANT_PLATFORM_CATEGORY
+    consumer: apps/api/src/routes/tenant-categories.ts
+
+  - key: FF_SCAN_ENRICHMENT
+    owner: api_team
+    created: 2025-10-31
+    expires: 2026-04-30
+    status: active
+    default: true
+    description: "Enable image enrichment during barcode scan"
+    env_var: FF_SCAN_ENRICHMENT
+    consumer: apps/api/src/routes/scan.ts
+
+  # --- Web-only flags (not in seed script, not in DB) ---
+
+  - key: FF_TENANT_GBP_CATEGORY_SYNC
+    owner: integrations_team
+    created: 2026-06-01
+    expires: 2026-12-01
+    status: pilot
+    default: false
+    description: "Google Business Profile category sync for tenant directory listings"
+    consumer: apps/web/src/lib/featureFlags/index.ts
+
 # Cleanup Schedule
 cleanup_schedule:
-  next_review: 2026-01-01
+  next_review: 2026-09-01
   flags_to_remove:
     - key: FF_OLD_FEATURE_EXAMPLE
       expired: 2025-10-01
       status: removed
       removed_date: 2025-11-01
       removal_pr: "#1234"
+    - key: FF_SCHEMA_V34_READY
+      expired: 2026-02-01
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer — schema migration completed"
+    - key: FF_DIRECTORY_ENTRY_LAYOUT
+      expired: 2026-12-17
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer — handled by capability system"
+    - key: FF_DIRECTORY_ENTRY_LAYOUT_EDITORIAL
+      expired: 2026-12-17
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
+    - key: FF_DIRECTORY_ENTRY_LAYOUT_IMMERSIVE
+      expired: 2026-12-17
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
+    - key: FF_DIRECTORY_ENTRY_LAYOUT_PREMIUM
+      expired: 2026-12-17
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
+    - key: FF_TENANT_CATEGORY_OVERRIDE
+      expired: 2026-02-05
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
+    - key: FF_ASYNC_FEED_JOBS
+      expired: 2026-04-30
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
+    - key: FF_SYNTHETIC_MONITORING
+      expired: 2026-04-30
+      status: removed
+      removed_date: 2026-06-30
+      removal_reason: "No code consumer"
 
 # Notification Settings
 notifications:

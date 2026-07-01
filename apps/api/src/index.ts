@@ -143,6 +143,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
+import organizationUserRoutes from './routes/organization-users';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
 // import userRoutes from './routes/users';
@@ -5745,6 +5746,17 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
       data: { item_status: 'trashed' }
     });
 
+    // Fire-and-forget: delete from GMC if item was previously synced
+    if (item.sync_status === 'success' || item.sync_status === 'error') {
+      import('./services/GMCProductSync').then(({ deleteProduct }) => {
+        deleteProduct(item.tenant_id, req.params.id)
+          .then(result => {
+            console.log(`[Delete Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch(err => console.error(`[Delete Item] GMC deletion error for ${req.params.id}:`, err));
+      }).catch(err => console.error('[Delete Item] Failed to load GMCProductSync:', err));
+    }
+
     // Sync variants with parent item status
     if (updated.item_status === 'trashed') {
       // Deactivate all variants when item is trashed
@@ -5838,6 +5850,18 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
 
     // Permanently delete
     await prisma.inventory_items.delete({ where: { id: req.params.id } });
+
+    // Fire-and-forget: delete from GMC if item was previously synced
+    if (item.sync_status === 'success' || item.sync_status === 'error' || (item.sync_status as string) === 'permanent_error') {
+      import('./services/GMCProductSync').then(({ deleteProduct }) => {
+        deleteProduct(item.tenant_id, req.params.id)
+          .then(result => {
+            console.log(`[Purge Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch(err => console.error(`[Purge Item] GMC deletion error for ${req.params.id}:`, err));
+      }).catch(err => console.error('[Purge Item] Failed to load GMCProductSync:', err));
+    }
+
     res.status(204).end();
   } catch {
     res.status(500).json({ error: "failed_to_purge_item" });
@@ -7336,6 +7360,16 @@ import adminInventoryStatsRoutes from './routes/admin/inventory-stats';
 app.use('/api/admin/inventory', adminInventoryStatsRoutes);
 console.log('Admin inventory stats routes mounted at /api/admin/inventory');
 
+/* ------------------------------ admin google product taxonomy ------------------------------ */
+import googleProductTaxonomyRoutes from './routes/admin/google-product-taxonomy';
+app.use('/api/admin/google-product-taxonomy', googleProductTaxonomyRoutes);
+console.log('✅ Google Product Taxonomy routes mounted at /api/admin/google-product-taxonomy');
+
+/* ------------------------------ admin demo tenants ------------------------------ */
+import adminDemoTenantRoutes from './routes/admin/demo-tenants';
+app.use('/api/admin/demo-tenants', adminDemoTenantRoutes);
+console.log('✅ Admin demo tenant routes mounted at /api/admin/demo-tenants');
+
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
 app.use('/api/gbp-advanced-sync-singleton', gbpAdvancedSyncSingletonRoutes);
@@ -7954,6 +7988,10 @@ import organizationCapabilitiesRoutes from './routes/organization-capabilities';
 app.use('/api/organizations', organizationCapabilitiesRoutes);
 console.log('✅ Organization capabilities routes mounted at /api/organizations/:orgId/effective-capabilities');
 
+/* ------------------------------ organization users ------------------------------ */
+app.use('/api/organizations', organizationUserRoutes);
+console.log('✅ Organization users routes mounted at /api/organizations/:orgId/users');
+
 /* ------------------------------ hero location ------------------------------ */
 import heroLocationRoutes from './routes/hero-location';
 app.use('/api/hero-location', heroLocationRoutes);
@@ -8108,6 +8146,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start GMC scheduled sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start GMC sync retry (every 2 hours)
+      try {
+        const { startGMCSyncRetry } = await import('./jobs/gmc-sync-retry');
+        startGMCSyncRetry();
+        logger.info('GMC sync retry started (every 2 hours)');
+      } catch (err) {
+        logger.error('Failed to start GMC sync retry', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start OAuth token refresh (every hour)
       try {
         const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');
@@ -8238,6 +8285,51 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('TikTok catalog sync job started (every 6 hours)');
       } catch (err) {
         logger.error('Failed to start TikTok catalog sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier CSV sync job (every 6 hours)
+      try {
+        const { startSupplierCsvSync } = await import('./jobs/supplier-csv-sync');
+        startSupplierCsvSync();
+        logger.info('Supplier CSV sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start supplier CSV sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier open-source sync job (hourly incremental + nightly backfill)
+      try {
+        const { startSupplierOpenSourceSync } = await import('./jobs/supplier-opensource-sync');
+        startSupplierOpenSourceSync();
+        logger.info('Supplier open-source sync job started (hourly incremental + nightly backfill)');
+      } catch (err) {
+        logger.error('Failed to start supplier open-source sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier auto-sync job (every 1 hour)
+      try {
+        const { startSupplierAutoSync } = await import('./jobs/supplier-auto-sync');
+        startSupplierAutoSync();
+        logger.info('Supplier auto-sync job started (every 1 hour)');
+      } catch (err) {
+        logger.error('Failed to start supplier auto-sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start flag expiry cleanup job (daily) — removes stale tenant flag overrides
+      try {
+        const { startFlagExpiryCleanup } = await import('./jobs/flag-expiry-cleanup');
+        startFlagExpiryCleanup();
+        logger.info('Flag expiry cleanup job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start flag expiry cleanup job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start demo tenant expiry job (hourly) — expires demo tenants past their demo_expires_at
+      try {
+        const { startDemoExpiryJob } = await import('./jobs/demo-tenant-expiry');
+        startDemoExpiryJob();
+        logger.info('Demo tenant expiry job started (every 1 hour)');
+      } catch (err) {
+        logger.error('Failed to start demo tenant expiry job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 

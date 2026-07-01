@@ -5,6 +5,7 @@
 
 import { prisma } from '../prisma';
 import { batchSyncProducts } from '../services/GMCProductSync';
+import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 let syncIntervalId: NodeJS.Timeout | null = null;
@@ -61,6 +62,13 @@ async function runScheduledSync(): Promise<void> {
 
     for (const tenantId of tenantIds) {
       try {
+        // Skip tenants whose tier doesn't allow GMC sync
+        const allowed = await isGMCSyncAllowed(tenantId);
+        if (!allowed) {
+          console.log(`[GMC Scheduled Sync] Skipping tenant ${tenantId}: GMC sync not allowed on current plan`);
+          continue;
+        }
+
         console.log(`[GMC Scheduled Sync] Syncing tenant ${tenantId}...`);
         const result = await batchSyncProducts(tenantId);
         
@@ -130,6 +138,11 @@ export async function triggerManualSync(): Promise<{ tenants: number; synced: nu
 
   for (const tenantId of tenantIds) {
     try {
+      const allowed = await isGMCSyncAllowed(tenantId);
+      if (!allowed) {
+        console.log(`[GMC Manual Sync] Skipping tenant ${tenantId}: GMC sync not allowed on current plan`);
+        continue;
+      }
       const result = await batchSyncProducts(tenantId);
       totalSynced += result.synced;
       totalFailed += result.failed;

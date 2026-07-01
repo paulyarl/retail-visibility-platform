@@ -2812,21 +2812,38 @@ model organization_requests_list {
 }
 
 model organizations_list {
-  id                     String    @id
+  id                     String               @id
   name                   String
   owner_id               String
-  created_at             DateTime  @default(now())
+  created_at             DateTime             @default(now())
   updated_at             DateTime
-  subscription_tier      String?   @default("chain_starter")
-  subscription_status    String?   @default("trial")
+  subscription_tier      String?              @default("chain_starter")
+  subscription_status    String?              @default("trial")
   trial_ends_at          DateTime?
   subscription_ends_at   DateTime?
   stripe_customer_id     String?
   stripe_subscription_id String?
-  max_locations          Int       @default(5)
-  max_total_skus         Int       @default(2500)
+  max_locations          Int                  @default(5)
+  max_total_skus         Int                  @default(2500)
   metadata               Json?
   tenants                tenants[]
+  user_organizations     user_organizations[]
+}
+
+model user_organizations {
+  id              String             @id @db.VarChar(255)
+  user_id         String             @db.VarChar(255)
+  organization_id String             @db.VarChar(255)
+  role            String             @default("ORG_MEMBER") @db.VarChar(50)
+  created_at      DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?          @default(now()) @db.Timestamptz(6)
+  organization    organizations_list @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user            users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, organization_id])
+  @@index([user_id], map: "idx_user_organizations_user_id")
+  @@index([organization_id], map: "idx_user_organizations_org_id")
+  @@index([role], map: "idx_user_organizations_role")
 }
 
 model outreach_feedback_list {
@@ -4655,6 +4672,10 @@ model tenants {
   gbp_secondary_categories                                                               Json?                                    @default("[]")
   gbp_categories_sync_status                                                             String?                                  @default("pending") @db.VarChar(50)
   gbp_categories_last_synced_at                                                          DateTime?                                @db.Timestamptz(6)
+  is_demo                                                                                Boolean?                                 @default(false)
+  demo_expires_at                                                                        DateTime?                                @db.Timestamptz(6)
+  demo_source_tenant_id                                                                  String?                                  @db.VarChar(255)
+  demo_template                                                                          String?                                  @db.VarChar(50)
   abandoned_carts                                                                        abandoned_carts[]
   bot_configurations                                                                     bot_configurations?
   bot_conversations                                                                      bot_conversations[]
@@ -4717,6 +4738,7 @@ model tenants {
   platform_revenue_transactions                                                          platform_revenue_transactions[]
   product_performances                                                                   product_performances[]
   product_variants                                                                       product_variants[]
+  qr_scan_events                                                                         qr_scan_events[]
   refunds                                                                                refunds[]
   return_requests                                                                        return_requests[]
   scan_results_list                                                                      scan_results_list[]
@@ -5095,6 +5117,7 @@ model users {
   security_threats                                            security_threats[]
   shopping_carts                                              shopping_carts[]
   tenants                                                     tenants[]
+  user_organizations                                          user_organizations[]
   user_preferences                                            user_preferences[]
   user_sessions_list                                          user_sessions_list[]
   user_tenants                                                user_tenants[]
@@ -5239,6 +5262,21 @@ model supplier_mapping {
   @@index([inventory_item_id], map: "idx_supplier_mapping_inventory_item")
   @@index([tenant_id], map: "idx_supplier_mapping_tenant")
   @@index([tenant_id, supplier_id], map: "idx_supplier_mapping_tenant_supplier")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model qr_scan_events {
+  id         String    @id @db.VarChar(255)
+  tenant_id  String    @db.VarChar(255)
+  source     String?   @default("qr_code") @db.VarChar(100)
+  referrer   String?
+  user_agent String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_qr_scan_events_tenant")
+
+  @@index([created_at(sort: Desc)], map: "idx_qr_scan_events_created_at")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_qr_scan_events_tenant_created")
+  @@index([tenant_id], map: "idx_qr_scan_events_tenant_id")
 }
 
 enum action {

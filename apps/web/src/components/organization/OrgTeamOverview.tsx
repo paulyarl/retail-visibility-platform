@@ -11,6 +11,7 @@ import type { OrganizationData } from "./types";
 
 interface OrgTeamOverviewProps {
   locations: OrganizationData["locationBreakdown"];
+  tenantId?: string | null;
 }
 
 interface TeamData {
@@ -20,8 +21,9 @@ interface TeamData {
   pendingInvitations: any[];
 }
 
-export default function OrgTeamOverview({ locations }: OrgTeamOverviewProps) {
+export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverviewProps) {
   const [teamData, setTeamData] = useState<TeamData[]>([]);
+  const [orgUsers, setOrgUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +54,22 @@ export default function OrgTeamOverview({ locations }: OrgTeamOverviewProps) {
           })
         );
         setTeamData(results);
+
+        if (tenantId) {
+          try {
+            const { useOrgBehaviorAccess } = await import("@/hooks/tenant-access/useOrgBehaviorAccess");
+            void useOrgBehaviorAccess;
+            const { organizationUsersService } = await import("@/services/OrganizationUsersService");
+            const tenant = await tenantInfoService.getTenantInfo(tenantId);
+            const orgId = tenant?.metadata?.organizationId;
+            if (orgId) {
+              const orgUsersData = await organizationUsersService.getUsers(orgId);
+              setOrgUsers(orgUsersData);
+            }
+          } catch {
+            setOrgUsers([]);
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch team data:", error);
       } finally {
@@ -61,11 +79,12 @@ export default function OrgTeamOverview({ locations }: OrgTeamOverviewProps) {
     if (locations.length > 0) {
       fetchTeamData();
     }
-  }, [locations]);
+  }, [locations, tenantId]);
 
   const totalEmployees = teamData.reduce((sum, td) => sum + td.users.length, 0);
   const locationsWithTeams = teamData.filter((td) => td.users.length > 0).length;
   const totalPending = teamData.reduce((sum, td) => sum + td.pendingInvitations.length, 0);
+  const totalOrgMembers = orgUsers.length;
 
   const roleColors: Record<string, string> = {
     OWNER: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
@@ -91,6 +110,15 @@ export default function OrgTeamOverview({ locations }: OrgTeamOverviewProps) {
     <div className="space-y-6">
       {/* KPI Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {totalOrgMembers > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-4 h-4 text-amber-600" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">Org Members</span>
+            </div>
+            <span className="text-2xl font-bold text-gray-900 dark:text-white">{totalOrgMembers}</span>
+          </div>
+        )}
         {[
           { label: "Total Employees", value: totalEmployees, icon: Users, color: "text-blue-600" },
           { label: "Locations with Teams", value: locationsWithTeams, icon: Users, color: "text-emerald-600" },
@@ -109,6 +137,63 @@ export default function OrgTeamOverview({ locations }: OrgTeamOverviewProps) {
           );
         })}
       </div>
+
+      {/* Org Users Section */}
+      {totalOrgMembers > 0 && tenantId && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Organization Members</h3>
+            <Link href={`/t/${tenantId}/settings/organization/users`}>
+              <Button variant="light" size="sm" rightSection={<ChevronRight className="w-4 h-4" />}>
+                Manage Org Users
+              </Button>
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {orgUsers.slice(0, 5).map((u: any, i: number) => (
+              <div
+                key={u.id || i}
+                className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-semibold">
+                      {(u.firstName?.[0] || u.email?.[0] || "?").toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.email}
+                    </div>
+                    <div className="text-xs text-gray-400">{u.email}</div>
+                  </div>
+                </div>
+                <Badge
+                  variant="default"
+                  className={`text-xs ${
+                    u.role === "ORG_OWNER"
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400"
+                      : u.role === "ORG_ADMIN"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+                      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  }`}
+                >
+                  {(u.role || "ORG_MEMBER").replace("ORG_", "")}
+                </Badge>
+              </div>
+            ))}
+            {orgUsers.length > 5 && (
+              <div className="text-center pt-2">
+                <Link href={`/t/${tenantId}/settings/organization/users`}>
+                  <span className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                    View all {orgUsers.length} members
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Per-Location Team Table */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
@@ -64,7 +65,7 @@ router.get('/:tenantId/barcode-scan', authenticateToken, async (req, res) => {
 });
 
 // Update barcode scan settings for a tenant
-router.put('/:tenantId/barcode-scan', authenticateToken, async (req, res) => {
+router.put('/:tenantId/barcode-scan', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

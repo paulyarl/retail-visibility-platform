@@ -7,9 +7,10 @@ import { Button } from "@mantine/core";
 
 interface OrgCommerceCardProps {
   organizationId: string;
+  readOnly?: boolean;
 }
 
-export default function OrgCommerceCard({ organizationId }: OrgCommerceCardProps) {
+export default function OrgCommerceCard({ organizationId, readOnly }: OrgCommerceCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -29,8 +30,8 @@ export default function OrgCommerceCard({ organizationId }: OrgCommerceCardProps
               </p>
             </div>
           </div>
-          <Link href={`/settings/organization/commerce?organizationId=${organizationId}`}>
-            <Button variant="light" size="sm" rightSection={<ArrowRight className="w-4 h-4" />}>
+          <Link href={readOnly ? "#" : `/settings/organization/commerce?organizationId=${organizationId}`}>
+            <Button variant="light" size="sm" rightSection={<ArrowRight className="w-4 h-4" />} disabled={readOnly}>
               Configure
             </Button>
           </Link>

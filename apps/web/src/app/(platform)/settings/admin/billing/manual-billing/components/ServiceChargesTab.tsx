@@ -127,9 +127,7 @@ export default function ServiceChargesTab() {
   const fetchStats = async () => {
     try {
       // This would call the actual API
-      // const response = await fetch('/api/admin/service-charges/stats');
-      // const data = await response.json();
-      
+      // const data = await response.json();      
       // Mock stats for now
       const mockStats: ServiceChargeStats = {
         totalCharges: 0,

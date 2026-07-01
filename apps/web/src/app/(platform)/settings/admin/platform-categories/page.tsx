@@ -5,6 +5,8 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { adminCategoriesService } from '@/services/AdminCategoriesService';
 import { Plus, Edit2, Trash2, GripVertical, Save, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
+import GoogleCategorySelector from '@/components/categories/GoogleCategorySelector';
+import CategoryCoverageBadge from '@/components/categories/CategoryCoverageBadge';
 
 interface PlatformCategory {
   id: string;
@@ -355,6 +357,7 @@ export default function PlatformCategoriesPage() {
       <PageHeader
         title="Directory Categories"
         description="Manage business categories for the directory - sourced from Google Business Profile"
+        badge={<CategoryCoverageBadge />}
       />
 
       {error && (
@@ -461,6 +464,9 @@ export default function PlatformCategoriesPage() {
                   Slug
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Google Category
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Stores
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -514,6 +520,15 @@ export default function PlatformCategoriesPage() {
                       {category.slug}
                     </code>
                   </td>
+                  <td className="px-4 py-3">
+                    {category.google_category_id ? (
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <span className="font-mono text-gray-500 dark:text-gray-400">{category.google_category_id}</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 italic">Unmapped</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-gray-900 dark:text-white">
                       {category.store_count}
@@ -557,7 +572,7 @@ export default function PlatformCategoriesPage() {
               ))}
               {paginatedCategories.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                     {searchQuery ? 'No categories found matching your search.' : 'No categories yet.'}
                   </td>
                 </tr>
@@ -741,15 +756,15 @@ export default function PlatformCategoriesPage() {
                 {/* Google Category ID */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Google Category ID
+                    Google Product Category
                   </label>
-                  <input
-                    type="text"
+                  <GoogleCategorySelector
                     value={formData.googleCategoryId}
-                    onChange={(e) => setFormData({ ...formData, googleCategoryId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="gcid:2890"
+                    onChange={(id) => setFormData({ ...formData, googleCategoryId: id })}
                   />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Maps this platform category to a Google Shopping product taxonomy category
+                  </p>
                 </div>
 
                 {/* Sort Order */}

@@ -5,7 +5,7 @@
  */
 import type { Request, Response } from "express";
 import { prisma } from "../prisma";
-import { Flags } from "../config";
+import { getEffectivePlatform } from "../utils/effectiveFlags";
 
 /**
  * POST /jobs/rates/daily
@@ -22,7 +22,8 @@ export async function dailyRatesJob(req: Request, res: Response) {
   }
 
   // Feature flag guard (only check after auth)
-  if (!Flags.CURRENCY_RATE_STUB) {
+  const eff = await getEffectivePlatform('FF_CURRENCY_RATE_STUB');
+  if (!eff.effectiveOn) {
     return res.status(503).json({ error: "rate_job_disabled", message: "FF_CURRENCY_RATE_STUB is OFF" });
   }
 
