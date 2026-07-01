@@ -238,6 +238,12 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
 
             float emissiveStrength = (uBaseEmissive + vSweepProx * 1.4 + vMouseProx * 0.5) * breathe;
             vec3 finalColor = uColor * grad + uEmissive * emissiveStrength;
+
+            float shelfLine = smoothstep(0.04, 0.0, vUv.y);
+            vec3 shelfColor = vec3(0.83, 0.63, 0.30);
+            finalColor = mix(finalColor, shelfColor, shelfLine * 0.8);
+            alpha = max(alpha, shelfLine * 0.7);
+
             gl_FragColor = vec4(finalColor, alpha + vSweepProx * 0.35);
           }
         `,
