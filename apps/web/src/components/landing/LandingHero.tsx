@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { HeroShader } from "./HeroShader";
+import { ShelfShader } from "./ShelfShader";
 
 const CAPABILITIES = [
   "sync inventory to Google Shopping",
@@ -17,7 +17,7 @@ const CAPABILITIES = [
 const BASE_TEXT = "Make your shelves visible —";
 
 export function LandingHero() {
-  const [animatedText, setAnimatedText] = useState<string>(BASE_TEXT);
+  const [animatedSuffix, setAnimatedSuffix] = useState<string>("");
   const typingStateRef = useRef({
     suggestionIndex: 0,
     charIndex: 0,
@@ -52,7 +52,7 @@ export function LandingHero() {
       if (!state.deleting) {
         const nextIndex = state.charIndex + 1;
         const next = current.slice(0, nextIndex);
-        setAnimatedText(BASE_TEXT + " " + next);
+        setAnimatedSuffix(next);
         state.charIndex = nextIndex;
         if (nextIndex >= current.length) {
           schedule(() => {
@@ -65,7 +65,7 @@ export function LandingHero() {
       } else {
         const nextIndex = Math.max(0, state.charIndex - 1);
         const next = current.slice(0, nextIndex);
-        setAnimatedText(next ? BASE_TEXT + " " + next : BASE_TEXT);
+        setAnimatedSuffix(next);
         state.charIndex = nextIndex;
         if (nextIndex <= 0) {
           state.deleting = false;
@@ -95,11 +95,11 @@ export function LandingHero() {
   return (
     <section
       className="relative w-full"
-      style={{ height: "100vh", minHeight: "600px" }}
+      style={{ height: "100vh", minHeight: "600px", background: "#0a0a0f" }}
       aria-label="VisibleShelf landing hero"
     >
       {/* Shader background */}
-      <HeroShader
+      <ShelfShader
         className="absolute inset-0"
         style={{ zIndex: 1 }}
       />
@@ -110,7 +110,7 @@ export function LandingHero() {
         style={{
           zIndex: 2,
           background:
-            "radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 100%)",
+            "radial-gradient(ellipse at center, rgba(10,10,15,0.2) 0%, rgba(10,10,15,0.55) 100%)",
           pointerEvents: "none",
         }}
       />
@@ -191,9 +191,12 @@ export function LandingHero() {
       >
         <div className="max-w-3xl w-full text-center" style={{ pointerEvents: "auto" }}>
           <h1 className="text-white text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight drop-shadow-[0_1px_8px_rgba(31,61,188,0.25)]">
-            {animatedText}
-            <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
+            {BASE_TEXT}
           </h1>
+          <div className="mt-2 sm:mt-3 text-lg sm:text-2xl md:text-3xl font-medium text-white/80 min-h-[1.5em]">
+            {animatedSuffix}
+            <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
+          </div>
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
             The platform that makes your local shelves visible online — inventory sync,
             storefronts, AI chatbots, and retail directory, all in one place.
