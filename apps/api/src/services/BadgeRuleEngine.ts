@@ -183,24 +183,26 @@ export function checkConflicts(
  * Fetch product data for rule evaluation.
  */
 export async function fetchProductData(tenantId: string): Promise<ProductData[]> {
-  const products = await prisma.$queryRaw`
-    SELECT
-      id as inventory_item_id,
-      tenant_id,
-      name,
-      price_cents,
-      sale_price_cents,
-      stock,
-      created_at,
-      item_status,
-      has_variants
-    FROM inventory_items
-    WHERE tenant_id = ${tenantId}
-      AND item_status = 'active'
-  ` as any[];
+  const products = await prisma.inventory_items.findMany({
+    where: {
+      tenant_id: tenantId,
+      item_status: 'active',
+    },
+    select: {
+      id: true,
+      tenant_id: true,
+      name: true,
+      price_cents: true,
+      sale_price_cents: true,
+      stock: true,
+      created_at: true,
+      item_status: true,
+      has_variants: true,
+    },
+  });
 
-  return products.map((p: any) => ({
-    inventory_item_id: p.inventory_item_id,
+  return products.map((p) => ({
+    inventory_item_id: p.id,
     tenant_id: p.tenant_id,
     name: p.name,
     price_cents: p.price_cents,

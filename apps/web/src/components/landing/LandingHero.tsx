@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { HeroShader } from "./HeroShader";
+import { ShelfShader } from "./ShelfShader";
 
 const CAPABILITIES = [
   "sync inventory to Google Shopping",
@@ -95,11 +95,11 @@ export function LandingHero() {
   return (
     <section
       className="relative w-full"
-      style={{ height: "100vh", minHeight: "600px" }}
+      style={{ height: "100vh", minHeight: "600px", background: "#0a0a0f" }}
       aria-label="VisibleShelf landing hero"
     >
       {/* Shader background */}
-      <HeroShader
+      <ShelfShader
         className="absolute inset-0"
         style={{ zIndex: 1 }}
       />
@@ -110,7 +110,7 @@ export function LandingHero() {
         style={{
           zIndex: 2,
           background:
-            "radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 100%)",
+            "radial-gradient(ellipse at center, rgba(10,10,15,0.2) 0%, rgba(10,10,15,0.55) 100%)",
           pointerEvents: "none",
         }}
       />
