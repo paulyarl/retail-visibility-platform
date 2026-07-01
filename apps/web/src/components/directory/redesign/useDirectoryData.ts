@@ -22,6 +22,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import type { DirectoryCategory, DirectoryStore } from '@/services/DirectorySingletonService';
 import { externalApiService } from '@/services/ExternalApiService';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 import type {
   DirectoryData,
   DirectoryViewMode,
@@ -396,6 +397,9 @@ export function useDirectoryData(): DirectoryData {
     searchParams.get('search')
   );
 
+  // --- Active featured (cross-tenant, for directory home spotlight) ---
+  const { data: activeFeatured } = useActiveFeatured(null, 'directory_home', { limit: 8 });
+
   // --- Normalized pagination ---
   const normalizedPagination: DirectoryPaginationInfo | null = pagination
     ? {
@@ -424,6 +428,7 @@ export function useDirectoryData(): DirectoryData {
     activeSort,
     hasLocation,
     hasActiveQuery,
+    activeFeatured: activeFeatured ?? undefined,
     setViewMode,
     setPageSize,
     handlePageChange,

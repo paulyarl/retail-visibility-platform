@@ -2096,6 +2096,8 @@ class TenantInfoService extends TenantApiSingleton {
       imageQuality: string;
       textModel: string;
       imageModel: string;
+      productType: string;
+      storefrontType?: string;
     }
   ): Promise<any | null> {
     try {

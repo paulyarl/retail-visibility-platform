@@ -95,13 +95,12 @@ const nextConfig: NextConfig = {
 
   // Suppress noisy Sentry/OpenTelemetry warnings in development
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
-    if (!isServer) {
-      // Suppress client-side warnings
-      config.infrastructureLogging = {
-        level: 'error',
-      };
-    }
-    
+    // Suppress noisy warnings on both server and client builds
+    config.infrastructureLogging = {
+      level: 'error',
+      debug: /PackFileCacheStrategy/i,
+    };
+
     // Filter out specific warnings
     config.ignoreWarnings = [
       // Ignore Sentry OpenTelemetry warnings

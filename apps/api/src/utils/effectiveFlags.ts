@@ -6,6 +6,25 @@ const platformOverrides = new Map<string, boolean>()
 // Tenant-scoped override: key is flag -> (tenantId -> boolean)
 const tenantOverrides = new Map<string, Map<string, boolean>>()
 
+// --- 30s cache to avoid repeated DB lookups in hot paths ---
+type CachedPlatform = { val: EffectivePlatform; ts: number }
+type CachedTenant = { val: EffectiveTenant; ts: number }
+const platformCache = new Map<string, CachedPlatform>()
+const tenantCache = new Map<string, CachedTenant>()
+const CACHE_TTL_MS = 30_000
+
+function invalidatePlatformCache(flag: string) {
+  platformCache.delete(flag)
+  // Tenant cache depends on platform state, invalidate all tenant entries for this flag
+  for (const key of tenantCache.keys()) {
+    if (key.startsWith(flag + ':')) tenantCache.delete(key)
+  }
+}
+
+function invalidateTenantCache(flag: string, tenantId: string) {
+  tenantCache.delete(`${flag}:${tenantId}`)
+}
+
 export type EffectivePlatform = {
   flag: string
   effectiveOn: boolean
@@ -33,6 +52,10 @@ function getEnvVarName(flag: string): string {
 }
 
 export async function getEffectivePlatform(flag: string): Promise<EffectivePlatform> {
+  const now = Date.now()
+  const cached = platformCache.get(flag)
+  if (cached && now - cached.ts < CACHE_TTL_MS) return cached.val
+
   const envVar = getEnvVarName(flag)
   const platformEnvOn = String(process.env[envVar] || '').toLowerCase() === 'true'
 
@@ -60,7 +83,7 @@ export async function getEffectivePlatform(flag: string): Promise<EffectivePlatf
     effectiveSource = 'off'
   }
 
-  return {
+  const result: EffectivePlatform = {
     flag,
     effectiveOn,
     sources: {
@@ -71,9 +94,17 @@ export async function getEffectivePlatform(flag: string): Promise<EffectivePlatf
     },
     effectiveSource,
   }
+
+  platformCache.set(flag, { val: result, ts: now })
+  return result
 }
 
 export async function getEffectiveTenant(flag: string, tenantId: string): Promise<EffectiveTenant> {
+  const now = Date.now()
+  const cacheKey = `${flag}:${tenantId}`
+  const cached = tenantCache.get(cacheKey)
+  if (cached && now - cached.ts < CACHE_TTL_MS) return cached.val
+
   const plat = await getEffectivePlatform(flag)
 
   const tenantMap = tenantOverrides.get(flag)
@@ -113,7 +144,7 @@ export async function getEffectiveTenant(flag: string, tenantId: string): Promis
     }
   }
 
-  return {
+  const result: EffectiveTenant = {
     ...plat,
     tenantId,
     tenantEffectiveOn,
@@ -123,6 +154,9 @@ export async function getEffectiveTenant(flag: string, tenantId: string): Promis
     },
     tenantEffectiveSource,
   }
+
+  tenantCache.set(cacheKey, { val: result, ts: now })
+  return result
 }
 
 // Runtime override mutators
@@ -132,6 +166,7 @@ export function setPlatformOverride(flag: string, value: boolean | null) {
   } else {
     platformOverrides.set(flag, value)
   }
+  invalidatePlatformCache(flag)
 }
 
 export function setTenantOverride(flag: string, tenantId: string, value: boolean | null) {
@@ -139,12 +174,18 @@ export function setTenantOverride(flag: string, tenantId: string, value: boolean
     const map = tenantOverrides.get(flag)
     map?.delete(tenantId)
     if (map && map.size === 0) tenantOverrides.delete(flag)
-    return
+  } else {
+    let map = tenantOverrides.get(flag)
+    if (!map) {
+      map = new Map<string, boolean>()
+      tenantOverrides.set(flag, map)
+    }
+    map.set(tenantId, value)
   }
-  let map = tenantOverrides.get(flag)
-  if (!map) {
-    map = new Map<string, boolean>()
-    tenantOverrides.set(flag, map)
-  }
-  map.set(tenantId, value)
+  invalidateTenantCache(flag, tenantId)
+}
+
+export function invalidateEffectiveFlagCaches() {
+  platformCache.clear()
+  tenantCache.clear()
 }

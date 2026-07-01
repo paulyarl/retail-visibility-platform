@@ -32,6 +32,7 @@ interface AddToCartButtonProps {
     payment_gateway_type?: string | null;
     payment_gateway_id?: string | null;
     has_variants?: boolean;
+    productType?: string;
   };
   variant?: ProductVariant | null; // Selected variant if product has variants
   tenantName: string;
@@ -131,6 +132,8 @@ export function AddToCartButton({
       suggested_gateway_id: product.payment_gateway_id || undefined,
       // Stock info for validation
       stock: itemStock,
+      // Product type for type-aware cart display
+      productType: product.productType,
     }, product.tenantLogo || tenantLogo);
 
     setAdded(true);

@@ -31,6 +31,7 @@ interface Product {
   };
   featuredType?: string;
   featuredTypes?: string[];
+  productType?: string;
 }
 
 interface ProductDisplayProps {
@@ -246,6 +247,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 tenantCategory: product.tenantCategory,
                 featuredType: product.featuredType,
                 featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                productType: product.productType || 'physical',
               }}
               tenantName={tenantName}
               tenantLogo={tenantLogo}
@@ -508,6 +510,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                     tenantCategory: productsWithPhotos[currentProductIndex].tenantCategory,
                     featuredType: productsWithPhotos[currentProductIndex].featuredType,
                     featuredTypes: productsWithPhotos[currentProductIndex].featuredTypes || (productsWithPhotos[currentProductIndex].featuredType ? [productsWithPhotos[currentProductIndex].featuredType] : []),
+                    productType: productsWithPhotos[currentProductIndex].productType || 'physical',
                   }}
                   tenantName={tenantName}
                   tenantLogo={tenantLogo}
@@ -548,6 +551,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 tenantCategory: product.tenantCategory,
                 featuredType: product.featuredType,
                 featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                productType: product.productType || 'physical',
               }}
               tenantName={tenantName}
               tenantLogo={tenantLogo}

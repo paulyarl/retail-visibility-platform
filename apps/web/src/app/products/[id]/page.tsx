@@ -23,6 +23,7 @@ import { platformSettingsService } from '@/services/PlatformSettingsSingletonSer
 import LastViewed from '@/components/directory/LastViewed';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
 
 // Shared product page sections
 import { ProductHeaderSection } from '@/components/products/sections/ProductHeaderSection';
@@ -493,6 +494,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
 
   return (
     <>
+      <SocialPixels tenantId={product.tenantId} usePublic />
       <ProductLikeProvider>
         {/* SEO Meta Tags — gated behind enhanced SEO capability */}
         {optFlags?.showEnhancedSEO && tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (

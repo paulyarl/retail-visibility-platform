@@ -805,7 +805,9 @@ router.get('/tenant/:identifier', async (req, res) => {
           status_changed_at: true,
           gbp_primary_category_id: true,
           gbp_primary_category_name: true,
-          gbp_secondary_categories: true
+          gbp_secondary_categories: true,
+          is_demo: true,
+          demo_expires_at: true
         }
       });
 
@@ -947,7 +949,9 @@ router.get('/tenant/:identifier', async (req, res) => {
         // GBP categories from dedicated columns
         gbpPrimaryCategoryId: tenant.gbp_primary_category_id,
         gbpPrimaryCategoryName: tenant.gbp_primary_category_name,
-        gbpSecondaryCategories: tenant.gbp_secondary_categories || []
+        gbpSecondaryCategories: tenant.gbp_secondary_categories || [],
+        isDemo: tenant.is_demo || false,
+        demoExpiresAt: tenant.demo_expires_at || null
       },
       metadata: {
         tenant: {
@@ -3996,6 +4000,101 @@ router.post('/help-desk', async (req, res) => {
   } catch (error) {
     console.error('[Help Desk] Error creating inquiry:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit help desk inquiry' });
+  }
+});
+
+// ====================
+// QR SCAN TRACKING
+// ====================
+
+/**
+ * POST /api/public/qr/:tenantId/scan
+ * Track a QR code scan for a demo tenant
+ */
+router.post('/qr/:tenantId/scan', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { source, referrer, userAgent } = req.body;
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { id: true, is_demo: true, name: true, subdomain: true, slug: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant not found' });
+    }
+
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+    await pool.query(
+      `INSERT INTO qr_scan_events (id, tenant_id, source, referrer, user_agent, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [
+        `qrs-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        tenantId,
+        source || 'qr_code',
+        referrer || null,
+        userAgent || req.headers['user-agent'] || null,
+      ]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        subdomain: tenant.subdomain,
+        slug: tenant.slug,
+        isDemo: tenant.is_demo,
+      },
+    });
+  } catch (error) {
+    console.error('[QR Scan] Error tracking scan:', error);
+    res.status(500).json({ success: false, error: 'Failed to track scan' });
+  }
+});
+
+/**
+ * GET /api/admin/demo-tenants/:id/qr-analytics
+ * Get QR scan analytics for a demo tenant (admin only)
+ */
+router.get('/admin/demo-tenants/:id/qr-analytics', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+
+    const [statsResult, recentResult] = await Promise.all([
+      pool.query(
+        `SELECT
+           COUNT(*) as total_scans,
+           COUNT(DISTINCT DATE(created_at)) as unique_days,
+           MAX(created_at) as last_scan_at,
+           COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as scans_24h,
+           COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as scans_7d,
+           COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as scans_30d
+         FROM qr_scan_events WHERE tenant_id = $1`,
+        [id]
+      ),
+      pool.query(
+        `SELECT id, source, referrer, user_agent, created_at
+         FROM qr_scan_events WHERE tenant_id = $1
+         ORDER BY created_at DESC LIMIT 50`,
+        [id]
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        stats: statsResult.rows[0],
+        recentScans: recentResult.rows,
+      },
+    });
+  } catch (error) {
+    console.error('[QR Analytics] Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch QR analytics' });
   }
 });
 

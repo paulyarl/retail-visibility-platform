@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import ProductOptionsSettingsClient from './ProductOptionsSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Product Options - Store Settings',
@@ -18,5 +19,9 @@ export default async function ProductOptionsSettingsPage({ params }: PageProps) 
     redirect('/');
   }
 
-  return <ProductOptionsSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <ProductOptionsSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isFeatureEnabled } from '@/lib/featureFlags';
 import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 // Stub GBP category data until real GBP API is wired

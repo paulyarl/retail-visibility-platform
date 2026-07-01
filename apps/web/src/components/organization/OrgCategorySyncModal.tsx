@@ -14,6 +14,7 @@ interface OrgCategorySyncModalProps {
   onSync: () => void;
   onClose: () => void;
   syncing: boolean;
+  readOnly?: boolean;
 }
 
 export default function OrgCategorySyncModal({
@@ -26,6 +27,7 @@ export default function OrgCategorySyncModal({
   onSync,
   onClose,
   syncing,
+  readOnly,
 }: OrgCategorySyncModalProps) {
   if (!open) return null;
 
@@ -61,6 +63,7 @@ export default function OrgCategorySyncModal({
                   value="all"
                   checked={scope === "all"}
                   onChange={() => onScopeChange("all")}
+                  disabled={readOnly}
                   className="h-4 w-4"
                 />
                 <div className="flex-1">
@@ -77,6 +80,7 @@ export default function OrgCategorySyncModal({
                   value="single"
                   checked={scope === "single"}
                   onChange={() => onScopeChange("single")}
+                  disabled={readOnly}
                   className="h-4 w-4"
                 />
                 <div className="flex-1">
@@ -98,6 +102,7 @@ export default function OrgCategorySyncModal({
               <select
                 value={selectedTenantId}
                 onChange={(e) => onTenantSelect(e.target.value)}
+                disabled={readOnly}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 <option value="">Choose a location...</option>
@@ -134,7 +139,7 @@ export default function OrgCategorySyncModal({
             style={{ color: "white" }}
             className="flex-1"
             onClick={onSync}
-            disabled={(scope === "single" && !selectedTenantId) || syncing}
+            disabled={readOnly || (scope === "single" && !selectedTenantId) || syncing}
           >
             {syncing ? "Syncing..." : "Sync Now"}
           </Button>

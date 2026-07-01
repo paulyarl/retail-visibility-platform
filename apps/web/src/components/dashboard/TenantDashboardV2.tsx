@@ -48,6 +48,7 @@ import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 import { botService } from '@/services/BotService';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import { useTenantBehaviorAccess } from '@/hooks/tenant-access/useTenantBehaviorAccess';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -70,6 +71,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
   const { profile, loading: profileLoading } = useUserProfile();
   const allCaps = useAllCapabilities(tenantId);
+  const { canEdit } = useTenantBehaviorAccess(tenantId);
 
   // Subscription-status-aware capability flags
   const chatbotEnabled = allCaps.data?.chatbotOptions?.enabled ?? true;
@@ -481,6 +483,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 capabilities={allCaps.data}
                 tenantId={tenantId}
                 canUpgrade={tier?.canUpgrade ?? false}
+                readOnly={!canEdit}
               />
             </motion.div>
 

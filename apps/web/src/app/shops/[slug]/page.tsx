@@ -17,6 +17,7 @@ import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
 
 interface ShopProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -171,6 +172,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
 
     return (
       <Suspense fallback={<ShopProfileSkeleton />}>
+        {tenantId && <SocialPixels tenantId={tenantId as string} usePublic />}
         <ShopProfileClient
           shop={minimalShopResponse}
           businessHours={businessHours?.data}
@@ -207,6 +209,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
 
   return (
     <Suspense fallback={<ShopProfileSkeleton />}>
+      {tenantId && <SocialPixels tenantId={tenantId as string} usePublic />}
       <ShopProfileClient 
         shop={shop} 
         businessHours={businessHours?.data} 

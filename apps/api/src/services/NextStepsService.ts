@@ -401,7 +401,7 @@ const TASKS: TaskDefinition[] = [
   {
     id: 'social-commerce',
     label: () => 'Connect your social commerce channels',
-    link: (ctx) => `/t/${ctx.tenantId}/settings/integrations`,
+    link: (ctx) => `/t/${ctx.tenantId}/settings/social-commerce`,
     category: 'engagement',
     priority: 'low',
     condition: (ctx) => hasSocialCommerce(ctx) && ctx.businessState.hasProducts,

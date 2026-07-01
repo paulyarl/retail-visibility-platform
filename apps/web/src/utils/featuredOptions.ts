@@ -11,6 +11,18 @@ import {
   FeaturedOptionsState,
 } from '@/services/CapabilityResolutionService';
 
+// Re-export registry service for gradual migration from hardcoded arrays
+export {
+  badgeRegistryService,
+  type BadgeTypeMeta,
+} from '@/services/BadgeRegistryService';
+export {
+  useSystemBadges,
+  useTenantBadges,
+  useBadgeMeta,
+  useBadgeColorClass,
+} from '@/hooks/useBadgeRegistry';
+
 // Re-export FeaturedType for consumers
 export type FeaturedType = FeaturedTypeInternal;
 

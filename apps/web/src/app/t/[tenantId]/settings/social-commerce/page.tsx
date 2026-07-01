@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import SocialCommerceSettingsClient from './SocialCommerceSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Social Commerce - Store Settings',
@@ -18,5 +19,9 @@ export default async function SocialCommerceSettingsPage({ params }: PageProps) 
     redirect('/');
   }
 
-  return <SocialCommerceSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <SocialCommerceSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

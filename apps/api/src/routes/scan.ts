@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
-import { Flags } from '../config';
+import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { imageEnrichmentService } from '../services/ImageEnrichmentService';
 import { audit } from '../audit';
 import { z } from 'zod';
@@ -61,10 +61,6 @@ const commitSessionSchema = z.object({
 // POST /scan/start - Start new scan session
 router.post('/scan/start', authenticateToken, requireWritableSubscription, /* requireTierFeature('barcode_scan'), */ async (req: Request, res: Response) => {
   try {
-    // if (!Flags.SKU_SCANNING) {
-    //   return res.status(409).json({ success: false, error: 'feature_disabled', flag: 'FF_SKU_SCANNING' });
-    // }
-
     const parsed = startSessionSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: 'invalid_input', details: parsed.error.issues });
@@ -581,7 +577,8 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
         }
 
         // Process product images if available
-        if (Flags.SCAN_ENRICHMENT && enrichment) {
+        const scanEff = await getEffectivePlatform('FF_SCAN_ENRICHMENT');
+        if (scanEff.effectiveOn && enrichment) {
           try {
             const imageUrls = imageEnrichmentService.extractImageUrls(enrichment);
             if (imageUrls.length > 0) {

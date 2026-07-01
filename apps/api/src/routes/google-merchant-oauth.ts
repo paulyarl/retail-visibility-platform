@@ -9,6 +9,7 @@ import {
 } from '../lib/google/oauth';
 import { listMerchantAccounts } from '../lib/google/gmc';
 import { generateQuickStart } from '../lib/id-generator';
+import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 
 const router = Router();
 
@@ -126,10 +127,13 @@ router.get('/google/oauth/authorize', async (req, res) => {
     // Generate authorization URL
     const authUrl = getAuthorizationUrl(tenantId);
     
-    console.log(`[Google Merchant OAuth] Redirecting tenant ${tenantId} to Google OAuth`);
+    console.log(`[Google Merchant OAuth] Returning OAuth URL for tenant ${tenantId}`);
     
-    // Redirect to Google OAuth
-    res.redirect(authUrl);
+    // Return URL as JSON — frontend navigates browser to it
+    return res.json({
+      success: true,
+      data: { url: authUrl }
+    });
   } catch (error) {
     console.error('[Google Merchant OAuth] Error initiating OAuth:', error);
     res.status(500).json({
@@ -611,6 +615,16 @@ router.post('/google/merchant/sync', async (req, res) => {
 
     const { batchSyncProducts, getGMCSyncStatus } = await import('../services/GMCProductSync');
 
+    // Check if tenant's tier allows GMC sync
+    const gmcAllowed = await isGMCSyncAllowed(tenantId);
+    if (!gmcAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Merchant Center sync is not available on your current plan. Please upgrade to use this feature.'
+      });
+    }
+
     // Check if tenant can sync
     const status = await getGMCSyncStatus(tenantId);
     if (!status.hasGMCConnection) {
@@ -669,6 +683,16 @@ router.post('/google/merchant/sync/:itemId', async (req, res) => {
         success: false,
         error: 'missing_tenantId',
         message: 'tenantId is required'
+      });
+    }
+
+    // Check if tenant's tier allows GMC sync
+    const gmcAllowed = await isGMCSyncAllowed(tenantId);
+    if (!gmcAllowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'tier_restricted',
+        message: 'Google Merchant Center sync is not available on your current plan. Please upgrade to use this feature.'
       });
     }
 
@@ -814,6 +838,167 @@ router.delete('/google/merchant/product/:itemId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'delete_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * Get GMC validation report for all products
+ * GET /google/merchant/validation-report
+ */
+router.get('/google/merchant/validation-report', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenantId',
+        message: 'tenantId is required'
+      });
+    }
+
+    const { validateProductsForGMC } = await import('../services/GMCValidationService');
+
+    // Fetch all syncable inventory items for the tenant
+    const items = await prisma.inventory_items.findMany({
+      where: {
+        tenant_id: tenantId,
+        item_status: { not: 'trashed' },
+        product_type: { in: ['physical', 'hybrid'] },
+        visibility: 'public',
+      },
+      take: 1000,
+    });
+
+    // Resolve Google category IDs from platform_categories
+    const platformCats = await prisma.platform_categories.findMany({
+      where: { is_active: true, google_category_id: { not: null } as any },
+      select: { name: true, google_category_id: true },
+    });
+    const googleCatByPlatformName = new Map<string, string>();
+    for (const pc of platformCats) {
+      if (pc.google_category_id) {
+        googleCatByPlatformName.set(pc.name.toLowerCase(), pc.google_category_id);
+      }
+    }
+    for (const item of items) {
+      const catPath = (item as any).category_path as string[] | undefined;
+      if (catPath && catPath.length > 0) {
+        for (let i = catPath.length - 1; i >= 0; i--) {
+          const gcid = googleCatByPlatformName.get(catPath[i].toLowerCase());
+          if (gcid) {
+            (item as any).google_product_category_id = gcid;
+            break;
+          }
+        }
+      }
+    }
+
+    const report = validateProductsForGMC(items);
+    report.tenantId = tenantId;
+
+    res.json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error('[GMC Validation Report] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'validation_report_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * Get per-product GMC sync status
+ * GET /google/merchant/product-sync-status
+ */
+router.get('/google/merchant/product-sync-status', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    const statusFilter = (req.query.status as string) || 'all';
+    const search = (req.query.search as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenantId',
+        message: 'tenantId query parameter is required'
+      });
+    }
+
+    const { prisma } = await import('../prisma');
+
+    const where: any = { tenant_id: tenantId };
+
+    if (statusFilter !== 'all' && ['pending', 'success', 'error'].includes(statusFilter)) {
+      where.sync_status = statusFilter;
+    }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          sku: true,
+          sync_status: true,
+          synced_at: true,
+          visibility: true,
+          price: true,
+          product_type: true,
+          metadata: true,
+        },
+        orderBy: { title: 'asc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    const products = items.map((item) => {
+      const meta = item.metadata as any;
+      return {
+        id: item.id,
+        title: item.title,
+        sku: item.sku || null,
+        syncStatus: item.sync_status || 'pending',
+        syncedAt: item.synced_at?.toISOString() || null,
+        visibility: item.visibility || 'public',
+        price: item.price ? Number(item.price) : null,
+        productType: item.product_type || null,
+        syncError: meta?.gmc_sync_error || null,
+        gmcItemId: meta?.gmc_item_id || null,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        total,
+        limit,
+        offset,
+      },
+    });
+  } catch (error) {
+    console.error('[GMC Product Sync Status] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'product_sync_status_failed',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

@@ -25,6 +25,7 @@ interface RecommendedProduct {
   productCategorySlug?: string;
   featuredType?: string;
   featuredTypes?: string[];
+  productType?: string;
 }
 
 interface ProductRecommendationsProps {
@@ -92,45 +93,123 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
         {priority === 'trending' ? 'Trending Now' : 'You Might Also Like'}
       </h2>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {recommendations.map((product) => { 
-          return (
-            <SmartProductCard
-              key={product.id}
-              tenantId={product.tenantId}
-              product={{
-                id: product.id,
-                sku: product.id,
-                name: product.name,
-                title: product.title,
-                brand: product.brand,
-                priceCents: product.priceCents,
-                salePriceCents: product.salePriceCents ?? undefined,
-                stock: 999,
-                imageUrl: product.imageUrl,
-                tenantId: product.tenantId,
-                availability: 'in_stock',
-                has_active_payment_gateway: product.has_active_payment_gateway,
-                payment_gateway_type: product.payment_gateway_type,
-                productCategory: product.productCategory,
-                productCategorySlug: product.productCategorySlug,
-                featuredType: product.featuredType,
-                featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
-              }}
-              tenantName=""
-              hasActivePaymentGateway={product.has_active_payment_gateway}
-              defaultGatewayType={product.payment_gateway_type || undefined}
-              variant="compact"
-              showCategory={true}
-              showDescription={false}
-              className="h-full"
-              tenantSlug={product.tenantSlug || ''}
-              productCategory={product.productCategory}
-              productCategorySlug={product.productCategorySlug}
-            />
-          );
-        })}
-      </div>
+      {(() => {
+        const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+        const productTypeLabels: Record<string, string> = {
+          physical: 'Physical Products',
+          digital: 'Digital Products',
+          service: 'Service Products',
+          hybrid: 'Hybrid Products',
+        };
+        const grouped = productTypeOrder.reduce((acc, pt) => {
+          acc[pt] = recommendations.filter(p => (p.productType || 'physical') === pt);
+          return acc;
+        }, {} as Record<string, typeof recommendations>);
+        const otherProducts = recommendations.filter(p => {
+          const pt = p.productType || 'physical';
+          return !productTypeOrder.includes(pt as any);
+        });
+
+        return (
+          <div className="space-y-8">
+            {productTypeOrder.map(pt => {
+              const group = grouped[pt];
+              if (!group || group.length === 0) return null;
+              return (
+                <div key={pt}>
+                  <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">{productTypeLabels[pt]}</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {group.map((product) => {
+                      return (
+                        <SmartProductCard
+                          key={product.id}
+                          tenantId={product.tenantId}
+                          product={{
+                            id: product.id,
+                            sku: product.id,
+                            name: product.name,
+                            title: product.title,
+                            brand: product.brand,
+                            priceCents: product.priceCents,
+                            salePriceCents: product.salePriceCents ?? undefined,
+                            stock: 999,
+                            imageUrl: product.imageUrl,
+                            tenantId: product.tenantId,
+                            availability: 'in_stock',
+                            has_active_payment_gateway: product.has_active_payment_gateway,
+                            payment_gateway_type: product.payment_gateway_type,
+                            productCategory: product.productCategory,
+                            productCategorySlug: product.productCategorySlug,
+                            featuredType: product.featuredType,
+                            featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                            productType: product.productType || 'physical',
+                          }}
+                          tenantName=""
+                          hasActivePaymentGateway={product.has_active_payment_gateway}
+                          defaultGatewayType={product.payment_gateway_type || undefined}
+                          variant="compact"
+                          showCategory={true}
+                          showDescription={false}
+                          className="h-full"
+                          tenantSlug={product.tenantSlug || ''}
+                          productCategory={product.productCategory}
+                          productCategorySlug={product.productCategorySlug}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {otherProducts.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">Other Products</h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {otherProducts.map((product) => {
+                    return (
+                      <SmartProductCard
+                        key={product.id}
+                        tenantId={product.tenantId}
+                        product={{
+                          id: product.id,
+                          sku: product.id,
+                          name: product.name,
+                          title: product.title,
+                          brand: product.brand,
+                          priceCents: product.priceCents,
+                          salePriceCents: product.salePriceCents ?? undefined,
+                          stock: 999,
+                          imageUrl: product.imageUrl,
+                          tenantId: product.tenantId,
+                          availability: 'in_stock',
+                          has_active_payment_gateway: product.has_active_payment_gateway,
+                          payment_gateway_type: product.payment_gateway_type,
+                          productCategory: product.productCategory,
+                          productCategorySlug: product.productCategorySlug,
+                          featuredType: product.featuredType,
+                          featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                          productType: product.productType || 'physical',
+                        }}
+                        tenantName=""
+                        hasActivePaymentGateway={product.has_active_payment_gateway}
+                        defaultGatewayType={product.payment_gateway_type || undefined}
+                        variant="compact"
+                        showCategory={true}
+                        showDescription={false}
+                        className="h-full"
+                        tenantSlug={product.tenantSlug || ''}
+                        productCategory={product.productCategory}
+                        productCategorySlug={product.productCategorySlug}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Browse More Link */}
       {recommendations.length >= 6 && (

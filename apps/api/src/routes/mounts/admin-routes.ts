@@ -39,6 +39,7 @@ import bsaasCatalogRoutes from '../admin/bsaas-catalog';
 import bsaasAnalyticsRoutes from '../admin/bsaas-analytics';
 import bsaasPromotionsRoutes from '../admin/bsaas-promotions';
 import capabilityConstraintsRoutes from '../admin/capability-constraints';
+import supplierAdminRoutes from '../admin/suppliers';
 
 /**
  * Mount admin routes
@@ -116,6 +117,9 @@ export function mountAdminRoutes(app: Express) {
 
   // Capability constraints admin routes (CCL Phase 4)
   app.use('/api/admin/capability-constraints', authenticateToken, capabilityConstraintsRoutes);
+
+  // Supplier catalog admin routes
+  app.use('/api/admin/suppliers', authenticateToken, supplierAdminRoutes);
 
   // Platform settings - mount LAST to avoid conflicts with generic /api/admin routes
   console.log('🔧 Mounting platform settings route...');

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgMember, requireOrgAdminForRequest } from '../middleware/permissions';
 
 const router = Router();
 
@@ -93,7 +94,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /organization-requests - Create a new request
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requireOrgMember, async (req, res) => {
   try {
     const { tenantId, organizationId, requestedBy, requestType, notes, estimatedCost, costCurrency } = req.body;
 
@@ -139,7 +140,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PATCH /organization-requests/:id - Update request (approve/reject/agree to cost)
-router.patch('/:id', authenticateToken, async (req, res) => {
+router.patch('/:id', authenticateToken, requireOrgAdminForRequest, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, adminNotes, processedBy, costAgreed, estimatedCost } = req.body;
@@ -209,7 +210,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /organization-requests/:id - Cancel/delete a request
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requireOrgAdminForRequest, async (req, res) => {
   try {
     const { id } = req.params;
 

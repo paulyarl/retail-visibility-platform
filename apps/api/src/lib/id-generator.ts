@@ -857,6 +857,16 @@ export function generateOrganizationCommerceSettingsId(organizationId: string): 
 }
 
 /**
+ * Generate user_organizations ID
+ * Format: uorg-org-abc123 (18 chars)
+ * URL-safe, readable, unique, organization-traceable
+ */
+export function generateUserOrgId(organizationId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `uorg-${generateOrganizationKey(organizationId)}-${nanoid()}`;
+}
+
+/**
  * Generate access grant ID
  * Format: grant-tid-abc123 (19 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1224,4 +1234,87 @@ export function generateSocialPixelId(tenantId: string): string {
 export function generateAbandonedCartId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `acart-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate TikTok OAuth account ID
+ * Format: ttoa-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateTikTokOAuthAccountId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ttoa-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate TikTok OAuth token ID
+ * Format: ttot-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateTikTokOAuthTokenId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ttot-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate social mention ID
+ * Format: smnt-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateSocialMentionId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `smnt-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate return request ID
+ * Format: rtrn-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateReturnRequestId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `rtrn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate badge analytics aggregate ID
+ * Format: bdga-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateBadgeAnalyticsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bdga-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate badge event ID
+ * Format: bdge-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateBadgeEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bdge-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate service booking ID
+ * Format: booking-{nanoid} (16 chars)
+ */
+export function generateBookingId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `booking-${nanoid()}`;
+}
+
+/**
+ * Generate featured placement purchase ID
+ * Format: fpp-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePlacementPurchaseId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fpp-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate featured placement catalog ID
+ * Format: fpc-{nanoid} (12 chars)
+ * URL-safe, readable, unique
+ */
+export function generatePlacementCatalogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fpc-${nanoid()}`;
 }

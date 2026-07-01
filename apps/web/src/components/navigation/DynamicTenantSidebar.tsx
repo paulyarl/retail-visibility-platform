@@ -11,9 +11,12 @@ import { NavItemRow, type NavItem } from '@/components/navigation/NavItemRow';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavLinks } from '@/hooks/useNavLinks';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useTenantBehaviorAccess } from '@/hooks/tenant-access/useTenantBehaviorAccess';
+import { useOrgBehaviorAccess } from '@/hooks/tenant-access/useOrgBehaviorAccess';
 import { NavTemplateParser } from '@/services/NavigationLinksService';
 import TenantScopeHeader from '@/components/tenant/TenantScopeHeader';
 import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
+import { SidebarAuthButton } from '@/components/navigation/SidebarAuthButton';
 
 // Types are imported from NavItemRow component
 type NavItemWithRBAC = NavItem & RBACNavGates;
@@ -254,7 +257,9 @@ function buildTenantNav(
         { label: 'Barcode Scan', href: `/t/${currentTenantId}/scan` },
         { label: 'Quick Start', href: `/t/${currentTenantId}/quick-start` },
         { label: 'Categories', href: `/t/${currentTenantId}/categories` },
-        { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products` },
+        { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Featured Store', href: `/t/${currentTenantId}/settings/featured-store`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Custom Badges', href: `/t/${currentTenantId}/settings/products/badges`, requiredGroup: 'IS_TENANT_ADMIN' },
       ],
     },
     {
@@ -277,10 +282,10 @@ function buildTenantNav(
           ? [{ label: 'View in Directory', href: `/directory/${directorySlug}`, badge: 'Live', badgeVariant: 'success' as const }]
           : []),
         { label: 'Directory Settings', href: `/t/${currentTenantId}/settings/directory` },
-        { label: 'Branding', href: `/t/${currentTenantId}/settings/branding` },
-        { label: 'Store Hours', href: `/t/${currentTenantId}/settings/hours` },
-        { label: 'Business Category', href: `/t/${currentTenantId}/settings/gbp-category` },
-        { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status` },
+        { label: 'Branding', href: `/t/${currentTenantId}/settings/branding`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Store Hours', href: `/t/${currentTenantId}/settings/hours`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Business Category', href: `/t/${currentTenantId}/settings/gbp-category`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Review Management', href: `/t/${currentTenantId}/reviews` },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
@@ -291,7 +296,7 @@ function buildTenantNav(
       icon: <Icon.FAQ />,
       children: [
         { label: 'FAQ Hub', href: `/t/${currentTenantId}/faq` },
-        { label: 'FAQ Options', href: `/t/${currentTenantId}/faq/options` },
+        { label: 'FAQ Options', href: `/t/${currentTenantId}/faq/options`, requiredGroup: 'IS_TENANT_ADMIN' },
       ],
     },
     {
@@ -300,7 +305,7 @@ function buildTenantNav(
       icon: <Icon.Bot />,
       children: [
         { label: 'Dashboard', href: `/t/${currentTenantId}/bot` },
-        { label: 'Configuration', href: `/t/${currentTenantId}/bot/config` },
+        { label: 'Configuration', href: `/t/${currentTenantId}/bot/config`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Analytics', href: `/t/${currentTenantId}/bot/analytics` },
         { label: 'Skills', href: `/t/${currentTenantId}/bot/skills` },
         { label: 'Knowledge', href: `/t/${currentTenantId}/bot/knowledge` },
@@ -313,7 +318,7 @@ function buildTenantNav(
       icon: <Icon.Integrations />,
       requiredGroup: 'IS_TENANT_ADMIN',
       children: [
-        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integrations/options` },
+        { label: 'Integration Options', href: `/t/${currentTenantId}/settings/integration-options` },
         { label: 'Google Merchant Center', href: `/t/${currentTenantId}/settings/integrations/google` },
         { label: 'Feed Validation', href: `/t/${currentTenantId}/feed-validation` },
         { label: 'Clover POS', href: `/t/${currentTenantId}/settings/integrations/clover` },
@@ -343,9 +348,10 @@ function buildTenantNav(
         { label: 'Language & Region', href: `/t/${currentTenantId}/settings/language` },
         { label: 'Digital Downloads', href: `/t/${currentTenantId}/settings/digital-downloads` },
         { label: 'Onboarding', href: `/t/${currentTenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization` },
-        { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation` },
-        { label: 'Propagation Center', href: `/t/${currentTenantId}/propagation` },
+        { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization`, requiredOrgAdmin: true },
+        { label: 'Org Team', href: `/t/${currentTenantId}/settings/organization/users`, requiredOrgAdmin: true },
+        { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation`, requiredOrgAdmin: true },
+        { label: 'Propagation Center', href: `/t/${currentTenantId}/propagation`, requiredOrgAdmin: true },
       ],
     },
     {
@@ -463,13 +469,18 @@ function MobileDrawer({
           </button>
         </div>
         <ScopeSwitcher scope="tenant" tenantId={tenantId} />
-        <SidebarNav
-          items={items}
-          pathname={pathname}
-          expanded={expanded}
-          onToggle={onToggle}
-          onNavigate={onClose}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <SidebarNav
+            items={items}
+            pathname={pathname}
+            expanded={expanded}
+            onToggle={onToggle}
+            onNavigate={onClose}
+          />
+        </div>
+        <div className="px-2 py-3 border-t border-neutral-100 dark:border-neutral-800">
+          <SidebarAuthButton />
+        </div>
       </div>
     </>
   );
@@ -556,13 +567,20 @@ function DesktopSidebar({
         )}
       </div>
 
-      <SidebarNav
-        items={items}
-        pathname={pathname}
-        expanded={expanded}
-        onToggle={onToggle}
-        onNavigate={() => {}}
-      />
+      <div className="flex-1 overflow-y-auto">
+        <SidebarNav
+          items={items}
+          pathname={pathname}
+          expanded={expanded}
+          onToggle={onToggle}
+          onNavigate={() => {}}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="px-2 py-3 border-t border-neutral-100 dark:border-neutral-800">
+        <SidebarAuthButton collapsed={collapsed} />
+      </div>
     </aside>
   );
 }
@@ -603,6 +621,8 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const { user } = useAuth();
   const { tenantLinks } = useNavLinks();
   const allCaps = useAllCapabilities(tenantId);
+  const { canEdit } = useTenantBehaviorAccess(tenantId);
+  const { isOrgAdmin } = useOrgBehaviorAccess(tenantId);
 
   // Capability flags for nav filtering
   const chatbotEnabled = allCaps.data?.chatbotOptions?.enabled ?? true;
@@ -627,6 +647,32 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
         children: item.children ? filterByCapability(item.children) : item.children,
       }))
       .filter(item => !item.children || item.children.length > 0 || !item.href || item.href.includes('/bot'));
+  };
+
+  // Filter nav items by org admin role — removes items with requiredOrgAdmin: true
+  // when the user is not an org admin (not admin of hero tenant)
+  const filterByOrgRole = (navItems: NavItem[]): NavItem[] => {
+    if (isOrgAdmin) return navItems; // User is org admin, show everything
+    return navItems
+      .filter(item => !(item as any).requiredOrgAdmin)
+      .map(item => ({
+        ...item,
+        children: item.children ? filterByOrgRole(item.children) : item.children,
+      }))
+      .filter(item => !item.children || item.children.length > 0 || !item.href);
+  };
+
+  // Filter nav items by tenant admin role — removes items with requiredGroup: 'IS_TENANT_ADMIN'
+  // when the user's tenant-specific role is not in the IS_TENANT_ADMIN group
+  const filterByTenantRole = (navItems: NavItem[]): NavItem[] => {
+    if (canEdit) return navItems; // User is tenant admin, show everything
+    return navItems
+      .filter(item => (item as any).requiredGroup !== 'IS_TENANT_ADMIN')
+      .map(item => ({
+        ...item,
+        children: item.children ? filterByTenantRole(item.children) : item.children,
+      }))
+      .filter(item => !item.children || item.children.length > 0 || !item.href);
   };
 
   // Stabilize user.tenants to prevent infinite re-renders
@@ -769,6 +815,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
         requiredPermission: link.requiredPermission || '',
         requiredGroup: link.requiredGroup || '',
         requiredRole: link.requiredRole || '',
+        requiredOrgAdmin: (link.metadata as any)?.requiredOrgAdmin || false,
         prefetch: link.prefetch !== false,
         metadata: link.metadata || {},
         children: link.children || [],
@@ -777,9 +824,9 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
       processedItems = buildTenantNav(tenantId, tenantId, slug, isPublished, directorySlug);
     }
 
-    return filterByCapability(filterNavItems(processedItems));
+    return filterByOrgRole(filterByTenantRole(filterByCapability(filterNavItems(processedItems))));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished, chatbotEnabled, barcodeScanEnabled, quickstartEnabled]);
+  }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished, chatbotEnabled, barcodeScanEnabled, quickstartEnabled, canEdit, isOrgAdmin]);
 
   // Expanded state for navigation items
   const [expanded, setExpanded] = useState<Set<string>>(() => computeExpanded(items, pathname));

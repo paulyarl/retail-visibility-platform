@@ -8,7 +8,8 @@ import { useIntegrationOptionsCapability } from '@/hooks/tenant-access/useCapabi
 import { CloverConnectionCard } from '@/components/clover';
 import { SquareConnectionCard } from '@/components/square';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { AlertTriangle, Lock } from 'lucide-react';
+import { AlertTriangle, Lock, Camera, Share2, Video, RefreshCw, Store } from 'lucide-react';
+import Link from 'next/link';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -349,6 +350,104 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
+      {/* Social Commerce Integrations */}
+      <div className="mt-8">
+        <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+          Social Commerce
+        </h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+          Connect social platforms for catalog sync, conversion tracking, and order ingestion.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Meta Commerce Card */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+            <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                    <Camera className="w-5 h-5 text-pink-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                      Meta Commerce
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Instagram Shopping + Facebook Shop
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <Link
+                href={`/t/${tenantId}/settings/integrations/meta`}
+                className="block w-full text-center px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors text-sm"
+              >
+                Configure →
+              </Link>
+            </div>
+          </div>
+
+          {/* TikTok Shop Card */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+            <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-neutral-900 dark:bg-neutral-100 rounded-lg flex items-center justify-center">
+                    <Video className="w-5 h-5 text-white dark:text-neutral-900" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                      TikTok Shop
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Catalog sync + order ingestion
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <Link
+                href={`/t/${tenantId}/settings/integrations/tiktok`}
+                className="block w-full text-center px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors text-sm"
+              >
+                Configure →
+              </Link>
+            </div>
+          </div>
+
+          {/* Social Pixels Card */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+            <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <Share2 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                      Social Pixels
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Meta + TikTok conversion tracking
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <Link
+                href={`/t/${tenantId}/settings/integrations/pixels`}
+                className="block w-full text-center px-4 py-2 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors text-sm"
+              >
+                Configure →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Help Section */}
       <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
@@ -375,6 +474,24 @@ export default function IntegrationsPage() {
             className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             Google Integration →
+          </a>
+          <a
+            href={`/t/${tenantId}/settings/integrations/meta`}
+            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Meta Commerce →
+          </a>
+          <a
+            href={`/t/${tenantId}/settings/integrations/tiktok`}
+            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            TikTok Shop →
+          </a>
+          <a
+            href={`/t/${tenantId}/settings/integrations/pixels`}
+            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Social Pixels →
           </a>
         </div>
       </div>

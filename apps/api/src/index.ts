@@ -143,6 +143,7 @@ import { enforcePolicyCompliance } from './middleware/policy-enforcement';
 import platformSettingsRoutes from './routes/platform-settings';
 import organizationRoutes from './routes/organizations';
 import organizationRequestRoutes from './routes/organization-requests';
+import organizationUserRoutes from './routes/organization-users';
 import upgradeRequestsRoutes from './routes/upgrade-requests';
 import permissionRoutes from './routes/permissions';
 // import userRoutes from './routes/users';
@@ -203,6 +204,12 @@ import tierSystemRoutes from './routes/admin/tier-system';
 import googleBusinessOAuthRoutes from './routes/google-business-oauth';
 import googleMerchantOAuthRoutes from './routes/google-merchant-oauth';
 import metaOAuthRoutes from './routes/meta-oauth';
+import metaWebhookRoutes from './routes/meta-webhooks';
+import tiktokOAuthRoutes from './routes/tiktok-oauth';
+import tiktokWebhookRoutes from './routes/tiktok-webhooks';
+import socialProofRoutes from './routes/social-proof';
+import shippingRateRoutes from './routes/shipping-rates';
+import returnsRoutes from './routes/returns';
 import socialPixelRoutes from './routes/social-pixels';
 // import cloverRoutes from './routes/integrations/clover';
 // import emailTestRoutes from './routes/email-test';
@@ -5739,6 +5746,17 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
       data: { item_status: 'trashed' }
     });
 
+    // Fire-and-forget: delete from GMC if item was previously synced
+    if (item.sync_status === 'success' || item.sync_status === 'error') {
+      import('./services/GMCProductSync').then(({ deleteProduct }) => {
+        deleteProduct(item.tenant_id, req.params.id)
+          .then(result => {
+            console.log(`[Delete Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch(err => console.error(`[Delete Item] GMC deletion error for ${req.params.id}:`, err));
+      }).catch(err => console.error('[Delete Item] Failed to load GMCProductSync:', err));
+    }
+
     // Sync variants with parent item status
     if (updated.item_status === 'trashed') {
       // Deactivate all variants when item is trashed
@@ -5832,6 +5850,18 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
 
     // Permanently delete
     await prisma.inventory_items.delete({ where: { id: req.params.id } });
+
+    // Fire-and-forget: delete from GMC if item was previously synced
+    if (item.sync_status === 'success' || item.sync_status === 'error' || (item.sync_status as string) === 'permanent_error') {
+      import('./services/GMCProductSync').then(({ deleteProduct }) => {
+        deleteProduct(item.tenant_id, req.params.id)
+          .then(result => {
+            console.log(`[Purge Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch(err => console.error(`[Purge Item] GMC deletion error for ${req.params.id}:`, err));
+      }).catch(err => console.error('[Purge Item] Failed to load GMCProductSync:', err));
+    }
+
     res.status(204).end();
   } catch {
     res.status(500).json({ error: "failed_to_purge_item" });
@@ -7193,7 +7223,7 @@ app.use('/api/rate-limit', rateLimitingRoutes);
 console.log('✅ Rate Limiting routes mounted at /api/rate-limit (UniversalSingleton)');
 
 import behaviorTrackingRoutes from './routes/behavior-tracking';
-app.use('/api/behavior', authenticateToken, behaviorTrackingRoutes);
+app.use('/api/behavior', behaviorTrackingRoutes);
 console.log('✅ Behavior Tracking routes mounted at /api/behavior (UniversalSingleton)');
 
 import tenantProfileRoutes from './routes/tenant-profile';
@@ -7329,6 +7359,16 @@ console.log('Admin catalog routes mounted at /api/admin/catalog');
 import adminInventoryStatsRoutes from './routes/admin/inventory-stats';
 app.use('/api/admin/inventory', adminInventoryStatsRoutes);
 console.log('Admin inventory stats routes mounted at /api/admin/inventory');
+
+/* ------------------------------ admin google product taxonomy ------------------------------ */
+import googleProductTaxonomyRoutes from './routes/admin/google-product-taxonomy';
+app.use('/api/admin/google-product-taxonomy', googleProductTaxonomyRoutes);
+console.log('✅ Google Product Taxonomy routes mounted at /api/admin/google-product-taxonomy');
+
+/* ------------------------------ admin demo tenants ------------------------------ */
+import adminDemoTenantRoutes from './routes/admin/demo-tenants';
+app.use('/api/admin/demo-tenants', adminDemoTenantRoutes);
+console.log('✅ Admin demo tenant routes mounted at /api/admin/demo-tenants');
 
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
@@ -7510,6 +7550,26 @@ console.log('✅ Product options settings routes mounted at /api/tenants/:tenant
 app.use('/api/tenants', featuredOptionsSettingsRoutes);
 app.use('/api', featuredOptionsSettingsRoutes);
 console.log('✅ Featured options settings routes mounted at /api/tenants/:tenantId/featured-options and /api/public/tenant/:tenantId/featured-options');
+
+/* ------------------------------ badge registry ------------------------------ */
+import badgeRegistryRoutes from './routes/badge-registry';
+app.use('/api', badgeRegistryRoutes);
+console.log('✅ Badge registry routes mounted at /api/public/badge-registry and /api/tenants/:tenantId/badge-registry');
+
+/* ------------------------------ badge analytics ------------------------------ */
+import badgeAnalyticsRoutes from './routes/badge-analytics';
+app.use('/api', badgeAnalyticsRoutes);
+console.log('✅ Badge analytics routes mounted at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events');
+
+/* ------------------------------ active featured resolver ------------------------------ */
+import activeFeaturedRoutes from './routes/active-featured';
+app.use('/api', activeFeaturedRoutes);
+console.log('✅ Active featured resolver routes mounted at /api/active-featured and /api/tenants/:tenantId/active-featured');
+
+/* ------------------------------ featured placement (monetization) ------------------------------ */
+import featuredPlacementRoutes from './routes/featured-placements';
+app.use('/api', featuredPlacementRoutes);
+console.log('✅ Featured placement routes mounted at /api/admin/featured-placement and /api/tenants/:tenantId/featured-placements');
 
 /* ------------------------------ faq options settings ------------------------------ */
 app.use('/api/tenants', faqOptionsSettingsRoutes);
@@ -7928,6 +7988,10 @@ import organizationCapabilitiesRoutes from './routes/organization-capabilities';
 app.use('/api/organizations', organizationCapabilitiesRoutes);
 console.log('✅ Organization capabilities routes mounted at /api/organizations/:orgId/effective-capabilities');
 
+/* ------------------------------ organization users ------------------------------ */
+app.use('/api/organizations', organizationUserRoutes);
+console.log('✅ Organization users routes mounted at /api/organizations/:orgId/users');
+
 /* ------------------------------ hero location ------------------------------ */
 import heroLocationRoutes from './routes/hero-location';
 app.use('/api/hero-location', heroLocationRoutes);
@@ -7998,6 +8062,32 @@ console.log('✅ Google Merchant Center OAuth routes mounted at /api/google/oaut
 app.use('/api', metaOAuthRoutes);
 console.log('✅ Meta Commerce OAuth routes mounted at /api/meta/oauth');
 
+/* ------------------------------ Meta Commerce Webhooks ------------------------------ */
+app.use('/api', metaWebhookRoutes);
+console.log('✅ Meta Commerce webhooks mounted at /api/meta/webhooks');
+
+/* ------------------------------ TikTok Shop OAuth ------------------------------ */
+app.use('/api', tiktokOAuthRoutes);
+console.log('✅ TikTok Shop OAuth routes mounted at /api/tiktok/oauth');
+
+/* ------------------------------ TikTok Shop Webhooks ------------------------------ */
+app.use('/api', tiktokWebhookRoutes);
+console.log('✅ TikTok Shop webhooks mounted at /api/tiktok/webhooks');
+
+/* ------------------------------ Social Proof / UGC ------------------------------ */
+app.use('/api', socialProofRoutes);
+app.use('/api/tenants', socialProofRoutes);
+console.log('✅ Social Proof / UGC routes mounted at /api/public/social-proof and /api/tenants/:tenantId/social-proof');
+
+/* ------------------------------ Shipping Rates ------------------------------ */
+app.use('/api', shippingRateRoutes);
+console.log('✅ Shipping rates routes mounted at /api/shipping/rates');
+
+/* ------------------------------ Returns Portal ------------------------------ */
+app.use('/api', returnsRoutes);
+app.use('/api/tenants', returnsRoutes);
+console.log('✅ Returns portal routes mounted at /api/public/returns and /api/tenants/:tenantId/returns');
+
 /* ------------------------------ Social Pixels ------------------------------ */
 app.use('/api', socialPixelRoutes);
 console.log('✅ Social Pixels routes mounted at /api/social-pixels');
@@ -8056,6 +8146,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start GMC scheduled sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start GMC sync retry (every 2 hours)
+      try {
+        const { startGMCSyncRetry } = await import('./jobs/gmc-sync-retry');
+        startGMCSyncRetry();
+        logger.info('GMC sync retry started (every 2 hours)');
+      } catch (err) {
+        logger.error('Failed to start GMC sync retry', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start OAuth token refresh (every hour)
       try {
         const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');
@@ -8092,6 +8191,24 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start featured products expiry monitor', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start featured expiration enforcer (every 5 minutes) — deactivates expired featured_products
+      try {
+        const { startFeaturedExpirationEnforcer } = await import('./jobs/featured-expiration-enforcer');
+        startFeaturedExpirationEnforcer();
+        logger.info('Featured expiration enforcer started (every 5 minutes)');
+      } catch (err) {
+        logger.error('Failed to start featured expiration enforcer', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start featured placement renewal job (daily) — auto-renew, grace period, trial support
+      try {
+        const { startPlacementRenewalJob } = await import('./jobs/featured-placement-renewal');
+        startPlacementRenewalJob();
+        logger.info('Featured placement renewal job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start featured placement renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start bot product embedding sync (every 12 hours) — gated by platform settings
       try {
         const settings = await prisma.platform_settings_list.findFirst();
@@ -8105,6 +8222,33 @@ if (process.env.NODE_ENV !== "test") {
         }
       } catch (err) {
         logger.error('Failed to start bot product embedding sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start platform badge sync (every 6 hours) — syncs trending/bestseller/recommended to featured_products
+      try {
+        const { startPlatformBadgeSync } = await import('./jobs/platform-badge-sync');
+        await startPlatformBadgeSync();
+        logger.info('Platform badge sync started');
+      } catch (err) {
+        logger.error('Failed to start platform badge sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start badge rule auto-assign sync (every 4 hours) — evaluates sale/new_arrival/clearance rules
+      try {
+        const { startBadgeRuleSync } = await import('./jobs/badge-rule-sync');
+        await startBadgeRuleSync();
+        logger.info('Badge rule sync started');
+      } catch (err) {
+        logger.error('Failed to start badge rule sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start badge analytics aggregation (every 6 hours) — aggregates badge_events into badge_analytics
+      try {
+        const { startBadgeAnalyticsSync } = await import('./jobs/badge-analytics-sync');
+        await startBadgeAnalyticsSync();
+        logger.info('Badge analytics sync started');
+      } catch (err) {
+        logger.error('Failed to start badge analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start log purge job (daily at 2 AM UTC)
@@ -8123,6 +8267,69 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Abandoned cart recovery job started (every 30 minutes)');
       } catch (err) {
         logger.error('Failed to start abandoned cart recovery job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start Meta catalog sync job (every 6 hours)
+      try {
+        const { startMetaCatalogSync } = await import('./jobs/meta-catalog-sync');
+        startMetaCatalogSync();
+        logger.info('Meta catalog sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start Meta catalog sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start TikTok catalog sync job (every 6 hours)
+      try {
+        const { startTikTokCatalogSync } = await import('./jobs/tiktok-catalog-sync');
+        startTikTokCatalogSync();
+        logger.info('TikTok catalog sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start TikTok catalog sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier CSV sync job (every 6 hours)
+      try {
+        const { startSupplierCsvSync } = await import('./jobs/supplier-csv-sync');
+        startSupplierCsvSync();
+        logger.info('Supplier CSV sync job started (every 6 hours)');
+      } catch (err) {
+        logger.error('Failed to start supplier CSV sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier open-source sync job (hourly incremental + nightly backfill)
+      try {
+        const { startSupplierOpenSourceSync } = await import('./jobs/supplier-opensource-sync');
+        startSupplierOpenSourceSync();
+        logger.info('Supplier open-source sync job started (hourly incremental + nightly backfill)');
+      } catch (err) {
+        logger.error('Failed to start supplier open-source sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier auto-sync job (every 1 hour)
+      try {
+        const { startSupplierAutoSync } = await import('./jobs/supplier-auto-sync');
+        startSupplierAutoSync();
+        logger.info('Supplier auto-sync job started (every 1 hour)');
+      } catch (err) {
+        logger.error('Failed to start supplier auto-sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start flag expiry cleanup job (daily) — removes stale tenant flag overrides
+      try {
+        const { startFlagExpiryCleanup } = await import('./jobs/flag-expiry-cleanup');
+        startFlagExpiryCleanup();
+        logger.info('Flag expiry cleanup job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start flag expiry cleanup job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start demo tenant expiry job (hourly) — expires demo tenants past their demo_expires_at
+      try {
+        const { startDemoExpiryJob } = await import('./jobs/demo-tenant-expiry');
+        startDemoExpiryJob();
+        logger.info('Demo tenant expiry job started (every 1 hour)');
+      } catch (err) {
+        logger.error('Failed to start demo tenant expiry job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 

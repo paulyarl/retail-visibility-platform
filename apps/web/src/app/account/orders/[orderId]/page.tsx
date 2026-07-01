@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
+import DigitalDownloadsCard from '@/components/downloads/DigitalDownloadsCard';
+import FulfillmentTimeline from '@/components/orders/FulfillmentTimeline';
+import ProductTypeBadge from '@/components/products/ProductTypeBadge';
+import ServiceAppointmentCard from '@/components/orders/ServiceAppointmentCard';
+import type { ServiceBooking } from '@/services/CustomerOrderService';
 import { 
   Package, 
   ArrowLeft, 
@@ -21,7 +26,6 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -30,6 +34,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [serviceBookings, setServiceBookings] = useState<ServiceBooking[]>([]);
 
   useEffect(() => {
     loadOrder();
@@ -40,6 +45,15 @@ export default function OrderDetailPage() {
       const result = await customerOrderService.getOrder(orderId);
       if (result) {
         setOrder(result);
+        // Fetch service bookings if order has service items
+        if (result.items?.some(item => item.productType === 'service' || item.productType === 'hybrid')) {
+          try {
+            const bookings = await customerOrderService.getOrderServiceBookings(result.orderId);
+            setServiceBookings(bookings);
+          } catch (e) {
+            console.error('Failed to load service bookings:', e);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load order:', error);
@@ -82,17 +96,14 @@ export default function OrderDetailPage() {
     }).format(amount);
   };
 
-  const getFulfillmentSteps = () => {
-    if (!order) return [];
-    
-    const steps = [
-      { label: 'Order Placed', date: order.createdAt, icon: CheckCircle, completed: true },
-      { label: 'Processing', date: order.paidAt, icon: Clock, completed: !!order.paidAt },
-      { label: 'Shipped', date: order.fulfilledAt, icon: Truck, completed: !!order.fulfilledAt },
-      { label: 'Delivered', date: null, icon: Package, completed: order.orderStatus === 'delivered' },
-    ];
-
-    return steps;
+  const getDominantProductType = (): 'physical' | 'digital' | 'service' | 'hybrid' => {
+    if (!order?.items?.length) return 'physical';
+    const types = order.items.map(item => item.productType || 'physical');
+    const uniqueTypes = [...new Set(types)];
+    if (uniqueTypes.length === 1) return uniqueTypes[0] as any;
+    if (uniqueTypes.includes('digital') && uniqueTypes.includes('physical')) return 'hybrid';
+    if (uniqueTypes.includes('service') && uniqueTypes.includes('physical')) return 'hybrid';
+    return uniqueTypes[0] as any;
   };
 
   if (isLoading) {
@@ -136,33 +147,66 @@ export default function OrderDetailPage() {
           <CardTitle>Order Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
-            {getFulfillmentSteps().map((step, idx) => (
-              <div key={idx} className="flex flex-col items-center flex-1">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  step.completed 
-                    ? 'bg-green-100 text-green-600' 
-                    : 'bg-gray-100 text-gray-400'
-                }`}>
-                  <step.icon className="w-6 h-6" />
-                </div>
-                <p className={`text-sm mt-2 ${step.completed ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
-                  {step.label}
-                </p>
-                {step.date && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatDate(step.date)}
-                  </p>
-                )}
+          <FulfillmentTimeline
+            productType={getDominantProductType()}
+            orderStatus={order.orderStatus}
+            createdAt={order.createdAt}
+            paidAt={order.paidAt}
+            fulfilledAt={order.fulfilledAt}
+            digitalDeliveredAt={order.items?.find((item: any) => item.digitalDeliveredAt)?.digitalDeliveredAt}
+            trackingNumber={order.trackingNumber}
+          />
+
+          {/* Split fulfillment status for hybrid orders */}
+          {getDominantProductType() === 'hybrid' && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Fulfillment by Component</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(() => {
+                  const items = order.items || [];
+                  const hasPhysical = items.some(i => (i.productType || 'physical') === 'physical');
+                  const hasDigital = items.some(i => i.productType === 'digital' || i.productType === 'hybrid');
+                  const hasService = items.some(i => i.productType === 'service');
+
+                  const components: Array<{ type: string; label: string; status: string; color: string }> = [];
+
+                  if (hasPhysical) {
+                    const physicalFulfilled = order.fulfillmentStatus === 'fulfilled' || order.fulfilledAt;
+                    components.push({
+                      type: 'physical',
+                      label: 'Physical',
+                      status: physicalFulfilled ? 'Fulfilled' : order.fulfillmentStatus || 'Pending',
+                      color: physicalFulfilled ? 'text-green-700 bg-green-50' : 'text-yellow-700 bg-yellow-50',
+                    });
+                  }
+                  if (hasDigital) {
+                    const digitalDelivered = items.some((i: any) => i.digitalDeliveredAt || i.digitalDeliveryStatus === 'delivered');
+                    components.push({
+                      type: 'digital',
+                      label: 'Digital',
+                      status: digitalDelivered ? 'Delivered' : 'Pending',
+                      color: digitalDelivered ? 'text-green-700 bg-green-50' : 'text-yellow-700 bg-yellow-50',
+                    });
+                  }
+                  if (hasService) {
+                    const serviceBooked = serviceBookings.length > 0;
+                    const serviceCompleted = serviceBookings.length > 0 && serviceBookings.every(b => b.status === 'completed');
+                    components.push({
+                      type: 'service',
+                      label: 'Service',
+                      status: serviceCompleted ? 'Completed' : serviceBooked ? serviceBookings[0].status : 'Pending',
+                      color: serviceCompleted ? 'text-green-700 bg-green-50' : serviceBooked ? 'text-blue-700 bg-blue-50' : 'text-yellow-700 bg-yellow-50',
+                    });
+                  }
+
+                  return components.map(c => (
+                    <div key={c.type} className={`rounded-lg px-3 py-2 ${c.color}`}>
+                      <p className="text-xs font-medium">{c.label}</p>
+                      <p className="text-sm font-semibold capitalize">{c.status}</p>
+                    </div>
+                  ));
+                })()}
               </div>
-            ))}
-          </div>
-          {order.trackingNumber && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Tracking Number: </span>
-                {order.trackingNumber}
-              </p>
             </div>
           )}
         </CardContent>
@@ -186,7 +230,12 @@ export default function OrderDetailPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{item.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      {item.productType && item.productType !== 'physical' && (
+                        <ProductTypeBadge productType={item.productType} size="sm" />
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">SKU: {item.sku}</p>
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
@@ -297,6 +346,32 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Digital Downloads */}
+      {order.items?.some((item: any) => item.productType === 'digital' || item.productType === 'hybrid') && (
+        <div className="mt-6">
+          <DigitalDownloadsCard orderId={order.orderId} />
+          <div className="text-center mt-2">
+            <Link href="/account/downloads" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              Go to Downloads Page →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Service Appointments */}
+      {serviceBookings.length > 0 && (
+        <div className="mt-6 space-y-4">
+          {serviceBookings.map(booking => (
+            <ServiceAppointmentCard key={booking.id} booking={booking} />
+          ))}
+          <div className="text-center">
+            <Link href="/account/appointments" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              View All Appointments →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Receipt View */}
       {showReceipt && order && (
         <div className="max-w-4xl mx-auto mt-8">
@@ -311,6 +386,7 @@ export default function OrderDetailPage() {
                 sku: item.sku,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice * 100,
+                productType: item.productType,
               })),
               subtotal: order.subtotal * 100,
               status: order.orderStatus,

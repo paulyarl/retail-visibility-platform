@@ -42,6 +42,7 @@ const businessTypes: BusinessType[] = [
   { id: 'hardware_tools', name: 'Hardware & Tools', icon: '🔧', description: 'Power tools, hand tools, building materials', defaultProductCount: 15 },
   { id: 'furniture', name: 'Furniture', icon: '🛋️', description: 'Living room, bedroom, office furniture', defaultProductCount: 12 },
   { id: 'restaurant', name: 'Restaurant', icon: '🍽️', description: 'Prepared foods, menu items, beverages', defaultProductCount: 15 },
+  { id: 'service_business', name: 'Service Business', icon: '🛎️', description: 'Consulting, repairs, appointments, subscriptions', defaultProductCount: 16 },
   { id: 'general', name: 'General Store', icon: '🏪', description: 'Mixed merchandise, variety store', defaultProductCount: 20 },
 ];
 

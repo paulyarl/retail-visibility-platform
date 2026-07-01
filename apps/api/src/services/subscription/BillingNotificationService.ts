@@ -33,7 +33,12 @@ export type BillingNotificationType =
   | 'bsaas_renewal_failed'
   | 'bsaas_grace_period_warning'
   | 'bsaas_trial_started'
-  | 'bsaas_purchase_cancelled';
+  | 'bsaas_purchase_cancelled'
+  | 'featured_placement_purchased'
+  | 'featured_placement_renewal_success'
+  | 'featured_placement_renewal_failed'
+  | 'featured_placement_grace_period_warning'
+  | 'featured_placement_expired';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -270,6 +275,46 @@ class BillingNotificationService {
           subject: `Free Trial Started - ${data.metadata?.featureName || 'Feature'} - ${businessName}`,
           html: this.buildBsaasTrialStartedHtml(ownerName, businessName, data),
           text: this.buildBsaasTrialStartedText(ownerName, businessName, data),
+        };
+
+      case 'featured_placement_purchased':
+        return {
+          to: toEmail,
+          subject: `Featured Placement Active - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
+          html: this.buildFeaturedPlacementPurchasedHtml(ownerName, businessName, data),
+          text: this.buildFeaturedPlacementPurchasedText(ownerName, businessName, data),
+        };
+
+      case 'featured_placement_renewal_success':
+        return {
+          to: toEmail,
+          subject: `Featured Placement Renewed - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
+          html: this.buildFeaturedPlacementRenewalSuccessHtml(ownerName, businessName, data),
+          text: this.buildFeaturedPlacementRenewalSuccessText(ownerName, businessName, data),
+        };
+
+      case 'featured_placement_renewal_failed':
+        return {
+          to: toEmail,
+          subject: `Payment Failed: Featured Placement Renewal - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
+          html: this.buildFeaturedPlacementRenewalFailedHtml(ownerName, businessName, data),
+          text: this.buildFeaturedPlacementRenewalFailedText(ownerName, businessName, data),
+        };
+
+      case 'featured_placement_grace_period_warning':
+        return {
+          to: toEmail,
+          subject: `Action Required: Featured Placement Grace Period - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
+          html: this.buildFeaturedPlacementGracePeriodHtml(ownerName, businessName, data),
+          text: this.buildFeaturedPlacementGracePeriodText(ownerName, businessName, data),
+        };
+
+      case 'featured_placement_expired':
+        return {
+          to: toEmail,
+          subject: `Featured Placement Expired - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
+          html: this.buildFeaturedPlacementExpiredHtml(ownerName, businessName, data),
+          text: this.buildFeaturedPlacementExpiredText(ownerName, businessName, data),
         };
 
       default:
@@ -982,6 +1027,36 @@ Your new plan is now active.`;
           body: `You started a ${data.metadata?.trialDays || 0}-day free trial for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. No charge until the trial ends.`,
           icon: '🎁',
         };
+      case 'featured_placement_purchased':
+        return {
+          title: 'Featured placement is live',
+          body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} is now active. ${data.metadata?.durationDays || 0}-day placement expires on ${data.metadata?.expiresAt || 'soon'}.`,
+          icon: '🎉',
+        };
+      case 'featured_placement_renewal_success':
+        return {
+          title: 'Featured placement renewed',
+          body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} was renewed successfully.`,
+          icon: '✅',
+        };
+      case 'featured_placement_renewal_failed':
+        return {
+          title: 'Featured placement renewal payment failed',
+          body: `We could not process payment for "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" on ${tenantName}. Please update your payment method.`,
+          icon: '⚠️',
+        };
+      case 'featured_placement_grace_period_warning':
+        return {
+          title: 'Featured placement grace period warning',
+          body: `Payment for "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" on ${tenantName} failed. ${data.gracePeriodDaysRemaining || 7} days remaining in grace period to update your payment method.`,
+          icon: '⏰',
+        };
+      case 'featured_placement_expired':
+        return {
+          title: 'Featured placement expired',
+          body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} has expired. The product is no longer in the spotlight channel.`,
+          icon: '⌛',
+        };
       default:
         return {
           title: 'Subscription update',
@@ -1183,6 +1258,173 @@ The feature is now active. You won't be charged until the trial ends.
 Price after trial: $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})
 
 Add a payment method at: ${process.env.WEB_URL}/settings/subscription`;
+  }
+
+  // Email templates - Featured Placement Purchased
+  private buildFeaturedPlacementPurchasedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    const durationDays = data.metadata?.durationDays || 0;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Featured Placement is Live!</h2>
+        <p>Hi ${name},</p>
+        <p>Your featured placement <strong>${planLabel}</strong> for <strong>${business}</strong> is now active.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Plan:</strong> ${planLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Duration:</strong> ${durationDays} days</p>
+          <p style="margin: 8px 0 0;"><strong>Amount:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your product is now featured in the spotlight channel. It will remain featured for ${durationDays} days.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Placements</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFeaturedPlacementPurchasedText(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    const durationDays = data.metadata?.durationDays || 0;
+    return `Hi ${name},
+
+Your featured placement ${planLabel} for ${business} is now active.
+
+Plan: ${planLabel}
+Duration: ${durationDays} days
+Amount: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your product is now featured in the spotlight channel.
+
+Manage placements at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
+  }
+
+  // Email templates - Featured Placement Renewal Success
+  private buildFeaturedPlacementRenewalSuccessHtml(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Featured Placement Renewed</h2>
+        <p>Hi ${name},</p>
+        <p>Your featured placement <strong>${planLabel}</strong> for <strong>${business}</strong> has been renewed successfully.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Plan:</strong> ${planLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Amount:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your product remains featured in the spotlight channel.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Placements</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFeaturedPlacementRenewalSuccessText(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `Hi ${name},
+
+Your featured placement ${planLabel} for ${business} has been renewed successfully.
+
+Plan: ${planLabel}
+Amount: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your product remains featured in the spotlight channel.
+
+Manage placements at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
+  }
+
+  // Email templates - Featured Placement Renewal Failed
+  private buildFeaturedPlacementRenewalFailedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Featured Placement Renewal Payment Failed</h2>
+        <p>Hi ${name},</p>
+        <p>We were unable to process payment for <strong>${planLabel}</strong> on <strong>${business}</strong>.</p>
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Reason:</strong> ${data.reason || 'Payment method declined'}</p>
+        </div>
+        <p>Your placement has entered a <strong>7-day grace period</strong>. Please update your payment method to avoid losing your featured spot.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store" style="background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment & Renew</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFeaturedPlacementRenewalFailedText(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `Hi ${name},
+
+We were unable to process payment for ${planLabel} on ${business}.
+
+Reason: ${data.reason || 'Payment method declined'}
+
+Your placement has entered a 7-day grace period. Please update your payment method to avoid losing your featured spot.
+
+Renew at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
+  }
+
+  // Email templates - Featured Placement Grace Period Warning
+  private buildFeaturedPlacementGracePeriodHtml(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    const daysLeft = data.gracePeriodDaysRemaining || 7;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Action Required: Featured Placement Grace Period</h2>
+        <p>Hi ${name},</p>
+        <p>Payment for <strong>${planLabel}</strong> on <strong>${business}</strong> failed during auto-renewal.</p>
+        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fde68a;">
+          <p style="margin: 0;"><strong>Placement:</strong> ${planLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Grace period:</strong> ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining</p>
+          <p style="margin: 8px 0 0;"><strong>Reason:</strong> ${data.reason || 'Payment declined'}</p>
+        </div>
+        <p>Your placement is still active, but will be <strong>removed in ${daysLeft} days</strong> if payment is not updated.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment & Renew</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFeaturedPlacementGracePeriodText(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    const daysLeft = data.gracePeriodDaysRemaining || 7;
+    return `Hi ${name},
+
+Payment for ${planLabel} on ${business} failed during auto-renewal.
+
+Your placement is still active, but will be removed in ${daysLeft} days if payment is not updated.
+
+Reason: ${data.reason || 'Payment declined'}
+
+Renew at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
+  }
+
+  // Email templates - Featured Placement Expired
+  private buildFeaturedPlacementExpiredHtml(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Featured Placement Expired</h2>
+        <p>Hi ${name},</p>
+        <p>Your featured placement <strong>${planLabel}</strong> for <strong>${business}</strong> has expired.</p>
+        <p>The product is no longer in the spotlight channel. You can renew your placement to restore featured visibility.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Renew Placement</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFeaturedPlacementExpiredText(name: string, business: string, data: BillingNotificationData): string {
+    const planLabel = data.metadata?.planLabel || data.metadata?.planKey || 'Featured Placement';
+    return `Hi ${name},
+
+Your featured placement ${planLabel} for ${business} has expired.
+
+The product is no longer in the spotlight channel. You can renew your placement to restore featured visibility.
+
+Renew at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
   }
 
   private buildPaymentMethodAddedText(name: string, business: string, data: BillingNotificationData): string {

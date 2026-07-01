@@ -5,7 +5,7 @@
  * Integrates with platform caching and data warehouse
  */
 
-import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 
 export interface AnalyticsEvent {
   type: 'page_view' | 'product_view' | 'add_to_cart' | 'purchase' | 'search' | 'filter' | 'review' | 'share' | 'wishlist';
@@ -103,7 +103,7 @@ export interface RealTimeMetrics {
  * Provides comprehensive analytics with real-time tracking
  * Leverages platform caching and optimized data pipelines
  */
-class AdvancedAnalyticsService extends PublicApiSingleton {
+class AdvancedAnalyticsService extends ApiSystemSingleton {
   private static instance: AdvancedAnalyticsService;
   private eventQueue: AnalyticsEvent[] = [];
   private isProcessingQueue = false;
@@ -366,10 +366,10 @@ class AdvancedAnalyticsService extends PublicApiSingleton {
    */
   async getRealTimeMetrics(): Promise<RealTimeMetrics> {
     try {
-      const response = await this.makeDefaultRequest<{
+      const response = await this.makeEnhancedDefaultRequest<{
         metrics: RealTimeMetrics;
       }>(
-        '/api/analytics/realtime',
+        '/behavior/metrics',
         {},
         'analytics-realtime',
         30 * 1000 // 30 seconds cache for real-time data
@@ -412,10 +412,10 @@ class AdvancedAnalyticsService extends PublicApiSingleton {
     try {
       const cacheKey = `analytics-product-${productId}-${timeRange}`;
       
-      const response = await this.makeDefaultRequest<{
+      const response = await this.makeEnhancedDefaultRequest<{
         performance: any;
       }>(
-        `/api/analytics/product/${productId}?timeRange=${timeRange}`,
+        `/behavior/analytics?hours=${this.timeRangeToHours(timeRange)}`,
         {},
         cacheKey,
         10 * 60 * 1000 // 10 minutes cache for product analytics
@@ -461,10 +461,10 @@ class AdvancedAnalyticsService extends PublicApiSingleton {
     try {
       const cacheKey = `analytics-user-${userId}-${timeRange}`;
       
-      const response = await this.makeDefaultRequest<{
+      const response = await this.makeEnhancedDefaultRequest<{
         behavior: any;
       }>(
-        `/api/analytics/user/${userId}?timeRange=${timeRange}`,
+        `/behavior/patterns/${userId}?days=${this.timeRangeToDays(timeRange)}`,
         {},
         cacheKey,
         15 * 60 * 1000 // 15 minutes cache for user analytics
@@ -507,8 +507,8 @@ class AdvancedAnalyticsService extends PublicApiSingleton {
     this.eventQueue = [];
 
     try {
-      await this.makeDefaultRequest<void>(
-        '/api/analytics/events',
+      await this.makeEnhancedDefaultRequest<void>(
+        '/behavior/events/batch',
         {
           method: 'POST',
           body: JSON.stringify({ events })
@@ -522,6 +522,30 @@ class AdvancedAnalyticsService extends PublicApiSingleton {
       this.eventQueue.unshift(...events);
     } finally {
       this.isProcessingQueue = false;
+    }
+  }
+
+  /**
+   * Convert timeRange string to hours
+   */
+  private timeRangeToHours(timeRange: '24h' | '7d' | '30d'): number {
+    switch (timeRange) {
+      case '24h': return 24;
+      case '7d': return 168;
+      case '30d': return 720;
+      default: return 168;
+    }
+  }
+
+  /**
+   * Convert timeRange string to days
+   */
+  private timeRangeToDays(timeRange: '7d' | '30d' | '90d'): number {
+    switch (timeRange) {
+      case '7d': return 7;
+      case '30d': return 30;
+      case '90d': return 90;
+      default: return 30;
     }
   }
 

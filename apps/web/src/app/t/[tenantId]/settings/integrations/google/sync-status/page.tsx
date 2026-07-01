@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { gmcValidationService, BulkValidationReport } from '@/services/GMCValidationService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   ArrowLeft,
@@ -78,6 +79,8 @@ export default function GBPSyncStatusPage() {
   const [gmcPickupSla, setGmcPickupSla] = useState<'same day' | 'next day' | '2-day' | '3-day' | '4-day' | '5-day' | '6-day' | '7-day' | 'multi-week'>('same day');
   const [savingGmcSettings, setSavingGmcSettings] = useState(false);
   const [gmcSettingsResult, setGmcSettingsResult] = useState<any>(null);
+  const [validationReport, setValidationReport] = useState<BulkValidationReport | null>(null);
+  const [loadingValidation, setLoadingValidation] = useState(false);
 
   useEffect(() => {
     async function fetchSyncStatus() {
@@ -1149,6 +1152,111 @@ export default function GBPSyncStatusPage() {
           </div>
         ))}
       </div>
+
+      {/* Future Enhancement Notice */}
+      {/* GMC Validation Report */}
+      {gmcStatus?.hasGMCConnection && (
+        <div className="mt-8 bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+          <div className="p-4 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">GMC Validation Report</h3>
+              <p className="text-sm text-neutral-500">Pre-sync compliance check for Google Shopping</p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  setLoadingValidation(true);
+                  const report = await gmcValidationService.getValidationReport(tenantId);
+                  setValidationReport(report);
+                } catch (err) {
+                  console.error('Failed to load validation report:', err);
+                } finally {
+                  setLoadingValidation(false);
+                }
+              }}
+              disabled={loadingValidation}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingValidation ? 'animate-spin' : ''}`} />
+              {validationReport ? 'Refresh' : 'Run Validation'}
+            </button>
+          </div>
+          {validationReport && (
+            <div className="p-4 space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-3">
+                  <div className="text-xs text-neutral-500">Total Products</div>
+                  <div className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{validationReport.totalItems}</div>
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                  <div className="text-xs text-green-600 dark:text-green-400">Valid</div>
+                  <div className="text-xl font-bold text-green-700 dark:text-green-300">{validationReport.validItems}</div>
+                </div>
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                  <div className="text-xs text-red-600 dark:text-red-400">Errors</div>
+                  <div className="text-xl font-bold text-red-700 dark:text-red-300">{validationReport.itemsWithErrors}</div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+                  <div className="text-xs text-amber-600 dark:text-amber-400">Warnings</div>
+                  <div className="text-xl font-bold text-amber-700 dark:text-amber-300">{validationReport.itemsWithWarnings}</div>
+                </div>
+              </div>
+
+              {/* Per-product issues */}
+              {validationReport.results.filter(r => r.validation.issues.length > 0).length > 0 && (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {validationReport.results
+                    .filter(r => r.validation.issues.length > 0)
+                    .map((r) => (
+                      <div key={r.itemId} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm text-neutral-900 dark:text-neutral-100">{r.itemName}</span>
+                            {r.sku && <span className="text-xs text-neutral-500 font-mono">{r.sku}</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {r.validation.errors > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                <XCircle className="w-3 h-3" /> {r.validation.errors} error{r.validation.errors !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {r.validation.warnings > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                <AlertTriangle className="w-3 h-3" /> {r.validation.warnings} warning{r.validation.warnings !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ul className="space-y-1">
+                          {r.validation.issues.map((issue, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-xs">
+                              {issue.severity === 'error' ? (
+                                <XCircle className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                              ) : (
+                                <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                              )}
+                              <span className="text-neutral-700 dark:text-neutral-300">
+                                <span className="font-medium">{issue.field}:</span> {issue.message}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {validationReport.results.filter(r => r.validation.issues.length > 0).length === 0 && (
+                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <CheckCircle className="w-5 h-5" />
+                  All products pass Google Shopping validation checks.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Future Enhancement Notice */}
       <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-6">

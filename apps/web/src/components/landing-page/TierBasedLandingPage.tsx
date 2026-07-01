@@ -987,7 +987,7 @@ interface Product {
   sku: string;
   availability: string;
   stock?: number;  // Add stock property
-  productType?: 'physical' | 'digital' | 'hybrid';  // Add product type
+  productType?: 'physical' | 'digital' | 'hybrid' | 'service';  // Add product type
   
   // Featured types
   featuredTypes?: string[];
@@ -1442,7 +1442,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                       ? 'bg-green-100 text-green-800' 
                       : 'bg-red-100 text-red-800'
                   }`}>
-                    {(selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+                    {(() => { const inStock = (selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock'; const pt = product.productType; if (pt === 'digital') return inStock ? '✓ Available' : '✗ Unavailable'; if (pt === 'service') return inStock ? '✓ Open Slots' : '✗ Fully Booked'; return inStock ? '✓ In Stock' : '✗ Out of Stock'; })()}
                   </span>
                   {((selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock') && (
                     <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
@@ -1462,9 +1462,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                       ? 'bg-green-100 text-green-800' 
                       : 'bg-red-100 text-red-800'
                   }`}>
-                    {currentAvailability === 'in_stock' 
-                      ? `✓ In Stock (${currentStock} available)` 
-                      : '✗ Out of Stock'}
+                    {(() => { const inStock = currentAvailability === 'in_stock'; const pt = product.productType; if (pt === 'digital') return inStock ? '✓ Available' : '✗ Unavailable'; if (pt === 'service') return inStock ? '✓ Open Slots' : '✗ Fully Booked'; return inStock ? `✓ In Stock (${currentStock} available)` : '✗ Out of Stock'; })()}
                   </span>
                 </div>
               );
@@ -1708,6 +1706,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                     variants={product.variants || []}
                     onVariantChange={setSelectedVariant}
                     selectedVariant={selectedVariant}
+                    productType={product.productType}
                   />
                 </div>
               );

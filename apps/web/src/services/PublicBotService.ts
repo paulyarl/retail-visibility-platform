@@ -143,7 +143,6 @@ class PublicBotService extends PublicApiSingleton {
     const result = await this.makePublicRequest<ApiEnvelope<any>>(
       `/api/public/bot/conversations`,
       { method: 'POST', body: JSON.stringify(params) },
-      `bot-start-conversation-${params.tenantId}`
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data.success) throw new Error(result.data.error || 'Failed to start conversation');
@@ -153,11 +152,23 @@ class PublicBotService extends PublicApiSingleton {
     };
   }
 
-  async sendMessage(sessionId: string, message: string): Promise<SendMessageResult> {
+  async sendMessage(sessionId: string, message: string, context?: {
+    tenantId?: string;
+    pageContext?: string;
+    contextEntityName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+  }): Promise<SendMessageResult> {
+    const body: any = { message };
+    if (context?.tenantId) body.tenantId = context.tenantId;
+    if (context?.pageContext) body.pageContext = context.pageContext;
+    if (context?.contextEntityName) body.contextEntityName = context.contextEntityName;
+    if (context?.customerEmail) body.customerEmail = context.customerEmail;
+    if (context?.customerPhone) body.customerPhone = context.customerPhone;
+
     const result = await this.makePublicRequest<ApiEnvelope<any>>(
       `/api/public/bot/conversations/${sessionId}/messages`,
-      { method: 'POST', body: JSON.stringify({ message }) },
-      `bot-send-message-${sessionId}`
+      { method: 'POST', body: JSON.stringify(body) },
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
     if (!result.data.success) throw new Error(result.data.error || 'Failed to send message');

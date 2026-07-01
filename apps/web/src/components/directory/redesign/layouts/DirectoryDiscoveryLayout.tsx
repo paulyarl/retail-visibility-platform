@@ -22,6 +22,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
+import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
@@ -134,6 +135,9 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
               storeTypes={data.storeTypes}
               className=""
             />
+
+            {/* Active featured products */}
+            <ActiveFeaturedSection activeFeatured={data.activeFeatured} />
 
             {/* Random featured products */}
             <ProductSingletonProvider>

@@ -87,8 +87,21 @@ export function resolveProductType(
   // ── Merchant preferences ──
   const productTypesEnabled = merchantPrefs?.product_types_enabled !== false;
   const rawSelected = merchantPrefs?.selected_product_type;
+  const rawSelectedTypes = merchantPrefs?.selected_product_types;
 
-  // Validate selected type against tier allowed types
+  // Build merchant-selected types array (prefer new array field, fall back to scalar)
+  let selectedTypes: ProductType[] = [];
+  if (rawSelectedTypes && Array.isArray(rawSelectedTypes)) {
+    selectedTypes = rawSelectedTypes.filter((t): t is ProductType =>
+      uniqueAllowedTypes.includes(t as ProductType)
+    );
+  } else if (rawSelected && rawSelected !== 'none' && rawSelected !== 'flexible') {
+    if (uniqueAllowedTypes.includes(rawSelected as ProductType)) {
+      selectedTypes = [rawSelected as ProductType];
+    }
+  }
+
+  // Validate selected type against tier allowed types (backward compat scalar)
   let selectedProductType: ProductTypeValue = type;
   let hasMerchantSelection = false;
 
@@ -99,11 +112,32 @@ export function resolveProductType(
     }
   }
 
-  // Effective type: if merchant has selected a specific type and tier allows it, use it
+  // Compute effective_types: intersection of tier-allowed and merchant-selected
+  let effectiveTypes: ProductType[] = [];
+  if (isEnabled && productTypesEnabled) {
+    if (selectedTypes.length > 0) {
+      effectiveTypes = selectedTypes;
+      hasMerchantSelection = true;
+    } else if (type !== 'flexible' && type !== 'none') {
+      // Tier forces a single type — use it
+      effectiveTypes = [type as ProductType];
+    } else if (type === 'flexible' && uniqueAllowedTypes.length === 1) {
+      effectiveTypes = [uniqueAllowedTypes[0]];
+    }
+  }
+
+  // Backward compat: effective_type as scalar (flexible if multiple, single type, or none)
   let effectiveType: ProductTypeValue = type;
-  if (isEnabled && type === 'flexible' && productTypesEnabled) {
-    if (selectedProductType !== 'flexible' && uniqueAllowedTypes.includes(selectedProductType as ProductType)) {
-      effectiveType = selectedProductType;
+  if (isEnabled && productTypesEnabled) {
+    if (effectiveTypes.length === 1) {
+      effectiveType = effectiveTypes[0];
+      selectedProductType = effectiveTypes[0];
+    } else if (effectiveTypes.length > 1) {
+      effectiveType = 'flexible';
+      selectedProductType = 'flexible';
+    } else if (effectiveTypes.length === 0 && type === 'flexible') {
+      effectiveType = 'none';
+      selectedProductType = 'none';
     }
   }
 
@@ -111,12 +145,14 @@ export function resolveProductType(
     enabled: isEnabled && productTypesEnabled,
     type,
     effective_type: effectiveType,
+    effective_types: effectiveTypes,
     is_flexible: isFlexible,
     allowed_types: uniqueAllowedTypes,
     has_merchant_selection: hasMerchantSelection,
     merchant_preferences: {
       product_types_enabled: productTypesEnabled,
       selected_product_type: selectedProductType,
+      selected_product_types: selectedTypes,
     },
   };
 }

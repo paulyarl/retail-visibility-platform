@@ -321,6 +321,20 @@ export class AuthService {
       // Continue with empty tenants array
     }
 
+    // Get user_organizations for explicit org roles
+    let userOrgs: { organization_id: string; role: string }[] = [];
+    try {
+      userOrgs = await prisma.user_organizations.findMany({
+        where: { user_id: userId },
+        select: {
+          organization_id: true,
+          role: true,
+        },
+      });
+    } catch (orgError) {
+      // Continue with empty organizations array
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -341,6 +355,10 @@ export class AuthService {
         name: ut.tenants?.name || ut.tenant_id,
         role: ut.role,
         organization_id: ut.tenants?.organization_id,
+      })),
+      organizations: userOrgs.map((uo) => ({
+        id: uo.organization_id,
+        role: uo.role,
       })),
     };
   }

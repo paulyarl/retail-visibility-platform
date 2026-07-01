@@ -85,6 +85,27 @@ export interface Tier {
   updated_at?: string;
 }
 
+export interface ConstraintData {
+  id: string;
+  constraint_id: string;
+  type: string;
+  severity: string;
+  source_capability: string;
+  source_field: string;
+  source_operator: string;
+  source_value: string;
+  target_capability: string;
+  target_field: string;
+  target_operator: string;
+  target_value: string;
+  message: string;
+  resolution_hint: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 /**
  * Service for managing admin capability operations
  */
@@ -338,6 +359,54 @@ export class AdminCapabilityService extends AdminApiSingleton {
     await this.invalidateCachePattern('admin-tiers');
     await this.invalidateCachePattern('admin-capabilities');
     return result.data!;
+  }
+
+  // ===== Constraints CRUD =====
+
+  async getConstraints(): Promise<ConstraintData[]> {
+    const result = await this.makeDefaultRequest<ConstraintData[]>(
+      '/api/admin/capability-constraints',
+      {},
+      'admin-constraints-all',
+      this.cacheTTL,
+    );
+    if (!result.success) throw new Error('Failed to fetch constraints');
+    return result.data!;
+  }
+
+  async createConstraint(data: Omit<ConstraintData, 'id' | 'created_at' | 'updated_at'>): Promise<ConstraintData> {
+    const result = await this.makeDefaultRequest<ConstraintData>(
+      '/api/admin/capability-constraints',
+      { method: 'POST', body: JSON.stringify(data) },
+      'admin-constraints-create',
+      0,
+    );
+    if (!result.success) throw new Error('Failed to create constraint');
+    await this.invalidateCachePattern('admin-constraints');
+    return result.data!;
+  }
+
+  async updateConstraint(id: string, data: Partial<Omit<ConstraintData, 'id' | 'created_at' | 'updated_at'>>): Promise<ConstraintData> {
+    const result = await this.makeDefaultRequest<ConstraintData>(
+      `/api/admin/capability-constraints/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      'admin-constraints-update',
+      0,
+    );
+    if (!result.success) throw new Error('Failed to update constraint');
+    await this.invalidateCachePattern('admin-constraints');
+    return result.data!;
+  }
+
+  async deleteConstraint(id: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/capability-constraints/${id}`,
+      { method: 'DELETE' },
+      'admin-constraints-delete',
+      0,
+    );
+    if (!result.success) throw new Error('Failed to delete constraint');
+    await this.invalidateCachePattern('admin-constraints');
   }
 
   /**

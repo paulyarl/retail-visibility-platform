@@ -165,6 +165,7 @@ resolveXxxOptions(
 - R1: Resolver MUST accept `merchantPrefs` and produce both `allowed_*` (tier-only) and `can_use_*` / `effective_*` (tier + merchant)
 - R2: `enabled` = tier feature enabled AND merchant master switch on
 - R3: `*Available` is convenience only — never use as sole tier check in dashboard
+- R23: Every individual feature flag check MUST include `flexible ||` prefix — including standalone booleans outside group arrays. Flexible tiers unlock ALL features in the capability; missing the prefix causes features to stay disabled on flexible tiers.
 - For choice-based config (layouts, types, modes): compute a single `effective_*` value, not just raw merchant preference
 - Trim feature keys to avoid whitespace issues: `cleanFeatures[key.trim()] = val`
 
@@ -401,6 +402,7 @@ const allowedCount = cap?.allowedResponseEngines.length + cap?.allowedSkillTypes
 7. Cache not invalidated after settings update
 8. Wrong property name on state object
 9. Zod schema enum out of sync with type union
+10. Missing `flexible ||` prefix on standalone feature flags (R23) — feature stays disabled on flexible tiers
 
 ---
 
@@ -463,6 +465,7 @@ When deploying a capability change, verify ALL of these:
 - [ ] Merchant pref column exists in `tenant_*_options_settings` + Prisma schema
 - [ ] Resolver accepts `merchantPrefs` and computes `allowed_*` + `can_use_*` / `effective_*`
 - [ ] Resolver follows enablement precedence (R17): `*_disabled` > `*_enabled` > `*_flexible` > features
+- [ ] Every individual feature flag check in the resolver includes `flexible ||` prefix (R23) — including standalone booleans outside group arrays
 - [ ] Resolver returns `merchant_preferences` field
 - [ ] Orchestrator passes `merchantBundle.xxx` to resolver
 - [ ] If cross-capability dependency exists: insert constraint into `capability_constraints_list` DB table (R20)

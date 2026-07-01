@@ -3,11 +3,39 @@
 import { useEffect, useState } from 'react';
 import { Card, Badge, Modal, ModalFooter, Input, Select, ToastContainer } from '@/components/ui';
 import { Button } from '@mantine/core';
+import { Package, Download, Wrench, Layers } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useTenantOrganizations } from '@/hooks/useTenantOrganizations';
 import { type Organization } from '@/lib/singletons/TenantOrganizationsSingleton';
 import { useToast } from '@/components/ui/use-toast';
 import { tierSystemService, type Tier } from '@/services/TierSystemService';
+import { AdminOrganizationsService } from '@/services/AdminOrganizationsService';
+
+interface OrgProductTypeEntry {
+  type: string;
+  count: number;
+}
+interface OrgProductTypeSummary {
+  orgId: string;
+  orgName: string;
+  productTypes: OrgProductTypeEntry[];
+  totalItems: number;
+}
+
+const PRODUCT_TYPE_ICONS: Record<string, { icon: typeof Package; color: string; label: string }> = {
+  physical: { icon: Package, color: 'text-blue-600', label: 'Physical' },
+  digital: { icon: Download, color: 'text-violet-600', label: 'Digital' },
+  service: { icon: Wrench, color: 'text-amber-600', label: 'Service' },
+  hybrid: { icon: Layers, color: 'text-cyan-600', label: 'Hybrid' },
+};
+
+const PRODUCT_TYPE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Product Types' },
+  { value: 'physical', label: 'Has Physical' },
+  { value: 'digital', label: 'Has Digital' },
+  { value: 'service', label: 'Has Service' },
+  { value: 'hybrid', label: 'Has Hybrid' },
+];
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -18,6 +46,8 @@ export default function AdminOrganizationsPage() {
   const { toast, toasts, removeToast } = useToast();
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
+  const [productTypeSummary, setProductTypeSummary] = useState<Record<string, OrgProductTypeSummary>>({});
+  const [productTypeFilter, setProductTypeFilter] = useState('all');
 
   const {
     organizations,
@@ -33,6 +63,18 @@ export default function AdminOrganizationsPage() {
     refreshTenants,
     clearError,
   } = useTenantOrganizations('admin', { autoInitialize: true });
+
+  useEffect(() => {
+    const fetchProductTypeSummary = async () => {
+      try {
+        const map = await AdminOrganizationsService.getInstance().getProductTypeSummary();
+        setProductTypeSummary(map as Record<string, OrgProductTypeSummary>);
+      } catch (error) {
+        console.error('Failed to fetch product type summary:', error);
+      }
+    };
+    fetchProductTypeSummary();
+  }, []);
 
   useEffect(() => {
     const fetchTiers = async () => {
@@ -229,12 +271,23 @@ export default function AdminOrganizationsPage() {
       <PageHeader title="Organizations" description="Manage chain organizations and multi-location accounts" icon={Icons.Settings} backLink={{ href: '/settings/admin', label: 'Back to Admin' }} />
 
       <div className="mt-6 space-y-6">
-        <div className="flex items-center justify-between">
-          {organizations.length > 0 ? (
-            <p className="text-sm font-medium text-neutral-700">
-              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
-            </p>
-          ) : <div />}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            {organizations.length > 0 ? (
+              <p className="text-sm font-medium text-neutral-700">
+                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, organizations.length)} of {organizations.length} organizations
+              </p>
+            ) : <div />}
+            <select
+              value={productTypeFilter}
+              onChange={(e) => { setProductTypeFilter(e.target.value); setCurrentPage(1); }}
+              className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {PRODUCT_TYPE_FILTER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           <Button variant="filled" style={{ color: 'white' }} size="sm" onClick={() => setShowCreateModal(true)}>+ Create New Organization</Button>
         </div>
 
@@ -245,7 +298,16 @@ export default function AdminOrganizationsPage() {
             </div>
           </Card>
         ) : (
-          organizations.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((org) => (
+          organizations
+            .filter((org) => {
+              if (productTypeFilter === 'all') return true;
+              const summary = productTypeSummary[org.id];
+              if (!summary) return false;
+              return summary.productTypes.some(pt => pt.type === productTypeFilter);
+            })
+            .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((org) => {
+              const ptSummary = productTypeSummary[org.id];
+              return (
             <Card key={org.id} className="p-6 rounded-lg">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -259,6 +321,22 @@ export default function AdminOrganizationsPage() {
                     <Badge variant={org.subscriptionStatus === 'active' ? 'success' : 'default'}>{org.subscriptionStatus}</Badge>
                   </div>
                 </div>
+                {/* Product Type Badges */}
+                {ptSummary && ptSummary.productTypes.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {ptSummary.productTypes.map((pt) => {
+                      const config = PRODUCT_TYPE_ICONS[pt.type] || { icon: Package, color: 'text-gray-600', label: pt.type };
+                      const Icon = config.icon;
+                      return (
+                        <div key={pt.type} className={`flex items-center gap-1.5 px-2.5 py-1 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg text-xs ${config.color}`}>
+                          <Icon className="h-3.5 w-3.5" />
+                          <span className="font-medium">{config.label}</span>
+                          <span className="text-neutral-500">{pt.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
                     { label: 'Locations', value: `${org.stats.totalLocations} / ${org.maxLocations}` },
@@ -289,16 +367,27 @@ export default function AdminOrganizationsPage() {
                 </div>
               </div>
             </Card>
-          ))
+              );
+            })
         )}
 
-        {organizations.length > ITEMS_PER_PAGE && (
+        {(() => {
+          const filteredOrgs = organizations.filter((org) => {
+            if (productTypeFilter === 'all') return true;
+            const summary = productTypeSummary[org.id];
+            if (!summary) return false;
+            return summary.productTypes.some(pt => pt.type === productTypeFilter);
+          });
+          if (filteredOrgs.length <= ITEMS_PER_PAGE) return null;
+          const totalPages = Math.ceil(filteredOrgs.length / ITEMS_PER_PAGE);
+          return (
           <div className="flex items-center justify-center gap-2 mt-6">
             <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
-            <span className="text-sm font-medium text-neutral-700">Page {currentPage} of {Math.ceil(organizations.length / ITEMS_PER_PAGE)}</span>
-            <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(organizations.length / ITEMS_PER_PAGE), p + 1))} disabled={currentPage >= Math.ceil(organizations.length / ITEMS_PER_PAGE)}>Next</Button>
+            <span className="text-sm font-medium text-neutral-700">Page {currentPage} of {totalPages}</span>
+            <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}>Next</Button>
           </div>
-        )}
+          );
+        })()}
       </div>
 
       <Modal isOpen={showManageModal} onClose={() => { setShowManageModal(false); setSelectedOrg(null); setSelectedTenantId(''); }} title="Manage Locations" description={selectedOrg ? `Add or remove locations for ${selectedOrg.name}` : ''}>

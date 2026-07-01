@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { generateOrganizationCommerceSettingsId } from '../lib/id-generator';
 import { getOrganizationCommerceCapabilities } from '../utils/commerce-capabilities';
@@ -29,6 +30,21 @@ const organizationCommerceSettingsSchema = z.object({
   notify_on_payment: z.boolean().optional(),
   notify_on_deposit: z.boolean().optional(),
   notify_on_fulfillment: z.boolean().optional(),
+
+  // Product Type-Specific Settings
+  // Physical
+  physical_shipping_enabled: z.boolean().optional(),
+  physical_pickup_enabled: z.boolean().optional(),
+  physical_default_shipping_cents: z.number().int().min(0).optional(),
+  // Digital
+  digital_delivery_method: z.enum(['download', 'email', 'both']).optional(),
+  digital_access_duration_days: z.number().int().min(0).optional(),
+  digital_download_limit: z.number().int().min(0).optional(),
+  // Service
+  service_booking_lead_time_hours: z.number().int().min(0).optional(),
+  service_cancellation_policy: z.enum(['flexible', 'moderate', 'strict']).optional(),
+  // Hybrid
+  hybrid_fulfillment_split: z.boolean().optional(),
 });
 
 /**
@@ -41,6 +57,11 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
 
     // Get organization commerce capabilities (respects tier features from all tenants)
     const capabilities = await getOrganizationCommerceCapabilities(organizationId);
+
+    // Fetch type-specific settings from DB record
+    const dbSettings = await prisma.organization_commerce_settings.findUnique({
+      where: { organization_id: organizationId },
+    });
 
     res.json({
       success: true,
@@ -59,6 +80,17 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
         notify_on_payment: capabilities.notify_on_payment,
         notify_on_deposit: capabilities.notify_on_deposit,
         notify_on_fulfillment: capabilities.notify_on_fulfillment,
+
+        // Product type-specific settings (from DB record if exists, else defaults)
+        physical_shipping_enabled: dbSettings?.physical_shipping_enabled ?? true,
+        physical_pickup_enabled: dbSettings?.physical_pickup_enabled ?? true,
+        physical_default_shipping_cents: dbSettings?.physical_default_shipping_cents ?? 0,
+        digital_delivery_method: dbSettings?.digital_delivery_method ?? 'download',
+        digital_access_duration_days: dbSettings?.digital_access_duration_days ?? null,
+        digital_download_limit: dbSettings?.digital_download_limit ?? null,
+        service_booking_lead_time_hours: dbSettings?.service_booking_lead_time_hours ?? 24,
+        service_cancellation_policy: dbSettings?.service_cancellation_policy ?? 'flexible',
+        hybrid_fulfillment_split: dbSettings?.hybrid_fulfillment_split ?? true,
       },
       source: capabilities.source,
     });
@@ -76,7 +108,7 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
  * PUT /api/organizations/:organizationId/commerce-settings
  * Update organization commerce settings
  */
-router.put('/organizations/:organizationId/commerce-settings', authenticateToken, async (req: Request, res: Response) => {
+router.put('/organizations/:organizationId/commerce-settings', authenticateToken, requireOrgAdmin, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.params;
 
@@ -120,6 +152,17 @@ router.put('/organizations/:organizationId/commerce-settings', authenticateToken
         notify_on_payment: result.notify_on_payment,
         notify_on_deposit: result.notify_on_deposit,
         notify_on_fulfillment: result.notify_on_fulfillment,
+
+        // Product type-specific settings
+        physical_shipping_enabled: result.physical_shipping_enabled,
+        physical_pickup_enabled: result.physical_pickup_enabled,
+        physical_default_shipping_cents: result.physical_default_shipping_cents,
+        digital_delivery_method: result.digital_delivery_method,
+        digital_access_duration_days: result.digital_access_duration_days,
+        digital_download_limit: result.digital_download_limit,
+        service_booking_lead_time_hours: result.service_booking_lead_time_hours,
+        service_cancellation_policy: result.service_cancellation_policy,
+        hybrid_fulfillment_split: result.hybrid_fulfillment_split,
       },
       message: 'Organization commerce settings updated successfully'
     });

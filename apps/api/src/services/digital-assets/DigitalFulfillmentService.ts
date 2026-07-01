@@ -137,6 +137,43 @@ export class DigitalFulfillmentService {
         errors: result.errors.length,
       });
 
+      // Update order status based on product types
+      if (result.accessGrants.length > 0 && result.errors.length === 0) {
+        const allItems = order.order_items;
+        const hasPhysical = allItems.some(item => {
+          const pt = item.product_type || (item.inventory_items as any)?.product_type;
+          return pt === 'physical';
+        });
+        const hasService = allItems.some(item => {
+          const pt = item.product_type || (item.inventory_items as any)?.product_type;
+          return pt === 'service';
+        });
+
+        if (!hasPhysical && !hasService) {
+          // Digital-only order — fully fulfilled
+          await prisma.orders.update({
+            where: { id: orderId },
+            data: {
+              fulfillment_status: 'fulfilled',
+              order_status: 'delivered',
+              fulfilled_at: new Date(),
+              updated_at: new Date(),
+            },
+          });
+          console.log('[DigitalFulfillment] Digital-only order marked as fulfilled/delivered:', orderId);
+        } else {
+          // Hybrid order — partially fulfilled (physical or service component remains)
+          await prisma.orders.update({
+            where: { id: orderId },
+            data: {
+              fulfillment_status: 'partially_fulfilled',
+              updated_at: new Date(),
+            },
+          });
+          console.log('[DigitalFulfillment] Hybrid order marked as partially_fulfilled:', orderId);
+        }
+      }
+
       // Send email notification if any grants were created
       if (result.accessGrants.length > 0) {
         try {

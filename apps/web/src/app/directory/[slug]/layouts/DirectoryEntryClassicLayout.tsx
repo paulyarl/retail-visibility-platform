@@ -14,6 +14,7 @@ import ContactInformationCollapsible from '@/components/directory/ContactInforma
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
+import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
@@ -35,6 +36,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     businessHours,
     storefrontCategories,
     featuredProducts,
+    activeFeatured,
     tenantInfo,
     slugForRelated,
     optFlags,
@@ -167,6 +169,22 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                 </div>
               )}
 
+              {/* Active Featured Products (from ActiveFeaturedResolver) */}
+              {!showStatusPanel && activeFeatured?.hasActive && activeFeatured.products.length > 0 && (
+                <TenantPaymentProvider tenantId={listing.tenantId}>
+                  <div className="mb-6">
+                    <h2 className="text-lg font-bold text-neutral-900 dark:text-white mb-3">Featured</h2>
+                    <EnhancedProductDisplay
+                      products={activeFeatured.products as any}
+                      tenantId={listing.tenantId}
+                      displayMode="carousel"
+                      carouselItemsVisible={4}
+                      variant="grid"
+                    />
+                  </div>
+                </TenantPaymentProvider>
+              )}
+
               {/* Featured Products */}
               {!showStatusPanel && featuredProducts.length > 0 && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
@@ -176,31 +194,98 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       <h2 className="text-2xl font-bold text-gray-900">Store Selections</h2>
                       <Link href={`/tenant/${slugForRelated || listing.tenantId}`} className="text-sm text-blue-600 hover:text-blue-700 font-medium">View All Products →</Link>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {featuredProducts.map((product: any) => (
-                        <SmartProductCard
-                          key={`directory-featured-${product.id}`}
-                          tenantId={listing.tenantId}
-                          product={{
-                            id: product.id, sku: product.sku || product.id,
-                            name: product.name || product.title, title: product.title || product.name,
-                            brand: product.brand, description: product.description,
-                            priceCents: product.priceCents || Math.round((product.price || 0) * 100),
-                            salePriceCents: product.salePriceCents, stock: product.stock || 999,
-                            imageUrl: product.imageUrl || product.image_url, tenantId: listing.tenantId,
-                            availability: product.availability || 'in_stock',
-                            tenantCategory: product.tenantCategory, productCategory: product.category_name,
-                            has_variants: product.has_variants,
-                            payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
-                            featuredType: product.featuredType,
-                            featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
-                          }}
-                          tenantName={listing.businessName}
-                          tenantLogo={tenantLogo?.toString() || listing.logoUrl}
-                          defaultGatewayType={paymentGatewayStatus.defaultGatewayType || undefined}
-                          variant="featured" showCategory={true} showDescription={true}
-                        />
-                      ))}
+                    <div className="space-y-6">
+                      {(() => {
+                        const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+                        const productTypeLabels: Record<string, string> = {
+                          physical: 'Physical Products',
+                          digital: 'Digital Products',
+                          service: 'Service Products',
+                          hybrid: 'Hybrid Products',
+                        };
+                        const grouped = productTypeOrder.reduce((acc, pt) => {
+                          acc[pt] = featuredProducts.filter((p: any) => (p.productType || 'physical') === pt);
+                          return acc;
+                        }, {} as Record<string, any[]>);
+                        const otherProducts = featuredProducts.filter((p: any) => {
+                          const pt = p.productType || 'physical';
+                          return !productTypeOrder.includes(pt as any);
+                        });
+
+                        return (
+                          <>
+                            {productTypeOrder.map(pt => {
+                              const group = grouped[pt];
+                              if (!group || group.length === 0) return null;
+                              return (
+                                <div key={pt}>
+                                  <h3 className="text-sm font-semibold text-gray-700 mb-3">{productTypeLabels[pt]}</h3>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {group.map((product: any) => (
+                                      <SmartProductCard
+                                        key={`directory-featured-${product.id}`}
+                                        tenantId={listing.tenantId}
+                                        product={{
+                                          id: product.id, sku: product.sku || product.id,
+                                          name: product.name || product.title, title: product.title || product.name,
+                                          brand: product.brand, description: product.description,
+                                          priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                                          salePriceCents: product.salePriceCents, stock: product.stock || 999,
+                                          imageUrl: product.imageUrl || product.image_url, tenantId: listing.tenantId,
+                                          availability: product.availability || 'in_stock',
+                                          tenantCategory: product.tenantCategory, productCategory: product.category_name,
+                                          has_variants: product.has_variants,
+                                          payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
+                                          featuredType: product.featuredType,
+                                          featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                                          productType: product.productType || 'physical',
+                                        }}
+                                        tenantName={listing.businessName}
+                                        tenantLogo={tenantLogo?.toString() || listing.logoUrl}
+                                        defaultGatewayType={paymentGatewayStatus.defaultGatewayType || undefined}
+                                        variant="featured" showCategory={true} showDescription={true}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {otherProducts.length > 0 && (
+                              <div>
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Other Products</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  {otherProducts.map((product: any) => (
+                                    <SmartProductCard
+                                      key={`directory-featured-${product.id}`}
+                                      tenantId={listing.tenantId}
+                                      product={{
+                                        id: product.id, sku: product.sku || product.id,
+                                        name: product.name || product.title, title: product.title || product.name,
+                                        brand: product.brand, description: product.description,
+                                        priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                                        salePriceCents: product.salePriceCents, stock: product.stock || 999,
+                                        imageUrl: product.imageUrl || product.image_url, tenantId: listing.tenantId,
+                                        availability: product.availability || 'in_stock',
+                                        tenantCategory: product.tenantCategory, productCategory: product.category_name,
+                                        has_variants: product.has_variants,
+                                        payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
+                                        featuredType: product.featuredType,
+                                        featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                                        productType: product.productType || 'physical',
+                                      }}
+                                      tenantName={listing.businessName}
+                                      tenantLogo={tenantLogo?.toString() || listing.logoUrl}
+                                      defaultGatewayType={paymentGatewayStatus.defaultGatewayType || undefined}
+                                      variant="featured" showCategory={true} showDescription={true}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </TenantPaymentProvider>

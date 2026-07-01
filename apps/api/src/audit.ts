@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { Flags } from "./config";
+import { getEffectivePlatform } from "./utils/effectiveFlags";
 import { Prisma } from '@prisma/client';
 import { generateQuickStart } from "./lib/id-generator";
 
@@ -11,7 +12,11 @@ export async function audit(opts: {
   action: string;
   payload?: AuditPayload;
 }) {
-  if (!Flags.AUDIT_LOG) return; // feature-guarded noop
+  if (!Flags.AUDIT_LOG) {
+    // Boot-time fallback: if env var is off, skip even the DB check
+    const eff = await getEffectivePlatform('FF_AUDIT_LOG');
+    if (!eff.effectiveOn) return;
+  }
   try {
     // Map action strings to enum values
     let mappedAction: 'create' | 'update' | 'delete' | 'sync' | 'policyApply' | 'oauthConnect' | 'oauthRefresh';

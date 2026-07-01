@@ -5,11 +5,13 @@ import { VariantBadge } from './VariantBadge';
 import { PriceRangeDisplay } from './PriceRangeDisplay';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Package, DollarSign, Tag } from 'lucide-react';
+import { ProductTypeBadge } from '@/components/products/ProductTypeBadge';
 
 interface VariantInfoCardProps {
   product: ProductWithVariants;
   showPriceRange?: boolean;
   showAttributes?: boolean;
+  productType?: string;
   className?: string;
 }
 
@@ -26,6 +28,7 @@ export function VariantInfoCard({
   product,
   showPriceRange = true,
   showAttributes = true,
+  productType = 'physical',
   className = ''
 }: VariantInfoCardProps) {
   if (!product.has_variants || !product.variant_count) {
@@ -38,8 +41,11 @@ export function VariantInfoCard({
         {/* Variant Count */}
         <div className="flex items-center gap-2">
           <Package className="text-muted-foreground" size={20} />
-          <div>
-            <p className="text-sm font-medium">Available Variants</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">Available Variants</p>
+              <ProductTypeBadge productType={productType} />
+            </div>
             <p className="text-2xl font-bold">{product.variant_count}</p>
           </div>
         </div>

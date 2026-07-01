@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Store, Package, MapPin, CreditCard, Truck, ShoppingCart,
   HelpCircle, Bot, Headset, Globe, Star, Users, Settings,
+  Share2,
   ArrowRight, Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -11,7 +12,7 @@ import { useQuickLinks } from "@/hooks/dashboard/useQuickLinks";
 
 const ICONS: Record<string, LucideIcon> = {
   Store, Package, MapPin, CreditCard, Truck, ShoppingCart,
-  HelpCircle, Bot, Headset, Globe, Star, Users, Settings,
+  HelpCircle, Bot, Headset, Globe, Star, Users, Settings, Share2,
 };
 
 const ICON_COLORS: Record<string, { bg: string; text: string }> = {

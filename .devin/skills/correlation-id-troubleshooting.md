@@ -9,14 +9,14 @@ Use this skill when debugging production issues, tracing errors across client an
 ```
 Browser (client)                       API server
 ─────────────────                      ──────────────
-corr-CL-{nanoid}                       corr-{tenantKey}-{nanoid}
+corr-CL-{tenantKey}-{nanoid}           corr-{tenantKey}-{nanoid}
   │                                      │
   ├─ sessionStorage                      ├─ req.ctx.correlationId
-  ├─ x-correlation-id header (out)       ├─ X-Correlation-Id header (resp)
-  ├─ clientLogger.error()                ├─ logger.error/warn/info/debug()
-  ├─ error-reporter.ts → POST            ├─ DatabaseTransport → application_error_log
-  │   /api/client-errors                 ├─ SentryTransport → Sentry
-  │                                      ├─ FileTransport → logs/app-YYYY-MM-DD.log
+  ├─ vs_correlation_tenant_key           ├─ X-Correlation-Id header (resp)
+  ├─ x-correlation-id header (out)       ├─ logger.error/warn/info/debug()
+  ├─ clientLogger.error()                ├─ DatabaseTransport → application_error_log
+  ├─ error-reporter.ts → POST            ├─ SentryTransport → Sentry
+  │   /api/client-errors                 ├─ FileTransport → logs/app-YYYY-MM-DD.log
   │                                      └─ ConsoleTransport → stdout
   │
   └─ Server adopts or overrides client ID via response header
@@ -27,6 +27,7 @@ corr-CL-{nanoid}                       corr-{tenantKey}-{nanoid}
 | Source | Location | How to access |
 |--------|----------|---------------|
 | Browser sessionStorage | `vs_correlation_id` key | DevTools → Application → Session Storage |
+| Browser sessionStorage | `vs_correlation_tenant_key` key | Stores the tenant key used to scope the client correlation ID |
 | HTTP request header | `x-correlation-id` | DevTools → Network → Request Headers |
 | HTTP response header | `X-Correlation-Id` | DevTools → Network → Response Headers |
 | Server file logs | JSON `correlationId` field | `grep "corr-XXX" logs/app-YYYY-MM-DD.log` |
@@ -51,7 +52,7 @@ corr-CL-{nanoid}                       corr-{tenantKey}-{nanoid}
 
 ### Option A: From a user report
 
-Ask the user to open DevTools (F12) → **Application** → **Session Storage** → site URL → copy the `vs_correlation_id` value (e.g., `corr-CL-a1b2c3d4`).
+Ask the user to open DevTools (F12) → **Application** → **Session Storage** → site URL → copy the `vs_correlation_id` value (e.g., `corr-CL-A3K9-x7y2z9k4`).
 
 ### Option B: From browser DevTools Network tab
 
@@ -323,7 +324,8 @@ This sets `resolved=true`, `resolved_at=now()`, and `resolved_by=<admin_user_id>
 
 ## Common Pitfalls
 
-- **Client ID vs server ID**: The client generates `corr-CL-{nanoid}` initially, but the server may override it with `corr-{tenantKey}-{nanoid}` via the `X-Correlation-Id` response header. Always use the **server's** ID when searching server logs and DB — it's the authoritative one.
+- **Client ID vs server ID**: The client generates `corr-CL-{tenantKey}-{nanoid}` when a tenant context is available, or `corr-CL-{nanoid}` when no tenant is known. The server may override it with `corr-{tenantKey}-{nanoid}` via the `X-Correlation-Id` response header. Always use the **server's** ID when searching server logs and DB — it's the authoritative one.
+- **Tenant-scoped IDs regenerate on tenant change**: `getOrCreateCorrelationId(tenantId)` stores the tenant key in `vs_correlation_tenant_key`. If the user switches tenants and the stored key differs, the client generates a new correlation ID with the new tenant key.
 - **Rate-limited client errors**: The client drops errors exceeding 10/min. If a user reports an issue but no client error appears in the DB, it may have been rate-limited. Check Sentry as a fallback.
 - **Deduplicated errors**: Same message + stack hash within 60s is deduplicated on the client. Check Sentry for the original event.
 - **sessionStorage cleared on logout**: `clearCorrelationId()` is called on logout. If a user logs out and back in, they get a new correlation ID — the old one won't trace subsequent requests.

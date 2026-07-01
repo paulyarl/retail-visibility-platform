@@ -338,8 +338,6 @@ export default function DirectoryClient() {
 
   useEffect(() => {
     const fetchFilters = async () => {
-      // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
       try {
         // Start location detection asynchronously (non-blocking)
         getUserLocation().then((location) => {
@@ -398,7 +396,6 @@ export default function DirectoryClient() {
 
         // Locations endpoint is disabled (old directory system)
         // TODO: Re-enable when directory_listings table is available
-        // const locationsRes = await fetch(`${apiBaseUrl}/api/directory/locations`);
         // if (locationsRes.ok) {
         //   const locData = await locationsRes.json();
         //   setLocations(locData.locations || []);

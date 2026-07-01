@@ -10,8 +10,10 @@ import { generateItemId, generateTenantItemId,generateOrganizationId, generatePh
 import { propagateVariants } from '../utils/variant-propagation';
 import { ensureGlobalCatalogEntry, hasGlobalCatalogEntry } from '../utils/global-catalog-sync';
 import { authenticateToken } from '../middleware/auth';
+import { requireOrgAdmin } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
+import ProductTypeService from '../services/ProductTypeService';
 
 const router = Router();
 
@@ -542,7 +544,7 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
 
 // PUT /organizations/:id/self-update - Update own organization
 // Permission: Organization owner can update their own organization settings
-router.put('/:id/self-update', authenticateToken, async (req, res) => {
+router.put('/:id/self-update', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -678,7 +680,7 @@ const propagateSchema = z.object({
 
 // POST /organizations/:id/items/propagate - Propagate item to tenants
 // Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
+router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -806,6 +808,19 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
         if (tenantId === sourceItem.tenant_id) {
           results.skipped.push({ tenantId, reason: 'source_tenant' });
           continue;
+        }
+
+        // Check if target tenant's tier allows the source item's product type
+        const sourceProductType = sourceItem.product_type || 'physical';
+        try {
+          const productTypeService = ProductTypeService.getInstance();
+          const allowed = await productTypeService.isProductTypeAllowed(tenantId, sourceProductType as any);
+          if (!allowed) {
+            results.skipped.push({ tenantId, reason: `product_type_not_allowed: ${sourceProductType}` });
+            continue;
+          }
+        } catch (capError) {
+          console.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, capError);
         }
 
         // Check if SKU already exists for this tenant
@@ -1237,7 +1252,7 @@ const propagateBulkSchema = z.object({
 
 // POST /organizations/:id/items/propagate-bulk - Bulk propagate items
 // Permission: Authenticated user with propagation rights (tier validation done inline)
-router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => {
+router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -1455,6 +1470,24 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
               reason: 'source_tenant' 
             });
             continue;
+          }
+
+          // Check if target tenant's tier allows the source item's product type
+          const sourceProductType = sourceItem.product_type || 'physical';
+          try {
+            const productTypeService = ProductTypeService.getInstance();
+            const allowed = await productTypeService.isProductTypeAllowed(tenantId, sourceProductType as any);
+            if (!allowed) {
+              results.skipped.push({ 
+                item_id: sourceItem.id, 
+                tenantId, 
+                sku: sourceItem.sku,
+                reason: `product_type_not_allowed: ${sourceProductType}` 
+              });
+              continue;
+            }
+          } catch (capError) {
+            console.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, capError);
           }
 
           // Check if SKU already exists for this tenant
@@ -1775,6 +1808,9 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
             access_duration_days: sourceItem.access_duration_days,
             download_limit: sourceItem.download_limit,
             license_type: sourceItem.license_type,
+            features: sourceItem.features,
+            specifications: sourceItem.specifications as any,
+            enhanced_description: sourceItem.enhanced_description,
             has_variants: sourceItem.has_variants,
             is_featured: sourceItem.is_featured,
             featured_at: sourceItem.featured_at,
@@ -1899,7 +1935,7 @@ const setHeroLocationSchema = z.object({
 
 // PUT /organizations/:id/hero-location - Set hero location
 // Permission: Organization member (can manage their own organization settings)
-router.put('/:id/hero-location', authenticateToken, requireSupportActions, async (req, res) => {
+router.put('/:id/hero-location', authenticateToken, requireOrgAdmin, async (req, res) => {
   try {
     const parsed = setHeroLocationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -2029,6 +2065,24 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     for (const sourceItem of heroItems) {
       for (const targetTenant of targetTenants) {
         try {
+          // Check if target tenant's tier allows the source item's product type
+          const sourceProductType = sourceItem.product_type || 'physical';
+          try {
+            const productTypeService = ProductTypeService.getInstance();
+            const allowed = await productTypeService.isProductTypeAllowed(targetTenant.id, sourceProductType as any);
+            if (!allowed) {
+              results.skipped.push({
+                item_id: sourceItem.id,
+                tenantId: targetTenant.id,
+                sku: sourceItem.sku,
+                reason: `product_type_not_allowed: ${sourceProductType}`,
+              });
+              continue;
+            }
+          } catch (capError) {
+            console.error(`[Organizations] Product type capability check failed for tenant ${targetTenant.id}:`, capError);
+          }
+
           // Check if SKU already exists for this tenant
           const existing = await prisma.inventory_items.findFirst({
             where: {
@@ -2096,6 +2150,24 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
             missing_description: sourceItem.missing_description,
             missing_specs: sourceItem.missing_specs,
             missing_brand: sourceItem.missing_brand,
+            sale_price_cents: sourceItem.sale_price_cents,
+            payment_gateway_type: sourceItem.payment_gateway_type,
+            payment_gateway_id: sourceItem.payment_gateway_id,
+            product_type: sourceItem.product_type,
+            digital_delivery_method: sourceItem.digital_delivery_method,
+            digital_assets: sourceItem.digital_assets as any,
+            access_duration_days: sourceItem.access_duration_days,
+            download_limit: sourceItem.download_limit,
+            license_type: sourceItem.license_type,
+            features: sourceItem.features,
+            specifications: sourceItem.specifications as any,
+            enhanced_description: sourceItem.enhanced_description,
+            has_variants: sourceItem.has_variants,
+            is_featured: sourceItem.is_featured,
+            featured_at: sourceItem.featured_at,
+            featured_until: sourceItem.featured_until,
+            featured_priority: sourceItem.featured_priority,
+            featured_type: sourceItem.featured_type,
             },
           });
 
@@ -2116,6 +2188,103 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
                 caption: photo.caption,
               })),
             });
+          }
+
+          // Propagate slug registry entry if source has one
+          try {
+            const heroSlugRegistry = await prisma.product_slug_registry.findFirst({
+              where: {
+                tenant_id: heroTenant.id,
+                original_sku: sourceItem.sku,
+              },
+            });
+            if (heroSlugRegistry) {
+              await prisma.product_slug_registry.upsert({
+                where: {
+                  product_slug: heroSlugRegistry.product_slug,
+                },
+                update: {
+                  universal_sku: heroSlugRegistry.universal_sku,
+                  slug_hash: heroSlugRegistry.slug_hash,
+                  tenant_id: targetTenant.id,
+                  original_sku: sourceItem.sku,
+                },
+                create: {
+                  id: `psr-${generateTenantItemId(targetTenant.id)}`,
+                  product_slug: heroSlugRegistry.product_slug,
+                  universal_sku: heroSlugRegistry.universal_sku,
+                  slug_hash: heroSlugRegistry.slug_hash,
+                  tenant_id: targetTenant.id,
+                  original_sku: sourceItem.sku,
+                  created_at: new Date(),
+                },
+              });
+            }
+          } catch (slugError) {
+            console.error(`[Organizations] Failed to propagate slug registry for SKU ${sourceItem.sku}:`, slugError);
+          }
+
+          // Ensure global catalog entry exists
+          try {
+            const hasGlobalEntry = await hasGlobalCatalogEntry(sourceItem.sku);
+            if (!hasGlobalEntry) {
+              let variants: Array<{
+                sku: string;
+                variant_name: string;
+                price_cents: number | null;
+                attributes: Record<string, any> | null;
+              }> = [];
+              if (sourceItem.has_variants) {
+                const rawVariants = await prisma.product_variants.findMany({
+                  where: { parent_item_id: sourceItem.id },
+                  select: { sku: true, variant_name: true, price_cents: true, attributes: true },
+                  orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                });
+                variants = rawVariants.map(v => ({
+                  sku: v.sku,
+                  variant_name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || null,
+                }));
+              }
+              await ensureGlobalCatalogEntry({
+                id: newItem.id,
+                tenant_id: targetTenant.id,
+                sku: sourceItem.sku,
+                name: sourceItem.name,
+                description: sourceItem.description || undefined,
+                brand: sourceItem.brand || undefined,
+                category_path: sourceItem.category_path || undefined,
+                gtin: sourceItem.gtin || undefined,
+                price_cents: sourceItem.price_cents || undefined,
+                image_url: sourceItem.image_url || undefined,
+                has_variants: sourceItem.has_variants || false,
+                variants: variants.map(v => ({
+                  sku: v.sku,
+                  name: v.variant_name,
+                  price_cents: v.price_cents,
+                  attributes: (v.attributes as Record<string, any>) || {},
+                })),
+              });
+            }
+          } catch (catalogError) {
+            console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, catalogError);
+          }
+
+          // Propagate variants if source item has them
+          if (sourceItem.has_variants) {
+            console.log(`[Organizations] SYNC-FROM-HERO: Propagating variants for source ${sourceItem.id} -> target ${newItem.id} (tenant: ${targetTenant.id})`);
+            const variantResult = await propagateVariants(
+              sourceItem.id,
+              targetTenant.id,
+              newItem.id,
+              undefined,
+              sourceItem.directory_category_id,
+              'create'
+            );
+            if (variantResult.errors.length > 0) {
+              console.error(`[Organizations] SYNC-FROM-HERO: Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+            }
           }
 
           results.created.push({ 
@@ -2154,6 +2323,64 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
   } catch (error: any) {
     console.error('[Organizations] Sync from hero error:', error);
     res.status(500).json({ error: 'failed_to_sync_from_hero', message: error.message });
+  }
+});
+
+/**
+ * GET /organizations/product-type-summary
+ * Admin endpoint: Aggregates product type distribution across all organizations.
+ * Returns per-org product mix (which product types they sell) for admin audit view.
+ */
+router.get('/product-type-summary', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const isPlatformAdminUser = await isPlatformAdmin(req.user?.sub || req.user?.userId || '');
+    if (!isPlatformAdminUser) {
+      return res.status(403).json({ error: 'forbidden', message: 'Platform admin access required' });
+    }
+
+    const orgs = await prisma.organizations_list.findMany({
+      select: {
+        id: true,
+        name: true,
+        tenants: { select: { id: true } },
+      },
+    });
+
+    const summary = await Promise.all(
+      orgs.map(async (org) => {
+        const tenantIds = org.tenants.map((t) => t.id);
+        if (tenantIds.length === 0) {
+          return { orgId: org.id, orgName: org.name, productTypes: [], totalItems: 0 };
+        }
+
+        const grouped = await prisma.inventory_items.groupBy({
+          by: ['product_type'],
+          where: { tenant_id: { in: tenantIds } },
+          _count: { id: true },
+        });
+
+        const totalItems = grouped.reduce((sum, g) => sum + g._count.id, 0);
+        const productTypes = grouped.map((g) => ({
+          type: g.product_type || 'unknown',
+          count: g._count.id,
+        }));
+
+        return {
+          orgId: org.id,
+          orgName: org.name,
+          productTypes,
+          totalItems,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      organizations: summary.filter((s) => s.totalItems > 0),
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Product type summary error:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product type summary' });
   }
 });
 

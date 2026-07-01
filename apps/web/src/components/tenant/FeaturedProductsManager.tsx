@@ -22,6 +22,7 @@ import { StockUpdateService } from '@/services/stockUpdateService';
 import { useProduct } from '@/providers/ProductProvider';
 import { PublicProduct } from '@/providers/data/ProductSingleton';
 import { useTenantFeaturedProducts } from '@/hooks/useTenantFeaturedProducts';
+import { useBadgeRuleValidation } from '@/hooks/useBadgeRegistry';
 
 // Helper functions for featured type badges
 const getFeaturedBadgeStyle = (typeId: string): string => {
@@ -303,6 +304,11 @@ export default function FeaturedProductsManager({
   //   }))
   // });
 
+  // Badge rule validation — shows warnings when manual badges contradict product state
+  const { data: ruleValidation } = useBadgeRuleValidation(tenantId);
+  const badgeConflicts = ruleValidation?.conflicts || [];
+  const badgeAutoAssign = ruleValidation?.toAssign || [];
+
   // Local state for modals and UI
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
@@ -457,12 +463,12 @@ export default function FeaturedProductsManager({
   };
 
   const handleProductFeatureAllTypes = async (product: any) => {
-    // Check if tenant has featured access (only for "featured" type)
-    if (selectedType === 'featured' && !hasFeaturedAccess) {
+    // Check if tenant has featured access (only for types requiring tenant access)
+    if (currentType?.requiresTenantAccess && !hasFeaturedAccess) {
       alert('Featured access requires approval. Please contact support to request access.');
       return;
     }
-    
+
     if (!confirm(`Are you sure you want to feature "${product.name}" in the current type (${currentType?.name})?`)) {
       return;
     }
@@ -528,12 +534,64 @@ export default function FeaturedProductsManager({
         </p>
       </div>
 
+      {/* Badge Rule Validation Warnings */}
+      {badgeConflicts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-900">Badge Rule Conflicts Detected</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                Some badges conflict with each other on the same product. The auto-assign job will skip these until conflicts are resolved.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {badgeConflicts.slice(0, 5).map((c, i) => (
+                  <li key={i} className="text-sm text-amber-800">
+                    <strong>{c.badgeKey}</strong> on product <code className="text-xs bg-amber-100 px-1 rounded">{c.inventoryItemId.slice(0, 8)}...</code>
+                    {' '}conflicts with: {c.conflictsWith.join(', ')}
+                  </li>
+                ))}
+                {badgeConflicts.length > 5 && (
+                  <li className="text-sm text-amber-600">...and {badgeConflicts.length - 5} more</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Assign Suggestions */}
+      {badgeAutoAssign.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Zap className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900">Badge Auto-Assign Suggestions</h3>
+              <p className="text-sm text-blue-700 mt-1">
+                The following badges will be auto-assigned on the next rule sync cycle (every 4 hours):
+              </p>
+              <ul className="mt-2 space-y-1">
+                {badgeAutoAssign.slice(0, 5).map((a, i) => (
+                  <li key={i} className="text-sm text-blue-800">
+                    <strong>{a.badgeKey}</strong> for product <code className="text-xs bg-blue-100 px-1 rounded">{a.inventoryItemId.slice(0, 8)}...</code>
+                    {' '}— {a.reason}
+                  </li>
+                ))}
+                {badgeAutoAssign.length > 5 && (
+                  <li className="text-sm text-blue-600">...and {badgeAutoAssign.length - 5} more</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Featured Type Selector */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Featured Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {featuredTypes.map((type) => {
-            const isPayToPlay = type.id === 'featured' && (type as any).isPayToPlay;
+            const isPayToPlay = !!type.requiresTenantAccess;
             const isLocked = isPayToPlay && !hasFeaturedAccess;
             const isPlatformControlled = ['trending', 'recommended'].includes(type.id);
             
@@ -1092,25 +1150,25 @@ export default function FeaturedProductsManager({
                           return;
                         }
                         
-                        // Check if tenant has featured access (only for "featured" type)
-                        if (selectedType === 'featured' && !hasFeaturedAccess) {
+                        // Check if tenant has featured access (only for types requiring tenant access)
+                        if (currentType?.requiresTenantAccess && !hasFeaturedAccess) {
                           alert('Featured access requires approval. Please contact support to request access.');
                           return;
                         }
                         
                         handleError(() => featureProduct(product.id!), 'Failed to feature product');
                       }}
-                      disabled={processing || !product.id || isCurrentTypeAtLimit || (selectedType === 'featured' && !hasFeaturedAccess)}
+                      disabled={processing || !product.id || isCurrentTypeAtLimit || (currentType?.requiresTenantAccess && !hasFeaturedAccess)}
                       className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                         isCurrentTypeAtLimit 
                           ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                          : (selectedType === 'featured' && !hasFeaturedAccess)
+                          : (currentType?.requiresTenantAccess && !hasFeaturedAccess)
                           ? 'bg-orange-400 text-orange-100 cursor-not-allowed'
                           : 'bg-blue-600 text-white'
                       }`}
-                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Featured access requires approval' : `Add to ${currentType?.name}`}
+                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : (currentType?.requiresTenantAccess && !hasFeaturedAccess) ? 'Featured access requires approval' : `Add to ${currentType?.name}`}
                     >
-                      {isCurrentTypeAtLimit ? 'Limit Reached' : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Approval Required' : `Add to ${currentType?.name}`}
+                      {isCurrentTypeAtLimit ? 'Limit Reached' : (currentType?.requiresTenantAccess && !hasFeaturedAccess) ? 'Approval Required' : `Add to ${currentType?.name}`}
                     </button>
                   )}
                   </div>

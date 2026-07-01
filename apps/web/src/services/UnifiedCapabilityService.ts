@@ -205,10 +205,11 @@ interface BackendEffectiveProductTypes {
   enabled: boolean;
   type: string;
   effective_type: string;
+  effective_types: ProductType[];
   is_flexible: boolean;
   allowed_types: ProductType[];
   has_merchant_selection: boolean;
-  merchant_preferences: { product_types_enabled: boolean; selected_product_type: string };
+  merchant_preferences: { product_types_enabled: boolean; selected_product_type: string; selected_product_types: ProductType[] };
 }
 
 interface BackendEffectiveProductOptions {
@@ -544,12 +545,14 @@ function mapProductType(b: BackendEffectiveProductTypes): ProductTypeState {
     enabled: b.enabled,
     type: b.type as ProductTypeState['type'],
     effectiveType: b.effective_type as ProductTypeState['effectiveType'],
+    effectiveTypes: b.effective_types ?? [],
     isFlexible: b.is_flexible,
     allowedTypes: b.allowed_types,
     hasMerchantSelection: b.has_merchant_selection,
     merchantPreferences: {
       product_types_enabled: b.merchant_preferences?.product_types_enabled ?? true,
       selected_product_type: (b.merchant_preferences?.selected_product_type as ProductType | 'none') || 'none',
+      selected_product_types: b.merchant_preferences?.selected_product_types ?? [],
     },
     features: {},
   };

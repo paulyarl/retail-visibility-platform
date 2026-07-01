@@ -131,6 +131,7 @@ router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
                   name: true,
                   sku: true,
                   image_url: true,
+                  product_type: true,
                 },
               },
             },
@@ -233,7 +234,9 @@ router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
           quantity: item.quantity,
           unitPrice: item.unit_price_cents,
           total: item.total_cents,
-          imageUrl: item.inventory_items?.image_url || null
+          imageUrl: item.inventory_items?.image_url || null,
+          productType: item.product_type || item.inventory_items?.product_type || 'physical',
+          digitalDeliveryStatus: item.digital_delivery_status || undefined,
         })),
         payment: payment ? {
           id: payment.id,
@@ -291,7 +294,8 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
               select: {
                 name: true,
                 sku: true,
-                image_url: true
+                image_url: true,
+                product_type: true
               }
             }
           }
@@ -392,7 +396,9 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
         quantity: item.quantity,
         unitPrice: item.unit_price_cents,
         total: item.total_cents,
-        imageUrl: item.inventory_items?.image_url || null
+        imageUrl: item.inventory_items?.image_url || null,
+        productType: item.product_type || item.inventory_items?.product_type || 'physical',
+        digitalDeliveryStatus: item.digital_delivery_status || undefined,
       })),
       payment: payment ? {
         id: payment.id,
@@ -603,6 +609,16 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       });
     }
 
+    // B7.3: Check hybrid fulfillment completion after physical fulfillment update
+    if (fulfillmentStatus === 'fulfilled') {
+      try {
+        const { hybridFulfillmentCoordinator } = await import('../services/HybridFulfillmentCoordinator');
+        await hybridFulfillmentCoordinator.checkHybridFulfillmentComplete(orderId);
+      } catch (hybridError) {
+        console.error('[Tenant Orders] Hybrid fulfillment check failed:', hybridError);
+      }
+    }
+
     // Restore stock for cancelled orders
     if (fulfillmentStatus === 'cancelled') {
       try {
@@ -613,6 +629,27 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       } catch (stockError) {
         console.error(`[Tenant Orders] Failed to restore stock for cancelled order ${orderId}:`, stockError);
         // Don't fail the cancellation if stock restoration fails
+      }
+
+      // Revoke digital access grants for cancelled orders
+      try {
+        const revokedCount = await prisma.digital_access_grants.updateMany({
+          where: {
+            order_id: orderId,
+            status: 'active',
+          },
+          data: {
+            status: 'revoked',
+            revoked_at: new Date(),
+            revoked_reason: 'Order cancelled by merchant',
+            updated_at: new Date(),
+          },
+        });
+        if (revokedCount.count > 0) {
+          console.log(`[Tenant Orders] Revoked ${revokedCount.count} digital access grants for cancelled order: ${orderId}`);
+        }
+      } catch (digitalError) {
+        console.error(`[Tenant Orders] Failed to revoke digital access for cancelled order ${orderId}:`, digitalError);
       }
     }
 
@@ -778,6 +815,121 @@ router.put('/tenants/:tenantId/orders/:orderId/archive', authenticateToken, asyn
       error: 'internal_error',
       message: 'Failed to archive order'
     });
+  }
+});
+
+// GET /api/tenants/:tenantId/orders/:orderId/service-bookings - Get service bookings for an order
+router.get('/tenants/:tenantId/orders/:orderId/service-bookings', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, orderId } = req.params;
+
+    const order = await prisma.orders.findFirst({
+      where: { id: orderId, tenant_id: tenantId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Order not found' });
+    }
+
+    const { serviceFulfillmentService } = await import('../services/ServiceFulfillmentService');
+    const bookings = await serviceFulfillmentService.getOrderBookings(orderId);
+
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    console.error('Error fetching service bookings:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch service bookings' });
+  }
+});
+
+// PUT /api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId - Update a service booking
+router.put('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, orderId, bookingId } = req.params;
+    const { scheduledDate, scheduledTime, durationMinutes, providerId, providerName, serviceLocation, status, notes } = req.body;
+
+    const booking = await prisma.service_bookings.findFirst({
+      where: { id: bookingId, order_id: orderId, tenant_id: tenantId },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Service booking not found' });
+    }
+
+    const validStatuses = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'invalid_status', message: 'Invalid service booking status' });
+    }
+
+    const { serviceFulfillmentService } = await import('../services/ServiceFulfillmentService');
+    const updated = await serviceFulfillmentService.updateBooking(bookingId, {
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
+      scheduledTime,
+      durationMinutes,
+      providerId,
+      providerName,
+      serviceLocation,
+      status,
+      notes,
+    });
+
+    // Send notification on status changes
+    if (status && status !== booking.status) {
+      try {
+        const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+        const order = await prisma.orders.findUnique({
+          where: { id: orderId },
+          select: { order_number: true, customer_email: true, customer_name: true, total_cents: true },
+        });
+        if (order) {
+          if (status === 'completed') {
+            await getOrderNotificationService().notifyServiceCompleted({
+              tenantId,
+              orderId,
+              orderNumber: order.order_number,
+              customerEmail: order.customer_email,
+              customerName: order.customer_name || undefined,
+              amount: order.total_cents,
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error('[Tenant Orders] Failed to send service notification:', notifError);
+      }
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating service booking:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update service booking' });
+  }
+});
+
+// POST /api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider - Assign provider
+router.post('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId, orderId, bookingId } = req.params;
+    const { providerId, providerName } = req.body;
+
+    if (!providerId || !providerName) {
+      return res.status(400).json({ success: false, error: 'missing_fields', message: 'providerId and providerName are required' });
+    }
+
+    const booking = await prisma.service_bookings.findFirst({
+      where: { id: bookingId, order_id: orderId, tenant_id: tenantId },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Service booking not found' });
+    }
+
+    const { serviceFulfillmentService } = await import('../services/ServiceFulfillmentService');
+    const updated = await serviceFulfillmentService.assignProvider(bookingId, providerId, providerName);
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error assigning provider:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to assign provider' });
   }
 });
 

@@ -70,12 +70,12 @@ class BehaviorTrackingService extends ApiSystemSingleton {
 
   /**
    * Send single tracking event
-   * Uses the /api/analytics/events endpoint
+   * Uses the /api/behavior/events endpoint
    */
   async sendEvent(event: TrackingEvent): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/analytics/events',
+        '/behavior/events',
         {
           method: 'POST',
           body: JSON.stringify(event)
@@ -91,12 +91,12 @@ class BehaviorTrackingService extends ApiSystemSingleton {
 
   /**
    * Send batch of tracking events
-   * Uses the /api/analytics/events/batch endpoint
+   * Uses the /api/behavior/events/batch endpoint
    */
   async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/analytics/events/batch',
+        '/behavior/events/batch',
         {
           method: 'POST',
           body: JSON.stringify({ events })
@@ -112,12 +112,12 @@ class BehaviorTrackingService extends ApiSystemSingleton {
 
   /**
    * Send tracking session data
-   * Uses the /api/analytics/sessions endpoint
+   * Uses the /api/behavior/sessions endpoint
    */
   async sendSession(session: TrackingSession): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/analytics/sessions',
+        '/behavior/sessions',
         {
           method: 'POST',
           body: JSON.stringify(session)
@@ -133,11 +133,11 @@ class BehaviorTrackingService extends ApiSystemSingleton {
 
   /**
    * Get behavior analytics
-   * Uses the /api/analytics/behavior endpoint
+   * Uses the /api/behavior/analytics endpoint
    */
   async getBehaviorAnalytics(hours: number = 24): Promise<BehaviorAnalytics> {
     const response = await super.makeEnhancedDefaultRequest<BehaviorAnalytics>(
-      `/analytics/behavior?hours=${hours}`,
+      `/behavior/analytics?hours=${hours}`,
       {},
       `behavior-analytics-${hours}`,
       this.ANALYTICS_TTL
@@ -165,11 +165,11 @@ class BehaviorTrackingService extends ApiSystemSingleton {
 
   /**
    * Get user behavior patterns
-   * Uses the /api/analytics/users/:userId/behavior endpoint
+   * Uses the /api/behavior/patterns/:userId endpoint
    */
   async getUserBehaviorPatterns(userId: string, days: number = 30): Promise<any> {
     const response = await super.makeEnhancedDefaultRequest<any>(
-      `/analytics/users/${userId}/behavior?days=${days}`,
+      `/behavior/patterns/${userId}?days=${days}`,
       {},
       `user-behavior-${userId}-${days}`,
       this.ANALYTICS_TTL

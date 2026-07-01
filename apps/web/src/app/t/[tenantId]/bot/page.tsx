@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import SetTenantId from '@/components/client/SetTenantId';
 import BotDashboardPage from '@/components/bot/BotDashboardPage';
 import TenantBotPageShell from '@/components/bot/TenantBotPageShell';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Bot Dashboard',
@@ -21,7 +22,7 @@ export default async function BotDashboard({ params }: PageProps) {
   }
 
   return (
-    <>
+    <TenantGuard tenantId={tenantId}>
       <SetTenantId tenantId={tenantId} />
       <TenantBotPageShell
         tenantId={tenantId}
@@ -34,6 +35,6 @@ export default async function BotDashboard({ params }: PageProps) {
       >
         <BotDashboardPage tenantId={tenantId} />
       </TenantBotPageShell>
-    </>
+    </TenantGuard>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Star, ShoppingBag, TrendingUp, Save, AlertCircle, ArrowRight, Zap, Tag, Plus } from 'lucide-react';
+import { Star, ShoppingBag, TrendingUp, Save, AlertCircle, ArrowRight, Zap, Tag, Plus, Sparkles, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useFeaturedOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
@@ -90,6 +90,22 @@ function getQuickActions(settings: FeaturedOptionsSettings, tenantId: string): Q
       href: `/t/${tenantId}/items/create`,
       icon: Plus,
       variant: 'product',
+    });
+    actions.push({
+      id: 'custom-badges',
+      label: 'Create Custom Badges',
+      description: 'Design custom badges to highlight products in your storefront',
+      href: `/t/${tenantId}/settings/products/badges`,
+      icon: Sparkles,
+      variant: 'featured',
+    });
+    actions.push({
+      id: 'badge-analytics',
+      label: 'Badge Analytics',
+      description: 'Track badge performance, CTR, and revenue impact',
+      href: `/t/${tenantId}/settings/products/badges/analytics`,
+      icon: BarChart3,
+      variant: 'featured',
     });
   }
 

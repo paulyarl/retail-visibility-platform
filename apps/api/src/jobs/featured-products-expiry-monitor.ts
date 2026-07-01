@@ -21,6 +21,7 @@ export interface FeaturedExpiryMonitorResult {
   autoUnfeatured: number;
   expiringSoonAlerts: number;
   expiredAlerts: number;
+  badgeRuleWarnings: number;
   errors: string[];
 }
 
@@ -32,6 +33,7 @@ export async function processFeaturedProductsExpiry(): Promise<FeaturedExpiryMon
     autoUnfeatured: 0,
     expiringSoonAlerts: 0,
     expiredAlerts: 0,
+    badgeRuleWarnings: 0,
     errors: [],
   };
 
@@ -156,7 +158,38 @@ export async function processFeaturedProductsExpiry(): Promise<FeaturedExpiryMon
       }
     }
 
-    console.log(`[FeaturedExpiryMonitor] Complete. Unfeatured: ${result.autoUnfeatured}, Expiring alerts: ${result.expiringSoonAlerts}, Expired alerts: ${result.expiredAlerts}, Errors: ${result.errors.length}`);
+    // 5. Badge rule validation — check for manual badges that contradict product state
+    try {
+      const { evaluateBadgeRulesForTenant } = await import('../services/BadgeRuleEngine');
+      const allTenants = new Set<string>([
+        ...Array.from(expiredByTenant.keys()),
+        ...Array.from(expiringByTenant.keys()),
+      ]);
+
+      // Also check tenants with auto-assigned badges
+      const autoAssignedTenants = await prisma.featured_products.findMany({
+        where: { is_active: true, assignment_source: 'auto' },
+        select: { tenant_id: true },
+        distinct: ['tenant_id'],
+      });
+      autoAssignedTenants.forEach(t => allTenants.add(t.tenant_id));
+
+      for (const tenantId of allTenants) {
+        try {
+          const evaluation = await evaluateBadgeRulesForTenant(tenantId);
+          if (evaluation.conflicts.length > 0) {
+            result.badgeRuleWarnings += evaluation.conflicts.length;
+            console.log(`[FeaturedExpiryMonitor] Tenant ${tenantId}: ${evaluation.conflicts.length} badge rule conflicts detected`);
+          }
+        } catch (err) {
+          // Non-fatal — rule engine may fail if registry not populated
+        }
+      }
+    } catch (importErr) {
+      // BadgeRuleEngine not available — skip rule validation
+    }
+
+    console.log(`[FeaturedExpiryMonitor] Complete. Unfeatured: ${result.autoUnfeatured}, Expiring alerts: ${result.expiringSoonAlerts}, Expired alerts: ${result.expiredAlerts}, Rule warnings: ${result.badgeRuleWarnings}, Errors: ${result.errors.length}`);
 
     return result;
   } catch (error: any) {

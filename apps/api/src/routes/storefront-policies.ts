@@ -10,8 +10,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import storefrontPolicyService, { PolicyType } from '../services/StorefrontPolicyService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = Router();
 
@@ -74,7 +76,7 @@ router.get('/:tenantId/storefront-policies', authenticateToken, async (req, res)
 });
 
 // Merchant: Update policies
-router.put('/:tenantId/storefront-policies', authenticateToken, async (req, res) => {
+router.put('/:tenantId/storefront-policies', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validation = policySchema.safeParse(req.body);
@@ -84,6 +86,9 @@ router.put('/:tenantId/storefront-policies', authenticateToken, async (req, res)
     const updated = await storefrontPolicyService.upsertPolicies(tenantId, validation.data);
     invalidateEffectiveCapabilities(tenantId);
     res.json({ success: true, policies: updated });
+
+    // Refresh policy knowledge embeddings
+    BotKnowledgeEmbeddingService.getInstance().refreshPolicyEmbeddings(tenantId).catch(() => {});
   } catch (error) {
     console.error('Error updating storefront policies:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update policies' });

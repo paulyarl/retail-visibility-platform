@@ -259,6 +259,14 @@ class BehaviorTrackingService extends UniversalSingleton {
   }
 
   /**
+   * Save session data (from frontend)
+   */
+  async saveSession(session: TrackingSession): Promise<TrackingSession> {
+    await this.storeSession(session);
+    return session;
+  }
+
+  /**
    * Get session data
    */
   async getSessionData(sessionId: string): Promise<TrackingSession | null> {

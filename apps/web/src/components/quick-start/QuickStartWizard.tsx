@@ -23,6 +23,7 @@ interface QuickStartWizardProps {
     createAsDrafts: boolean;
     generateImages: boolean;
     imageQuality: 'standard' | 'hd';
+    productType: 'physical' | 'digital' | 'hybrid' | 'service';
   }) => Promise<void>;
   loading?: boolean;
   error?: string | null;
@@ -33,6 +34,7 @@ interface QuickStartWizardProps {
   tenants?: Array<{ id: string; name: string }>;
   selectedTenant?: string | null;
   onTenantSelect?: (tenantId: string) => void;
+  allowedProductTypes?: ('physical' | 'digital' | 'hybrid' | 'service')[];
 }
 
 export default function QuickStartWizard({
@@ -47,11 +49,13 @@ export default function QuickStartWizard({
   tenants = [],
   selectedTenant = null,
   onTenantSelect,
+  allowedProductTypes,
 }: QuickStartWizardProps) {
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [productCount, setProductCount] = useState<number>(25);
   const [generateImages, setGenerateImages] = useState<boolean>(false);
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
+  const [productType, setProductType] = useState<'physical' | 'digital' | 'hybrid' | 'service'>('physical');
 
   const handleGenerate = async () => {
     if (!selectedScenario) return;
@@ -64,6 +68,7 @@ export default function QuickStartWizard({
       createAsDrafts: true,
       generateImages,
       imageQuality,
+      productType,
     });
   };
 
@@ -232,6 +237,39 @@ export default function QuickStartWizard({
                 {showTenantSelector ? '3.' : '2.'} Configure Products
               </h3>
               
+              {/* Product Type Selection */}
+              <div className="mb-8">
+                <label className="text-sm font-medium text-neutral-700 mb-3 block">Product Type</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([
+                    { value: 'physical', label: '📦 Physical', sub: 'Shipped items' },
+                    { value: 'digital', label: '💾 Digital', sub: 'Downloadable' },
+                    { value: 'hybrid', label: '🔀 Hybrid', sub: 'Physical + digital' },
+                    { value: 'service', label: '🛎️ Service', sub: 'Bookable services' },
+                  ] as { value: 'physical' | 'digital' | 'hybrid' | 'service'; label: string; sub: string }[])
+                    .filter(t => !allowedProductTypes || allowedProductTypes.includes(t.value))
+                    .map((t) => (
+                      <button
+                        key={t.value}
+                        onClick={() => setProductType(t.value)}
+                        className={`p-4 rounded-lg border-2 transition-all text-center ${
+                          productType === t.value
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-neutral-200 hover:border-purple-300'
+                        }`}
+                      >
+                        <div className="font-medium text-neutral-900">{t.label}</div>
+                        <div className="text-xs text-neutral-500 mt-1">{t.sub}</div>
+                      </button>
+                    ))}
+                </div>
+                {allowedProductTypes && allowedProductTypes.length < 4 && (
+                  <p className="text-xs text-neutral-500 mt-2">
+                    Your plan allows: {allowedProductTypes.join(', ')}. Upgrade to unlock more types.
+                  </p>
+                )}
+              </div>
+
               {/* Product Count */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">

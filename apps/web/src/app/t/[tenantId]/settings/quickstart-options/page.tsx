@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import QuickstartOptionsSettingsClient from './QuickstartOptionsSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Quickstart Options - Store Settings',
@@ -18,5 +19,9 @@ export default async function QuickstartOptionsSettingsPage({ params }: PageProp
     redirect('/');
   }
 
-  return <QuickstartOptionsSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <QuickstartOptionsSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

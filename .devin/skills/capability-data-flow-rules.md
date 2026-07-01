@@ -345,6 +345,29 @@ All resolvers MUST determine the `enabled` state using this precedence:
 
 This replaces ad-hoc enablement logic. The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
 
+### R23: Flexible Tier Unlocks ALL Features — No Exceptions
+When `*_flexible` is true, the resolver MUST treat EVERY feature flag within that capability as enabled — including standalone flags that are not part of any `allowed_*_types` array. The `flexible ||` prefix MUST be applied to every individual feature check, not just group-level allowed-type arrays.
+
+**Why flexible exists**: Flexible allows admins to grant a tier full access to a capability without individually seeding every feature key into `tier_features_list`. Higher tiers (e.g., organization, chain) get `*_flexible` instead of dozens of individual feature rows. This is a powerful convenience — but only if resolvers honor it universally.
+
+**Pattern**:
+```ts
+const flexible = !!features.featured_flexible;
+
+// CORRECT — flexible unlocks everything:
+expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor,
+customBadgeSlotsEnabled: flexible || !!features.featured_custom_badge_slots,
+const staticEnabled = flexible || !!feat.chatbot_static_enabled;
+
+// WRONG — flexible is ignored, feature stays disabled even on flexible tiers:
+expiryMonitorEnabled: !!features.featured_expiry_monitor,
+const staticEnabled = !!feat.chatbot_static_enabled;
+```
+
+**Audit rule**: For every `!!features.<key>` or `!!feat.<key>` check in a resolver, verify that `flexible ||` precedes it. The only exceptions are the master gate checks themselves (`*_enabled`, `*_disabled`, `*_flexible`) which define `enabled`, `disabled`, and `flexible` — these are the inputs, not the consumers, of the flexible logic.
+
+**Common trap**: Standalone flags added outside the group structure (e.g., `featured_expiry_monitor`, `featured_custom_badge_slots`) are the most likely to miss the `flexible ||` prefix because they don't follow the `if (flexible) { push(...all) } else { if (feat.x) push(x) }` array pattern. Always check standalone boolean flags.
+
 ### R18: Cross-Capability Constraints Are Post-Resolution
 Cross-capability constraints MUST run as a post-resolution pass, never inside individual resolvers. Individual resolvers remain pure functions of `(features, merchantPrefs)`. The Cross-Capability Constraint Layer (CCL) operates on the assembled `effective` manifest after all resolvers complete.
 

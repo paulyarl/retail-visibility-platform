@@ -4,7 +4,6 @@
  * Single source of truth for tenant switching logic
  */
 
-import { isFeatureEnabled } from './featureFlags';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { LocalStorageCache } from './cache/local-storage-cache';
 
@@ -145,7 +144,7 @@ export async function getTenantNavigationUrl(options: TenantNavigationOptions): 
   // Check if tenant URLs are enabled for platform → tenant navigation
   const tenantUrlsEnabled = 
     (typeof window !== 'undefined' && localStorage.getItem('ff_tenant_urls') === 'on') || 
-    isFeatureEnabled('FF_TENANT_URLS', tenantId);
+    process.env.NEXT_PUBLIC_FF_TENANT_URLS !== 'false';
   
   if (tenantUrlsEnabled) {
     // Map platform pages to tenant-scoped equivalents

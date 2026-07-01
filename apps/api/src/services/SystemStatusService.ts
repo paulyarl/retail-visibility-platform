@@ -149,12 +149,13 @@ function buildStatusItems(
         link: `/t/${tenantId}/settings/product-types`,
       });
     } else {
-      const pt = eff?.product_types.effective_type ?? 'none';
+      const pts = eff?.product_types.effective_types ?? [];
+      const ptLabel = pts.length > 0 ? pts.map(capitalize).join(', ') : (eff?.product_types.effective_type ?? 'none');
       items.push({
         key: 'product-type',
         label: 'Product Type',
         status: 'ok',
-        detail: pt !== 'none' && pt !== 'flexible' ? capitalize(pt) : undefined,
+        detail: ptLabel !== 'none' && ptLabel !== 'flexible' ? ptLabel : undefined,
         link: `/t/${tenantId}/settings/product-types`,
       });
     }

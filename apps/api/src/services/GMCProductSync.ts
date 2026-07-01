@@ -12,9 +12,13 @@
 
 import { prisma } from '../prisma';
 import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
+import { validateProductForGMC } from './GMCValidationService';
 
 const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
 const CONTENT_API_VERSION = 'v2.1';
+
+/** Product types that can be synced to Google Merchant Center */
+const GMC_SYNCABLE_PRODUCT_TYPES = ['physical', 'hybrid'] as const;
 
 interface ProductData {
   id: string;
@@ -40,6 +44,11 @@ interface ProductData {
   googleProductCategory?: string;
   productType?: string;
   identifierExists?: boolean;
+  customLabel0?: string;
+  customLabel1?: string;
+  customLabel2?: string;
+  customLabel3?: string;
+  customLabel4?: string;
 }
 
 interface SyncResult {
@@ -48,6 +57,9 @@ interface SyncResult {
   offerId: string;
   error?: string;
   googleProductId?: string;
+  variantsSynced?: number;
+  variantsFailed?: number;
+  validationWarnings?: Array<{ field: string; message: string }>;
 }
 
 interface BatchSyncResult {
@@ -56,6 +68,10 @@ interface BatchSyncResult {
   synced: number;
   failed: number;
   results: SyncResult[];
+  validationSummary?: {
+    errors: number;
+    warnings: number;
+  };
 }
 
 /**
@@ -125,13 +141,14 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
 }
 
 /**
- * Convert platform inventory item to Google Product format
+ * Convert platform inventory item to Google Product format.
+ * If `variant` is provided, adds variant-specific GMC fields (itemGroupId, color, size, etc.).
  */
 function convertToGoogleProduct(
   item: any,
   tenantId: string,
   websiteUrl: string,
-  options?: { fulfillmentMode?: string; pickupMethod?: string; pickupSla?: string },
+  options?: { fulfillmentMode?: string; pickupMethod?: string; pickupSla?: string; variant?: any },
   targetCountry: string = 'US',
   contentLanguage: string = 'en'
 ): any {
@@ -210,6 +227,56 @@ function convertToGoogleProduct(
     googleProduct.identifierExists = false;
   }
 
+  // Map badge types to GMC custom labels (custom_label_0 through custom_label_4)
+  // This enables badge-based filtering and reporting in Google Shopping campaigns
+  const badgeTypes: string[] = item.featured_type_array || (item.featured_type ? [item.featured_type] : []);
+  if (badgeTypes.length > 0) {
+    const labelFields = ['customLabel0', 'customLabel1', 'customLabel2', 'customLabel3', 'customLabel4'] as const;
+    for (let i = 0; i < Math.min(badgeTypes.length, 5); i++) {
+      googleProduct[labelFields[i]] = badgeTypes[i];
+    }
+  }
+
+  // Variant-specific GMC fields
+  const variant = options?.variant;
+  if (variant) {
+    // itemGroupId links variant to the parent product
+    googleProduct.itemGroupId = item.sku || item.id;
+
+    // Override offerId, title, price, availability, and image with variant values
+    googleProduct.offerId = variant.sku || `${item.sku || item.id}-${variant.id.slice(-6)}`;
+    googleProduct.title = `${item.name || item.title} - ${variant.variant_name}`;
+    if (variant.price_cents != null) {
+      const vPrice = (variant.price_cents / 100).toFixed(2);
+      googleProduct.price = { value: vPrice, currency: 'USD' };
+      if (variant.sale_price_cents != null) {
+        const vSale = (variant.sale_price_cents / 100).toFixed(2);
+        if (parseFloat(vSale) < parseFloat(vPrice)) {
+          googleProduct.salePrice = { value: vSale, currency: 'USD' };
+        }
+      }
+    }
+    googleProduct.availability = variant.stock != null && variant.stock > 0 ? 'in stock' : 'out of stock';
+    if (variant.image_url) {
+      googleProduct.imageLink = variant.image_url;
+    }
+
+    // Map variant attributes to GMC fields
+    const attrs = variant.attributes || {};
+    const attrMap: Record<string, string> = {
+      color: 'color',
+      size: 'size',
+      pattern: 'pattern',
+      material: 'material',
+      gender: 'gender',
+      age_group: 'ageGroup',
+    };
+    for (const [key, gmcKey] of Object.entries(attrMap)) {
+      const val = attrs[key] || attrs[key.toLowerCase()];
+      if (val) googleProduct[gmcKey] = val;
+    }
+  }
+
   return googleProduct;
 }
 
@@ -235,9 +302,66 @@ export async function syncProduct(
       return { success: false, productId: itemId, offerId: '', error: 'Item not found' };
     }
 
+    // Fetch active badge assignments for GMC custom_label mapping
+    const badges = await prisma.featured_products.findMany({
+      where: {
+        inventory_item_id: itemId,
+        is_active: true,
+      },
+      select: { featured_type: true },
+    });
+    (item as any).featured_type_array = badges.map(b => b.featured_type);
+
+    // Resolve Google product category from platform_categories based on item's category_path
+    const catPath = (item as any).category_path as string[] | undefined;
+    if (catPath && catPath.length > 0 && !(item as any).google_product_category_id) {
+      const platformCats = await prisma.platform_categories.findMany({
+        where: { is_active: true, google_category_id: { not: null } as any },
+        select: { name: true, google_category_id: true },
+      });
+      const googleCatByPlatformName = new Map<string, string>();
+      for (const pc of platformCats) {
+        if (pc.google_category_id) {
+          googleCatByPlatformName.set(pc.name.toLowerCase(), pc.google_category_id);
+        }
+      }
+      for (let i = catPath.length - 1; i >= 0; i--) {
+        const gcid = googleCatByPlatformName.get(catPath[i].toLowerCase());
+        if (gcid) {
+          (item as any).google_product_category_id = gcid;
+          break;
+        }
+      }
+    }
+
     // Check if item is public (visibility = 'public')
     if (item.visibility !== 'public') {
       return { success: false, productId: itemId, offerId: item.sku || '', error: 'Item is not public' };
+    }
+
+    // Check if item product type is syncable to Google Shopping
+    const productType = (item as any).product_type || 'physical';
+    if (!GMC_SYNCABLE_PRODUCT_TYPES.includes(productType as 'physical' | 'hybrid')) {
+      return { success: false, productId: itemId, offerId: item.sku || '', error: `Product type '${productType}' is not syncable to Google Shopping (only physical and hybrid)` };
+    }
+
+    // Pre-sync validation (warnings only, don't block)
+    const validation = validateProductForGMC(item);
+    const validationWarnings = validation.issues
+      .filter(i => i.severity === 'warning')
+      .map(i => ({ field: i.field, message: i.message }));
+    if (validation.errors > 0) {
+      const errorMessages = validation.issues
+        .filter(i => i.severity === 'error')
+        .map(i => i.message)
+        .join('; ');
+      return {
+        success: false,
+        productId: itemId,
+        offerId: item.sku || '',
+        error: `Validation failed: ${errorMessages}`,
+        validationWarnings,
+      };
     }
 
     // Get tenant business profile for website and subdomain
@@ -253,13 +377,15 @@ export async function syncProduct(
     });
 
     // Build website URL with subdomain support
+    // GMC requires product links to point to a domain the merchant controls.
+    // The fallback visibleshelf.com/store/{tenantId} URL causes mismatched domain errors.
     let websiteUrl: string;
     if (tenant?.subdomain) {
-      // Use tenant subdomain: https://{subdomain}.visibleshelf.com
       websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    } else if (businessProfile?.website) {
+      websiteUrl = businessProfile.website;
     } else {
-      // Fallback to business profile website or default store URL
-      websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+      return { success: false, productId: itemId, offerId: item.sku || '', error: 'Storefront not published: tenant must have a subdomain or website configured before GMC sync (fallback URL causes mismatched domain errors)' };
     }
 
     // Get merchant link settings (pickup-only, etc.)
@@ -319,11 +445,62 @@ export async function syncProduct(
     });
 
     console.log(`[GMCProductSync] Synced product ${itemId} to GMC`);
+
+    // Sync product variants as separate GMC entries (linked via itemGroupId)
+    const variants = await prisma.product_variants.findMany({
+      where: { parent_item_id: itemId, is_active: true },
+      take: 100,
+    });
+
+    let variantSynced = 0;
+    let variantFailed = 0;
+
+    for (const variant of variants) {
+      try {
+        const variantProduct = convertToGoogleProduct(item, tenantId, websiteUrl, {
+          fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
+          pickupMethod: merchantLink?.pickup_method || undefined,
+          pickupSla: merchantLink?.pickup_sla || undefined,
+          variant,
+        });
+
+        const variantResponse = await fetch(
+          `${GMC_API_BASE}/content/${CONTENT_API_VERSION}/${auth.merchantId}/products`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${auth.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(variantProduct),
+          }
+        );
+
+        if (variantResponse.ok) {
+          variantSynced++;
+        } else {
+          variantFailed++;
+          const vError = await variantResponse.text();
+          console.error(`[GMCProductSync] Failed to sync variant ${variant.id}:`, vError);
+        }
+      } catch (variantError) {
+        variantFailed++;
+        console.error(`[GMCProductSync] Error syncing variant ${variant.id}:`, variantError);
+      }
+    }
+
+    if (variants.length > 0) {
+      console.log(`[GMCProductSync] Variant sync for ${itemId}: ${variantSynced} synced, ${variantFailed} failed`);
+    }
+
     return { 
       success: true, 
       productId: itemId, 
       offerId: googleProduct.offerId,
-      googleProductId: result.id 
+      googleProductId: result.id,
+      variantsSynced: variantSynced,
+      variantsFailed: variantFailed,
+      validationWarnings,
     };
   } catch (error: any) {
     console.error(`[GMCProductSync] Error syncing product ${itemId}:`, error);
@@ -353,11 +530,13 @@ export async function batchSyncProducts(
     }
 
     // Get items to sync
-    // Use visibility='public' for public items and exclude trashed items
+    // Use visibility='public' for public items, exclude trashed items,
+    // and only sync product types that are valid for Google Shopping (physical, hybrid)
     const whereClause: any = {
       tenant_id: tenantId,
       visibility: 'public',
       item_status: { not: 'trashed' },
+      product_type: { in: [...GMC_SYNCABLE_PRODUCT_TYPES] },
     };
 
     if (itemIds && itemIds.length > 0) {
@@ -373,6 +552,51 @@ export async function batchSyncProducts(
       return { success: true, total: 0, synced: 0, failed: 0, results: [] };
     }
 
+    // Fetch active badge assignments for all items (for GMC custom_label mapping)
+    const itemIdsList = items.map(i => i.id);
+    const allBadges = await prisma.featured_products.findMany({
+      where: {
+        inventory_item_id: { in: itemIdsList },
+        is_active: true,
+      },
+      select: { inventory_item_id: true, featured_type: true },
+    });
+    const badgesByItem = new Map<string, string[]>();
+    for (const b of allBadges) {
+      const arr = badgesByItem.get(b.inventory_item_id) || [];
+      arr.push(b.featured_type);
+      badgesByItem.set(b.inventory_item_id, arr);
+    }
+    for (const item of items) {
+      (item as any).featured_type_array = badgesByItem.get(item.id) || [];
+    }
+
+    // Resolve Google product category IDs from platform_categories
+    // Match item.category_path entries against platform_categories.name → google_category_id
+    const platformCats = await prisma.platform_categories.findMany({
+      where: { is_active: true, google_category_id: { not: null } as any },
+      select: { name: true, google_category_id: true },
+    });
+    const googleCatByPlatformName = new Map<string, string>();
+    for (const pc of platformCats) {
+      if (pc.google_category_id) {
+        googleCatByPlatformName.set(pc.name.toLowerCase(), pc.google_category_id);
+      }
+    }
+    for (const item of items) {
+      const catPath = (item as any).category_path as string[] | undefined;
+      if (catPath && catPath.length > 0 && !(item as any).google_product_category_id) {
+        // Try matching from most specific (last) to least specific (first)
+        for (let i = catPath.length - 1; i >= 0; i--) {
+          const gcid = googleCatByPlatformName.get(catPath[i].toLowerCase());
+          if (gcid) {
+            (item as any).google_product_category_id = gcid;
+            break;
+          }
+        }
+      }
+    }
+
     // Get tenant business profile for website and subdomain
     const businessProfile = await prisma.tenant_business_profiles_list.findFirst({
       where: { tenant_id: tenantId },
@@ -386,13 +610,20 @@ export async function batchSyncProducts(
     });
 
     // Build website URL with subdomain support
+    // GMC requires product links to point to a domain the merchant controls.
     let websiteUrl: string;
     if (tenant?.subdomain) {
-      // Use tenant subdomain: https://{subdomain}.visibleshelf.com
       websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    } else if (businessProfile?.website) {
+      websiteUrl = businessProfile.website;
     } else {
-      // Fallback to business profile website or default store URL
-      websiteUrl = businessProfile?.website || `https://visibleshelf.com/store/${tenantId}`;
+      return {
+        success: false,
+        total: 0,
+        synced: 0,
+        failed: 0,
+        results: [{ success: false, productId: '', offerId: '', error: 'Storefront not published: tenant must have a subdomain or website configured before GMC sync' }]
+      };
     }
 
     // Get merchant link settings (pickup-only, etc.)
@@ -415,13 +646,70 @@ export async function batchSyncProducts(
       pickupSla: merchantLink?.pickup_sla || undefined,
     };
 
-    // Build batch entries
-    const batchEntries = items.map((item, index) => ({
-      batchId: index + 1,
-      merchantId: auth.merchantId,
-      method: 'insert',
-      product: convertToGoogleProduct(item, tenantId, websiteUrl, merchantSettings),
-    }));
+    // Fetch active variants for all items (for variant-aware batch sync)
+    const allVariants = await prisma.product_variants.findMany({
+      where: { parent_item_id: { in: itemIdsList }, is_active: true },
+      take: 2000,
+    });
+    const variantsByItem = new Map<string, any[]>();
+    for (const v of allVariants) {
+      const arr = variantsByItem.get(v.parent_item_id) || [];
+      arr.push(v);
+      variantsByItem.set(v.parent_item_id, arr);
+    }
+
+    // Build batch entries (parent products + variant products)
+    const batchEntries: any[] = [];
+    let batchId = 0;
+    let synced = 0;
+    let failed = 0;
+    let totalValidationErrors = 0;
+    let totalValidationWarnings = 0;
+
+    for (const item of items) {
+      // Pre-sync validation for this item
+      const validation = validateProductForGMC(item);
+      totalValidationErrors += validation.errors;
+      totalValidationWarnings += validation.warnings;
+
+      // Skip items with validation errors (they would be rejected by Google)
+      if (validation.errors > 0) {
+        const errorMessages = validation.issues
+          .filter(i => i.severity === 'error')
+          .map(i => i.message)
+          .join('; ');
+        results.push({
+          success: false,
+          productId: item.id,
+          offerId: item.sku || item.id,
+          error: `Validation failed: ${errorMessages}`,
+          validationWarnings: validation.issues
+            .filter(i => i.severity === 'warning')
+            .map(i => ({ field: i.field, message: i.message })),
+        });
+        failed++;
+        continue;
+      }
+
+      // Parent product entry
+      batchEntries.push({
+        batchId: ++batchId,
+        merchantId: auth.merchantId,
+        method: 'insert',
+        product: convertToGoogleProduct(item, tenantId, websiteUrl, merchantSettings),
+      });
+
+      // Variant product entries
+      const variants = variantsByItem.get(item.id) || [];
+      for (const variant of variants) {
+        batchEntries.push({
+          batchId: ++batchId,
+          merchantId: auth.merchantId,
+          method: 'insert',
+          product: convertToGoogleProduct(item, tenantId, websiteUrl, { ...merchantSettings, variant }),
+        });
+      }
+    }
 
     // Use Content API products.custombatch for batch operations
     const response = await fetch(
@@ -451,54 +739,70 @@ export async function batchSyncProducts(
     const batchResult = await response.json() as { entries?: any[] };
     const entries = batchResult.entries || [];
 
-    let synced = 0;
-    let failed = 0;
+    const processedItemIds = new Set<string>();
 
     // Process batch results
     for (const entry of entries) {
-      const item = items[(entry as any).batchId - 1];
-      if (!item) continue;
+      const batchEntry = batchEntries[(entry as any).batchId - 1];
+      if (!batchEntry) continue;
+
+      const offerId = batchEntry.product.offerId;
+      const isVariant = !!batchEntry.product.itemGroupId;
+      const productId = isVariant ? offerId : (items.find(i => (i.sku || i.id) === offerId)?.id || offerId);
 
       if (entry.errors) {
         failed++;
-        results.push({
-          success: false,
-          productId: item.id,
-          offerId: item.sku || item.id,
-          error: entry.errors.map((e: any) => e.message).join(', '),
-        });
+        if (!isVariant) {
+          results.push({
+            success: false,
+            productId,
+            offerId,
+            error: entry.errors.map((e: any) => e.message).join(', '),
+          });
 
-        // Update item sync status
-        await prisma.inventory_items.update({
-          where: { id: item.id },
-          data: {
-            sync_status: 'error',
-            updated_at: new Date(),
-          },
-        });
+          // Update item sync status
+          await prisma.inventory_items.update({
+            where: { id: productId },
+            data: {
+              sync_status: 'error',
+              updated_at: new Date(),
+            },
+          });
+        }
       } else {
         synced++;
-        results.push({
-          success: true,
-          productId: item.id,
-          offerId: item.sku || item.id,
-          googleProductId: entry.product?.id,
-        });
+        if (!isVariant && !processedItemIds.has(productId)) {
+          processedItemIds.add(productId);
+          results.push({
+            success: true,
+            productId,
+            offerId,
+            googleProductId: entry.product?.id,
+          });
 
-        // Update item with GMC sync status
-        await prisma.inventory_items.update({
-          where: { id: item.id },
-          data: {
-            sync_status: 'success',
-            synced_at: new Date(),
-            updated_at: new Date(),
-          },
-        });
+          // Update item with GMC sync status
+          await prisma.inventory_items.update({
+            where: { id: productId },
+            data: {
+              sync_status: 'success',
+              synced_at: new Date(),
+              updated_at: new Date(),
+            },
+          });
+        }
       }
     }
 
-    console.log(`[GMCProductSync] Batch sync complete: ${synced} synced, ${failed} failed`);
-    return { success: failed === 0, total: items.length, synced, failed, results };
+    const totalEntries = batchEntries.length;
+    console.log(`[GMCProductSync] Batch sync complete: ${synced} synced, ${failed} failed (${totalEntries} total entries including variants)`);
+    return {
+      success: failed === 0,
+      total: items.length,
+      synced,
+      failed,
+      results,
+      validationSummary: { errors: totalValidationErrors, warnings: totalValidationWarnings },
+    };
   } catch (error: any) {
     console.error(`[GMCProductSync] Batch sync error:`, error);
     return { 
@@ -700,6 +1004,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   pendingProducts: number;
   errorProducts: number;
   lastSyncAt: Date | null;
+  storefrontReady: boolean;
+  syncableProducts: number;
   // Domain validation warnings
   domainValidation?: {
     hasWebsiteConfigured: boolean;
@@ -781,6 +1087,15 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       pendingProducts: pending,
       errorProducts: errors,
       lastSyncAt: merchantLink?.last_sync_at || null,
+      storefrontReady: !!tenant?.subdomain,
+      syncableProducts: await prisma.inventory_items.count({
+        where: {
+          tenant_id: tenantId,
+          visibility: 'public',
+          item_status: { not: 'trashed' },
+          product_type: { in: [...GMC_SYNCABLE_PRODUCT_TYPES] },
+        },
+      }),
     };
   } catch (error) {
     console.error(`[GMCProductSync] Error getting sync status:`, error);
@@ -800,6 +1115,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       pendingProducts: 0,
       errorProducts: 0,
       lastSyncAt: null,
+      storefrontReady: false,
+      syncableProducts: 0,
     };
   }
 }

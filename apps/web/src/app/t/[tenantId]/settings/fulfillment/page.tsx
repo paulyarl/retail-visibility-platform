@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Button } from '@mantine/core';
 import FulfillmentSettingsClient from './FulfillmentSettingsClient';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Fulfillment Settings - Store Settings',
@@ -19,5 +20,9 @@ export default async function FulfillmentSettingsPage({ params }: PageProps) {
     redirect('/');
   }
 
-  return <FulfillmentSettingsClient tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <FulfillmentSettingsClient tenantId={tenantId} />
+    </TenantGuard>
+  );
 }

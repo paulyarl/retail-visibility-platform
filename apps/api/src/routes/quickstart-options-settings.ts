@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateQuickstartOptionsSettingsId } from '../lib/id-generator';
@@ -80,7 +81,7 @@ router.get('/:tenantId/quickstart-options', authenticateToken, async (req, res) 
 });
 
 // Update quickstart options settings for a tenant
-router.put('/:tenantId/quickstart-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/quickstart-options', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

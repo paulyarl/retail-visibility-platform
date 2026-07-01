@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../../prisma';
-import { digitalFulfillmentService } from '../../services/digital-assets';
+import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { randomUUID } from 'crypto';
 
 const router = Router();
@@ -121,26 +121,8 @@ router.post('/process-payment', async (req, res) => {
       },
     });
 
-    // Fulfill digital products
-    try {
-      const hasDigital = await digitalFulfillmentService.hasDigitalProducts(orderId);
-      if (hasDigital) {
-        console.log('[Square] Order contains digital products, fulfilling...');
-        const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-        const fulfillmentResult = await digitalFulfillmentService.fulfillOrder(
-          orderId,
-          baseUrl
-        );
-        console.log('[Square] Digital fulfillment result:', {
-          success: fulfillmentResult.success,
-          grants: fulfillmentResult.accessGrants.length,
-          errors: fulfillmentResult.errors.length,
-        });
-      }
-    } catch (error) {
-      console.error('[Square] Digital fulfillment failed:', error);
-      // Don't fail the payment if digital fulfillment fails - can retry later
-    }
+    // Decrement stock and fulfill digital products via shared coordinator
+    await PostPaymentFulfillment.run(orderId);
 
     console.log('[Square] Payment processed successfully:', {
       orderId,
@@ -237,17 +219,10 @@ router.post('/webhook', async (req, res) => {
               },
             });
 
-            // Decrement stock when payment status changes to paid
+            // Decrement stock and fulfill digital products when payment status changes to paid
             if (!wasPaid && isNowPaid) {
-              try {
-                const { getStockService } = await import('../../services/StockService');
-                const stockService = getStockService(prisma);
-                await stockService.decrementStockForOrder(payment.order_id);
-                console.log(`[Square] Stock decremented for order ${payment.order_id} after payment completion`);
-              } catch (stockError) {
-                console.error(`[Square] Failed to decrement stock for order ${payment.order_id}:`, stockError);
-                // Don't fail the payment processing if stock decrement fails
-              }
+              await PostPaymentFulfillment.run(payment.order_id);
+              console.log(`[Square] Post-payment fulfillment completed for order ${payment.order_id}`);
             }
           }
         }

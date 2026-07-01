@@ -26,7 +26,19 @@ const router = Router();
 router.get('/consolidated/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
+    const { badge } = req.query;
     const pool = getDirectPool();
+
+    // Build badge filter clause for mv_global_discovery queries
+    let badgeFilter = '';
+    const badgeParams: any[] = [];
+    if (badge && typeof badge === 'string') {
+      const badgeTypes = badge.split(',').map(b => b.trim()).filter(Boolean);
+      if (badgeTypes.length > 0) {
+        badgeFilter = `AND featured_type = ANY($1)`;
+        badgeParams.push(badgeTypes);
+      }
+    }
 
     // Start all queries in parallel
     const [
@@ -108,9 +120,10 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           AND featured_is_active = true
           AND item_status = 'active'
           AND visibility = 'public'
+          ${badgeFilter}
         ORDER BY inventory_item_id, featured_priority DESC, featured_at DESC
         LIMIT 6`,
-        [slug]
+        badgeParams.length > 0 ? [...badgeParams, slug] : [slug]
       ),
 
       // 3. Store types
@@ -157,9 +170,10 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           AND dsl.is_published = true
           AND mv.item_status = 'active'
           AND mv.visibility = 'public'
+          ${badgeFilter ? badgeFilter.replace('$1', '$1') : ''}
         ORDER BY inventory_item_id, RANDOM()
         LIMIT 12`,
-        []
+        badgeParams.length > 0 ? badgeParams : []
       ),
 
       // Note: Recommendations and last viewed are fetched separately by the frontend

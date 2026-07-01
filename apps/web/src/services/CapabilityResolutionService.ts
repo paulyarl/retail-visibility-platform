@@ -237,17 +237,20 @@ export interface ProductTypeState {
   enabled: boolean;
   /** Type determined by tier features (physical/digital/hybrid/service/flexible/none) */
   type: ProductType | 'flexible' | 'none';
-  /** Type effectively used after applying merchant preferences */
+  /** Type effectively used after applying merchant preferences (scalar, backward compat) */
   effectiveType: ProductType | 'flexible' | 'none';
+  /** Types effectively available after applying merchant preferences (multi-select) */
+  effectiveTypes: ProductType[];
   isFlexible: boolean;
   /** Which individual product types are allowed by the tier */
   allowedTypes: ProductType[];
-  /** Whether the merchant has selected a specific type when multiple are available */
+  /** Whether the merchant has selected specific types when multiple are available */
   hasMerchantSelection: boolean;
-  /** Merchant preference for product type */
+  /** Merchant preference for product types */
   merchantPreferences: {
     product_types_enabled: boolean;
     selected_product_type: ProductType | 'none';
+    selected_product_types: ProductType[];
   };
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -1210,6 +1213,7 @@ export function resolveProductTypeState(
   merchantPrefs?: {
     product_types_enabled?: boolean;
     selected_product_type?: string | null;
+    selected_product_types?: string[] | null;
   } | null
 ): ProductTypeState {
   const masterActivate = !!features.product_types_enabled;
@@ -1262,16 +1266,44 @@ export function resolveProductTypeState(
   const prefs = {
     product_types_enabled: merchantPrefs?.product_types_enabled !== false,
     selected_product_type: (merchantPrefs?.selected_product_type as ProductType | 'none') || 'none',
+    selected_product_types: (merchantPrefs?.selected_product_types as ProductType[] | null) || [],
   };
 
-  // Compute effective type
+  // Build merchant-selected types array (prefer new array field, fall back to scalar)
+  let selectedTypes: ProductType[] = [];
+  if (prefs.selected_product_types && prefs.selected_product_types.length > 0) {
+    selectedTypes = prefs.selected_product_types.filter(t => allowedTypes.includes(t));
+  } else if (prefs.selected_product_type !== 'none') {
+    if (allowedTypes.includes(prefs.selected_product_type)) {
+      selectedTypes = [prefs.selected_product_type];
+    }
+  }
+
+  // Compute effective_types: intersection of tier-allowed and merchant-selected
+  let effectiveTypes: ProductType[] = [];
+  if (isEnabled && prefs.product_types_enabled) {
+    if (selectedTypes.length > 0) {
+      effectiveTypes = selectedTypes;
+    } else if (type !== 'flexible' && type !== 'none') {
+      effectiveTypes = [type as ProductType];
+    } else if (type === 'flexible' && allowedTypes.length === 1) {
+      effectiveTypes = [allowedTypes[0]];
+    }
+  }
+
+  // Backward compat: effective_type as scalar
   let effectiveType: ProductType | 'flexible' | 'none' = type;
   let hasMerchantSelection = false;
 
-  if (type === 'flexible' && prefs.product_types_enabled) {
-    if (prefs.selected_product_type !== 'none' && allowedTypes.includes(prefs.selected_product_type)) {
-      effectiveType = prefs.selected_product_type;
+  if (isEnabled && prefs.product_types_enabled) {
+    if (effectiveTypes.length === 1) {
+      effectiveType = effectiveTypes[0];
       hasMerchantSelection = true;
+    } else if (effectiveTypes.length > 1) {
+      effectiveType = 'flexible';
+      hasMerchantSelection = true;
+    } else if (effectiveTypes.length === 0 && type === 'flexible') {
+      effectiveType = 'none';
     }
   } else if (!prefs.product_types_enabled) {
     effectiveType = 'none';
@@ -1281,6 +1313,7 @@ export function resolveProductTypeState(
     enabled: isEnabled,
     type,
     effectiveType,
+    effectiveTypes,
     isFlexible: flexible,
     allowedTypes,
     hasMerchantSelection,
@@ -1594,7 +1627,7 @@ export function resolveFeaturedOptionsState(
     isFlexible: flexible,
     featuredAvailable: isEnabled && allTypes.length > 0,
     effectiveFeaturedAvailable: isEnabled && effectiveTypes.length > 0,
-    expiryMonitorEnabled: !!features.featured_expiry_monitor,
+    expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor,
     features,
   };
 }

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Text, Group, Stack, Divider, Badge } from '@mantine/core';
 import { X, Package, Check } from 'lucide-react';
 import ProductVariantSelector from './ProductVariantSelector';
+import { ProductTypeBadge } from './ProductTypeBadge';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface VariantPopupModalProps {
@@ -36,6 +37,7 @@ interface VariantPopupModalProps {
     imageUrl?: string;
     currency: string;
     hasActivePaymentGateway?: boolean;
+    productType?: string;
   };
   onVariantSelect?: (variant: any) => void;
   onProductSelect?: (product: any) => void;
@@ -144,7 +146,12 @@ export default function VariantPopupModal({
             </div>
           )}
           <div className="flex-1">
-            <Text fw={600} size="lg">{product.title || product.name}</Text>
+            <Group gap="xs" align="center">
+              <Text fw={600} size="lg">{product.title || product.name}</Text>
+              {product.productType && (
+                <ProductTypeBadge productType={product.productType} size="sm" showPhysical />
+              )}
+            </Group>
             {tenantName && (
               <Text size="sm" c="dimmed">by {tenantName}</Text>
             )}
@@ -158,15 +165,13 @@ export default function VariantPopupModal({
                   Single Item
                 </Badge>
               )}
-              {currentStock > 0 ? (
-                <Badge color="green" variant="light">
-                  In Stock ({currentStock})
-                </Badge>
-              ) : (
-                <Badge color="red" variant="light">
-                  Out of Stock
-                </Badge>
-              )}
+              {(() => {
+                const inStock = currentStock > 0;
+                const pt = product.productType;
+                if (pt === 'digital') return inStock ? <Badge color="green" variant="light">Available</Badge> : <Badge color="red" variant="light">Unavailable</Badge>;
+                if (pt === 'service') return inStock ? <Badge color="green" variant="light">Open Slots</Badge> : <Badge color="red" variant="light">Fully Booked</Badge>;
+                return inStock ? <Badge color="green" variant="light">In Stock ({currentStock})</Badge> : <Badge color="red" variant="light">Out of Stock</Badge>;
+              })()}
             </Group>
           </div>
         </Group>
@@ -182,6 +187,7 @@ export default function VariantPopupModal({
               onVariantChange={handleVariantChange}
               selectedVariant={selectedVariant}
               className="mt-2"
+              productType={product.productType}
             />
           </div>
         )}

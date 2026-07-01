@@ -4,6 +4,8 @@
  */
 
 import { prisma } from '../../prisma';
+import { emailService } from '../email-service';
+import { getOrderNotificationService } from '../OrderNotificationService';
 
 interface DownloadEmailData {
   customerEmail: string;
@@ -32,26 +34,57 @@ export class DigitalDownloadEmailService {
     const emailHtml = this.generateDownloadReceiptHtml(data);
     const emailText = this.generateDownloadReceiptText(data);
 
-    // TODO: Integrate with your email service (SendGrid, Resend, etc.)
-    // For now, just log the email content
-    console.log('[DigitalDownloadEmail] Email HTML generated');
-    console.log('[DigitalDownloadEmail] Subject:', `Your Digital Download is Ready! 🎉`);
-    
-    // Example integration with email service:
-    // await emailService.send({
-    //   to: data.customerEmail,
-    //   subject: 'Your Digital Download is Ready! 🎉',
-    //   html: emailHtml,
-    //   text: emailText,
-    // });
+    const subject = 'Your Digital Download is Ready! 🎉';
 
-    // For development, write to console
+    try {
+      const result = await emailService.sendEmail({
+        to: data.customerEmail,
+        subject,
+        html: emailHtml,
+        text: emailText,
+      });
+
+      if (result.success) {
+        console.log('[DigitalDownloadEmail] Email sent successfully to:', data.customerEmail);
+
+        // Log to notification_logs for audit trail and CRM tracking
+        try {
+          // Find the order to get tenantId
+          const order = await prisma.orders.findUnique({
+            where: { id: data.orderId },
+            select: { tenant_id: true },
+          });
+          if (order) {
+            await getOrderNotificationService().notifyDigitalDelivered({
+              tenantId: order.tenant_id,
+              orderId: data.orderId,
+              orderNumber: data.orderNumber,
+              customerEmail: data.customerEmail,
+              customerName: data.customerName,
+              amount: data.orderTotal,
+              downloadLinks: data.downloads.map(d => ({
+                productName: d.productName,
+                url: d.downloadUrl,
+                expiresAt: d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : undefined,
+              })),
+            });
+          }
+        } catch (logError) {
+          console.error('[DigitalDownloadEmail] Failed to log notification:', logError);
+        }
+      } else {
+        console.error('[DigitalDownloadEmail] Failed to send email:', result.error);
+      }
+    } catch (error) {
+      console.error('[DigitalDownloadEmail] Error sending email:', error);
+    }
+
     if (process.env.NODE_ENV === 'development') {
       console.log('\n' + '='.repeat(80));
       console.log('DIGITAL DOWNLOAD EMAIL');
       console.log('='.repeat(80));
       console.log('To:', data.customerEmail);
-      console.log('Subject: Your Digital Download is Ready! 🎉');
+      console.log('Subject:', subject);
       console.log('\n' + emailText);
       console.log('='.repeat(80) + '\n');
     }
@@ -271,8 +304,24 @@ Thanks for your business!
     const emailHtml = this.generateExpirationReminderHtml(data);
     const emailText = this.generateExpirationReminderText(data);
 
-    // TODO: Integrate with your email service
-    console.log('[DigitalDownloadEmail] Expiration reminder generated');
+    const subject = '⚠️ Your Digital Downloads Are Expiring Soon';
+
+    try {
+      const result = await emailService.sendEmail({
+        to: data.customerEmail,
+        subject,
+        html: emailHtml,
+        text: emailText,
+      });
+
+      if (result.success) {
+        console.log('[DigitalDownloadEmail] Expiration reminder sent to:', data.customerEmail);
+      } else {
+        console.error('[DigitalDownloadEmail] Failed to send expiration reminder:', result.error);
+      }
+    } catch (error) {
+      console.error('[DigitalDownloadEmail] Error sending expiration reminder:', error);
+    }
 
     if (process.env.NODE_ENV === 'development') {
       console.log('\n' + '='.repeat(80));

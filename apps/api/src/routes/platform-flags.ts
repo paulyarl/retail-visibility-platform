@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth'
+import { audit } from '../audit'
 
 const router = Router()
 
@@ -39,6 +40,12 @@ router.put('/platform-flags/:flag', requirePlatformAdmin, async (req, res) => {
       created_at: new Date()
     },
   })
+  await audit({
+    tenantId: 'platform',
+    actor: req.user?.userId || req.user?.id || 'system',
+    action: 'update',
+    payload: { flag, enabled, description, rollout, allowTenantOverride, entity_type: 'other', id: flag },
+  })
   res.json({ success: true, data: row })
 })
 
@@ -54,6 +61,12 @@ router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, 
       const row = await prisma.platform_feature_flags_list.update({
         where: { flag },
         data: { enabled: false }
+      })
+      await audit({
+        tenantId: 'platform',
+        actor: req.user?.userId || req.user?.id || 'system',
+        action: 'update',
+        payload: { flag, override_cleared: true, entity_type: 'other', id: flag },
       })
       return res.json({ success: true, data: row, message: 'Override cleared' })
     }
@@ -104,6 +117,13 @@ router.delete('/platform-flags', requirePlatformAdmin, async (req, res) => {
     // Delete platform flag
     const deleted = await prisma.platform_feature_flags_list.delete({
       where: { flag }
+    })
+    
+    await audit({
+      tenantId: 'platform',
+      actor: req.user?.userId || req.user?.id || 'system',
+      action: 'delete',
+      payload: { flag, tenantUsageCount: tenantUsage, entity_type: 'other', id: flag },
     })
     
     res.json({ 

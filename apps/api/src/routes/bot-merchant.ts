@@ -21,10 +21,12 @@ import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import BotConfigurationService from '../services/BotConfigurationService';
 import BotConversationService from '../services/BotConversationService';
 import BotSkillService from '../services/BotSkillService';
 import BotRagService from '../services/BotRagService';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import BotDynamicResponseService from '../services/BotDynamicResponseService';
 import BotStaticResponseService from '../services/BotStaticResponseService';
 import BotGuardrailService from '../services/BotGuardrailService';
@@ -95,7 +97,7 @@ router.get('/config', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/tenants/:tenantId/bot/config
-router.put('/config', authenticateToken, async (req, res) => {
+router.put('/config', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validation = botConfigSchema.safeParse(req.body);
@@ -360,13 +362,34 @@ router.post('/embeddings/refresh', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/tenants/:tenantId/bot/embeddings/status — Check FAQ + product embedding status
+// GET /api/tenants/:tenantId/bot/embeddings/status — Check FAQ + product + knowledge embedding status
 router.get('/embeddings/status', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const hasFaqEmbeddings = await ragService.hasEmbeddings(tenantId);
     const hasProductEmbeddings = await ragService.hasProductEmbeddings(tenantId);
-    res.json({ success: true, hasFaqEmbeddings, hasProductEmbeddings });
+    const productTypeBreakdown = hasProductEmbeddings
+      ? await ragService.getProductTypeBreakdown(tenantId)
+      : [];
+    const knowledgeService = BotKnowledgeEmbeddingService.getInstance();
+    const hasBadgeRegistryEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'badge_registry');
+    const hasPolicyEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'policy');
+    const hasBusinessInfoEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'business_info');
+    const hasHoursEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'hours');
+    const hasFulfillmentEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'fulfillment');
+    const knowledgeEmbeddingCounts = await knowledgeService.getKnowledgeEmbeddingCounts(tenantId);
+    res.json({
+      success: true,
+      hasFaqEmbeddings,
+      hasProductEmbeddings,
+      productTypeBreakdown,
+      hasBadgeRegistryEmbeddings,
+      hasPolicyEmbeddings,
+      hasBusinessInfoEmbeddings,
+      hasHoursEmbeddings,
+      hasFulfillmentEmbeddings,
+      knowledgeEmbeddingCounts,
+    });
   } catch (error) {
     console.error('Error checking embedding status:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to check embedding status' });
@@ -382,6 +405,20 @@ router.post('/product-embeddings/refresh', authenticateToken, async (req, res) =
   } catch (error) {
     console.error('Error refreshing product embeddings:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to refresh product embeddings' });
+  }
+});
+
+// POST /api/tenants/:tenantId/bot/embeddings/knowledge/refresh — Refresh knowledge embeddings (badge registry + policies)
+router.post('/embeddings/knowledge/refresh', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { sourceType } = req.body;
+    const knowledgeService = BotKnowledgeEmbeddingService.getInstance();
+    const result = await knowledgeService.refreshKnowledgeEmbeddings(tenantId, sourceType);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error refreshing knowledge embeddings:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to refresh knowledge embeddings' });
   }
 });
 

@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "./prisma";
-import { Flags } from "./config";
+import { getEffectivePlatform } from "./utils/effectiveFlags";
 import { generateCorrelationId } from "./lib/id-generator";
 
 export type RequestCtx = {
@@ -32,12 +32,15 @@ export async function setRequestContext(req: Request, res: Response, next: NextF
   res.setHeader('X-Correlation-Id', ctx.correlationId);
 
   // Only resolve region from DB when the flag is ON and we have a tenantId
-  if (Flags.GLOBAL_TENANT_META && tenantId) {
+  if (tenantId) {
     try {
-      const rows = await prisma.$queryRaw<{ region: string }[]>`
-        SELECT region FROM "Tenant" WHERE id = ${tenantId} LIMIT 1
-      `;
-      if (rows && rows[0]?.region) ctx.region = rows[0].region;
+      const eff = await getEffectivePlatform('FF_GLOBAL_TENANT_META');
+      if (eff.effectiveOn) {
+        const rows = await prisma.$queryRaw<{ region: string }[]>`
+          SELECT region FROM "Tenant" WHERE id = ${tenantId} LIMIT 1
+        `;
+        if (rows && rows[0]?.region) ctx.region = rows[0].region;
+      }
     } catch {
       // ignore lookup errors to avoid request impact
     }

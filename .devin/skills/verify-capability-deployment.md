@@ -53,6 +53,7 @@ The orchestrator `EffectiveCapabilityResolver.ts` fetches all merchant settings 
 
 **Verify the resolver file** at `apps/api/src/services/resolvers/<Domain>Resolver.ts`:
 - [ ] Maps feature keys to `allowed_*` arrays or booleans in the return object
+- [ ] **Every individual feature flag check includes `flexible ||` prefix (R23)** — including standalone booleans outside group arrays. Flexible tiers unlock ALL features; missing the prefix causes features to stay disabled on flexible tiers.
 - [ ] Reads the correct merchant preference fields from `merchantBundle`
 - [ ] Computes `effective_*` from `allowed_*` ∩ merchant preference (with fallback for missing preference)
 - [ ] For choice-based config (layouts, types, modes): computes a single `effective_*` value, not just the raw merchant preference
@@ -219,3 +220,5 @@ All resolution happens in the backend resolver. The frontend `UnifiedCapabilityS
 10. **Missing CCL write-time validation**: If a `block` severity constraint references the capability, the PUT handler MUST call `await validateProposedChange()` before persisting. Forgetting this allows invalid configurations (e.g., service storefront without service product type) to be saved. Fix: add the validation pattern from R22 in `capability-data-flow-rules.md` — resolve current caps, simulate the proposed change, validate, reject if block violations exist.
 
 11. **CCL constraint not in DB table**: Constraints added only to the static `CAPABILITY_CONSTRAINTS` array in `CapabilityConstraintRegistry.ts` will work as a fallback, but won't be manageable via the admin API at `/api/admin/capability-constraints`. Fix: also insert the constraint into the `capability_constraints_list` DB table via SQL migration or admin API.
+
+12. **Missing `flexible ||` prefix on standalone feature flags (R23)**: When a resolver checks a standalone boolean feature flag (e.g., `!!features.featured_expiry_monitor`) without prefixing with `flexible ||`, the feature stays disabled on flexible tiers even though the admin granted full capability access via `*_flexible`. This is the most common bug for standalone flags outside the group array pattern. Fix: prefix every `!!features.<key>` check with `flexible ||`, except for the master gate checks themselves (`*_enabled`, `*_disabled`, `*_flexible`).

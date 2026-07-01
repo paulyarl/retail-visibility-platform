@@ -35,6 +35,7 @@ export interface RBACNavGates {
   requiredGroup?: string;
   requiredRole?: string;
   anyRole?: string[];
+  requiredOrgAdmin?: boolean;
 }
 
 // ─── Hook return type ─────────────────────────────────────────────────────────

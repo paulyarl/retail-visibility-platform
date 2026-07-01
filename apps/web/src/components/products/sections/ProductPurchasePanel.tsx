@@ -114,6 +114,8 @@ export function ProductPurchasePanel({
   const isQuickCommerce = layoutVariant === 'quick-commerce';
   const isServiceProduct = product.productType === 'service';
   const isHybridProduct = product.productType === 'hybrid';
+  const isDigitalProduct = product.productType === 'digital';
+  const isPhysicalProduct = !product.productType || product.productType === 'physical';
   const isSocialStorefront = storefrontType === 'social';
   const canShare = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) || isSocialStorefront;
   const spaceY = isQuickCommerce ? 'space-y-4' : 'space-y-6';
@@ -231,6 +233,7 @@ export function ProductPurchasePanel({
             variants={product.variants || []}
             onVariantChange={setSelectedVariant}
             selectedVariant={selectedVariant}
+            productType={product.productType}
           />
         </div>
       )}
@@ -244,7 +247,15 @@ export function ProductPurchasePanel({
               : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
           }`}
         >
-          {effectiveAvailability === 'in_stock'
+          {isDigitalProduct
+            ? effectiveAvailability === 'in_stock'
+              ? isQuickCommerce ? 'Available' : '✓ Available'
+              : isQuickCommerce ? 'Unavailable' : '✗ Unavailable'
+          : isServiceProduct
+            ? effectiveAvailability === 'in_stock'
+              ? isQuickCommerce ? 'Open Slots' : '✓ Open Slots'
+              : isQuickCommerce ? 'Fully Booked' : '✗ Fully Booked'
+          : effectiveAvailability === 'in_stock'
             ? isQuickCommerce
               ? 'In Stock'
               : `✓ In Stock${!hasVariants && effectiveStock ? ` (${effectiveStock} available)` : ''}`
@@ -252,6 +263,9 @@ export function ProductPurchasePanel({
               ? 'Out of Stock'
               : '✗ Out of Stock'}
         </span>
+        {isHybridProduct && effectiveAvailability === 'in_stock' && (
+          <span className="ml-1 text-xs text-blue-600 dark:text-blue-400 font-medium">Digital Available</span>
+        )}
         {hasVariants && effectiveAvailability === 'in_stock' && !selectedVariant && variantStockInfo && !isQuickCommerce && (
           <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
             {variantStockInfo.totalStock} units across{' '}
@@ -371,7 +385,7 @@ export function ProductPurchasePanel({
               <input
                 type="number"
                 min={1}
-                max={maxQuantity}
+                max={isDigitalProduct ? undefined : maxQuantity}
                 value={quantity}
                 onChange={handleQuantityInput}
                 className={`text-center border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 ${isQuickCommerce ? 'focus:ring-primary-500 w-14 h-8' : 'focus:ring-blue-500 w-16 h-8'}`}
@@ -379,15 +393,21 @@ export function ProductPurchasePanel({
               />
               <button
                 onClick={handleQuantityIncrement}
-                disabled={quantity >= maxQuantity}
+                disabled={!isDigitalProduct && quantity >= maxQuantity}
                 className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Increase quantity"
               >
                 +
               </button>
             </div>
-            {currentStock != null && currentStock > 0 && !isQuickCommerce && (
+            {isPhysicalProduct && currentStock != null && currentStock > 0 && !isQuickCommerce && (
               <span className="text-xs text-gray-400 dark:text-neutral-500">max {currentStock}</span>
+            )}
+            {isHybridProduct && currentStock != null && currentStock > 0 && !isQuickCommerce && (
+              <span className="text-xs text-gray-400 dark:text-neutral-500">physical max {currentStock}</span>
+            )}
+            {isDigitalProduct && !isQuickCommerce && (
+              <span className="text-xs text-blue-500 dark:text-blue-400">multi-license</span>
             )}
           </div>
 
@@ -404,6 +424,7 @@ export function ProductPurchasePanel({
               stock: currentAvailability === 'in_stock' ? currentStock || 999 : 0,
               tenantId: product.tenantId,
               has_variants: hasVariants,
+              productType: product.productType,
             }}
             variant={selectedVariant}
             quantity={quantity}

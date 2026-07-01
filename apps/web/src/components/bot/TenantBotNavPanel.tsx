@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/bot/config', label: 'Config', emoji: '⚙️' },
   { href: '/bot/options', label: 'Options', emoji: '🔧' },
   { href: '/bot/skills', label: 'Skills', emoji: '⚡' },
+  { href: '/bot/knowledge', label: 'Knowledge', emoji: '🧠' },
   { href: '/bot/analytics', label: 'Analytics', emoji: '📈' },
   { href: '/bot/widget', label: 'Widget', emoji: '🧩' },
 ] as const;

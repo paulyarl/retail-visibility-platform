@@ -2,10 +2,11 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Crown, ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { Crown, ChevronLeft, ChevronRight, Package, Download, Layers, Wrench } from "lucide-react";
 import { Button } from "@mantine/core";
 import { Badge } from "@/components/ui/Badge";
 import type { OrganizationData } from "./types";
+import type { OrgProductMix } from "@/services/OrgCapabilityService";
 
 interface OrgLocationTableProps {
   locations: OrganizationData["locationBreakdown"];
@@ -14,6 +15,7 @@ interface OrgLocationTableProps {
   currentPage: number;
   locationsPerPage: number;
   onPageChange: (page: number) => void;
+  productMix?: OrgProductMix | undefined;
 }
 
 export default function OrgLocationTable({
@@ -23,6 +25,7 @@ export default function OrgLocationTable({
   currentPage,
   locationsPerPage,
   onPageChange,
+  productMix,
 }: OrgLocationTableProps) {
   const sorted = [...locations].sort((a, b) => b.skuCount - a.skuCount);
   const totalPages = Math.ceil(sorted.length / locationsPerPage);
@@ -82,6 +85,31 @@ export default function OrgLocationTable({
                           <Package className="w-3 h-3 mr-0.5" />
                           {location.skuCount.toLocaleString()} SKUs
                         </Badge>
+                        {productMix?.perLocation
+                          ?.find((pl) => pl.tenantId === location.tenantId)
+                          ?.mix.filter((m) => m.count > 0)
+                          .map((m) => {
+                            const icon =
+                              m.productType === "digital" ? Download :
+                              m.productType === "hybrid" ? Layers :
+                              m.productType === "service" ? Wrench : Package;
+                            const Icon = icon;
+                            const color =
+                              m.productType === "digital" ? "text-violet-500" :
+                              m.productType === "hybrid" ? "text-cyan-500" :
+                              m.productType === "service" ? "text-amber-500" :
+                              "text-blue-500";
+                            return (
+                              <span
+                                key={m.productType}
+                                className={`inline-flex items-center gap-0.5 text-xs ${color}`}
+                                title={`${m.productType}: ${m.count}`}
+                              >
+                                <Icon className="w-3 h-3" />
+                                {m.count}
+                              </span>
+                            );
+                          })}
                       </div>
                       <div className="mt-2 w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                         <div

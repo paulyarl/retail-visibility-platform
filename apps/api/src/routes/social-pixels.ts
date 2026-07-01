@@ -9,6 +9,7 @@
 
 import { Router } from 'express';
 import { socialPixelService } from '../services/SocialPixelService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ router.get('/api/social-pixels/public/:tenantId', async (req, res) => {
       data: config || { metaPixelId: null, tiktokPixelId: null },
     });
   } catch (error) {
-    console.error('[SocialPixels] Error getting public config:', error);
+    logger.error('SocialPixels: Error getting public config', undefined, { tenantId: req.params.tenantId, error: String(error) });
     res.status(500).json({ success: false, error: 'get_public_failed' });
   }
 });
@@ -56,7 +57,7 @@ router.get('/api/social-pixels/:tenantId', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[SocialPixels] Error getting config:', error);
+    logger.error('SocialPixels: Error getting config', undefined, { tenantId: req.params.tenantId, error: String(error) });
     res.status(500).json({ success: false, error: 'get_failed' });
   }
 });
@@ -87,7 +88,7 @@ router.put('/api/social-pixels/:tenantId', async (req, res) => {
       message: 'Pixel configuration saved successfully',
     });
   } catch (error) {
-    console.error('[SocialPixels] Error updating config:', error);
+    logger.error('SocialPixels: Error updating config', undefined, { tenantId: req.params.tenantId, error: String(error) });
     res.status(500).json({ success: false, error: 'update_failed' });
   }
 });

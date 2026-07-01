@@ -43,6 +43,8 @@ interface PlanSummaryPanelProps {
   highlightCapability?: string;
   /** Tenant ID for building settings page navigation links */
   tenantId?: string;
+  /** When true, capability cards render without clickable navigation links */
+  readOnly?: boolean;
 }
 
 // --- Display label helpers ---
@@ -431,7 +433,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     pt.allowedTypes.forEach(t => {
       const label = PRODUCT_TYPE_LABELS[t] || t;
       specifics.push(label);
-      const isEnabled = pt.effectiveType === t || pt.effectiveType === 'flexible';
+      const isEnabled = pt.effectiveTypes.includes(t) || pt.effectiveType === 'flexible';
       statuses.push({ label, status: isEnabled ? 'enabled' : 'merchant-gated' });
     });
     summaries.push({
@@ -808,7 +810,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
   return summaries;
 }
 
-export default function PlanSummaryPanel({ capabilities, loading, highlightCapability, tenantId, merchantGates }: PlanSummaryPanelProps) {
+export default function PlanSummaryPanel({ capabilities, loading, highlightCapability, tenantId, merchantGates, readOnly }: PlanSummaryPanelProps) {
   const router = useRouter();
   if (loading || !capabilities) {
     return (
@@ -889,7 +891,7 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
         {/* Capability grid with resolved features */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
           {summaries.map(cap => {
-            const href = cap.settingsPath && tenantId ? `/t/${tenantId}${cap.settingsPath}` : null;
+            const href = !readOnly && cap.settingsPath && tenantId ? `/t/${tenantId}${cap.settingsPath}` : null;
             return (
               <div
                 key={cap.key}

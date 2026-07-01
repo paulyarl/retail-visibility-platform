@@ -15,7 +15,9 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import { validateSKULimits } from '../middleware/sku-limits';
 import { requireTierFeature, requireWritableSubscription } from '../middleware/tier-access';
+import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
+import ProductTypeService from '../services/ProductTypeService';
 
 const router = Router();
 
@@ -107,6 +109,7 @@ const quickStartSchema = z.object({
     'hardware_tools',
     'furniture',
     'restaurant',
+    'service_business',
     'general'
   ]),
   productCount: z.number().int().min(5).max(200).default(50),
@@ -116,6 +119,8 @@ const quickStartSchema = z.object({
   imageQuality: z.enum(['standard', 'hd']).optional().default('standard'), // NEW: Image quality
   textModel: z.enum(['openai', 'google', 'anthropic', 'mistral']).optional().default('openai'), // NEW: AI model for text/product generation
   imageModel: z.enum(['openai', 'google']).optional().default('openai'), // NEW: AI model for image generation
+  productType: z.enum(['physical', 'digital', 'hybrid', 'service']).optional().default('physical'),
+  storefrontType: z.enum(['online', 'retail', 'service', 'social', 'flexible', 'none']).optional(),
 });
 
 router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quickstart_enabled'), validateSKULimits, async (req, res) => {
@@ -233,6 +238,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       imageQuality: parsedBody.imageQuality || parsedBody.image_quality,
       textModel: parsedBody.textModel || parsedBody.text_model,
       imageModel: parsedBody.imageModel || parsedBody.image_model,
+      productType: parsedBody.productType || parsedBody.product_type,
+      storefrontType: parsedBody.storefrontType || parsedBody.storefront_type,
     };
     
     console.log('[Quick Start] Normalized body:', normalizedBody);
@@ -246,7 +253,10 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       });
     }
 
-    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality, textModel, imageModel } = quickStartSchema.parse(normalizedBody);
+    const { scenario, productCount, assignCategories, createAsDrafts, generateImages, imageQuality, textModel, imageModel, productType, storefrontType } = quickStartSchema.parse(normalizedBody);
+
+    // Auto-force service product type for service_business scenario
+    const effectiveProductType = scenario === 'service_business' ? 'service' as const : productType;
 
     // Check rate limit (platform support bypasses - they're helping multiple customers)
     // Tenant owners/admins are subject to rate limits on their own tenant
@@ -272,8 +282,23 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       console.warn(`[Quick Start] Tenant ${tenantId} already has ${existingProductCount} products`);
     }
 
+    // Check if tenant's tier allows the requested product type
+    try {
+      const productTypeService = ProductTypeService.getInstance();
+      const allowed = await productTypeService.isProductTypeAllowed(tenantId, effectiveProductType as any);
+      if (!allowed) {
+        return res.status(403).json({
+          error: 'Product type not allowed',
+          message: `Your tier does not allow ${effectiveProductType} products. Please upgrade your plan or choose a different product type.`,
+        });
+      }
+    } catch (capError: any) {
+      console.error('[Quick Start] Product type capability check failed:', capError);
+      // Continue with generation — fail open
+    }
+
     // Generate products
-    console.log(`[Quick Start] Generating ${productCount} ${scenario} products for tenant ${tenantId}`);
+    console.log(`[Quick Start] Generating ${productCount} ${scenario} products (${effectiveProductType}) for tenant ${tenantId}`);
     if (generateImages) {
       console.log(`[Quick Start] ⏳ This may take 2-3 minutes. AI is generating products with images (${imageQuality} quality)...`);
       console.log(`[Quick Start] 💡 Images: Using ${imageModel === 'google' ? 'Google Imagen 3' : 'OpenAI DALL-E 3'} for professional product photography`);
@@ -293,6 +318,8 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
       imageQuality,
       textModel,
       imageModel,
+      productType: effectiveProductType,
+      storefrontType,
     }, prisma);
 
     console.log(`[Quick Start] Success:`, result);
@@ -498,12 +525,14 @@ const categoryQuickStartSchema = z.object({
     'furniture',
     'restaurant',
     'pharmacy',
+    'service_business',
     'general'
   ]),
-  categoryCount: z.number().int().min(5).max(30).optional().default(15),
+  categoryCount: z.number().int().min(4).max(30).optional().default(15),
+  storefrontType: z.enum(['online', 'retail', 'service', 'social', 'flexible', 'none']).optional(),
 });
 
-router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('category_quick_start'), async (req, res) => {
+router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;
@@ -575,6 +604,19 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       }
     }
 
+    // Check effective capabilities (replaces legacy requireTierFeature middleware)
+    // Ensures merchant preferences, subscription status, CCL constraints, and BSaaS purchases are all respected
+    if (!userCanPerformSupport) {
+      const effectiveCaps = await resolveEffectiveCapabilities(tenantId);
+      if (!effectiveCaps?.effective.quickstart.can_use_category_generator) {
+        return res.status(403).json({
+          error: 'feature_not_available',
+          message: 'Category Quick Start is not available on your plan or has been disabled.',
+          upgradeUrl: '/settings/subscription',
+        });
+      }
+    }
+
     // Validate request body
     const parsed = categoryQuickStartSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -584,7 +626,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       });
     }
 
-    const { businessType, categoryCount } = parsed.data;
+    const { businessType, categoryCount, storefrontType } = parsed.data;
 
     // Check if tenant already has categories (optional warning, not blocking)
     const existingCategoryCount = await prisma.directory_category.count({
@@ -688,6 +730,11 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
         ['Health & Beauty', 'Personal Care'],
         ['Health & Beauty', 'Vitamins & Supplements'],
       ],
+      service_business: [
+        ['Services'],
+        ['Professional Services'],
+        ['Business Services'],
+      ],
       general: [
         ['Home & Garden'],
         ['Health & Beauty'],
@@ -743,6 +790,16 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
         { name: 'Accessories', searchTerm: 'electronics accessories peripherals' },
         { name: 'Cables & Chargers', searchTerm: 'cables chargers adapters power' }
       ],
+      service_business: [
+        { name: 'Consultations', searchTerm: 'consulting professional advisory services' },
+        { name: 'Repairs & Maintenance', searchTerm: 'repair maintenance fix service' },
+        { name: 'Appointments', searchTerm: 'appointment booking scheduling service' },
+        { name: 'Subscriptions', searchTerm: 'subscription service plan recurring' },
+        { name: 'Classes & Workshops', searchTerm: 'classes workshops training education' },
+        { name: 'Custom Services', searchTerm: 'custom bespoke tailored services' },
+        { name: 'Package Deals', searchTerm: 'package bundle service deals' },
+        { name: 'Gift Cards', searchTerm: 'gift card voucher service certificate' },
+      ],
       general: [
         { name: 'Home & Garden', searchTerm: 'home garden furniture decor' },
         { name: 'Health & Beauty', searchTerm: 'health beauty cosmetics skincare' },
@@ -768,9 +825,41 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
     };
 
     const allCategories = categoryTemplates[businessType] || categoryTemplates.general;
-    
+
+    // Apply storefront-type-aware adjustments to category ordering
+    let adjustedCategories = allCategories;
+    if (storefrontType && storefrontType !== 'flexible' && storefrontType !== 'none') {
+      console.log(`[Category Quick Start] Applying storefront type adjustments for: ${storefrontType}`);
+      if (storefrontType === 'service' && businessType !== 'service_business') {
+        const serviceCats = categoryTemplates.service_business || [];
+        adjustedCategories = [...serviceCats, ...allCategories];
+      } else if (storefrontType === 'social') {
+        const socialBoost = ['fashion', 'health_beauty', 'jewelry'];
+        if (socialBoost.includes(businessType)) {
+          adjustedCategories = allCategories;
+        } else {
+          const socialCats = [
+            ...Object.entries(categoryTemplates)
+              .filter(([k]) => socialBoost.includes(k))
+              .flatMap(([, v]) => v.slice(0, 3)),
+          ];
+          adjustedCategories = [...socialCats, ...allCategories];
+        }
+      } else if (storefrontType === 'online') {
+        const onlineBoost = ['electronics', 'books_media'];
+        if (!onlineBoost.includes(businessType)) {
+          const onlineCats = [
+            ...Object.entries(categoryTemplates)
+              .filter(([k]) => onlineBoost.includes(k))
+              .flatMap(([, v]) => v.slice(0, 2)),
+          ];
+          adjustedCategories = [...onlineCats, ...allCategories];
+        }
+      }
+    }
+
     // Limit to requested count
-    const categories = allCategories.slice(0, categoryCount);
+    const categories = adjustedCategories.slice(0, categoryCount);
 
     // Fetch existing categories to avoid duplicates
     const existingCategories = await prisma.directory_category.findMany({

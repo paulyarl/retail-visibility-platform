@@ -70,9 +70,11 @@ export interface Recommendation {
   productCategory?: string;
   productCategorySlug?: string;
   featuredType?: string;
+  featuredTypeArray?: string[];
   featuredPriority?: number;
   featuredAt?: string;
   isFeaturedActive?: boolean;
+  productType?: string;
 }
 
 export interface RecommendationResponse {
@@ -570,6 +572,7 @@ export async function getProductsViewedBySameUsers(
         mgd.featured_priority,
         mgd.featured_at,
         mgd.featured_is_active,
+        mgd.product_type,
         mgd.tenant_id,
         mgd.tenant_name as business_name,
         mgd.tenant_slug as slug,
@@ -646,9 +649,11 @@ export async function getProductsViewedBySameUsers(
       productCategory: row.product_category,
       productCategorySlug: row.product_category_slug,
       featuredType: row.featured_type,
+      featuredTypeArray: row.featured_type ? [row.featured_type] : [],
       featuredPriority: row.featured_priority,
       featuredAt: row.featured_at,
       isFeaturedActive: row.featured_is_active,
+      productType: row.product_type || 'physical',
 
       // Store location data
       address: row.address,
@@ -1060,6 +1065,7 @@ export async function getLastViewedItems(
               'tenantId', sp.tenant_id,
               'hasActivePaymentGateway', mgd.has_active_payment_gateway,
               'defaultGatewayType', mgd.default_gateway_type,
+              'productType', mgd.product_type,
               'tenantCategory', CASE 
                 WHEN sp.tenant_category_id IS NOT NULL THEN
                   json_build_object(
@@ -1159,6 +1165,7 @@ export async function getLastViewedItems(
             tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
             defaultGatewayType: data.defaultGatewayType,
+            productType: data.productType || 'physical',
             // Variant-aware fields
             has_variants: data.has_variants,
             variants: data.variants,
@@ -1180,4 +1187,99 @@ export async function getLastViewedItems(
     console.error('Error in getLastViewedItems:', error);
     return { recommendations: [], algorithm: 'last_viewed', generatedAt: new Date() };
   }
+}
+
+/**
+ * Get a user's badge preferences based on their product viewing history.
+ * Analyzes which badge types appear most frequently in products the user has viewed.
+ * Returns a map of badge type → preference score (0-1).
+ */
+export async function getUserBadgePreferences(
+  userId: string,
+  daysBack: number = 30
+): Promise<Map<string, number>> {
+  const pool = getDirectPool();
+
+  try {
+    const query = `
+      WITH viewed_products AS (
+        SELECT DISTINCT ub.entity_id
+        FROM user_behavior_simple ub
+        WHERE ub.user_id = $1
+          AND ub.entity_type = 'product'
+          AND ub.timestamp >= NOW() - INTERVAL '${daysBack} days'
+      ),
+      badge_counts AS (
+        SELECT
+          fp.featured_type,
+          COUNT(DISTINCT vp.entity_id) as view_count
+        FROM viewed_products vp
+        JOIN featured_products fp ON fp.inventory_item_id = vp.entity_id
+          AND fp.is_active = true
+        GROUP BY fp.featured_type
+      ),
+      total AS (
+        SELECT COUNT(DISTINCT vp.entity_id) as total_views
+        FROM viewed_products vp
+      )
+      SELECT
+        bc.featured_type,
+        CASE WHEN t.total_views > 0
+          THEN bc.view_count::float / t.total_views
+          ELSE 0
+        END as preference_score
+      FROM badge_counts bc
+      CROSS JOIN total t
+      ORDER BY preference_score DESC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    const preferences = new Map<string, number>();
+    for (const row of result.rows) {
+      preferences.set(row.featured_type, parseFloat(row.preference_score));
+    }
+
+    return preferences;
+  } catch (error) {
+    console.error('Error in getUserBadgePreferences:', error);
+    return new Map<string, number>();
+  }
+}
+
+/**
+ * Apply badge-based scoring boost to existing recommendations.
+ * Products with badge types that match the user's preferences get a score boost.
+ */
+export function applyBadgeBoost(
+  recommendations: Recommendation[],
+  badgePreferences: Map<string, number>,
+  boostWeight: number = 5
+): Recommendation[] {
+  return recommendations.map(rec => {
+    const badges = rec.featuredTypeArray || (rec.featuredType ? [rec.featuredType] : []);
+    if (badges.length === 0) return rec;
+
+    let boost = 0;
+    const matchedBadges: string[] = [];
+
+    for (const badge of badges) {
+      const pref = badgePreferences.get(badge);
+      if (pref && pref > 0) {
+        boost += pref * boostWeight;
+        matchedBadges.push(badge);
+      }
+    }
+
+    if (boost === 0) return rec;
+
+    const reasonSuffix = matchedBadges.length > 0
+      ? ` • Matches your interest in ${matchedBadges.join(', ')}`
+      : '';
+
+    return {
+      ...rec,
+      score: rec.score + boost,
+      reason: rec.reason + reasonSuffix,
+    };
+  }).sort((a, b) => b.score - a.score);
 }

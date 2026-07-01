@@ -22,6 +22,7 @@ export interface Item {
   category?: string;
   status: 'active' | 'inactive' | 'draft';
   visibility: 'public' | 'private';
+  product_type?: 'physical' | 'digital' | 'hybrid' | 'service';
   createdAt: string;
   updatedAt: string;
   tenantId: string;

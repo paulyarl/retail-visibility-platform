@@ -9,6 +9,7 @@ import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import aiProviderFactory from './ai-providers';
+import { getTenantBadges } from './BadgeRegistryService';
 
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIM = 1536;
@@ -214,9 +215,10 @@ class BotRagService {
 
   /**
    * Chunk product catalog data into embeddings from the storefront MV.
-   * Includes name, description, features, tags, and badges for rich search.
+   * Includes name, description, features, tags, product type, and enriched badges for rich search.
+   * Badge keys are enriched with label + description from the badge registry.
    */
-  private chunkProduct(product: any): { text: string; index: number }[] {
+  private chunkProduct(product: any, badgeMap?: Map<string, string>): { text: string; index: number }[] {
     const parsePgArray = (val: any): string[] => {
       if (!val) return [];
       if (Array.isArray(val)) return val;
@@ -226,10 +228,14 @@ class BotRagService {
 
     const features = parsePgArray(product.features);
     const tags = parsePgArray(product.tags);
-    const badges = parsePgArray(product.featured_type_array);
+    const badgeKeys = parsePgArray(product.featured_type_array);
+    const badges = badgeMap
+      ? badgeKeys.map(k => badgeMap.get(k) || k)
+      : badgeKeys;
 
     const parts = [
       `Product: ${product.product_name}`,
+      product.product_type ? `Type: ${product.product_type}` : '',
       product.brand ? `Brand: ${product.brand}` : '',
       product.product_category ? `Category: ${product.product_category}` : '',
       product.product_description ? `Description: ${product.product_description}` : '',
@@ -269,6 +275,7 @@ class BotRagService {
       `SELECT
         inventory_item_id::text as product_id,
         product_name::text as product_name,
+        COALESCE(product_type::text, '') as product_type,
         COALESCE(product_description::text, '') as product_description,
         COALESCE(marketing_description::text, '') as marketing_description,
         COALESCE(brand::text, '') as brand,
@@ -292,6 +299,24 @@ class BotRagService {
       return { processed: 0, chunks: 0 };
     }
 
+    // Load badge registry to enrich badge keys with descriptions
+    let badgeMap: Map<string, string> | undefined;
+    try {
+      const tenantBadges = await getTenantBadges(tenantId);
+      badgeMap = new Map<string, string>();
+      for (const badge of tenantBadges) {
+        const enriched = badge.description
+          ? `${badge.label} (${badge.description})`
+          : badge.label;
+        badgeMap.set(badge.key, enriched);
+      }
+    } catch (err) {
+      logger.warn('[BotRagService] Failed to load badge registry for enrichment, using raw keys', undefined, {
+        tenantId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // Delete existing product embeddings for this tenant
     await pool.query('DELETE FROM bot_product_embeddings WHERE tenant_id = $1', [tenantId]);
 
@@ -304,7 +329,7 @@ class BotRagService {
       const allChunks: { productId: string; text: string; index: number }[] = [];
 
       for (const product of batch) {
-        const chunks = this.chunkProduct(product);
+        const chunks = this.chunkProduct(product, badgeMap);
         for (const chunk of chunks) {
           allChunks.push({ productId: product.product_id, text: chunk.text, index: chunk.index });
         }
@@ -340,14 +365,39 @@ class BotRagService {
 
   /**
    * Search for similar product chunks using pgvector cosine similarity.
+   * Optionally filter by product_type.
    */
-  async searchProducts(tenantId: string, query: string, topK: number = 3): Promise<ProductRagResult> {
+  async searchProducts(
+    tenantId: string,
+    query: string,
+    topK: number = 3,
+    productTypes?: string[]
+  ): Promise<ProductRagResult> {
     const queryEmbedding = await this.generateQueryEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
     const pool = getDirectPool();
-    const results = (await pool.query(
-      `SELECT
+
+    let sql: string;
+    let params: any[];
+
+    if (productTypes && productTypes.length > 0) {
+      sql = `SELECT
+        e.product_id,
+        ii.name as product_name,
+        e.chunk_text,
+        (1 - (e.embedding <=> $1::vector))::text as score
+      FROM bot_product_embeddings e
+      JOIN inventory_items ii ON ii.id = e.product_id
+      WHERE e.tenant_id = $2
+        AND ii.item_status = 'active'
+        AND e.embedding IS NOT NULL
+        AND ii.product_type = ANY($4)
+      ORDER BY e.embedding <=> $1::vector
+      LIMIT $3`;
+      params = [embeddingStr, tenantId, topK, productTypes];
+    } else {
+      sql = `SELECT
         e.product_id,
         ii.name as product_name,
         e.chunk_text,
@@ -358,9 +408,11 @@ class BotRagService {
         AND ii.item_status = 'active'
         AND e.embedding IS NOT NULL
       ORDER BY e.embedding <=> $1::vector
-      LIMIT $3`,
-      [embeddingStr, tenantId, topK]
-    )).rows;
+      LIMIT $3`;
+      params = [embeddingStr, tenantId, topK];
+    }
+
+    const results = (await pool.query(sql, params)).rows;
 
     const chunks = results
       .filter((r: any) => parseFloat(r.score) >= SIMILARITY_THRESHOLD)
@@ -384,6 +436,29 @@ class BotRagService {
       [tenantId]
     );
     return parseInt(result.rows[0]?.cnt || '0', 10) > 0;
+  }
+
+  /**
+   * Get product type breakdown from product embeddings.
+   * Returns counts per product_type by joining bot_product_embeddings with inventory_items.
+   */
+  async getProductTypeBreakdown(tenantId: string): Promise<{ productType: string; count: number }[]> {
+    const pool = getDirectPool();
+    const result = await pool.query(
+      `SELECT
+        COALESCE(ii.product_type, 'unknown') as product_type,
+        COUNT(DISTINCT e.product_id)::text as cnt
+      FROM bot_product_embeddings e
+      JOIN inventory_items ii ON ii.id = e.product_id
+      WHERE e.tenant_id = $1
+      GROUP BY ii.product_type
+      ORDER BY cnt DESC`,
+      [tenantId]
+    );
+    return result.rows.map((r: any) => ({
+      productType: r.product_type,
+      count: parseInt(r.cnt, 10),
+    }));
   }
 }
 

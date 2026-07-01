@@ -3,6 +3,7 @@
 import { BusinessTypeSelector, BUSINESS_TYPES, getDefaultCount } from './BusinessTypeSelector';
 
 export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
+export type QuickStartProductType = 'physical' | 'digital' | 'hybrid' | 'service';
 
 export interface ProductGenerationSettings {
   businessType: string | null;
@@ -11,6 +12,7 @@ export interface ProductGenerationSettings {
   imageQuality: 'standard' | 'hd';
   textModel: QuickStartTextProvider;
   imageModel: 'openai' | 'google';
+  productType: QuickStartProductType;
 }
 
 interface QuickStartProductSettingsProps {
@@ -21,6 +23,7 @@ interface QuickStartProductSettingsProps {
   showBusinessTypeSelector?: boolean;
   businessTypeSelectorVariant?: 'dropdown' | 'grid';
   className?: string;
+  allowedProductTypes?: QuickStartProductType[];
 }
 
 /**
@@ -41,6 +44,7 @@ export function QuickStartProductSettings({
   showBusinessTypeSelector = true,
   businessTypeSelectorVariant = 'grid',
   className = '',
+  allowedProductTypes,
 }: QuickStartProductSettingsProps) {
   const updateSettings = (partial: Partial<ProductGenerationSettings>) => {
     onChange({ ...settings, ...partial });
@@ -67,6 +71,40 @@ export function QuickStartProductSettings({
           />
         </div>
       )}
+
+      {/* Product Type Selection */}
+      <div>
+        <h3 className="text-lg font-bold text-neutral-900 mb-4">Select Product Type</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {([
+            { value: 'physical', label: '📦 Physical', sub: 'Shipped items' },
+            { value: 'digital', label: '💾 Digital', sub: 'Downloadable' },
+            { value: 'hybrid', label: '🔀 Hybrid', sub: 'Physical + digital' },
+            { value: 'service', label: '🛎️ Service', sub: 'Bookable services' },
+          ] as { value: QuickStartProductType; label: string; sub: string }[])
+            .filter(t => !allowedProductTypes || allowedProductTypes.includes(t.value))
+            .map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => updateSettings({ productType: t.value })}
+                className={`px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  settings.productType === t.value
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-1">{t.label}</span>
+                <span className="text-xs opacity-75 mt-1 block">{t.sub}</span>
+              </button>
+            ))}
+        </div>
+        {allowedProductTypes && allowedProductTypes.length < 4 && (
+          <p className="text-xs text-neutral-500 mt-2">
+            Your plan allows: {allowedProductTypes.join(', ')}. Upgrade to unlock more types.
+          </p>
+        )}
+      </div>
 
       {/* Product Count Slider */}
       <div>
@@ -282,6 +320,7 @@ export const DEFAULT_PRODUCT_SETTINGS: ProductGenerationSettings = {
   imageQuality: 'standard',
   textModel: 'openai',
   imageModel: 'openai',
+  productType: 'physical',
 };
 
 export default QuickStartProductSettings;

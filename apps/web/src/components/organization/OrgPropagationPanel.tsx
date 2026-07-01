@@ -4,11 +4,12 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   Zap, Tag, Package, Globe, Clock, Building, Flag, Users, Palette,
-  CheckCircle2, ArrowRight, type LucideIcon,
+  CheckCircle2, ArrowRight, AlertTriangle, XCircle, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@mantine/core";
 import { Badge } from "@/components/ui/Badge";
 import type { OrganizationData } from "./types";
+import type { OrgProductTypeRollup } from "@/services/OrgCapabilityService";
 
 interface PropCardProps {
   icon: LucideIcon;
@@ -75,6 +76,60 @@ function PropCard({
   );
 }
 
+function SyncSkippedBreakdown({ skipped }: { skipped: Array<{ item_id?: string; tenantId?: string; sku?: string; reason: string }> }) {
+  const byReason: Record<string, Array<{ sku?: string; tenantId?: string }>> = {};
+  for (const s of skipped) {
+    const key = s.reason;
+    if (!byReason[key]) byReason[key] = [];
+    byReason[key].push({ sku: s.sku, tenantId: s.tenantId });
+  }
+
+  const productTypeSkips = Object.entries(byReason).filter(([reason]) => reason.startsWith("product_type_not_allowed"));
+  const otherSkips = Object.entries(byReason).filter(([reason]) => !reason.startsWith("product_type_not_allowed"));
+
+  return (
+    <div className="mt-3 space-y-2">
+      {productTypeSkips.length > 0 && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="flex items-center gap-2 mb-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-400">
+              Product Type Mismatches ({productTypeSkips.reduce((sum, [, items]) => sum + items.length, 0)} items skipped)
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {productTypeSkips.map(([reason, items]) => {
+              const productType = reason.replace("product_type_not_allowed: ", "");
+              return (
+                <div key={reason} className="text-xs text-amber-700 dark:text-amber-500">
+                  <span className="font-medium capitalize">{productType}</span> products skipped — {items.length} item{items.length !== 1 ? "s" : ""}
+                  <span className="text-amber-500 ml-1">
+                    ({items.slice(0, 3).map((i) => i.sku).join(", ")}{items.length > 3 ? `, +${items.length - 3} more` : ""})
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {otherSkips.length > 0 && (
+        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">
+            Other Skips ({otherSkips.reduce((sum, [, items]) => sum + items.length, 0)} items)
+          </p>
+          <div className="space-y-1">
+            {otherSkips.map(([reason, items]) => (
+              <p key={reason} className="text-xs text-gray-500 dark:text-gray-500">
+                {reason}: {items.length} item{items.length !== 1 ? "s" : ""}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface OrgPropagationPanelProps {
   organizationId: string;
   heroLocation?: OrganizationData["locationBreakdown"][0];
@@ -84,6 +139,8 @@ interface OrgPropagationPanelProps {
   categorySyncResult: { success: boolean; message: string; jobId?: string } | null;
   onSyncFromHero: () => void;
   onOpenCategorySync: () => void;
+  productTypeRollup?: OrgProductTypeRollup | undefined;
+  readOnly?: boolean;
 }
 
 export default function OrgPropagationPanel({
@@ -95,6 +152,8 @@ export default function OrgPropagationPanel({
   categorySyncResult,
   onSyncFromHero,
   onOpenCategorySync,
+  productTypeRollup,
+  readOnly,
 }: OrgPropagationPanelProps) {
   const heroId = heroLocation?.tenantId;
 
@@ -118,6 +177,58 @@ export default function OrgPropagationPanel({
           </div>
         </div>
 
+        {/* Product Type Awareness Section */}
+        {productTypeRollup && productTypeRollup.totalLocations > 0 && (
+          <div className="mb-6 p-4 bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800/50 rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <Package className="w-4 h-4 text-violet-600" />
+              <h4 className="text-xs font-semibold text-violet-900 dark:text-violet-300 uppercase tracking-wide">
+                Product Type Compatibility
+              </h4>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {productTypeRollup.locations.map((loc) => {
+                const isDisabled = !loc.enabled;
+                const hasRestrictions = loc.enabled && !loc.isFlexible && loc.allowedTypes.length > 0 && loc.allowedTypes.length < 4;
+                return (
+                  <div
+                    key={loc.tenantId}
+                    className={`px-3 py-1.5 rounded-lg text-xs border ${
+                      isDisabled
+                        ? "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-500"
+                        : hasRestrictions
+                          ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+                          : "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                    }`}
+                    title={
+                      isDisabled
+                        ? "Product types disabled"
+                        : hasRestrictions
+                          ? `Allows: ${loc.allowedTypes.join(", ")}`
+                          : "All product types allowed"
+                    }
+                  >
+                    <span className="font-medium">{loc.tenantName}</span>
+                    {isDisabled ? (
+                      <span className="ml-1.5">— disabled</span>
+                    ) : hasRestrictions ? (
+                      <span className="ml-1.5">— {loc.allowedTypes.join(", ")} only</span>
+                    ) : (
+                      <span className="ml-1.5">— all types</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {productTypeRollup.summary.misalignedCount > 0 && (
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {productTypeRollup.summary.misalignedCount} location{productTypeRollup.summary.misalignedCount !== 1 ? "s" : ""} have restricted product types — some items may be skipped during sync
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Group 1: Product & Catalog */}
         <div className="mb-6">
           <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
@@ -130,7 +241,7 @@ export default function OrgPropagationPanel({
               title="Categories" status="ACTIVE" statusVariant="success"
               description="Propagate product categories and Google taxonomy alignments"
               subLabel="Bulk propagation"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#categories` : undefined}
             />
@@ -140,7 +251,7 @@ export default function OrgPropagationPanel({
               title="Products/SKUs" status="ACTIVE" statusVariant="success"
               description="Propagate individual or bulk products to locations"
               subLabel="Single or bulk"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Sync All from Hero"
               onAction={onSyncFromHero}
               syncing={syncing}
@@ -151,7 +262,7 @@ export default function OrgPropagationPanel({
               title="GBP Category Sync" status="ACTIVE" statusVariant="success"
               description="Sync product categories to Google Business Profile"
               subLabel="Organization-wide sync"
-              disabled={!organizationId}
+              disabled={readOnly || !organizationId}
               actionLabel="Sync to GBP"
               onAction={onOpenCategorySync}
               syncing={syncingCategories}
@@ -172,7 +283,7 @@ export default function OrgPropagationPanel({
               title="Business Hours" status="NEW" statusVariant="default"
               description="Propagate regular and special hours to all locations"
               subLabel="Hours template"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#hours` : undefined}
             />
@@ -182,7 +293,7 @@ export default function OrgPropagationPanel({
               title="Business Profile" status="NEW" statusVariant="default"
               description="Propagate business description, attributes, and settings"
               subLabel="Profile info"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#profile` : undefined}
             />
@@ -201,7 +312,7 @@ export default function OrgPropagationPanel({
               title="Feature Flags" status="NEW" statusVariant="default"
               description="Enable or disable features across all locations"
               subLabel="Centralized control"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#flags` : undefined}
             />
@@ -211,7 +322,7 @@ export default function OrgPropagationPanel({
               title="User Roles & Permissions" status="NEW" statusVariant="default"
               description="Propagate user invitations and role assignments"
               subLabel="Team management"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#roles` : undefined}
             />
@@ -230,7 +341,7 @@ export default function OrgPropagationPanel({
               title="Brand Assets" status="NEW" statusVariant="default"
               description="Propagate logos, colors, and branding elements"
               subLabel="Brand consistency"
-              disabled={!heroLocation}
+              disabled={readOnly || !heroLocation}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#brand` : undefined}
             />
@@ -262,6 +373,33 @@ export default function OrgPropagationPanel({
                 <p className="text-amber-700 dark:text-amber-500">⏭️ {syncResult.summary.skipped}</p>
               </div>
             </div>
+
+            {/* Product Type Mismatch Breakdown */}
+            {syncResult.results?.skipped && syncResult.results.skipped.length > 0 && (
+              <SyncSkippedBreakdown skipped={syncResult.results.skipped} />
+            )}
+
+            {/* Errors */}
+            {syncResult.results?.errors && syncResult.results.errors.length > 0 && (
+              <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <p className="text-sm font-semibold text-rose-800 dark:text-rose-400">
+                    {syncResult.results.errors.length} Error{syncResult.results.errors.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {syncResult.results.errors.slice(0, 10).map((err: any, i: number) => (
+                    <p key={i} className="text-xs text-rose-700 dark:text-rose-500">
+                      SKU {err.sku}: {err.error}
+                    </p>
+                  ))}
+                  {syncResult.results.errors.length > 10 && (
+                    <p className="text-xs text-rose-500">...and {syncResult.results.errors.length - 10} more</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

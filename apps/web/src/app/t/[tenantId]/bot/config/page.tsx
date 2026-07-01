@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import SetTenantId from '@/components/client/SetTenantId';
 import BotConfigPage from '@/components/bot/BotConfigPage';
 import TenantBotPageShell from '@/components/bot/TenantBotPageShell';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'Bot Configuration',
@@ -21,7 +22,7 @@ export default async function BotConfig({ params }: PageProps) {
   }
 
   return (
-    <>
+    <TenantGuard tenantId={tenantId}>
       <SetTenantId tenantId={tenantId} />
       <TenantBotPageShell
         tenantId={tenantId}
@@ -35,6 +36,6 @@ export default async function BotConfig({ params }: PageProps) {
       >
         <BotConfigPage tenantId={tenantId} />
       </TenantBotPageShell>
-    </>
+    </TenantGuard>
   );
 }

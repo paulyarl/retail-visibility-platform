@@ -16,7 +16,9 @@ import BotProductCatalogService from './BotProductCatalogService';
 import BotPlatformGuideService from './BotPlatformGuideService';
 import BotCrmAssistantService from './BotCrmAssistantService';
 import { StorefrontPolicyService } from './StorefrontPolicyService';
+import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 import BotChannelSteeringService, { type SteeringChannel } from './BotChannelSteeringService';
+import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';
 import type { PlatformContextSurface } from './BotPlatformGuideService';
@@ -30,6 +32,7 @@ export interface DynamicResponseResult {
   productContextUsed: boolean;
   crmContextUsed: boolean;
   policyContextUsed: boolean;
+  knowledgeContextUsed: boolean;
   channels?: SteeringChannel[];
 }
 
@@ -177,6 +180,26 @@ class BotDynamicResponseService {
     const conversationService = BotConversationService.getInstance();
     const productCatalogService = BotProductCatalogService.getInstance();
 
+    // Resolve effective capabilities once for skill gating
+    let allowedSkills: string[] = [];
+    let effectiveProductTypes: string[] | undefined;
+    try {
+      const caps = await resolveEffectiveCapabilities(tenantId);
+      if (caps?.effective?.chatbot) {
+        allowedSkills = caps.effective.chatbot.allowed_skill_types || [];
+      }
+      if (caps?.effective?.product_types) {
+        effectiveProductTypes = caps.effective.product_types.effective_types;
+      }
+    } catch (capError) {
+      logger.warn('[BotDynamicResponseService] Failed to resolve capabilities, allowing all skills', undefined, {
+        tenantId,
+        error: capError instanceof Error ? capError.message : String(capError),
+      });
+    }
+
+    const hasSkill = (skill: string) => allowedSkills.length === 0 || allowedSkills.includes(skill);
+
     let ragContext = '';
     let ragChunksUsed = 0;
     let matchedFaqId: string | null = null;
@@ -186,17 +209,22 @@ class BotDynamicResponseService {
     let crmContextUsed = false;
     let policyContext = '';
     let policyContextUsed = false;
+    let knowledgeContext = '';
+    let knowledgeContextUsed = false;
 
+    // 1. FAQ RAG — gated by chatbot_skill_policy_faq
     try {
-      const hasEmb = await ragService.hasEmbeddings(tenantId);
-      if (hasEmb) {
-        const ragResult = await ragService.search(tenantId, message, 3);
-        if (ragResult.chunks.length > 0) {
-          ragContext = '\n\nRelevant FAQ context:\n' + ragResult.chunks
-            .map(c => `Q: ${c.question}\n${c.chunkText}`)
-            .join('\n\n');
-          ragChunksUsed = ragResult.chunks.length;
-          matchedFaqId = ragResult.chunks[0].faqId;
+      if (hasSkill('chatbot_skill_policy_faq')) {
+        const hasEmb = await ragService.hasEmbeddings(tenantId);
+        if (hasEmb) {
+          const ragResult = await ragService.search(tenantId, message, 3);
+          if (ragResult.chunks.length > 0) {
+            ragContext = '\n\nRelevant FAQ context:\n' + ragResult.chunks
+              .map(c => `Q: ${c.question}\n${c.chunkText}`)
+              .join('\n\n');
+            ragChunksUsed = ragResult.chunks.length;
+            matchedFaqId = ragResult.chunks[0].faqId;
+          }
         }
       }
     } catch (ragError) {
@@ -205,12 +233,13 @@ class BotDynamicResponseService {
       });
     }
 
-    // 2. Retrieve product catalog context when the query is product-related
+    // 2. Retrieve product catalog context — gated by chatbot_skill_product_search
     try {
-      if (isProductQuery(message)) {
+      if (hasSkill('chatbot_skill_product_search') && isProductQuery(message)) {
         const productSearch = await productCatalogService.searchProducts(tenantId, message, {
           limit: 5,
           inStockOnly: true,
+          productTypes: effectiveProductTypes,
         });
         if (productSearch.products.length > 0) {
           productContext = '\n\nRelevant product catalog context:\n' +
@@ -224,9 +253,9 @@ class BotDynamicResponseService {
       });
     }
 
-    // 2.5. Retrieve CRM ticket context when the query is support-related
+    // 2.5. Retrieve CRM ticket context — gated by chatbot_skill_crm_assistant
     try {
-      if (isSupportQuery(message)) {
+      if (hasSkill('chatbot_skill_crm_assistant') && isSupportQuery(message)) {
         const crmAssistantService = BotCrmAssistantService.getInstance();
         // We don't have customer email in this context, so inject general CRM availability
         // The actual ticket lookup happens via the CRM skill endpoints
@@ -239,26 +268,69 @@ class BotDynamicResponseService {
       });
     }
 
-    // 2.6. Retrieve storefront policy context when the query is policy-related
+    // 2.6. Knowledge RAG — badge registry + store policies via semantic search
+    // Replaces fragile keyword-gated injection with pgvector similarity search.
     try {
-      if (isPolicyQuery(message)) {
-        const policies = await StorefrontPolicyService.getInstance().getPolicies(tenantId);
-        if (policies.hasAnyPolicies) {
-          const parts: string[] = [];
-          if (policies.return_policy) parts.push(`Return Policy:\n${policies.return_policy}`);
-          if (policies.shipping_policy) parts.push(`Shipping Policy:\n${policies.shipping_policy}`);
-          if (policies.refund_policy) parts.push(`Refund Policy:\n${policies.refund_policy}`);
-          if (policies.privacy_policy) parts.push(`Privacy Policy:\n${policies.privacy_policy}`);
-          if (policies.terms_of_service) parts.push(`Terms of Service:\n${policies.terms_of_service}`);
-          if (parts.length > 0) {
-            policyContext = '\n\nStore policies context:\n' + parts.join('\n\n');
+      const knowledgeService = BotKnowledgeEmbeddingService.getInstance();
+
+      // Badge registry knowledge — gated by chatbot_skill_product_search
+      if (hasSkill('chatbot_skill_product_search')) {
+        const hasBadgeEmb = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'badge_registry');
+        if (hasBadgeEmb) {
+          const badgeResult = await knowledgeService.searchKnowledge(tenantId, message, ['badge_registry'], 3);
+          if (badgeResult.chunks.length > 0) {
+            knowledgeContext += '\n\nBadge knowledge context:\n' +
+              badgeResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      }
+
+      // Policy knowledge — gated by chatbot_skill_policy_faq
+      if (hasSkill('chatbot_skill_policy_faq')) {
+        const hasPolicyEmb = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'policy');
+        if (hasPolicyEmb) {
+          const policyResult = await knowledgeService.searchKnowledge(tenantId, message, ['policy'], 3);
+          if (policyResult.chunks.length > 0) {
+            policyContext = '\n\nStore policies context:\n' +
+              policyResult.chunks.map(c => c.chunkText).join('\n\n');
             policyContextUsed = true;
           }
         }
       }
-    } catch (policyError) {
-      logger.warn('[BotDynamicResponseService] Policy context lookup failed, continuing without policies', undefined, {
-        error: policyError instanceof Error ? policyError.message : String(policyError),
+
+      // Business info + hours knowledge — gated by chatbot_skill_store_hours
+      if (hasSkill('chatbot_skill_store_hours')) {
+        const hasBizInfo = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'business_info');
+        const hasHours = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'hours');
+        const bizSourceTypes: string[] = [];
+        if (hasBizInfo) bizSourceTypes.push('business_info');
+        if (hasHours) bizSourceTypes.push('hours');
+        if (bizSourceTypes.length > 0) {
+          const bizResult = await knowledgeService.searchKnowledge(tenantId, message, bizSourceTypes, 3);
+          if (bizResult.chunks.length > 0) {
+            knowledgeContext += '\n\nBusiness info context:\n' +
+              bizResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      }
+
+      // Fulfillment settings knowledge — gated by chatbot_skill_inventory
+      if (hasSkill('chatbot_skill_inventory')) {
+        const hasFulfillment = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'fulfillment');
+        if (hasFulfillment) {
+          const fulfillmentResult = await knowledgeService.searchKnowledge(tenantId, message, ['fulfillment'], 3);
+          if (fulfillmentResult.chunks.length > 0) {
+            knowledgeContext += '\n\nFulfillment context:\n' +
+              fulfillmentResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      }
+    } catch (knowledgeError) {
+      logger.warn('[BotDynamicResponseService] Knowledge RAG search failed, continuing without knowledge context', undefined, {
+        error: knowledgeError instanceof Error ? knowledgeError.message : String(knowledgeError),
       });
     }
 
@@ -279,7 +351,7 @@ class BotDynamicResponseService {
 
     // 4. Build messages array for OpenAI
     const surface = pageContext === 'dashboard' ? 'dashboard' : undefined;
-    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config, surface) + ragContext + productContext + crmContext + policyContext + platformContext;
+    let systemPrompt = SYSTEM_PROMPT_TEMPLATE(config, surface) + ragContext + productContext + knowledgeContext + crmContext + policyContext + platformContext;
     if (pageContext) {
       systemPrompt += `\n\nThe customer is currently viewing a ${pageContext} page. Tailor your response accordingly.`;
     }
@@ -320,6 +392,7 @@ class BotDynamicResponseService {
           productContextUsed: false,
           crmContextUsed: false,
           policyContextUsed: false,
+          knowledgeContextUsed: false,
           channels: steering.channels,
         };
       }
@@ -333,6 +406,7 @@ class BotDynamicResponseService {
         productContextUsed,
         crmContextUsed,
         policyContextUsed,
+        knowledgeContextUsed,
       };
     } catch (gptError) {
       logger.error('[BotDynamicResponseService] Chat completion failed', undefined, {
@@ -350,6 +424,7 @@ class BotDynamicResponseService {
         productContextUsed: false,
         crmContextUsed: false,
         policyContextUsed: false,
+        knowledgeContextUsed: false,
         channels: steering.channels,
       };
     }

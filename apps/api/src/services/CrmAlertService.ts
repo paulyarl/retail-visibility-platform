@@ -198,6 +198,69 @@ export class CrmAlertService extends BaseService {
       console.error('[CrmAlertService] Failed to create abandoned cart alert:', error);
     }
   }
+
+  /**
+   * Create a featured placement lifecycle alert.
+   * Fire-and-forget from FeaturedPlacementService — errors are logged, never thrown.
+   */
+  async createFeaturedPlacementAlert(params: {
+    tenantId: string;
+    placementId: string;
+    productName: string;
+    planKey: string;
+    surface: string;
+    expiresAt: Date;
+    durationDays: number;
+    priceCents: number;
+    alertType: 'featured_placement_active' | 'featured_placement_expiring' | 'featured_placement_urgent' | 'featured_placement_expired';
+  }): Promise<void> {
+    try {
+      const expiresStr = params.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const priceFormatted = `$${(params.priceCents / 100).toFixed(2)}`;
+
+      const titles: Record<string, string> = {
+        featured_placement_active: `Featured placement is now live — ${params.productName}`,
+        featured_placement_expiring: `Your featured placement expires in 3 days — ${params.productName}`,
+        featured_placement_urgent: `Your featured placement expires tomorrow — ${params.productName}`,
+        featured_placement_expired: `Featured placement expired — ${params.productName}`,
+      };
+
+      const bodies: Record<string, string> = {
+        featured_placement_active: `"${params.productName}" is now in the ${params.surface} channel for ${params.durationDays} days. Expires on ${expiresStr}.`,
+        featured_placement_expiring: `"${params.productName}" ${params.surface} placement expires on ${expiresStr}. Renew to keep it visible.`,
+        featured_placement_urgent: `"${params.productName}" ${params.surface} placement expires tomorrow. Renew now to avoid losing visibility.`,
+        featured_placement_expired: `"${params.productName}" ${params.surface} placement has expired. The product is no longer in the spotlight channel.`,
+      };
+
+      const icons: Record<string, string> = {
+        featured_placement_active: '🎉',
+        featured_placement_expiring: '⏰',
+        featured_placement_urgent: '⚠️',
+        featured_placement_expired: '✅',
+      };
+
+      await this.create({
+        tenant_id: params.tenantId,
+        type: 'featured_placement',
+        title: titles[params.alertType],
+        body: bodies[params.alertType],
+        icon: icons[params.alertType],
+        metadata: {
+          placement_id: params.placementId,
+          product_name: params.productName,
+          plan_key: params.planKey,
+          surface: params.surface,
+          expires_at: params.expiresAt.toISOString(),
+          duration_days: params.durationDays,
+          price_cents: params.priceCents,
+          alert_type: params.alertType,
+          price_formatted: priceFormatted,
+        },
+      });
+    } catch (error) {
+      console.error('[CrmAlertService] Failed to create featured placement alert:', error);
+    }
+  }
 }
 
 export default CrmAlertService;

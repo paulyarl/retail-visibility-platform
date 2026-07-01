@@ -36,7 +36,7 @@ export default function PaymentGatewaysPage() {
 
   const { hasAccess, loading: accessLoading, accessReason } = useAccessControl(
     tenantId,
-    AccessPresets.SUPPORT_OR_TENANT_ADMIN
+    AccessPresets.CAN_MANAGE_TENANT_SETTINGS
   );
   const tierConfig = useTierConfig();
 

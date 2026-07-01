@@ -46,14 +46,26 @@ interface ProductVariantSelectorProps {
   onVariantChange: (variant: ProductVariant | null) => void;
   selectedVariant?: ProductVariant | null;
   className?: string;
+  productType?: string;
 }
 
 const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
   variants,
   onVariantChange,
   selectedVariant,
-  className = ''
+  className = '',
+  productType = 'physical'
 }) => {
+  const isDigital = productType === 'digital';
+  const isService = productType === 'service';
+  const isHybrid = productType === 'hybrid';
+  const showStockLabels = productType === 'physical' || productType === 'hybrid';
+
+  const getUnavailableLabel = () => {
+    if (isService) return 'Fully Booked';
+    if (isDigital) return 'Unavailable';
+    return 'Out of Stock';
+  };
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableCombinations, setAvailableCombinations] = useState<Set<string>>(new Set());
 
@@ -344,7 +356,7 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
             </option>
             {group.options.map(opt => (
               <option key={opt.value} value={opt.value} disabled={!opt.available}>
-                {opt.label} {!opt.available && '(Out of Stock)'}
+                {opt.label} {!opt.available && `(${getUnavailableLabel()})`}
               </option>
             ))}
           </select>
@@ -447,7 +459,15 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
           <div className="text-sm text-gray-600">
             <div className="font-medium">Selected Variant:</div>
             <div>SKU: {selectedVariant.sku}</div>
-            <div>Stock: {selectedVariant.stock} units</div>
+            {showStockLabels ? (
+              <div>Stock: {selectedVariant.stock} units</div>
+            ) : isDigital ? (
+              <div>Availability: {selectedVariant.stock > 0 ? 'Available' : 'Limited'}</div>
+            ) : isService ? (
+              <div>Availability: {selectedVariant.stock > 0 ? 'Open Slots' : 'Fully Booked'}</div>
+            ) : (
+              <div>Availability: {selectedVariant.stock > 0 ? 'Available' : 'Unavailable'}</div>
+            )}
           </div>
         </div>
       )}

@@ -8,6 +8,401 @@ import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSuppo
 import { user_tenant_role } from '@prisma/client';
 
 /**
+ * Get organization ID from request (params or body)
+ */
+function getOrganizationIdFromRequest(req: Request): string | null {
+  return (
+    req.params.organizationId ||
+    req.params.orgId ||
+    req.params.id ||
+    req.body.organizationId ||
+    req.body.orgId ||
+    null
+  );
+}
+
+/**
+ * Fetch organization with its tenants and identify the hero tenant.
+ * The hero tenant is the one with metadata.isHeroLocation === true.
+ * Falls back to the first tenant if no hero is marked.
+ */
+async function getOrgWithHeroTenant(orgId: string) {
+  const organization = await prisma.organizations_list.findUnique({
+    where: { id: orgId },
+    include: {
+      tenants: {
+        select: { id: true, metadata: true },
+      },
+    },
+  });
+
+  if (!organization) return null;
+
+  const heroTenant = organization.tenants.find(
+    (t: any) => t.metadata && (t.metadata as any).isHeroLocation === true
+  );
+
+  const heroTenantId = heroTenant?.id || organization.tenants[0]?.id || null;
+
+  return { organization, heroTenantId, tenantIds: organization.tenants.map((t: any) => t.id) };
+}
+
+/**
+ * Check if user has an explicit org role in user_organizations.
+ * Returns the role string or null if no explicit role exists.
+ */
+async function getExplicitOrgRole(userId: string, orgId: string): Promise<string | null> {
+  try {
+    const userOrg = await prisma.user_organizations.findUnique({
+      where: {
+        user_id_organization_id: {
+          user_id: userId,
+          organization_id: orgId,
+        },
+      },
+      select: { role: true },
+    });
+    return userOrg?.role || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Middleware to check if user is an organization admin.
+ * Checks explicit org role (ORG_OWNER, ORG_ADMIN) first, then falls back to hero tenant admin.
+ * Platform admins always bypass.
+ */
+export async function requireOrgAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Not authenticated',
+      });
+    }
+
+    // Platform admins bypass org checks
+    if (isPlatformAdmin(req.user)) {
+      return next();
+    }
+
+    const orgId = getOrganizationIdFromRequest(req);
+    if (!orgId) {
+      return res.status(400).json({
+        error: 'organizationId_required',
+        message: 'Organization ID is required',
+      });
+    }
+
+    const userId = req.user.userId || req.user.user_id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
+    // Check explicit org role first
+    const explicitRole = await getExplicitOrgRole(userId, orgId);
+    if (explicitRole === 'ORG_OWNER' || explicitRole === 'ORG_ADMIN') {
+      return next();
+    }
+
+    // Fallback: hero tenant admin derivation for backward compat
+    if (!explicitRole) {
+      const orgData = await getOrgWithHeroTenant(orgId);
+      if (!orgData) {
+        return res.status(404).json({
+          error: 'organization_not_found',
+          message: 'Organization not found',
+        });
+      }
+
+      if (!orgData.heroTenantId) {
+        return res.status(400).json({
+          error: 'no_hero_tenant',
+          message: 'Organization has no tenants',
+        });
+      }
+
+      const userRole = await getUserTenantRole(userId, orgData.heroTenantId);
+
+      if (!userRole || (userRole !== user_tenant_role.OWNER && userRole !== user_tenant_role.ADMIN)) {
+        return res.status(403).json({
+          error: 'org_admin_required',
+          message: 'Only organization administrators can perform this action',
+          requiredRole: 'ORG_ADMIN, ORG_OWNER, or admin of the primary location',
+        });
+      }
+    } else {
+      // User has explicit role but not admin-level
+      return res.status(403).json({
+        error: 'org_admin_required',
+        message: 'Only organization administrators can perform this action',
+        requiredRole: 'ORG_ADMIN or ORG_OWNER',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[requireOrgAdmin] Error:', error);
+    return res.status(500).json({
+      error: 'permission_check_failed',
+      message: 'Failed to verify organization admin permissions',
+    });
+  }
+}
+
+/**
+ * Middleware to check if user is an organization member.
+ * Checks explicit org role (any role in user_organizations) first, then falls back to tenant admin.
+ * Platform admins always bypass.
+ */
+export async function requireOrgMember(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Not authenticated',
+      });
+    }
+
+    // Platform admins bypass org checks
+    if (isPlatformAdmin(req.user)) {
+      return next();
+    }
+
+    const orgId = getOrganizationIdFromRequest(req);
+    if (!orgId) {
+      return res.status(400).json({
+        error: 'organizationId_required',
+        message: 'Organization ID is required',
+      });
+    }
+
+    const userId = req.user.userId || req.user.user_id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
+    // Check explicit org role first — any role means member
+    const explicitRole = await getExplicitOrgRole(userId, orgId);
+    if (explicitRole !== null) {
+      return next();
+    }
+
+    // Fallback: any tenant admin in org for backward compat
+    const orgData = await getOrgWithHeroTenant(orgId);
+    if (!orgData) {
+      return res.status(404).json({
+        error: 'organization_not_found',
+        message: 'Organization not found',
+      });
+    }
+
+    if (orgData.tenantIds.length === 0) {
+      return res.status(400).json({
+        error: 'no_tenants',
+        message: 'Organization has no tenants',
+      });
+    }
+
+    const userTenants = await prisma.user_tenants.findMany({
+      where: {
+        user_id: userId,
+        tenant_id: { in: orgData.tenantIds },
+        role: { in: [user_tenant_role.OWNER, user_tenant_role.ADMIN] },
+      },
+    });
+
+    if (userTenants.length === 0) {
+      return res.status(403).json({
+        error: 'org_member_required',
+        message: 'You must be a member of this organization to perform this action',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[requireOrgMember] Error:', error);
+    return res.status(500).json({
+      error: 'permission_check_failed',
+      message: 'Failed to verify organization member permissions',
+    });
+  }
+}
+
+/**
+ * Middleware to check if user is an organization admin for a specific org request.
+ * Fetches the organization_requests_list record by req.params.id to get the org ID,
+ * then checks explicit org role first, falls back to hero tenant admin.
+ * Use this for routes where :id is the request ID, not the org ID.
+ */
+export async function requireOrgAdminForRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Not authenticated',
+      });
+    }
+
+    if (isPlatformAdmin(req.user)) {
+      return next();
+    }
+
+    const requestId = req.params.id;
+    if (!requestId) {
+      return res.status(400).json({
+        error: 'requestId_required',
+        message: 'Request ID is required',
+      });
+    }
+
+    const userId = req.user.userId || req.user.user_id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
+    const orgRequest = await prisma.organization_requests_list.findUnique({
+      where: { id: requestId },
+      select: { organization_id: true },
+    });
+
+    if (!orgRequest) {
+      return res.status(404).json({
+        error: 'request_not_found',
+        message: 'Organization request not found',
+      });
+    }
+
+    const orgId = orgRequest.organization_id;
+
+    // Check explicit org role first
+    const explicitRole = await getExplicitOrgRole(userId, orgId);
+    if (explicitRole === 'ORG_OWNER' || explicitRole === 'ORG_ADMIN') {
+      return next();
+    }
+
+    // Fallback: hero tenant admin derivation for backward compat
+    if (!explicitRole) {
+      const orgData = await getOrgWithHeroTenant(orgId);
+      if (!orgData) {
+        return res.status(404).json({
+          error: 'organization_not_found',
+          message: 'Organization not found',
+        });
+      }
+
+      if (!orgData.heroTenantId) {
+        return res.status(400).json({
+          error: 'no_hero_tenant',
+          message: 'Organization has no tenants',
+        });
+      }
+
+      const userRole = await getUserTenantRole(userId, orgData.heroTenantId);
+
+      if (!userRole || (userRole !== user_tenant_role.OWNER && userRole !== user_tenant_role.ADMIN)) {
+        return res.status(403).json({
+          error: 'org_admin_required',
+          message: 'Only organization administrators can perform this action',
+        });
+      }
+    } else {
+      return res.status(403).json({
+        error: 'org_admin_required',
+        message: 'Only organization administrators can perform this action',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[requireOrgAdminForRequest] Error:', error);
+    return res.status(500).json({
+      error: 'permission_check_failed',
+      message: 'Failed to verify organization admin permissions',
+    });
+  }
+}
+
+/**
+ * Middleware to check if user is an organization owner.
+ * Only ORG_OWNER or platform admin can pass. No fallback — explicit role required.
+ * Used for sensitive operations like changing other users' roles or removing users.
+ */
+export async function requireOrgOwner(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Not authenticated',
+      });
+    }
+
+    if (isPlatformAdmin(req.user)) {
+      return next();
+    }
+
+    const orgId = getOrganizationIdFromRequest(req);
+    if (!orgId) {
+      return res.status(400).json({
+        error: 'organizationId_required',
+        message: 'Organization ID is required',
+      });
+    }
+
+    const userId = req.user.userId || req.user.user_id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'User ID is required',
+      });
+    }
+
+    const explicitRole = await getExplicitOrgRole(userId, orgId);
+    if (explicitRole !== 'ORG_OWNER') {
+      return res.status(403).json({
+        error: 'org_owner_required',
+        message: 'Only organization owners can perform this action',
+        requiredRole: 'ORG_OWNER',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[requireOrgOwner] Error:', error);
+    return res.status(500).json({
+      error: 'permission_check_failed',
+      message: 'Failed to verify organization owner permissions',
+    });
+  }
+}
+
+/**
  * Get tenant ID from request
  */
 function getTenantIdFromRequest(req: Request): string | null {

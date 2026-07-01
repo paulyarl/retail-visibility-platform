@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import ShopManagementService from '../services/ShopManagementService';
 import { authenticateToken } from '../middleware/auth';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = Router();
 const shopService = ShopManagementService.getInstance();
@@ -150,7 +151,10 @@ router.post('/:tenantId', async (req, res) => {
     const shopData = req.body;
     
     const shop = await shopService.upsertShop(tenantId, shopData);
-    
+
+    // Refresh business info embeddings (fire-and-forget)
+    BotKnowledgeEmbeddingService.getInstance().refreshBusinessInfoEmbeddings(tenantId).catch(() => {});
+
     res.json({
       success: true,
       data: shop,
@@ -176,7 +180,10 @@ router.put('/:tenantId', async (req, res) => {
     const shopData = req.body;
     
     const shop = await shopService.upsertShop(tenantId, shopData);
-    
+
+    // Refresh business info embeddings (fire-and-forget)
+    BotKnowledgeEmbeddingService.getInstance().refreshBusinessInfoEmbeddings(tenantId).catch(() => {});
+
     res.json({
       success: true,
       data: shop,
@@ -345,6 +352,9 @@ router.put('/:tenantId/hours', async (req, res) => {
       hours: hoursWithTimezone,
       timezone 
     });
+
+    // Refresh hours embeddings (fire-and-forget)
+    BotKnowledgeEmbeddingService.getInstance().refreshHoursEmbeddings(tenantId).catch(() => {});
     
     res.json({
       success: true,

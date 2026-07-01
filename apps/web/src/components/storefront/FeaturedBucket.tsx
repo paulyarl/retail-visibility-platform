@@ -93,38 +93,111 @@ export default function FeaturedBucket({
         )}
       </div>
 
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        {currentProducts.map((product: any) => (
-          <SmartProductCard
-            key={product.id}
-            tenantId={tenantId}
-            product={{
-              id: product.id,
-              sku: product.sku,
-              name: product.name,
-              title: product.title || product.name,
-              brand: product.brand || '',
-              description: product.description || '',
-              priceCents: product.priceCents,
-              salePriceCents: product.salePriceCents,
-              stock: product.stock,
-              imageUrl: product.imageUrl,
-              tenantId: product.tenantId,
-              availability: product.availability || 'in_stock',
-              has_variants: product.hasVariants || false,
-              has_active_payment_gateway: hasActivePaymentGateway,
-              payment_gateway_type: defaultGatewayType,
-              featuredType: product.featuredType || bucketType || undefined,
-              featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])))
-                .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
-            }}
-            hasActivePaymentGateway={hasActivePaymentGateway}
-            defaultGatewayType={defaultGatewayType}
-            allowedFeaturedTypes={allowedFeaturedTypes}
-            variant="featured"
-          />
-        ))}
+      {/* Products Grid — grouped by product type */}
+      <div className="space-y-6 mb-6">
+        {(() => {
+          const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+          const productTypeLabels: Record<string, string> = {
+            physical: 'Physical Products',
+            digital: 'Digital Products',
+            service: 'Service Products',
+            hybrid: 'Hybrid Products',
+          };
+          const grouped = productTypeOrder.reduce((acc, pt) => {
+            acc[pt] = currentProducts.filter((p: any) => (p.productType || 'physical') === pt);
+            return acc;
+          }, {} as Record<string, any[]>);
+          const otherProducts = currentProducts.filter((p: any) => {
+            const pt = p.productType || 'physical';
+            return !productTypeOrder.includes(pt as any);
+          });
+
+          return (
+            <>
+              {productTypeOrder.map(pt => {
+                const group = grouped[pt];
+                if (!group || group.length === 0) return null;
+                return (
+                  <div key={pt}>
+                    <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">{productTypeLabels[pt]}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {group.map((product: any) => (
+                        <SmartProductCard
+                          key={product.id}
+                          tenantId={tenantId}
+                          product={{
+                            id: product.id,
+                            sku: product.sku,
+                            name: product.name,
+                            title: product.title || product.name,
+                            brand: product.brand || '',
+                            description: product.description || '',
+                            priceCents: product.priceCents,
+                            salePriceCents: product.salePriceCents,
+                            stock: product.stock,
+                            imageUrl: product.imageUrl,
+                            tenantId: product.tenantId,
+                            availability: product.availability || 'in_stock',
+                            has_variants: product.hasVariants || false,
+                            has_active_payment_gateway: hasActivePaymentGateway,
+                            payment_gateway_type: defaultGatewayType,
+                            featuredType: product.featuredType || bucketType || undefined,
+                            featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])))
+                              .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
+                            productType: product.productType || 'physical',
+                          }}
+                          hasActivePaymentGateway={hasActivePaymentGateway}
+                          defaultGatewayType={defaultGatewayType}
+                          allowedFeaturedTypes={allowedFeaturedTypes}
+                          variant="featured"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {otherProducts.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">Other Products</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {otherProducts.map((product: any) => (
+                      <SmartProductCard
+                        key={product.id}
+                        tenantId={tenantId}
+                        product={{
+                          id: product.id,
+                          sku: product.sku,
+                          name: product.name,
+                          title: product.title || product.name,
+                          brand: product.brand || '',
+                          description: product.description || '',
+                          priceCents: product.priceCents,
+                          salePriceCents: product.salePriceCents,
+                          stock: product.stock,
+                          imageUrl: product.imageUrl,
+                          tenantId: product.tenantId,
+                          availability: product.availability || 'in_stock',
+                          has_variants: product.hasVariants || false,
+                          has_active_payment_gateway: hasActivePaymentGateway,
+                          payment_gateway_type: defaultGatewayType,
+                          featuredType: product.featuredType || bucketType || undefined,
+                          featuredTypes: (product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucketType ? [bucketType] : [])))
+                            .filter((t: string) => !allowedFeaturedTypes || allowedFeaturedTypes.includes(t)),
+                          productType: product.productType || 'physical',
+                        }}
+                        hasActivePaymentGateway={hasActivePaymentGateway}
+                        defaultGatewayType={defaultGatewayType}
+                        allowedFeaturedTypes={allowedFeaturedTypes}
+                        variant="featured"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Pagination */}

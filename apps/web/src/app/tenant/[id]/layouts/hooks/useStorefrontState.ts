@@ -22,6 +22,8 @@ import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
+import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 export interface SocialCommerceFlags {
   enabled?: boolean;
@@ -225,6 +227,8 @@ export function useStorefrontState({
     initialProductOptionFlags ?? null,
   );
   const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled) || isServiceStore;
+  const showDigital = !!(productOptionFlags?.merchantPreferences?.product_digital_enabled);
+  const showHybrid = !!(productOptionFlags?.merchantPreferences?.product_hybrid_enabled);
 
   // ---- Social commerce flags ----
   const [socialCommerceFlags] = useState<SocialCommerceFlags | null>(
@@ -254,6 +258,9 @@ export function useStorefrontState({
     Record<string, number>
   >({});
   const [featuredData, setFeaturedData] = useState<any>(null);
+
+  // ---- Active featured (from ActiveFeaturedResolver) ----
+  const { data: activeFeatured } = useActiveFeatured(tenantId, 'storefront_spotlight', { limit: 8 });
 
   useEffect(() => {
     let cancelled = false;
@@ -398,6 +405,8 @@ export function useStorefrontState({
     // Product options
     productOptionFlags,
     showServices,
+    showDigital,
+    showHybrid,
 
     // Social commerce
     socialCommerceFlags,
@@ -409,6 +418,7 @@ export function useStorefrontState({
     // Featured
     featuredCounts,
     featuredData,
+    activeFeatured: activeFeatured ?? undefined,
     getFeaturedTypeName,
     getCategoryUrl,
   };

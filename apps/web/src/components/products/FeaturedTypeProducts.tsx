@@ -27,6 +27,7 @@ interface FeaturedTypeProduct {
   availability?: string;
   categoryName?: string;
   categorySlug?: string;
+  productType?: string;
 }
 
 interface FeaturedTypeProductsProps {
@@ -255,42 +256,120 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
       {bucketsWithProducts.map((bucket, index) => (
         <div key={bucket.type}>
           {index === activeTabIndex && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {bucket.products.map((product) => (
-                <SmartProductCard
-                  key={product.id}
-                  tenantId={product.tenantId}
-                  defaultGatewayType={product.defaultGatewayType || undefined}
-                  product={{
-                    id: product.id,
-                    name: product.name,
-                    title: product.title,
-                    priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
-                    salePriceCents: product.salePriceCents,
-                    listPriceCents: product.listPriceCents,
-                    isOnSale: product.isOnSale,
-                    discountPercentage: product.discountPercentage,
-                    currency: product.currency,
-                    imageUrl: product.imageUrl,
-                    brand: product.brand,
-                    tenantId: product.tenantId,
-                    sku: product.sku || '',
-                    stock: product.stock,
-                  availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
-                    has_active_payment_gateway: product.hasActivePaymentGateway,
-                    payment_gateway_type: product.defaultGatewayType,
-                    featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucket.type ? [bucket.type] : [])),
-                    featuredType: product.featuredType || bucket.type || undefined,
-                    categoryName: product.categoryName,
-                    categorySlug: product.categorySlug,
-                  }}
-                  variant="grid"
-                  showCategory={true}
-                  showDescription={true}
-                  buttonLayout="stacked"
-                  allowedFeaturedTypes={allowedFeaturedTypes}
-                />
-              ))}
+            <div className="space-y-6">
+              {(() => {
+                const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+                const productTypeLabels: Record<string, string> = {
+                  physical: 'Physical Products',
+                  digital: 'Digital Products',
+                  service: 'Service Products',
+                  hybrid: 'Hybrid Products',
+                };
+                const grouped = productTypeOrder.reduce((acc, pt) => {
+                  acc[pt] = bucket.products.filter(p => (p.productType || 'physical') === pt);
+                  return acc;
+                }, {} as Record<string, typeof bucket.products>);
+                const otherProducts = bucket.products.filter(p => {
+                  const pt = p.productType || 'physical';
+                  return !productTypeOrder.includes(pt as any);
+                });
+
+                return (
+                  <>
+                    {productTypeOrder.map(pt => {
+                      const group = grouped[pt];
+                      if (!group || group.length === 0) return null;
+                      return (
+                        <div key={pt}>
+                          <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">{productTypeLabels[pt]}</h3>
+                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            {group.map((product) => (
+                              <SmartProductCard
+                                key={product.id}
+                                tenantId={product.tenantId}
+                                defaultGatewayType={product.defaultGatewayType || undefined}
+                                product={{
+                                  id: product.id,
+                                  name: product.name,
+                                  title: product.title,
+                                  priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
+                                  salePriceCents: product.salePriceCents,
+                                  listPriceCents: product.listPriceCents,
+                                  isOnSale: product.isOnSale,
+                                  discountPercentage: product.discountPercentage,
+                                  currency: product.currency,
+                                  imageUrl: product.imageUrl,
+                                  brand: product.brand,
+                                  tenantId: product.tenantId,
+                                  sku: product.sku || '',
+                                  stock: product.stock,
+                                  availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
+                                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                                  payment_gateway_type: product.defaultGatewayType,
+                                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucket.type ? [bucket.type] : [])),
+                                  featuredType: product.featuredType || bucket.type || undefined,
+                                  categoryName: product.categoryName,
+                                  categorySlug: product.categorySlug,
+                                  productType: product.productType || 'physical',
+                                }}
+                                variant="grid"
+                                showCategory={true}
+                                showDescription={true}
+                                buttonLayout="stacked"
+                                allowedFeaturedTypes={allowedFeaturedTypes}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {otherProducts.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">Other Products</h3>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                          {otherProducts.map((product) => (
+                            <SmartProductCard
+                              key={product.id}
+                              tenantId={product.tenantId}
+                              defaultGatewayType={product.defaultGatewayType || undefined}
+                              product={{
+                                id: product.id,
+                                name: product.name,
+                                title: product.title,
+                                priceCents: product.listPriceCents || product.priceCents || Math.round((product.price || 0) * 100),
+                                salePriceCents: product.salePriceCents,
+                                listPriceCents: product.listPriceCents,
+                                isOnSale: product.isOnSale,
+                                discountPercentage: product.discountPercentage,
+                                currency: product.currency,
+                                imageUrl: product.imageUrl,
+                                brand: product.brand,
+                                tenantId: product.tenantId,
+                                sku: product.sku || '',
+                                stock: product.stock,
+                                availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
+                                has_active_payment_gateway: product.hasActivePaymentGateway,
+                                payment_gateway_type: product.defaultGatewayType,
+                                featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : (bucket.type ? [bucket.type] : [])),
+                                featuredType: product.featuredType || bucket.type || undefined,
+                                categoryName: product.categoryName,
+                                categorySlug: product.categorySlug,
+                                productType: product.productType || 'physical',
+                              }}
+                              variant="grid"
+                              showCategory={true}
+                              showDescription={true}
+                              buttonLayout="stacked"
+                              allowedFeaturedTypes={allowedFeaturedTypes}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

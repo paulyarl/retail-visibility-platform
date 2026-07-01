@@ -15,18 +15,26 @@ export class StockService {
     try {
       console.log(`[StockService] Decrementing stock for order: ${orderId}`);
 
-      // Get all order items with their variant information
+      // Get all order items with their variant and inventory item information
       const orderItems = await this.prisma.order_items.findMany({
         where: { order_id: orderId },
         include: {
           // Include variant information if available
           product_variants: true,
+          inventory_items: true,
         },
       });
 
       console.log(`[StockService] Found ${orderItems.length} items to process`);
 
       for (const item of orderItems) {
+        // Skip stock operations for digital and service products
+        const productType = item.product_type || item.inventory_items?.product_type;
+        if (productType === 'digital' || productType === 'service') {
+          console.log(`[StockService] Skipping stock decrement for ${productType} item ${item.sku}`);
+          continue;
+        }
+
         const quantity = item.quantity;
         let stockUpdated = false;
 
@@ -96,10 +104,18 @@ export class StockService {
         where: { order_id: orderId },
         include: {
           product_variants: true,
+          inventory_items: true,
         },
       });
 
       for (const item of orderItems) {
+        // Skip stock restoration for digital and service products
+        const productType = item.product_type || item.inventory_items?.product_type;
+        if (productType === 'digital' || productType === 'service') {
+          console.log(`[StockService] Skipping stock restore for ${productType} item ${item.sku}`);
+          continue;
+        }
+
         const quantity = item.quantity;
         let stockRestored = false;
 
@@ -188,6 +204,12 @@ export class StockService {
       }> = [];
 
       for (const item of orderItems) {
+        // Skip stock check for digital and service products
+        const productType = item.product_type || item.inventory_items?.product_type;
+        if (productType === 'digital' || productType === 'service') {
+          continue;
+        }
+
         const requested = item.quantity;
         let available = 0;
         let itemSku = '';

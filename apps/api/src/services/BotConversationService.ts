@@ -87,15 +87,35 @@ export class BotConversationService {
     return BotConversationService.instance;
   }
 
+  /**
+   * Generate a session ID and greeting without persisting to DB.
+   * The conversation is only created on the first visitor message (lazy creation).
+   * This prevents greeting-only conversations from spamming the conversation list.
+   */
+  async prepareConversation(params: {
+    tenantId: string;
+  }): Promise<{ sessionId: string; greeting: string }> {
+    const sessionId = generateBotConversationSessionId(params.tenantId);
+
+    const config = await prisma.bot_configurations.findUnique({
+      where: { tenant_id: params.tenantId },
+    });
+
+    const greeting = config?.greeting || 'Hi! How can I help you today?';
+
+    return { sessionId, greeting };
+  }
+
   async createConversation(params: {
     tenantId: string;
+    sessionId?: string;
     customerEmail?: string;
     customerPhone?: string;
     pageContext?: string;
     contextEntityName?: string;
     source?: string;
   }): Promise<{ conversation: BotConversation; greeting: string }> {
-    const sessionId = generateBotConversationSessionId(params.tenantId);
+    const sessionId = params.sessionId || generateBotConversationSessionId(params.tenantId);
     const now = new Date();
 
     const config = await prisma.bot_configurations.findUnique({
@@ -147,7 +167,9 @@ export class BotConversationService {
 
   async isSessionValid(sessionId: string): Promise<boolean> {
     const conv = await this.getConversationBySession(sessionId);
-    if (!conv || conv.status !== 'active') return false;
+    // If conversation doesn't exist yet (lazy creation), session is valid
+    if (!conv) return true;
+    if (conv.status !== 'active') return false;
     const age = Date.now() - conv.createdAt.getTime();
     return age < SESSION_TTL_MS;
   }

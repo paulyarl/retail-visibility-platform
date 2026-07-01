@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import FeaturedOptionsService, { FeaturedType } from '../services/FeaturedOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -122,7 +123,7 @@ router.get('/:tenantId/featured-options', authenticateToken, async (req, res) =>
 });
 
 // Update featured options settings for a tenant
-router.put('/:tenantId/featured-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/featured-options', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

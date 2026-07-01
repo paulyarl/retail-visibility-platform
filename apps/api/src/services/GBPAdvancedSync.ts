@@ -11,6 +11,7 @@
  */
 
 import { prisma } from '../prisma';
+import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 const GBP_MEDIA_API = 'https://mybusiness.googleapis.com/v4';
@@ -23,6 +24,41 @@ const GBP_POSTS_API = 'https://mybusiness.googleapis.com/v4';
 
 async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
+    // First, try the unified OAuth token store
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { google_oauth_tokens_list: true },
+    });
+
+    if (account?.google_oauth_tokens_list) {
+      const tokenRecord = account.google_oauth_tokens_list;
+      const now = new Date();
+
+      if (tokenRecord.expires_at <= now) {
+        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
+        const newTokens = await refreshAccessToken(refreshToken);
+
+        if (!newTokens) {
+          console.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`);
+          return null;
+        }
+
+        await prisma.google_oauth_tokens_list.update({
+          where: { id: tokenRecord.id },
+          data: {
+            access_token_encrypted: encryptToken(newTokens.access_token),
+            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
+            updated_at: new Date(),
+          },
+        });
+
+        return newTokens.access_token;
+      }
+
+      return decryptToken(tokenRecord.access_token_encrypted);
+    }
+
+    // Fallback: legacy tenants table columns
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
@@ -36,7 +72,6 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
       return null;
     }
 
-    // Check if token is expired
     if (tenant.google_business_token_expiry && new Date(tenant.google_business_token_expiry) < new Date()) {
       if (tenant.google_business_refresh_token) {
         const { google } = await import('googleapis');
@@ -59,7 +94,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
           
           return credentials.access_token!;
         } catch (refreshError) {
-          console.error(`[GBPAdvanced] Token refresh failed:`, refreshError);
+          console.error(`[GBPAdvanced] Legacy token refresh failed:`, refreshError);
           return null;
         }
       }

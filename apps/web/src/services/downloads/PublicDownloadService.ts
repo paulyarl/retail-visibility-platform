@@ -427,44 +427,10 @@ class PublicDownloadService extends CustomerApiSingleton {
     onProgress?: (progress: number) => void
   ): Promise<Blob> {
     const downloadUrl = await this.getDownloadUrl(accessToken, assetId);
-    
-    // Fetch the file with progress tracking
-    const response = await fetch(downloadUrl, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.statusText}`);
-    }
-
-    const contentLength = response.headers.get('content-length');
-    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-    if (!response.body) {
-      throw new Error('Response body is null');
-    }
-
-    // Stream the response for progress tracking
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let receivedBytes = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-      
-      chunks.push(value);
-      receivedBytes += value.length;
-      
-      if (onProgress && totalBytes > 0) {
-        onProgress((receivedBytes / totalBytes) * 100);
-      }
-    }
-
-    // Combine chunks into blob
-    const blob = new Blob(chunks as BlobPart[]);
-    return blob;
+    return this.downloadFileWithProgress(
+      downloadUrl,
+      onProgress ? (prog) => onProgress(prog) : undefined
+    );
   }
 
   /**
@@ -612,6 +578,81 @@ class PublicDownloadService extends CustomerApiSingleton {
     link.click();
     
     // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Validate access token then open download URL in browser.
+   * Pre-flight check prevents opening expired/revoked/exhausted tokens.
+   * Falls back to window.open for the actual file transfer (browser handles streaming to disk).
+   */
+  async validateAndDownload(accessToken: string): Promise<void> {
+    const access = await this.checkAccess(accessToken);
+    if (!access.isValid) {
+      const reason = access.status === 'expired' ? 'Access has expired'
+        : access.status === 'revoked' ? 'Access has been revoked'
+        : access.status === 'exhausted' ? 'Download limit reached'
+        : 'Access denied';
+      throw new Error(reason);
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+    window.open(`${apiUrl}/api/download/${accessToken}`, '_blank');
+  }
+
+  /**
+   * Validate access token then trigger blob download with assetId.
+   * Full singleton path: validate → request download URL → fetch blob → trigger save.
+   * Use this when assetId is available for proper download tracking and naming.
+   */
+  async validateAndTriggerDownload(
+    accessToken: string,
+    assetId: string,
+    fileName?: string
+  ): Promise<void> {
+    const access = await this.checkAccess(accessToken);
+    if (!access.isValid) {
+      const reason = access.status === 'expired' ? 'Access has expired'
+        : access.status === 'revoked' ? 'Access has been revoked'
+        : access.status === 'exhausted' ? 'Download limit reached'
+        : 'Access denied';
+      throw new Error(reason);
+    }
+
+    await this.triggerDownload(accessToken, assetId, fileName);
+  }
+
+  /**
+   * Validate access token then download with platform progress tracking.
+   * Full singleton path: validate → STREAM request → progress callback → blob save.
+   * Use this when you want in-app progress UI instead of browser-native download.
+   */
+  async validateAndDownloadWithProgress(
+    accessToken: string,
+    fileName?: string,
+    onProgress?: (progress: number, loadedBytes: number, totalBytes: number) => void
+  ): Promise<void> {
+    const access = await this.checkAccess(accessToken);
+    if (!access.isValid) {
+      const reason = access.status === 'expired' ? 'Access has expired'
+        : access.status === 'revoked' ? 'Access has been revoked'
+        : access.status === 'exhausted' ? 'Download limit reached'
+        : 'Access denied';
+      throw new Error(reason);
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+    const downloadUrl = `${apiUrl}/api/download/${accessToken}`;
+
+    const blob = await this.downloadFileWithProgress(downloadUrl, onProgress);
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName || 'download';
+    document.body.appendChild(link);
+    link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   }

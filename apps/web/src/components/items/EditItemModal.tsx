@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
-import { useFeatureFlag } from '@/lib/featureFlags';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { useCapabilityGate } from '@/hooks/useCapabilityGate';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 import CategoryAssignmentModal from './CategoryAssignmentModal';

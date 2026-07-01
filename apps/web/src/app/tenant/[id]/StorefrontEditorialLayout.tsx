@@ -39,6 +39,8 @@ import { StorefrontRecommendations } from './StorefrontClient';
 
 // Service section
 import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
+import { DigitalSection } from '@/components/storefront/sections/DigitalSection';
+import { HybridSection } from '@/components/storefront/sections/HybridSection';
 import { SocialProofSection } from '@/components/storefront/sections/SocialProofSection';
 
 // FAQ & CRM
@@ -141,11 +143,14 @@ export default function StorefrontEditorialLayout({
     faqFeedbackEnabled,
     crmInquiryStorefrontEnabled,
     showServices,
+    showDigital,
+    showHybrid,
     showSocialProof,
     socialCommerceFlags,
     contactInfo,
     featuredData,
     featuredCounts,
+    activeFeatured,
     getFeaturedTypeName,
     getCategoryUrl,
   } = useStorefrontState({
@@ -177,7 +182,7 @@ export default function StorefrontEditorialLayout({
   const primaryColor = tenant?.metadata?.primary_color || tenant?.branding?.primaryColor || '#6366f1';
 
   // ---- Derived: filter products by product_type (switch-based for extensibility) ----
-  const { physicalProducts, serviceProducts } = useMemo(() => {
+  const { physicalProducts, serviceProducts, digitalProducts, hybridProducts } = useMemo(() => {
     const buckets: Record<string, any[]> = { physical: [], service: [], digital: [], hybrid: [] };
     for (const p of products) {
       const pt = p.productType || p.product_type || 'physical';
@@ -197,14 +202,17 @@ export default function StorefrontEditorialLayout({
           break;
       }
     }
-    return { physicalProducts: buckets.physical, serviceProducts: buckets.service };
+    return { physicalProducts: buckets.physical, serviceProducts: buckets.service, digitalProducts: buckets.digital, hybridProducts: buckets.hybrid };
   }, [products]);
 
-  // ---- Derived: first 3 featured products for spotlight ----
+  // ---- Derived: first 3 featured products for spotlight (prefer active featured) ----
   const spotlightProducts = useMemo(() => {
+    if (activeFeatured?.hasActive && activeFeatured.products.length > 0) {
+      return activeFeatured.products.slice(0, 3);
+    }
     if (!featuredData?.buckets?.[0]?.products) return [];
     return featuredData.buckets[0].products.slice(0, 3);
-  }, [featuredData]);
+  }, [activeFeatured, featuredData]);
 
   // ---- Derived: social links ----
   const socialLinks = useMemo(() => {
@@ -750,6 +758,40 @@ export default function StorefrontEditorialLayout({
           services={serviceProducts}
           layoutVariant="editorial"
           isServiceStore={isServiceStore}
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* ================================================================= */}
+      {/* DIGITAL SECTION (downloadable products)                           */}
+      {/* ================================================================= */}
+      {showDigital && digitalProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <DigitalSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          digitalProducts={digitalProducts}
+          layoutVariant="editorial"
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* ================================================================= */}
+      {/* HYBRID SECTION (physical + digital bundles)                      */}
+      {/* ================================================================= */}
+      {showHybrid && hybridProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <HybridSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          hybridProducts={hybridProducts}
+          layoutVariant="editorial"
           hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
           isSocialStore={isSocialStore}
           socialCommerceFlags={socialCommerceFlags}

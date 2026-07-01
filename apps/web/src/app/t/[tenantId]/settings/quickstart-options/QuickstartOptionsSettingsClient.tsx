@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircle2, ArrowRight, Zap, Plus, FolderOpen } from 'lucide-react';
+import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircle2, ArrowRight, Zap, Plus, FolderOpen, Store } from 'lucide-react';
 import Link from 'next/link';
-import { useQuickstartOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useQuickstartOptionsCapability, useAllCapabilities, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
@@ -68,11 +68,11 @@ function getQuickActions(settings: QuickstartOptionsSettings, tenantId: string):
 
   if (settings.quickstart_category_generator) {
     actions.push({
-      id: 'categories',
-      label: 'Manage Categories',
-      description: 'Auto-generate categories for your store',
-      href: `/t/${tenantId}/categories`,
-      icon: FolderOpen,
+      id: 'quick-start-categories',
+      label: 'Generate Categories',
+      description: 'Auto-generate storefront-aligned categories for your store',
+      href: `/t/${tenantId}/categories/quick-start`,
+      icon: LayoutGrid,
       variant: 'category',
     });
   }
@@ -94,6 +94,8 @@ function getQuickActions(settings: QuickstartOptionsSettings, tenantId: string):
 export default function QuickstartOptionsSettingsClient({ tenantId }: QuickstartOptionsSettingsClientProps) {
   const quickstartCap = useQuickstartOptionsCapability(tenantId);
   const allCaps = useAllCapabilities(tenantId);
+  const { data: storefrontCap } = useStorefrontCapability(tenantId);
+  const storefrontType = storefrontCap?.effectiveType ?? 'none';
 
   // Tier-level gates: what the plan allows (not effective/merged state)
   // Settings page must show toggles for everything the tier permits so merchant can control them
@@ -262,6 +264,14 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Auto-generate categories from business type templates
               </p>
+              {storefrontType !== 'none' && storefrontType !== 'flexible' && (
+                <div className="mt-2 text-xs text-neutral-500 flex items-center gap-1">
+                  <Store className="h-3 w-3" />
+                  Storefront type: <strong className="capitalize">{storefrontType}</strong>
+                  {storefrontType === 'service' && ' — service-oriented categories recommended'}
+                  {storefrontType === 'social' && ' — visually-driven categories recommended'}
+                </div>
+              )}
             </div>
             <Switch
               checked={settings.quickstart_category_generator}

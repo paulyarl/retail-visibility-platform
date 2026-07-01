@@ -7,14 +7,191 @@ import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
+import { Star, Sparkles, Calendar, Tag, Award, Download, Globe, Package } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
+import { ProductTypeBadge } from './ProductTypeBadge';
 import type { PriceRange, AvailableAttributes } from '@/types/variants';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { distanceUtils } from '@/lib/utils';
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
+import { PromotedBadge, promotedCardClass } from './PromotedBadge';
+
+// Type-aware CTA: renders the correct button based on productType
+function TypeAwareCTA({
+  product,
+  tenantName,
+  tenantLogo,
+  effectiveCanPurchase,
+  effectiveGatewayType,
+  propHasActivePaymentGateway,
+  propDefaultGatewayType,
+  buttonLayout,
+  commerceDisabled,
+  className,
+  compact = false,
+}: {
+  product: ProductData;
+  tenantName: string;
+  tenantLogo?: string;
+  effectiveCanPurchase: boolean;
+  effectiveGatewayType?: string;
+  propHasActivePaymentGateway?: boolean;
+  propDefaultGatewayType?: string;
+  buttonLayout: 'horizontal' | 'stacked';
+  commerceDisabled: boolean;
+  className?: string;
+  compact?: boolean;
+}) {
+  const productType = product.productType || 'physical';
+
+  // Digital products: "Get" button linking to product page for download flow
+  if (productType === 'digital') {
+    return (
+      <Link
+        href={`/products/${product.id}`}
+        className={`inline-flex items-center justify-center w-full rounded-md border border-blue-300 bg-blue-50 ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors`}
+      >
+        <Download className={`mr-2 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
+        Get
+      </Link>
+    );
+  }
+
+  // Service products: "Book Now" button linking to product page for booking flow
+  if (productType === 'service') {
+    return (
+      <Link
+        href={`/products/${product.id}`}
+        className={`inline-flex items-center justify-center w-full rounded-md border border-green-300 bg-green-50 ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-green-700 hover:bg-green-100 hover:border-green-400 transition-colors`}
+      >
+        <Calendar className={`mr-2 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
+        Book Now
+      </Link>
+    );
+  }
+
+  // Physical / Hybrid: existing flow (View Options if variants, else AddToCartButton)
+  if (product.has_variants === true && !commerceDisabled) {
+    return (
+      <Link
+        href={`/products/${product.id}`}
+        className={`inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors ${className || ''}`}
+      >
+        View Options
+      </Link>
+    );
+  }
+
+  return (
+    <AddToCartButton
+      product={product}
+      tenantName={tenantName}
+      tenantLogo={tenantLogo}
+      hasActivePaymentGateway={effectiveCanPurchase || propHasActivePaymentGateway}
+      defaultGatewayType={effectiveGatewayType || propDefaultGatewayType}
+      layout={buttonLayout}
+      commerceDisabled={commerceDisabled}
+      className={className}
+    />
+  );
+}
+
+// Whether stock info should be shown for this product type
+function shouldShowStock(productType: string): boolean {
+  const type = productType || 'physical';
+  return type === 'physical' || type === 'hybrid';
+}
+
+// Type-specific metadata row: shows relevant fields from product.metadata based on productType
+function TypeMetadataRow({ product, compact = false }: { product: ProductData; compact?: boolean }) {
+  const productType = product.productType || 'physical';
+  const metadata = (product as any).metadata || {};
+  const items: { icon: string; label: string }[] = [];
+
+  if (productType === 'digital') {
+    const fileType = metadata.fileType || metadata.file_type || (product as any).fileType;
+    const fileSize = metadata.fileSize || metadata.file_size || (product as any).fileSize;
+    const licenseType = metadata.licenseType || metadata.license_type || (product as any).licenseType;
+    if (fileType) items.push({ icon: 'file', label: fileType });
+    if (fileSize) items.push({ icon: 'download', label: fileSize });
+    if (licenseType) items.push({ icon: 'check', label: licenseType });
+  } else if (productType === 'service') {
+    const durationMinutes = metadata.durationMinutes || metadata.duration_minutes || (product as any).durationMinutes;
+    const serviceArea = metadata.serviceArea || metadata.service_area || (product as any).serviceArea;
+    const serviceLocation = metadata.serviceLocation || metadata.service_location || (product as any).serviceLocation;
+    const providerName = metadata.providerName || metadata.provider_name || (product as any).providerName;
+    if (durationMinutes) items.push({ icon: 'clock', label: `${durationMinutes} min` });
+    if (serviceLocation) items.push({ icon: 'pin', label: serviceLocation.replace(/_/g, ' ') });
+    if (serviceArea) items.push({ icon: 'area', label: serviceArea });
+    if (providerName) items.push({ icon: 'user', label: providerName });
+  } else if (productType === 'hybrid') {
+    const digitalComponent = metadata.digitalComponent || metadata.digital_component || (product as any).digitalComponent;
+    const physicalComponent = metadata.physicalComponent || metadata.physical_component || (product as any).physicalComponent;
+    if (physicalComponent) items.push({ icon: 'box', label: physicalComponent });
+    if (digitalComponent) items.push({ icon: 'download', label: digitalComponent });
+  }
+
+  if (items.length === 0) return null;
+
+  const maxItems = compact ? 2 : 3;
+  const displayItems = items.slice(0, maxItems);
+  const sizeClasses = compact ? 'text-[0.625rem] gap-2' : 'text-xs gap-3';
+  const iconSize = compact ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5';
+
+  return (
+    <div className={`flex flex-wrap items-center ${sizeClasses} text-neutral-500 dark:text-neutral-400`}>
+      {displayItems.map((item, i) => (
+        <span key={i} className="flex items-center gap-1">
+          {item.icon === 'file' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          )}
+          {item.icon === 'download' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+          )}
+          {item.icon === 'check' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          {item.icon === 'clock' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          {item.icon === 'pin' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+          )}
+          {item.icon === 'area' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+          )}
+          {item.icon === 'user' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+          )}
+          {item.icon === 'box' && (
+            <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+          )}
+          {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -386,6 +563,7 @@ interface ProductData {
   
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  promotional_priority?: number;
 }
 
 interface SmartProductCardProps {
@@ -546,6 +724,9 @@ export default function SmartProductCard({
   
   const displayBrand = product.brand || '';
 
+  const productType = product.productType || 'physical';
+  const showStock = shouldShowStock(productType);
+
   // console.log(`[SmartProductCard] product: ${JSON.stringify(product, null, 2)}`)
  
   // console.log(`[SmartProductCard] hoursStatus: ${JSON.stringify(hoursStatus, null, 2)}`)
@@ -681,6 +862,11 @@ export default function SmartProductCard({
               </p>
             )}
 
+            {/* Type-specific metadata */}
+            <div className="mb-4">
+              <TypeMetadataRow product={product} />
+            </div>
+
             {/* Enhanced Product Info */}
             <div className="space-y-3 mb-4">
               {/* Brand and Rating Row */}
@@ -779,46 +965,40 @@ export default function SmartProductCard({
                     SKU: {product.sku}
                   </p>
                 )}
-                <p className={`text-xs font-semibold ${
-                  product.stock === 0 
-                    ? 'text-red-600 dark:text-red-400' 
-                    : product.stock < 10 
-                      ? 'text-amber-600 dark:text-amber-400' 
-                      : 'text-green-600 dark:text-green-400'
-                }`}>
-                  Stock: {product.stock}
-                </p>
+                {showStock && (
+                  <p className={`text-xs font-semibold ${
+                    product.stock === 0 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : product.stock < 10 
+                        ? 'text-amber-600 dark:text-amber-400' 
+                        : 'text-green-600 dark:text-green-400'
+                  }`}>
+                    Stock: {product.stock}
+                  </p>
+                )}
+                <div className="mt-1">
+                  <ProductTypeBadge productType={productType} />
+                </div>
               </div>
             </div>
 
-            {/* Purchase UI - Prominent */}
-            {(() => {
-              return (effectiveCanPurchase || commerceDisabled) && (
-                <div className="mt-4">
-                  {(product.has_variants === true && !commerceDisabled) ? (
-                    <Link
-                      href={`/products/${product.id}`}
-                      className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-                    >
-                      View Options
-                    </Link>
-                  ) : (
-                    <>
-                      <AddToCartButton
-                        product={product}
-                        tenantName={tenantName || ''}
-                        tenantLogo={tenantLogo}
-                        hasActivePaymentGateway={effectiveCanPurchase||propHasActivePaymentGateway}
-                        defaultGatewayType={effectiveGatewayType||propDefaultGatewayType}
-                        layout={buttonLayout}
-                        commerceDisabled={commerceDisabled}
-                        className="w-full"
-                      />
-                    </>
-                  )}
-                </div>
-              );
-            })()}
+            {/* Purchase UI - Type-aware CTA */}
+            {(effectiveCanPurchase || commerceDisabled) && (
+              <div className="mt-4">
+                <TypeAwareCTA
+                  product={product}
+                  tenantName={tenantName || ''}
+                  tenantLogo={tenantLogo}
+                  effectiveCanPurchase={effectiveCanPurchase}
+                  effectiveGatewayType={effectiveGatewayType}
+                  propHasActivePaymentGateway={propHasActivePaymentGateway}
+                  propDefaultGatewayType={propDefaultGatewayType}
+                  buttonLayout={buttonLayout}
+                  commerceDisabled={commerceDisabled}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -935,6 +1115,10 @@ export default function SmartProductCard({
               </div>
             )}
             
+            <div className="mt-0.5">
+              <TypeMetadataRow product={product} compact />
+            </div>
+
             <div className="flex items-center gap-1 mt-0.5">
               {product.has_variants && product.price_range ? (
                 <PriceRangeDisplay 
@@ -980,17 +1164,17 @@ export default function SmartProductCard({
                   {product.condition.replace('_', ' ')}
                 </span>
               )}
-              {(product.inStock === true || (product.stock && product.stock > 0)) && (
+              {showStock && (product.inStock === true || (product.stock && product.stock > 0)) && (
                 <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
                   ✓ In Stock
                 </span>
               )}
-              {product.inStock === false && (
+              {showStock && product.inStock === false && (
                 <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
                   Out of Stock
                 </span>
               )}
-              {product.stock !== undefined && product.stock !== null && (
+              {showStock && product.stock !== undefined && product.stock !== null && (
                 <>
                   {(showCategory && (product.categoryName || product.productCategory)) || product.condition || product.inStock !== undefined ? <span>•</span> : null}
                   <span className={`flex items-center gap-1 ${
@@ -1012,6 +1196,7 @@ export default function SmartProductCard({
                   </span>
                 </>
               )}
+              <ProductTypeBadge productType={productType} size="xs" />
               {product.has_variants && (
                 <>
                   {(showCategory && product.productCategory) || (product.stock !== undefined && product.stock !== null) ? <span>•</span> : null}
@@ -1024,25 +1209,18 @@ export default function SmartProductCard({
             
             {(effectiveCanPurchase || commerceDisabled) && (
               <div className="mt-2">
-                {(product.has_variants === true && !commerceDisabled) ? (
-                  <Link
-                    href={`/products/${product.id}`}
-                    className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-                  >
-                    View Options
-                  </Link>
-                ) : (
-                  <AddToCartButton
-                    product={product}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    hasActivePaymentGateway={effectiveCanPurchase}
-                    defaultGatewayType={effectiveGatewayType}
-                    layout={buttonLayout}
-                    commerceDisabled={commerceDisabled}
-                    className="text-xs py-1"
-                  />
-                )}
+                <TypeAwareCTA
+                  product={product}
+                  tenantName={tenantName || ''}
+                  tenantLogo={tenantLogo}
+                  effectiveCanPurchase={effectiveCanPurchase}
+                  effectiveGatewayType={effectiveGatewayType}
+                  propHasActivePaymentGateway={propHasActivePaymentGateway}
+                  propDefaultGatewayType={propDefaultGatewayType}
+                  buttonLayout={buttonLayout}
+                  commerceDisabled={commerceDisabled}
+                  compact
+                />
               </div>
             )}
           </div>
@@ -1184,6 +1362,9 @@ export default function SmartProductCard({
                 {product.description}
               </p>
             )}
+            <div className="mb-4">
+              <TypeMetadataRow product={product} />
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-xs">
@@ -1193,17 +1374,17 @@ export default function SmartProductCard({
                   {product.condition.replace('_', ' ')}
                 </span>
               )}
-              {(product.inStock === true || (product.stock && product.stock > 0)) && (
+              {showStock && (product.inStock === true || (product.stock && product.stock > 0)) && (
                 <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
                   ✓ In Stock
                 </span>
               )}
-              {product.inStock === false && (
+              {showStock && product.inStock === false && (
                 <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
                   Out of Stock
                 </span>
               )}
-              {product.stock !== undefined && product.stock !== null && (
+              {showStock && product.stock !== undefined && product.stock !== null && (
                 <span className={`font-medium ${
                   product.stock === 0 
                     ? 'text-red-600 dark:text-red-400' 
@@ -1214,26 +1395,20 @@ export default function SmartProductCard({
                   Stock: {product.stock}
                 </span>
               )}
+              <ProductTypeBadge productType={productType} size="xs" />
             </div>
             {(effectiveCanPurchase || commerceDisabled) && (
-              (product.has_variants === true && !commerceDisabled) ? (
-                <Link
-                  href={`/products/${product.id}`}
-                  className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-                >
-                  View Options
-                </Link>
-              ) : (
-                <AddToCartButton
-                  product={product}
-                  tenantName={tenantName || ''}
-                  tenantLogo={tenantLogo}
-                  hasActivePaymentGateway={effectiveCanPurchase}
-                  defaultGatewayType={effectiveGatewayType}
-                  layout={buttonLayout}
-                  commerceDisabled={commerceDisabled}
-                />
-              )
+              <TypeAwareCTA
+                product={product}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                effectiveCanPurchase={effectiveCanPurchase}
+                effectiveGatewayType={effectiveGatewayType}
+                propHasActivePaymentGateway={propHasActivePaymentGateway}
+                propDefaultGatewayType={propDefaultGatewayType}
+                buttonLayout={buttonLayout}
+                commerceDisabled={commerceDisabled}
+              />
             )}
           </div>
         </div>
@@ -1244,7 +1419,7 @@ export default function SmartProductCard({
   // Grid variant (default)
   const aspectClass = aspectRatioClasses[imageAspectRatio] || 'aspect-square';
   return (
-    <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
+    <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${product.promotional_priority ? promotedCardClass() : ''} ${className}`}>
       {/* Grid Image */}
       <div className={`block relative ${aspectClass} bg-neutral-100 dark:bg-neutral-700 overflow-hidden`}>
         <Link href={`/products/${product.id}`} className="absolute inset-0">
@@ -1274,6 +1449,11 @@ export default function SmartProductCard({
               <FeaturedTypeIcon key={index} type={type} />
             ))}
           </div>
+        )}
+
+        {/* Promoted Badge */}
+        {product.promotional_priority && product.promotional_priority > 0 && (
+          <PromotedBadge priority={product.promotional_priority} />
         )}
 
         {/* Availability badges */}
@@ -1359,6 +1539,10 @@ export default function SmartProductCard({
           </p>
         )}
 
+        <div className="mb-3">
+          <TypeMetadataRow product={product} />
+        </div>
+
         <div className="flex items-center justify-between mb-3">
           {/* Condition and Stock Status */}
           <div className="flex items-center gap-2 text-xs">
@@ -1367,16 +1551,17 @@ export default function SmartProductCard({
                 {product.condition.replace('_', ' ')}
               </span>
             )}
-            {(product.inStock === true || (product.stock && product.stock > 0)) && (
+            {showStock && (product.inStock === true || (product.stock && product.stock > 0)) && (
               <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
                 ✓ In Stock
               </span>
             )}
-            {product.inStock === false && (
+            {showStock && product.inStock === false && (
               <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
                 Out of Stock
               </span>
             )}
+            <ProductTypeBadge productType={productType} />
           </div>
 
           <div className="flex-1">
@@ -1405,7 +1590,7 @@ export default function SmartProductCard({
             <p className="text-xs text-neutral-500">
               SKU: {product.sku}
             </p>
-            {product.stock !== undefined && product.stock !== null && (
+            {showStock && product.stock !== undefined && product.stock !== null && (
               <p className={`text-xs font-medium ${
                 product.stock === 0
                   ? 'text-red-600 dark:text-red-400'
@@ -1420,26 +1605,19 @@ export default function SmartProductCard({
         </div>
 
         {(effectiveCanPurchase || commerceDisabled) && (
-            (product.has_variants === true && !commerceDisabled) ? (
-              <Link
-                href={`/products/${product.id}`}
-                className="inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-              >
-                View Options
-              </Link>
-            ) : (
-              <AddToCartButton
-                product={product}
-                tenantName={tenantName || ''}
-                tenantLogo={tenantLogo}
-                hasActivePaymentGateway={effectiveCanPurchase}
-                defaultGatewayType={effectiveGatewayType}
-                layout={buttonLayout}
-                commerceDisabled={commerceDisabled}
-                className="w-full"
-              />
-            )
-          )}
+          <TypeAwareCTA
+            product={product}
+            tenantName={tenantName || ''}
+            tenantLogo={tenantLogo}
+            effectiveCanPurchase={effectiveCanPurchase}
+            effectiveGatewayType={effectiveGatewayType}
+            propHasActivePaymentGateway={propHasActivePaymentGateway}
+            propDefaultGatewayType={propDefaultGatewayType}
+            buttonLayout={buttonLayout}
+            commerceDisabled={commerceDisabled}
+            className="w-full"
+          />
+        )}
       </div>
     </div>
   );

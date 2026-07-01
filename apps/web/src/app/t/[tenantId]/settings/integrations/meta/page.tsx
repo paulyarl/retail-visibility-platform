@@ -17,7 +17,6 @@ import {
   Share2,
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { API_BASE_URL } from '@/lib/api';
 import { metaIntegrationService } from '@/services/MetaIntegrationService';
 import type { MetaStatus, MetaSyncStatus, MetaBusiness } from '@/services/MetaIntegrationService';
 
@@ -81,7 +80,13 @@ function MetaIntegrationContent() {
 
   async function handleConnect() {
     setConnecting(true);
-    window.location.href = `${API_BASE_URL}/api/meta/oauth/authorize?tenantId=${tenantId}`;
+    try {
+      const url = await metaIntegrationService.getOAuthAuthorizeUrl(tenantId);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start connection');
+      setConnecting(false);
+    }
   }
 
   async function handleDisconnect() {

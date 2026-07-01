@@ -146,6 +146,26 @@ export default function RandomFeaturedProducts() {
           </div>
         </div>
 
+        {/* Product type grouping */}
+        {(() => {
+          const productTypeOrder = ['physical', 'digital', 'service', 'hybrid'] as const;
+          const productTypeLabels: Record<string, string> = {
+            physical: 'Physical Products',
+            digital: 'Digital Products',
+            service: 'Service Products',
+            hybrid: 'Hybrid Products',
+          };
+          const groupedProducts = productTypeOrder.reduce((acc, pt) => {
+            acc[pt] = products.filter(p => (p.productType || 'physical') === pt);
+            return acc;
+          }, {} as Record<string, PublicProduct[]>);
+          const otherProducts = products.filter(p => {
+            const pt = p.productType || 'physical';
+            return !productTypeOrder.includes(pt as any);
+          });
+
+          return (
+            <>
         {/* View Toggle */}
         {isClient && (
           <div className="flex justify-center mb-8">
@@ -174,131 +194,203 @@ export default function RandomFeaturedProducts() {
           </div>
         )}
 
-        {/* Products Display */}
-        {viewMode === 'grid' ? (
-          /* Grid View */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product: PublicProduct, index: number) => (
-              <SmartProductCard
-                key={`${product.id}-${product.tenantId}-${index}`}
-                tenantId={product.tenantId}
-                product={{
-                  id: product.id,
-                  sku: product.sku,
-                  name: product.name,
-                  title: product.title || product.name,
-                  brand: product.brand || '',
-                  description: product.distanceKm !== null
-                    ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
-                    : product.description || '',
-                  priceCents: product.priceCents,
-                  salePriceCents: product.salePriceCents,
-                  isOnSale: !!(product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents),
-                  discountPercentage: (product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents)
-                    ? String(Math.round(((product?.priceCents - product?.salePriceCents) / product?.priceCents) * 100))
-                    : undefined,
-                  stock: product.stock,
-                  imageUrl: product.imageUrl,
-                  tenantId: product.tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                  has_variants: product.hasVariants || false,
-                  // All products in RandomFeaturedProducts are featured by definition
-                  featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
-                  featuredPriority: product.featuredPriority,
-                  featuredAt: product.featuredAt,
-                  featuredExpiresAt: product.featuredExpiresAt,
-                  metadata: product.metadata,
-                  hasGallery: product.hasGallery,
-                  hasDescription: product.hasDescription,
-                  hasBrand: product.hasBrand,
-                  hasPrice: product.hasPrice,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.defaultGatewayType,
-                  categoryName: product.category?.name,
-                  categorySlug: product.category?.slug,
-                  productCategory: product.category?.name,
-                  productCategorySlug: product.category?.slug,
-                  // Store information (passed as props, not in ProductData)
-                }}
-                variant="featured"
-                showCategory={true}
-                showDescription={true}
-                hasActivePaymentGateway={product.hasActivePaymentGateway}
-                defaultGatewayType={product.defaultGatewayType || undefined}
-                tenantName={product.storeName}
-                tenantLogo={product.storeLogo}
-                tenantCity={product.storeCity}
-                tenantState={product.storeState}
-                tenantSlug={product.storeSlug}
-                distanceKm={product.distanceKm}
-                buttonLayout="stacked"
-              />
-            ))}
-          </div>
-        ) : (
-          /* List View */
-          <div className="space-y-4">
-            {products.map((product: PublicProduct, index: number) => (
-              <SmartProductCard
-                key={`${product.id}-${product.tenantId}-${index}`}
-                tenantId={product.tenantId}
-                product={{
-                  id: product.id,
-                  sku: product.sku,
-                  name: product.name,
-                  title: product.title || product.name,
-                  brand: product.brand || '',
-                  description: product.distanceKm !== null
-                    ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
-                    : product.description || '',
-                  priceCents: product.priceCents,
-                  salePriceCents: product.salePriceCents,
-                  isOnSale: !!(product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents),
-                  discountPercentage: (product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents)
-                    ? String(Math.round(((product.priceCents - product.salePriceCents) / product.priceCents) * 100))
-                    : undefined,
-                  stock: product.stock,
-                  imageUrl: product.imageUrl,
-                  tenantId: product.tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                  has_variants: product.hasVariants || false,
+        {/* Products Display — grouped by product type */}
+        <div className="space-y-8">
+          {productTypeOrder.map(pt => {
+            const group = groupedProducts[pt];
+            if (!group || group.length === 0) return null;
+            return (
+              <div key={pt}>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">{productTypeLabels[pt]}</h3>
+                {viewMode === 'grid' ? (
+                  /* Grid View */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {group.map((product: PublicProduct, index: number) => (
+                      <SmartProductCard
+                        key={`${product.id}-${product.tenantId}-${index}`}
+                        tenantId={product.tenantId}
+                        product={{
+                          id: product.id,
+                          sku: product.sku,
+                          name: product.name,
+                          title: product.title || product.name,
+                          brand: product.brand || '',
+                          description: product.distanceKm !== null
+                            ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
+                            : product.description || '',
+                          priceCents: product.priceCents,
+                          salePriceCents: product.salePriceCents,
+                          isOnSale: !!(product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents),
+                          discountPercentage: (product?.salePriceCents && product?.salePriceCents > 0 && product?.salePriceCents < product?.priceCents)
+                            ? String(Math.round(((product?.priceCents - product?.salePriceCents) / product?.priceCents) * 100))
+                            : undefined,
+                          stock: product.stock,
+                          imageUrl: product.imageUrl,
+                          tenantId: product.tenantId,
+                          availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                          has_variants: product.hasVariants || false,
+                          featuredType: product.featuredType,
+                          featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                          featuredPriority: product.featuredPriority,
+                          featuredAt: product.featuredAt,
+                          featuredExpiresAt: product.featuredExpiresAt,
+                          metadata: product.metadata,
+                          hasGallery: product.hasGallery,
+                          hasDescription: product.hasDescription,
+                          hasBrand: product.hasBrand,
+                          hasPrice: product.hasPrice,
+                          has_active_payment_gateway: product.hasActivePaymentGateway,
+                          payment_gateway_type: product.defaultGatewayType,
+                          categoryName: product.category?.name,
+                          categorySlug: product.category?.slug,
+                          productCategory: product.category?.name,
+                          productCategorySlug: product.category?.slug,
+                          productType: product.productType || 'physical',
+                        }}
+                        variant="featured"
+                        showCategory={true}
+                        showDescription={true}
+                        hasActivePaymentGateway={product.hasActivePaymentGateway}
+                        defaultGatewayType={product.defaultGatewayType || undefined}
+                        tenantName={product.storeName}
+                        tenantLogo={product.storeLogo}
+                        tenantCity={product.storeCity}
+                        tenantState={product.storeState}
+                        tenantSlug={product.storeSlug}
+                        distanceKm={product.distanceKm}
+                        buttonLayout="stacked"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  /* List View */
+                  <div className="space-y-4">
+                    {group.map((product: PublicProduct, index: number) => (
+                      <SmartProductCard
+                        key={`${product.id}-${product.tenantId}-${index}`}
+                        tenantId={product.tenantId}
+                        product={{
+                          id: product.id,
+                          sku: product.sku,
+                          name: product.name,
+                          title: product.title || product.name,
+                          brand: product.brand || '',
+                          description: product.distanceKm !== null
+                            ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
+                            : product.description || '',
+                          priceCents: product.priceCents,
+                          salePriceCents: product.salePriceCents,
+                          isOnSale: !!(product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents),
+                          discountPercentage: (product.salePriceCents && product.salePriceCents > 0 && product.salePriceCents < product.priceCents)
+                            ? String(Math.round(((product.priceCents - product.salePriceCents) / product.priceCents) * 100))
+                            : undefined,
+                          stock: product.stock,
+                          imageUrl: product.imageUrl,
+                          tenantId: product.tenantId,
+                          availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                          has_variants: product.hasVariants || false,
+                          featuredType: product.featuredType,
+                          featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                          featuredPriority: product.featuredPriority,
+                          featuredAt: product.featuredAt,
+                          featuredExpiresAt: product.featuredExpiresAt,
+                          metadata: product.metadata,
+                          hasGallery: product.hasGallery,
+                          hasDescription: product.hasDescription,
+                          hasBrand: product.hasBrand,
+                          hasPrice: product.hasPrice,
+                          has_active_payment_gateway: product.hasActivePaymentGateway,
+                          payment_gateway_type: product.defaultGatewayType,
+                          categoryName: product.category?.name,
+                          categorySlug: product.category?.slug,
+                          productCategory: product.category?.name,
+                          productCategorySlug: product.category?.slug,
+                          productType: product.productType || 'physical',
+                        }}
+                        variant="featured"
+                        showCategory={true}
+                        showDescription={true}
+                        hasActivePaymentGateway={product.hasActivePaymentGateway}
+                        defaultGatewayType={product.defaultGatewayType || undefined}
+                        tenantName={product.storeName}
+                        tenantLogo={product.storeLogo}
+                        tenantCity={product.storeCity}
+                        tenantState={product.storeState}
+                        tenantSlug={product.storeSlug}
+                        distanceKm={product.distanceKm}
+                        buttonLayout="stacked"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-                  // All products in RandomFeaturedProducts are featured by definition
-                  featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
-                  featuredPriority: product.featuredPriority,
-                  featuredAt: product.featuredAt,
-                  featuredExpiresAt: product.featuredExpiresAt,
-                  metadata: product.metadata,
-                  hasGallery: product.hasGallery,
-                  hasDescription: product.hasDescription,
-                  hasBrand: product.hasBrand,
-                  hasPrice: product.hasPrice,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.defaultGatewayType,
-                  categoryName: product.category?.name,
-                  categorySlug: product.category?.slug,
-                  productCategory: product.category?.name,
-                  productCategorySlug: product.category?.slug,
-                  // Store information (passed as props, not in ProductData)
-                }}
-                variant="featured"
-                showCategory={true}
-                showDescription={true}
-                hasActivePaymentGateway={product.hasActivePaymentGateway}
-                defaultGatewayType={product.defaultGatewayType || undefined}
-                tenantName={product.storeName}
-                tenantLogo={product.storeLogo}
-                tenantCity={product.storeCity}
-                tenantState={product.storeState}
-                tenantSlug={product.storeSlug}
-                distanceKm={product.distanceKm}
-                buttonLayout="stacked"
-              />
-            ))}
-          </div>
-        )}
+          {otherProducts.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Other Products</h3>
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {otherProducts.map((product: PublicProduct, index: number) => (
+                    <SmartProductCard
+                      key={`${product.id}-${product.tenantId}-${index}`}
+                      tenantId={product.tenantId}
+                      product={{
+                        id: product.id, sku: product.sku, name: product.name,
+                        title: product.title || product.name, brand: product.brand || '',
+                        description: product.description || '',
+                        priceCents: product.priceCents, salePriceCents: product.salePriceCents,
+                        stock: product.stock, imageUrl: product.imageUrl, tenantId: product.tenantId,
+                        availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                        has_variants: product.hasVariants || false,
+                        featuredType: product.featuredType,
+                        featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                        productType: product.productType || 'physical',
+                      }}
+                      variant="featured" showCategory={true} showDescription={true}
+                      hasActivePaymentGateway={product.hasActivePaymentGateway}
+                      defaultGatewayType={product.defaultGatewayType || undefined}
+                      tenantName={product.storeName} tenantLogo={product.storeLogo}
+                      tenantSlug={product.storeSlug} distanceKm={product.distanceKm}
+                      buttonLayout="stacked"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {otherProducts.map((product: PublicProduct, index: number) => (
+                    <SmartProductCard
+                      key={`${product.id}-${product.tenantId}-${index}`}
+                      tenantId={product.tenantId}
+                      product={{
+                        id: product.id, sku: product.sku, name: product.name,
+                        title: product.title || product.name, brand: product.brand || '',
+                        description: product.description || '',
+                        priceCents: product.priceCents, salePriceCents: product.salePriceCents,
+                        stock: product.stock, imageUrl: product.imageUrl, tenantId: product.tenantId,
+                        availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                        has_variants: product.hasVariants || false,
+                        featuredType: product.featuredType,
+                        featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
+                        productType: product.productType || 'physical',
+                      }}
+                      variant="featured" showCategory={true} showDescription={true}
+                      hasActivePaymentGateway={product.hasActivePaymentGateway}
+                      defaultGatewayType={product.defaultGatewayType || undefined}
+                      tenantName={product.storeName} tenantLogo={product.storeLogo}
+                      tenantSlug={product.storeSlug} distanceKm={product.distanceKm}
+                      buttonLayout="stacked"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+            </>
+          );
+        })()}
 
         {/* Gradient border line */}
         <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />

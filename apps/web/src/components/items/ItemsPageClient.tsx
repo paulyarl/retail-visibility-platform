@@ -1205,6 +1205,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           }}
           itemId={propagateItem.id}
           itemName={propagateItem.name}
+          productType={propagateItem.product_type}
           currentTenantId={tenantId}
           organizationId={organizationData.id}
           onSuccess={() => {
@@ -1219,6 +1220,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           onClose={() => setShowBulkPropagateModal(false)}
           itemIds={Array.from(selectedItems)}
           itemNames={items.filter(item => selectedItems.has(item.id)).map(item => item.name)}
+          itemProductTypes={items.filter(item => selectedItems.has(item.id)).map(item => item.product_type).filter(Boolean) as string[]}
           currentTenantId={tenantId}
           organizationId={organizationData.id}
           onSuccess={() => {

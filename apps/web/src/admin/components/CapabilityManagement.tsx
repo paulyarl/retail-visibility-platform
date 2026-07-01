@@ -17,6 +17,7 @@ import {
   Feature,
   CapabilityType,
   Tier as CapabilityTier,
+  ConstraintData,
 } from '@/services/AdminCapabilityService';
 import {
   tenantTierService,
@@ -97,9 +98,31 @@ export default function CapabilityManagement() {
   const [tierCapPage, setTierCapPage] = useState(1);
   const [tierCapPageSize, setTierCapPageSize] = useState(10);
 
+  // Constraint state
+  const [constraints, setConstraints] = useState<ConstraintData[]>([]);
+  const [constraintDialogOpen, setConstraintDialogOpen] = useState(false);
+  const [editingConstraint, setEditingConstraint] = useState<ConstraintData | null>(null);
+  const [constraintForm, setConstraintForm] = useState({
+    constraint_id: '',
+    type: 'requires' as string,
+    severity: 'warn' as string,
+    source_capability: '',
+    source_field: '',
+    source_operator: 'equals' as string,
+    source_value: '',
+    target_capability: '',
+    target_field: '',
+    target_operator: 'equals' as string,
+    target_value: '',
+    message: '',
+    resolution_hint: '',
+    is_active: true,
+    sort_order: 0,
+  });
+
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'feature' | 'capType' | 'tierCap'; key: string; tierKey?: string; label: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'feature' | 'capType' | 'tierCap' | 'constraint'; key: string; tierKey?: string; label: string } | null>(null);
 
   // Tier Capability dialog state
   const [tierCapDialogOpen, setTierCapDialogOpen] = useState(false);
@@ -118,13 +141,14 @@ export default function CapabilityManagement() {
     try {
       setLoading(true);
       setError(null);
-      const [caps, feats, capTypes, tierList, legacyTiersList, legacyFeatsList] = await Promise.all([
+      const [caps, feats, capTypes, tierList, legacyTiersList, legacyFeatsList, constraintList] = await Promise.all([
         adminCapabilityService.getAllCapabilities().catch(() => []),
         adminCapabilityService.getFeatures().catch(() => []),
         adminCapabilityService.getCapabilityTypes().catch(() => []),
         adminCapabilityService.getTiers().catch(() => []),
         tenantTierService.getTierSystemTiersList().catch(() => []),
         tenantTierService.getTierSystemFeaturesList().catch(() => []),
+        adminCapabilityService.getConstraints().catch(() => []),
       ]);
       setCapabilities(caps);
       setFeatures(feats);
@@ -132,6 +156,7 @@ export default function CapabilityManagement() {
       setTiers(tierList);
       setLegacyTiers(legacyTiersList);
       setLegacyFeatures(legacyFeatsList);
+      setConstraints(constraintList);
     } catch (err) {
       console.error('Failed to load capability data:', err);
       setError('Failed to load capability data');
@@ -635,6 +660,76 @@ export default function CapabilityManagement() {
     }
   };
 
+  // ===== Constraint handlers =====
+  const openConstraintDialog = (constraint?: ConstraintData) => {
+    if (constraint) {
+      setEditingConstraint(constraint);
+      setConstraintForm({
+        constraint_id: constraint.constraint_id,
+        type: constraint.type,
+        severity: constraint.severity,
+        source_capability: constraint.source_capability,
+        source_field: constraint.source_field,
+        source_operator: constraint.source_operator,
+        source_value: constraint.source_value,
+        target_capability: constraint.target_capability,
+        target_field: constraint.target_field,
+        target_operator: constraint.target_operator,
+        target_value: constraint.target_value,
+        message: constraint.message,
+        resolution_hint: constraint.resolution_hint,
+        is_active: constraint.is_active,
+        sort_order: constraint.sort_order,
+      });
+    } else {
+      setEditingConstraint(null);
+      setConstraintForm({
+        constraint_id: '', type: 'requires', severity: 'warn',
+        source_capability: '', source_field: '', source_operator: 'equals', source_value: '',
+        target_capability: '', target_field: '', target_operator: 'equals', target_value: '',
+        message: '', resolution_hint: '', is_active: true, sort_order: 0,
+      });
+    }
+    setConstraintDialogOpen(true);
+  };
+
+  const handleConstraintSave = async () => {
+    try {
+      setSaving(true);
+      if (editingConstraint) {
+        await adminCapabilityService.updateConstraint(editingConstraint.id, constraintForm);
+      } else {
+        await adminCapabilityService.createConstraint(constraintForm);
+      }
+      setConstraintDialogOpen(false);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to save constraint:', err);
+      setError('Failed to save constraint');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConstraintDelete = (constraint: ConstraintData) => {
+    setDeleteTarget({ type: 'constraint', key: constraint.id, label: constraint.constraint_id });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConstraintDeleteConfirm = async () => {
+    if (!deleteTarget || deleteTarget.type !== 'constraint') return;
+    try {
+      await adminCapabilityService.deleteConstraint(deleteTarget.key);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to delete constraint:', err);
+      setError('Failed to delete constraint');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    }
+  };
+
   // Helper: find features from features_list that are NOT in the tier's tier_features_list
   const getAvailableFeaturesForLegacyTier = (tier: Tier): TierSystemFeature[] => {
     const tierFeatureKeys = new Set(tier.features.map(f => f.featureKey));
@@ -662,6 +757,7 @@ export default function CapabilityManagement() {
           <TabsTrigger value="capability-types">Capability Types</TabsTrigger>
           <TabsTrigger value="tier-capabilities">Tier Capabilities</TabsTrigger>
           <TabsTrigger value="legacy-tiers">Legacy Tiers</TabsTrigger>
+          <TabsTrigger value="constraints">Constraints</TabsTrigger>
         </TabsList>
 
         {/* ===== OVERVIEW TAB ===== */}
@@ -1249,6 +1345,60 @@ export default function CapabilityManagement() {
             )}
           </div>
         </TabsContent>
+
+        {/* ===== CONSTRAINTS TAB ===== */}
+        <TabsContent value="constraints">
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Cross-Capability Constraints</h2>
+                <p className="text-sm text-gray-500">Manage declarative constraints between capabilities (CCL)</p>
+              </div>
+              <Button onClick={() => openConstraintDialog()} size="sm">
+                + Add Constraint
+              </Button>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {constraints.length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  No constraints defined. Constraints enforce rules between capabilities (e.g. digital products require fulfillment shipping to be off).
+                </div>
+              ) : (
+                constraints.map((c) => (
+                  <div key={c.id} className="px-6 py-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-900 font-mono">{c.constraint_id}</span>
+                          <Badge variant={c.severity === 'block' ? 'destructive' : c.severity === 'warn' ? 'default' : 'info'}>
+                            {c.severity}
+                          </Badge>
+                          <Badge variant="outline">{c.type}</Badge>
+                          {!c.is_active && <Badge variant="default">Inactive</Badge>}
+                        </div>
+                        <p className="text-sm text-gray-700 mt-1">{c.message}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{c.resolution_hint}</p>
+                        <div className="text-xs text-gray-400 mt-1 font-mono">
+                          {c.source_capability}.{c.source_field} {c.source_operator} &quot;{c.source_value}&quot;
+                          {' → '}
+                          {c.target_capability}.{c.target_field} {c.target_operator} &quot;{c.target_value}&quot;
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                        <Button variant="ghost" size="sm" onClick={() => openConstraintDialog(c)}>
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleConstraintDelete(c)} className="text-red-600 hover:text-red-800">
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* ===== Feature Dialog ===== */}
@@ -1830,6 +1980,167 @@ export default function CapabilityManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* ===== Constraint Dialog ===== */}
+      <Dialog open={constraintDialogOpen} onOpenChange={setConstraintDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingConstraint ? 'Edit Constraint' : 'Add Constraint'}</DialogTitle>
+            <DialogDescription>
+              {editingConstraint
+                ? `Update constraint ${editingConstraint.constraint_id}`
+                : 'Create a new cross-capability constraint'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Constraint ID</label>
+                <Input
+                  placeholder="e.g. digital_requires_no_shipping"
+                  value={constraintForm.constraint_id}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, constraint_id: e.target.value }))}
+                  disabled={!!editingConstraint}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={constraintForm.type}
+                    onChange={(e) => setConstraintForm(prev => ({ ...prev, type: e.target.value }))}
+                  >
+                    <option value="requires">requires</option>
+                    <option value="recommends">recommends</option>
+                    <option value="excludes">excludes</option>
+                    <option value="implies">implies</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Severity</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={constraintForm.severity}
+                    onChange={(e) => setConstraintForm(prev => ({ ...prev, severity: e.target.value }))}
+                  >
+                    <option value="block">block</option>
+                    <option value="warn">warn</option>
+                    <option value="info">info</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="border rounded-md p-3 bg-gray-50">
+              <div className="text-xs font-semibold text-gray-600 mb-2">Source (IF condition)</div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  placeholder="capability key (e.g. product_types)"
+                  value={constraintForm.source_capability}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_capability: e.target.value }))}
+                />
+                <Input
+                  placeholder="field (e.g. effective_types)"
+                  value={constraintForm.source_field}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_field: e.target.value }))}
+                />
+                <select
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={constraintForm.source_operator}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_operator: e.target.value }))}
+                >
+                  <option value="equals">equals</option>
+                  <option value="includes">includes</option>
+                  <option value="not_includes">not_includes</option>
+                  <option value="is_true">is_true</option>
+                  <option value="is_false">is_false</option>
+                </select>
+                <Input
+                  placeholder="value (e.g. digital)"
+                  value={constraintForm.source_value}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_value: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="border rounded-md p-3 bg-gray-50">
+              <div className="text-xs font-semibold text-gray-600 mb-2">Target (THEN condition)</div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  placeholder="capability key (e.g. fulfillment)"
+                  value={constraintForm.target_capability}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_capability: e.target.value }))}
+                />
+                <Input
+                  placeholder="field (e.g. shows_shipping)"
+                  value={constraintForm.target_field}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_field: e.target.value }))}
+                />
+                <select
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={constraintForm.target_operator}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_operator: e.target.value }))}
+                >
+                  <option value="equals">equals</option>
+                  <option value="includes">includes</option>
+                  <option value="not_includes">not_includes</option>
+                  <option value="is_true">is_true</option>
+                  <option value="is_false">is_false</option>
+                </select>
+                <Input
+                  placeholder="value (e.g. false)"
+                  value={constraintForm.target_value}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_value: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Message</label>
+              <Input
+                placeholder="e.g. Digital products cannot have shipping enabled"
+                value={constraintForm.message}
+                onChange={(e) => setConstraintForm(prev => ({ ...prev, message: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Resolution Hint</label>
+              <Input
+                placeholder="e.g. Disable shipping in fulfillment settings"
+                value={constraintForm.resolution_hint}
+                onChange={(e) => setConstraintForm(prev => ({ ...prev, resolution_hint: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={constraintForm.is_active}
+                  onCheckedChange={(checked) => setConstraintForm(prev => ({ ...prev, is_active: checked }))}
+                />
+                <span className="text-sm text-gray-700">Active</span>
+              </div>
+              <div>
+                <Input
+                  label="Sort Order"
+                  type="number"
+                  value={constraintForm.sort_order}
+                  onChange={(e) => setConstraintForm(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConstraintDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleConstraintSave}
+              disabled={saving || !constraintForm.constraint_id || !constraintForm.source_capability || !constraintForm.target_capability || !constraintForm.message}
+            >
+              {saving ? 'Saving...' : editingConstraint ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ===== Delete Confirmation Dialog ===== */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
@@ -1845,6 +2156,9 @@ export default function CapabilityManagement() {
               {deleteTarget?.type === 'tierCap' && (
                 <>Are you sure you want to remove <strong className="text-gray-900">{deleteTarget.label}</strong>? This will disable the capability and all its features for the affected tier.</>
               )}
+              {deleteTarget?.type === 'constraint' && (
+                <>Are you sure you want to delete the constraint <strong className="text-gray-900">{deleteTarget.label}</strong>? This will remove the cross-capability rule. This action cannot be undone.</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -1859,6 +2173,8 @@ export default function CapabilityManagement() {
                     ? 'Deleting a capability type will break tier assignments and may affect merchant feature availability.'
                     : deleteTarget?.type === 'feature'
                     ? 'Deleting a feature will remove it from all capability type collections that reference it.'
+                    : deleteTarget?.type === 'constraint'
+                    ? 'Deleting a constraint will remove the rule enforcement between capabilities. This may allow invalid configurations.'
                     : 'Removing a tier capability will disable features for merchants on that tier.'
                   }
                 </p>
@@ -1873,6 +2189,7 @@ export default function CapabilityManagement() {
                 if (deleteTarget?.type === 'feature') handleFeatureDeleteConfirm();
                 else if (deleteTarget?.type === 'capType') handleCapTypeDeleteConfirm();
                 else if (deleteTarget?.type === 'tierCap') handleTierCapDeleteConfirm();
+                else if (deleteTarget?.type === 'constraint') handleConstraintDeleteConfirm();
               }}
             >
               {deleteTarget?.type === 'tierCap' ? 'Remove' : 'Delete'}

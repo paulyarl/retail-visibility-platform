@@ -73,6 +73,52 @@ export interface OrgCapabilityRollup {
 }
 
 // ====================
+// PRODUCT TYPE ROLLUP TYPES
+// ====================
+
+export interface ProductTypeLocationState {
+  tenantId: string;
+  tenantName: string;
+  enabled: boolean;
+  type: string;
+  isFlexible: boolean;
+  allowedTypes: string[];
+  selectedTypes: string[];
+}
+
+export interface OrgProductTypeRollup {
+  totalLocations: number;
+  locations: ProductTypeLocationState[];
+  summary: {
+    enabledCount: number;
+    disabledCount: number;
+    typeDistribution: Record<string, number>;
+    misalignedCount: number;
+  };
+}
+
+// ====================
+// PRODUCT MIX TYPES
+// ====================
+
+export interface ProductMixEntry {
+  productType: string;
+  count: number;
+  percentage: number;
+}
+
+export interface OrgProductMix {
+  totalItems: number;
+  mix: ProductMixEntry[];
+  perLocation: Array<{
+    tenantId: string;
+    tenantName: string;
+    totalItems: number;
+    mix: ProductMixEntry[];
+  }>;
+}
+
+// ====================
 // BOT STATUS TYPES
 // ====================
 
@@ -251,6 +297,62 @@ class OrgCapabilityService extends AuthenticatedApiSingleton {
 
     const data = result.data.data;
     this.botStatusCache.set(orgId, { data, expiry: Date.now() + this.BOT_STATUS_CACHE_TTL });
+    return data;
+  }
+
+  private productTypeRollupCache = new Map<string, { data: OrgProductTypeRollup; expiry: number }>();
+  private readonly PRODUCT_TYPE_ROLLUP_CACHE_TTL = 5 * 60 * 1000;
+
+  async getProductTypeRollup(orgId: string): Promise<OrgProductTypeRollup> {
+    const cached = this.productTypeRollupCache.get(orgId);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
+
+    const cacheKey = `org-product-type-rollup-${orgId}`;
+    const result = await this.makeAuthenticatedRequest<{
+      success: boolean;
+      data: OrgProductTypeRollup;
+    }>(
+      `/api/organizations/${orgId}/product-type-rollup`,
+      {},
+      cacheKey
+    );
+
+    if (!result.success || !result.data?.data) {
+      throw new Error(`[OrgCapabilityService] Failed to fetch product type rollup for ${orgId}`);
+    }
+
+    const data = result.data.data;
+    this.productTypeRollupCache.set(orgId, { data, expiry: Date.now() + this.PRODUCT_TYPE_ROLLUP_CACHE_TTL });
+    return data;
+  }
+
+  private productMixCache = new Map<string, { data: OrgProductMix; expiry: number }>();
+  private readonly PRODUCT_MIX_CACHE_TTL = 5 * 60 * 1000;
+
+  async getProductMix(orgId: string): Promise<OrgProductMix> {
+    const cached = this.productMixCache.get(orgId);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
+
+    const cacheKey = `org-product-mix-${orgId}`;
+    const result = await this.makeAuthenticatedRequest<{
+      success: boolean;
+      data: OrgProductMix;
+    }>(
+      `/api/organizations/${orgId}/product-mix`,
+      {},
+      cacheKey
+    );
+
+    if (!result.success || !result.data?.data) {
+      throw new Error(`[OrgCapabilityService] Failed to fetch product mix for ${orgId}`);
+    }
+
+    const data = result.data.data;
+    this.productMixCache.set(orgId, { data, expiry: Date.now() + this.PRODUCT_MIX_CACHE_TTL });
     return data;
   }
 

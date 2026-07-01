@@ -12,6 +12,7 @@ interface OrgHeroLocationModalProps {
   onSelect: (tenantId: string) => void;
   onClose: () => void;
   settingHero: boolean;
+  readOnly?: boolean;
 }
 
 export default function OrgHeroLocationModal({
@@ -21,6 +22,7 @@ export default function OrgHeroLocationModal({
   onSelect,
   onClose,
   settingHero,
+  readOnly,
 }: OrgHeroLocationModalProps) {
   if (!open) return null;
 
@@ -52,7 +54,7 @@ export default function OrgHeroLocationModal({
               <button
                 key={location.tenantId}
                 onClick={() => onSelect(location.tenantId)}
-                disabled={settingHero}
+                disabled={settingHero || readOnly}
                 className={`w-full p-4 text-left rounded-xl border-2 transition-all disabled:opacity-50 ${
                   isCurrent
                     ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"

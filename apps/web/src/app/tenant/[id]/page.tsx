@@ -35,6 +35,7 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
@@ -45,6 +46,7 @@ import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, 
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
+import DemoBanner from '@/components/storefront/DemoBanner';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 
@@ -134,6 +136,8 @@ interface Tenant {
   };
 
   hasActivePaymentGateway?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -186,10 +190,10 @@ interface Category {
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string; badge?: string }>;
 }
 
-async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
+async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string, badge?: string) {
   try {
     // console.log(`[getTenantWithProducts] Resolving tenant ID for slug: ${tenantId}`);
     const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
@@ -354,7 +358,8 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         page,
         limit,
         search,
-        category
+        category,
+        badge,
       });
       // console.log('[TenantPage] Products data:', productsData);
     }
@@ -567,7 +572,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   // console.log(`[TenantStorefrontPage] id:`, id);
-  const { page: pageParam, search, category, products_only, featured, view } = await searchParams;
+  const { page: pageParam, search, category, products_only, featured, view, badge } = await searchParams;
   // console.log(`[TenantStorefrontPage] searchParams:`, searchParams);
   const currentPage = parseInt(pageParam || '1', 10);
   // console.log(`[TenantStorefrontPage] currentPage:`, currentPage);
@@ -577,7 +582,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const isProductsOnly = products_only === 'true';
   // console.log(`[TenantStorefrontPage] isProductsOnly:`, isProductsOnly);
 
-  const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
+  const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured, badge);
   // console.log('[TenantStorefrontPage] data:', data); 
 
   if (!data) {
@@ -619,9 +624,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     );
   }
   const totalPages = Math.ceil(total / limit);
-
-  // API base URL for additional calls
-  // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   // Fetch directory publish status and actual slug using singleton services
   let directoryPublished = tenant?.hasDirectory || false;
@@ -745,6 +747,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
+      {tenant.isDemo && <DemoBanner expiresAt={tenant.demoExpiresAt} />}
+      <SocialPixels tenantId={resolvedTenantId || tenant.id || id} usePublic />
       <TenantPaymentProvider
         tenantId={resolvedTenantId || tenant.id || id}
         initialCommerceSettings={commerceSettings}

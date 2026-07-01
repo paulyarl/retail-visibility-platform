@@ -22,7 +22,10 @@ export type OrderNotificationType =
   | 'order_out_for_delivery'
   | 'order_delivered'
   | 'deposit_forfeited'
-  | 'refund_processed';
+  | 'refund_processed'
+  | 'digital_delivered'
+  | 'service_scheduled'
+  | 'service_completed';
 
 export interface OrderNotificationData {
   tenantId: string;
@@ -66,7 +69,7 @@ class OrderNotificationService {
       }
 
       // Send to customer for certain notification types
-      if (data.customerEmail && ['order_cancelled', 'order_fulfilled', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'deposit_forfeited', 'refund_processed'].includes(data.type)) {
+      if (data.customerEmail && ['order_cancelled', 'order_fulfilled', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'deposit_forfeited', 'refund_processed', 'digital_delivered', 'service_scheduled', 'service_completed'].includes(data.type)) {
         const customerEmailPayload = this.buildCustomerEmailPayload(data.customerEmail, data.customerName || 'Customer', tenantName, data);
         const customerSent = await emailService.sendEmail(customerEmailPayload);
         emailsSent.push(customerSent.success);
@@ -370,6 +373,85 @@ class OrderNotificationService {
           text: `Refund Processed\n\nHi ${customerName},\n\nA refund of ${amountFormatted} has been processed for your order ${orderRef}.${data.reason ? `\nReason: ${data.reason}` : ''}\n\nPlease allow 5-10 business days for the refund to appear in your account.\n\nBest regards,\n${tenantName}`,
         };
 
+      case 'digital_delivered': {
+        const downloadLinks = (data.metadata?.downloadLinks || []) as Array<{ productName: string; url: string; expiresAt?: string }>;
+        const downloadHtml = downloadLinks.length > 0
+          ? `<div style="margin: 16px 0; padding: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+               <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">Your Downloads</p>
+               ${downloadLinks.map(d => `<p style="margin: 4px 0;"><a href="${d.url}" style="color: #2563eb;">${d.productName} →</a>${d.expiresAt ? ` <span style="color: #6b7280; font-size: 0.875rem;">(expires ${d.expiresAt})</span>` : ''}</p>`).join('')}
+             </div>`
+          : '';
+        const downloadText = downloadLinks.length > 0
+          ? `\nYour Downloads:\n${downloadLinks.map(d => `- ${d.productName}: ${d.url}${d.expiresAt ? ` (expires ${d.expiresAt})` : ''}`).join('\n')}\n`
+          : '';
+        return {
+          to: toEmail,
+          subject: `Your Digital Products Are Ready - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Digital Products Ready to Download</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your digital products from order <strong>${orderRef}</strong> are ready to download!</p>
+              ${downloadHtml}
+              <p><strong>Total:</strong> ${amountFormatted}</p>
+              <p>You can access your downloads anytime from your account.</p>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Digital Products Ready to Download\n\nHi ${customerName},\n\nYour digital products from order ${orderRef} are ready to download!${downloadText}\nTotal: ${amountFormatted}\n\nYou can access your downloads anytime from your account.\n\nBest regards,\n${tenantName}`,
+        };
+      }
+
+      case 'service_scheduled': {
+        const appointmentDate = data.metadata?.appointmentDate || 'N/A';
+        const appointmentTime = data.metadata?.appointmentTime || '';
+        const providerName = data.metadata?.providerName;
+        const serviceLocation = data.metadata?.serviceLocation;
+        const apptHtml = `
+          <div style="margin: 16px 0; padding: 12px; background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #166534;">Appointment Details</p>
+            <p style="margin: 0 0 4px 0;"><strong>Date:</strong> ${appointmentDate}</p>
+            ${appointmentTime ? `<p style="margin: 0 0 4px 0;"><strong>Time:</strong> ${appointmentTime}</p>` : ''}
+            ${providerName ? `<p style="margin: 0 0 4px 0;"><strong>Provider:</strong> ${providerName}</p>` : ''}
+            ${serviceLocation ? `<p style="margin: 0 0 4px 0;"><strong>Location:</strong> ${serviceLocation}</p>` : ''}
+          </div>`;
+        const apptText = `\nAppointment Details:\nDate: ${appointmentDate}${appointmentTime ? `\nTime: ${appointmentTime}` : ''}${providerName ? `\nProvider: ${providerName}` : ''}${serviceLocation ? `\nLocation: ${serviceLocation}` : ''}\n`;
+        return {
+          to: toEmail,
+          subject: `Service Confirmed - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #059669;">Service Confirmed</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your service booking for order <strong>${orderRef}</strong> has been confirmed!</p>
+              ${apptHtml}
+              <p><strong>Total:</strong> ${amountFormatted}</p>
+              <p>If you need to reschedule, please contact us.</p>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Service Confirmed\n\nHi ${customerName},\n\nYour service booking for order ${orderRef} has been confirmed!${apptText}\nTotal: ${amountFormatted}\n\nIf you need to reschedule, please contact us.\n\nBest regards,\n${tenantName}`,
+        };
+      }
+
+      case 'service_completed': {
+        return {
+          to: toEmail,
+          subject: `Service Completed - ${orderRef}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #059669;">Service Completed</h2>
+              <p>Hi ${customerName},</p>
+              <p>Your service from order <strong>${orderRef}</strong> has been completed.</p>
+              <p><strong>Total:</strong> ${amountFormatted}</p>
+              <p>Thank you for your business! We'd love to hear your feedback.</p>
+              <p>Best regards,<br>${tenantName}</p>
+            </div>
+          `,
+          text: `Service Completed\n\nHi ${customerName},\n\nYour service from order ${orderRef} has been completed.\n\nTotal: ${amountFormatted}\n\nThank you for your business! We'd love to hear your feedback.\n\nBest regards,\n${tenantName}`,
+        };
+      }
+
       default:
         return {
           to: toEmail,
@@ -625,6 +707,86 @@ class OrderNotificationService {
         trackingUrl: params.trackingUrl || null,
         remainingBalance: params.remainingBalance || null,
       },
+    });
+  }
+
+  /**
+   * Notify when digital products are delivered (access granted)
+   */
+  async notifyDigitalDelivered(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+    downloadLinks?: Array<{ productName: string; url: string; expiresAt?: string }>;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'digital_delivered',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
+      metadata: {
+        downloadLinks: params.downloadLinks || [],
+      },
+    });
+  }
+
+  /**
+   * Notify when service booking is scheduled/confirmed
+   */
+  async notifyServiceScheduled(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+    appointmentDate?: string;
+    appointmentTime?: string;
+    providerName?: string;
+    serviceLocation?: string;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'service_scheduled',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
+      metadata: {
+        appointmentDate: params.appointmentDate,
+        appointmentTime: params.appointmentTime,
+        providerName: params.providerName,
+        serviceLocation: params.serviceLocation,
+      },
+    });
+  }
+
+  /**
+   * Notify when service has been completed
+   */
+  async notifyServiceCompleted(params: {
+    tenantId: string;
+    orderId: string;
+    orderNumber?: string;
+    customerEmail: string;
+    customerName?: string;
+    amount: number;
+  }): Promise<boolean> {
+    return this.sendNotification({
+      tenantId: params.tenantId,
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      type: 'service_completed',
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      amount: params.amount,
     });
   }
 }

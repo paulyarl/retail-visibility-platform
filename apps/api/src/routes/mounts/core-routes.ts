@@ -36,6 +36,7 @@ import tenantCapabilitiesRoutes from '../tenant-capabilities';
 import crmTenantRoutes from '../crm/tenant/crm-tenant';
 import { authenticateCustomer } from '../../middleware/auth';
 import crmCustomerRoutes from '../crm/customer/crm-customer';
+import tenantSupplierRoutes from '../tenant/suppliers';
 
 /**
  * Mount core business routes
@@ -103,6 +104,9 @@ export function mountCoreRoutes(app: Express) {
 
   // CRM customer routes (customer-scoped, requires customer JWT auth)
   app.use('/api/customer/crm', authenticateCustomer, crmCustomerRoutes);
+
+  // Supplier catalog tenant routes (catalog search, import, mappings)
+  app.use('/api/tenants/:tenantId', tenantSupplierRoutes);
 
   console.log('✅ Core business routes mounted');
 }

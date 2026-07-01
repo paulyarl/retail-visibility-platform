@@ -1,4 +1,5 @@
 import type { StorefrontOptionFlags, PublicFaqOptionsFlags, PublicCrmOptionsFlags, FeaturedOptionsState } from '@/services/CapabilityResolutionService';
+import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 export type DirectoryEntryLayoutKey = 'classic' | 'editorial' | 'immersive' | 'premium';
 
@@ -10,6 +11,7 @@ export interface DirectoryEntryLayoutProps {
   businessHours: any;
   storefrontCategories: { categories: any[]; uncategorizedCount: number };
   featuredProducts: any[];
+  activeFeatured?: ActiveFeaturedResult;
   relatedProducts: any[];
   tenantInfo: any;
   slugForRelated: string;

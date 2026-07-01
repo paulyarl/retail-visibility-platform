@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { triggerRevalidate } from '../utils/revalidate';
+import { isValidBadgeKey, isPlatformControlledKey, getBadgeByKey } from './BadgeRegistryService';
 
 // Dynamic featured type validation
 const VALID_FEATURED_TYPES = [
@@ -50,6 +51,22 @@ export function getValidFeaturedTypes(): FeaturedType[] {
 }
 
 /**
+ * Async: Validate if a featured type is supported via the badge registry.
+ * Falls back to the static array if the registry is unavailable.
+ */
+export async function isValidFeaturedTypeAsync(type: string): Promise<boolean> {
+  return isValidBadgeKey(type);
+}
+
+/**
+ * Async: Check if a featured type is platform-controlled via the badge registry.
+ * Falls back to the static array if the registry is unavailable.
+ */
+export async function isPlatformControlledTypeAsync(type: string): Promise<boolean> {
+  return isPlatformControlledKey(type);
+}
+
+/**
  * Generate trending products based on mv_storefront_discovery metrics
  */
 async function generateTrendingProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
@@ -88,6 +105,7 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
         trending_score,
         price_status,
         stock_status,
+        product_type,
         created_at,
         updated_at
       FROM mv_storefront_discovery 
@@ -136,7 +154,8 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
       category_normalized: item.category_normalized,
       slug_type: item.slug_type,
       platform_tenant_count: item.platform_tenant_count,
-      platform_purchase_count: item.platform_purchase_count
+      platform_purchase_count: item.platform_purchase_count,
+      product_type: item.product_type || 'physical'
     }));
   } catch (error) {
     console.error('Error generating trending products from MV:', error);
@@ -183,6 +202,7 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
         has_price,
         price_status,
         stock_status,
+        product_type,
         created_at,
         updated_at
       FROM mv_storefront_discovery 
@@ -239,7 +259,8 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
       brand_normalized: item.brand_normalized,
       category_normalized: item.category_normalized,
       slug_type: item.slug_type,
-      platform_tenant_count: item.platform_tenant_count
+      platform_tenant_count: item.platform_tenant_count,
+      product_type: item.product_type || 'physical'
     }));
   } catch (error) {
     console.error('Error generating recommended products from MV:', error);
@@ -284,6 +305,7 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
         product_review_count,
         price_status,
         stock_status,
+        product_type,
         created_at,
         updated_at
       FROM mv_storefront_discovery 
@@ -338,7 +360,8 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
       platform_tenant_count: item.platform_tenant_count,
       platform_purchase_count: item.platform_purchase_count,
       price: item.price_cents ? item.price_cents / 100 : 0,
-      imageUrl: item.image_url
+      imageUrl: item.image_url,
+      product_type: item.product_type || 'physical'
     }));
   } catch (error) {
     console.error('Error generating bestseller products from MV:', error);
@@ -377,6 +400,7 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
         has_price,
         price_status,
         stock_status,
+        product_type,
         view_count,
         unique_viewers,
         created_at,
@@ -443,7 +467,8 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
       has_variants: false,
       payment_gateway_type: null,
       price: item.price_cents ? item.price_cents / 100 : 0,
-      imageUrl: item.image_url
+      imageUrl: item.image_url,
+      product_type: item.product_type || 'physical'
     }));
   } catch (error) {
     console.error('Error generating random discovery products from MV:', error);
@@ -467,6 +492,7 @@ export interface FeaturedProductWithDetails extends FeaturedProduct {
   days_until_expiration?: number;
   is_expired?: boolean;
   is_expiring_soon?: boolean;
+  product_type?: string;
 }
 
 export class FeaturedProductsService {
@@ -596,10 +622,14 @@ export class FeaturedProductsService {
       featured_priority?: number;
       featured_expires_at?: Date | string | null;
       auto_unfeature?: boolean;
+      assignment_source?: 'auto' | 'manual' | 'system';
     }
   ): Promise<FeaturedProduct> {
     try {
-      // console.log(`[addFeaturedType] Adding product ${inventoryItemId} as ${featuredType} for tenant ${tenantId}`);
+      // Look up badge type from registry to determine approval behavior
+      const badgeType = await getBadgeByKey(featuredType);
+      const requiresAdminApproval = badgeType?.requiresAdminApproval ?? false;
+      const adminApproved = !requiresAdminApproval;
       
       const featuredProduct = await prisma.featured_products.upsert({
         where: {
@@ -612,7 +642,9 @@ export class FeaturedProductsService {
           featured_priority: options?.featured_priority || 50,
           featured_expires_at: options?.featured_expires_at ? new Date(options.featured_expires_at) : null,
           auto_unfeature: options?.auto_unfeature !== undefined ? options.auto_unfeature : true,
-          is_active: true
+          is_active: true,
+          admin_approved: adminApproved,
+          assignment_source: options?.assignment_source || 'manual',
         },
         create: {
           inventory_item_id: inventoryItemId,
@@ -622,7 +654,9 @@ export class FeaturedProductsService {
           featured_at: new Date(),
           featured_expires_at: options?.featured_expires_at ? new Date(options.featured_expires_at) : null,
           auto_unfeature: options?.auto_unfeature !== undefined ? options.auto_unfeature : true,
-          is_active: true
+          is_active: true,
+          admin_approved: adminApproved,
+          assignment_source: options?.assignment_source || 'manual',
         }
       });
 
@@ -997,29 +1031,53 @@ export class FeaturedProductsService {
       });
 
       // Generate platform-controlled algorithmic selections
+      // Prefer system-assigned badges from featured_products (synced by syncPlatformTypes job).
+      // Fall back to on-the-fly generation if no system-assigned badges exist yet.
       try {
-        // Generate trending products
-        const trendingProducts = await generateTrendingProducts(tenantId, limit);
-        grouped.trending = trendingProducts.slice(0, limit);
-
-        // Generate recommended products  
-        const recommendedProducts = await generateRecommendedProducts(tenantId, limit);
-        grouped.recommended = recommendedProducts.slice(0, limit);
-
-        // Generate bestseller products
-        const bestsellerProducts = await generateBestsellerProducts(tenantId, limit);
-        grouped.bestseller = bestsellerProducts.slice(0, limit);
-
-        // Generate random discovery products
-        const randomProducts = await generateRandomDiscoveryProducts(tenantId, limit);
-        grouped.random_featured = randomProducts.slice(0, limit);
-
-        console.log(`[getStorefrontFeaturedProducts] Generated platform-controlled selections:`, {
-          trending: grouped.trending.length,
-          recommended: grouped.recommended.length, 
-          bestseller: grouped.bestseller.length,
-          random_featured: grouped.random_featured.length
+        // Check if system-assigned platform types exist in featured_products
+        const systemPlatformBadges = await prisma.featured_products.findMany({
+          where: {
+            tenant_id: tenantId,
+            is_active: true,
+            assignment_source: 'system',
+            featured_type: { in: ['trending', 'bestseller', 'recommended', 'random_featured'] },
+          },
+          select: { featured_type: true },
+          distinct: ['featured_type'],
         });
+
+        const systemTypesAvailable = new Set(systemPlatformBadges.map(b => b.featured_type));
+
+        // For each platform type, use system-assigned badges if available, otherwise generate on-the-fly
+        if (systemTypesAvailable.has('trending')) {
+          // Already in grouped from the featured_products query above
+        } else {
+          const trendingProducts = await generateTrendingProducts(tenantId, limit);
+          grouped.trending = trendingProducts.slice(0, limit);
+        }
+
+        if (systemTypesAvailable.has('recommended')) {
+          // Already in grouped from the featured_products query above
+        } else {
+          const recommendedProducts = await generateRecommendedProducts(tenantId, limit);
+          grouped.recommended = recommendedProducts.slice(0, limit);
+        }
+
+        if (systemTypesAvailable.has('bestseller')) {
+          // Already in grouped from the featured_products query above
+        } else {
+          const bestsellerProducts = await generateBestsellerProducts(tenantId, limit);
+          grouped.bestseller = bestsellerProducts.slice(0, limit);
+        }
+
+        if (systemTypesAvailable.has('random_featured')) {
+          // Already in grouped from the featured_products query above
+        } else {
+          const randomProducts = await generateRandomDiscoveryProducts(tenantId, limit);
+          grouped.random_featured = randomProducts.slice(0, limit);
+        }
+
+        console.log(`[getStorefrontFeaturedProducts] Platform types: ${Array.from(systemTypesAvailable).join(', ') || 'all on-the-fly'}`);
       } catch (error) {
         console.error('[getStorefrontFeaturedProducts] Error generating platform-controlled selections:', error);
         // Continue with merchant-controlled products if algorithmic generation fails
@@ -1571,5 +1629,92 @@ export class FeaturedProductsService {
       console.error('Error invalidating cache:', error);
       // Don't throw error for cache invalidation failures
     }
+  }
+
+  /**
+   * Sync platform-controlled types (trending, bestseller, recommended, random_featured)
+   * from mv_storefront_discovery into the featured_products table with assignment_source='system'.
+   *
+   * This unifies the query pattern — all badge types can be read from featured_products
+   * instead of some being computed on-the-fly and others stored in the table.
+   *
+   * Should be called by a periodic job (e.g., every 6 hours).
+   */
+  static async syncPlatformTypes(
+    tenantId: string,
+    limit: number = 10
+  ): Promise<{ synced: number; deactivated: number }> {
+    let synced = 0;
+    let deactivated = 0;
+
+    try {
+      const platformTypes = [
+        { type: 'trending' as const, generator: generateTrendingProducts },
+        { type: 'bestseller' as const, generator: generateBestsellerProducts },
+        { type: 'recommended' as const, generator: generateRecommendedProducts },
+        { type: 'random_featured' as const, generator: generateRandomDiscoveryProducts },
+      ];
+
+      for (const { type, generator } of platformTypes) {
+        const products = await generator(tenantId, limit);
+
+        // Deactivate existing system-assigned badges of this type that are no longer in the new set
+        const newItemIds = new Set(products.map(p => p.inventory_item_id));
+        const existing = await prisma.featured_products.findMany({
+          where: {
+            tenant_id: tenantId,
+            featured_type: type,
+            is_active: true,
+            assignment_source: 'system',
+          },
+          select: { id: true, inventory_item_id: true },
+        });
+
+        const toDeactivate = existing.filter(e => !newItemIds.has(e.inventory_item_id));
+        if (toDeactivate.length > 0) {
+          await prisma.featured_products.updateMany({
+            where: { id: { in: toDeactivate.map(e => e.id) } },
+            data: { is_active: false },
+          });
+          deactivated += toDeactivate.length;
+        }
+
+        // Upsert new system-assigned badges
+        for (const product of products) {
+          await prisma.featured_products.upsert({
+            where: {
+              inventory_item_id_featured_type: {
+                inventory_item_id: product.inventory_item_id,
+                featured_type: type,
+              },
+            },
+            update: {
+              featured_priority: product.featured_priority,
+              is_active: true,
+              assignment_source: 'system',
+              rule_evaluated_at: new Date(),
+            },
+            create: {
+              inventory_item_id: product.inventory_item_id,
+              tenant_id: tenantId,
+              featured_type: type,
+              featured_priority: product.featured_priority,
+              featured_at: new Date(),
+              auto_unfeature: false,
+              is_active: true,
+              assignment_source: 'system',
+              rule_evaluated_at: new Date(),
+            },
+          });
+          synced++;
+        }
+      }
+
+      console.log(`[syncPlatformTypes] Tenant ${tenantId}: synced=${synced}, deactivated=${deactivated}`);
+    } catch (error) {
+      console.error('[syncPlatformTypes] Error:', error);
+    }
+
+    return { synced, deactivated };
   }
 }

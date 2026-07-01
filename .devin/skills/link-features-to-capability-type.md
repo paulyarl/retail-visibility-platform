@@ -126,7 +126,7 @@ Linking features to a capability type only makes them **available at the capabil
    );
    ```
 
-2. **Update the backend service** (`ProductOptionsService`, `CrmOptionsService`, etc.) to resolve the new feature key.
+2. **Update the backend service** (`ProductOptionsService`, `CrmOptionsService`, etc.) to resolve the new feature key. **MUST prefix every individual feature check with `flexible ||`** (R23 in `capability-data-flow-rules.md`). When a tier has `*_flexible` enabled, ALL features in the capability are unlocked — the resolver must honor this for every flag, including standalone booleans outside group arrays. Example: `expiryMonitorEnabled: flexible || !!features.featured_expiry_monitor`.
 
 3. **Update the frontend resolver** (`CapabilityResolutionService`) to expose the new flag.
 

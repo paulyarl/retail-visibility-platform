@@ -55,86 +55,18 @@ const FLAG_DESCRIPTIONS: Record<string, { title: string; description: string }> 
     title: 'Global Tenant Metadata',
     description: 'Enable global tenant metadata management',
   },
-  FF_ENFORCE_CSRF: {
-    title: 'CSRF Protection',
-    description: 'Enforce CSRF token validation on write operations',
+  FF_SUPPLIER_CATALOG_IMPORT: {
+    title: 'Supplier Catalog Import',
+    description: 'Browse open-source product catalogs and bulk import items into tenant inventory',
   },
-  FF_PRODUCT_ENRICHMENT: {
-    title: 'Product Enrichment',
-    description: 'AI-powered product description and metadata enhancement',
+  FF_TENANT_GBP_CATEGORY_SYNC: {
+    title: 'GBP Category Sync',
+    description: 'Google Business Profile category sync for tenant directory listings',
   },
-  FF_AI_SUGGESTIONS: {
-    title: 'AI Suggestions',
-    description: 'AI-powered product suggestions and recommendations',
+  FF_CATEGORY_MIRRORING: {
+    title: 'Category Mirroring',
+    description: 'Mirror categories between platform and Google Business Profile',
   },
-  FF_ANALYTICS_DASHBOARD: {
-    title: 'Analytics Dashboard',
-    description: 'Advanced analytics dashboard with insights and metrics',
-  },
-  FF_BULK_OPERATIONS: {
-    title: 'Bulk Operations',
-    description: 'Enable bulk operations for items, categories, and more',
-  },
-  FF_REAL_TIME_SYNC: {
-    title: 'Real-Time Sync',
-    description: 'Real-time synchronization across all platforms',
-  },
-  FF_MULTI_TENANT_SUPPORT: {
-    title: 'Multi-Tenant Support',
-    description: 'Advanced multi-tenant management features',
-  },
-  FF_API_RATE_LIMITING: {
-    title: 'API Rate Limiting',
-    description: 'Advanced API rate limiting and throttling',
-  },
-  FF_ADVANCED_SEARCH: {
-    title: 'Advanced Search',
-    description: 'Advanced search with filters and faceting',
-  },
-  FF_MOBILE_OPTIMIZED: {
-    title: 'Mobile Optimized',
-    description: 'Mobile-first design and performance optimizations',
-  },
-  FF_PWA_SUPPORT: {
-    title: 'PWA Support',
-    description: 'Progressive Web App features and offline support',
-  },
-  FF_SOCIAL_SHARING: {
-    title: 'Social Sharing',
-    description: 'Social media sharing integrations',
-  },
-  FF_EMAIL_NOTIFICATIONS: {
-    title: 'Email Notifications',
-    description: 'Advanced email notification system',
-  },
-  FF_WEBHOOKS: {
-    title: 'Webhooks',
-    description: 'Webhook integrations and automation',
-  },
-  FF_CUSTOM_BRANDING: {
-    title: 'Custom Branding',
-    description: 'Custom branding and white-label options',
-  },
-  FF_ADVANCED_REPORTING: {
-    title: 'Advanced Reporting',
-    description: 'Advanced reporting and analytics',
-  },
-  FF_INTEGRATION_MARKETPLACE: {
-    title: 'Integration Marketplace',
-    description: 'Third-party integration marketplace',
-  },
-  FF_AI_COPILOT: {
-    title: 'AI Co-Pilot',
-    description: 'AI-powered assistant for enhanced productivity',
-  },
-  FF_VOICE_COMMANDS: {
-    title: 'Voice Commands',
-    description: 'Voice command interface for hands-free operation',
-  },
-  FF_BLOCKCHAIN_INTEGRATION: {
-    title: 'Blockchain Integration',
-    description: 'Blockchain and cryptocurrency integrations',
-  }
 };
 
 export default function AdminPlatformFlags() {
@@ -250,11 +182,13 @@ export default function AdminPlatformFlags() {
   const getEffectiveInfo = (flag: string) => {
     const info = effective[flag];
     if (!info) return null;
+    const divergent = info.sources.platform_env !== info.sources.platform_db && info.effectiveSource === 'env';
     return {
       source: info.effectiveSource,
       color: info.effectiveOn ? 'text-green-600' : 'text-gray-400',
       icon: info.effectiveOn ? '✓' : '✗',
-      description: `Effective: ${info.effectiveSource} (${info.effectiveOn ? 'ON' : 'OFF'})`
+      description: `Effective: ${info.effectiveSource} (${info.effectiveOn ? 'ON' : 'OFF'})`,
+      divergent,
     };
   };
 
@@ -329,6 +263,11 @@ export default function AdminPlatformFlags() {
                   <td className="px-6 py-4">
                     <div className="font-mono text-sm text-gray-900">{row.flag}</div>
                     <div className="text-xs text-gray-500 mt-1">{flagInfo.title}</div>
+                    {effectiveInfo?.divergent && (
+                      <div className="text-xs text-amber-600 mt-1" title="Environment variable overrides DB value">
+                        ⚠ env overrides DB
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <button
@@ -430,6 +369,9 @@ export default function AdminPlatformFlags() {
       <div className="mt-6 flex items-center justify-between text-sm text-gray-500">
         <div>
           {rows.length} flags loaded • {Object.values(effective).filter(f => f.effectiveOn).length} effective
+          {Object.values(effective).filter(f => f.sources.platform_env !== f.sources.platform_db && f.effectiveSource === 'env').length > 0 && (
+            <span className="text-amber-600"> • {Object.values(effective).filter(f => f.sources.platform_env !== f.sources.platform_db && f.effectiveSource === 'env').length} env-divergent</span>
+          )}
         </div>
         <button
           onClick={() => setDebug(!debug)}

@@ -408,11 +408,120 @@ export class SingleProductService {
         : 0
     };
 
+    // Apply supplier field merge if this item has a supplier mapping
+    const mergedProduct = await this.applySupplierFieldMerge(productId, transformedProduct, product);
+
     // Cache the result
-    this.setCache(cacheKey, transformedProduct);
+    this.setCache(cacheKey, mergedProduct);
 
     console.log(`[SingleProductService] Cached product: ${productId}`);
-    return transformedProduct;
+    return mergedProduct;
+  }
+
+  /**
+   * Apply field merge & precedence read order for supplier-mapped items.
+   *
+   * Read order: merchant.overrides → inventory_items → supplier_catalog_item
+   * - Price: always from inventory_items (merchant controlled)
+   * - Stock: always from inventory_items (merchant controlled)
+   * - Title: from supplier_catalog_item unless merchant has overridden
+   * - Brand/GTIN: from supplier_catalog_item (locked to supplier)
+   * - Image: supplier preferred, but inventory_items override allowed
+   * - Category: supplier normalized, merchant may refine
+   * - Description: from supplier_catalog_item if inventory description is empty
+   */
+  private async applySupplierFieldMerge(
+    productId: string,
+    product: SingleProductResult,
+    inventoryItem: any
+  ): Promise<SingleProductResult> {
+    const { prisma } = await import('../prisma');
+
+    // Check if this inventory item has a supplier mapping
+    const mapping = await prisma.supplier_mapping.findFirst({
+      where: { inventory_item_id: productId },
+    });
+
+    if (!mapping) return product;
+
+    // Fetch the supplier catalog item
+    const catalogItem = await prisma.supplier_catalog_item.findUnique({
+      where: {
+        supplier_id_supplier_sku: {
+          supplier_id: mapping.supplier_id,
+          supplier_sku: mapping.supplier_sku,
+        },
+      },
+    });
+
+    if (!catalogItem) return product;
+
+    // Check merchant metadata for override flags
+    const merchantMetadata = inventoryItem.metadata || {};
+    const overrides = merchantMetadata.supplier_overrides || {};
+
+    const merged = { ...product };
+
+    // Title: from supplier unless merchant has overridden
+    // We detect merchant override by checking if the metadata explicitly sets title_override
+    if (!overrides.title && catalogItem.name) {
+      merged.name = catalogItem.name;
+      merged.title = catalogItem.name;
+    }
+
+    // Brand: from supplier (locked field)
+    if (catalogItem.brand) {
+      merged.brand = catalogItem.brand;
+    }
+
+    // GTIN: from supplier (locked field)
+    if (catalogItem.gtin) {
+      merged.gtin = catalogItem.gtin;
+    }
+
+    // Image: supplier preferred, but inventory_items override allowed
+    // Only use supplier image if inventory has no custom image
+    if (catalogItem.image_url && !inventoryItem.image_url && !overrides.image) {
+      merged.imageUrl = catalogItem.image_url;
+      // Also update images array if empty
+      if (merged.images.length === 0) {
+        merged.images = [{
+          id: 'supplier-primary',
+          url: catalogItem.image_url,
+          position: 0,
+          isPrimary: true,
+        }];
+      }
+    }
+
+    // Description: from supplier if inventory description is empty
+    if (catalogItem.description && (!product.description || product.description === '') && !overrides.description) {
+      merged.description = catalogItem.description;
+    }
+
+    // Category: supplier normalized, merchant may refine
+    // Only apply supplier category if merchant hasn't set one
+    if (catalogItem.category && !inventoryItem.directory_category_id && !overrides.category) {
+      // We don't create a directory_category here, but we store the supplier category
+      // in the product's specifications for reference
+      merged.specifications = {
+        ...merged.specifications,
+        supplier_category: catalogItem.category,
+      };
+    }
+
+    // Add supplier source metadata
+    merged.metadata = {
+      ...merged.metadata,
+      supplier_source: {
+        supplier_id: mapping.supplier_id,
+        supplier_sku: mapping.supplier_sku,
+        sync_mode: mapping.sync_mode,
+        last_sync: mapping.last_sync,
+      },
+    };
+
+    return merged;
   }
 
   /**

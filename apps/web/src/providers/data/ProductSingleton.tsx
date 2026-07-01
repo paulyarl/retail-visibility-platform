@@ -68,6 +68,7 @@ export interface PublicProduct {
   storeCity?: string;
   storeState?: string;
   storeCategory?: string;
+  productType?: string;
 }
 
 export interface ProductFilters {

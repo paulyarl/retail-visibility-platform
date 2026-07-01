@@ -1,7 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { isTenantFlagOn } from '../utils/tenantFlags'
 import { getEffectivePlatform, getEffectiveTenant } from '../utils/effectiveFlags'
-import { prisma } from '../prisma'
 
 export type FlagScope = 'platform' | 'tenant'
 

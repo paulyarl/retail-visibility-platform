@@ -144,6 +144,8 @@ Links with IDs prefixed `built-in-` (e.g., `built-in-home`, `built-in-admin`) ca
 
 ### Option B: Via Database Query (For programmatic/agent-driven changes)
 
+> **Before writing a migration script:** Query **both** staging and production databases to find existing sibling links and their parent IDs. Parent IDs are generated at runtime (e.g., `custom-1776276917946`) and **differ between environments**. Use a query like `SELECT id, label, href, metadata FROM navigation_links WHERE href LIKE '%feature%'` on both DBs to identify sibling links that exist in both. Then use dynamic subqueries in your migration (see Migration Script Best Practices #11-13 below).
+
 **Insert a single link:**
 
 ```sql
@@ -319,7 +321,7 @@ FROM navigation_links GROUP BY sort_order, targets HAVING count(*) > 1;
 
 10. **Altering fragile dynamic templates** — Two template types (`tenant-locations`, `organization-locations`) generate children client-side via `DynamicNavTemplates.tsx`. Their children are NOT stored in the database. Do not insert database links as children of these template parents — they will be duplicated or conflict.
 
-11. **Forgetting to register icons in all 3 places** — A new icon string must be added to `useNavLinks.tsx`, `page.tsx` (IconComponents + ICON_OPTIONS), and `NavItemRow.tsx`. Missing any of these causes broken icon rendering.
+11. **Forgetting to register icons in all 3 places** — A new icon string must be added to `useNavLinks.tsx`, `page.tsx` (IconComponents + ICON_OPTIONS), and `NavItemRow.tsx`. Missing any of these causes broken icon rendering. **Note:** `useNavLinks.tsx` has a smaller icon set than `page.tsx` — icons like `store`, `chart`, `dashboard`, `products`, `categories`, etc. exist in `page.tsx` but may be missing from `useNavLinks.tsx`. Always verify the icon exists in all three maps, not just the admin nav page. When adding a new icon, define the SVG component in `useNavLinks.tsx` (following the existing function-component pattern) and add the entry to its `IconComponents` map.
 
 12. **Using `to_jsonb(null::text)` to set parentKey to JSON null** — This returns SQL NULL, which makes `jsonb_set()` return NULL for the entire metadata field. The link then disappears from the sidebar tree and its children become orphans. **Correct approach:** `COALESCE(metadata, '{}'::jsonb)` first, then `jsonb_set(metadata, '{parentKey}', 'null'::jsonb)`. The recursive CTE checks `metadata->>'parentKey' IS NULL OR metadata->>'parentKey' = '' OR metadata->>'parentKey' = 'null'`, so JSON null (which `->>` extracts as SQL NULL) works correctly.
 
@@ -404,3 +406,37 @@ When writing SQL migration scripts to restructure navigation_links:
 9. **Run on staging first, then production**: Always test on staging, verify results, then run on production.
 
 10. **Watch for orphaned children**: If a parent is deleted or its metadata becomes NULL, children with `parentKey` pointing to it become invisible. Always check for orphans after structural changes.
+
+11. **Use dynamic subqueries for parent IDs when they differ between environments** — Parent link IDs (e.g., `custom-1776276917946`) are generated at runtime and differ between staging and production. Never hardcode parent IDs in migration scripts. Instead, use subqueries to look up the parent dynamically:
+    ```sql
+    -- CORRECT: dynamic parent lookup
+    INSERT INTO navigation_links (..., metadata, ...)
+    SELECT ..., jsonb_build_object(
+      'parentKey', (SELECT metadata->>'parentKey' FROM navigation_links WHERE id = 'known-sibling-id'),
+      'nestingLevel', (SELECT (metadata->>'nestingLevel')::int FROM navigation_links WHERE id = 'known-sibling-id'),
+      ...
+    )
+    WHERE NOT EXISTS (SELECT 1 FROM navigation_links WHERE id = 'new-link-id')
+      AND EXISTS (SELECT 1 FROM navigation_links WHERE id = 'known-sibling-id');
+    
+    -- WRONG: hardcoded parent ID that may not exist in the target DB
+    'parentKey': 'custom-1776276917946'
+    ```
+    Use a **known sibling link's ID** (a link that already exists in both staging and production) to look up the parent dynamically. Query both databases first: `SELECT id, label, href, metadata FROM navigation_links WHERE href LIKE '%feature%'` to find sibling links.
+
+12. **Use `jsonb_build_object` for metadata in INSERTs** — When inserting a new link with metadata that references dynamic values from subqueries, use `jsonb_build_object()` instead of a static JSON string. This allows embedding subquery results directly:
+    ```sql
+    jsonb_build_object(
+      'parentKey', (SELECT metadata->>'parentKey' FROM navigation_links WHERE href = '/settings/admin/bsaas-analytics' LIMIT 1),
+      'hasChildren', false,
+      'childrenKeys', '[]'::jsonb,
+      'nestingLevel', (SELECT (metadata->>'nestingLevel')::int FROM navigation_links WHERE href = '/settings/admin/bsaas-analytics' LIMIT 1)
+    )
+    ```
+
+13. **Compute sort_order dynamically from sibling links** — Instead of guessing a sort_order, compute it from an existing sibling to ensure correct ordering without collisions:
+    ```sql
+    -- Place new link after the sibling (sibling_sort * 100 + 99 for same-level children)
+    (SELECT sort_order FROM navigation_links WHERE id = 'known-sibling-id') * 100 + 99
+    ```
+    This ensures the new link sorts near its sibling without hardcoding a number that might collide.

@@ -2551,6 +2551,29 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Get Google Business sync tracking
+   */
+  async getGoogleBusinessSyncTracking(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/sync-tracking?tenantId=${tenantId}`,
+        {},
+        `platform-google-business-sync-tracking-${tenantId}`,
+        this.cacheTTL
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[PlatformHomeSingleton] Failed to get Google Business sync tracking:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get Google Business comparison data
    */
   async getGoogleBusinessComparison(tenantId: string): Promise<any> {
@@ -2642,6 +2665,37 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       return result;
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to sync Google Merchant:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get per-product GMC sync status
+   */
+  async getGMCProductSyncStatus(
+    tenantId: string,
+    options?: { status?: string; search?: string; limit?: number; offset?: number }
+  ): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const params = new URLSearchParams({ tenantId });
+      if (options?.status && options.status !== 'all') params.set('status', options.status);
+      if (options?.search) params.set('search', options.search);
+      if (options?.limit) params.set('limit', String(options.limit));
+      if (options?.offset) params.set('offset', String(options.offset));
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/merchant/product-sync-status?${params.toString()}`,
+        {},
+        `platform-gmc-product-sync-status-${tenantId}-${params.toString()}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[PlatformHomeSingleton] Failed to get GMC product sync status:', error);
       throw error;
     }
   }

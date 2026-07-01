@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { getEffectivePlatform, getEffectiveTenant, setPlatformOverride, setTenantOverride } from '../utils/effectiveFlags'
-import { checkTenantAccess, requirePlatformUser } from '../middleware/auth'
+import { checkTenantAccess, requirePlatformUser, requirePlatformAdmin } from '../middleware/auth'
+import { audit } from '../audit'
 
 const router = Router()
 
@@ -43,24 +44,36 @@ router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => 
 
 // POST /api/admin/flags/override/platform/:flag - set/clear platform runtime override (kill switch)
 // Body: { value: true | false | null }
-router.post('/flags/override/platform/:flag', async (req, res) => {
+router.post('/flags/override/platform/:flag', requirePlatformAdmin, async (req, res) => {
   const { flag } = req.params
   const { value } = (req.body || {}) as { value?: boolean | null }
   if (value === undefined) return res.status(400).json({ error: 'value_required' })
   setPlatformOverride(flag, value === null ? null : !!value)
   const eff = await getEffectivePlatform(flag)
+  await audit({
+    tenantId: 'platform',
+    actor: req.user?.userId || req.user?.id || 'system',
+    action: 'update',
+    payload: { flag, override_value: value, entity_type: 'other', id: flag },
+  })
   res.json({ success: true, data: eff })
 })
 
 // POST /api/admin/flags/override/tenant/:tenantId/:flag - set/clear tenant runtime override
 // Body: { value: true | false | null }
-router.post('/flags/override/tenant/:tenantId/:flag', async (req, res) => {
+router.post('/flags/override/tenant/:tenantId/:flag', requirePlatformAdmin, async (req, res) => {
   const { tenantId, flag } = req.params
   const { value } = (req.body || {}) as { value?: boolean | null }
   if (!tenantId) return res.status(400).json({ error: 'tenantId_required' })
   if (value === undefined) return res.status(400).json({ error: 'value_required' })
   setTenantOverride(flag, tenantId, value === null ? null : !!value)
   const eff = await getEffectiveTenant(flag, tenantId)
+  await audit({
+    tenantId,
+    actor: req.user?.userId || req.user?.id || 'system',
+    action: 'update',
+    payload: { flag, override_value: value, entity_type: 'other', id: flag },
+  })
   res.json({ success: true, data: eff })
 })
 

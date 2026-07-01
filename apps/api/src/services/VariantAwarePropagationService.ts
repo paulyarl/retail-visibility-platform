@@ -483,31 +483,24 @@ export class VariantAwarePropagationService extends BaseService {
     logger.info(`Handling GMC sync propagation for ${products.length} products`);
     
     try {
-      // Import here to avoid circular dependencies
-      const { VariantAwareGMCSync } = await import('./VariantAwareGMCSync');
-      
-      // Get tenant's website URL for GMC
-      const tenant = await prisma.tenants.findUnique({
-        where: { id: request.tenantId },
-        select: { metadata: true }
-      });
+      const { batchSyncProducts } = await import('./GMCProductSync');
 
-      const tenantMetadata = tenant?.metadata as Record<string, any> || {};
-      const websiteUrl = tenantMetadata?.website_url;
+      const itemIds = request.productIds || products.map(p => p.id);
+      const result = await batchSyncProducts(request.tenantId, itemIds);
 
-      if (!websiteUrl) {
-        throw new Error('Tenant website URL not configured for GMC sync');
-      }
-
-      const gmcSync = new VariantAwareGMCSync({
-        tenantId: request.tenantId,
-        websiteUrl: websiteUrl,
-        includeVariants: true,
-        syncStock: true,
-        syncPrices: true
-      });
-
-      return await gmcSync.batchSync(products);
+      return {
+        success: result.success,
+        propagatedCount: result.synced,
+        errorCount: result.failed,
+        errors: result.results
+          .filter(r => !r.success)
+          .map(r => ({ productId: r.productId, error: r.error || 'Unknown error' })),
+        details: {
+          target: request.target,
+          operation: request.operation,
+          duration: Date.now() - startTime
+        }
+      };
     } catch (error) {
       return {
         success: false,

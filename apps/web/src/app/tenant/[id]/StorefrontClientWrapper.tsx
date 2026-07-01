@@ -17,6 +17,7 @@ import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilit
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
 import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
+import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
 // Product Discovery & Navigation
 // import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
@@ -43,6 +44,8 @@ import { FAQSection } from '@/components/storefront/sections/FAQSection';
 import { InquirySection } from '@/components/storefront/sections/InquirySection';
 import { ReviewsSection } from '@/components/storefront/sections/ReviewsSection';
 import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
+import { DigitalSection } from '@/components/storefront/sections/DigitalSection';
+import { HybridSection } from '@/components/storefront/sections/HybridSection';
 import { SocialProofSection } from '@/components/storefront/sections/SocialProofSection';
 
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
@@ -158,6 +161,7 @@ export default function StorefrontClientWrapper({
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
+  const { data: activeFeatured } = useActiveFeatured(tenantId, 'storefront_spotlight', { limit: 8 });
   const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
 
@@ -215,6 +219,8 @@ export default function StorefrontClientWrapper({
   // Product option flags — for service product gating
   const [productOptionFlags] = useState<ProductOptionFlags | null>(initialProductOptionFlags ?? null);
   const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled) || isServiceStore;
+  const showDigital = !!(productOptionFlags?.merchantPreferences?.product_digital_enabled);
+  const showHybrid = !!(productOptionFlags?.merchantPreferences?.product_hybrid_enabled);
 
   // Social commerce flags — for social proof gating
   const [socialCommerceFlags] = useState<{ enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null>(
@@ -226,7 +232,7 @@ export default function StorefrontClientWrapper({
   // Filter products by product_type into section buckets.
   // Switch-based for extensibility — adding 'digital', 'hybrid', or future
   // types only requires adding a new case + accumulator array.
-  const { physicalProducts, serviceProducts } = useMemo(() => {
+  const { physicalProducts, serviceProducts, digitalProducts, hybridProducts } = useMemo(() => {
     const buckets: Record<string, any[]> = { physical: [], service: [], digital: [], hybrid: [] };
     for (const p of products) {
       const pt = p.productType || p.product_type || 'physical';
@@ -249,6 +255,8 @@ export default function StorefrontClientWrapper({
     return {
       physicalProducts: buckets.physical,
       serviceProducts: buckets.service,
+      digitalProducts: buckets.digital,
+      hybridProducts: buckets.hybrid,
     };
   }, [products]);
 
@@ -481,6 +489,7 @@ export default function StorefrontClientWrapper({
         showsVariants={showsVariants}
         allowedFeaturedTypes={allowedFeaturedTypes}
         featuredData={featuredData}
+        activeFeatured={activeFeatured ?? undefined}
         featuredCounts={featuredCounts}
         hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
         defaultGatewayType={tenant.metadata?.defaultGatewayType}
@@ -502,6 +511,36 @@ export default function StorefrontClientWrapper({
           services={serviceProducts}
           layoutVariant="classic"
           isServiceStore={isServiceStore}
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* Digital Section: Downloadable products (gated by product_digital_enabled) */}
+      {showDigital && digitalProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <DigitalSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          digitalProducts={digitalProducts}
+          layoutVariant="classic"
+          hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+          isSocialStore={isSocialStore}
+          socialCommerceFlags={socialCommerceFlags}
+          currentUrl={currentUrl}
+        />
+      )}
+
+      {/* Hybrid Section: Physical + Digital bundles (gated by product_hybrid_enabled) */}
+      {showHybrid && hybridProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
+        <HybridSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          hybridProducts={hybridProducts}
+          layoutVariant="classic"
           hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
           isSocialStore={isSocialStore}
           socialCommerceFlags={socialCommerceFlags}

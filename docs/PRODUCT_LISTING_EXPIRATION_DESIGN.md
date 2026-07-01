@@ -950,3 +950,51 @@ The sale expiration badges use warmer colors (red/orange) compared to listing ex
 - **Merchant extends sale** — setting `sale_expires_at` to a future date re-activates the sale price on next MV refresh
 - **Merchant removes sale price** — setting `sale_price_cents` to null also nullifies the sale expiration (no sale = no sale expiration)
 - **Variant sale prices** — `sale_expires_at` is on the parent `inventory_items` record. If individual variants have their own `sale_price_cents`, the parent `sale_expires_at` applies to all variant sale prices. This is the simplest model; per-variant sale expiration is a future enhancement.
+
+---
+
+### Phase 10 — Skill Document: Product Expiration Architecture
+
+**Goal:** Capture the architectural insights and patterns from this design as a reusable skill document for future development.
+
+**Scope:**
+- Create `.devin/skills/product-expiration-architecture.md` capturing:
+  - **Pattern: MV as enforcement layer** — the materialized view WHERE clause is the single enforcement point for listing expiration. Expired products are filtered before they reach any API response, so no client-side or API-level filtering is needed. This is the root cause fix — every downstream consumer automatically benefits.
+  - **Pattern: MV as computation layer** — sale expiration uses the MV SELECT clause (not WHERE) to nullify sale prices. The product stays visible but the price reverts. Same MV, different enforcement mechanism (filter vs transform).
+  - **Pattern: Two expiration types, one capability gate** — `product_options_creation_expiration` gates both `expires_at` and `sale_expires_at`. Splitting them into separate feature keys would create a confusing UX ("I can expire listings but not sales?"). One conceptual feature ("expiration") maps to two DB columns.
+  - **Pattern: Shared badge component with mode switch** — `ExpirationBadge` handles both listing and sale modes via a `saleMode` prop. Avoids two separate components with duplicated date math. Badge priority (sale > listing) is a render-time decision, not a config decision.
+  - **Pattern: Capability-gated display, MV-enforced behavior** — the MV enforces expiration regardless of tier (expired products are hidden for ALL tenants). The capability only gates whether merchants can SET expiration dates and whether customers SEE the "Expiring Soon" badges. This separation means: a downgraded tenant's existing expirations still work (products still hide), they just can't set new ones.
+  - **Insight: Expiration ≠ featured expiration** — the codebase already had `featuredExpiresAt`, `daysUntilExpiration`, `isExpired`, `isExpiringSoon` on `SmartProductCard.ProductData` — but these are for the `featured_products` table (featured badge lifecycle), not the `inventory_items` table (product listing lifecycle). The new `expiresAt` / `saleExpiresAt` fields are structurally similar but semantically distinct. Both can coexist on the same product.
+  - **Insight: Sale expiration is price transformation, not visibility filtering** — listing expiration removes the product from the MV result set (WHERE clause). Sale expiration transforms the price columns in the MV SELECT (sale_price_cents → NULL, is_on_sale → false). Confusing these two would put sale-expired products in a WHERE filter, hiding products that should remain visible at regular price.
+  - **Insight: Badge urgency should match actionability** — "Sale Ends Today!" with pulse animation drives immediate purchase. "Expiring Soon" (listing) is informational, not actionable. The badge styling reflects this: sale badges are warmer (red/orange) and more aggressive; listing badges are cooler (red/amber) and calmer.
+  - **Insight: Per-tenant capability checks on multi-tenant surfaces** — directory pages show products from multiple tenants. The `useProductOptionsCapability(product.tenantId)` hook runs per-product, so badges appear only for eligible tenants' products. This is correct — capability settings are per-tenant, not per-page.
+  - **Checklist for future expiration work:**
+    - Does the expiration enforcement happen in the MV? If not, it's a downstream workaround — move it upstream
+    - Is the new expiration field in the MV SELECT? If not, frontend badges can't access it
+    - Does the wizard date picker check `showsExpiration`? If not, lower-tier merchants can set expirations they can't use
+    - Does the API reject `expires_at` / `sale_expires_at` when the capability is off? If not, it's a write-time validation gap
+    - Is the badge using the shared `ExpirationBadge` component? If not, date math and styling will diverge
+    - Are both listing and sale expiration badges handled with priority? If not, both could render simultaneously and clutter the card
+  - **Related patterns in the codebase:**
+    - `CapabilityConstraintService.ts` — same cache + DB-driven + static fallback pattern (for capability constraints)
+    - `featured_products` table — separate expiration system for featured badges (the "other" expiration)
+    - `PriceDisplay.tsx` — existing sale-price-aware display that automatically benefits from MV sale nullification
+    - `GMCProductSync.ts` — downstream consumer that needs explicit expiration awareness (edge case: expired products syncing to Google)
+
+**Key files:**
+- New: `.devin/skills/product-expiration-architecture.md`
+
+**Estimated effort:** 1 day
+
+---
+
+## Phase Dependencies
+
+- **Phases 1-6** (DB + API + wizard + items table) — sequential, each builds on the previous
+- **Phase 7** (capability gating) — depends on Phases 1-6 (feature must exist before it can be gated)
+- **Phase 8** (product display cards) — depends on Phases 1-6 (MV exposes `expires_at`) and Phase 7 (capability check for badge display)
+- **Phase 9** (sale expiration) — depends on Phases 1-6 (same migration, same MV recreate) and Phase 8 (extends `ExpirationBadge` component)
+- **Phase 10** (skill document) — depends on Phases 1-9 (captures real implementation insights, not just design predictions)
+
+**Critical path:** Phase 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+**Documentation track:** Phase 9 → Phase 10 (can be drafted after Phase 9, finalized after all phases are implemented)

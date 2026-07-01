@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar, User, X, CreditCard, Filter } from 'lucide-react';
+import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar, User, X, CreditCard, Filter, Download } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { customerOrderService } from '@/services/CustomerOrderService';
+import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
+import DigitalDownloadsCard from '@/components/downloads/DigitalDownloadsCard';
+import ProductTypeBadge from '@/components/products/ProductTypeBadge';
 
 type OrderStatusFilter = 'all' | 'draft' | 'active' | 'completed' | 'cancelled';
 
@@ -49,6 +52,9 @@ interface BuyerOrder {
     quantity: number;
     unitPrice: number;
     imageUrl: string | null;
+    productType?: 'physical' | 'digital' | 'hybrid' | 'service';
+    digitalDeliveryStatus?: string;
+    digitalDeliveredAt?: string;
   }>;
   itemCount: number;
   refunds?: Array<{
@@ -309,9 +315,25 @@ export default function BuyerOrderHistory() {
     }
   };
 
-  const handleDownload = (accessToken: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-    window.open(`${apiUrl}/api/download/${accessToken}`, '_blank');
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  const handleDownload = async (accessToken: string) => {
+    try {
+      setDownloading(true);
+      setDownloadError(null);
+      setDownloadProgress(0);
+      await publicDownloadService.validateAndDownloadWithProgress(
+        accessToken,
+        undefined,
+        (prog) => setDownloadProgress(prog)
+      );
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -715,123 +737,25 @@ export default function BuyerOrderHistory() {
           )}
 
           {/* Digital Downloads */}
-          {digitalDownloads.length > 0 && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  💾 Digital Downloads
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {digitalDownloads.map((download: any) => {
-                  const daysRemaining = getDaysRemaining(download.expiresAt);
-                  const isExpiringSoon = daysRemaining !== null && daysRemaining <= 7;
-                  const canDownload = !download.isExpired && !download.isRevoked && 
-                    (download.downloadsRemaining === null || download.downloadsRemaining > 0);
-
-                  return (
-                    <div key={download.accessToken} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-1">{download.productName}</h4>
-                          <p className="text-sm text-gray-600">
-                            {download.licenseType?.charAt(0).toUpperCase() + download.licenseType?.slice(1)} License
-                          </p>
-                        </div>
-                      </div>
-
-                      {canDownload ? (
-                        <button
-                          onClick={() => handleDownload(download.accessToken)}
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors mb-3"
-                        >
-                          <Package className="w-4 h-4" />
-                          Download Now
-                        </button>
-                      ) : (
-                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                          {download.isExpired && '⏰ Access has expired'}
-                          {download.isRevoked && '🔒 Access has been revoked'}
-                          {!download.isExpired && !download.isRevoked && download.downloadsRemaining === 0 && 
-                            '📊 Download limit reached'}
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-gray-400" />
-                          <span>
-                            {download.downloadLimit === null ? (
-                              'Unlimited downloads'
-                            ) : (
-                              <>
-                                <span className="font-medium">{download.downloadsRemaining}</span> of{' '}
-                                <span className="font-medium">{download.downloadLimit}</span> remaining
-                              </>
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span>
-                            {download.expiresAt === null ? (
-                              'Lifetime access'
-                            ) : (
-                              <>
-                                {download.isExpired ? (
-                                  <span className="text-red-600 font-medium">Expired</span>
-                                ) : (
-                                  <>
-                                    {isExpiringSoon && (
-                                      <span className="text-orange-600 font-medium">
-                                        ⚠️ {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
-                                      </span>
-                                    )}
-                                    {!isExpiringSoon && (
-                                      <span>
-                                        Expires {formatDate(download.expiresAt)}
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </span>
-                        </div>
-
-                        {download.asset && (
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-gray-400" />
-                            <span>Size: {formatFileSize(download.asset.fileSize)}</span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-gray-400" />
-                          <span>Downloaded {download.downloadCount} {download.downloadCount === 1 ? 'time' : 'times'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900 mb-2">
-                    💡 <strong>Download Instructions:</strong>
-                  </p>
-                  <ol className="list-decimal list-inside text-sm text-blue-900 space-y-1 ml-2">
-                    <li>Click "Download Now" button above</li>
-                    <li>Files will download directly to your device</li>
-                    <li>Save files to a secure location</li>
-                  </ol>
-                  <p className="text-xs text-blue-800 mt-3">
-                    🔒 Your download links are unique and secure. Do not share them with others.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+          {downloadError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              {downloadError}
+            </div>
           )}
+          {downloading && (
+            <div className="mb-4 space-y-1">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Downloading... {Math.round(downloadProgress)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <DigitalDownloadsCard orderId={selectedOrder.orderId} onDownload={handleDownload} />
 
           {/* Refund Information */}
           {selectedOrder.refunds && selectedOrder.refunds.length > 0 && (
@@ -1139,6 +1063,20 @@ export default function BuyerOrderHistory() {
                                 </span>
                               )}
 
+                              {/* Has Downloads Badge */}
+                              {order.items?.some(i => i.productType === 'digital' || i.productType === 'hybrid') && (
+                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                                  DOWNLOADS
+                                </span>
+                              )}
+
+                              {/* Has Service Badge */}
+                              {order.items?.some(i => i.productType === 'service') && (
+                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                  SERVICE
+                                </span>
+                              )}
+
                               {/* Refund Status Badge */}
                               {order.refunds && order.refunds.length > 0 && (
                                 <>
@@ -1177,6 +1115,17 @@ export default function BuyerOrderHistory() {
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4" />
                                 <span>{order.itemCount} item{order.itemCount !== 1 ? 's' : ''}</span>
+                                {(() => {
+                                  const types = (order.items || []).map(i => i.productType || 'physical');
+                                  const unique = [...new Set(types)];
+                                  if (unique.length === 1 && unique[0] !== 'physical') {
+                                    return <ProductTypeBadge productType={unique[0] as any} size="sm" />;
+                                  }
+                                  if (unique.length > 1) {
+                                    return <ProductTypeBadge productType="hybrid" size="sm" />;
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </div>
                           </div>

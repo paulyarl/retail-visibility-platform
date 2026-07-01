@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import FaqControlPanel from '@/components/faq/FaqControlPanel';
+import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
   title: 'FAQ Control Panel - Store Settings',
@@ -18,5 +19,9 @@ export default async function FaqControlPanelPage({ params }: PageProps) {
     redirect('/');
   }
 
-  return <FaqControlPanel tenantId={tenantId} />;
+  return (
+    <TenantGuard tenantId={tenantId}>
+      <FaqControlPanel tenantId={tenantId} />
+    </TenantGuard>
+  );
 }
