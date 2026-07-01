@@ -5,16 +5,15 @@ import Link from "next/link";
 import { ShelfShader } from "./ShelfShader";
 
 const CAPABILITIES = [
-  "sync inventory to Google Shopping",
-  "build a beautiful storefront",
-  "manage products across platforms",
-  "engage customers with an AI chatbot",
-  "list in our retail directory",
-  "track sales with real-time analytics",
-  "compete with the giants",
+  "sync products to Google Shopping",
+  "build a storefront that sells",
+  "list products in our retail directory",
+  "let an AI chatbot sell your products",
+  "track product sales with real-time analytics",
+  "make every product compete with the giants",
 ];
 
-const BASE_TEXT = "Make your shelves visible —";
+const BASE_TEXT = "Make every product visible —";
 
 export function LandingHero() {
   const [animatedSuffix, setAnimatedSuffix] = useState<string>("");
@@ -198,8 +197,8 @@ export function LandingHero() {
             <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
           </div>
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
-            The platform that makes your local shelves visible online — inventory sync,
-            storefronts, AI chatbots, and retail directory, all in one place.
+            The platform that puts your products in front of every shopper — inventory sync,
+            storefronts, AI chatbots, and a retail directory, all working to make your products visible.
           </p>
 
           {/* CTA buttons */}
