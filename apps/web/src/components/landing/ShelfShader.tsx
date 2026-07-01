@@ -81,7 +81,17 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
     const BAR_HEIGHTS = [25, 40, 55, 35, 50, 30, 45, 60, 20, 48, 38, 52];
     const SWEEP_WIDTH_PX = 220;
     const MOUSE_GLOW_WIDTH_PX = 280;
-    const SHELF_LINE_HEIGHT = 2;
+    const SHELF_LINE_HEIGHT = 5;
+
+    // Per-shelf bar config: [width, gap, maxBars, heightMultiplier]
+    // Bottom shelf (index 0) has widest bars, upper shelves get progressively narrower
+    const SHELF_BAR_CONFIG = [
+      { width: 28, gap: 14, maxBars: 30, heightMul: 1.6 },  // bottom shelf — wide bulk items
+      { width: 20, gap: 12, maxBars: 40, heightMul: 1.3 },  // wide-medium
+      { width: 14, gap: 10, maxBars: 50, heightMul: 1.0 },  // medium
+      { width: 10, gap: 8,  maxBars: 60, heightMul: 0.85 }, // narrow
+      { width: 7,  gap: 6,  maxBars: 70, heightMul: 0.7 },  // top shelf — small items
+    ];
 
     // --- Three.js Setup ---
     let DPR_CAP = 2;
@@ -140,8 +150,8 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
           uSweepX: { value: sweep.x },
           uHalfW: { value: cameraWidth * 0.5 },
           uSweepWidth: { value: SWEEP_WIDTH_PX },
-          uColor: { value: new THREE.Color("#d4a04c") },
-          uBaseOpacity: { value: 0.08 },
+          uColor: { value: new THREE.Color("#c9933e") },
+          uBaseOpacity: { value: 0.45 },
         },
         vertexShader: `
           varying vec2 vUv;
@@ -161,8 +171,14 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
             float dx = abs(uSweepX - clipX) * uHalfW;
             float prox = clamp(1.0 - dx / uSweepWidth, 0.0, 1.0);
             prox = pow(prox, 2.0);
-            float opacity = uBaseOpacity + prox * 0.35;
-            gl_FragColor = vec4(uColor, opacity);
+
+            float topGlow = smoothstep(0.0, 0.3, vUv.y);
+            float bottomFade = smoothstep(1.0, 0.5, vUv.y);
+            float shelfShape = topGlow * bottomFade;
+
+            float opacity = uBaseOpacity * shelfShape + prox * 0.4 * shelfShape;
+            vec3 color = uColor * (0.6 + 0.4 * shelfShape);
+            gl_FragColor = vec4(color, opacity);
           }
         `,
         transparent: true,
@@ -239,11 +255,6 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
             float emissiveStrength = (uBaseEmissive + vSweepProx * 1.4 + vMouseProx * 0.5) * breathe;
             vec3 finalColor = uColor * grad + uEmissive * emissiveStrength;
 
-            float shelfLine = smoothstep(0.04, 0.0, vUv.y);
-            vec3 shelfColor = vec3(0.83, 0.63, 0.30);
-            finalColor = mix(finalColor, shelfColor, shelfLine * 0.8);
-            alpha = max(alpha, shelfLine * 0.7);
-
             gl_FragColor = vec4(finalColor, alpha + vSweepProx * 0.35);
           }
         `,
@@ -286,23 +297,24 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
       }
 
       const isMobile = window.innerWidth < 768;
-      const barWidth = isMobile ? 10 : BAR_WIDTH;
-      const barGap = isMobile ? 6 : BAR_GAP;
-      const maxPerShelf = isMobile ? 30 : MAX_BARS_PER_SHELF;
 
       const shelfSpacing = cameraHeight * 0.13;
       const startY = -cameraHeight * 0.5 + cameraHeight * 0.08;
 
       let totalBars = 0;
-      const shelves: Array<{ y: number; count: number }> = [];
+      const shelves: Array<{ y: number; count: number; width: number; gap: number; heightMul: number }> = [];
 
       for (let s = 0; s < SHELF_COUNT; s++) {
+        const cfg = SHELF_BAR_CONFIG[s];
+        const barWidth = isMobile ? cfg.width * 0.8 : cfg.width;
+        const barGap = isMobile ? cfg.gap * 0.8 : cfg.gap;
+        const maxPerShelf = isMobile ? Math.floor(cfg.maxBars * 0.6) : cfg.maxBars;
         const shelfY = startY + s * shelfSpacing;
         const span = cameraWidth + barGap;
         let count = Math.min(maxPerShelf, Math.max(1, Math.floor((span + barGap) / (barWidth + barGap))));
         count = Math.floor(count * 0.85);
         totalBars += count;
-        shelves.push({ y: shelfY, count });
+        shelves.push({ y: shelfY, count, width: barWidth, gap: barGap, heightMul: cfg.heightMul });
       }
 
       const geo = new THREE.PlaneGeometry(1, 1, 1, 1);
@@ -315,8 +327,8 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
 
       let idx = 0;
       for (let s = 0; s < SHELF_COUNT; s++) {
-        const { y: shelfY, count } = shelves[s];
-        const span = cameraWidth + barGap;
+        const { y: shelfY, count, width: sBarWidth, gap: sBarGap, heightMul } = shelves[s];
+        const span = cameraWidth + sBarGap;
         const startX = -cameraWidth / 2;
         const step = span / count;
 
@@ -327,8 +339,8 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
 
           aXPos[idx] = x;
           aShelfY[idx] = shelfY;
-          aBarHeight[idx] = BAR_HEIGHTS[heightIdx];
-          aBarWidth[idx] = barWidth;
+          aBarHeight[idx] = BAR_HEIGHTS[heightIdx] * heightMul;
+          aBarWidth[idx] = sBarWidth;
           idx++;
         }
       }
