@@ -113,13 +113,12 @@ export async function getSystemBadges(): Promise<BadgeTypeMeta[]> {
   }
 
   try {
-    const rows = await prisma.$queryRaw`
-      SELECT * FROM featured_type_registry
-      WHERE tenant_id IS NULL AND is_active = true
-      ORDER BY sort_order ASC
-    `;
+    const rows = await prisma.featured_type_registry.findMany({
+      where: { tenant_id: null, is_active: true },
+      orderBy: { sort_order: 'asc' },
+    });
 
-    if (Array.isArray(rows) && rows.length > 0) {
+    if (rows.length > 0) {
       cachedSystemBadges = rows.map(dbRowToMeta);
     } else {
       cachedSystemBadges = STATIC_BADGE_TYPES;
@@ -146,14 +145,15 @@ export async function getTenantBadges(tenantId: string): Promise<BadgeTypeMeta[]
   }
 
   try {
-    const rows = await prisma.$queryRaw`
-      SELECT * FROM featured_type_registry
-      WHERE (tenant_id IS NULL OR tenant_id = ${tenantId}::text)
-        AND is_active = true
-      ORDER BY is_system DESC, sort_order ASC
-    `;
+    const rows = await prisma.featured_type_registry.findMany({
+      where: {
+        OR: [{ tenant_id: null }, { tenant_id: tenantId }],
+        is_active: true,
+      },
+      orderBy: [{ is_system: 'desc' }, { sort_order: 'asc' }],
+    });
 
-    if (Array.isArray(rows) && rows.length > 0) {
+    if (rows.length > 0) {
       const badges = rows.map(dbRowToMeta);
       cachedTenantBadges.set(tenantId, badges);
       cacheExpiry = now + CACHE_TTL_MS;
@@ -291,11 +291,10 @@ export interface UpdateTenantBadgeInput {
  */
 export async function countTenantCustomBadges(tenantId: string): Promise<number> {
   try {
-    const result = await prisma.$queryRaw`
-      SELECT COUNT(*)::int as count FROM featured_type_registry
-      WHERE tenant_id = ${tenantId}::text AND is_system = false
-    `;
-    return (result as any[])[0]?.count ?? 0;
+    const count = await prisma.featured_type_registry.count({
+      where: { tenant_id: tenantId, is_system: false },
+    });
+    return count;
   } catch (error) {
     logger.warn('[BadgeRegistryService] Failed to count tenant custom badges', undefined, {
       error: (error as Error).message,
@@ -387,12 +386,11 @@ export async function deleteTenantBadge(tenantId: string, badgeId: string): Prom
  */
 export async function getTenantCustomBadges(tenantId: string): Promise<BadgeTypeMeta[]> {
   try {
-    const rows = await prisma.$queryRaw`
-      SELECT * FROM featured_type_registry
-      WHERE tenant_id = ${tenantId}::text AND is_system = false
-      ORDER BY sort_order ASC
-    `;
-    return (rows as any[]).map(dbRowToMeta);
+    const rows = await prisma.featured_type_registry.findMany({
+      where: { tenant_id: tenantId, is_system: false },
+      orderBy: { sort_order: 'asc' },
+    });
+    return rows.map(dbRowToMeta);
   } catch (error) {
     logger.warn('[BadgeRegistryService] Failed to load tenant custom badges', undefined, {
       error: (error as Error).message,
