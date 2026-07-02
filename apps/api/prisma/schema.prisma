@@ -1250,35 +1250,41 @@ model directory_listing_categories {
 }
 
 model directory_listings_list {
-  id                   String             @id
-  tenant_id            String
-  business_name        String?
-  slug                 String?
-  address              String?
-  city                 String?
-  state                String?
-  zip_code             String?
-  phone                String?
-  email                String?
-  website              String?
-  latitude             Float?
-  longitude            Float?
-  primary_category     String?
-  secondary_categories String[]
-  logo_url             String?
-  description          String?
-  business_hours       Json?
-  rating_avg           Float?             @default(0)
-  rating_count         Int?               @default(0)
-  product_count        Int?               @default(0)
-  is_featured          Boolean?           @default(false)
-  subscription_tier    String?            @default("trial")
-  use_custom_website   Boolean?           @default(false)
-  is_published         Boolean?           @default(true)
-  created_at           DateTime?          @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime?          @default(now()) @db.Timestamptz(6)
-  keywords             String[]
-  directory_photos     directory_photos[]
+  id                    String             @id
+  tenant_id             String
+  business_name         String?
+  slug                  String?
+  address               String?
+  city                  String?
+  state                 String?
+  zip_code              String?
+  phone                 String?
+  email                 String?
+  website               String?
+  latitude              Float?
+  longitude             Float?
+  primary_category      String?
+  secondary_categories  String[]
+  logo_url              String?
+  description           String?
+  business_hours        Json?
+  rating_avg            Float?             @default(0)
+  rating_count          Int?               @default(0)
+  product_count         Int?               @default(0)
+  is_featured           Boolean?           @default(false)
+  subscription_tier     String?            @default("trial")
+  use_custom_website    Boolean?           @default(false)
+  is_published          Boolean?           @default(true)
+  created_at            DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?          @default(now()) @db.Timestamptz(6)
+  keywords              String[]
+  is_promoted           Boolean?           @default(false)
+  promotion_tier        String?            @db.VarChar(50)
+  promotion_started_at  DateTime?          @db.Timestamptz(6)
+  promotion_expires_at  DateTime?          @db.Timestamptz(6)
+  promotion_impressions Int?               @default(0)
+  promotion_clicks      Int?               @default(0)
+  directory_photos      directory_photos[]
 
   @@index([is_published], map: "idx_directory_listings_is_published")
   @@index([keywords], map: "idx_directory_listings_keywords", type: Gin)

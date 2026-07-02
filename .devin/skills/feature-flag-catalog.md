@@ -159,7 +159,7 @@ These exist in `platform_feature_flags_list` DB table. Can be toggled via admin 
 | FF_ITEMS_V2_GRID | false | `FF_ITEMS_V2_GRID` | true | off | ❌ Inactive | Items grid v2 (virtualized) |
 | FF_CATEGORY_MANAGEMENT_PAGE | true | `FF_CATEGORY_MANAGEMENT_PAGE` | false | on (100%) | ✅ Active | OnboardingWizard, category management |
 | FF_CATEGORY_QUICK_ACTIONS | false | `FF_CATEGORY_QUICK_ACTIONS` | true | off | ❌ Inactive | Quick actions footer |
-| FF_SUPPLIER_CATALOG_IMPORT | false | `FF_SUPPLIER_CATALOG_IMPORT` | true | pilot | ❌ Inactive | Supplier routes (`routes/tenant/suppliers.ts`) |
+| FF_SUPPLIER_CATALOG_IMPORT | false | `FF_SUPPLIER_CATALOG_IMPORT` | true | pilot | ✅ Active (enabled via DB) | Supplier routes (`routes/tenant/suppliers.ts`) |
 
 ### Group E: Web `featureFlags/index.ts` Only (not in seed script, not in DB)
 
@@ -291,8 +291,36 @@ This is the most recently added flag (created 2026-06-29). It is the only flag t
 ### 6. Web localStorage Override
 The web `featureFlags/index.ts` loads overrides from `localStorage.feature_flags`. This means a developer can override flag state in their browser without touching the server. This is a client-only override — it does not affect API-side gating.
 
-### 7. `requireFlag()` Middleware Is Unused
-The `requireFlag()` Express middleware in `middleware/flags.ts` is defined but not imported by any route. The supplier routes use a custom `requireSupplierCatalogFeature` function instead. Route-level flag gating is currently ad-hoc, not centralized.
+### 7. `requireFlag()` Middleware Is Used by Supplier Routes
+The `requireFlag()` Express middleware in `middleware/flags.ts` is used by `routes/tenant/suppliers.ts` (line 48) to gate all supplier endpoints with `FF_SUPPLIER_CATALOG_IMPORT` at tenant scope. This is the only route currently using `requireFlag()`, but it demonstrates the correct pattern for centralized flag gating.
+
+**Troubleshooting `platform_disabled` errors:**
+When `requireFlag()` returns a 400 with `{ error: 'platform_disabled' }`, it means:
+- The flag is OFF at the platform level (`platform_feature_flags_list.enabled = false`)
+- AND `allow_tenant_override = false` (or the flag row doesn't exist in the DB at all)
+- The tenant is therefore blocked — no tenant-level override can rescue it
+
+**Fix (SQL):**
+```sql
+INSERT INTO platform_feature_flags_list (id, flag, enabled, allow_tenant_override, created_at, updated_at)
+VALUES (gen_random_uuid(), 'FF_SUPPLIER_CATALOG_IMPORT', true, true, now(), now())
+ON CONFLICT (flag) DO UPDATE SET enabled = true, allow_tenant_override = true, updated_at = now();
+```
+
+**Fix (API):**
+```
+PUT /api/admin/platform-flags/FF_SUPPLIER_CATALOG_IMPORT
+{ "enabled": true, "allowTenantOverride": true }
+```
+
+**Fix (Env var):** Set `FF_FF_SUPPLIER_CATALOG_IMPORT=true` on the API server (note: the code prepends `FF_` to the flag name, which already starts with `FF_`, resulting in a double prefix).
+
+The API `PUT` endpoint calls `invalidateEffectiveFlagCaches()` so changes take effect immediately. The SQL approach requires either an API restart or calling `invalidateEffectiveFlagCaches()` via the admin API to clear the 30s in-memory cache.
+
+**Other error codes from `requireFlag()`:**
+- `tenant_not_enabled` — platform flag is ON but tenant has no DB record and no override (inherits platform state, but `allow_tenant_override=true` means tenant must opt in)
+- `tenantId_required` — no tenant ID found in params/query/body/headers
+- `flag_check_failed` — exception during resolution (DB error, etc.)
 
 ## Database Seed Script
 
@@ -353,7 +381,7 @@ The deprecated scan flags (`SKU_SCANNING`, etc.) were superseded by the `barcode
 
 **Problem:** The `requireFlag()` middleware in `middleware/flags.ts` is defined but unused. The supplier routes implement a custom `requireSupplierCatalogFeature` function instead. Flag gating is ad-hoc.
 
-**Recommendation:** Refactor all flag-gated routes to use `requireFlag({ flag, scope, tenantParam })`. Remove the custom `requireSupplierCatalogFeature` in `routes/tenant/suppliers.ts` and replace with `requireFlag({ flag: 'FF_SUPPLIER_CATALOG_IMPORT', scope: 'tenant' })`. This ensures consistent resolution precedence and error responses.
+**Status:** Partially done. `routes/tenant/suppliers.ts` already uses `requireFlag({ flag: 'FF_SUPPLIER_CATALOG_IMPORT', scope: 'tenant', tenantParam: 'tenantId' })`. Other flag-gated routes should follow the same pattern.
 
 #### R3: Move Web `featureFlags/index.ts` Logic Server-Side
 

@@ -105,7 +105,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       this.cacheTTL
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to load plans');
+    if (result.data.error) throw new Error(result.data.error);
     return result.data.plans || [];
   }
 
@@ -122,7 +122,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       this.cacheTTL
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to load purchases');
+    if (result.data.error) throw new Error(result.data.error);
     return result.data.purchases || [];
   }
 
@@ -134,7 +134,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       this.cacheTTL
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to load purchase');
+    if (result.data.error) throw new Error(result.data.error);
     return result.data.purchase!;
   }
 
@@ -149,7 +149,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       undefined
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success && result.data.error) throw new Error(result.data.error);
+    if (result.data.error) throw new Error(result.data.error);
     await this.invalidateServiceCaches(tenantId);
     return {
       purchaseId: result.data.purchaseId!,
@@ -169,7 +169,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       undefined
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success && result.data.error) throw new Error(result.data.error);
+    if (result.data.error) throw new Error(result.data.error);
     await this.invalidateServiceCaches(tenantId);
     return {
       newPurchaseId: result.data.newPurchaseId || result.data.purchaseId!,
@@ -209,7 +209,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       undefined
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to create plan');
+    if (result.data.error) throw new Error(result.data.error);
     this.invalidateCache('featured-placement-admin-plans');
     this.invalidateCache('featured-placement-plans');
     return result.data.plan;
@@ -231,7 +231,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       undefined
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to update plan');
+    if (result.data.error) throw new Error(result.data.error);
     this.invalidateCache('featured-placement-admin-plans');
     this.invalidateCache('featured-placement-plans');
     return result.data.plan;
@@ -278,7 +278,7 @@ class FeaturedPlacementPurchaseServiceClass extends TenantApiSingleton {
       undefined
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
-    if (!result.data.success) throw new Error(result.data.error || 'Failed to revoke');
+    if (result.data.error) throw new Error(result.data.error);
   }
 
   async adminGetRevenue(filters: { surface?: string; startDate?: string; endDate?: string } = {}): Promise<RevenueSummary> {

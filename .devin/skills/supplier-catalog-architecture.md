@@ -5,7 +5,7 @@
 This document captures the architectural insights, patterns, and lessons from implementing the Supplier Catalog Integration across 6 sprints. It covers the data model, service layer, scheduled jobs, frontend pages, and the role each component plays in the overall platform architecture.
 
 **Design doc:** `docs/SUPPLIER_CATALOG_SPRINT_PLAN.md`
-**Feature flag:** `FF_SUPPLIER_CATALOG_IMPORT` (pilot, default off, tenant override via DB hybrid flag)
+**Feature flag:** `FF_SUPPLIER_CATALOG_IMPORT` (pilot, default off in seed, tenant override via DB hybrid flag — **now enabled in production** with `enabled=true, allow_tenant_override=true`)
 
 ---
 
@@ -423,6 +423,21 @@ The `FF_SUPPLIER_CATALOG_IMPORT` flag gates the tenant-facing features. When dis
 - Admin routes work regardless (platform admin can always manage suppliers)
 
 This means the feature can be deployed to production with zero impact on tenants that don't have the flag enabled. Pilot tenants get the feature, everyone else sees no change.
+
+### Troubleshooting: `platform_disabled` Error
+
+If tenant supplier routes return `400 { error: 'platform_disabled' }`, the flag is OFF at platform level with `allow_tenant_override=false` (or the flag row is missing from `platform_feature_flags_list` entirely). The resolution logic in `effectiveFlags.ts` blocks all tenant access when the platform flag is off and overrides aren't allowed.
+
+**Quick fix (SQL):**
+```sql
+INSERT INTO platform_feature_flags_list (id, flag, enabled, allow_tenant_override, created_at, updated_at)
+VALUES (gen_random_uuid(), 'FF_SUPPLIER_CATALOG_IMPORT', true, true, now(), now())
+ON CONFLICT (flag) DO UPDATE SET enabled = true, allow_tenant_override = true, updated_at = now();
+```
+
+After running the SQL, either restart the API or wait 30s for the in-memory cache to expire. The admin API `PUT /api/admin/platform-flags/:flag` endpoint calls `invalidateEffectiveFlagCaches()` for immediate effect.
+
+**Symptom:** The error appears on pages that call supplier endpoints, such as `/t/[tenantId]/settings/import-wizard` when it fetches `GET /api/tenants/:tenantId/suppliers`.
 
 ---
 
