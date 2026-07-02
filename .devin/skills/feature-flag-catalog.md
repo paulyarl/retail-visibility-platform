@@ -350,18 +350,92 @@ This seeds 11 flags. The script is idempotent (uses Prisma `upsert`).
 
 **Note:** The override endpoints (`POST /flags/override/...`) have **no auth middleware** — they are mounted under the admin router but lack `requirePlatformAdmin`. This is a security gap.
 
-## Capability System (Separate from Feature Flags)
+## Capability System (Migration Target)
 
-The platform also has a **capability system** (`EffectiveCapabilityResolver.ts`) that gates features by tier + merchant settings. This is distinct from feature flags:
+The platform has a **capability system** (`EffectiveCapabilityResolver.ts`) that gates features by tier + merchant settings. Feature flags and capabilities served different purposes historically:
 
 - **Feature flags** = platform-wide on/off switches (kill switches, gradual rollouts)
 - **Capabilities** = per-tenant feature gating by subscription tier + merchant preferences
 
 Capability domains: `commerce`, `payment_gateway`, `storefront`, `fulfillment`, `barcode_scan`, `product_types`, `product_options`, `featured`, `integrations`, `quickstart`, `storefront_options`, `directory_entry`, `faq`, `crm`, `chatbot`, `org_options`, `social_commerce_options`.
 
-The deprecated scan flags (`SKU_SCANNING`, etc.) were superseded by the `barcode_scan_options` capability. This pattern may repeat for other flags.
+### Migration Path: Feature Flags → Capabilities
+
+The feature flag system is **on a migration path to the capability architecture**. The deprecated scan flags (`SKU_SCANNING`, `SCAN_CAMERA`, `SCAN_USB`, `SCAN_DUPLICATE_CHECK`) were the first group superseded by the `barcode_scan_options` capability type. This pattern is now the template for migrating remaining feature flags.
+
+**Why capabilities replace feature flags for tenant-gated features:**
+
+- **Tier-aware gating**: Capabilities respect subscription tier boundaries — features unlock by plan, not by env var or DB toggle. Feature flags cannot express "available on Professional tier, not on Starter."
+- **Merchant self-service**: Capabilities expose per-feature merchant toggles via settings pages. Merchants see what their plan includes and can opt-in to tier-allowed features. Feature flags require admin intervention or env var changes.
+- **Cross-capability constraints**: The Constraint Layer (CCL) can express dependencies between capabilities (e.g., "service storefront requires service product type"). Feature flags have no dependency model.
+- **Dashboard visibility**: `PlanSummaryPanel` and `CapabilityShowcase` automatically render capability state — tier-allowed, merchant-gated, enabled, or disabled. Feature flags have no dashboard representation.
+- **Consistent data flow**: The 6-layer architecture (resolver → orchestrator → route → service → hook → dashboard) ensures backend and frontend never diverge. Feature flags have three independent systems that can disagree.
+- **Well-documented**: Capability deployment follows `capability-deployment-flow.md` (8-phase pipeline) and `capability-data-flow-rules.md` (23 rules). Feature flags have no deployment skill.
+- **DB-managed**: Feature keys, tier assignments, and merchant prefs are all DB rows managed via admin UI or SQL. No env var redeployment needed.
+
+**What stays as feature flags (not migrating):**
+
+Platform infrastructure flags that control API-side behavior unrelated to tenant gating remain as env-only flags. These are kill switches and infrastructure toggles, not merchant-facing features:
+- `FF_AUDIT_LOG`, `FF_FEED_ALIGNMENT_ENFORCE`, `FF_FEED_COVERAGE`, `FF_GLOBAL_TENANT_META`, `FF_I18N_SCAFFOLD`, `FF_CURRENCY_RATE_STUB`, `FF_CATEGORY_MIRRORING`, `FF_TENANT_PLATFORM_CATEGORY`, `FF_SCAN_ENRICHMENT`
+
+**Migration process per flag:**
+
+1. Define feature key(s) in `canonical-features.ts` following R15 naming convention
+2. Seed into `features_list` + `capability_features_list` + `tier_features_list`
+3. Add merchant pref column to appropriate `tenant_*_options_settings` table
+4. Build or extend resolver (follow `capability-deployment-flow.md` Phases 1-8)
+5. Replace `requireFlag()` / `isFeatureEnabled()` / `Flags.XXX` calls with `resolveEffectiveCapabilities()` checks
+6. Remove the feature flag from `config.ts`, `flags.ts`, seed script, and admin UI
+7. Verify with `pnpm checkapi` and `pnpm checkweb`
+
+See `capability-deployment-flow.md` for the full 8-phase deployment pipeline.
 
 ## Recommendations
+
+### Feature Flag → Capability Migration Candidates
+
+The following feature flags are the next eligible group for migration to the capability architecture, ranked by readiness and impact. Each includes the ideal capability type (existing or new) and migration notes.
+
+#### Tier 1: Immediate Candidates (active, tenant-gated, clear mapping)
+
+| Flag | Current State | Target Capability | Migration Notes |
+|------|--------------|-------------------|-----------------|
+| `FF_SUPPLIER_CATALOG_IMPORT` | Active, `allow_tenant_override=true`, uses `requireFlag()` | **New: `supplier_options`** | Already the only flag using `requireFlag()` middleware with tenant scope. Per-feature toggle model. Create new capability type with feature keys like `supplier_options_enabled`, `supplier_options_catalog_import`. Replace `requireFlag()` call in `routes/tenant/suppliers.ts` with capability check. |
+| `FF_GOOGLE_CONNECT_SUITE` | Inactive, `allow_tenant_override=false`, pilot strategy | **Existing: `integrations`** | Google Connect is an integration feature. Add `integrations_google_connect` feature key to the existing `integrations` capability domain. Merchant toggle in `tenant_integrations_settings`. Replaces `GoogleConnectCard` component flag check. |
+| `FF_TENANT_GBP_CATEGORY_SYNC` | Pilot (1 tenant), web-only, no DB row | **Existing: `integrations`** | GBP category sync is an integration feature. Add `integrations_gbp_category_sync` feature key. Migrate from web-only `featureFlags/index.ts` pilot strategy to tier-gated capability. Replaces `GBPCategoryCard` component flag check. |
+
+#### Tier 2: Near-Term Candidates (display/behavior features fitting existing capabilities)
+
+| Flag | Current State | Target Capability | Migration Notes |
+|------|--------------|-------------------|-----------------|
+| `FF_MAP_CARD` | Inactive, `allow_tenant_override=true` | **Existing: `storefront_options`** (new group: `map`) | Display feature for tenant storefront. Add `storefront_options_map_enabled` group gate + `storefront_options_map_card` feature key. Replaces `MapCardSettings` component flag check. |
+| `FF_DARK_MODE` | Inactive, `allow_tenant_override=true` | **Existing: `storefront_options`** (new group: `theme`) | UI theme feature. Add `storefront_options_theme_enabled` group gate + `storefront_options_theme_dark_mode` feature key. |
+| `FF_TENANT_URLS` | Divergent (web ON, DB OFF) | **Existing: `storefront_options`** (new group: `urls`) | Custom tenant URLs. Add `storefront_options_urls_enabled` group gate + `storefront_options_urls_custom` feature key. Migration resolves the web/DB divergence automatically. |
+| `FF_ITEMS_V2_GRID` | Inactive, `allow_tenant_override=true` | **Existing: `product_options`** (new group: `layout`) | Virtualized items grid. Add `product_options_layout_enabled` group gate + `product_options_layout_v2_grid` feature key. Replaces web `isFeatureEnabled()` check. |
+| `FF_CATEGORY_QUICK_ACTIONS` | Inactive, `allow_tenant_override=true` | **Existing: `storefront_options`** (new group: `category`) | Quick actions footer for category management. Add `storefront_options_category_enabled` group gate + `storefront_options_category_quick_actions` feature key. |
+
+#### Tier 3: Lower Priority (already ON for all tenants, migration is cleanup)
+
+| Flag | Current State | Target Capability | Migration Notes |
+|------|--------------|-------------------|-----------------|
+| `FF_BUSINESS_PROFILE` | Active, `allow_tenant_override=false`, ON for all | **Existing: `storefront_options`** (new group: `info`) | Already always on — migration is cleanup to unify under capability architecture. Add `storefront_options_info_enabled` group gate + `storefront_options_info_business_profile` feature key. Replaces `BusinessProfileCard` component flag check. |
+| `FF_CATEGORY_MANAGEMENT_PAGE` | Active, `allow_tenant_override=false`, ON for all | **Existing: `storefront_options`** (existing group: `category`) | Already always on. Add `storefront_options_category_management_page` feature key to the `category` group created for `FF_CATEGORY_QUICK_ACTIONS`. |
+| `FF_SWIS_PREVIEW` | Inactive, `allow_tenant_override=true` | **New: `swis_options`** or **Existing: `storefront_options`** (new group: `swis`) | SWIS preview is a specialized feature. If it has multiple sub-features, create a dedicated `swis_options` capability type. If it's a single toggle, add as `storefront_options_swis_preview` under a `swis` group. |
+| `FF_APP_SHELL_NAV` | Inactive, `allow_tenant_override=false` | **Existing: `storefront_options`** (new group: `layout`) | App shell navigation. Add `storefront_options_layout_enabled` group gate + `storefront_options_layout_app_shell_nav` feature key. |
+
+#### Not Eligible for Migration (platform infrastructure)
+
+These flags control API-side infrastructure behavior and have no tenant-gating semantics. They remain as env-only flags in `config.ts`:
+
+- `FF_AUDIT_LOG` — audit log infrastructure, not tenant-facing
+- `FF_FEED_ALIGNMENT_ENFORCE` — feed validation infrastructure
+- `FF_FEED_COVERAGE` — feed validation infrastructure
+- `FF_GLOBAL_TENANT_META` — platform region resolution
+- `FF_I18N_SCAFFOLD` — i18n initialization
+- `FF_CURRENCY_RATE_STUB` — currency rate job infrastructure
+- `FF_CATEGORY_MIRRORING` — platform-level data operation
+- `FF_TENANT_PLATFORM_CATEGORY` — platform-level data operation
+- `FF_SCAN_ENRICHMENT` — scan pipeline infrastructure (last active scan flag)
 
 ### Restructuring
 

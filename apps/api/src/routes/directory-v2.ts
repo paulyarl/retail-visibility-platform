@@ -20,11 +20,14 @@ router.get('/stores', async (req: Request, res: Response) => {
     const offset = (pageNum - 1) * limitNum;
 
     // Get all stores using directory_listings_list materialized view
+    // Promoted listings are boosted to top, then sorted by selected criteria
+    const promotionBoost = `CASE WHEN is_promoted AND promotion_expires_at IS NOT NULL AND promotion_expires_at > NOW() THEN CASE promotion_tier WHEN 'featured' THEN 0 WHEN 'premium' THEN 1 WHEN 'basic' THEN 2 ELSE 3 END ELSE 3 END`;
     const query = `
       SELECT * FROM directory_listings_list
        WHERE is_published = true
          AND (business_hours IS NULL OR business_hours::text != 'null')
-       ORDER BY 
+       ORDER BY
+         ${promotionBoost},
          CASE 
            WHEN $3 = 'activity' THEN activity_score
            WHEN $3 = 'name' THEN business_name
@@ -114,17 +117,19 @@ router.get('/search', async (req: Request, res: Response) => {
     const whereClause = conditions.join(' AND ');
 
     // Determine ORDER BY clause based on sort parameter
-    let orderByClause = 'created_at DESC'; // default
+    // Promoted listings are always boosted to the top regardless of sort mode
+    const promotionBoost = `CASE WHEN dl.is_promoted AND dl.promotion_expires_at IS NOT NULL AND dl.promotion_expires_at > NOW() THEN CASE dl.promotion_tier WHEN 'featured' THEN 0 WHEN 'premium' THEN 1 WHEN 'basic' THEN 2 ELSE 3 END ELSE 3 END`;
+    let orderByClause = `${promotionBoost}, created_at DESC`; // default
     
     if (sort === 'rating') {
-      orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC, created_at DESC';
+      orderByClause = `${promotionBoost}, dl.rating_avg DESC NULLS LAST, dl.rating_count DESC, dl.created_at DESC`;
     } else if (sort === 'newest') {
-      orderByClause = 'created_at DESC';
+      orderByClause = `${promotionBoost}, dl.created_at DESC`;
     } else if (sort === 'products') {
-      orderByClause = 'product_count DESC NULLS LAST, created_at DESC';
+      orderByClause = `${promotionBoost}, dl.product_count DESC NULLS LAST, dl.created_at DESC`;
     } else if (sort === 'relevance' && q) {
       // For search queries, use relevance scoring
-      orderByClause = 'rating_avg DESC NULLS LAST, product_count DESC NULLS LAST, created_at DESC';
+      orderByClause = `${promotionBoost}, dl.rating_avg DESC NULLS LAST, dl.product_count DESC NULLS LAST, dl.created_at DESC`;
     }
 
     // Get listings - use direct database query with GBP category from tenants.metadata
@@ -138,7 +143,7 @@ router.get('/search', async (req: Request, res: Response) => {
       WHERE ${whereClause}
         AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
         AND dl.tenant_id IN (SELECT id FROM tenants WHERE id IS NOT NULL)
-      ORDER BY ${orderByClause.replace('is_featured', 'dl.is_featured').replace('created_at', 'dl.created_at')}
+      ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     // console.log('[Directory Search] Full SQL:', listingsQuery);
@@ -182,6 +187,9 @@ router.get('/search', async (req: Request, res: Response) => {
       ratingCount: row.rating_count || 0,
       productCount: row.product_count || 0,
       isFeatured: row.is_featured || false,
+      isPromoted: (row.is_promoted && row.promotion_expires_at && new Date(row.promotion_expires_at) > new Date()) || false,
+      promotionTier: row.promotion_tier || null,
+      promotionExpiresAt: row.promotion_expires_at || null,
       subscriptionTier: row.subscription_tier || 'trial',
       subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,

@@ -36,6 +36,7 @@ const productOptionsSettingsSchema = z.object({
   product_opt_fulfillment: z.boolean().optional(),
   product_opt_categories: z.boolean().optional(),
   product_opt_location_availability: z.boolean().optional(),
+  product_opt_supplier_catalog: z.boolean().optional(),
 });
 
 // Default settings
@@ -60,6 +61,7 @@ const DEFAULT_SETTINGS = {
   product_opt_fulfillment: true,
   product_opt_categories: true,
   product_opt_location_availability: true,
+  product_opt_supplier_catalog: true,
 };
 
 // Creation group feature keys gated by tier showsVariants/showsGallery/showsVideo
@@ -67,6 +69,7 @@ const CREATION_FEATURE_KEYS: Record<string, string> = {
   product_variant_enabled: 'showsVariants',
   product_gallery_enabled: 'showsGallery',
   product_video_enabled: 'showsVideo',
+  product_opt_supplier_catalog: 'showsSupplierCatalog',
 };
 
 // Section feature keys gated by tier section flags
@@ -119,6 +122,7 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
           product_opt_fulfillment: false,
           product_opt_categories: false,
           product_opt_location_availability: false,
+          product_opt_supplier_catalog: false,
         },
         tierState,
       });
@@ -313,6 +317,7 @@ router.put('/:tenantId/product-options', authenticateToken, requireTenantAdmin, 
         product_opt_fulfillment: settings.product_opt_fulfillment ?? true,
         product_opt_categories: settings.product_opt_categories ?? true,
         product_opt_location_availability: settings.product_opt_location_availability ?? true,
+        product_opt_supplier_catalog: settings.product_opt_supplier_catalog ?? true,
       },
     });
   } catch (error) {

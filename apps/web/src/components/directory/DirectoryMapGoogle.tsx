@@ -59,6 +59,8 @@ interface DirectoryListing {
   primaryCategory?: string;
   ratingAvg: number;
   productCount: number | string; // API may return string
+  isPromoted?: boolean;
+  promotionTier?: string;
 }
 
 interface DirectoryMapGoogleProps {
@@ -259,17 +261,37 @@ export default function DirectoryMapGoogle({
     validListings.forEach((listing) => {
       if (!listing.latitude || !listing.longitude || !mapRef.current) return;
 
+      // Determine marker style based on promotion status
+      const isPromoted = listing.isPromoted && listing.promotionTier;
+      const markerSize = isPromoted ? 48 : 40;
+
       // Create custom marker with store logo
       let markerOptions: any = {
         position: { lat: listing.latitude, lng: listing.longitude },
         map: mapRef.current,
         title: listing.businessName,
         animation: google.maps.Animation.DROP,
+        zIndex: isPromoted ? 1000 : undefined,
       };
 
-      // Use store logo as marker icon if available
+      // Use store logo as marker icon if available, or gold pin for promoted
       let marker: google.maps.Marker;
-      if (listing.logoUrl) {
+      if (isPromoted) {
+        // Gold pin SVG for promoted stores
+        const goldPinSvg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${markerSize}" height="${markerSize}" viewBox="0 0 48 48">
+            <path d="M24 0C14.6 0 7 7.6 7 17c0 13 17 31 17 31s17-18 17-31c0-9.4-7.6-17-17-17z" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+            <circle cx="24" cy="17" r="12" fill="white"/>
+            <text x="24" y="22" text-anchor="middle" font-size="14" fill="#f59e0b">⭐</text>
+          </svg>`
+        )}`;
+        markerOptions.icon = {
+          url: goldPinSvg,
+          scaledSize: new google.maps.Size(markerSize, markerSize),
+          origin: new google.maps.Point(0, 0),
+          anchor: new google.maps.Point(markerSize / 2, markerSize),
+        };
+      } else if (listing.logoUrl) {
         // Set initial icon with logo URL - Google Maps will handle loading
         markerOptions.icon = {
           url: listing.logoUrl,
@@ -297,7 +319,12 @@ export default function DirectoryMapGoogle({
 
       // Create info window content
       const infoContent = `
-        <div style="padding: 12px; max-width: 250px;">
+        <div style="padding: 12px; max-width: 250px; ${isPromoted ? 'border-left: 4px solid #f59e0b;' : ''}">
+          ${isPromoted ? `
+            <div style="display: inline-block; padding: 2px 8px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; font-size: 11px; font-weight: 700; border-radius: 12px; margin-bottom: 8px;">
+              ⭐ PROMOTED
+            </div>
+          ` : ''}
           <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #111;">
             ${listing.businessName}
           </h3>

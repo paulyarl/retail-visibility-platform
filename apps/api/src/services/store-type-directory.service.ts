@@ -291,6 +291,9 @@ class StoreTypeDirectoryService {
           dsl.logo_url as logo_url,
           null as description,
           dsl.is_featured,
+          (dsl.is_promoted AND dsl.promotion_expires_at IS NOT NULL AND dsl.promotion_expires_at > NOW()) as is_promoted,
+          dsl.promotion_tier,
+          dsl.promotion_expires_at,
           t.subscription_tier,
           -- Business hours for status indicator
           dsl.business_hours,
@@ -315,6 +318,7 @@ class StoreTypeDirectoryService {
           AND t.directory_visible = true
           AND dsl.is_published = true
         ORDER BY 
+          CASE WHEN dsl.is_promoted AND dsl.promotion_expires_at IS NOT NULL AND dsl.promotion_expires_at > NOW() THEN CASE dsl.promotion_tier WHEN 'featured' THEN 0 WHEN 'premium' THEN 1 WHEN 'basic' THEN 2 ELSE 3 END ELSE 3 END,
           dsl.rating_avg DESC NULLS LAST,
           real_counts.product_count DESC NULLS LAST,
           dsl.created_at DESC
@@ -350,6 +354,9 @@ class StoreTypeDirectoryService {
         logoUrl: store.logo_url,
         description: store.description,
         isFeatured: store.is_featured,
+        isPromoted: store.is_promoted || false,
+        promotionTier: store.promotion_tier || null,
+        promotionExpiresAt: store.promotion_expires_at || null,
         subscriptionTier: store.subscription_tier,
         businessHours: store.business_hours,
         directoryPublished: store.directory_published || false, // Add directory publish status

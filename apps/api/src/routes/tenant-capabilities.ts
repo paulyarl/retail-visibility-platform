@@ -458,6 +458,8 @@ function buildExpiredCapabilitiesResponse(tenant: {
         effective_shows_fulfillment: false,
         effective_shows_categories: false,
         effective_shows_location_availability: false,
+        shows_supplier_catalog: false,
+        effective_shows_supplier_catalog: false,
         merchant_preferences: {},
         is_flexible: false,
       },

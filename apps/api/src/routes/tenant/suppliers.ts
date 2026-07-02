@@ -12,6 +12,7 @@
  *   GET    /api/tenants/:tenantId/suppliers                    — list active suppliers
  *   GET    /api/tenants/:tenantId/suppliers/catalog/search     — search catalog items
  *   GET    /api/tenants/:tenantId/suppliers/catalog/lookup     — lookup by barcode/GTIN
+ *   GET    /api/tenants/:tenantId/suppliers/enrich/:barcode    — barcode enrichment from external APIs
  *   POST   /api/tenants/:tenantId/suppliers/import/check       — pre-flight conflict check
  *   POST   /api/tenants/:tenantId/suppliers/import             — execute import (emits audit_log)
  *   GET    /api/tenants/:tenantId/suppliers/mappings           — list supplier mappings
@@ -26,6 +27,7 @@ import { prisma } from '../../prisma';
 import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
 import SupplierImportService from '../../services/SupplierImportService';
+import { BarcodeEnrichmentService } from '../../services/BarcodeEnrichmentService';
 
 // mergeParams: true is required because this router is mounted at /api/tenants/:tenantId
 // and its global middleware (checkTenantAccess, requireFlag) needs req.params.tenantId.
@@ -91,6 +93,24 @@ router.get('/suppliers/catalog/lookup', async (req, res) => {
   } catch (error) {
     console.error('[tenant/suppliers] Barcode lookup error:', error);
     res.status(500).json({ error: 'Failed to lookup by barcode' });
+  }
+});
+
+// Barcode enrichment lookup (used by ItemCreationWizard when no supplier catalog match found)
+// Calls BarcodeEnrichmentService which checks cache then hits external APIs (UPC Database, Open Food Facts)
+router.get('/suppliers/enrich/:barcode', async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    if (!barcode) {
+      return res.status(400).json({ error: 'barcode path parameter is required' });
+    }
+    const tenantId = getTenantId(req);
+    const enrichmentService = new BarcodeEnrichmentService();
+    const enrichment = await enrichmentService.enrichWithCategorySuggestion(barcode, tenantId);
+    res.json({ enrichment });
+  } catch (error) {
+    console.error('[tenant/suppliers] Barcode enrichment error:', error);
+    res.status(500).json({ error: 'Failed to enrich barcode' });
   }
 });
 

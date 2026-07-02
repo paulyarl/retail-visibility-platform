@@ -35,7 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { itemsService } from '@/services/ItemsSingletonService';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-import type { TenantCatalogItem } from '@/services/SupplierImportService';
+import type { TenantCatalogItem, BarcodeEnrichment } from '@/services/SupplierImportService';
 
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
@@ -204,10 +204,10 @@ interface WizardData {
   };
   // Catalog match metadata (from Step 0)
   catalogMatch?: {
-    supplier_catalog_item_id: string;
-    supplier_id: string;
-    supplier_sku: string;
-    source_type: 'supplier_catalog';
+    supplier_catalog_item_id?: string;
+    supplier_id?: string;
+    supplier_sku?: string;
+    source_type: 'supplier_catalog' | 'barcode_enrichment';
   };
 }
 
@@ -828,8 +828,10 @@ export default function ItemCreationWizard({
         } : {}),
         // Include supplier catalog source info when product came from catalog match
         ...(wizardData.catalogMatch ? {
-          source_type: 'supplier_catalog',
-          supplier_catalog_item_id: wizardData.catalogMatch.supplier_catalog_item_id,
+          source_type: wizardData.catalogMatch.source_type,
+          ...(wizardData.catalogMatch.supplier_catalog_item_id ? {
+            supplier_catalog_item_id: wizardData.catalogMatch.supplier_catalog_item_id,
+          } : {})
         } : {})
       };
 
@@ -903,6 +905,121 @@ export default function ItemCreationWizard({
     setCurrentStep(STEPS.length - 1);
   };
 
+  const handleEnrichmentMatch = (enrichment: BarcodeEnrichment, barcode: string) => {
+    const meta = enrichment.metadata || {};
+    const specs = meta.specifications || {};
+    const features: string[] = Array.isArray(meta.features) ? meta.features : [];
+    const allImages: string[] = Array.isArray(meta.images)
+      ? meta.images
+      : meta.images && typeof meta.images === 'object'
+        ? Object.values(meta.images).filter(Boolean) as string[]
+        : [];
+    const primaryImageUrl = enrichment.imageUrl || allImages[0] || null;
+    const galleryUrls = allImages.filter((url: string) => url && url !== primaryImageUrl);
+
+    // Build specifications object from enrichment metadata
+    const specEntries: Record<string, any> = {};
+    if (specs.weight) specEntries.weight = specs.weight;
+    if (specs.length) specEntries.length = specs.length;
+    if (specs.width) specEntries.width = specs.width;
+    if (specs.height) specEntries.height = specs.height;
+    if (specs.color) specEntries.color = specs.color;
+    if (specs.size) specEntries.size = specs.size;
+    if (specs.material) specEntries.material = specs.material;
+    if (meta.manufacturer) specEntries.manufacturer = meta.manufacturer;
+    if (meta.warranty) specEntries.warranty = meta.warranty;
+    if (meta.ingredients) specEntries.ingredients = meta.ingredients;
+    if (meta.allergens) specEntries.allergens = meta.allergens;
+    if (meta.nutrition) specEntries.nutrition = meta.nutrition;
+    if (meta.packaging) specEntries.packaging = meta.packaging;
+    if (meta.quantity) specEntries.quantity = meta.quantity;
+    if (meta.origins) specEntries.origins = meta.origins;
+    if (meta.environmental) specEntries.environmental = meta.environmental;
+    if (meta.nova_group) specEntries.nova_group = meta.nova_group;
+    if (meta.labels) specEntries.labels = meta.labels;
+    if (meta.stores) specEntries.stores = meta.stores;
+    // Merge any remaining metadata keys not already captured
+    Object.entries(meta).forEach(([key, value]) => {
+      if (!['specifications', 'features', 'images', 'manufacturer', 'warranty',
+            'ingredients', 'allergens', 'nutrition', 'packaging', 'quantity',
+            'origins', 'environmental', 'nova_group', 'labels', 'stores',
+            'barcode', 'upc', 'ean', 'asin', 'isbn', 'mpn', 'model', 'elid',
+            'pricing', 'offers'].includes(key) && value != null) {
+        specEntries[key] = value;
+      }
+    });
+
+    // Category from enrichment suggestion
+    const catSuggestion = enrichment.categorySuggestion;
+    const existingCat = catSuggestion?.existingTenantCategory;
+
+    // Auto-populate wizard data from barcode enrichment data
+    setWizardData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        name: enrichment.name || prev.basicInfo.name,
+        brand: enrichment.brand || prev.basicInfo.brand,
+        gtin: barcode || prev.basicInfo.gtin,
+        manufacturer: meta.manufacturer || prev.basicInfo.manufacturer,
+        mpn: meta.mpn || meta.model || prev.basicInfo.mpn,
+      },
+      content: {
+        ...prev.content,
+        description: enrichment.description || prev.content.description,
+        features: features.length > 0 ? features : prev.content.features,
+        specifications: Object.keys(specEntries).length > 0 ? specEntries : prev.content.specifications,
+        tags: [
+          ...prev.content.tags,
+          ...(meta.labels && typeof meta.labels === 'string' ? meta.labels.split(',').map((l: string) => l.trim()) : []),
+        ].filter((tag, i, arr) => arr.indexOf(tag) === i), // dedupe
+      },
+      media: {
+        ...prev.media,
+        primaryImage: primaryImageUrl ? {
+          id: `enrichment-${barcode}`,
+          url: primaryImageUrl,
+          path: '',
+          name: 'Enrichment Image',
+          size: 0,
+          type: 'image/jpeg',
+          uploadedAt: new Date()
+        } : prev.media.primaryImage,
+        galleryImages: [
+          ...prev.media.galleryImages,
+          ...galleryUrls.map((url: string, i: number) => ({
+            id: `enrichment-gallery-${barcode}-${i}`,
+            url,
+            path: '',
+            name: `Enrichment Image ${i + 2}`,
+            size: 0,
+            type: 'image/jpeg',
+            uploadedAt: new Date()
+          })),
+        ],
+      },
+      pricing: {
+        ...prev.pricing,
+        listPrice: enrichment.priceCents || prev.pricing.listPrice,
+      },
+      organization: {
+        ...prev.organization,
+        categoryId: existingCat?.id || prev.organization.categoryId,
+        categoryName: existingCat?.name || catSuggestion?.suggestedName || prev.organization.categoryName,
+        googleCategoryId: existingCat?.googleCategoryId || catSuggestion?.googleCategoryId || prev.organization.googleCategoryId,
+        categoryPath: catSuggestion?.categoryPath?.join(' > ') || prev.organization.categoryPath,
+      },
+      catalogMatch: {
+        supplier_catalog_item_id: undefined,
+        supplier_id: undefined,
+        supplier_sku: undefined,
+        source_type: 'barcode_enrichment',
+      },
+    }));
+    // Jump to Review step (last step)
+    setCurrentStep(STEPS.length - 1);
+  };
+
   const handleCatalogSkip = () => {
     // Proceed to Basic Info step (step 1 when catalog enabled, step 0 otherwise)
     setCurrentStep(stepOffset);
@@ -915,6 +1032,7 @@ export default function ItemCreationWizard({
         <CatalogSearchStep
           tenantId={tenantId}
           onUseProduct={handleCatalogMatch}
+          onUseEnrichment={handleEnrichmentMatch}
           onSkip={handleCatalogSkip}
         />
       );

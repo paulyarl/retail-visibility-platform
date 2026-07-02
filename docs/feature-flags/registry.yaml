@@ -157,6 +157,22 @@ flags:
     removal_reason: "No code consumer — handled by capability system"
     default: false
     description: "Enables premium layout variant for directory entry pages (hard-gated)"
+
+  # Directory Promotion
+  - key: FF_DIRECTORY_PROMOTION
+    owner: growth_team
+    created: 2026-07-01
+    expires: 2027-01-01
+    status: active
+    default: true
+    description: "Directory promotion capability — tier-gated access to basic/premium/featured promotion tiers"
+    capability_key: directory_promotion
+    tier_access:
+      trial: { enabled: false, tiers: [] }
+      starter: { enabled: true, tiers: [basic] }
+      growth: { enabled: true, tiers: [basic, premium] }
+      scale: { enabled: true, tiers: [basic, premium, featured] }
+      enterprise: { enabled: true, tiers: [basic, premium, featured] }
   
   # SWIS Preview
   - key: FF_SWIS_PREVIEW

@@ -22,6 +22,8 @@ interface StoreCardProps {
     ratingCount: number;
     productCount: number;
     isFeatured: boolean;
+    isPromoted?: boolean;
+    promotionTier?: string;
     subscriptionTier: string;
     useCustomWebsite: boolean;
     website?: string;
@@ -109,8 +111,21 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
               </div>
             )}
 
+            {/* Promoted Badge */}
+            {listing.isPromoted && (
+              <div className="absolute top-2 left-2">
+                <Badge variant="warning" className={`text-xs font-semibold ${
+                  listing.promotionTier === 'featured' ? 'bg-purple-500 text-white' :
+                  listing.promotionTier === 'premium' ? 'bg-blue-500 text-white' :
+                  ''
+                }`}>
+                  ⭐ {(listing.promotionTier?.charAt(0) ?? '').toUpperCase() + (listing.promotionTier?.slice(1) ?? '') || 'Promoted'}
+                </Badge>
+              </div>
+            )}
+
             {/* Featured Badge */}
-            {listing.isFeatured && (
+            {listing.isFeatured && !listing.isPromoted && (
               <div className="absolute top-2 left-2">
                 <Badge variant="warning" className="text-xs font-semibold">
                   ⭐ Featured

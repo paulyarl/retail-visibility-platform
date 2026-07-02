@@ -24,6 +24,7 @@ import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBr
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
 import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
+import PromotedStoresCarousel from '@/components/directory/PromotedStoresCarousel';
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
@@ -185,6 +186,7 @@ export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps)
         {showDiscoverySections && (
           <div className="mt-12 space-y-12">
             <ActiveFeaturedSection activeFeatured={data.activeFeatured} />
+            <PromotedStoresCarousel />
             <ProductSingletonProvider>
               <RandomFeaturedProducts />
             </ProductSingletonProvider>

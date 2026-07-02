@@ -45,6 +45,8 @@ export interface DirectoryStore {
   primaryCategory?: string; // Primary category name
   isVerified?: boolean;
   isFeatured?: boolean;
+  isPromoted?: boolean;
+  promotionTier?: string;
   subscriptionTier?: string;
   coordinates?: {
     lat: number;
