@@ -119,7 +119,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
    */
   async getEffectiveFlags(): Promise<Record<string, EffectiveFlag>> {
     try {
-      const result = await this.makeDefaultRequest<Record<string, EffectiveFlag>>(
+      const result = await this.makeDefaultRequest<EffectiveFlag[]>(
         '/api/admin/effective-flags',
         {
           method: 'GET',
@@ -139,7 +139,12 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
         return {};
       }
 
-      return result.data || {};
+      const arr = result.data || [];
+      const record: Record<string, EffectiveFlag> = {};
+      for (const f of arr) {
+        record[f.flag] = f;
+      }
+      return record;
     } catch (error) {
       console.error('[AdminPlatformFlagsService] Failed to get effective flags:', error);
       return {};

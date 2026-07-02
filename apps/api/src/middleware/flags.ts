@@ -19,7 +19,7 @@ export function requireFlag(opts: { flag: string; scope: FlagScope; tenantParam?
       }
 
       // Tenant scope: check platform settings, then tenant flag (with override support)
-      const tenantId = (req.params as any)[tenantParam] || (req.query as any)[tenantParam] || (req.body as any)?.[tenantParam]
+      const tenantId = (req.params as any)[tenantParam] || (req.query as any)[tenantParam] || (req.body as any)?.[tenantParam] || (req.headers['x-tenant-id'] as string)
       if (!tenantId) return res.status(400).json({ error: 'tenantId_required' })
 
       // Use effective tenant status (handles overrides/env/db)

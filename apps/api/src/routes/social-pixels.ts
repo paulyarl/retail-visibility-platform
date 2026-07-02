@@ -17,7 +17,7 @@ const router = Router();
  * Get public pixel config (no tokens — safe for storefront)
  * GET /api/social-pixels/public/:tenantId
  */
-router.get('/api/social-pixels/public/:tenantId', async (req, res) => {
+router.get('/social-pixels/public/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     if (!tenantId) {
@@ -39,7 +39,7 @@ router.get('/api/social-pixels/public/:tenantId', async (req, res) => {
  * Get full pixel config (includes tokens — merchant/admin only)
  * GET /api/social-pixels/:tenantId
  */
-router.get('/api/social-pixels/:tenantId', async (req, res) => {
+router.get('/social-pixels/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     if (!tenantId) {
@@ -66,7 +66,7 @@ router.get('/api/social-pixels/:tenantId', async (req, res) => {
  * Update pixel config
  * PUT /api/social-pixels/:tenantId
  */
-router.put('/api/social-pixels/:tenantId', async (req, res) => {
+router.put('/social-pixels/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     if (!tenantId) {

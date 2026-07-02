@@ -216,6 +216,11 @@ export default function SupplierManagement() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {health?.total_catalog_items ?? '—'}
+                      {supplier.is_builtin && health?.total_catalog_items === 0 && (
+                        <span className="ml-1 text-xs text-gray-400" title="This supplier has no bulk catalog sync. Items are populated on-demand via barcode lookup in the product wizard.">
+                          (on-demand)
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {health ? formatPct(health.gtin_coverage_pct) : '—'}
@@ -242,11 +247,12 @@ export default function SupplierManagement() {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        {!supplier.is_builtin && (
+                        {(!supplier.is_builtin ||
+                          (health && health.total_catalog_items === 0 && health.mapping_count === 0)) && (
                           <button
                             onClick={() => setDeleteTarget(supplier)}
                             className="text-red-600 hover:text-red-800"
-                            title="Delete"
+                            title={supplier.is_builtin ? 'Delete (empty built-in supplier)' : 'Delete'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

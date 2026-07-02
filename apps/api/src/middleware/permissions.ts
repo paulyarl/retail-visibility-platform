@@ -411,6 +411,7 @@ function getTenantIdFromRequest(req: Request): string | null {
     req.params.id ||
     (req.query.tenantId as string) ||
     req.body.tenantId ||
+    (req.headers['x-tenant-id'] as string) ||
     null
   );
 }

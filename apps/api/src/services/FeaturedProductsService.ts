@@ -72,15 +72,15 @@ export async function isPlatformControlledTypeAsync(type: string): Promise<boole
 async function generateTrendingProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
     // Use mv_storefront_discovery for better trending signals
-    const trendingProducts = await prisma.$queryRaw`
+    const trendingProducts = await prisma.$queryRawUnsafe(`
       SELECT 
         inventory_item_id,
         product_name as name,
         product_title as title,
-        description,
+        product_description as description,
         sku,
         brand,
-        price_cents,
+        current_price_cents as price_cents,
         sale_price_cents,
         stock,
         image_url,
@@ -94,7 +94,7 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
         created_at,
         updated_at
       FROM mv_storefront_discovery 
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
         AND in_stock = true
@@ -103,8 +103,8 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
         view_count DESC,
         conversion_count DESC,
         units_sold DESC
-      LIMIT ${limit}
-    ` as any[];
+      LIMIT $2
+    `, tenantId, limit) as any[];
 
     return trendingProducts.map((item: any, index: number) => ({
       id: `trending-${item.inventory_item_id}`,
@@ -154,15 +154,15 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
 async function generateRecommendedProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
     // Use mv_storefront_discovery for quality-based recommendations
-    const recommendedProducts = await prisma.$queryRaw`
+    const recommendedProducts = await prisma.$queryRawUnsafe(`
       SELECT 
         inventory_item_id,
         product_name as name,
         product_title as title,
-        description,
+        product_description as description,
         sku,
         brand,
-        price_cents,
+        current_price_cents as price_cents,
         sale_price_cents,
         stock,
         image_url,
@@ -174,7 +174,7 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
         product_type::text as product_type,
         created_at
       FROM mv_storefront_discovery 
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
         AND in_stock = true
@@ -192,8 +192,8 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
         review_count DESC NULLS LAST,
         product_reviews_count_live DESC NULLS LAST,
         trending_score DESC
-      LIMIT ${limit}
-    ` as any[];
+      LIMIT $2
+    `, tenantId, limit) as any[];
 
     return recommendedProducts.map((item: any, index: number) => ({
       id: `recommended-${item.inventory_item_id}`,
@@ -242,15 +242,15 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
 async function generateBestsellerProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
     // Use mv_storefront_discovery for actual sales data
-    const bestsellerProducts = await prisma.$queryRaw`
+    const bestsellerProducts = await prisma.$queryRawUnsafe(`
       SELECT 
         inventory_item_id,
         product_name as name,
         product_title as title,
-        description,
+        product_description as description,
         sku,
         brand,
-        price_cents,
+        current_price_cents as price_cents,
         sale_price_cents,
         stock,
         image_url,
@@ -264,7 +264,7 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
         created_at,
         updated_at
       FROM mv_storefront_discovery 
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
         AND in_stock = true
@@ -279,8 +279,8 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
         revenue_cents DESC,
         (CASE WHEN units_sold > 0 THEN revenue_cents / units_sold ELSE 0 END) DESC,
         trending_score DESC
-      LIMIT ${limit}
-    ` as any[];
+      LIMIT $2
+    `, tenantId, limit) as any[];
 
     return bestsellerProducts.map((item: any, index: number) => ({
       id: `bestseller-${item.inventory_item_id}`,
@@ -330,15 +330,15 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
 async function generateRandomDiscoveryProducts(tenantId: string, limit: number): Promise<FeaturedProductWithDetails[]> {
   try {
     // Use mv_storefront_discovery for quality-based random selection
-    const qualityProducts = await prisma.$queryRaw`
+    const qualityProducts = await prisma.$queryRawUnsafe(`
       SELECT 
         inventory_item_id,
         product_name as name,
         product_title as title,
-        description,
+        product_description as description,
         sku,
         brand,
-        price_cents,
+        current_price_cents as price_cents,
         sale_price_cents,
         stock,
         image_url,
@@ -349,7 +349,7 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
         created_at,
         updated_at
       FROM mv_storefront_discovery 
-      WHERE tenant_id = ${tenantId}
+      WHERE tenant_id = $1
         AND item_status = 'active'
         AND visibility = 'public'
         AND in_stock = true
@@ -361,15 +361,15 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
           OR view_count > 5
         )
       ORDER BY RANDOM()
-      LIMIT ${Math.min(limit * 3, 100)}
-    ` as any[];
+      LIMIT $2
+    `, tenantId, Math.min(limit * 3, 100)) as any[];
 
     // Apply additional scoring and limit
     const scoredProducts = qualityProducts.map((item: any, index: number) => {
       const score = (
         (item.trending_score || 0) * 0.3 +
         (item.product_average_rating || 0) / 5 * 0.3 +
-        Math.min(item.view_count || 0, 100) / 100 * 0.2 +
+        Math.min(Number(item.view_count || 0), 100) / 100 * 0.2 +
         Math.random() * 0.2
       );
       

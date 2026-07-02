@@ -26,11 +26,26 @@ let hourlyIntervalId: NodeJS.Timeout | null = null;
 let nightlyIntervalId: NodeJS.Timeout | null = null;
 
 /**
+ * Ensure the supplier record exists in the database before ingesting data.
+ * These built-in open-source suppliers are seeded on first run.
+ */
+async function ensureSupplierExists(supplierId: string, name: string, apiUrl: string): Promise<void> {
+  await prisma.supplier.upsert({
+    where: { id: supplierId },
+    update: { name, api_url: apiUrl, is_builtin: true, active: true },
+    create: { id: supplierId, name, api_url: apiUrl, is_builtin: true, active: true },
+  });
+}
+
+/**
  * Run incremental sync for a connector (hourly).
  * Fetches items updated since last sync via searchByText with recent terms.
  */
 async function runIncrementalSync(connector: SupplierConnector, supplierId: string): Promise<void> {
   try {
+    // Ensure the supplier record exists before ingesting
+    await ensureSupplierExists(supplierId, connector instanceof OpenFoodFactsConnector ? 'Open Food Facts' : 'Open Beauty Facts', connector instanceof OpenFoodFactsConnector ? 'https://world.openfoodfacts.org/api/v2' : 'https://world.openbeautyfacts.org/api/v2');
+
     // Get the last sync timestamp from the most recent catalog item
     const latestItem = await prisma.supplier_catalog_item.findFirst({
       where: { supplier_id: supplierId },
@@ -61,6 +76,9 @@ async function runIncrementalSync(connector: SupplierConnector, supplierId: stri
  */
 async function runFullBackfill(connector: SupplierConnector, supplierId: string): Promise<void> {
   try {
+    // Ensure the supplier record exists before ingesting
+    await ensureSupplierExists(supplierId, connector instanceof OpenFoodFactsConnector ? 'Open Food Facts' : 'Open Beauty Facts', connector instanceof OpenFoodFactsConnector ? 'https://world.openfoodfacts.org/api/v2' : 'https://world.openbeautyfacts.org/api/v2');
+
     console.log(`[SupplierOpenSourceSync] Full backfill for ${supplierId}`);
 
     let totalInserted = 0;
@@ -97,8 +115,8 @@ async function runHourlySync(): Promise<void> {
   console.log('[SupplierOpenSourceSync] Starting hourly incremental sync...');
 
   const connectors: { connector: SupplierConnector; supplierId: string }[] = [
-    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-open-food-facts' },
-    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-open-beauty-facts' },
+    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-off-open-food-facts' },
+    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-off-open-beauty-facts' },
   ];
 
   for (const { connector, supplierId } of connectors) {
@@ -116,8 +134,8 @@ async function runNightlyBackfill(): Promise<void> {
   console.log('[SupplierOpenSourceSync] Starting nightly full backfill...');
 
   const connectors: { connector: SupplierConnector; supplierId: string }[] = [
-    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-open-food-facts' },
-    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-open-beauty-facts' },
+    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-off-open-food-facts' },
+    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-off-open-beauty-facts' },
   ];
 
   for (const { connector, supplierId } of connectors) {

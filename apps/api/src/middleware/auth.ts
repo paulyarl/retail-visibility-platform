@@ -412,16 +412,18 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
  * Checks multiple locations in order of priority
  */
 export function getTenantId(req: Request): string | null {
-  return (
+  const tenantId = (
     req.params?.tenantId ||
     req.params?.id ||
     (req.query?.tenantId as string) ||
     (req.query?.tenant_id as string) ||
     req.body?.tenantId ||
     req.body?.tenant_id ||
+    (req.headers['x-tenant-id'] as string) ||
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
+  return tenantId;
 }
 
 /**
@@ -656,8 +658,8 @@ export async function requireTenantAdmin(req: Request, res: Response, next: Next
     return next();
   }
 
-  // Get tenant ID from params
-  const tenantId = req.params.tenantId || req.params.id;
+  // Get tenant ID from params or header
+  const tenantId = req.params.tenantId || req.params.id || (req.headers['x-tenant-id'] as string);
   if (!tenantId) {
     return res.status(400).json({
       error: 'tenantId_required',

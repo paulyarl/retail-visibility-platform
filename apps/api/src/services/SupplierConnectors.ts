@@ -23,7 +23,7 @@ export interface SupplierConnector {
 // ---------------------------------------------------------------------------
 
 export class OpenFoodFactsConnector implements SupplierConnector {
-  supplierId = 'supplier-open-food-facts';
+  supplierId = 'supplier-off-open-food-facts';
   private baseUrl = 'https://world.openfoodfacts.org/api/v2';
 
   async fetchByBarcode(gtin: string): Promise<BatchIngestRow | null> {
@@ -105,7 +105,7 @@ export class OpenFoodFactsConnector implements SupplierConnector {
 // ---------------------------------------------------------------------------
 
 export class OpenBeautyFactsConnector implements SupplierConnector {
-  supplierId = 'supplier-open-beauty-facts';
+  supplierId = 'supplier-off-open-beauty-facts';
   private baseUrl = 'https://world.openbeautyfacts.org/api/v2';
 
   async fetchByBarcode(gtin: string): Promise<BatchIngestRow | null> {
@@ -184,7 +184,7 @@ export class OpenBeautyFactsConnector implements SupplierConnector {
 // ---------------------------------------------------------------------------
 
 export class UPCDatabaseConnector implements SupplierConnector {
-  supplierId = 'supplier-upc-database';
+  supplierId = 'supplier-off-upc-database';
   private baseUrl = 'https://api.upcdatabase.org/product';
 
   async fetchByBarcode(gtin: string): Promise<BatchIngestRow | null> {

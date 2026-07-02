@@ -109,12 +109,17 @@ export const TIER_FEATURES = {
 export const TIER_HIERARCHY: Record<string, string[]> = {
   google_only: [],
   starter: ['google_only'],
-  professional: ['starter', 'google_only'],
-  enterprise: ['professional', 'starter', 'google_only'],
-  organization: ['professional', 'starter', 'google_only'],
+  discovery: ['google_only'],
+  storefront: ['discovery', 'google_only'],
+  commitment: ['storefront', 'discovery', 'google_only'],
+  ecommerce: ['storefront', 'discovery', 'google_only'],
+  omnichannel: ['commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
+  professional: ['omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
+  enterprise: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
+  organization: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
   chain_starter: ['starter', 'google_only'],
-  chain_professional: ['professional', 'starter', 'google_only'],
-  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only'],
+  chain_professional: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
+  chain_enterprise: ['enterprise', 'professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only'],
 };
 
 // Feature to minimum required tier mapping
@@ -182,6 +187,11 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
   google_only: 'Google-Only',
   starter: 'Starter',
+  discovery: 'Discovery',
+  storefront: 'Storefront',
+  commitment: 'Commitment',
+  ecommerce: 'E-commerce',
+  omnichannel: 'Omnichannel',
   professional: 'Professional',
   enterprise: 'Enterprise',
   organization: 'Organization',

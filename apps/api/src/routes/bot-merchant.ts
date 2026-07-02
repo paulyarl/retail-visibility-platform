@@ -37,6 +37,14 @@ import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityRes
 
 const router = Router({ mergeParams: true });
 
+// Fallback: populate tenantId from X-Tenant-ID header when mergeParams doesn't propagate
+router.use((req: any, _res: any, next: any) => {
+  if (!req.params.tenantId && req.headers['x-tenant-id']) {
+    req.params.tenantId = req.headers['x-tenant-id'];
+  }
+  next();
+});
+
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabaseService = createClient(
   process.env.SUPABASE_URL!,

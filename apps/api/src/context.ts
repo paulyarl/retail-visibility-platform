@@ -20,6 +20,7 @@ export async function setRequestContext(req: Request, res: Response, next: NextF
     (typeof (req.query as any)?.tenantId === "string" && (req.query as any).tenantId) ||
     (typeof (req.body as any)?.tenantId === "string" && (req.body as any).tenantId) ||
     (typeof (req.params as any)?.tenantId === "string" && (req.params as any).tenantId) ||
+    (typeof req.headers['x-tenant-id'] === "string" && req.headers['x-tenant-id']) ||
     undefined;
 
   if (tenantId) ctx.tenantId = tenantId;

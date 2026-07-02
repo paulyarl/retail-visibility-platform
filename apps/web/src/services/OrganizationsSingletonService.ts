@@ -372,6 +372,48 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     return result.data?.settings || null;
   }
 
+  async getAvailableTenants(organizationId: string): Promise<any[]> {
+    if (!organizationId) return [];
+    const result = await this.makeDefaultRequest<any[]>(
+      `/api/organizations/${organizationId}/available-tenants`,
+      { method: 'GET' },
+      `org-available-tenants-${organizationId}`
+    );
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to get available tenants:', result.error);
+      return [];
+    }
+    return result.data || [];
+  }
+
+  async addTenantSelf(organizationId: string, tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/tenants/self`,
+      { method: 'POST', body: JSON.stringify({ tenantId }) },
+      `org-add-tenant-${organizationId}`
+    );
+    if (!result.success) {
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to add location');
+      throw new Error(errMsg);
+    }
+    this.invalidateOrganizationCache(organizationId);
+    return result.data;
+  }
+
+  async removeTenantSelf(organizationId: string, tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/tenants/${tenantId}/self`,
+      { method: 'DELETE' },
+      `org-remove-tenant-${organizationId}`
+    );
+    if (!result.success) {
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to remove location');
+      throw new Error(errMsg);
+    }
+    this.invalidateOrganizationCache(organizationId);
+    return result.data;
+  }
+
   private invalidateOrganizationCache(organizationId: string) {
     this.invalidateCache(`tenant-organization-${organizationId}`);
     this.invalidateCache(`organization-${organizationId}`);
