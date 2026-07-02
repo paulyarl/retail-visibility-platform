@@ -81,7 +81,7 @@ This is the main feature flag system with database persistence, env var override
 - `apps/web/src/components/admin/AdminPlatformFlags.tsx` — admin UI panel
 
 **Resolution precedence (highest to lowest):**
-1. **Env var** `FF_{FLAG_NAME}=true` on API server → forces ON
+1. **Env var** `FF_{FLAG_NAME}=true` on **Railway** (API server) → forces ON
 2. **Runtime override** (in-memory `platformOverrides` map, set via admin API) → kill switch / force-on
 3. **Database** `platform_feature_flags_list.enabled` → persistent default
 4. If none match → OFF
@@ -107,7 +107,7 @@ This is the main feature flag system with database persistence, env var override
 
 ### Group A: API `config.ts` Env-Only Flags (13 flags)
 
-These require environment variables on the **API server** (Railway/Vercel). No DB, no admin UI.
+These require environment variables on **Railway** (the API server). No DB, no admin UI. Do NOT set these on Vercel — the API process reads them from `process.env` at startup.
 
 | Flag | Env Var | Default | Active? | Consumer | Notes |
 |------|---------|---------|---------|----------|-------|
@@ -145,7 +145,7 @@ These require `NEXT_PUBLIC_FF_*` env vars on the **web server** (Vercel). Build-
 
 ### Group D: Database + Env Hybrid Flags (seeded via `seed-platform-flags.ts`)
 
-These exist in `platform_feature_flags_list` DB table. Can be toggled via admin UI at `/settings/admin` → Platform Flags. Env var `FF_{FLAG}=true` on API server forces ON regardless of DB state.
+These exist in `platform_feature_flags_list` DB table. Can be toggled via admin UI at `/settings/admin` → Platform Flags. Env var `FF_{FLAG}=true` on **Railway** (API server) forces ON regardless of DB state. The web client (Vercel) does not need these env vars — it fetches effective flags from the API via `GET /api/admin/effective-flags`.
 
 | Flag | DB Default | Env Var Override | allow_tenant_override | Web Strategy | Active? | Consumer |
 |------|-----------|-----------------|----------------------|-------------|---------|----------|
@@ -159,7 +159,7 @@ These exist in `platform_feature_flags_list` DB table. Can be toggled via admin 
 | FF_ITEMS_V2_GRID | false | `FF_ITEMS_V2_GRID` | true | off | ❌ Inactive | Items grid v2 (virtualized) |
 | FF_CATEGORY_MANAGEMENT_PAGE | true | `FF_CATEGORY_MANAGEMENT_PAGE` | false | on (100%) | ✅ Active | OnboardingWizard, category management |
 | FF_CATEGORY_QUICK_ACTIONS | false | `FF_CATEGORY_QUICK_ACTIONS` | true | off | ❌ Inactive | Quick actions footer |
-| FF_SUPPLIER_CATALOG_IMPORT | false | `FF_SUPPLIER_CATALOG_IMPORT` | true | pilot | ✅ Active (enabled via DB) | Supplier routes (`routes/tenant/suppliers.ts`) |
+| FF_SUPPLIER_CATALOG_IMPORT | true (DB) | `FF_FF_SUPPLIER_CATALOG_IMPORT` (Railway) | true | pilot | ✅ Active (enabled via DB) | Supplier routes (`routes/tenant/suppliers.ts`), ItemCreationWizard Step 0 |
 
 ### Group E: Web `featureFlags/index.ts` Only (not in seed script, not in DB)
 
@@ -216,9 +216,9 @@ The `AdminPlatformFlags.tsx` component has `FLAG_DESCRIPTIONS` for flags that ha
 
 ## Environment Variables Required on Remote Servers
 
-### API Server (Railway or Vercel API)
+### API Server (Railway)
 
-Set these in the API server's environment variables. All are optional — defaults are shown above.
+Set these in the Railway project environment variables. The API process reads them from `process.env` at startup. Do NOT set these on Vercel — Vercel hosts the Next.js web client, which fetches flag state from the API.
 
 #### To activate inactive API config flags:
 ```env
@@ -256,7 +256,7 @@ FF_SUPPLIER_CATALOG_IMPORT=true
 
 ### Web Server (Vercel)
 
-Set these in the Vercel project environment variables.
+Set these in the Vercel project environment variables. These are `NEXT_PUBLIC_*` vars baked into the Next.js build at compile time. They are read client-side only.
 
 ```env
 # Already in .env.local.example:
@@ -313,7 +313,7 @@ PUT /api/admin/platform-flags/FF_SUPPLIER_CATALOG_IMPORT
 { "enabled": true, "allowTenantOverride": true }
 ```
 
-**Fix (Env var):** Set `FF_FF_SUPPLIER_CATALOG_IMPORT=true` on the API server (note: the code prepends `FF_` to the flag name, which already starts with `FF_`, resulting in a double prefix).
+**Fix (Env var):** Set `FF_FF_SUPPLIER_CATALOG_IMPORT=true` on **Railway** (note: the code prepends `FF_` to the flag name, which already starts with `FF_`, resulting in a double prefix). Do NOT set this on Vercel — the API process is the only consumer of this env var.
 
 The API `PUT` endpoint calls `invalidateEffectiveFlagCaches()` so changes take effect immediately. The SQL approach requires either an API restart or calling `invalidateEffectiveFlagCaches()` via the admin API to clear the 30s in-memory cache.
 

@@ -259,6 +259,7 @@ function buildTenantNav(
         { label: 'Categories', href: `/t/${currentTenantId}/categories` },
         { label: 'Featured Products', href: `/t/${currentTenantId}/settings/featured-products`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Featured Store', href: `/t/${currentTenantId}/settings/featured-store`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Directory Promotion', href: `/t/${currentTenantId}/settings/promotion`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Custom Badges', href: `/t/${currentTenantId}/settings/products/badges`, requiredGroup: 'IS_TENANT_ADMIN' },
       ],
     },

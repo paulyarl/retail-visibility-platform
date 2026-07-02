@@ -381,5 +381,15 @@ These patterns are not badge-specific. They apply to any entity type system in a
 ## Related Documents
 
 - `docs/FEATURED_TYPES_MEANINGFUL_BADGES_DESIGN.md` — the original design document with full phase specs
-- `.devin/skills/meaningful-badge-architecture.md` — technical architecture reference (components, schema, file map)
+- `.devin/skills/meaningful-badge-architecture.md` — technical architecture reference (components, schema, file map, visibility system hierarchy)
 - `.devin/skills/custom-badge-creation-guide.md` — merchant user guide for custom badge CRUD
+
+## Platform Visibility System
+
+The badge system is one of three visibility layers. See "Platform Visibility System Hierarchy" in `meaningful-badge-architecture.md` for the full breakdown:
+
+1. **Directory Promotion** (store-level) — `directory_listings_list` promotion columns, route at `/settings/promotion`
+2. **Featured Store / Featured Placements** (product-level, paid) — `featured_placement_purchases`, route at `/settings/featured-store`
+3. **Badge System** (product-level, semantic) — `featured_type_registry` + `featured_products`, route at `/settings/products/badges`
+
+All three are surfaced together in the "Featured Products" settings group and the "My Inventory" sidebar section.

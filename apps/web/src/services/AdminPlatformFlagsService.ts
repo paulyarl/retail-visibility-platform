@@ -106,7 +106,8 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
         return [];
       }
 
-      return result.data || [];
+      const rawData: any = result.data;
+      return Array.isArray(rawData) ? rawData : (rawData?.data || []);
     } catch (error) {
       console.error('[AdminPlatformFlagsService] Failed to get platform flags:', error);
       return [];
@@ -139,7 +140,8 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
         return {};
       }
 
-      const arr = result.data || [];
+      const rawData: any = result.data;
+      const arr: EffectiveFlag[] = Array.isArray(rawData) ? rawData : (rawData?.data || []);
       const record: Record<string, EffectiveFlag> = {};
       for (const f of arr) {
         record[f.flag] = f;

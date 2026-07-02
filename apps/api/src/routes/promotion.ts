@@ -1,21 +1,46 @@
-import { Router } from 'express';
+/**
+ * Promotion Routes — Directory Promotion lifecycle
+ *
+ * Tenant endpoints:
+ *   GET    /api/tenants/:tenantId/promotion/status       — current promotion status
+ *   GET    /api/tenants/:tenantId/promotion/plans         — list available plans
+ *   POST   /api/tenants/:tenantId/promotion/purchase      — create Stripe checkout session
+ *   POST   /api/tenants/:tenantId/promotion/renew         — renew existing promotion
+ *   POST   /api/tenants/:tenantId/promotion/cancel        — cancel (lets current period expire)
+ *   GET    /api/tenants/:tenantId/promotion/purchases      — list purchase history
+ *   GET    /api/tenants/:tenantId/promotion/analytics      — analytics with CTR
+ *   POST   /api/tenants/:tenantId/promotion/track-impression
+ *   POST   /api/tenants/:tenantId/promotion/track-click
+ *
+ * Admin endpoints:
+ *   GET    /api/admin/promotion/catalog                    — list all plans
+ *   POST   /api/admin/promotion/catalog                    — create plan
+ *   PUT    /api/admin/promotion/catalog/:planKey           — update plan
+ *   DELETE /api/admin/promotion/catalog/:planKey           — deactivate plan
+ *   GET    /api/admin/promotion/purchases                   — list all purchases
+ *   GET    /api/admin/promotion/revenue                     — revenue summary
+ */
+
+import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import DirectoryPromotionService from '../services/DirectoryPromotionService';
 
 const router = Router();
-
-// Use shared connection pool (safe to call at module load - getDirectPool returns singleton)
 const pool = getDirectPool();
+
+// ====================
+// TENANT ENDPOINTS
+// ====================
 
 /**
  * GET /api/tenants/:tenantId/promotion/status
- * Get current promotion status for a tenant
  */
-router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
+router.get('/tenants/:tenantId/promotion/status', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
     const result = await pool.query(
-      `SELECT 
+      `SELECT
         is_promoted,
         promotion_tier,
         promotion_started_at,
@@ -34,7 +59,9 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
     }
 
     const listing = result.rows[0];
-    
+
+    const activePurchase = await DirectoryPromotionService.getInstance().getActivePurchase(tenantId);
+
     res.json({
       isPromoted: listing.is_promoted || false,
       promotionTier: listing.promotion_tier,
@@ -42,6 +69,7 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
       promotionExpiresAt: listing.promotion_expires_at,
       promotionImpressions: listing.promotion_impressions || 0,
       promotionClicks: listing.promotion_clicks || 0,
+      activePurchase: activePurchase || null,
     });
   } catch (error) {
     console.error('Error fetching promotion status:', error);
@@ -50,119 +78,162 @@ router.get('/tenants/:tenantId/promotion/status', async (req, res) => {
 });
 
 /**
- * POST /api/tenants/:tenantId/promotion/enable
- * Enable promotion for a tenant
+ * GET /api/tenants/:tenantId/promotion/plans
  */
-router.post('/tenants/:tenantId/promotion/enable', async (req, res) => {
+router.get('/tenants/:tenantId/promotion/plans', async (req: Request, res: Response) => {
   try {
-    const { tenantId } = req.params;
-    const { tier, durationMonths } = req.body;
-
-    // Validate tier
-    const validTiers = ['basic', 'premium', 'featured'];
-    if (!validTiers.includes(tier)) {
-      return res.status(400).json({ error: 'Invalid promotion tier' });
-    }
-
-    // Validate duration
-    if (!durationMonths || durationMonths < 1 || durationMonths > 12) {
-      return res.status(400).json({ error: 'Invalid duration' });
-    }
-
-    // Calculate expiration date
-    const startDate = new Date();
-    const expiresAt = new Date(startDate);
-    expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
-
-    // Update directory listing
-    const result = await pool.query(
-      `UPDATE directory_listings_list
-      SET 
-        is_promoted = TRUE,
-        promotion_tier = $1,
-        promotion_started_at = $2,
-        promotion_expires_at = $3,
-        promotion_impressions = 0,
-        promotion_clicks = 0
-      WHERE tenant_id = $4
-      RETURNING id`,
-      [tier, startDate, expiresAt, tenantId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
-    }
-
-    // TODO: Create Stripe subscription here
-    // TODO: Send confirmation email
-
-    res.json({
-      success: true,
-      message: 'Promotion enabled successfully',
-      promotionTier: tier,
-      promotionExpiresAt: expiresAt,
-    });
+    const plans = await DirectoryPromotionService.getInstance().listCatalogPlans(false);
+    res.json({ plans });
   } catch (error) {
-    console.error('Error enabling promotion:', error);
-    res.status(500).json({ error: 'Failed to enable promotion' });
+    console.error('Error listing promotion plans:', error);
+    res.status(500).json({ error: 'Failed to list promotion plans' });
   }
 });
 
 /**
- * POST /api/tenants/:tenantId/promotion/disable
- * Disable promotion for a tenant
+ * POST /api/tenants/:tenantId/promotion/purchase
  */
-router.post('/tenants/:tenantId/promotion/disable', async (req, res) => {
+router.post('/tenants/:tenantId/promotion/purchase', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { planKey, successUrl, cancelUrl } = req.body;
+
+    if (!planKey || !successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'Missing required fields: planKey, successUrl, cancelUrl' });
+    }
+
+    const result = await DirectoryPromotionService.getInstance().createPurchase({
+      tenantId,
+      planKey,
+      successUrl,
+      cancelUrl,
+    });
+
+    res.json({
+      purchaseId: result.purchaseId,
+      checkoutUrl: result.checkoutUrl,
+    });
+  } catch (error) {
+    const message = (error as Error).message;
+    console.error('Error creating promotion purchase:', message);
+
+    if (message === 'plan_not_found_or_inactive') {
+      return res.status(404).json({ error: 'Plan not found or inactive' });
+    }
+    if (message === 'tenant_already_has_active_promotion') {
+      return res.status(409).json({ error: 'Tenant already has an active promotion' });
+    }
+    if (message === 'tenant_has_no_directory_listing') {
+      return res.status(404).json({ error: 'Tenant has no directory listing' });
+    }
+    if (message === 'stripe_not_configured') {
+      return res.status(503).json({ error: 'Payment system not configured' });
+    }
+
+    res.status(500).json({ error: 'Failed to create promotion purchase' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/promotion/renew
+ */
+router.post('/tenants/:tenantId/promotion/renew', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { purchaseId, successUrl, cancelUrl } = req.body;
+
+    if (!purchaseId || !successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'Missing required fields: purchaseId, successUrl, cancelUrl' });
+    }
+
+    const result = await DirectoryPromotionService.getInstance().renewPurchase({
+      purchaseId,
+      successUrl,
+      cancelUrl,
+    });
+
+    res.json({
+      newPurchaseId: result.newPurchaseId,
+      checkoutUrl: result.checkoutUrl,
+    });
+  } catch (error) {
+    const message = (error as Error).message;
+    console.error('Error renewing promotion:', message);
+
+    if (message === 'purchase_not_found') {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    if (message === 'plan_not_found_or_inactive') {
+      return res.status(404).json({ error: 'Plan not found or inactive' });
+    }
+    if (message === 'stripe_not_configured') {
+      return res.status(503).json({ error: 'Payment system not configured' });
+    }
+
+    res.status(500).json({ error: 'Failed to renew promotion' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/promotion/cancel
+ */
+router.post('/tenants/:tenantId/promotion/cancel', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
-    const result = await pool.query(
-      `UPDATE directory_listings_list
-      SET 
-        is_promoted = FALSE,
-        promotion_tier = NULL
-      WHERE tenant_id = $1
-      RETURNING id`,
-      [tenantId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
-    }
-
-    // TODO: Cancel Stripe subscription here
-    // TODO: Send cancellation email
+    await DirectoryPromotionService.getInstance().cancelPromotion(tenantId);
 
     res.json({
       success: true,
-      message: 'Promotion disabled successfully',
+      message: 'Promotion cancelled. It will remain active until the current period expires.',
     });
   } catch (error) {
-    console.error('Error disabling promotion:', error);
-    res.status(500).json({ error: 'Failed to disable promotion' });
+    const message = (error as Error).message;
+    console.error('Error cancelling promotion:', message);
+
+    if (message === 'no_active_promotion') {
+      return res.status(404).json({ error: 'No active promotion to cancel' });
+    }
+
+    res.status(500).json({ error: 'Failed to cancel promotion' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/promotion/purchases
+ */
+router.get('/tenants/:tenantId/promotion/purchases', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const status = req.query.status as string | undefined;
+
+    const purchases = await DirectoryPromotionService.getInstance().listTenantPurchases(tenantId, status ? { status } : {});
+    res.json({ purchases });
+  } catch (error) {
+    console.error('Error listing promotion purchases:', error);
+    res.status(500).json({ error: 'Failed to list promotion purchases' });
   }
 });
 
 /**
  * GET /api/tenants/:tenantId/promotion/analytics
- * Get detailed analytics for promotion
  */
-router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
+router.get('/tenants/:tenantId/promotion/analytics', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
     const result = await pool.query(
-      `SELECT 
+      `SELECT
         is_promoted,
         promotion_tier,
         promotion_started_at,
         promotion_expires_at,
         promotion_impressions,
         promotion_clicks,
-        CASE 
-          WHEN promotion_impressions > 0 
+        CASE
+          WHEN promotion_impressions > 0
           THEN ROUND((promotion_clicks::numeric / promotion_impressions::numeric) * 100, 2)
-          ELSE 0 
+          ELSE 0
         END as click_through_rate
       FROM directory_listings_list
       WHERE tenant_id = $1
@@ -177,7 +248,6 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
 
     const listing = result.rows[0];
 
-    // Calculate days active
     let daysActive = 0;
     if (listing.promotion_started_at) {
       const start = new Date(listing.promotion_started_at);
@@ -185,7 +255,6 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
       daysActive = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    // Calculate average per day
     const avgImpressionsPerDay = daysActive > 0 ? Math.round(listing.promotion_impressions / daysActive) : 0;
     const avgClicksPerDay = daysActive > 0 ? Math.round(listing.promotion_clicks / daysActive) : 0;
 
@@ -209,9 +278,8 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req, res) => {
 
 /**
  * POST /api/tenants/:tenantId/promotion/track-impression
- * Track an impression (map view)
  */
-router.post('/tenants/:tenantId/promotion/track-impression', async (req, res) => {
+router.post('/tenants/:tenantId/promotion/track-impression', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -231,9 +299,8 @@ router.post('/tenants/:tenantId/promotion/track-impression', async (req, res) =>
 
 /**
  * POST /api/tenants/:tenantId/promotion/track-click
- * Track a click (popup link click)
  */
-router.post('/tenants/:tenantId/promotion/track-click', async (req, res) => {
+router.post('/tenants/:tenantId/promotion/track-click', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -248,6 +315,135 @@ router.post('/tenants/:tenantId/promotion/track-click', async (req, res) => {
   } catch (error) {
     console.error('Error tracking click:', error);
     res.status(500).json({ error: 'Failed to track click' });
+  }
+});
+
+// ====================
+// ADMIN ENDPOINTS
+// ====================
+
+/**
+ * GET /api/admin/promotion/catalog
+ */
+router.get('/admin/promotion/catalog', async (req: Request, res: Response) => {
+  try {
+    const includeInactive = req.query.includeInactive === 'true';
+    const plans = await DirectoryPromotionService.getInstance().listCatalogPlans(includeInactive);
+    res.json({ plans });
+  } catch (error) {
+    console.error('Error listing promotion catalog:', error);
+    res.status(500).json({ error: 'Failed to list promotion catalog' });
+  }
+});
+
+/**
+ * POST /api/admin/promotion/catalog
+ */
+router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
+  try {
+    const { planKey, label, tier, durationDays, priceCents, currency, sortOrder } = req.body;
+
+    if (!planKey || !label || !tier || !durationDays || !priceCents) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const plan = await DirectoryPromotionService.getInstance().createCatalogPlan({
+      planKey,
+      label,
+      tier,
+      durationDays,
+      priceCents,
+      currency,
+      sortOrder,
+    });
+
+    res.json({ plan });
+  } catch (error) {
+    const message = (error as Error).message;
+    console.error('Error creating promotion catalog plan:', message);
+
+    if (message === 'invalid_tier') {
+      return res.status(400).json({ error: 'Invalid tier. Must be: basic, premium, or featured' });
+    }
+
+    res.status(500).json({ error: 'Failed to create promotion catalog plan' });
+  }
+});
+
+/**
+ * PUT /api/admin/promotion/catalog/:planKey
+ */
+router.put('/admin/promotion/catalog/:planKey', async (req: Request, res: Response) => {
+  try {
+    const { planKey } = req.params;
+    const { label, tier, durationDays, priceCents, currency, isActive, sortOrder } = req.body;
+
+    const plan = await DirectoryPromotionService.getInstance().updateCatalogPlan(planKey, {
+      label,
+      tier,
+      durationDays,
+      priceCents,
+      currency,
+      isActive,
+      sortOrder,
+    });
+
+    res.json({ plan });
+  } catch (error) {
+    console.error('Error updating promotion catalog plan:', error);
+    res.status(500).json({ error: 'Failed to update promotion catalog plan' });
+  }
+});
+
+/**
+ * DELETE /api/admin/promotion/catalog/:planKey
+ */
+router.delete('/admin/promotion/catalog/:planKey', async (req: Request, res: Response) => {
+  try {
+    const { planKey } = req.params;
+
+    await DirectoryPromotionService.getInstance().deleteCatalogPlan(planKey);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deactivating promotion catalog plan:', error);
+    res.status(500).json({ error: 'Failed to deactivate promotion catalog plan' });
+  }
+});
+
+/**
+ * GET /api/admin/promotion/purchases
+ */
+router.get('/admin/promotion/purchases', async (req: Request, res: Response) => {
+  try {
+    const filters: { status?: string; tier?: string; tenantId?: string } = {};
+    if (req.query.status) filters.status = req.query.status as string;
+    if (req.query.tier) filters.tier = req.query.tier as string;
+    if (req.query.tenantId) filters.tenantId = req.query.tenantId as string;
+
+    const purchases = await DirectoryPromotionService.getInstance().listAllPurchases(filters);
+    res.json({ purchases });
+  } catch (error) {
+    console.error('Error listing all promotion purchases:', error);
+    res.status(500).json({ error: 'Failed to list promotion purchases' });
+  }
+});
+
+/**
+ * GET /api/admin/promotion/revenue
+ */
+router.get('/admin/promotion/revenue', async (req: Request, res: Response) => {
+  try {
+    const filters: { tier?: string; startDate?: Date; endDate?: Date } = {};
+    if (req.query.tier) filters.tier = req.query.tier as string;
+    if (req.query.startDate) filters.startDate = new Date(req.query.startDate as string);
+    if (req.query.endDate) filters.endDate = new Date(req.query.endDate as string);
+
+    const summary = await DirectoryPromotionService.getInstance().getRevenueSummary(filters);
+    res.json({ summary });
+  } catch (error) {
+    console.error('Error fetching promotion revenue summary:', error);
+    res.status(500).json({ error: 'Failed to fetch promotion revenue summary' });
   }
 });
 
