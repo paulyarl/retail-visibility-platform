@@ -13,6 +13,14 @@ import FaqOptionsService from '../services/FaqOptionsService';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router({ mergeParams: true });
+
+// Fallback: populate tenantId from X-Tenant-ID header when mergeParams doesn't propagate
+router.use((req: any, _res: any, next: any) => {
+  if (!req.params.tenantId && req.headers['x-tenant-id']) {
+    req.params.tenantId = req.headers['x-tenant-id'];
+  }
+  next();
+});
 const faqService = FaqService.getInstance();
 const faqCoverageService = FaqCoverageService.getInstance();
 const faqOptionsService = FaqOptionsService.getInstance();

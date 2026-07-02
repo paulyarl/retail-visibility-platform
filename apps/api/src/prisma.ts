@@ -103,6 +103,13 @@ const basePrismaWithRetry = new Proxy(basePrisma, {
       });
     }
     
+    // Bind utility methods ($queryRaw, $queryRawUnsafe, $transaction, etc.)
+    // to the actual PrismaClient so internal `this._engine` access works correctly.
+    // Without this, the Proxy breaks `this` context, causing JsonBody serialization errors.
+    if (typeof original === 'function') {
+      return original.bind(target);
+    }
+    
     return original;
   },
 });
