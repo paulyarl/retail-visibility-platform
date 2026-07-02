@@ -821,14 +821,14 @@ Your new plan is now active.`;
       case 'bsaas_purchase_success':
         return {
           title: `Feature purchased: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Tenant "${tenantName}" purchased the "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" feature for $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'}).\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          description: `Tenant "${tenantName}" purchased the "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" feature for $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'}).\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'low',
         };
 
       case 'bsaas_renewal_success':
         return {
           title: `Feature renewed: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was renewed for tenant "${tenantName}". Charged $${((data.amount || 0) / 100).toFixed(2)}.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was renewed for tenant "${tenantName}". Charged $${((data.amount || 0) / 100).toFixed(2)}.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'low',
         };
 
@@ -843,7 +843,7 @@ Your new plan is now active.`;
       case 'bsaas_purchase_cancelled':
         return {
           title: `Feature cancelled: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was cancelled for tenant "${tenantName}". The feature will remain active until the current billing period ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          description: `Feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" was cancelled for tenant "${tenantName}". The feature will remain active until the current billing period ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'medium',
         };
 
@@ -858,7 +858,7 @@ Your new plan is now active.`;
       case 'bsaas_trial_started':
         return {
           title: `Feature trial started: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Tenant "${tenantName}" started a ${data.metadata?.trialDays || 0}-day free trial for feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}". No charge until trial ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/settings/feature-store`,
+          description: `Tenant "${tenantName}" started a ${data.metadata?.trialDays || 0}-day free trial for feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}". No charge until trial ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'low',
         };
 
@@ -1080,7 +1080,7 @@ Your new plan is now active.`;
         </div>
         <p>The feature is now active and ready to use.</p>
         <p style="margin-top: 24px;">
-          <a href="${process.env.WEB_URL}/settings/feature-store" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Features</a>
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/feature-store" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Features</a>
         </p>
       </div>
     `;
@@ -1097,7 +1097,7 @@ Price: $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthl
 
 The feature is now active and ready to use.
 
-Manage your features at: ${process.env.WEB_URL}/settings/feature-store`;
+Manage your features at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/feature-store`;
   }
 
   // Email templates - BSaaS Renewal Success
@@ -1142,7 +1142,7 @@ Your feature remains active.`;
         </div>
         <p>The feature has been <strong>suspended</strong>. Please update your payment method to restore access.</p>
         <p style="margin-top: 24px;">
-          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription" style="background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
         </p>
       </div>
     `;
@@ -1158,7 +1158,7 @@ Reason: ${data.reason || 'Payment method declined'}
 
 The feature has been suspended. Please update your payment method to restore access.
 
-Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
+Update your payment method at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription`;
   }
 
   // Email templates - BSaaS Purchase Cancelled
@@ -1171,7 +1171,7 @@ Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
         <p>You've cancelled <strong>${featureName}</strong> for <strong>${business}</strong>.</p>
         <p>The feature will remain active until the end of the current billing period, then will be deactivated.</p>
         <p style="margin-top: 24px;">
-          <a href="${process.env.WEB_URL}/settings/feature-store" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Browse Features</a>
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/feature-store" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Browse Features</a>
         </p>
       </div>
     `;
@@ -1185,7 +1185,7 @@ You've cancelled ${featureName} for ${business}.
 
 The feature will remain active until the end of the current billing period, then will be deactivated.
 
-Browse features at: ${process.env.WEB_URL}/settings/feature-store`;
+Browse features at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/feature-store`;
   }
 
   // Email templates - BSaaS Grace Period Warning
@@ -1204,7 +1204,7 @@ Browse features at: ${process.env.WEB_URL}/settings/feature-store`;
         </div>
         <p>The feature is still active, but will be <strong>suspended in ${daysLeft} days</strong> if payment is not updated.</p>
         <p style="margin-top: 24px;">
-          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
         </p>
       </div>
     `;
@@ -1221,7 +1221,7 @@ The feature is still active, but will be suspended in ${daysLeft} days if paymen
 
 Reason: ${data.reason || 'Payment declined'}
 
-Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
+Update your payment method at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription`;
   }
 
   // Email templates - BSaaS Trial Started
@@ -1240,7 +1240,7 @@ Update your payment method at: ${process.env.WEB_URL}/settings/subscription`;
         </div>
         <p>The feature is now active. You won't be charged until the trial ends. Add a payment method to ensure uninterrupted service after the trial.</p>
         <p style="margin-top: 24px;">
-          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Add Payment Method</a>
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Add Payment Method</a>
         </p>
       </div>
     `;
@@ -1257,7 +1257,7 @@ The feature is now active. You won't be charged until the trial ends.
 
 Price after trial: $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'})
 
-Add a payment method at: ${process.env.WEB_URL}/settings/subscription`;
+Add a payment method at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/subscription`;
   }
 
   // Email templates - Featured Placement Purchased
