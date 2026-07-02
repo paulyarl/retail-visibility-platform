@@ -115,8 +115,8 @@ async function runHourlySync(): Promise<void> {
   console.log('[SupplierOpenSourceSync] Starting hourly incremental sync...');
 
   const connectors: { connector: SupplierConnector; supplierId: string }[] = [
-    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-open-food-facts' },
-    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-open-beauty-facts' },
+    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-off-open-food-facts' },
+    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-off-open-beauty-facts' },
   ];
 
   for (const { connector, supplierId } of connectors) {
@@ -134,8 +134,8 @@ async function runNightlyBackfill(): Promise<void> {
   console.log('[SupplierOpenSourceSync] Starting nightly full backfill...');
 
   const connectors: { connector: SupplierConnector; supplierId: string }[] = [
-    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-open-food-facts' },
-    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-open-beauty-facts' },
+    { connector: new OpenFoodFactsConnector(), supplierId: 'supplier-off-open-food-facts' },
+    { connector: new OpenBeautyFactsConnector(), supplierId: 'supplier-off-open-beauty-facts' },
   ];
 
   for (const { connector, supplierId } of connectors) {

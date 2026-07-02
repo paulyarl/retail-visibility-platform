@@ -128,15 +128,27 @@ class SupplierServiceClass {
   }
 
   /**
-   * Delete a supplier (only custom suppliers can be deleted)
+   * Delete a supplier.
+   * Custom suppliers can always be deleted.
+   * Built-in suppliers can be deleted only if they have 0 catalog items and 0 mappings.
    */
   async deleteSupplier(id: string) {
-    const supplier = await prisma.supplier.findUnique({ where: { id } });
+    const supplier = await prisma.supplier.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            supplier_catalog_item: true,
+            supplier_mapping: true,
+          },
+        },
+      },
+    });
     if (!supplier) {
       throw new Error('Supplier not found');
     }
-    if (supplier.is_builtin) {
-      throw new Error('Built-in suppliers cannot be deleted');
+    if (supplier.is_builtin && (supplier._count.supplier_catalog_item > 0 || supplier._count.supplier_mapping > 0)) {
+      throw new Error('Built-in suppliers with catalog items or mappings cannot be deleted');
     }
     return prisma.supplier.delete({ where: { id } });
   }

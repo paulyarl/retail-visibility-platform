@@ -111,6 +111,7 @@ This document captures the architectural insights, patterns, and lessons from im
 | 071 | `071_nav_supplier_management.sql` | Admin nav link for "Suppliers" |
 | 072 | `072_nav_import_wizard_supplier_mappings.sql` | Tenant nav links for "Import Wizard" + "Supplier Mappings" |
 | 073 | `073_nav_supplier_health.sql` | Admin nav link for "Supplier Health" |
+| 077 | `077_supplier_dedup_cleanup.sql` | Cleanup duplicate supplier records from ID mismatch |
 
 ---
 
@@ -281,6 +282,88 @@ The auto-sync job and `SingleProductService.applySupplierFieldMerge` both follow
 
 ---
 
+## Product Wizard Integration
+
+The supplier catalog integrates directly into the Item Creation Wizard (`/t/[tenantId]/items/create`) as an optional Step 0, providing proactive product discovery before manual entry.
+
+### Architecture
+
+```
+ItemCreationWizard
+  ├── useFeatureFlag('FF_SUPPLIER_CATALOG_IMPORT')
+  ├── catalogEnabled = !isEditing && ffSupplierCatalog
+  ├── STEPS = catalogEnabled ? [CATALOG_STEP, ...BASE_STEPS] : BASE_STEPS
+  └── renderStep()
+       ├── Step 0: CatalogSearchStep (when catalogEnabled)
+       │    ├── Supplier dropdown (from SupplierImportService.listSuppliers)
+       │    ├── Barcode/GTIN lookup → SupplierImportService.lookupByBarcode()
+       │    ├── Text search → SupplierImportService.searchCatalog()
+       │    ├── Result grid (image, name, brand, SKU, price, GTIN)
+       │    ├── "Use This Product" → handleCatalogMatch()
+       │    └── "Skip & Enter Manually" → handleCatalogSkip()
+       └── Steps 1-7: BasicInfoStep, ProductTypeStep, ... ReviewStep
+```
+
+### Key Components
+
+**`CatalogSearchStep`** (`apps/web/src/components/inventory/wizards/steps/CatalogSearchStep.tsx`)
+- Props: `tenantId`, `onUseProduct(item)`, `onSkip()`
+- Loads active suppliers via `SupplierImportService.listSuppliers(tenantId)` on mount
+- Dual search mode: barcode/GTIN lookup + text search
+- Supplier filter dropdown (optional — searches all suppliers by default)
+- Result cards with image preview, name, brand, SKU, price, GTIN
+- Select a result → click "Use This Product" → auto-populates wizard
+
+**`ItemCreationWizard`** (`apps/web/src/components/inventory/wizards/ItemCreationWizard.tsx`)
+- `WizardData` interface extended with `catalogMatch` field:
+  ```ts
+  catalogMatch?: {
+    supplier_catalog_item_id: string;
+    supplier_id: string;
+    supplier_sku: string;
+    source_type: 'supplier_catalog';
+  }
+  ```
+- `handleCatalogMatch(item)`: auto-populates `basicInfo` (name, brand, gtin), `content` (description, specifications), `media` (primaryImage from catalog URL), `pricing` (listPrice from MSRP), and `catalogMatch` metadata. Jumps to Review step.
+- `handleCatalogSkip()`: proceeds to Basic Info step (step 1 when catalog enabled, step 0 otherwise)
+- On submit: includes `source_type: 'supplier_catalog'` and `supplier_catalog_item_id` in the API payload when `catalogMatch` is set
+- `BasicInfoStep` receives `gtinReadOnly={!!wizardData.catalogMatch}` — GTIN is locked when product came from supplier catalog (supplier is source of truth for GTIN)
+
+### On-Demand Barcode Lookup (UPC Database)
+
+The UPC Database connector has no bulk search API — it only supports single barcode lookups. This means:
+- **Catalog Items count is always 0** in the admin suppliers table (no bulk sync job)
+- The "(on-demand)" badge appears next to the count for built-in suppliers with 0 items
+- When a merchant scans a barcode in the wizard, `lookupByBarcode()` calls the UPC Database connector's `fetchByBarcode(gtin)` in real-time
+- If found, the result is returned to the wizard for selection — no pre-ingestion needed
+- The `supplier-opensource-sync.ts` job does NOT include UPC Database (only OFF + OBF have scheduled sync)
+
+### Feature Flag Gating
+
+The wizard integration is gated by `FF_SUPPLIER_CATALOG_IMPORT`:
+- **Enabled (pilot tenants):** Wizard starts at Step 0 (Catalog Search). Merchant can search supplier catalogs, select a match, and jump to Review with auto-populated data.
+- **Disabled (default):** Wizard starts at Step 1 (Basic Info) as before. Zero regression — no code path changes, no UI changes.
+- **Edit mode:** Catalog search step is never shown when editing an existing product (`catalogEnabled = !isEditing && ffSupplierCatalog`)
+
+### Data Flow
+
+```
+Merchant scans barcode in wizard
+  → CatalogSearchStep calls SupplierImportService.lookupByBarcode(tenantId, gtin)
+  → Tenant route /api/tenants/:tenantId/suppliers/catalog/lookup
+  → SupplierCatalogService.lookupByBarcode() checks supplier_catalog_item table first
+  → If not found, calls SupplierConnectors.getConnector(supplierId).fetchByBarcode(gtin)
+  → Connector hits external API (OFF, OBF, or UPC Database)
+  → Returns BatchIngestRow → normalized to TenantCatalogItem
+  → Merchant clicks "Use This Product"
+  → handleCatalogMatch() populates wizardData + jumps to Review
+  → On submit, API receives source_type='supplier_catalog' + supplier_catalog_item_id
+  → inventory_items record created with supplier link
+  → supplier_mapping record created (tenant ↔ supplier catalog item)
+```
+
+---
+
 ## RBAC Matrix
 
 | Action | Platform Admin | Tenant Owner/Admin | Tenant Staff | Tenant Viewer |
@@ -347,7 +430,9 @@ This means the feature can be deployed to production with zero impact on tenants
 
 Built-in suppliers (Open Food Facts, Open Beauty Facts, UPC Database) are seeded in the migration with `is_builtin = true`. Custom suppliers created by admins have `is_builtin = false`.
 
-- Built-in suppliers **cannot be deleted** (enforced in `SupplierService.deleteSupplier`)
+- Built-in suppliers **cannot be deleted if they have catalog items or mappings** (enforced in `SupplierService.deleteSupplier`)
+- Built-in suppliers **can be deleted when empty** (0 catalog items + 0 mappings) — allows cleanup of unused built-in suppliers
+- Custom suppliers can always be deleted
 - Built-in suppliers have pre-configured connectors in `SupplierConnectors.ts`
 - Custom suppliers use the generic CSV connector (`supplier-csv-sync.ts`)
 - The `is_builtin` flag drives UI behavior (badge display, delete button visibility)
@@ -401,6 +486,7 @@ Each migration is idempotent (WHERE NOT EXISTS) and updates the parent's `childr
 - `database/migrations/071_nav_supplier_management.sql` — Admin nav
 - `database/migrations/072_nav_import_wizard_supplier_mappings.sql` — Tenant nav
 - `database/migrations/073_nav_supplier_health.sql` — Health dashboard nav
+- `database/migrations/077_supplier_dedup_cleanup.sql` — Duplicate supplier cleanup
 
 ### Config
 - `docs/feature-flags/registry.yaml` — `FF_SUPPLIER_CATALOG_IMPORT` flag
@@ -425,3 +511,5 @@ Each migration is idempotent (WHERE NOT EXISTS) and updates the parent's `childr
 7. **Health dashboard route before parameterized route.** The `/health/dashboard` endpoint aggregates across all suppliers. It must be declared before `/:id` in the Express router, or it will be interpreted as "get supplier with id=health".
 
 8. **Frontend service types must match backend return types.** When upgrading `replayQuarantine` from returning the quarantined item to returning `{ success, error }`, both the backend route response and the frontend service method signature needed updating in lockstep.
+
+9. **Seed IDs must match connector IDs exactly.** Migration 070 seeded suppliers with IDs like `supplier-off-open-food-facts`, but the connectors and sync job used `supplier-open-food-facts` (missing the `off-` prefix). The sync job's `ensureSupplierExists()` upsert created duplicate supplier records with the wrong IDs. Always verify that hardcoded IDs in connectors/jobs match the migration seed IDs exactly. Migration 077 was created to clean up the duplicates.

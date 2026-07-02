@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth'
 import { audit } from '../audit'
+import { invalidateEffectiveFlagCaches } from '../utils/effectiveFlags'
 
 const router = Router()
 
@@ -40,6 +41,7 @@ router.put('/platform-flags/:flag', requirePlatformAdmin, async (req, res) => {
       created_at: new Date()
     },
   })
+  invalidateEffectiveFlagCaches()
   await audit({
     tenantId: 'platform',
     actor: req.user?.userId || req.user?.id || 'system',

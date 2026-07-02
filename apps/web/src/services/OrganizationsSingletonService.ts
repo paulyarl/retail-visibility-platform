@@ -393,7 +393,8 @@ class OrganizationsSingletonService extends TenantApiSingleton {
       `org-add-tenant-${organizationId}`
     );
     if (!result.success) {
-      throw new Error(result.error?.message || 'Failed to add location');
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to add location');
+      throw new Error(errMsg);
     }
     this.invalidateOrganizationCache(organizationId);
     return result.data;
@@ -406,7 +407,8 @@ class OrganizationsSingletonService extends TenantApiSingleton {
       `org-remove-tenant-${organizationId}`
     );
     if (!result.success) {
-      throw new Error(result.error?.message || 'Failed to remove location');
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to remove location');
+      throw new Error(errMsg);
     }
     this.invalidateOrganizationCache(organizationId);
     return result.data;
