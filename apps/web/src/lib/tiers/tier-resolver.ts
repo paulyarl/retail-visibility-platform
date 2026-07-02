@@ -27,7 +27,7 @@ export interface TierLimits {
 export interface TierInfo {
   id: string;
   name: string;
-  level: 'google_only' |'starter' |'discovery' | 'storefront' | 'commitment' | 'omnichannel' | 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+  level: 'google_only' |'starter' |'discovery' | 'storefront' | 'commitment' | 'ecommerce' | 'omnichannel' | 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
@@ -67,6 +67,7 @@ export function resolveTier(
       case 'discovery': return 'discovery';
       case 'storefront': return 'storefront';
       case 'commitment': return 'commitment';
+      case 'ecommerce': return 'ecommerce';
       case 'omnichannel': return 'omnichannel';
       case 'professional': return 'professional';
       case 'enterprise': return 'enterprise';
@@ -202,7 +203,7 @@ function getHigherTierLevel(
   level1: TierInfo['level'],
   level2: TierInfo['level']
 ): TierInfo['level'] {
-  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'omnichannel', 'professional', 'enterprise', 'custom'];
+  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise', 'custom'];
   const index1 = hierarchy.indexOf(level1);
   const index2 = hierarchy.indexOf(level2);
   return index1 > index2 ? level1 : level2;
@@ -212,7 +213,7 @@ function getHigherTierLevel(
  * Gets available upgrade options for a tier level
  */
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
-  const allTiers: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'omnichannel', 'professional', 'enterprise'];
+  const allTiers: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'];
   const currentIndex = allTiers.indexOf(currentLevel);
   return allTiers.slice(currentIndex + 1);
 }

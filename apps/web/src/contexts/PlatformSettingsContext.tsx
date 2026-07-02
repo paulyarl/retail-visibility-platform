@@ -92,8 +92,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
   };
 
   useEffect(() => {
+    if (authLoading) return;
     fetchSettings();
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   if (authLoading) {
     return null;

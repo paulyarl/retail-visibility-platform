@@ -11,6 +11,7 @@ const CAPABILITIES = [
   "let an AI chatbot sell your products",
   "track product sales with real-time analytics",
   "make every product compete with the giants",
+  "turn your shelves into a digital storefront",
 ];
 
 const BASE_TEXT = "Make every product visible —";

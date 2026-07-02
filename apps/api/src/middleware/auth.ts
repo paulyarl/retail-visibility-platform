@@ -260,14 +260,6 @@ export function requirePlatformUser(req: Request, res: Response, next: NextFunct
  * Uses centralized helper for consistent platform role checking
  */
 export async function checkTenantAccess(req: Request, res: Response, next: NextFunction) {
-  console.log('[checkTenantAccess] called', {
-    url: req.originalUrl,
-    params: req.params,
-    query: req.query,
-    headers: { 'x-tenant-id': req.headers['x-tenant-id'] },
-    user: req.user ? { id: req.user.id, role: req.user.role, tenantIds: req.user.tenantIds } : null,
-    isPlatformUser: req.user ? isPlatformUser(req.user) : null,
-  });
   if (!req.user) {
     return res.status(401).json({ error: 'authentication_required', message: 'Not authenticated' });
   }
@@ -279,7 +271,6 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
 
   // Platform users (admin, support, viewer) have access to all tenants
   if (isPlatformUser(req.user)) {
-    console.log('[checkTenantAccess] platform user bypass');
     return next();
   }
 
@@ -432,15 +423,6 @@ export function getTenantId(req: Request): string | null {
     (req.user?.tenantIds && req.user.tenantIds[0]) ||
     null
   );
-  console.log('[DEBUG getTenantId]', {
-    params: req.params,
-    query: req.query,
-    bodyTenantId: req.body?.tenantId,
-    headerTenantId: req.headers['x-tenant-id'],
-    userTenantIds: req.user?.tenantIds,
-    resolved: tenantId,
-    url: req.originalUrl,
-  });
   return tenantId;
 }
 

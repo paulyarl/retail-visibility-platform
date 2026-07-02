@@ -38,8 +38,11 @@ function getTenantId(req: express.Request): string {
   return req.params.tenantId as string;
 }
 
-// All routes require auth + tenant access + feature flag
+// All supplier routes require auth + tenant access + feature flag.
+// Scope the middleware to '/suppliers' so this router (mounted at /api/tenants/:tenantId)
+// does not intercept unrelated /api/tenants/:tenantId/* requests like /faqs, /faq-options, /bot/*.
 router.use(
+  '/suppliers',
   authenticateToken,
   checkTenantAccess,
   requireFlag({ flag: 'FF_SUPPLIER_CATALOG_IMPORT', scope: 'tenant', tenantParam: 'tenantId' }),

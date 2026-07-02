@@ -10,7 +10,7 @@ import { generateItemId, generateTenantItemId,generateOrganizationId, generatePh
 import { propagateVariants } from '../utils/variant-propagation';
 import { ensureGlobalCatalogEntry, hasGlobalCatalogEntry } from '../utils/global-catalog-sync';
 import { authenticateToken } from '../middleware/auth';
-import { requireOrgAdmin } from '../middleware/permissions';
+import { requireOrgAdmin, getUserTenantRole } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
 import ProductTypeService from '../services/ProductTypeService';
@@ -661,6 +661,231 @@ router.delete('/:id/tenants/:tenantId', requirePlatformAdmin, async (req, res) =
     res.json(tenant);
   } catch (error: any) {
     console.error('[Organizations] Remove tenant error:', error);
+    res.status(500).json({ error: 'failed_to_remove_tenant' });
+  }
+});
+
+// GET /organizations/:id/available-tenants - List tenants the user owns/admins that are NOT in any organization
+// Permission: Org admin or platform admin
+router.get('/:id/available-tenants', authenticateToken, requireOrgAdmin, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const userId = user.userId || user.user_id;
+    const isPlatformAdminUser = isPlatformAdmin(user);
+
+    let whereClause: any;
+
+    if (isPlatformAdminUser) {
+      whereClause = {
+        organization_id: null,
+      };
+    } else {
+      whereClause = {
+        organization_id: null,
+        user_tenants: {
+          some: {
+            user_id: userId,
+            role: { in: [user_tenant_role.OWNER, user_tenant_role.ADMIN] },
+          },
+        },
+      };
+    }
+
+    const availableTenants = await prisma.tenants.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        subscription_tier: true,
+        subscription_status: true,
+        created_at: true,
+        _count: {
+          select: {
+            inventory_items: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    res.json(availableTenants);
+  } catch (error: any) {
+    console.error('[Organizations] Available tenants error:', error);
+    res.status(500).json({ error: 'failed_to_fetch_available_tenants' });
+  }
+});
+
+// POST /organizations/:id/tenants/self - Self-service add tenant to organization
+// Permission: Org admin + must be owner/admin of the tenant being added
+const selfAddTenantSchema = z.object({
+  tenantId: z.string().min(1),
+});
+
+router.post('/:id/tenants/self', authenticateToken, requireOrgAdmin, async (req, res) => {
+  try {
+    const parsed = selfAddTenantSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const user = (req as any).user;
+    const userId = user.userId || user.user_id;
+    const { tenantId } = parsed.data;
+
+    // 1. Verify the user is owner/admin of the tenant being added
+    if (!isPlatformAdmin(user)) {
+      const tenantRole = await getUserTenantRole(userId, tenantId);
+      if (!tenantRole || (tenantRole !== user_tenant_role.OWNER && tenantRole !== user_tenant_role.ADMIN)) {
+        return res.status(403).json({
+          error: 'tenant_ownership_required',
+          message: 'You must be an owner or admin of this location to add it to an organization',
+        });
+      }
+    }
+
+    // 2. Check the tenant isn't already in another organization
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, organization_id: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found', message: 'Location not found' });
+    }
+
+    if (tenant.organization_id && tenant.organization_id !== req.params.id) {
+      return res.status(409).json({
+        error: 'tenant_already_in_org',
+        message: 'This location is already part of another organization',
+      });
+    }
+
+    if (tenant.organization_id === req.params.id) {
+      return res.status(409).json({
+        error: 'tenant_already_in_this_org',
+        message: 'This location is already in this organization',
+      });
+    }
+
+    // 3. Check organization max_locations limit
+    const organization = await prisma.organizations_list.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        max_locations: true,
+        _count: { select: { tenants: true } },
+      },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found' });
+    }
+
+    if (organization._count.tenants >= organization.max_locations) {
+      return res.status(400).json({
+        error: 'max_locations_reached',
+        message: `This organization has reached its maximum of ${organization.max_locations} locations`,
+        maxLocations: organization.max_locations,
+        currentLocations: organization._count.tenants,
+      });
+    }
+
+    // 4. Add tenant to organization
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        organizations_list: {
+          connect: { id: req.params.id },
+        },
+      },
+    });
+
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      message: `Successfully added "${tenant.name}" to "${organization.name}"`,
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Self-service add tenant error:', error);
+    res.status(500).json({ error: 'failed_to_add_tenant' });
+  }
+});
+
+// DELETE /organizations/:id/tenants/:tenantId/self - Self-service remove tenant from organization
+// Permission: Org admin + must be owner/admin of the tenant being removed
+router.delete('/:id/tenants/:tenantId/self', authenticateToken, requireOrgAdmin, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const userId = user.userId || user.user_id;
+    const { tenantId } = req.params;
+
+    // 1. Verify the user is owner/admin of the tenant being removed
+    if (!isPlatformAdmin(user)) {
+      const tenantRole = await getUserTenantRole(userId, tenantId);
+      if (!tenantRole || (tenantRole !== user_tenant_role.OWNER && tenantRole !== user_tenant_role.ADMIN)) {
+        return res.status(403).json({
+          error: 'tenant_ownership_required',
+          message: 'You must be an owner or admin of this location to remove it from an organization',
+        });
+      }
+    }
+
+    // 2. Verify tenant is in this organization
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, organization_id: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found', message: 'Location not found' });
+    }
+
+    if (tenant.organization_id !== req.params.id) {
+      return res.status(400).json({
+        error: 'tenant_not_in_org',
+        message: 'This location is not part of this organization',
+      });
+    }
+
+    // 3. Check if this is the hero location (don't allow removing hero)
+    const tenantWithMetadata = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { metadata: true },
+    });
+
+    if (tenantWithMetadata?.metadata && (tenantWithMetadata.metadata as any).isHeroLocation) {
+      return res.status(400).json({
+        error: 'cannot_remove_hero_location',
+        message: 'Cannot remove the hero (primary) location. Set another location as hero first.',
+      });
+    }
+
+    // 4. Check if this is the last tenant (don't allow removing the last one)
+    const orgTenantCount = await prisma.tenants.count({
+      where: { organization_id: req.params.id },
+    });
+
+    if (orgTenantCount <= 1) {
+      return res.status(400).json({
+        error: 'cannot_remove_last_location',
+        message: 'Cannot remove the last location from an organization',
+      });
+    }
+
+    // 5. Remove tenant from organization
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: { organization_id: null },
+    });
+
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      message: `Successfully removed "${tenant.name}" from the organization`,
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Self-service remove tenant error:', error);
     res.status(500).json({ error: 'failed_to_remove_tenant' });
   }
 });

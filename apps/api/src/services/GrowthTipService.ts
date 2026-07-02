@@ -139,7 +139,7 @@ function hasIntegrations(ctx: TipContext): boolean {
 
 const TIER_ORDER: string[] = [
   'google_only', 'starter', 'discovery', 'storefront', 'commitment',
-  'omnichannel', 'professional', 'enterprise',
+  'ecommerce', 'omnichannel', 'professional', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
 
@@ -160,8 +160,12 @@ function isCommitment(key: string): boolean {
   return key === 'commitment';
 }
 
+function isEcommerce(key: string): boolean {
+  return key === 'ecommerce';
+}
+
 function isEcommerceOrAbove(key: string): boolean {
-  return tierIndex(key) >= tierIndex('omnichannel');
+  return tierIndex(key) >= tierIndex('ecommerce');
 }
 
 function isEnterprise(key: string): boolean {
@@ -174,7 +178,8 @@ function nextTierName(key: string): string | null {
     starter: 'Storefront',
     discovery: 'Storefront',
     storefront: 'Commitment',
-    commitment: 'Omnichannel',
+    commitment: 'E-commerce',
+    ecommerce: 'Omnichannel',
     omnichannel: 'Enterprise',
     professional: 'Enterprise',
   };
@@ -469,6 +474,7 @@ const TIPS: TipDefinition[] = [
     body: (ctx) => {
       const next = nextTierName(ctx.tierKey);
       if (next === 'Commitment') return 'Shoppers are browsing your store — but can\'t act on it. Add deposit checkout to capture intent and drive foot traffic to your physical store.';
+      if (next === 'E-commerce') return 'Shoppers are browsing your store — but can\'t act on it. Add full online checkout to start selling to shoppers who want to buy completely online.';
       if (next === 'Omnichannel') return 'You\'re successfully using deposit commerce. Now add full online payment and delivery to sell to shoppers who want to buy completely online.';
       return 'Shoppers are browsing — now give them a way to buy. Upgrade to start converting browsers into customers.';
     },
@@ -497,6 +503,29 @@ const TIPS: TipDefinition[] = [
     gradient: 'from-cyan-500 to-blue-600',
     condition: (ctx) => !ctx.businessState.hasFAQs && hasFAQ(ctx) && !isDiscoveryOrBelow(ctx.tierKey),
     score: () => 60,
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // TIER-SPECIFIC: E-commerce (Tier 4) — "Sell Online — Fully & Simply"
+  // ═══════════════════════════════════════════════════════
+
+  {
+    id: 'ecommerce-to-omnichannel',
+    category: 'upgrade',
+    priority: 'high',
+    title: 'Add physical pickup options with Omnichannel',
+    body: 'You\'re selling online successfully — now add deposit/pickup options for local customers. Upgrade to Omnichannel to offer both full payment with delivery AND deposit with in-store pickup.',
+    cta: 'Explore Omnichannel',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/subscription`,
+    icon: 'ArrowUpCircle',
+    gradient: 'from-violet-600 to-purple-700',
+    condition: (ctx) => isEcommerce(ctx.tierKey) && ctx.businessState.ordersCount > 0,
+    score: (ctx) => {
+      let s = 80;
+      if (ctx.businessState.ordersCount > 5) s += 15;
+      if (ctx.businessState.ordersCount > 20) s += 10;
+      return s;
+    },
   },
 
   // ═══════════════════════════════════════════════════════

@@ -349,6 +349,7 @@ function buildTenantNav(
         { label: 'Digital Downloads', href: `/t/${currentTenantId}/settings/digital-downloads` },
         { label: 'Onboarding', href: `/t/${currentTenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
         { label: 'Organization Dashboard', href: `/t/${currentTenantId}/settings/organization`, requiredOrgAdmin: true },
+        { label: 'Manage Locations', href: `/t/${currentTenantId}/settings/organization/locations`, requiredOrgAdmin: true },
         { label: 'Org Team', href: `/t/${currentTenantId}/settings/organization/users`, requiredOrgAdmin: true },
         { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation`, requiredOrgAdmin: true },
         { label: 'Propagation Center', href: `/t/${currentTenantId}/propagation`, requiredOrgAdmin: true },
