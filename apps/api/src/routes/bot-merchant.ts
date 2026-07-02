@@ -37,8 +37,22 @@ import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityRes
 
 const router = Router({ mergeParams: true });
 
+console.log('[BOT MODULE] loaded from source');
+
 // Fallback: populate tenantId from X-Tenant-ID header when mergeParams doesn't propagate
 router.use((req: any, _res: any, next: any) => {
+  console.log('[BOT ROUTER ENTERED]', {
+    url: req.originalUrl,
+    params: req.params,
+    query: req.query,
+    body: req.body,
+    headers: {
+      'x-tenant-id': req.headers['x-tenant-id'],
+      'x-auth0-id': req.headers['x-auth0-id'],
+      'x-auth0-email': req.headers['x-auth0-email'],
+    },
+    user: req.user ? { id: req.user.id, role: req.user.role, tenantIds: req.user.tenantIds } : null,
+  });
   if (!req.params.tenantId && req.headers['x-tenant-id']) {
     req.params.tenantId = req.headers['x-tenant-id'];
   }

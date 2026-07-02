@@ -27,7 +27,11 @@ import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
 import SupplierImportService from '../../services/SupplierImportService';
 
-const router = express.Router();
+// mergeParams: true is required because this router is mounted at /api/tenants/:tenantId
+// and its global middleware (checkTenantAccess, requireFlag) needs req.params.tenantId.
+// Without it, the router intercepts all /api/tenants/:tenantId/* requests and fails
+// with tenantId_required before the intended FAQ/bot/faq-options routers are reached.
+const router = express.Router({ mergeParams: true });
 
 // Helper to safely extract tenantId from route params
 function getTenantId(req: express.Request): string {
