@@ -8,7 +8,7 @@ import {
   useDeleteCustomBadge,
 } from '@/hooks/useBadgeRegistry';
 import { BadgeTypeMeta } from '@/services/BadgeRegistryService';
-import { Tag, Plus, Pencil, Trash2, X, AlertCircle, Check, BarChart3, Sparkles } from 'lucide-react';
+import { Tag, Plus, Pencil, Trash2, X, AlertCircle, Check, BarChart3, Sparkles, ShoppingBag, ArrowUpCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface CustomBadgeManagerClientProps {
@@ -145,11 +145,29 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
       <div className="max-w-2xl mx-auto py-8">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="space-y-3">
             <h2 className="text-sm font-semibold text-amber-900">Custom Badges Not Available</h2>
-            <p className="text-sm text-amber-700 mt-1">
-              Your current plan does not include custom badge slots. Upgrade to the Professional tier
-              or higher to create custom badges for your products.
+            <p className="text-sm text-amber-700">
+              Your current plan does not include custom badge slots. You can get this feature in two ways:
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
+              <Link
+                href={`/t/${tenantId}/settings/feature-store`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 transition-colors"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                Purchase from Feature Store
+              </Link>
+              <Link
+                href={`/t/${tenantId}/settings/billing`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-md hover:bg-amber-50 transition-colors"
+              >
+                <ArrowUpCircle className="w-4 h-4" />
+                Upgrade Your Plan
+              </Link>
+            </div>
+            <p className="text-xs text-amber-600 pt-1">
+              Custom badge slots are included in Professional and higher tiers, or available as a monthly add-on.
             </p>
           </div>
         </div>

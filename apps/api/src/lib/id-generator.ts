@@ -1318,3 +1318,23 @@ export function generatePlacementCatalogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `fpc-${nanoid()}`;
 }
+
+/**
+ * Generate tenant-scoped promotion purchase ID
+ * Format: prom-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePromotionPurchaseId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `prom-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate promotion catalog ID (global, not tenant-scoped)
+ * Format: promcat-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generatePromotionCatalogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `promcat-${nanoid()}`;
+}

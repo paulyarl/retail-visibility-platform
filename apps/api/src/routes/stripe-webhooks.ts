@@ -182,6 +182,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     await handleFeaturedPlacementCheckout(session);
     return;
   }
+  if (metadataType === 'directory_promotion' || metadataType === 'directory_promotion_renewal') {
+    await handleDirectoryPromotionCheckout(session);
+    return;
+  }
 
   const tenantId = session.metadata?.tenantId || session.client_reference_id;
 
@@ -230,6 +234,30 @@ async function handleFeaturedPlacementCheckout(session: Stripe.Checkout.Session)
     console.log(`[Stripe Webhooks] Featured placement ${purchaseId} activated`);
   } catch (error) {
     console.error(`[Stripe Webhooks] Failed to activate featured placement ${purchaseId}:`, error);
+  }
+}
+
+/**
+ * Handle directory promotion checkout completion
+ * Activates the promotion purchase and updates directory_listings_list
+ */
+async function handleDirectoryPromotionCheckout(session: Stripe.Checkout.Session) {
+  console.log('[Stripe Webhooks] Processing directory promotion checkout:', session.id);
+
+  const purchaseId = session.metadata?.purchaseId;
+  if (!purchaseId) {
+    console.error('[Stripe Webhooks] No purchaseId in directory promotion session metadata');
+    return;
+  }
+
+  const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : undefined;
+
+  try {
+    const { default: DirectoryPromotionService } = await import('../services/DirectoryPromotionService');
+    await DirectoryPromotionService.getInstance().activatePurchase(purchaseId, paymentIntentId);
+    console.log(`[Stripe Webhooks] Directory promotion ${purchaseId} activated`);
+  } catch (error) {
+    console.error(`[Stripe Webhooks] Failed to activate directory promotion ${purchaseId}:`, error);
   }
 }
 

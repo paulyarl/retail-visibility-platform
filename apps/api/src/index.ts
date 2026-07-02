@@ -8209,6 +8209,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start featured placement renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start directory promotion renewal job (daily) — auto-renew, grace period, expiration
+      try {
+        const { startPromotionRenewalJob } = await import('./jobs/promotion-renewal');
+        startPromotionRenewalJob();
+        logger.info('Directory promotion renewal job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start directory promotion renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start bot product embedding sync (every 12 hours) — gated by platform settings
       try {
         const settings = await prisma.platform_settings_list.findFirst();

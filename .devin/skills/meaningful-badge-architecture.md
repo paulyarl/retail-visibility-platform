@@ -133,3 +133,40 @@ The Meaningful Badge system replaces hardcoded `featured_type` arrays with a dat
 - `CapabilityConstraintService.ts` — same cache + DB-driven + static fallback pattern
 - `capability_features_list` — same registry pattern for capability definitions
 - `navigation_links` table — same data-driven vs hardcoded evolution
+
+## Platform Visibility System Hierarchy
+
+The platform has three layers of visibility boosting, each operating at a different scope:
+
+### 1. Directory Promotion (Store-Level)
+- **Scope**: The entire store listing in the public directory/map
+- **Route**: `/t/[tenantId]/settings/promotion`
+- **Backend**: `apps/api/src/routes/promotion.ts` — GET/POST `/api/tenants/:tenantId/promotion/*`
+- **Table**: `directory_listings_list` columns: `is_promoted`, `promotion_tier` (basic/premium/featured), `promotion_started_at`, `promotion_expires_at`, `promotion_impressions`, `promotion_clicks`
+- **Migration**: `078_directory_promotion_columns.sql`
+- **Frontend service**: `TenantInfoService.getPromotionStatus/enablePromotion/disablePromotion`
+- **Effect**: Gold map marker, promoted badge on directory listing, higher search result ranking, homepage carousel spot (tier-dependent)
+- **Status**: SCAFFOLD — DB columns + API endpoints exist but no payment, no feature delivery, no lifecycle automation. Route mounted via `dashboard-routes.ts`. Free enable/disable (no Stripe). `DirectoryMap.tsx` has promoted-marker rendering but no API passes promotion data to it. Settings card in "Featured Products" group. Sidebar link under "My Inventory". See `docs/DIRECTORY_PROMOTION_SPRINT_PLAN.md` for full production implementation plan.
+
+### 2. Featured Store / Featured Placements (Product-Level, Paid)
+- **Scope**: Individual products get premium placement on storefront and directory
+- **Route**: `/t/[tenantId]/settings/featured-store`
+- **Backend**: `FeaturedPlacementService.ts` — purchase 7/14/30-day placements with Stripe checkout
+- **Table**: `featured_placement_purchases` + `featured_products` (with `assignment_source='purchase'`)
+- **Effect**: Product appears in featured sections, spotlight layouts, cross-tenant surfacing
+- **Lifecycle**: Auto-renewal via `featured-placement-renewal.ts` job, 7-day grace period on failure
+
+### 3. Badge System (Product-Level, Semantic)
+- **Scope**: Individual products get badges that signal attributes (sale, new_arrival, clearance, etc.)
+- **Route**: `/t/[tenantId]/settings/products/badges`
+- **Backend**: `BadgeRegistryService.ts`, `BadgeRuleEngine.ts`, `BadgeAnalyticsService.ts`
+- **Tables**: `featured_type_registry` (definitions), `featured_products` (assignments), `badge_analytics` + `badge_events` (metrics)
+- **Effect**: Badges appear on product cards, power filtering/sorting, bot NL queries, GMC custom labels, recommendation boosting
+- **Analytics**: CTR, conversion rate, revenue lift per badge
+
+### How They Compose
+- A store with **Directory Promotion** (tier=featured) gets top-3 placement in directory search
+- Products with **Featured Placements** get spotlight real estate on that store's storefront
+- Products with **Badges** get filtered/sorted within all discovery surfaces
+- All three are independent — a product can have badges without a paid placement, and a store can be promoted without any featured product placements
+- The "Featured Products" settings group surfaces all three side-by-side for the merchant

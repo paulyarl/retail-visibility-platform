@@ -333,15 +333,29 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
 
         {/* Locations Tab */}
         {activeTab === "locations" && isTabAllowed("locations") && (
-          <OrgLocationTable
-            locations={orgData.locationBreakdown}
-            heroLocation={heroLocation}
-            maxTotalSKUs={orgData.limits.maxTotalSKUs}
-            currentPage={currentPage}
-            locationsPerPage={5}
-            onPageChange={setCurrentPage}
-            productMix={productMixData}
-          />
+          <div className="space-y-4">
+            {!readOnly && tenantId && (
+              <div className="flex justify-end">
+                <Button
+                  leftSection={<MapPin size={16} />}
+                  variant="filled"
+                  color="blue"
+                  onClick={() => router.push(`/t/${tenantId}/settings/organization/locations`)}
+                >
+                  Manage Locations
+                </Button>
+              </div>
+            )}
+            <OrgLocationTable
+              locations={orgData.locationBreakdown}
+              heroLocation={heroLocation}
+              maxTotalSKUs={orgData.limits.maxTotalSKUs}
+              currentPage={currentPage}
+              locationsPerPage={5}
+              onPageChange={setCurrentPage}
+              productMix={productMixData}
+            />
+          </div>
         )}
 
         {/* Propagation Tab */}

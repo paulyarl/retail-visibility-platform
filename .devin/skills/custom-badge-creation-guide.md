@@ -6,9 +6,15 @@ Merchants can create custom badges to highlight products in their storefront bey
 
 ## Access Requirements
 
-- **Tier gate**: Custom badges require the `featured_custom_badge_slots` capability, available on the Professional tier or higher. Flexible tier includes all features.
-- **Slot limit**: Maximum 10 custom badges per tenant.
-- **Access check**: If your tier doesn't include custom badges, the UI shows an upgrade prompt instead of the badge manager.
+Custom badges require the `featured_custom_badge_slots` capability (under the `featured_options` capability type). This feature can be enabled through **any** of the following paths — the platform's capability architecture is flexible and not hardcoded to specific tiers:
+
+- **Tier-bundled**: Included in Professional, Enterprise, Organization, Chain Professional, and Chain Enterprise tiers (plus trial mirrors). Flexible tier includes all features.
+- **BSaaS purchase**: Available as a monthly add-on in the Feature Store (`/t/[tenantId]/settings/feature-store`) for tenants on any tier. Includes a 14-day free trial. The `EffectiveCapabilityResolver` auto-merges active purchases into the tenant's capability set.
+- **Admin grant**: Platform admins can assign the `featured_custom_badge_slots` feature to any tier via the capability admin UI, or grant it directly to a tenant via `POST /api/admin/feature-purchases` (source `admin_grant`, price 0).
+
+**Slot limit**: Maximum 10 custom badges per tenant.
+
+**Access check**: The backend returns `hasAccess: boolean` from `GET /api/tenants/:tenantId/badge-registry/custom`. If `false`, the UI shows options to purchase from the Feature Store or upgrade the plan.
 
 ## Where to Find It
 
@@ -92,16 +98,31 @@ Custom badges with declarative rules (auto-assign/auto-remove JSONB) are evaluat
 | `useUpdateCustomBadge(tenantId)` | Update mutation |
 | `useDeleteCustomBadge(tenantId)` | Delete mutation |
 
+## Capability Architecture
+
+Custom badge slots use the platform's standard capability architecture. The feature is **source-agnostic** — the `EffectiveCapabilityResolver` merges features from three sources (org-tier, tenant-tier, BSaaS purchases) into a single `mergedFeatures` map. Downstream services only check "is this feature enabled?" without caring how it was enabled.
+
+- **Feature key**: `featured_custom_badge_slots` (in `features_list`)
+- **Capability type**: `featured_options` (linked via `capability_features_list`)
+- **Tier seeding**: Migration `062_custom_badge_slots_capability.sql` seeds the feature for Professional+ tiers
+- **BSaaS catalog**: Migration `080_bsaas_custom_badge_slots.sql` adds it to `bsaas_catalog` for à la carte purchase
+- **Resolver**: `FeaturedOptionsService.resolveFeaturedOptionsState()` checks `flexible || !!features.featured_custom_badge_slots`
+- **Admin override**: Admins can grant via `POST /api/admin/feature-purchases` with `source: 'admin_grant'`
+
+See `.devin/skills/bsaas-purchase-flow.md` and `.devin/skills/add-bsaas-feature.md` for the full BSaaS architecture.
+
 ## Key Files
 
 | File | Role |
 |------|------|
 | `apps/api/src/routes/badge-registry.ts` | CRUD endpoints for custom badges |
 | `apps/api/src/services/BadgeRegistryService.ts` | `createTenantBadge`, `updateTenantBadge`, `deleteTenantBadge`, `getTenantCustomBadges`, `countTenantCustomBadges` |
-| `apps/api/src/services/FeaturedOptionsService.ts` | Tier gate via `customBadgeSlotsEnabled` |
+| `apps/api/src/services/FeaturedOptionsService.ts` | Capability gate via `customBadgeSlotsEnabled` |
 | `apps/web/src/hooks/useBadgeRegistry.ts` | React Query hooks for CRUD operations |
-| `apps/web/src/app/t/[tenantId]/settings/products/badges/CustomBadgeManagerClient.tsx` | Badge manager UI |
+| `apps/web/src/app/t/[tenantId]/settings/products/badges/CustomBadgeManagerClient.tsx` | Badge manager UI (shows Feature Store + upgrade options when access denied) |
 | `apps/web/src/services/BadgeRegistryService.ts` | Frontend service with badge metadata + color classes |
+| `database/migrations/062_custom_badge_slots_capability.sql` | Seeds feature in `features_list` + tier features for Professional+ |
+| `database/migrations/080_bsaas_custom_badge_slots.sql` | Adds feature to `bsaas_catalog` for à la carte purchase |
 
 ## Tips
 
