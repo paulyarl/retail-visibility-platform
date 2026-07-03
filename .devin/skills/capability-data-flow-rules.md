@@ -394,6 +394,22 @@ Constraints are declared as data (source target, target target, type, severity),
 ### R22: Write-Time Validation Mirrors Read-Time Evaluation
 PUT handlers in settings routes MUST use `validateProposedChange()` from `CapabilityConstraintResolver.ts` to validate settings changes before persisting. The function is **async** — it loads constraints from the DB via `getActiveConstraints()`. The evaluation logic is identical to read-time — the only difference is the input (simulated effective state vs. current effective state).
 
+### R23: Subscription-Status Override Must Include Every Write-Capable Domain
+`EffectiveCapabilityResolver.ts` Step 6 applies a subscription-status override after all resolvers run. When `internalStatus` is `frozen`, `canceled`, or `expired` (`isReadOnly`), it sets `enabled = false` on write-heavy capabilities. When `internalStatus` is `maintenance` or `past_due` (`isLimited`), it disables a subset.
+
+**When adding a new capability domain, it MUST be added to the appropriate override block**:
+- **`isReadOnly` block** (frozen/canceled/expired): Add `result.effective.<domain>.enabled = false` if the capability involves writes, purchases, or active operations. Read-only display capabilities (storefront, CRM, FAQ, featured, directory entry, storefront options, product options, org options) are intentionally left `enabled = true` so the UI shows them in read-only mode.
+- **`isLimited` block** (maintenance/past_due): Add `result.effective.<domain>.enabled = false` if the capability involves creating new entities or purchases. Maintenance mode allows editing existing content but not growth actions.
+
+**Common pitfall**: Resolvers that fail-open (e.g., `DirectoryPromotionResolver` returns `enabled = true` when no tier config exists) will bypass tier gating for tiers like `expired_trial` that have minimal features. The Step 6 override is the safety net — if a new capability is missing from the override, it will appear enabled for frozen/canceled tenants.
+
+**Also update `buildExpiredCapabilitiesResponse`** in `tenant-capabilities.ts` with a fully-disabled entry for the new domain (see R13).
+
+### R24: Frontend Status Derivation Must Match Backend
+The frontend `deriveInternalStatus()` in `apps/web/src/lib/subscription-status.ts` MUST mirror the backend logic in `apps/api/src/utils/subscription-status.ts`. When the backend adds a new tier-to-status mapping (e.g., `expired_trial` → `frozen`), the frontend must be updated in lockstep.
+
+**Prefer backend-provided status**: Components that receive `AllCapabilitiesState` (from the effective-capabilities endpoint) SHOULD use `capabilities.subscriptionContext.internalStatus` as the primary source, with `deriveInternalStatus()` as a fallback for when capabilities data is not yet loaded. This avoids drift between backend and frontend derivation logic.
+
 **Pattern** (see `storefront-type-settings.ts` and `product-type-settings.ts`):
 ```ts
 // 1. Resolve current effective capabilities

@@ -276,6 +276,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.fulfillment.enabled = false;
     result.effective.integrations.enabled = false;
     result.effective.payment_gateway.enabled = false;
+    result.effective.directory_promotion.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -288,6 +289,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.quickstart.enabled = false;
     result.effective.featured.enabled = false;
     result.effective.chatbot.enabled = false;
+    result.effective.directory_promotion.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance

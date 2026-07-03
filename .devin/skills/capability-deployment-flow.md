@@ -487,6 +487,9 @@ When deploying a capability change, verify ALL of these:
 - [ ] Expired/inactive tenant returns 200 with disabled capabilities (not 404) — see R13 in `capability-data-flow-rules.md`
 - [ ] `buildExpiredCapabilitiesResponse` includes the new capability domain with all fields disabled
 - [ ] `buildExpiredCapabilitiesResponse` includes `constraint_violations: []` and `constraint_status: {}`
+- [ ] **Subscription-status override** (`EffectiveCapabilityResolver.ts` Step 6): If the capability involves writes, purchases, or active operations, add `result.effective.<domain>.enabled = false` to the `isReadOnly` block. If it involves creating new entities, also add to `isLimited` block. See R23 in `capability-data-flow-rules.md`
+- [ ] **Frontend `deriveInternalStatus` sync**: If the backend `deriveInternalStatus` has a tier-to-status mapping the frontend lacks, add it to `apps/web/src/lib/subscription-status.ts`. See R24 in `capability-data-flow-rules.md`
+- [ ] **Frontend status display prefers backend**: Components displaying subscription status (e.g., `SubscriptionDisplayCard`) should use `capabilities.subscriptionContext.internalStatus` when available, falling back to `deriveInternalStatus()`. See R24
 - [ ] If adding a cross-capability constraint: insert into `capability_constraints_list` DB table + add static fallback in `CapabilityConstraintRegistry.ts` (R20)
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors

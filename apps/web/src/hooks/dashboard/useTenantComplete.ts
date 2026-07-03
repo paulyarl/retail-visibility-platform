@@ -148,11 +148,20 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   const queryClient = useQueryClient();
 
   // Seed React Query cache with server-resolved tenant info before the query fires
+  // IMPORTANT: The queryFn returns getCompleteTenantInfo() which wraps the tenant
+  // inside { tenant: ..., businessProfile: ..., ... }. The server-resolved tenantInfo
+  // is the raw tenant object, so we must wrap it in the same shape to avoid a shape
+  // mismatch that would cause rawProfile extraction to fail and tenant to be null.
   const hasSeededRef = React.useRef(false);
   useEffect(() => {
     if (serverTenant?.tenantInfo && tenantId && !hasSeededRef.current) {
       hasSeededRef.current = true;
-      queryClient.setQueryData(['tenant', 'info', tenantId], serverTenant.tenantInfo);
+      queryClient.setQueryData(['tenant', 'info', tenantId], {
+        tenant: serverTenant.tenantInfo,
+        businessProfile: null,
+        businessHours: null,
+        paymentGateways: [],
+      });
     }
   }, [serverTenant, tenantId, queryClient]);
 
@@ -272,7 +281,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
 
   // Build tenant from primary query
   // The API returns data.profile (not data.tenant) from /complete endpoint
-  const rawProfile = (tenantData as any)?.profile || tenantData?.tenant;
+  // Fallback to tenantData itself if it looks like a raw tenant object (has id but no .tenant/.profile)
+  const rawProfile = (tenantData as any)?.profile || tenantData?.tenant || ((tenantData as any)?.id && !(tenantData as any)?.tenant && !(tenantData as any)?.businessProfile ? (tenantData as any) : null);
   const businessProfile = tenantData?.businessProfile;
   
   const tenant = useMemo(() => rawProfile ? {

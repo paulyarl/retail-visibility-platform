@@ -41,17 +41,22 @@ export function deriveInternalStatus(tenant: {
   const status = tenant.subscriptionStatus || 'active';
   const tier = tenant.subscriptionTier || 'starter';
 
-  // 1. Check for explicit canceled status
+  // 1. Check for expired_trial tier (frozen, read-only)
+  if (tier === 'expired_trial') {
+    return 'frozen';
+  }
+
+  // 2. Check for explicit canceled status
   if (status === 'canceled') {
     return 'canceled';
   }
 
-  // 2. Check for past_due status (payment failed, grace period)
+  // 3. Check for past_due status (payment failed, grace period)
   if (status === 'past_due') {
     return 'past_due';
   }
 
-  // 3. Check for active trial
+  // 4. Check for active trial
   if (status === 'trial') {
     // If trial hasn't expired yet, it's trialing
     if (!tenant.trialEndsAt) {
@@ -65,7 +70,7 @@ export function deriveInternalStatus(tenant: {
     return 'expired';
   }
 
-  // 4. Check for explicit expired status (from auto-downgrade)
+  // 5. Check for explicit expired status (from auto-downgrade)
   if (status === 'expired') {
     // If tier is google_only, check maintenance window
     if (tier === 'google_only' || tier === 'discovery') {
@@ -84,7 +89,7 @@ export function deriveInternalStatus(tenant: {
     return 'expired';
   }
 
-  // 5. Check for active paid subscription
+  // 6. Check for active paid subscription
   if (status === 'active') {
     // Check if subscription has expired
     if (tenant.subscriptionEndsAt) {
