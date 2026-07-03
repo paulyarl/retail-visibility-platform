@@ -229,6 +229,8 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Manual Billing',     href: '/settings/admin/billing/manual-billing' },
       { label: 'Platform Revenue',   href: '/settings/admin/bsaas-analytics' },
       { label: 'Placement Revenue',  href: '/settings/admin/featured-placement-revenue' },
+      { label: 'Promotion Catalog',  href: '/settings/admin/promotion-catalog' },
+      { label: 'Promotion Revenue',  href: '/settings/admin/promotion-revenue' },
       { label: 'Payment Settings',   href: '/settings/admin/payment' },
     ],
   },
