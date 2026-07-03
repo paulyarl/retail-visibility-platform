@@ -107,13 +107,16 @@ export function SubscriptionDisplayCard({
     trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }
 
-  // Derive internal status from tier data
-  const internalStatus = deriveInternalStatus({
-    subscriptionStatus: tierData.subscriptionStatus,
-    subscriptionTier: tierData.tier,
-    trialEndsAt: tierData.trialEndsAt,
-    subscriptionEndsAt: tierData.subscriptionEndsAt,
-  });
+  // Derive internal status — prefer backend-provided subscriptionContext from
+  // effective-capabilities endpoint, fall back to local derivation
+  const internalStatus: InternalStatus =
+    capabilities?.subscriptionContext?.internalStatus ??
+    deriveInternalStatus({
+      subscriptionStatus: tierData.subscriptionStatus,
+      subscriptionTier: tierData.tier,
+      trialEndsAt: tierData.trialEndsAt,
+      subscriptionEndsAt: tierData.subscriptionEndsAt,
+    });
 
   // Status badge color based on internal status
   const getStatusColor = (status: InternalStatus): 'success' | 'info' | 'warning' | 'error' | 'default' => {
