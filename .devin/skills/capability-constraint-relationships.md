@@ -134,10 +134,11 @@ resolution_hint:   Enable Social Commerce in your plan or select a different sto
 4. Fill in the form:
    - Enter a unique `constraint_id` (snake_case, descriptive)
    - Select `type` and `severity`
-   - Define the **Source** (IF condition): capability key, field, operator, value
-   - Define the **Target** (THEN condition): capability key, field, operator, value
+   - Define the **Source** (IF condition): select capability, field, operator, and value from dropdowns
+   - Define the **Target** (THEN condition): select capability, field, operator, and value from dropdowns
    - Write a clear `message` and `resolution_hint`
    - Set `is_active` to true
+   - Dropdowns are populated from `GET /api/admin/capability-constraints/metadata`, which returns valid capability keys, fields, operators, and values derived from the resolver types in `types.ts`. Fields and operators cascade based on the selected capability. Values with predefined options show as dropdowns; fields without predefined values fall back to free text input.
 5. Click **Create**
 6. The constraint is enforced within 60 seconds (cache TTL) or immediately on cache invalidation
 
@@ -164,7 +165,7 @@ INSERT INTO capability_constraints_list (
 
 | File | Role |
 |---|---|
-| `apps/api/src/routes/admin/capability-constraints.ts` | Admin CRUD API (GET, POST, PUT, DELETE) |
+| `apps/api/src/routes/admin/capability-constraints.ts` | Admin CRUD API (GET, POST, PUT, DELETE) + `GET /metadata` for dropdown options |
 | `apps/api/src/services/resolvers/CapabilityConstraintService.ts` | Loads constraints from DB with 60s cache, falls back to static registry |
 | `apps/api/src/services/resolvers/CapabilityConstraintResolver.ts` | Evaluates constraints against effective capability manifest |
 | `apps/api/src/services/resolvers/CapabilityConstraintRegistry.ts` | Static seed constraints (6 initial rules) |
