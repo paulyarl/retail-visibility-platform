@@ -5,10 +5,10 @@
  * Used by visibility channels (storefront, directory, shops) to display
  * active featured products with fallback behavior.
  *
- * Extends TenantApiSingleton for automatic auth, caching, and cache invalidation.
+ * Extends PublicApiSingleton for public (no-auth) requests with caching.
  */
 
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface ActiveFeaturedProduct {
   id: string;
@@ -41,7 +41,7 @@ export interface ActiveFeaturedResult {
   fallbackUsed: boolean;
 }
 
-class ActiveFeaturedService extends TenantApiSingleton {
+class ActiveFeaturedService extends PublicApiSingleton {
   private static instance: ActiveFeaturedService;
 
   private constructor() {
@@ -53,19 +53,6 @@ class ActiveFeaturedService extends TenantApiSingleton {
       ActiveFeaturedService.instance = new ActiveFeaturedService();
     }
     return ActiveFeaturedService.instance;
-  }
-
-  public getServiceCachePatterns(): string[] {
-    return ['active-featured-tenant-*', 'active-featured-platform-*'];
-  }
-
-  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
-    if (tenantId) {
-      await this.invalidateCache(`active-featured-tenant-${tenantId}*`);
-    } else {
-      // Invalidate all
-      await this.invalidateCache('active-featured-platform*');
-    }
   }
 
   /**
