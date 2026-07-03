@@ -364,14 +364,17 @@ export class AdminCapabilityService extends AdminApiSingleton {
   // ===== Constraints CRUD =====
 
   async getConstraints(): Promise<ConstraintData[]> {
-    const result = await this.makeDefaultRequest<ConstraintData[]>(
+    const result = await this.makeDefaultRequest<ConstraintData[] | { constraints: ConstraintData[] }>(
       '/api/admin/capability-constraints',
       {},
       'admin-constraints-all',
       this.cacheTTL,
     );
     if (!result.success) throw new Error('Failed to fetch constraints');
-    return result.data!;
+    const data = result.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray((data as any).constraints)) return (data as any).constraints;
+    return [];
   }
 
   async createConstraint(data: Omit<ConstraintData, 'id' | 'created_at' | 'updated_at'>): Promise<ConstraintData> {
