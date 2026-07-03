@@ -21,7 +21,7 @@ export function OrgGuard({ tenantId, children, requireAdmin = true }: OrgGuardPr
     );
   }
 
-  const hasAccess = requireAdmin ? isOrgAdmin : isOrgMember;
+  const hasAccess = isPlatformAdmin || (requireAdmin ? isOrgAdmin : isOrgMember);
 
   if (!hasAccess) {
     return (
