@@ -7562,9 +7562,9 @@ app.use('/api', badgeAnalyticsRoutes);
 console.log('✅ Badge analytics routes mounted at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events');
 
 /* ------------------------------ active featured resolver ------------------------------ */
-import activeFeaturedRoutes from './routes/active-featured';
+import activeFeaturedRoutes, { publicTenantRouter as activeFeaturedPublicRouter } from './routes/active-featured';
 app.use('/api', activeFeaturedRoutes);
-app.use('/api/public/tenants/:tenantId', activeFeaturedRoutes.publicTenantRouter);
+app.use('/api/public/tenants/:tenantId', activeFeaturedPublicRouter);
 console.log('✅ Active featured resolver routes mounted at /api/active-featured and /api/public/tenants/:tenantId/active-featured');
 
 /* ------------------------------ featured placement (monetization) ------------------------------ */

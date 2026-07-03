@@ -30,7 +30,7 @@ const publicTenantRouter = express.Router({ mergeParams: true });
  * Tenant-scoped active featured products (public — no auth required).
  * Used by storefronts, product detail, directory entry.
  */
-publicTenantRouter.get('/active-featured', async (req, res) => {
+publicTenantRouter.get('/active-featured', async (req: express.Request<{ tenantId: string }>, res) => {
   try {
     const { tenantId } = req.params;
     const surface = req.query.surface as string;
