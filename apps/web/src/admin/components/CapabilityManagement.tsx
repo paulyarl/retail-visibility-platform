@@ -150,13 +150,13 @@ export default function CapabilityManagement() {
         tenantTierService.getTierSystemFeaturesList().catch(() => []),
         adminCapabilityService.getConstraints().catch(() => []),
       ]);
-      setCapabilities(caps);
-      setFeatures(feats);
-      setCapabilityTypes(capTypes);
-      setTiers(tierList);
-      setLegacyTiers(legacyTiersList);
-      setLegacyFeatures(legacyFeatsList);
-      setConstraints(constraintList);
+      setCapabilities(Array.isArray(caps) ? caps : []);
+      setFeatures(Array.isArray(feats) ? feats : []);
+      setCapabilityTypes(Array.isArray(capTypes) ? capTypes : []);
+      setTiers(Array.isArray(tierList) ? tierList : []);
+      setLegacyTiers(Array.isArray(legacyTiersList) ? legacyTiersList : []);
+      setLegacyFeatures(Array.isArray(legacyFeatsList) ? legacyFeatsList : []);
+      setConstraints(Array.isArray(constraintList) ? constraintList : []);
     } catch (err) {
       console.error('Failed to load capability data:', err);
       setError('Failed to load capability data');
@@ -173,7 +173,7 @@ export default function CapabilityManagement() {
     if (!tierKey) return;
     try {
       const data = await adminCapabilityService.getTierCapabilities(tierKey);
-      setTierCapabilities(data);
+      setTierCapabilities(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load tier capabilities:', err);
       setTierCapabilities([]);

@@ -36,7 +36,7 @@ router.get('/', async (_req, res) => {
     const constraints = await prisma.capability_constraints_list.findMany({
       orderBy: { sort_order: 'asc' },
     });
-    res.json({ success: true, constraints });
+    res.json(constraints);
   } catch (error) {
     console.error('Error fetching capability constraints:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch constraints' });
@@ -52,7 +52,7 @@ router.get('/:id', async (req, res) => {
     if (!constraint) {
       return res.status(404).json({ success: false, error: 'not_found', message: 'Constraint not found' });
     }
-    res.json({ success: true, constraint });
+    res.json(constraint);
   } catch (error) {
     console.error('Error fetching constraint:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch constraint' });
@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
     });
 
     invalidateConstraintCache();
-    res.status(201).json({ success: true, constraint });
+    res.status(201).json(constraint);
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return res.status(409).json({ success: false, error: 'duplicate', message: 'Constraint ID already exists' });
@@ -121,7 +121,7 @@ router.put('/:id', async (req, res) => {
     });
 
     invalidateConstraintCache();
-    res.json({ success: true, constraint });
+    res.json(constraint);
   } catch (error) {
     console.error('Error updating constraint:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update constraint' });
@@ -138,7 +138,7 @@ router.delete('/:id', async (req, res) => {
 
     await prisma.capability_constraints_list.delete({ where: { id: req.params.id } });
     invalidateConstraintCache();
-    res.json({ success: true, message: 'Constraint deleted' });
+    res.json({ message: 'Constraint deleted' });
   } catch (error) {
     console.error('Error deleting constraint:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to delete constraint' });
