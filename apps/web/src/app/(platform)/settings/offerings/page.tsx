@@ -299,7 +299,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔍</span>
                 <h3 className="font-bold text-blue-900 text-base">Discovery</h3>
-                <Badge className="bg-blue-100 text-blue-800 text-xs">$29/mo</Badge>
+                <Badge variant="light" color="blue" size="xs">$29/mo</Badge>
               </div>
               <p className="text-xs text-blue-700 mb-2 italic">"I exist online"</p>
               <p className="text-xs text-blue-600 mb-3">People are finding my products on Google</p>
@@ -343,7 +343,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏪</span>
                 <h3 className="font-bold text-purple-900 text-base">Storefront</h3>
-                <Badge className="bg-purple-100 text-purple-800 text-xs">$59/mo</Badge>
+                <Badge variant="light" color="grape" size="xs">$59/mo</Badge>
               </div>
               <p className="text-xs text-purple-700 mb-2 italic">"I have a store online"</p>
               <p className="text-xs text-purple-600 mb-3">Shoppers are browsing — but can't act on it</p>
@@ -383,7 +383,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🛒</span>
                 <h3 className="font-bold text-green-900 text-base">Commitment</h3>
-                <Badge className="bg-green-100 text-green-800 text-xs">$79/mo</Badge>
+                <Badge variant="light" color="green" size="xs">$79/mo</Badge>
               </div>
               <p className="text-xs text-green-700 mb-2 italic">"I drive foot traffic"</p>
               <p className="text-xs text-green-600 mb-3">Deposit-only commerce for physical retailers</p>
@@ -427,7 +427,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">�️</span>
                 <h3 className="font-bold text-amber-900 text-base">E-commerce</h3>
-                <Badge className="bg-amber-100 text-amber-800 text-xs">$99/mo</Badge>
+                <Badge variant="light" color="orange" size="xs">$99/mo</Badge>
               </div>
               <p className="text-xs text-amber-700 mb-2 italic">"I sell online"</p>
               <p className="text-xs text-amber-600 mb-3">Full-payment only for online merchants</p>
@@ -467,7 +467,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔄</span>
                 <h3 className="font-bold text-indigo-900 text-base">Omnichannel</h3>
-                <Badge className="bg-indigo-100 text-indigo-800 text-xs">$149/mo</Badge>
+                <Badge variant="light" color="indigo" size="xs">$149/mo</Badge>
               </div>
               <p className="text-xs text-indigo-700 mb-2 italic">"I sell everywhere"</p>
               <p className="text-xs text-indigo-600 mb-3">Physical + online — shopper chooses path</p>
@@ -511,7 +511,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏢</span>
                 <h3 className="font-bold text-red-900 text-base">Enterprise</h3>
-                <Badge className="bg-red-100 text-red-800 text-xs">$499/mo</Badge>
+                <Badge variant="light" color="red" size="xs">$499/mo</Badge>
               </div>
               <p className="text-xs text-red-700 mb-2 italic">"I run a business empire"</p>
               <p className="text-xs text-red-600 mb-3">Multi-location with enterprise tools</p>
@@ -569,7 +569,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-blue-900">Discovery</h3>
-                  <Badge variant="default" className="bg-blue-100 text-blue-800">$29/mo</Badge>
+                  <Badge variant="light" color="blue">$29/mo</Badge>
                 </div>
                 <p className="text-xs text-blue-700 italic mb-1">"I exist online"</p>
                 <p className="text-sm text-neutral-600">Get Found on Google</p>
@@ -609,7 +609,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-purple-900">Storefront</h3>
-                  <Badge variant="default" className="bg-purple-100 text-purple-800">$59/mo</Badge>
+                  <Badge variant="light" color="grape">$59/mo</Badge>
                 </div>
                 <p className="text-xs text-purple-700 italic mb-1">"I have a store online"</p>
                 <p className="text-sm text-neutral-600">Own Your Platform Presence</p>
@@ -647,12 +647,12 @@ export default function OfferingsPage() {
             {/* Commitment ($79) - POPULAR */}
             <Card className="border-2 border-green-500 shadow-lg relative" withBorder padding="lg" radius="md">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <Badge variant="success" className="bg-green-500 text-white text-xs">POPULAR</Badge>
+                <Badge color="green" variant="filled" size="xs">POPULAR</Badge>
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-green-900">Commitment</h3>
-                  <Badge variant="default" className="bg-green-100 text-green-800">$79/mo</Badge>
+                  <Badge variant="light" color="green">$79/mo</Badge>
                 </div>
                 <p className="text-xs text-green-700 italic mb-1">"I am selling online"</p>
                 <p className="text-sm text-neutral-600">Capture Intent and Drive Foot Traffic</p>
@@ -696,7 +696,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-amber-900">E-commerce</h3>
-                  <Badge variant="default" className="bg-amber-100 text-amber-800">$99/mo</Badge>
+                  <Badge variant="light" color="orange">$99/mo</Badge>
                 </div>
                 <p className="text-xs text-amber-700 italic mb-1">"I sell online"</p>
                 <p className="text-sm text-neutral-600">Full-payment only for online merchants</p>
@@ -732,7 +732,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-indigo-900">Omnichannel</h3>
-                  <Badge variant="default" className="bg-indigo-100 text-indigo-800">$149/mo</Badge>
+                  <Badge variant="light" color="indigo">$149/mo</Badge>
                 </div>
                 <p className="text-xs text-indigo-700 italic mb-1">"I sell everywhere"</p>
                 <p className="text-sm text-neutral-600">Physical + online — shopper chooses path</p>
@@ -776,7 +776,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-red-900">Enterprise</h3>
-                  <Badge variant="default" className="bg-red-100 text-red-800">$499/mo</Badge>
+                  <Badge variant="light" color="red">$499/mo</Badge>
                 </div>
                 <p className="text-xs text-red-700 italic mb-1">"I run a complete business"</p>
                 <p className="text-sm text-neutral-600">Complete Business Solution</p>
