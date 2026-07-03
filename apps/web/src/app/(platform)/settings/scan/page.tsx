@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@mantine/core';
-import { Button } from '@mantine/core';
+import { Card, Button } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { UserTenantSelector } from '@/components/tenant/UserTenantSelector';
+
+export const dynamic = 'force-dynamic';
 
 
 interface ScanSession {
@@ -75,13 +77,13 @@ export default function ScanPage() {
       await loadSessions(); // Refresh the list
     } catch (err) {
       console.error('[ScanPage] Failed to cancel session:', err);
-      alert('Failed to cancel session');
+      notifications.show({ title: 'Error', message: 'Failed to cancel session', color: 'red' });
     }
   };
 
   const cleanupMySessions = async () => {
     if (!selectedTenant) {
-      alert('Please select a tenant first');
+      notifications.show({ title: 'Warning', message: 'Please select a tenant first', color: 'yellow' });
       return;
     }
     
@@ -93,11 +95,11 @@ export default function ScanPage() {
       setCleaningUp(true);
       
       await itemsSingletonService.cleanupMyScanSessions(selectedTenant);
-      alert(`✅ Cleaned up active sessions. You can now start a new scan.`);
+      notifications.show({ title: 'Success', message: 'Cleaned up active sessions. You can now start a new scan.', color: 'green' });
       await loadSessions();
     } catch (error) {
       console.error('Failed to cleanup sessions:', error);
-      alert('Failed to cleanup sessions');
+      notifications.show({ title: 'Error', message: 'Failed to cleanup sessions', color: 'red' });
     } finally {
       setCleaningUp(false);
     }
@@ -118,12 +120,12 @@ export default function ScanPage() {
 
   const startNewSession = async () => {
     if (!barcodeEnabled) {
-      alert('Barcode scanning is not enabled for this tenant. Please upgrade your plan or contact your administrator.');
+      notifications.show({ title: 'Scanning Disabled', message: 'Barcode scanning is not enabled for this tenant. Please upgrade your plan or contact your administrator.', color: 'yellow' });
       return;
     }
 
     if (!selectedTenant) {
-      alert('Please select a tenant first');
+      notifications.show({ title: 'Warning', message: 'Please select a tenant first', color: 'yellow' });
       return;
     }
 
@@ -138,11 +140,11 @@ export default function ScanPage() {
         router.push(`/scan/${data.session.id}`);
       } else {
         console.error('Invalid session response:', data);
-        alert('Failed to start session: Invalid response from server');
+        notifications.show({ title: 'Error', message: 'Failed to start session: Invalid response from server', color: 'red' });
       }
     } catch (error) {
       console.error('Failed to start session:', error);
-      alert('Failed to start scanning session');
+      notifications.show({ title: 'Error', message: 'Failed to start scanning session', color: 'red' });
     } finally {
       setCreating(false);
     }

@@ -29,6 +29,7 @@ export default function CrmDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [myTickets, setMyTickets] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [promoStats, setPromoStats] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'all' | 'my-work'>('all');
   const { user } = useAuth();
@@ -41,10 +42,11 @@ export default function CrmDashboardPage() {
           ticketFilters.assignedTo = user.id;
         }
 
-        const [statsRes, ticketsRes, activityRes] = await Promise.allSettled([
+        const [statsRes, ticketsRes, activityRes, promoRes] = await Promise.allSettled([
           crmAdminService.getDashboardStats(),
           crmAdminService.listGlobalTickets(ticketFilters),
           crmAdminService.listGlobalActivities({ limit: 8 }),
+          crmAdminService.getPromotionStats(),
         ]);
 
         if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -56,6 +58,8 @@ export default function CrmDashboardPage() {
         if (activityRes.status === 'fulfilled') {
           setRecentActivity(activityRes.value.slice(0, 8));
         }
+
+        if (promoRes.status === 'fulfilled') setPromoStats(promoRes.value);
       } catch (err) {
         console.error('[CRM Dashboard] Load error:', err);
       } finally {
@@ -174,7 +178,101 @@ export default function CrmDashboardPage() {
           </CardContent>
         </Card>
       </div>
+      {/* Directory Promotions Widget */}
+      {promoStats && (
+        <DirectoryPromotionsWidget stats={promoStats} />
+      )}
     </CrmPageShell>
+  );
+}
+
+function DirectoryPromotionsWidget({ stats }: { stats: any }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Directory Promotions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          <MiniStat label="Active" value={stats.activeCount ?? 0} />
+          <MiniStat label="Revenue (Active)" value={`$${((stats.totalRevenueCents ?? 0) / 100).toFixed(0)}`} />
+          <MiniStat label="Grace Period" value={stats.gracePeriodCount ?? 0} />
+          <MiniStat label="Expired" value={stats.expiredCount ?? 0} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Upcoming Renewals */}
+          <div>
+            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Upcoming Renewals (7d)</p>
+            {stats.upcomingRenewals?.length ? (
+              <div className="space-y-1">
+                {stats.upcomingRenewals.map((p: any) => (
+                  <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <Link href={`/settings/admin/crm/tenants/${p.tenantId}`} className="text-amber-600 hover:underline truncate">
+                      {p.tenantId}
+                    </Link>
+                    <span className="text-neutral-500 ml-2 shrink-0">
+                      {p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500">No upcoming renewals</p>
+            )}
+          </div>
+
+          {/* Grace Period */}
+          <div>
+            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">In Grace Period</p>
+            {stats.gracePeriodPromotions?.length ? (
+              <div className="space-y-1">
+                {stats.gracePeriodPromotions.map((p: any) => (
+                  <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <Link href={`/settings/admin/crm/tenants/${p.tenantId}`} className="text-red-600 hover:underline truncate">
+                      {p.tenantId}
+                    </Link>
+                    <span className="text-neutral-500 ml-2 shrink-0">
+                      {p.gracePeriodEndsAt ? new Date(p.gracePeriodEndsAt).toLocaleDateString() : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500">None in grace period</p>
+            )}
+          </div>
+
+          {/* Recent Activations */}
+          <div>
+            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Recent Activations</p>
+            {stats.recentActivations?.length ? (
+              <div className="space-y-1">
+                {stats.recentActivations.map((p: any) => (
+                  <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <Link href={`/settings/admin/crm/tenants/${p.tenantId}`} className="text-amber-600 hover:underline truncate">
+                      {p.tenantId}
+                    </Link>
+                    <span className="text-neutral-500 ml-2 shrink-0 capitalize">{p.tier}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500">No recent activations</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg p-3 bg-neutral-50 dark:bg-neutral-800/50">
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
+      <p className="text-xl font-bold mt-0.5">{value}</p>
+    </div>
   );
 }
 

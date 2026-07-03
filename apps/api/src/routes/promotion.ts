@@ -24,6 +24,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import DirectoryPromotionService from '../services/DirectoryPromotionService';
+import { trackBadgeEvent } from '../services/BadgeAnalyticsService';
 
 const router = Router();
 const pool = getDirectPool();
@@ -290,6 +291,14 @@ router.post('/tenants/:tenantId/promotion/track-impression', async (req: Request
       [tenantId]
     );
 
+    // Track badge event for unified analytics
+    trackBadgeEvent({
+      tenantId,
+      badgeKey: 'directory_promoted',
+      inventoryItemId: 'store-level',
+      eventType: 'view',
+    }).catch(() => {});
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error tracking impression:', error);
@@ -310,6 +319,14 @@ router.post('/tenants/:tenantId/promotion/track-click', async (req: Request, res
       WHERE tenant_id = $1 AND is_promoted = TRUE`,
       [tenantId]
     );
+
+    // Track badge event for unified analytics
+    trackBadgeEvent({
+      tenantId,
+      badgeKey: 'directory_promoted',
+      inventoryItemId: 'store-level',
+      eventType: 'click',
+    }).catch(() => {});
 
     res.json({ success: true });
   } catch (error) {
@@ -444,6 +461,37 @@ router.get('/admin/promotion/revenue', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching promotion revenue summary:', error);
     res.status(500).json({ error: 'Failed to fetch promotion revenue summary' });
+  }
+});
+
+/**
+ * GET /api/admin/promotion/stats — dashboard stats for CRM widget
+ */
+router.get('/admin/promotion/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await DirectoryPromotionService.getInstance().getDashboardStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error('Error fetching promotion dashboard stats:', error);
+    res.status(500).json({ error: 'Failed to fetch promotion dashboard stats' });
+  }
+});
+
+/**
+ * GET /api/admin/promotion/tenant/:tenantId — tenant-specific promotion data for CRM tab
+ */
+router.get('/admin/promotion/tenant/:tenantId', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const service = DirectoryPromotionService.getInstance();
+    const [activePurchase, purchases] = await Promise.all([
+      service.getActivePurchase(tenantId),
+      service.listTenantPurchases(tenantId),
+    ]);
+    res.json({ activePurchase, purchases });
+  } catch (error) {
+    console.error('Error fetching tenant promotion data:', error);
+    res.status(500).json({ error: 'Failed to fetch tenant promotion data' });
   }
 });
 

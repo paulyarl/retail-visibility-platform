@@ -1,8 +1,6 @@
 'use client';
 
-import { Card } from '@mantine/core';
-import { Button } from '@mantine/core';
-import { Badge } from '@/components/ui/Badge';
+import { Card, Button, Badge, Title, Text } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { MANAGED_SERVICES, type ServiceLevel } from '@/lib/managed-services';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
@@ -32,10 +30,10 @@ export default function OfferingsPage() {
         
         {/* What You Get Overview */}
         <section>
-          <h2 className="text-3xl font-bold text-neutral-900 mb-6 text-center">Complete Online Presence Solution</h2>
-          <p className="text-lg text-neutral-600 mb-8 text-center max-w-3xl mx-auto">
+          <Title order={2} ta="center" mb="md">Complete Online Presence Solution</Title>
+          <Text size="lg" c="dimmed" ta="center" maw={600} mx="auto" mb="xl">
             Everything you need to dominate local search and drive customers to your store
-          </p>
+          </Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Quick Start - NEW! */}
@@ -292,8 +290,8 @@ export default function OfferingsPage() {
               </svg>
             </button>
           </div>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">What's Included at Each Level</h2>
-          <p className="text-neutral-600 mb-6">Each tier builds on the previous one with clear progression: Discovery → Storefront → Commitment → E-commerce → Omnichannel → Enterprise. Tiers are aligned to business models, not just feature accumulation.</p>
+          <Title order={2} mb="xs">What's Included at Each Level</Title>
+          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: Discovery → Storefront → Commitment → E-commerce → Omnichannel → Enterprise. Tiers are aligned to business models, not just feature accumulation.</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
@@ -562,8 +560,8 @@ export default function OfferingsPage() {
 
         {/* Individual Location Subscriptions */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Individual Location Subscriptions</h2>
-          <p className="text-neutral-600 mb-6">Perfect for individual retailers and small chains</p>
+          <Title order={2} mb="xs">Individual Location Subscriptions</Title>
+          <Text c="dimmed" mb="xl">Perfect for individual retailers and small chains</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
@@ -821,8 +819,8 @@ export default function OfferingsPage() {
 
         {/* Feature Mapping Display */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Marketing Benefits → Technical Features</h2>
-          <p className="text-neutral-600 mb-6">See how marketing benefits translate to technical implementation</p>
+          <Title order={2} mb="xs">Marketing Benefits → Technical Features</Title>
+          <Text c="dimmed" mb="xl">See how marketing benefits translate to technical implementation</Text>
           
           <div className="space-y-8">
             <FeatureMappingDisplay selectedTier="discovery" compact={false} />
@@ -836,16 +834,16 @@ export default function OfferingsPage() {
 
         {/* Tier Comparison Table */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Complete Tier Comparison</h2>
-          <p className="text-neutral-600 mb-6">Compare all tiers side-by-side with detailed feature breakdown</p>
+          <Title order={2} mb="xs">Complete Tier Comparison</Title>
+          <Text c="dimmed" mb="xl">Compare all tiers side-by-side with detailed feature breakdown</Text>
           
           <TierComparisonTable compact={false} />
         </section>
 
         {/* Content Consistency Validator */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Content Consistency Check</h2>
-          <p className="text-neutral-600 mb-6">Ensure alignment between marketing (/features) and admin (/settings/offerings) pages</p>
+          <Title order={2} mb="xs">Content Consistency Check</Title>
+          <Text c="dimmed" mb="xl">Ensure alignment between marketing (/features) and admin (/settings/offerings) pages</Text>
           
           <ContentConsistencyValidator showOnlyInconsistent={false} />
         </section>
@@ -857,8 +855,8 @@ export default function OfferingsPage() {
 
         {/* Managed Services */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Managed Services</h2>
-          <p className="text-neutral-600 mb-6">Let our team manage your inventory for you</p>
+          <Title order={2} mb="xs">Managed Services</Title>
+          <Text c="dimmed" mb="xl">Let our team manage your inventory for you</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Object.values(MANAGED_SERVICES).filter(s => s.id !== 'self_service').map((service) => (
@@ -903,8 +901,8 @@ export default function OfferingsPage() {
 
         {/* All Benefits Summary */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Everything You Need to Succeed Online</h2>
-          <p className="text-neutral-600 mb-6">All the tools to drive foot traffic and dominate local search</p>
+          <Title order={2} mb="xs">Everything You Need to Succeed Online</Title>
+          <Text c="dimmed" mb="xl">All the tools to drive foot traffic and dominate local search</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card withBorder padding="lg" radius="md">
@@ -985,10 +983,10 @@ export default function OfferingsPage() {
         <section className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-8">
           <div className="max-w-3xl mx-auto text-center">
             <div className="text-5xl mb-4">🔄</div>
-            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Flexible Plans That Grow With You</h2>
-            <p className="text-neutral-700 mb-6">
+            <Title order={2} mb="sm">Flexible Plans That Grow With You</Title>
+            <Text c="dimmed" mb="xl">
               Your business needs change, and your subscription should too. We make it easy to adjust your plan anytime.
-            </p>
+            </Text>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="bg-white rounded-lg p-6 border-2 border-green-200">
@@ -1018,10 +1016,10 @@ export default function OfferingsPage() {
 
         {/* Contact CTA */}
         <section className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-lg p-8 text-center text-white">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-lg mb-6 opacity-90">
+          <Title order={2} mb="md">Ready to Get Started?</Title>
+          <Text size="lg" mb="xl" opacity={0.9}>
             Choose the plan that's right for your business. Change it anytime as your needs evolve.
-          </p>
+          </Text>
           <div className="flex gap-4 justify-center">
             <button 
               onClick={() => window.location.href = '/settings/subscription'}

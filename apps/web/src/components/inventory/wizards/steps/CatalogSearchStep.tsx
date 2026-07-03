@@ -3,7 +3,7 @@
  *
  * Optional pre-step in ItemCreationWizard.
  * Search supplier catalogs by barcode/GTIN or text, select a match to auto-populate wizard.
- * Only visible when FF_SUPPLIER_CATALOG_IMPORT is enabled for the tenant.
+ * Only visible when product_options supplier catalog capability is enabled for the tenant.
  */
 
 'use client';

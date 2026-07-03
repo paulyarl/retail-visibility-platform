@@ -422,6 +422,40 @@ class CrmAdminService extends AdminApiSingleton {
     );
     return this.unwrap<CrmInquiry[]>(result);
   }
+
+  // --- Directory Promotions ---
+  async getPromotionStats(): Promise<{
+    activeCount: number;
+    gracePeriodCount: number;
+    expiredCount: number;
+    totalRevenueCents: number;
+    upcomingRenewals: any[];
+    gracePeriodPromotions: any[];
+    recentActivations: any[];
+  }> {
+    const cacheKey = 'crm-promotion-stats';
+    const result = await this.makeDefaultRequest<any>(
+      '/api/admin/promotion/stats',
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<any>(result);
+  }
+
+  async getTenantPromotion(tenantId: string): Promise<{
+    activePurchase: any | null;
+    purchases: any[];
+  }> {
+    const cacheKey = `crm-promotion-tenant-${tenantId}`;
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/promotion/tenant/${tenantId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<any>(result);
+  }
 }
 
 export const crmAdminService = CrmAdminService.getInstance();

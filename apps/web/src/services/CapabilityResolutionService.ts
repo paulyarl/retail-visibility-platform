@@ -316,6 +316,10 @@ export interface ProductOptionsState {
   effectiveShowsFulfillment: boolean;
   effectiveShowsCategories: boolean;
   effectiveShowsLocationAvailability: boolean;
+  /** Whether supplier catalog import is available during creation (tier-allowed) */
+  showsSupplierCatalog: boolean;
+  /** Whether supplier catalog import is effectively available after merchant preferences */
+  effectiveShowsSupplierCatalog: boolean;
   /** Merchant preference toggles for product options */
   merchantPreferences: {
     product_physical_enabled: boolean;
@@ -337,6 +341,7 @@ export interface ProductOptionsState {
     product_opt_fulfillment: boolean;
     product_opt_categories: boolean;
     product_opt_location_availability: boolean;
+    product_opt_supplier_catalog: boolean;
   };
   /** Whether all product options are available (flexible tier) */
   isFlexible: boolean;
@@ -757,6 +762,16 @@ export interface SocialCommerceOptionsState {
   features: Record<string, boolean>;
 }
 
+// --- Directory Promotion ---
+
+export type PromotionTierType = 'basic' | 'premium' | 'featured';
+
+export interface DirectoryPromotionState {
+  enabled: boolean;
+  isFlexible: boolean;
+  allowedTiers: PromotionTierType[];
+}
+
 // --- Chatbot Options ---
 
 export type ChatbotResponseEngineType =
@@ -917,6 +932,7 @@ export interface AllCapabilitiesState {
   crmOptions: CrmOptionsState;
   chatbotOptions: ChatbotOptionsState;
   socialCommerceOptions: SocialCommerceOptionsState;
+  directoryPromotion: DirectoryPromotionState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -944,6 +960,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   crm_: 'crm_options',
   chatbot_: 'chatbot_options',
   social_commerce_: 'social_commerce_options',
+  directory_promotion_: 'directory_promotion',
 };
 
 /**
@@ -1348,6 +1365,7 @@ export function resolveProductOptionsState(
     product_opt_fulfillment?: boolean;
     product_opt_categories?: boolean;
     product_opt_location_availability?: boolean;
+    product_opt_supplier_catalog?: boolean;
   } | null
 ): ProductOptionsState {
   const enabled = !!features.product_options_enabled || !!features.product_enabled;
@@ -1420,6 +1438,7 @@ export function resolveProductOptionsState(
     product_opt_fulfillment: merchantPrefs?.product_opt_fulfillment !== false,
     product_opt_categories: merchantPrefs?.product_opt_categories !== false,
     product_opt_location_availability: merchantPrefs?.product_opt_location_availability !== false,
+    product_opt_supplier_catalog: merchantPrefs?.product_opt_supplier_catalog !== false,
   };
 
   // Effective types = tier allows AND merchant enabled
@@ -1429,6 +1448,7 @@ export function resolveProductOptionsState(
   const effectiveShowsVariants = (flexible || variant) && prefs.product_variant_enabled;
   const effectiveShowsGallery = (flexible || gallery) && prefs.product_gallery_enabled;
   const effectiveShowsVideo = (flexible || video) && prefs.product_video_enabled;
+  const showsSupplierCatalog = creationGroupEnabled && (flexible || !!features.product_options_creation_supplier_catalog);
 
   // Effective layout = tier allows AND merchant preference
   const effectiveLayout = allowedLayouts.includes(prefs.product_layout)
@@ -1491,6 +1511,8 @@ export function resolveProductOptionsState(
     effectiveShowsFulfillment,
     effectiveShowsCategories,
     effectiveShowsLocationAvailability,
+    showsSupplierCatalog,
+    effectiveShowsSupplierCatalog: showsSupplierCatalog && prefs.product_opt_supplier_catalog,
     merchantPreferences: prefs,
     isFlexible: flexible,
     features,

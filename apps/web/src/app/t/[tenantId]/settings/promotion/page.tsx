@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
-import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X, CreditCard, RefreshCw, History } from 'lucide-react';
+import Link from 'next/link';
+import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X, CreditCard, RefreshCw, History, Lock } from 'lucide-react';
 import { DirectoryPromotionService, PromotionPlan, PromotionPurchase } from '@/services/DirectoryPromotionService';
+import { useDirectoryPromotionCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: ['Gold marker on map', 'Promoted badge', 'Higher visibility', 'Basic analytics'],
@@ -33,6 +35,8 @@ export default function PromotionSettingsPage() {
   const [selectedPlanKey, setSelectedPlanKey] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: promoCapability, loading: capLoading } = useDirectoryPromotionCapability(tenantId, { forTenant: true });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -128,7 +132,7 @@ export default function PromotionSettingsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || capLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -141,15 +145,24 @@ export default function PromotionSettingsPage() {
 
   const isActive = status?.isPromoted && status?.promotionExpiresAt && new Date(status.promotionExpiresAt) > new Date();
   const activePurchase = status?.activePurchase;
-  const selectedPlan = plans.find(p => p.planKey === selectedPlanKey);
 
-  // Group plans by tier
+  // Tier gate: filter plans by allowed tiers from capability
+  const allowedTiers = promoCapability?.allowedTiers || [];
+  const gatedPlans = promoCapability?.enabled
+    ? plans.filter(p => allowedTiers.includes(p.tier as any))
+    : [];
+  const selectedPlan = gatedPlans.find(p => p.planKey === selectedPlanKey);
+
+  // Group plans by tier (use gated plans for selection)
   const plansByTier: Record<string, PromotionPlan[]> = {};
-  for (const plan of plans) {
+  for (const plan of gatedPlans) {
     if (!plansByTier[plan.tier]) plansByTier[plan.tier] = [];
     plansByTier[plan.tier].push(plan);
   }
   const tierOrder = ['basic', 'premium', 'featured'];
+
+  // Capability gated — show upgrade prompt instead of plans
+  const isCapabilityGated = !promoCapability?.enabled || gatedPlans.length === 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -232,11 +245,42 @@ export default function PromotionSettingsPage() {
               <p className="text-2xl font-bold text-gray-900">{(status.promotionClicks || 0).toLocaleString()}</p>
             </div>
           </div>
+
+          {/* Detailed analytics link */}
+          <div className="mt-4">
+            <Link
+              href={`/t/${tenantId}/settings/promotion/analytics`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-700"
+            >
+              <TrendingUp className="w-4 h-4" />
+              View detailed analytics
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Capability gated — upgrade prompt */}
+      {!isActive && isCapabilityGated && !loading && (
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-200 rounded-lg p-8 mb-8 text-center">
+          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-gray-500" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Directory Promotion Not Available</h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Your current plan doesn't include directory promotion. Upgrade your subscription to promote your store on the directory map and search results.
+          </p>
+          <button
+            onClick={() => router.push(`/t/${tenantId}/settings/subscription`)}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+          >
+            <TrendingUp className="w-5 h-5" />
+            View Plans
+          </button>
         </div>
       )}
 
       {/* Plan Selection */}
-      {!isActive && plans.length > 0 && (
+      {!isActive && !isCapabilityGated && gatedPlans.length > 0 && (
         <>
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Choose Your Promotion</h2>
@@ -374,7 +418,7 @@ export default function PromotionSettingsPage() {
       )}
 
       {/* No plans available */}
-      {!isActive && plans.length === 0 && !loading && (
+      {!isActive && !isCapabilityGated && gatedPlans.length === 0 && !loading && (
         <div className="bg-gray-50 rounded-lg p-8 text-center mb-8">
           <p className="text-gray-600">No promotion plans are currently available. Please check back later.</p>
         </div>

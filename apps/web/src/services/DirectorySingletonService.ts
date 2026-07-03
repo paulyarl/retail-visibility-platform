@@ -438,6 +438,37 @@ class DirectorySingletonService extends PublicApiSingleton {
   }
 
   /**
+   * Get promoted stores for carousel display
+   * Fetches directory stores and filters for promoted ones
+   */
+  async getPromotedStores(limit: number = 12): Promise<any[]> {
+    const response = await this.makeDefaultRequest<{
+      listings?: any[];
+    }>(
+      `/api/directory/stores?limit=100&sort=activity`,
+      {},
+      `directory-promoted-stores`,
+      this.CACHE_TTL_MEDIUM,
+      {
+        context: this.defaultContext,
+        isolation: this.defaultIsolation,
+      }
+    );
+
+    if (!response.success) {
+      console.error('[DirectorySingletonService] Failed to get promoted stores:', response.error);
+      return [];
+    }
+
+    const data = response.data;
+    const listings = data?.listings || [];
+    const promoted = listings.filter(
+      (s: any) => s.isPromoted && s.promotionTier,
+    );
+    return promoted.slice(0, limit);
+  }
+
+  /**
    * Get directory map locations
    * Used for map display with coordinates
    */

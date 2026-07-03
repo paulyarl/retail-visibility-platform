@@ -3,6 +3,7 @@
  * User-facing security settings including sessions, alerts, and MFA
  */
 
+import { Title, Text, Stack } from '@mantine/core';
 import { SecuritySettings } from '@/components/security/SecuritySettings';
 
 
@@ -16,15 +17,15 @@ export const metadata = {
 
 export default function SecuritySettingsPage() {
   return (
-    <div className="space-y-6">
+    <Stack gap="lg">
       <div>
-        <h1 className="text-3xl font-bold">Security Settings</h1>
-        <p className="text-muted-foreground mt-2">
+        <Title order={1}>Security Settings</Title>
+        <Text c="dimmed" mt="sm">
           Manage your account security, active sessions, and security preferences
-        </p>
+        </Text>
       </div>
       
       <SecuritySettings />
-    </div>
+    </Stack>
   );
 }

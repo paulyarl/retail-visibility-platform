@@ -14,6 +14,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { getDirectPool } from '../utils/db-pool';
+import { getBillingNotificationService, BillingNotificationData } from '../services/subscription/BillingNotificationService';
 import Stripe from 'stripe';
 
 export interface PromotionRenewalJobResult {
@@ -162,6 +163,20 @@ async function processAutoRenewals(now: Date, result: PromotionRenewalJobResult)
 
         result.autoRenewed++;
         logger.info(`[PromotionRenewal] Auto-renewed promotion ${purchase.id} → ${newPurchaseId}`);
+
+        // Send renewal success notification
+        await sendBillingNotification({
+          tenantId: purchase.tenant_id,
+          type: 'directory_promotion_renewal_success',
+          amount: plan.price_cents,
+          metadata: {
+            tier: purchase.tier,
+            tierLabel: purchase.tier.charAt(0).toUpperCase() + purchase.tier.slice(1),
+            purchaseId: newPurchaseId,
+            durationDays: plan.duration_days,
+            expiresAt: newExpiresAt.toISOString(),
+          },
+        });
       } else {
         logger.warn(`[PromotionRenewal] Auto-renewal payment status: ${paymentIntent.status} for promotion ${purchase.id}`);
         await enterGracePeriod(purchase, now, result);
@@ -206,6 +221,19 @@ async function processGracePeriods(now: Date, result: PromotionRenewalJobResult)
 
       result.expired++;
       logger.info(`[PromotionRenewal] Grace period expired for promotion ${purchase.id}`);
+
+      // Send expiration notification
+      const tierLabel = purchase.tier ? (purchase.tier as string).charAt(0).toUpperCase() + (purchase.tier as string).slice(1) : 'Promotion';
+      await sendBillingNotification({
+        tenantId: purchase.tenant_id,
+        type: 'directory_promotion_expired',
+        metadata: {
+          tier: purchase.tier,
+          tierLabel,
+          purchaseId: purchase.id,
+          reason: 'grace_period_expired',
+        },
+      });
     }
   }
 }
@@ -238,6 +266,19 @@ async function processExpirations(now: Date, result: PromotionRenewalJobResult):
 
     result.expired++;
     logger.info(`[PromotionRenewal] Promotion ${purchase.id} expired for tenant ${purchase.tenant_id}`);
+
+    // Send expiration notification
+    const tierLabel = purchase.tier ? (purchase.tier as string).charAt(0).toUpperCase() + (purchase.tier as string).slice(1) : 'Promotion';
+    await sendBillingNotification({
+      tenantId: purchase.tenant_id,
+      type: 'directory_promotion_expired',
+      metadata: {
+        tier: purchase.tier,
+        tierLabel,
+        purchaseId: purchase.id,
+        reason: 'expired',
+      },
+    });
   }
 }
 
@@ -280,11 +321,45 @@ async function enterGracePeriod(purchase: any, now: Date, result: PromotionRenew
 
   result.gracePeriodEntered++;
   logger.info(`[PromotionRenewal] Entered grace period for promotion ${purchase.id}, grace ends ${graceEnds.toISOString()}`);
+
+  // Send renewal failed + grace period warning notifications
+  const tierLabel = purchase.tier ? (purchase.tier as string).charAt(0).toUpperCase() + (purchase.tier as string).slice(1) : 'Promotion';
+  await sendBillingNotification({
+    tenantId: purchase.tenant_id,
+    type: 'directory_promotion_renewal_failed',
+    gracePeriodDaysRemaining: GRACE_PERIOD_DAYS,
+    reason: 'Auto-renewal payment failed',
+    metadata: {
+      tier: purchase.tier,
+      tierLabel,
+      purchaseId: purchase.id,
+    },
+  });
+  await sendBillingNotification({
+    tenantId: purchase.tenant_id,
+    type: 'directory_promotion_grace_period_warning',
+    gracePeriodDaysRemaining: GRACE_PERIOD_DAYS,
+    reason: 'Auto-renewal payment failed',
+    metadata: {
+      tier: purchase.tier,
+      tierLabel,
+      purchaseId: purchase.id,
+      gracePeriodEndsAt: graceEnds.toISOString(),
+    },
+  });
 }
 
 function initStripe(): Stripe | null {
   if (!process.env.STRIPE_SECRET_KEY) return null;
   return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-05-27.dahlia' as any });
+}
+
+async function sendBillingNotification(data: BillingNotificationData): Promise<void> {
+  try {
+    await getBillingNotificationService().sendNotification(data);
+  } catch (err) {
+    logger.warn('[PromotionRenewal] Failed to send billing notification', undefined, { error: (err as Error).message });
+  }
 }
 
 // ====================

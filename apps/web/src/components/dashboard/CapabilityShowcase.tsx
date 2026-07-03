@@ -24,6 +24,7 @@ import {
   Bot,
   Share2,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -235,6 +236,15 @@ export default function CapabilityShowcase({
     if (scc?.canUseSocialProof) sccDetailParts.push('Social Proof');
     if (scc?.canUseAbandonedCart) sccDetailParts.push('Abandoned Cart');
 
+    // --- Directory Promotion ---
+    const dp = cap.directoryPromotion;
+    const dpTier = dp?.enabled ?? false;
+    const dpMerchantGated = false;
+    const dpDetailParts: string[] = [];
+    if (dp?.allowedTiers.includes('basic')) dpDetailParts.push('Basic');
+    if (dp?.allowedTiers.includes('premium')) dpDetailParts.push('Premium');
+    if (dp?.allowedTiers.includes('featured')) dpDetailParts.push('Featured');
+
     return [
       {
         key: "commerce",
@@ -433,6 +443,18 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/social-commerce`,
         constraintWarning: getConstraintWarning('social_commerce_options'),
+      },
+      {
+        key: "directoryPromotion",
+        label: "Directory Promotion",
+        icon: <Sparkles className="w-4 h-4" />,
+        enabled: dpTier && (dp?.allowedTiers.length ?? 0) > 0,
+        status: getStatus(dpTier, dpMerchantGated),
+        detail: dpTier
+          ? (dpDetailParts.length > 0 ? `${dpDetailParts.join(', ')} tiers` : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/promotion`,
+        constraintWarning: getConstraintWarning('directory_promotion'),
       },
     ];
   }, [capabilities, tenantId]);

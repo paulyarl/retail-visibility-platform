@@ -2,7 +2,7 @@
  * Tenant Supplier Routes
  *
  * Tenant-scoped endpoints for catalog search, import, and mapping management.
- * All routes require authentication + tenant access + FF_SUPPLIER_CATALOG_IMPORT enabled.
+ * All routes require authentication + tenant access + product_options.shows_supplier_catalog capability gate.
  *
  * RBAC:
  *   - Read endpoints (list, search, lookup, mappings list): checkTenantAccess (any tenant member)
@@ -22,15 +22,15 @@
 
 import express from 'express';
 import { authenticateToken, checkTenantAccess, requireTenantOwner } from '../../middleware/auth';
-import { requireFlag } from '../../middleware/flags';
 import { prisma } from '../../prisma';
 import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
 import SupplierImportService from '../../services/SupplierImportService';
 import { BarcodeEnrichmentService } from '../../services/BarcodeEnrichmentService';
+import { resolveEffectiveCapabilities } from '../../services/EffectiveCapabilityResolver';
 
 // mergeParams: true is required because this router is mounted at /api/tenants/:tenantId
-// and its global middleware (checkTenantAccess, requireFlag) needs req.params.tenantId.
+// and its global middleware (checkTenantAccess) needs req.params.tenantId.
 // Without it, the router intercepts all /api/tenants/:tenantId/* requests and fails
 // with tenantId_required before the intended FAQ/bot/faq-options routers are reached.
 const router = express.Router({ mergeParams: true });
@@ -40,15 +40,32 @@ function getTenantId(req: express.Request): string {
   return req.params.tenantId as string;
 }
 
-// All supplier routes require auth + tenant access + feature flag.
+// All supplier routes require auth + tenant access + capability gate.
 // Scope the middleware to '/suppliers' so this router (mounted at /api/tenants/:tenantId)
 // does not intercept unrelated /api/tenants/:tenantId/* requests like /faqs, /faq-options, /bot/*.
 router.use(
   '/suppliers',
   authenticateToken,
   checkTenantAccess,
-  requireFlag({ flag: 'FF_SUPPLIER_CATALOG_IMPORT', scope: 'tenant', tenantParam: 'tenantId' }),
 );
+
+// Capability gate: check product_options.shows_supplier_catalog (tier + merchant gate)
+router.use('/suppliers', async (req, res, next) => {
+  try {
+    const tenantId = getTenantId(req);
+    const caps = await resolveEffectiveCapabilities(tenantId, { detail: 'summary' });
+    if (!caps?.effective?.product_options?.shows_supplier_catalog) {
+      return res.status(403).json({
+        error: 'capability_disabled',
+        message: 'Supplier catalog import is not available on your current plan',
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('[tenant/suppliers] Capability check error:', error);
+    return res.status(500).json({ error: 'Failed to verify capability' });
+  }
+});
 
 // List active suppliers (for tenant dropdown)
 router.get('/suppliers', async (req, res) => {
@@ -160,7 +177,7 @@ router.post('/suppliers/import', requireTenantOwner, async (req, res) => {
             },
             metadata: {
               source: 'supplier_catalog_import',
-              flag: 'FF_SUPPLIER_CATALOG_IMPORT',
+              capability: 'product_opt_supplier_catalog',
             },
           },
         });
@@ -210,7 +227,7 @@ router.put('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) => {
             entity_type: 'inventory_item',
             entity_id: req.params.mid,
             diff: { event: 'supplier_mapping_sync_mode_changed', mapping_id: req.params.mid, sync_mode },
-            metadata: { source: 'supplier_catalog_import', flag: 'FF_SUPPLIER_CATALOG_IMPORT' },
+            metadata: { source: 'supplier_catalog_import', capability: 'product_opt_supplier_catalog' },
           },
         });
       } catch (auditError) {
@@ -243,7 +260,7 @@ router.delete('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) =
             entity_type: 'inventory_item',
             entity_id: req.params.mid,
             diff: { event: 'supplier_mapping_unlinked', mapping_id: req.params.mid },
-            metadata: { source: 'supplier_catalog_import', flag: 'FF_SUPPLIER_CATALOG_IMPORT' },
+            metadata: { source: 'supplier_catalog_import', capability: 'product_opt_supplier_catalog' },
           },
         });
       } catch (auditError) {

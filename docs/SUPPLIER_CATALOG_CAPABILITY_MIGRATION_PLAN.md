@@ -245,3 +245,22 @@ curl -s "http://localhost:3001/api/tenants/<tenantId>/suppliers" -H "Authorizati
 | 5 | Remove feature flag | Medium — no fallback if capability misconfigured | Yes (re-add flag) |
 
 **Key principle**: The feature flag (`FF_SUPPLIER_CATALOG_IMPORT`) remains functional through Phase 4. It's only removed in Phase 5 after the capability gate is proven to work correctly in production.
+
+---
+
+## Post-Migration: Three-Tier Gating Strategy (Phase 6)
+
+After completing the feature flag migration (Phases 1-5), the supplier catalog feature was moved from "enabled for all tiers" to the platform's three-tier gating pattern. See `.devin/skills/three-tier-feature-gating.md` for the canonical pattern.
+
+### Tier Assignments
+
+| Tier Category | Tiers | How They Get It |
+|---------------|-------|-----------------|
+| Flexible (automatic) | professional, chain_professional, organization, enterprise, trial_professional | Resolver auto-enables via `isFlexible` flag |
+| Explicit (mid-tier) | commitment, ecommerce, omnichannel, chain_starter + trials | `tier_features_list` assignment (from migration 082) |
+| BSaaS Purchasable | discovery, storefront + trials | Self-service purchase via Feature Store ($15/mo, 14-day trial) |
+
+### Migration Files
+
+- `082_supplier_catalog_capability.sql` — Initial setup, enabled for all tiers (Phases 1-5)
+- `083_supplier_catalog_tier_strategy.sql` — Applies three-tier pattern: removes lower-tier assignments, adds BSaaS catalog entry

@@ -34,7 +34,7 @@ import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { itemsService } from '@/services/ItemsSingletonService';
-import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import type { TenantCatalogItem, BarcodeEnrichment } from '@/services/SupplierImportService';
 
 import WizardProgress from './components/WizardProgress';
@@ -364,9 +364,9 @@ export default function ItemCreationWizard({
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const isEditing = !!productId;
 
-  // Feature flag: show catalog search step 0 when enabled
-  const ffSupplierCatalog = useFeatureFlag('FF_SUPPLIER_CATALOG_IMPORT');
-  const catalogEnabled = !isEditing && ffSupplierCatalog;
+  // Capability gate: show catalog search step 0 when supplier catalog is enabled
+  const { data: productOptionsCap } = useProductOptionsCapability(tenantId);
+  const catalogEnabled = !isEditing && !!productOptionsCap?.effectiveShowsSupplierCatalog;
   const STEPS = catalogEnabled ? [CATALOG_STEP, ...BASE_STEPS] : BASE_STEPS;
   const stepOffset = catalogEnabled ? 1 : 0;
 

@@ -3,6 +3,7 @@
  * Multi-factor authentication management (Auth0-powered)
  */
 
+import { Title, Text, Stack } from '@mantine/core';
 import { Auth0MFASettings } from '@/components/security/auth0-mfa/Auth0MFASettings';
 
 
@@ -16,15 +17,15 @@ export const metadata = {
 
 export default function MFASettingsPage() {
   return (
-    <div className="space-y-6">
+    <Stack gap="lg">
       <div>
-        <h1 className="text-3xl font-bold">Two-Factor Authentication</h1>
-        <p className="text-muted-foreground mt-2">
+        <Title order={1}>Two-Factor Authentication</Title>
+        <Text c="dimmed" mt="sm">
           Add an extra layer of security to your account with Auth0-powered 2FA
-        </p>
+        </Text>
       </div>
       
       <Auth0MFASettings />
-    </div>
+    </Stack>
   );
 }

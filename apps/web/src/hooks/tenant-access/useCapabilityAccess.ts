@@ -35,6 +35,7 @@ import {
   CrmOptionsState,
   ChatbotOptionsState,
   SocialCommerceOptionsState,
+  DirectoryPromotionState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -545,6 +546,38 @@ export function useSocialCommerceOptionsCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch social commerce options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useDirectoryPromotionCapability
+// ====================
+
+export function useDirectoryPromotionCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<DirectoryPromotionState> {
+  const [data, setData] = useState<DirectoryPromotionState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getDirectoryPromotionState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch directory promotion capability');
     } finally {
       setLoading(false);
     }

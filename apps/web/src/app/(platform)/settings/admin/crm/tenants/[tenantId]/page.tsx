@@ -16,6 +16,7 @@ const TABS = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'contacts', label: 'Contacts' },
   { key: 'transactions', label: 'Transactions' },
+  { key: 'promotion', label: 'Promotion' },
 ];
 
 export default function CrmTenantDetailPage() {
@@ -126,6 +127,7 @@ export default function CrmTenantDetailPage() {
       {activeTab === 'tasks' && <TasksTab tenantId={tenantId} />}
       {activeTab === 'contacts' && <ContactsTab tenantId={tenantId} />}
       {activeTab === 'transactions' && <TransactionsTab tenantId={tenantId} />}
+      {activeTab === 'promotion' && <PromotionTab tenantId={tenantId} />}
     </div>
     </CrmPageShell>
   );
@@ -953,6 +955,107 @@ function TransactionsTab({ tenantId }: { tenantId: string }) {
         </table>
         {orders.length === 0 && <p className="text-center text-neutral-500 py-6">No orders</p>}
       </div>
+    </div>
+  );
+}
+
+function PromotionTab({ tenantId }: { tenantId: string }) {
+  const [data, setData] = useState<{ activePurchase: any | null; purchases: any[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    crmAdminService.getTenantPromotion(tenantId)
+      .then(setData)
+      .catch(err => console.error('[Promotion Tab] Error:', err))
+      .finally(() => setLoading(false));
+  }, [tenantId]);
+
+  if (loading) return <div className="py-8 text-center"><Spinner /></div>;
+
+  const active = data?.activePurchase;
+  const purchases = data?.purchases ?? [];
+
+  const statusColors: Record<string, string> = {
+    active: 'bg-green-100 text-green-800',
+    grace_period: 'bg-red-100 text-red-800',
+    expired: 'bg-gray-100 text-gray-800',
+    cancelled: 'bg-gray-100 text-gray-800',
+    pending: 'bg-amber-100 text-amber-800',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Current Promotion Status */}
+      <Card>
+        <CardHeader><CardTitle>Current Promotion</CardTitle></CardHeader>
+        <CardContent>
+          {active ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[active.status] || 'bg-gray-100 text-gray-800'}`}>
+                  {active.status}
+                </span>
+                <span className="text-sm font-medium capitalize">{active.tier}</span>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div><dt className="text-neutral-500">Purchase ID</dt><dd className="font-mono text-xs">{active.id}</dd></div>
+                <div><dt className="text-neutral-500">Price</dt><dd>${((active.priceCents || 0) / 100).toFixed(2)}</dd></div>
+                <div><dt className="text-neutral-500">Started</dt><dd>{active.startsAt ? new Date(active.startsAt).toLocaleDateString() : '—'}</dd></div>
+                <div><dt className="text-neutral-500">Expires</dt><dd>{active.expiresAt ? new Date(active.expiresAt).toLocaleDateString() : '—'}</dd></div>
+                {active.gracePeriodEndsAt && (
+                  <div><dt className="text-neutral-500">Grace Period Ends</dt><dd className="text-red-600">{new Date(active.gracePeriodEndsAt).toLocaleDateString()}</dd></div>
+                )}
+                <div><dt className="text-neutral-500">Auto-Renew</dt><dd>{active.autoRenew ? 'Yes' : 'No'}</dd></div>
+              </dl>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-500">No active directory promotion</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Purchase History */}
+      <Card>
+        <CardHeader><CardTitle>Purchase History</CardTitle></CardHeader>
+        <CardContent>
+          {purchases.length === 0 ? (
+            <p className="text-sm text-neutral-500">No promotion purchases</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-neutral-50 dark:bg-neutral-800">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium">Purchase ID</th>
+                    <th className="text-left px-4 py-3 font-medium">Tier</th>
+                    <th className="text-left px-4 py-3 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 font-medium">Price</th>
+                    <th className="text-left px-4 py-3 font-medium">Period</th>
+                    <th className="text-left px-4 py-3 font-medium">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {purchases.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                      <td className="px-4 py-3 font-mono text-xs">{p.id}</td>
+                      <td className="px-4 py-3 capitalize">{p.tier}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[p.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">${((p.priceCents || 0) / 100).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">
+                        {p.startsAt ? new Date(p.startsAt).toLocaleDateString() : '—'} → {p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

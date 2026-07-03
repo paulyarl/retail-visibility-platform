@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Star, MapPin, Package } from 'lucide-react';
+import { directorySingletonService } from '@/services/DirectorySingletonService';
 
 interface PromotedStore {
   tenantId: string;
@@ -31,13 +32,8 @@ export default function PromotedStoresCarousel() {
   useEffect(() => {
     const fetchPromoted = async () => {
       try {
-        const res = await fetch('/api/directory/stores?limit=100&sort=activity');
-        if (!res.ok) throw new Error('Failed to fetch');
-        const data = await res.json();
-        const promoted = (data.listings || []).filter(
-          (s: any) => s.isPromoted && s.promotionTier,
-        );
-        setStores(promoted.slice(0, 12));
+        const promoted = await directorySingletonService.getPromotedStores(12);
+        setStores(promoted);
       } catch {
         setError(true);
       } finally {

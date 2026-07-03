@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Badge, Button, Tooltip } from '@/components/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 
 interface StoreCardProps {
   listing: {
@@ -47,6 +48,7 @@ interface StoreCardProps {
 
 export default function StoreCard({ listing, index, contextCategory }: StoreCardProps) {
   const router = useRouter();
+  const promotedBadge = useBadgeMeta('directory_promoted');
 
   // Determine destination URL based on tier and settings
   const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
@@ -111,7 +113,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
               </div>
             )}
 
-            {/* Promoted Badge */}
+            {/* Promoted Badge — registry-driven */}
             {listing.isPromoted && (
               <div className="absolute top-2 left-2">
                 <Badge variant="warning" className={`text-xs font-semibold ${
@@ -119,7 +121,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
                   listing.promotionTier === 'premium' ? 'bg-blue-500 text-white' :
                   ''
                 }`}>
-                  ⭐ {(listing.promotionTier?.charAt(0) ?? '').toUpperCase() + (listing.promotionTier?.slice(1) ?? '') || 'Promoted'}
+                  {promotedBadge?.icon ?? '⭐'} {(listing.promotionTier?.charAt(0) ?? '').toUpperCase() + (listing.promotionTier?.slice(1) ?? '') || (promotedBadge?.label ?? 'Promoted')}
                 </Badge>
               </div>
             )}

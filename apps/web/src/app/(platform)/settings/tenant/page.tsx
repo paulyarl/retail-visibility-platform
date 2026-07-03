@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import Link from "next/link";
-import { Card, Group, Switch, Text, Progress, Avatar, Badge as MantineBadge, ActionIcon, SimpleGrid, UnstyledButton, Button } from '@mantine/core';
-import { Card as LegacyCard, Badge, Alert, Modal, ModalFooter, Spinner, CardContent } from "@/components/ui";
+import { Card, Group, Switch, Text, Progress, Avatar, Badge, ActionIcon, SimpleGrid, UnstyledButton, Button, Alert, Modal, Loader, Title, Stack, Select, Textarea as MantineTextarea } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { IconUpload, IconUsers, IconPackage, IconChartBar, IconBuildingStore, IconShoppingCart, IconPhoto, IconSettings } from '@tabler/icons-react';
 import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
 import GBPCategoryCard from "@/components/settings/GBPCategoryCard";
@@ -18,6 +18,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
 import { isPlatformAdmin } from "@/lib/auth/access-control";
 import { BusinessProfile, geocodeAddress } from "@/lib/validation/businessProfile";
+
+export const dynamic = 'force-dynamic';
 
 type Tenant = {
   id: string;
@@ -77,8 +79,8 @@ export default function TenantSettingsPage() {
     if (typeof window === 'undefined') return;
     const id = localStorage.getItem('tenantId');
     const override = localStorage.getItem('ff_tenant_urls') === 'on';
-    if (id && (override || true)) {
-      // Prefer canonical route; this avoids duplicate settings variants
+    if (id && override) {
+      // Prefer canonical route when feature flag is enabled
       window.location.replace(`/t/${encodeURIComponent(id)}/settings`);
     }
   }, []);
@@ -235,12 +237,12 @@ export default function TenantSettingsPage() {
       <div className="min-h-screen bg-neutral-50">
         <div className="bg-white border-b border-neutral-200 dark:border-neutral-700 mb-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
+            <Title order={1}>{t('settings.tenant.title', 'Tenant Settings')}</Title>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" className="text-primary-600" />
+            <Loader size="lg" />
           </div>
         </div>
       </div>
@@ -252,11 +254,11 @@ export default function TenantSettingsPage() {
       <div className="min-h-screen bg-neutral-50">
         <div className="bg-white border-b border-neutral-200 dark:border-neutral-700 mb-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{t('settings.tenant.title', 'Tenant Settings')}</h1>
+            <Title order={1}>{t('settings.tenant.title', 'Tenant Settings')}</Title>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Alert variant="error" title="Error">
+          <Alert color="red" title="Error">
             {error || t('common.error', 'An error occurred')}
           </Alert>
           <div className="mt-4">
@@ -294,8 +296,8 @@ export default function TenantSettingsPage() {
                 />
               )}
               <div>
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">{tenant.name}</h2>
-                <p className="text-sm text-neutral-500">Profile Completion: {Math.round(((profile?.business_name ? 1 : 0) + (profile?.address_line1 ? 1 : 0) + (profile?.phone_number ? 1 : 0) + (profile?.email ? 1 : 0) + ((tenant.metadata as any)?.logo_url ? 1 : 0)) / 5 * 100)}%</p>
+                <Title order={2}>{tenant.name}</Title>
+                <Text size="sm" c="dimmed">Profile Completion: {Math.round(((profile?.business_name ? 1 : 0) + (profile?.address_line1 ? 1 : 0) + (profile?.phone_number ? 1 : 0) + (profile?.email ? 1 : 0) + ((tenant.metadata as any)?.logo_url ? 1 : 0)) / 5 * 100)}%</Text>
               </div>
             </div>
             <a
@@ -357,7 +359,7 @@ export default function TenantSettingsPage() {
                     });
                   } catch (err) {
                     console.error('Failed to update business profile:', err);
-                    alert('Failed to update business profile');
+                    notifications.show({ title: 'Error', message: 'Failed to update business profile', color: 'red' });
                   }
                 }}
               />
@@ -409,7 +411,7 @@ export default function TenantSettingsPage() {
                     }) as any : prev);
                   } catch (err) {
                     console.error('Failed to update map settings:', err);
-                    alert('Failed to update map settings');
+                    notifications.show({ title: 'Error', message: 'Failed to update map settings', color: 'red' });
                   }
                 }}
               />
@@ -419,22 +421,22 @@ export default function TenantSettingsPage() {
           {/* Right Column - Secondary Content */}
           <div className="space-y-6">
             {/* Tenant Information */}
-        <LegacyCard className="p-6 rounded-lg">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
+        <Card withBorder p="lg" radius="md">
+          <Stack gap="md">
+            <Group gap="sm" mb="md">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Information</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Basic information about your tenant</p>
+              <div>
+                <Title order={3}>Tenant Information</Title>
+                <Text size="sm" c="dimmed">Basic information about your tenant</Text>
               </div>
-            </div>
+            </Group>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
                   <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Tenant ID</p>
                   <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Unique identifier for your tenant</p>
                 </div>
-                <Badge variant="default">{tenant.id}</Badge>
+                <Badge variant="light">{tenant.id}</Badge>
               </div>
 
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
@@ -445,20 +447,20 @@ export default function TenantSettingsPage() {
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{tenant.name}</p>
               </div>
             </div>
-          </div>
-        </LegacyCard>
+          </Stack>
+        </Card>
 
         {/* Organization Assignment - Different UI for ADMIN vs OWNER */}
-        <LegacyCard className="p-6 rounded-lg">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <Card withBorder p="lg" radius="md">
+          <Stack gap="md">
+            <Group justify="space-between">
               <div>
-                <h3 className="text-lg font-semibold">Organization / Chain Assignment</h3>
-                <p className="text-sm text-neutral-600">
+                <Title order={3}>Organization / Chain Assignment</Title>
+                <Text size="sm" c="dimmed">
                   {user && isPlatformAdmin(user)
                     ? 'Assign this tenant to a chain organization (Admin Only)' 
                     : 'Request to join a chain organization'}
-                </p>
+                </Text>
               </div>
               {user && isPlatformAdmin(user) && !editingOrg && (
                 <button
@@ -476,7 +478,7 @@ export default function TenantSettingsPage() {
                   Request to Join
                 </Button>
               )}
-            </div>
+            </Group>
             <div className="space-y-4">
               {/* Current Organization Status */}
               <div className="flex items-center justify-between py-3">
@@ -506,12 +508,12 @@ export default function TenantSettingsPage() {
                         <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <Badge variant="default" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                        <Badge color="orange" variant="light">
                           {tenant.organization.name}
                         </Badge>
                       </>
                     ) : (
-                      <Badge variant="default">Standalone</Badge>
+                      <Badge variant="light">Standalone</Badge>
                     )}
                   </div>
                 )}
@@ -537,7 +539,7 @@ export default function TenantSettingsPage() {
                         setEditingOrg(false);
                       } catch (err) {
                         console.error('Failed to update organization:', err);
-                        alert('Failed to save changes. Please try again.');
+                        notifications.show({ title: 'Error', message: 'Failed to save changes. Please try again.', color: 'red' });
                       } finally {
                         setSavingOrg(false);
                       }
@@ -561,7 +563,7 @@ export default function TenantSettingsPage() {
 
               {/* Pending Request Status (for OWNER) */}
               {user?.role === 'OWNER' && pendingRequest && (
-                <Alert variant="info" title="Request Pending">
+                <Alert color="blue" title="Request Pending">
                   <div className="space-y-2">
                     <p className="text-sm">
                       Your request to join <strong>{pendingRequest.organization?.name}</strong> is pending admin approval.
@@ -592,12 +594,12 @@ export default function TenantSettingsPage() {
                           </Button>
                         )}
                         {pendingRequest.costAgreed && (
-                          <Badge variant="success" className="mt-2">Cost Agreed</Badge>
+                          <Badge color="green" variant="light" mt={4}>Cost Agreed</Badge>
                         )}
                       </div>
                     )}
                     <Button
-                      variant="secondary"
+                      variant="default"
                       size="sm"
                       onClick={async () => {
                         if (confirm('Are you sure you want to cancel this request?')) {
@@ -618,23 +620,23 @@ export default function TenantSettingsPage() {
 
               {/* No Organizations Alert */}
               {!editingOrg && organizations.length === 0 && user && isPlatformAdmin(user) && (
-                <Alert variant="info" title="No Organizations Available">
+                <Alert color="blue" title="No Organizations Available">
                   <p className="text-sm">
                     No chain organizations have been created yet. Create an organization first to assign this tenant to a chain.
                   </p>
-                  <Link href="/admin/organizations" className="text-sm text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
+                  <Link href="/settings/admin/organizations" className="text-sm text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
                     Go to Organizations →
                   </Link>
                 </Alert>
               )}
             </div>
-          </div>
-        </LegacyCard>
+          </Stack>
+        </Card>
 
         {/* Request Modal (for OWNER) */}
         {showRequestModal && (
           <Modal
-            isOpen={showRequestModal}
+            opened={showRequestModal}
             onClose={() => {
               setShowRequestModal(false);
               setSelectedOrgId('');
@@ -674,7 +676,7 @@ export default function TenantSettingsPage() {
                 />
               </div>
 
-              <Alert variant="info" title="What happens next?">
+              <Alert color="blue" title="What happens next?">
                 <ol className="text-sm space-y-1 list-decimal list-inside">
                   <li>Your request will be sent to platform administrators</li>
                   <li>Admin will review and provide estimated costs</li>
@@ -684,9 +686,9 @@ export default function TenantSettingsPage() {
               </Alert>
             </div>
 
-            <ModalFooter>
+            <Group justify="flex-end" mt="md">
               <Button
-                variant="secondary"
+                variant="default"
                 onClick={() => {
                   setShowRequestModal(false);
                   setSelectedOrgId('');
@@ -698,7 +700,7 @@ export default function TenantSettingsPage() {
               <Button
                 onClick={async () => {
                   if (!selectedOrgId) {
-                    alert('Please select an organization');
+                    notifications.show({ title: 'Warning', message: 'Please select an organization', color: 'yellow' });
                     return;
                   }
                   
@@ -717,27 +719,27 @@ export default function TenantSettingsPage() {
                       setSelectedOrgId('');
                       setRequestNotes('');
                     } else {
-                      alert('Failed to submit request');
+                      notifications.show({ title: 'Error', message: 'Failed to submit request', color: 'red' });
                     }
                   } catch (err) {
                     console.error('Failed to submit request:', err);
-                    alert('Failed to submit request. Please try again.');
+                    notifications.show({ title: 'Error', message: 'Failed to submit request. Please try again.', color: 'red' });
                   }
                 }}
                 disabled={!selectedOrgId}
               >
                 Submit Request
               </Button>
-            </ModalFooter>
+            </Group>
           </Modal>
         )}
 
         {/* Regional Settings */}
-        <LegacyCard className="p-6 rounded-lg">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <Card withBorder p="lg" radius="md">
+          <Stack gap="md">
+            <Group justify="space-between">
               <div>
-                <h3 className="text-lg font-semibold">Regional Settings</h3>
+                <Title order={3}>Regional Settings</Title>
                 <p className="text-sm text-neutral-600">Location and localization preferences</p>
               </div>
               {!editingRegional && (
@@ -748,7 +750,7 @@ export default function TenantSettingsPage() {
                   Edit
                 </button>
               )}
-            </div>
+            </Group>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
@@ -771,7 +773,7 @@ export default function TenantSettingsPage() {
                     <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <Badge variant="info">{regionalSettings.region}</Badge>
+                    <Badge color="blue" variant="light">{regionalSettings.region}</Badge>
                   </div>
                 )}
               </div>
@@ -825,7 +827,7 @@ export default function TenantSettingsPage() {
                     <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <Badge variant="success">{regionalSettings.currency}</Badge>
+                    <Badge color="green" variant="light">{regionalSettings.currency}</Badge>
                   </div>
                 )}
               </div>
@@ -843,7 +845,7 @@ export default function TenantSettingsPage() {
                         }
                       } catch (err) {
                         console.error('Failed to update regional settings:', err);
-                        alert('Failed to save changes');
+                        notifications.show({ title: 'Error', message: 'Failed to save changes', color: 'red' });
                       } finally {
                         setSavingRegional(false);
                       }
@@ -869,15 +871,15 @@ export default function TenantSettingsPage() {
                 </div>
               )}
             </div>
-          </div>
-        </LegacyCard>
+          </Stack>
+        </Card>
 
         {/* Compliance */}
-        <LegacyCard className="p-6 rounded-lg">
-          <div className="space-y-4">
+        <Card withBorder p="lg" radius="md">
+          <Stack gap="md">
             <div>
-              <h3 className="text-lg font-semibold">Compliance & Privacy</h3>
-              <p className="text-sm text-neutral-600">Data policy and compliance settings</p>
+              <Title order={3}>Compliance & Privacy</Title>
+              <Text size="sm" c="dimmed">Data policy and compliance settings</Text>
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
@@ -890,20 +892,20 @@ export default function TenantSettingsPage() {
                     <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <Badge variant="success">Accepted</Badge>
+                    <Badge color="green" variant="light">Accepted</Badge>
                   </>
                 ) : (
                   <>
                     <svg className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <Badge variant="warning">Pending</Badge>
+                    <Badge color="yellow" variant="light">Pending</Badge>
                   </>
                 )}
               </div>
             </div>
-          </div>
-        </LegacyCard>
+          </Stack>
+        </Card>
 
           </div>
         </div>
@@ -949,9 +951,9 @@ export default function TenantSettingsPage() {
                 <Text size="sm" c="dimmed">Platform usage overview</Text>
               </div>
             </div>
-            <MantineBadge color="blue" variant="light">
+            <Badge color="blue" variant="light">
               Active
-            </MantineBadge>
+            </Badge>
           </Group>
 
           <Text size="sm" c="dimmed" mb="md">
@@ -1137,10 +1139,10 @@ export default function TenantSettingsPage() {
         </Card>
 
         {/* Help Section */}
-        <LegacyCard className="p-6 rounded-lg">
-          <div className="space-y-4">
+        <Card withBorder p="lg" radius="md">
+          <Stack gap="md">
             <div>
-              <h3 className="text-lg font-semibold">Need Help?</h3>
+              <Title order={3}>Need Help?</Title>
               <p className="text-sm text-neutral-600">Resources and support</p>
             </div>
             <div className="space-y-3">
@@ -1163,8 +1165,8 @@ export default function TenantSettingsPage() {
                 </div>
               </a>
             </div>
-          </div>
-        </LegacyCard>
+          </Stack>
+        </Card>
       </div>
     </div>
   );

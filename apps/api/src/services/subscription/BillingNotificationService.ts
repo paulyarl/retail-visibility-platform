@@ -38,7 +38,12 @@ export type BillingNotificationType =
   | 'featured_placement_renewal_success'
   | 'featured_placement_renewal_failed'
   | 'featured_placement_grace_period_warning'
-  | 'featured_placement_expired';
+  | 'featured_placement_expired'
+  | 'directory_promotion_purchased'
+  | 'directory_promotion_renewal_success'
+  | 'directory_promotion_renewal_failed'
+  | 'directory_promotion_grace_period_warning'
+  | 'directory_promotion_expired';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -315,6 +320,46 @@ class BillingNotificationService {
           subject: `Featured Placement Expired - ${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'} - ${businessName}`,
           html: this.buildFeaturedPlacementExpiredHtml(ownerName, businessName, data),
           text: this.buildFeaturedPlacementExpiredText(ownerName, businessName, data),
+        };
+
+      case 'directory_promotion_purchased':
+        return {
+          to: toEmail,
+          subject: `Directory Promotion Active - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
+          html: this.buildDirectoryPromotionPurchasedHtml(ownerName, businessName, data),
+          text: this.buildDirectoryPromotionPurchasedText(ownerName, businessName, data),
+        };
+
+      case 'directory_promotion_renewal_success':
+        return {
+          to: toEmail,
+          subject: `Directory Promotion Renewed - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
+          html: this.buildDirectoryPromotionRenewalSuccessHtml(ownerName, businessName, data),
+          text: this.buildDirectoryPromotionRenewalSuccessText(ownerName, businessName, data),
+        };
+
+      case 'directory_promotion_renewal_failed':
+        return {
+          to: toEmail,
+          subject: `Payment Failed: Directory Promotion Renewal - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
+          html: this.buildDirectoryPromotionRenewalFailedHtml(ownerName, businessName, data),
+          text: this.buildDirectoryPromotionRenewalFailedText(ownerName, businessName, data),
+        };
+
+      case 'directory_promotion_grace_period_warning':
+        return {
+          to: toEmail,
+          subject: `Action Required: Directory Promotion Grace Period - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
+          html: this.buildDirectoryPromotionGracePeriodHtml(ownerName, businessName, data),
+          text: this.buildDirectoryPromotionGracePeriodText(ownerName, businessName, data),
+        };
+
+      case 'directory_promotion_expired':
+        return {
+          to: toEmail,
+          subject: `Directory Promotion Expired - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
+          html: this.buildDirectoryPromotionExpiredHtml(ownerName, businessName, data),
+          text: this.buildDirectoryPromotionExpiredText(ownerName, businessName, data),
         };
 
       default:
@@ -1057,6 +1102,36 @@ Your new plan is now active.`;
           body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} has expired. The product is no longer in the spotlight channel.`,
           icon: '⌛',
         };
+      case 'directory_promotion_purchased':
+        return {
+          title: 'Directory promotion activated',
+          body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} is now active. Your store will be highlighted in the directory${data.metadata?.expiresAt ? ` until ${new Date(data.metadata.expiresAt).toLocaleDateString()}` : ''}.`,
+          icon: '📍',
+        };
+      case 'directory_promotion_renewal_success':
+        return {
+          title: 'Directory promotion renewed',
+          body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} has been renewed${data.metadata?.expiresAt ? ` until ${new Date(data.metadata.expiresAt).toLocaleDateString()}` : ''}.`,
+          icon: '📍',
+        };
+      case 'directory_promotion_renewal_failed':
+        return {
+          title: 'Directory promotion renewal payment failed',
+          body: `Payment for directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" on ${tenantName} failed. ${data.gracePeriodDaysRemaining || 7} days remaining to update your payment method.`,
+          icon: '⚠️',
+        };
+      case 'directory_promotion_grace_period_warning':
+        return {
+          title: 'Directory promotion grace period warning',
+          body: `Payment for directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" on ${tenantName} failed. ${data.gracePeriodDaysRemaining || 7} days remaining in grace period to update your payment method.`,
+          icon: '⏰',
+        };
+      case 'directory_promotion_expired':
+        return {
+          title: 'Directory promotion expired',
+          body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} has expired. Your store is no longer highlighted in the directory.`,
+          icon: '⌛',
+        };
       default:
         return {
           title: 'Subscription update',
@@ -1425,6 +1500,184 @@ Your featured placement ${planLabel} for ${business} has expired.
 The product is no longer in the spotlight channel. You can renew your placement to restore featured visibility.
 
 Renew at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/featured-store`;
+  }
+
+  // Email templates - Directory Promotion Purchased
+  private buildDirectoryPromotionPurchasedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const expiresAt = data.metadata?.expiresAt ? new Date(data.metadata.expiresAt).toLocaleDateString() : 'N/A';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Directory Promotion Active</h2>
+        <p>Hi ${name},</p>
+        <p>Your directory promotion for <strong>${business}</strong> is now active!</p>
+        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Tier:</strong> ${tierLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Expires:</strong> ${expiresAt}</p>
+          <p style="margin: 8px 0 0;"><strong>Price:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your store will be highlighted in the directory with a promoted badge and priority placement.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Promotion</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildDirectoryPromotionPurchasedText(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const expiresAt = data.metadata?.expiresAt ? new Date(data.metadata.expiresAt).toLocaleDateString() : 'N/A';
+    return `Hi ${name},
+
+Your directory promotion ${tierLabel} for ${business} is now active!
+
+Tier: ${tierLabel}
+Expires: ${expiresAt}
+Price: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your store will be highlighted in the directory with a promoted badge and priority placement.
+
+Manage at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion`;
+  }
+
+  // Email templates - Directory Promotion Renewal Success
+  private buildDirectoryPromotionRenewalSuccessHtml(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const expiresAt = data.metadata?.expiresAt ? new Date(data.metadata.expiresAt).toLocaleDateString() : 'N/A';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Directory Promotion Renewed</h2>
+        <p>Hi ${name},</p>
+        <p>Your directory promotion for <strong>${business}</strong> has been successfully renewed.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Tier:</strong> ${tierLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>New Expiration:</strong> ${expiresAt}</p>
+          <p style="margin: 8px 0 0;"><strong>Price:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your store will continue to be highlighted in the directory.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Manage Promotion</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildDirectoryPromotionRenewalSuccessText(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const expiresAt = data.metadata?.expiresAt ? new Date(data.metadata.expiresAt).toLocaleDateString() : 'N/A';
+    return `Hi ${name},
+
+Your directory promotion ${tierLabel} for ${business} has been renewed!
+
+Tier: ${tierLabel}
+New Expiration: ${expiresAt}
+Price: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your store will continue to be highlighted in the directory.
+
+Manage at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion`;
+  }
+
+  // Email templates - Directory Promotion Renewal Failed
+  private buildDirectoryPromotionRenewalFailedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const graceDays = data.gracePeriodDaysRemaining || 7;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Payment Failed: Directory Promotion Renewal</h2>
+        <p>Hi ${name},</p>
+        <p>We were unable to charge your payment method for the directory promotion on <strong>${business}</strong>.</p>
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Tier:</strong> ${tierLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Grace Period:</strong> ${graceDays} days remaining</p>
+        </div>
+        <p>Please update your payment method within ${graceDays} days to avoid losing your directory promotion.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/billing/payment-methods" style="background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildDirectoryPromotionRenewalFailedText(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const graceDays = data.gracePeriodDaysRemaining || 7;
+    return `Hi ${name},
+
+We were unable to charge your payment method for the directory promotion ${tierLabel} on ${business}.
+
+Tier: ${tierLabel}
+Grace Period: ${graceDays} days remaining
+
+Please update your payment method within ${graceDays} days to avoid losing your directory promotion.
+
+Update payment method at: ${process.env.WEB_URL}/settings/billing/payment-methods`;
+  }
+
+  // Email templates - Directory Promotion Grace Period Warning
+  private buildDirectoryPromotionGracePeriodHtml(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const graceDays = data.gracePeriodDaysRemaining || 7;
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Action Required: Directory Promotion Grace Period</h2>
+        <p>Hi ${name},</p>
+        <p>Your directory promotion for <strong>${business}</strong> is in the grace period due to a failed payment.</p>
+        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Tier:</strong> ${tierLabel}</p>
+          <p style="margin: 8px 0 0;"><strong>Days Remaining:</strong> ${graceDays}</p>
+        </div>
+        <p>Your store is still promoted, but will lose its promoted status if payment is not updated within ${graceDays} days.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/billing/payment-methods" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildDirectoryPromotionGracePeriodText(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    const graceDays = data.gracePeriodDaysRemaining || 7;
+    return `Hi ${name},
+
+Your directory promotion ${tierLabel} for ${business} is in the grace period due to a failed payment.
+
+Tier: ${tierLabel}
+Days Remaining: ${graceDays}
+
+Your store is still promoted, but will lose its promoted status if payment is not updated within ${graceDays} days.
+
+Update payment method at: ${process.env.WEB_URL}/settings/billing/payment-methods`;
+  }
+
+  // Email templates - Directory Promotion Expired
+  private buildDirectoryPromotionExpiredHtml(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Directory Promotion Expired</h2>
+        <p>Hi ${name},</p>
+        <p>Your directory promotion for <strong>${business}</strong> has expired.</p>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Tier:</strong> ${tierLabel}</p>
+        </div>
+        <p>Your store is no longer highlighted in the directory. You can renew your promotion to restore promoted visibility.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Renew Promotion</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildDirectoryPromotionExpiredText(name: string, business: string, data: BillingNotificationData): string {
+    const tierLabel = data.metadata?.tierLabel || data.metadata?.tier || 'Promotion';
+    return `Hi ${name},
+
+Your directory promotion ${tierLabel} for ${business} has expired.
+
+Your store is no longer highlighted in the directory. You can renew your promotion to restore promoted visibility.
+
+Renew at: ${process.env.WEB_URL}/t/${data.tenantId}/settings/promotion`;
   }
 
   private buildPaymentMethodAddedText(name: string, business: string, data: BillingNotificationData): string {

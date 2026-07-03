@@ -194,6 +194,44 @@ class DirectoryPromotionServiceClass extends TenantApiSingleton {
   }
 
   // ====================
+  // ANALYTICS
+  // ====================
+
+  async getAnalytics(tenantId: string): Promise<{
+    isPromoted: boolean;
+    promotionTier: string | null;
+    promotionStartedAt: string | null;
+    promotionExpiresAt: string | null;
+    impressions: number;
+    clicks: number;
+    clickThroughRate: number;
+    daysActive: number;
+    avgImpressionsPerDay: number;
+    avgClicksPerDay: number;
+  }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/promotion/analytics`,
+      { method: 'GET' },
+      `directory-promotion-analytics-${tenantId}`,
+      this.cacheTTL
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    return {
+      isPromoted: result.data.isPromoted,
+      promotionTier: result.data.promotionTier,
+      promotionStartedAt: result.data.promotionStartedAt,
+      promotionExpiresAt: result.data.promotionExpiresAt,
+      impressions: result.data.impressions,
+      clicks: result.data.clicks,
+      clickThroughRate: result.data.clickThroughRate,
+      daysActive: result.data.daysActive,
+      avgImpressionsPerDay: result.data.avgImpressionsPerDay,
+      avgClicksPerDay: result.data.avgClicksPerDay,
+    };
+  }
+
+  // ====================
   // ADMIN: CATALOG CRUD
   // ====================
 

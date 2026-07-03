@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
   );
 
   // Use admin dashboard data hook - only fetches tenants and sync stats
-  const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminDashboardData();
+  const { tenants, loading: adminDataLoading, error: adminDataError } = useAdminDashboardData();
 
   // Track admin panel access
   useEffect(() => {
@@ -120,6 +120,188 @@ export default function AdminDashboardPage() {
           stats: 'Payment configuration',
           badge: 'NEW',
         },
+        {
+          title: 'Navigation Links',
+          description: 'Manage sidebar navigation links for all, tenant, and admin targets',
+          href: '/settings/admin/navigation',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          ),
+          color: 'bg-slate-500',
+          stats: 'Database-driven nav',
+          badge: 'NEW',
+        },
+        {
+          title: 'Platform Analytics',
+          description: 'View platform-wide analytics, traffic, and engagement metrics',
+          href: '/settings/admin/analytics',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-cyan-500',
+          stats: 'Traffic & engagement',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'Bot Management',
+      description: 'Manage AI chatbot configuration, guardrails, and knowledge across all tenants',
+      sections: [
+        {
+          title: 'Bot Dashboard',
+          description: 'Overview of bot activity, conversations, and tenant usage',
+          href: '/settings/admin/bot',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Bot overview',
+          badge: 'NEW',
+        },
+        {
+          title: 'Bot Guardrails',
+          description: 'Manage safety guardrails and content filters for the chatbot',
+          href: '/settings/admin/bot/guardrails',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          color: 'bg-red-500',
+          stats: 'Safety rules',
+          badge: 'NEW',
+        },
+        {
+          title: 'Bot Intents',
+          description: 'Configure bot intent recognition and routing rules',
+          href: '/settings/admin/bot/intents',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: 'Intent routing',
+          badge: 'NEW',
+        },
+        {
+          title: 'Bot Knowledge',
+          description: 'Manage knowledge embeddings, RAG sources, and refresh status',
+          href: '/settings/admin/bot/knowledge',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          ),
+          color: 'bg-teal-500',
+          stats: 'RAG embeddings',
+          badge: 'NEW',
+        },
+        {
+          title: 'Bot Skills',
+          description: 'Toggle bot skills and capabilities per tenant',
+          href: '/settings/admin/bot/skills',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          color: 'bg-purple-500',
+          stats: 'Per-tenant toggles',
+          badge: 'NEW',
+        },
+        {
+          title: 'Bot Tenants',
+          description: 'View and manage bot configuration for individual tenants',
+          href: '/settings/admin/bot/tenants',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          ),
+          color: 'bg-blue-500',
+          stats: 'Tenant configs',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'CRM',
+      description: 'Manage support tickets, tasks, and tenant CRM activity',
+      sections: [
+        {
+          title: 'CRM Dashboard',
+          description: 'Overview of tickets, tasks, and CRM analytics',
+          href: '/settings/admin/crm',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'CRM overview',
+          badge: 'NEW',
+        },
+        {
+          title: 'Global Tickets',
+          description: 'View and manage all support tickets across the platform',
+          href: '/settings/admin/crm/tickets',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.009 9.009 0 01-2.347-.615l-2.448.848c-.796.276-1.684.276-2.48 0l-2.448-.848A9.009 9.009 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          ),
+          color: 'bg-orange-500',
+          stats: 'Support tickets',
+          badge: 'NEW',
+        },
+        {
+          title: 'Tasks Kanban',
+          description: 'Manage internal tasks with Kanban board view',
+          href: '/settings/admin/crm/tasks',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          ),
+          color: 'bg-teal-500',
+          stats: 'Kanban board',
+          badge: 'NEW',
+        },
+        {
+          title: 'Requests Hub',
+          description: 'Review and process tenant requests and inquiries',
+          href: '/settings/admin/crm/requests',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          color: 'bg-amber-500',
+          stats: 'Request processing',
+          badge: 'NEW',
+        },
+        {
+          title: 'CRM Tenant List',
+          description: 'View tenant CRM activity, contacts, and engagement history',
+          href: '/settings/admin/crm/tenants',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          ),
+          color: 'bg-blue-600',
+          stats: 'Tenant CRM',
+          badge: 'NEW',
+        },
       ],
     },
     {
@@ -139,6 +321,20 @@ export default function AdminDashboardPage() {
           color: 'bg-orange-500',
           stats: 'Tenant customization',
         },
+        {
+          title: 'Capability Management',
+          description: 'View and manage capability constraints, resolvers, and feature keys',
+          href: '/settings/admin/capabilities',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+          color: 'bg-cyan-500',
+          stats: 'Constraints & resolvers',
+          badge: 'NEW',
+        },
       ],
     },
     {
@@ -148,7 +344,7 @@ export default function AdminDashboardPage() {
         {
           title: 'Tier & Feature Matrix',
           description: 'Live view of all tiers and their feature access',
-          href: '/settings/admin',
+          href: '/settings/admin/tier-system',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
@@ -219,18 +415,6 @@ export default function AdminDashboardPage() {
           badge: 'NEW',
         },
         {
-          title: 'Branding',
-          description: 'Customize platform logo, name, and appearance',
-          href: '/settings/admin/branding',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2V5a2 2 0 00-2-2h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293H9a2 2 0 00-2 2v12a4 4 0 004 4z" />
-            </svg>
-          ),
-          color: 'bg-blue-500',
-          stats: 'Platform identity',
-        },
-        {
           title: 'Sentry Monitoring',
           description: 'Error tracking, performance monitoring, and release health',
           href: '/settings/admin/sentry',
@@ -292,38 +476,24 @@ export default function AdminDashboardPage() {
           stats: 'Chain management',
           badge: 'NEW',
         },
+        {
+          title: 'Demo Tenants',
+          description: 'Manage demo and test tenant environments',
+          href: '/settings/admin/demo-tenants',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          ),
+          color: 'bg-slate-500',
+          stats: 'Test environments',
+        },
       ],
     },
     {
       title: 'Requests & Approvals',
       description: 'Review and process tenant requests',
       sections: [
-        {
-          title: 'Upgrade Requests',
-          description: 'Manage subscription upgrade requests from tenants',
-          href: '/settings/admin/upgrade-requests',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-            </svg>
-          ),
-          color: 'bg-indigo-500',
-          stats: 'Process requests',
-          badge: 'NEW',
-        },
-        {
-          title: 'Organization Requests',
-          description: 'Review and approve tenant requests to join organizations',
-          href: '/settings/admin/organization-requests',
-          icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          ),
-          color: 'bg-teal-500',
-          stats: 'Approve requests',
-          badge: 'NEW',
-        },
         {
           title: 'Account Deletion Requests',
           description: 'Review and manage user account deletion requests with 30-day grace period',
@@ -369,6 +539,82 @@ export default function AdminDashboardPage() {
           stats: '57 categories',
           badge: 'P4',
         },
+        {
+          title: 'Directory Management',
+          description: 'Manage directory listings, featured stores, and appearance',
+          href: '/settings/admin/directory',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          ),
+          color: 'bg-rose-500',
+          stats: 'Directory overview',
+          badge: 'NEW',
+        },
+        {
+          title: 'Directory Listings',
+          description: 'Review and manage all store directory listings',
+          href: '/settings/admin/directory/listings',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          ),
+          color: 'bg-rose-600',
+          stats: 'Store listings',
+          badge: 'NEW',
+        },
+        {
+          title: 'Directory Featured',
+          description: 'Manage featured stores and promoted placements in the directory',
+          href: '/settings/admin/directory/featured',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          ),
+          color: 'bg-amber-600',
+          stats: 'Featured stores',
+          badge: 'NEW',
+        },
+        {
+          title: 'Directory Appearance',
+          description: 'Configure directory page layout, colors, and display options',
+          href: '/settings/admin/directory/appearance',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          ),
+          color: 'bg-pink-500',
+          stats: 'Layout & styling',
+        },
+        {
+          title: 'Catalog Management',
+          description: 'Manage the platform product catalog and catalog rules',
+          href: '/settings/admin/catalog',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          ),
+          color: 'bg-cyan-600',
+          stats: 'Platform catalog',
+          badge: 'NEW',
+        },
+        {
+          title: 'Slug Registry',
+          description: 'Manage URL slugs and redirects across the platform',
+          href: '/settings/admin/slug-registry',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          ),
+          color: 'bg-slate-600',
+          stats: 'URL management',
+        },
       ],
     },
     {
@@ -388,24 +634,44 @@ export default function AdminDashboardPage() {
           stats: 'Platform-wide analytics',
           badge: 'NEW',
         },
-      ],
-    },
-    {
-      title: 'Google Business Profile Sync',
-      description: 'Monitor and manage GBP category synchronization',
-      sections: [
         {
-          title: 'GBP Category Sync',
-          description: 'Monitor sync status and trigger manual syncs',
-          href: '/settings/admin/gbp-sync',
+          title: 'Featured Placement Revenue',
+          description: 'View revenue from featured placement purchases across all tenants',
+          href: '/settings/admin/featured-placement-revenue',
           icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           ),
-          color: 'bg-cyan-500',
-          stats: adminDataLoading ? 'Loading...' : `${syncStats?.successRate || 0}% success rate`,
-          badge: 'M3',
+          color: 'bg-purple-600',
+          stats: 'Placement revenue',
+          badge: 'NEW',
+        },
+        {
+          title: 'Promotion Catalog',
+          description: 'Manage directory promotion plans — tiers, durations, and pricing',
+          href: '/settings/admin/promotion-catalog',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+          ),
+          color: 'bg-amber-600',
+          stats: 'Plan management',
+          badge: 'NEW',
+        },
+        {
+          title: 'Promotion Revenue',
+          description: 'Platform revenue, renewal metrics, and tier distribution for directory promotions',
+          href: '/settings/admin/promotion-revenue',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-indigo-600',
+          stats: 'Revenue analytics',
+          badge: 'NEW',
         },
       ],
     },
@@ -425,6 +691,166 @@ export default function AdminDashboardPage() {
           color: 'bg-purple-500',
           stats: 'Real-time metrics',
           badge: 'M4',
+        },
+        {
+          title: 'Data Enrichment',
+          description: 'Monitor product data enrichment pipeline and quality scores',
+          href: '/settings/admin/enrichment',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ),
+          color: 'bg-indigo-600',
+          stats: 'Enrichment pipeline',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'BSAAS',
+      description: 'Manage Buy-Sell-as-a-Service catalog, promotions, and analytics',
+      sections: [
+        {
+          title: 'BSAAS Catalog',
+          description: 'Manage the BSAAS product catalog and service offerings',
+          href: '/settings/admin/bsaas-catalog',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          ),
+          color: 'bg-violet-500',
+          stats: 'Service catalog',
+          badge: 'NEW',
+        },
+        {
+          title: 'BSAAS Promotions',
+          description: 'Manage promotional campaigns and discounts for BSAAS services',
+          href: '/settings/admin/bsaas-promotions',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          ),
+          color: 'bg-pink-600',
+          stats: 'Campaigns & discounts',
+          badge: 'NEW',
+        },
+        {
+          title: 'BSAAS Analytics',
+          description: 'View BSAAS performance, adoption, and revenue analytics',
+          href: '/settings/admin/bsaas-analytics',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-violet-600',
+          stats: 'Performance metrics',
+          badge: 'NEW',
+        },
+      ],
+    },
+    {
+      title: 'Inventory & Suppliers',
+      description: 'Monitor platform inventory and manage supplier integrations',
+      sections: [
+        {
+          title: 'Inventory Overview',
+          description: 'View platform-wide inventory stats and product counts',
+          href: '/settings/admin/inventory',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          ),
+          color: 'bg-blue-600',
+          stats: 'Platform inventory',
+          badge: 'NEW',
+        },
+        {
+          title: 'Inventory Dashboard',
+          description: 'Detailed inventory analytics, stock levels, and turnover rates',
+          href: '/settings/admin/inventory-dashboard',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+          color: 'bg-blue-700',
+          stats: 'Stock analytics',
+          badge: 'NEW',
+        },
+        {
+          title: 'Supplier Management',
+          description: 'Manage supplier accounts and integrations',
+          href: '/settings/admin/suppliers',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          ),
+          color: 'bg-teal-600',
+          stats: 'Supplier accounts',
+          badge: 'NEW',
+        },
+        {
+          title: 'Supplier Health',
+          description: 'Monitor supplier integration health and sync status',
+          href: '/settings/admin/suppliers/health',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          color: 'bg-teal-700',
+          stats: 'Integration health',
+        },
+      ],
+    },
+    {
+      title: 'Monitoring & Logs',
+      description: 'Platform monitoring, notification logs, and review moderation',
+      sections: [
+        {
+          title: 'Notification Logs',
+          description: 'View sent notification logs and delivery status across the platform',
+          href: '/settings/admin/notification-logs',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          ),
+          color: 'bg-amber-600',
+          stats: 'Delivery tracking',
+          badge: 'NEW',
+        },
+        {
+          title: 'Review Moderation',
+          description: 'Moderate customer reviews across all tenant stores',
+          href: '/settings/admin/reviews',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.009 9.009 0 01-2.347-.615l-2.448.848c-.796.276-1.684.276-2.48 0l-2.448-.848A9.009 9.009 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          ),
+          color: 'bg-purple-600',
+          stats: 'Cross-tenant moderation',
+          badge: 'NEW',
+        },
+        {
+          title: 'Tenant Limits',
+          description: 'Manage per-tenant limits for SKUs, locations, and features',
+          href: '/settings/admin/limits',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ),
+          color: 'bg-slate-600',
+          stats: 'Per-tenant limits',
+          badge: 'NEW',
         },
       ],
     },
@@ -534,6 +960,32 @@ export default function AdminDashboardPage() {
           ),
           color: 'bg-green-500',
           stats: 'Usage & limits',
+          badge: 'NEW',
+        },
+        {
+          title: 'Manual Billing',
+          description: 'Manage invoices, payment methods, service charges, and subscription control',
+          href: '/settings/admin/billing/manual-billing',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          color: 'bg-emerald-600',
+          stats: 'Invoices & charges',
+          badge: 'NEW',
+        },
+        {
+          title: 'Platform Revenue',
+          description: 'View platform revenue, subscription income, and transaction analytics',
+          href: '/settings/admin/platform-revenue',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          color: 'bg-emerald-700',
+          stats: 'Revenue analytics',
           badge: 'NEW',
         },
       ],
@@ -760,7 +1212,7 @@ export default function AdminDashboardPage() {
                 </div>
               </Link>
 
-              <Link href="/admin/capacity/overview" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
+              <Link href="/settings/admin/capacity/overview" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

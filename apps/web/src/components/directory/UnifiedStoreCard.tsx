@@ -8,6 +8,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import { MapPin, Star, Package, ExternalLink, Heart, Phone, Store } from 'lucide-react';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
+import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 
 export interface DirectoryListing {
   id: string;
@@ -89,6 +90,7 @@ export function UnifiedStoreCard({
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
+  const promotedBadge = useBadgeMeta('directory_promoted');
   // console.log(`UnifiedStoreCard - hoursStatus:`, hoursStatus);
   // console.log(`UnifiedStoreCard - listing:`, listing);
   
@@ -251,8 +253,8 @@ export function UnifiedStoreCard({
                             promotionTier === 'premium' ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
                             'bg-gradient-to-r from-amber-500 to-amber-600'
                           }`}>
-                            <Star className="w-3.5 h-3.5 fill-white" />
-                            {promotionTier?.toUpperCase() || 'PROMOTED'}
+                            <span>{promotedBadge?.icon ?? '⭐'}</span>
+                            {promotionTier?.toUpperCase() || promotedBadge?.label?.toUpperCase() || 'PROMOTED'}
                           </span>
                         )}
                         {isFeatured && !isPromoted && (
@@ -317,7 +319,7 @@ export function UnifiedStoreCard({
                     promotionTier === 'premium' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                     'bg-amber-100 text-amber-800 border-amber-200'
                   }`}>
-                    ⭐ {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || 'Promoted'}
+                    {promotedBadge?.icon ?? '⭐'} {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || (promotedBadge?.label ?? 'Promoted')}
                   </MantineBadge>
                 </div>
               )}
@@ -360,7 +362,7 @@ export function UnifiedStoreCard({
                 size="xs"
                 className="shrink-0"
               >
-                ⭐ {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || 'Promoted'}
+                {promotedBadge?.icon ?? '⭐'} {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || (promotedBadge?.label ?? 'Promoted')}
               </MantineBadge>
             )}
             {!showLogo && isFeatured && !isPromoted && (

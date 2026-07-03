@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Spinner } from '@/components/ui';
-import { Button } from '@mantine/core';
+import { Card, Title, Text, Badge, Stack, Group, SimpleGrid, Loader, Anchor } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+
+export const dynamic = 'force-dynamic';
 
 const BUSINESS_TYPES = [
   { id: 'retail', label: 'Retail Store', icon: '🏪' },
@@ -61,7 +62,7 @@ export default function ProfilePage() {
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spinner size="lg" />
+        <Loader size="lg" />
       </div>
     );
   }
@@ -71,146 +72,133 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-            <Link href="/" className="hover:text-gray-700">Dashboard</Link>
+          <nav className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+            <Link href="/" className="hover:text-neutral-700 dark:hover:text-neutral-200">Dashboard</Link>
             <span>/</span>
-            <span className="text-gray-900">Profile</span>
+            <span className="text-neutral-900 dark:text-neutral-100">Profile</span>
           </nav>
-          <h1 className="text-3xl font-bold text-gray-900">Your Profile</h1>
-          <p className="mt-2 text-gray-600">Manage your personal and business information</p>
+          <Title order={1}>Your Profile</Title>
+          <Text c="dimmed" mt="xs">Manage your personal and business information</Text>
         </div>
 
         {/* Profile Card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <Card withBorder p={0} radius="lg" className="overflow-hidden">
           {/* Personal Info Section */}
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
+            <Group justify="space-between" mb="md">
+              <Group gap="sm">
                 <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Personal Information
-              </h2>
-              <Link
-                href="/settings/account"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
+                <Title order={3}>Personal Information</Title>
+              </Group>
+              <Anchor component={Link} href="/settings/account" size="sm">
                 Edit Account Settings →
-              </Link>
-            </div>
+              </Anchor>
+            </Group>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Full Name</p>
-                <p className="text-sm font-medium text-gray-900">
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Full Name</Text>
+                <Text size="sm" fw={500}>
                   {profile.firstName || profile.lastName 
                     ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
                     : 'Not set'}
-                </p>
+                </Text>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Email</p>
-                <p className="text-sm font-medium text-gray-900">{profile.email}</p>
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Email</Text>
+                <Text size="sm" fw={500}>{profile.email}</Text>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Phone</p>
-                <p className="text-sm font-medium text-gray-900">{profile.phone || 'Not set'}</p>
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Phone</Text>
+                <Text size="sm" fw={500}>{profile.phone || 'Not set'}</Text>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Platform Role</p>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {profile.role}
-                </span>
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Platform Role</Text>
+                <Badge color="blue" variant="light">{profile.role}</Badge>
               </div>
-            </div>
+            </SimpleGrid>
           </div>
 
           {/* Business Info Section */}
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <div className="p-6 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50">
+            <Group justify="space-between" mb="md">
+              <Group gap="sm">
                 <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                Business Information
-              </h2>
+                <Title order={3}>Business Information</Title>
+              </Group>
               {!profile.businessName && (
-                <Link
-                  href="/onboarding"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
+                <Anchor component={Link} href="/onboarding" size="sm">
                   Complete Onboarding →
-                </Link>
+                </Anchor>
               )}
-            </div>
+            </Group>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Business Name</p>
-                <p className="text-sm font-medium text-gray-900">{profile.businessName || 'Not set'}</p>
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Business Name</Text>
+                <Text size="sm" fw={500}>{profile.businessName || 'Not set'}</Text>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Business Type</p>
-                <p className="text-sm font-medium text-gray-900">
+                <Text size="xs" c="dimmed" tt="uppercase" mb={4}>Business Type</Text>
+                <Text size="sm" fw={500}>
                   {profile.businessType 
                     ? BUSINESS_TYPES.find(t => t.id === profile.businessType)?.label || profile.businessType
                     : 'Not set'}
-                </p>
+                </Text>
               </div>
-            </div>
+            </SimpleGrid>
           </div>
 
           {/* Locations Section */}
           <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Group justify="space-between" mb="md">
+              <Group gap="sm">
                 <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Your Locations
-              </h2>
-              <Link
-                href="/tenants"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
+                <Title order={3}>Your Locations</Title>
+              </Group>
+              <Anchor component={Link} href="/tenants" size="sm">
                 Manage All Locations →
-              </Link>
-            </div>
+              </Anchor>
+            </Group>
 
             {profile.tenants && profile.tenants.length > 0 ? (
-              <div className="space-y-3">
+              <Stack gap="sm">
                 {profile.tenants.map((tenant) => (
                   <Link
                     key={tenant.id}
                     href={`/t/${tenant.id}/dashboard`}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700/50 transition-colors"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">{tenant.name}</p>
-                      <p className="text-sm text-gray-500">Role: {tenant.role}</p>
+                      <Text fw={500}>{tenant.name}</Text>
+                      <Text size="sm" c="dimmed">Role: {tenant.role}</Text>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Active
-                      </span>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <Group gap="sm">
+                      <Badge color="green" variant="light">Active</Badge>
+                      <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                    </div>
+                    </Group>
                   </Link>
                 ))}
-              </div>
+              </Stack>
             ) : (
               <div className="text-center py-8">
-                <svg className="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-12 h-12 text-neutral-300 dark:text-neutral-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <p className="text-gray-500 mb-4">No locations yet</p>
+                <Text c="dimmed" mb="md">No locations yet</Text>
                 <Link
                   href="/tenants"
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -223,56 +211,56 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Quick Actions */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" mt="md">
           <Link
             href="/settings/account"
-            className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all"
+            className="flex items-center gap-3 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all"
           >
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Account Settings</p>
-              <p className="text-sm text-gray-500">Password, email, security</p>
+              <Text fw={500}>Account Settings</Text>
+              <Text size="sm" c="dimmed">Password, email, security</Text>
             </div>
           </Link>
 
           <Link
             href="/tenants"
-            className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all"
+            className="flex items-center gap-3 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all"
           >
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Manage Locations</p>
-              <p className="text-sm text-gray-500">Add, edit, remove stores</p>
+              <Text fw={500}>Manage Locations</Text>
+              <Text size="sm" c="dimmed">Add, edit, remove stores</Text>
             </div>
           </Link>
 
           <Link
             href="/settings/subscription"
-            className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all"
+            className="flex items-center gap-3 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all"
           >
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Subscription</p>
-              <p className="text-sm text-gray-500">Plans, billing, invoices</p>
+              <Text fw={500}>Subscription</Text>
+              <Text size="sm" c="dimmed">Plans, billing, invoices</Text>
             </div>
           </Link>
-        </div>
+        </SimpleGrid>
       </div>
     </div>
   );

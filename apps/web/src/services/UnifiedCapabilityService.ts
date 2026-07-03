@@ -36,6 +36,8 @@ import {
   SocialCommerceMetaType,
   SocialCommerceTikTokType,
   SocialCommerceExperienceType,
+  DirectoryPromotionState,
+  PromotionTierType,
   CommercePaymentType,
   GatewayType,
   StorefrontType,
@@ -127,6 +129,7 @@ interface BackendEffectiveCapabilities {
     chatbot: BackendEffectiveChatbot;
     barcode_scan: BackendEffectiveBarcodeScan;
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
+    directory_promotion: BackendEffectiveDirectoryPromotion;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -239,6 +242,8 @@ interface BackendEffectiveProductOptions {
   shows_fulfillment: boolean;
   shows_categories: boolean;
   shows_location_availability: boolean;
+  shows_supplier_catalog: boolean;
+  effective_shows_supplier_catalog: boolean;
   creation_enabled: boolean;
   sections_enabled: boolean;
   merchant_preferences: Record<string, any>;
@@ -601,6 +606,8 @@ function mapProductOptions(b: BackendEffectiveProductOptions): ProductOptionsSta
     effectiveShowsFulfillment: b.shows_fulfillment,
     effectiveShowsCategories: b.shows_categories,
     effectiveShowsLocationAvailability: b.shows_location_availability,
+    showsSupplierCatalog: b.shows_supplier_catalog ?? false,
+    effectiveShowsSupplierCatalog: b.effective_shows_supplier_catalog ?? false,
     merchantPreferences: b.merchant_preferences as any,
     isFlexible: b.is_flexible,
     features: {},
@@ -863,6 +870,20 @@ function mapConstraintStatus(status: Record<string, BackendConstraintStatus>): C
   return result;
 }
 
+interface BackendEffectiveDirectoryPromotion {
+  enabled: boolean;
+  allowed_tiers: string[];
+  is_flexible: boolean;
+}
+
+function mapDirectoryPromotion(b: BackendEffectiveDirectoryPromotion): DirectoryPromotionState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    allowedTiers: (b.allowed_tiers || []) as PromotionTierType[],
+  };
+}
+
 function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
@@ -897,6 +918,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     crmOptions: mapCrm(b.effective.crm),
     chatbotOptions: mapChatbot(b.effective.chatbot),
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
+    directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1096,6 +1118,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     return all.socialCommerceOptions;
   }
 
+  async getDirectoryPromotionState(tenantId: string): Promise<DirectoryPromotionState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.directoryPromotion;
+  }
+
   async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
@@ -1126,6 +1153,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   crm_: 'crmOptions',
   chatbot_: 'chatbotOptions',
   social_commerce_: 'socialCommerceOptions',
+  directory_promotion_: 'directoryPromotion',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

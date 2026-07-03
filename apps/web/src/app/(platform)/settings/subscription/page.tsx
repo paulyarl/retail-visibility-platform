@@ -21,6 +21,8 @@ import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionS
 import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 
+export const dynamic = 'force-dynamic';
+
 // Simple icon component for subscription page
 const SubscriptionIcon = () => (
   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,56 +70,26 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const urlTenantId = searchParams?.get('tenantId');
   let tenantId = urlTenantId || propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
-  // Debug: Log tenant ID resolution
-  // console.log('[SubscriptionPage] Tenant ID resolution:', {
-  //   urlTenantId,
-  //   propTenantId,
-  //   localStorageId: typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null,
-  //   initialTenantId: tenantId,
-  //   userTenants: user?.tenants?.map((t: any) => t.id)
-  // });
-  
   // Validate tenant ownership - PLATFORM_ADMIN and PLATFORM_SUPPORT can access any tenant
   if (urlTenantId && user?.tenants) {
     const userTenants = user.tenants.map((t: any) => t.id);
     const isPlatformAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT';
     const isAuthorized = isPlatformAdmin || userTenants.includes(urlTenantId);
-    
-    // console.log('[SubscriptionPage] Validating URL tenant ID:', {
-    //   urlTenantId,
-    //   userTenants,
-    //   userRole: user.role,
-    //   isPlatformAdmin,
-    //   isAuthorized
-    // });
-    
     if (!isAuthorized) {
       console.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
       // Fall back to user's first tenant or localStorage
       tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
-      // console.log('[SubscriptionPage] Fell back to tenant ID:', tenantId);
-    } else {
-      // console.log('[SubscriptionPage] Access granted to tenant:', urlTenantId);
     }
   }
   
   // Use React Query hooks instead of manual API calls
   const { tenant, isLoading, error } = useTenantComplete(tenantId || '');
 
-  // Debug: Log tenant data to check effective expiration fields
-  // console.log('[SubscriptionPage] Tenant data:', tenant);
-  // console.log('[SubscriptionPage] Effective expiration:', {
-  //   effectiveExpiresAt: tenant?.effectiveExpiresAt,
-  //   effectiveExpiresType: tenant?.effectiveExpiresType,
-  //   effectiveExpiresSource: tenant?.effectiveExpiresSource,
-  // });
-
   // Cache invalidation for debugging
   const queryClient = useQueryClient();
   const invalidateCache = () => {
     if (tenantId) {
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
-      // console.log('[SubscriptionPage] Cache invalidated for tenant:', tenantId);
     }
   };
 
