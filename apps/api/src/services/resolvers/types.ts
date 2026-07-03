@@ -125,6 +125,7 @@ export interface ProductOptionsMerchantSettings {
   product_opt_fulfillment?: boolean | null;
   product_opt_categories?: boolean | null;
   product_opt_location_availability?: boolean | null;
+  product_opt_supplier_catalog?: boolean | null;
   product_options_enabled?: boolean | null;
   product_options_disabled?: boolean | null;
   page_type?: string | null;
@@ -393,6 +394,9 @@ export interface EffectiveProductOptions {
   effective_shows_fulfillment: boolean;
   effective_shows_categories: boolean;
   effective_shows_location_availability: boolean;
+  // ── Supplier catalog (creation group) ──
+  shows_supplier_catalog: boolean;
+  effective_shows_supplier_catalog: boolean;
   merchant_preferences: Record<string, any>;
   is_flexible: boolean;
 }
@@ -740,6 +744,18 @@ export interface ConstraintStatus {
 export type ConstraintStatusMap = Record<string, ConstraintStatus>;
 
 // ====================
+// DIRECTORY PROMOTION
+// ====================
+
+export type PromotionTier = 'basic' | 'premium' | 'featured';
+
+export interface EffectiveDirectoryPromotion {
+  enabled: boolean;
+  allowed_tiers: PromotionTier[];
+  is_flexible: boolean;
+}
+
+// ====================
 // SUBSCRIPTION CONTEXT
 // ====================
 
@@ -777,6 +793,7 @@ export interface EffectiveCapabilities {
     barcode_scan: EffectiveBarcodeScan;
     org_options: EffectiveOrgOptions;
     social_commerce_options: EffectiveSocialCommerceOptions;
+    directory_promotion: EffectiveDirectoryPromotion;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

@@ -376,14 +376,25 @@ const LINKS: LinkDefinition[] = [
   },
 
   {
-    id: 'store-settings',
-    label: () => 'Store Settings',
+    id: 'store-setup',
+    label: () => 'Store Setup',
     description: () => 'Profile, hours & location',
     href: (ctx) => `/t/${ctx.tenantId}/settings/tenant`,
     icon: 'Settings',
     category: 'settings',
     condition: () => true,
     score: () => 25,
+  },
+
+  {
+    id: 'all-settings',
+    label: () => 'Settings',
+    description: () => 'All settings & configuration',
+    href: (ctx) => `/t/${ctx.tenantId}/settings`,
+    icon: 'Settings',
+    category: 'settings',
+    condition: () => true,
+    score: () => 5,
   },
 
   {

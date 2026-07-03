@@ -32,6 +32,7 @@ import {
   resolveChatbotOptions,
   resolveOrgOptions,
   resolveSocialCommerceOptions,
+  resolveDirectoryPromotion,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -194,6 +195,9 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.social_commerce_options?.features || {},
       merchantBundle.socialCommerceOptions
     ),
+    resolveDirectoryPromotion(
+      rawCaps.capabilities.directory_promotion?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -224,6 +228,7 @@ export async function resolveEffectiveCapabilities(
       chatbot: effective[14],
       org_options: effective[15],
       social_commerce_options: effective[16],
+      directory_promotion: effective[17],
     },
     constraint_violations: [],
     constraint_status: {},

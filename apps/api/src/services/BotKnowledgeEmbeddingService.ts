@@ -500,11 +500,108 @@ class BotKnowledgeEmbeddingService {
   // ─── Unified Refresh ───
 
   /**
+   * Refresh directory promotion embeddings for a tenant.
+   * Reads the active promotion from directory_listings_list and chunks into
+   * a single embedding with source_type='promotion'.
+   */
+  async refreshPromotionEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    // Delete existing promotion embeddings for this tenant
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'promotion'",
+      [tenantId]
+    );
+
+    const result = await pool.query(
+      `SELECT
+        is_promoted,
+        promotion_tier,
+        promotion_started_at,
+        promotion_expires_at,
+        promotion_impressions,
+        promotion_clicks
+      FROM directory_listings_list
+      WHERE tenant_id = $1
+        AND (business_hours IS NULL OR business_hours::text != 'null')
+      LIMIT 1`,
+      [tenantId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].is_promoted) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const listing = result.rows[0];
+    const text = this.chunkPromotion(listing);
+    if (!text) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const embeddings = await this.generateEmbeddings([text]);
+    const embeddingStr = `[${embeddings[0].join(',')}]`;
+
+    await pool.query(
+      `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, chunk_index, embedding, model)
+       VALUES ($1, 'promotion', 'directory_promotion', $2, 0, $3::vector, $4)
+       ON CONFLICT (tenant_id, source_type, source_id, chunk_index) DO UPDATE SET
+         chunk_text = EXCLUDED.chunk_text,
+         embedding = EXCLUDED.embedding,
+         model = EXCLUDED.model,
+         updated_at = now()`,
+      [tenantId, text, embeddingStr, embeddingModel]
+    );
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed promotion embeddings', undefined, {
+      tenantId,
+    });
+
+    return { processed: 1, chunks: 1 };
+  }
+
+  private chunkPromotion(listing: any): string | null {
+    const tierLabels: Record<string, string> = {
+      basic: 'Basic',
+      premium: 'Premium',
+      featured: 'Featured',
+    };
+
+    const tierFeatures: Record<string, string[]> = {
+      basic: ['gold marker on map', 'promoted badge', 'higher visibility in directory'],
+      premium: ['featured in search results', 'homepage carousel spot', 'advanced analytics', 'priority support'],
+      featured: ['guaranteed top 3 position', 'custom marker icon', 'sponsored content placement', 'dedicated account manager'],
+    };
+
+    const tier = listing.promotion_tier || 'basic';
+    const parts: string[] = ['Directory Promotion:'];
+
+    parts.push(`Status: Active`);
+    parts.push(`Tier: ${tierLabels[tier] || tier}`);
+
+    if (listing.promotion_started_at) {
+      parts.push(`Started: ${new Date(listing.promotion_started_at).toLocaleDateString()}`);
+    }
+    if (listing.promotion_expires_at) {
+      parts.push(`Expires: ${new Date(listing.promotion_expires_at).toLocaleDateString()}`);
+    }
+
+    const features = tierFeatures[tier] || tierFeatures.basic;
+    parts.push(`Features: ${features.join(', ')}`);
+
+    if (listing.promotion_impressions > 0 || listing.promotion_clicks > 0) {
+      parts.push(`Performance: ${listing.promotion_impressions || 0} impressions, ${listing.promotion_clicks || 0} clicks`);
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
    * Refresh knowledge embeddings by source type (or all if not specified).
    */
   async refreshKnowledgeEmbeddings(
     tenantId: string,
-    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment'
+    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion'
   ): Promise<{ processed: number; chunks: number }> {
     if (sourceType === 'badge_registry') {
       return this.refreshBadgeRegistryEmbeddings(tenantId);
@@ -521,15 +618,19 @@ class BotKnowledgeEmbeddingService {
     if (sourceType === 'fulfillment') {
       return this.refreshFulfillmentEmbeddings(tenantId);
     }
+    if (sourceType === 'promotion') {
+      return this.refreshPromotionEmbeddings(tenantId);
+    }
 
     const badgeResult = await this.refreshBadgeRegistryEmbeddings(tenantId);
     const policyResult = await this.refreshPolicyEmbeddings(tenantId);
     const bizResult = await this.refreshBusinessInfoEmbeddings(tenantId);
     const hoursResult = await this.refreshHoursEmbeddings(tenantId);
     const fulfillmentResult = await this.refreshFulfillmentEmbeddings(tenantId);
+    const promotionResult = await this.refreshPromotionEmbeddings(tenantId);
     return {
-      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed,
-      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks,
+      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed,
+      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks,
     };
   }
 

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
-import { Button } from '@mantine/core';
+import { Card, Button, Title, Text, TextInput, Textarea, Stack, Group, SimpleGrid, Box } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { getAdminEmail, type EmailCategory } from '@/lib/admin-emails';
+
+export const dynamic = 'force-dynamic';
 
 
 interface ContactCategory {
@@ -84,7 +86,7 @@ export default function ContactPage() {
 
   const handleSendMessage = () => {
     if (!selectedCategory || !message.trim()) {
-      alert('Please select a category and enter a message');
+      notifications.show({ title: 'Missing Information', message: 'Please select a category and enter a message', color: 'yellow' });
       return;
     }
 
@@ -134,207 +136,183 @@ export default function ContactPage() {
         
         {/* Category Selection */}
         <div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-4">What can we help you with?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Title order={2} mb="md">What can we help you with?</Title>
+          <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
             {CONTACT_CATEGORIES.map((category) => (
-              <button
+              <Card
                 key={category.id}
+                withBorder
+                p="md"
                 onClick={() => handleCategorySelect(category.id)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  selectedCategory === category.id
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-neutral-200 bg-white hover:border-primary-300'
-                }`}
+                style={{
+                  cursor: 'pointer',
+                  borderColor: selectedCategory === category.id ? 'var(--mantine-color-primary-5)' : undefined,
+                  backgroundColor: selectedCategory === category.id ? 'var(--mantine-color-primary-0)' : undefined,
+                }}
               >
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl">{category.icon}</span>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-neutral-900 mb-1">{category.name}</h3>
-                    <p className="text-sm text-neutral-600">{category.description}</p>
-                  </div>
+                <Group gap="sm" align="flex-start" wrap="nowrap">
+                  <Text size="xl">{category.icon}</Text>
+                  <Stack gap={2} style={{ flex: 1 }}>
+                    <Text fw={600}>{category.name}</Text>
+                    <Text size="sm" c="dimmed">{category.description}</Text>
+                  </Stack>
                   {selectedCategory === category.id && (
-                    <span className="text-primary-500 text-xl">✓</span>
+                    <Text c="primary" size="xl">✓</Text>
                   )}
-                </div>
-              </button>
+                </Group>
+              </Card>
             ))}
-          </div>
+          </SimpleGrid>
         </div>
 
         {/* Contact Form */}
         {selectedCategory && (
-          <Card className="border-2 border-primary-500">
-            <CardHeader>
-              <CardTitle>
+          <Card withBorder p="lg">
+            <Stack gap="md">
+              <Title order={3}>
                 {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name}
-              </CardTitle>
+              </Title>
               
               {/* Purpose Blurb */}
-              <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
-                  <strong className="block mb-1">About this category:</strong>
+              <Box bg="blue.0" p="md" style={{ border: '1px solid var(--mantine-color-blue-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                <Text size="sm" c="blue.9">
+                  <Text fw={600} component="span" display="block" mb={4}>About this category:</Text>
                   {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.purposeBlurb}
-                </p>
-              </div>
+                </Text>
+              </Box>
               
-              <p className="text-sm text-neutral-600 mt-3">
+              <Text size="sm" c="dimmed">
                 Your message will be sent to our {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name.toLowerCase()} team
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Your Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="John Doe"
-                  />
-                </div>
+              </Text>
 
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Your Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="john@example.com"
-                  />
-                  <p className="text-xs text-neutral-500 mt-1">
-                    Provide your email if you'd like a response
-                  </p>
-                </div>
+              {/* Name */}
+              <TextInput
+                label="Your Name (Optional)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="John Doe"
+              />
 
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Your Phone Number (Optional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="(555) 123-4567"
-                  />
-                  <p className="text-xs text-neutral-500 mt-1">
-                    Provide your phone number for callback
-                  </p>
-                </div>
-
-                {/* Subject */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Contact Form: Inquiry"
-                  />
-                  <p className="text-xs text-neutral-500 mt-1">
-                    Customize the email subject line
-                  </p>
-                </div>
-
-                {/* Message */}
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Message <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    rows={6}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-white text-neutral-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
-                    placeholder={CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.placeholder}
-                  />
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3">
-                  <Button
-                    variant="primary"
-                    onClick={handleSendMessage}
-                    disabled={!message.trim()}
-                    className="flex-1"
-                  >
-                    Send Message
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setMessage('');
-                      setName('');
-                      setEmail('');
-                      setPhone('');
-                      setSubject('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-
-                {/* Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-blue-600 text-xl">ℹ️</span>
-                    <div className="text-sm text-blue-900">
-                      <p className="font-semibold mb-1">How it works:</p>
-                      <p>
-                        Clicking "Send Message" will open your email client with a pre-filled message 
-                        to our {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name.toLowerCase()} team. 
-                        You can review and edit before sending.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {/* Email */}
+              <div>
+                <TextInput
+                  label="Your Email (Optional)"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="john@example.com"
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  Provide your email if you'd like a response
+                </Text>
               </div>
-            </CardContent>
+
+              {/* Phone */}
+              <div>
+                <TextInput
+                  label="Your Phone Number (Optional)"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  Provide your phone number for callback
+                </Text>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <TextInput
+                  label="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Contact Form: Inquiry"
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  Customize the email subject line
+                </Text>
+              </div>
+
+              {/* Message */}
+              <Textarea
+                label="Message"
+                withAsterisk
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={6}
+                placeholder={CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.placeholder}
+              />
+
+              {/* Actions */}
+              <Group gap="sm">
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!message.trim()}
+                  style={{ flex: 1 }}
+                >
+                  Send Message
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setMessage('');
+                    setName('');
+                    setEmail('');
+                    setPhone('');
+                    setSubject('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </Group>
+
+              {/* Info */}
+              <Box bg="blue.0" p="md" style={{ border: '1px solid var(--mantine-color-blue-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                <Group gap="sm" align="flex-start" wrap="nowrap">
+                  <Text size="xl" c="blue.6">ℹ️</Text>
+                  <Stack gap={4}>
+                    <Text size="sm" fw={600} c="blue.9">How it works:</Text>
+                    <Text size="sm" c="blue.9">
+                      Clicking "Send Message" will open your email client with a pre-filled message 
+                      to our {CONTACT_CATEGORIES.find(c => c.id === selectedCategory)?.name.toLowerCase()} team. 
+                      You can review and edit before sending.
+                    </Text>
+                  </Stack>
+                </Group>
+              </Box>
+            </Stack>
           </Card>
         )}
 
         {/* Help Section */}
         {!selectedCategory && (
-          <Card className="bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <span className="text-4xl mb-4 block">💬</span>
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                  We're Here to Help!
-                </h3>
-                <p className="text-neutral-700 mb-4">
-                  Select a category above to get started. Your message will be routed to the right team 
-                  for the fastest response.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-white rounded-lg p-4">
-                    <div className="font-semibold text-neutral-900 mb-1">📧 Email</div>
-                    <div className="text-neutral-600">Routed to the right team</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4">
-                    <div className="font-semibold text-neutral-900 mb-1">⚡ Fast Response</div>
-                    <div className="text-neutral-600">Usually within 24 hours</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4">
-                    <div className="font-semibold text-neutral-900 mb-1">🎯 Targeted</div>
-                    <div className="text-neutral-600">Reaches the right experts</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
+          <Card p="xl" bg="primary.0" withBorder style={{ borderColor: 'var(--mantine-color-primary-2)' }}>
+            <Stack align="center" gap="md">
+              <Text size="xl">💬</Text>
+              <Title order={3}>
+                We're Here to Help!
+              </Title>
+              <Text c="dimmed" ta="center" maw={500}>
+                Select a category above to get started. Your message will be routed to the right team 
+                for the fastest response.
+              </Text>
+              <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" w="100%">
+                <Card withBorder p="md" bg="white">
+                  <Text fw={600} mb={4}>📧 Email</Text>
+                  <Text size="sm" c="dimmed">Routed to the right team</Text>
+                </Card>
+                <Card withBorder p="md" bg="white">
+                  <Text fw={600} mb={4}>⚡ Fast Response</Text>
+                  <Text size="sm" c="dimmed">Usually within 24 hours</Text>
+                </Card>
+                <Card withBorder p="md" bg="white">
+                  <Text fw={600} mb={4}>🎯 Targeted</Text>
+                  <Text size="sm" c="dimmed">Reaches the right experts</Text>
+                </Card>
+              </SimpleGrid>
+            </Stack>
           </Card>
         )}
 

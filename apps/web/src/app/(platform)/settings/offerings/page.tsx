@@ -1,8 +1,6 @@
 'use client';
 
-import { Card } from '@mantine/core';
-import { Button } from '@mantine/core';
-import { Badge } from '@/components/ui/Badge';
+import { Card, Button, Badge, Title, Text } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { MANAGED_SERVICES, type ServiceLevel } from '@/lib/managed-services';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
@@ -32,10 +30,10 @@ export default function OfferingsPage() {
         
         {/* What You Get Overview */}
         <section>
-          <h2 className="text-3xl font-bold text-neutral-900 mb-6 text-center">Complete Online Presence Solution</h2>
-          <p className="text-lg text-neutral-600 mb-8 text-center max-w-3xl mx-auto">
+          <Title order={2} ta="center" mb="md">Complete Online Presence Solution</Title>
+          <Text size="lg" c="dimmed" ta="center" maw={600} mx="auto" mb="xl">
             Everything you need to dominate local search and drive customers to your store
-          </p>
+          </Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Quick Start - NEW! */}
@@ -292,8 +290,8 @@ export default function OfferingsPage() {
               </svg>
             </button>
           </div>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">What's Included at Each Level</h2>
-          <p className="text-neutral-600 mb-6">Each tier builds on the previous one with clear progression: Discovery → Storefront → Commitment → E-commerce → Omnichannel → Enterprise. Tiers are aligned to business models, not just feature accumulation.</p>
+          <Title order={2} mb="xs">What's Included at Each Level</Title>
+          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: Discovery → Storefront → Commitment → E-commerce → Omnichannel → Enterprise. Tiers are aligned to business models, not just feature accumulation.</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
@@ -301,7 +299,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔍</span>
                 <h3 className="font-bold text-blue-900 text-base">Discovery</h3>
-                <Badge className="bg-blue-100 text-blue-800 text-xs">$29/mo</Badge>
+                <Badge variant="light" color="blue" size="xs">$29/mo</Badge>
               </div>
               <p className="text-xs text-blue-700 mb-2 italic">"I exist online"</p>
               <p className="text-xs text-blue-600 mb-3">People are finding my products on Google</p>
@@ -345,7 +343,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏪</span>
                 <h3 className="font-bold text-purple-900 text-base">Storefront</h3>
-                <Badge className="bg-purple-100 text-purple-800 text-xs">$59/mo</Badge>
+                <Badge variant="light" color="grape" size="xs">$59/mo</Badge>
               </div>
               <p className="text-xs text-purple-700 mb-2 italic">"I have a store online"</p>
               <p className="text-xs text-purple-600 mb-3">Shoppers are browsing — but can't act on it</p>
@@ -385,7 +383,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🛒</span>
                 <h3 className="font-bold text-green-900 text-base">Commitment</h3>
-                <Badge className="bg-green-100 text-green-800 text-xs">$79/mo</Badge>
+                <Badge variant="light" color="green" size="xs">$79/mo</Badge>
               </div>
               <p className="text-xs text-green-700 mb-2 italic">"I drive foot traffic"</p>
               <p className="text-xs text-green-600 mb-3">Deposit-only commerce for physical retailers</p>
@@ -429,7 +427,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">�️</span>
                 <h3 className="font-bold text-amber-900 text-base">E-commerce</h3>
-                <Badge className="bg-amber-100 text-amber-800 text-xs">$99/mo</Badge>
+                <Badge variant="light" color="orange" size="xs">$99/mo</Badge>
               </div>
               <p className="text-xs text-amber-700 mb-2 italic">"I sell online"</p>
               <p className="text-xs text-amber-600 mb-3">Full-payment only for online merchants</p>
@@ -469,7 +467,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔄</span>
                 <h3 className="font-bold text-indigo-900 text-base">Omnichannel</h3>
-                <Badge className="bg-indigo-100 text-indigo-800 text-xs">$149/mo</Badge>
+                <Badge variant="light" color="indigo" size="xs">$149/mo</Badge>
               </div>
               <p className="text-xs text-indigo-700 mb-2 italic">"I sell everywhere"</p>
               <p className="text-xs text-indigo-600 mb-3">Physical + online — shopper chooses path</p>
@@ -513,7 +511,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏢</span>
                 <h3 className="font-bold text-red-900 text-base">Enterprise</h3>
-                <Badge className="bg-red-100 text-red-800 text-xs">$499/mo</Badge>
+                <Badge variant="light" color="red" size="xs">$499/mo</Badge>
               </div>
               <p className="text-xs text-red-700 mb-2 italic">"I run a business empire"</p>
               <p className="text-xs text-red-600 mb-3">Multi-location with enterprise tools</p>
@@ -562,8 +560,8 @@ export default function OfferingsPage() {
 
         {/* Individual Location Subscriptions */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Individual Location Subscriptions</h2>
-          <p className="text-neutral-600 mb-6">Perfect for individual retailers and small chains</p>
+          <Title order={2} mb="xs">Individual Location Subscriptions</Title>
+          <Text c="dimmed" mb="xl">Perfect for individual retailers and small chains</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
@@ -571,7 +569,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-blue-900">Discovery</h3>
-                  <Badge variant="default" className="bg-blue-100 text-blue-800">$29/mo</Badge>
+                  <Badge variant="light" color="blue">$29/mo</Badge>
                 </div>
                 <p className="text-xs text-blue-700 italic mb-1">"I exist online"</p>
                 <p className="text-sm text-neutral-600">Get Found on Google</p>
@@ -611,7 +609,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-purple-900">Storefront</h3>
-                  <Badge variant="default" className="bg-purple-100 text-purple-800">$59/mo</Badge>
+                  <Badge variant="light" color="grape">$59/mo</Badge>
                 </div>
                 <p className="text-xs text-purple-700 italic mb-1">"I have a store online"</p>
                 <p className="text-sm text-neutral-600">Own Your Platform Presence</p>
@@ -649,12 +647,12 @@ export default function OfferingsPage() {
             {/* Commitment ($79) - POPULAR */}
             <Card className="border-2 border-green-500 shadow-lg relative" withBorder padding="lg" radius="md">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <Badge variant="success" className="bg-green-500 text-white text-xs">POPULAR</Badge>
+                <Badge color="green" variant="filled" size="xs">POPULAR</Badge>
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-green-900">Commitment</h3>
-                  <Badge variant="default" className="bg-green-100 text-green-800">$79/mo</Badge>
+                  <Badge variant="light" color="green">$79/mo</Badge>
                 </div>
                 <p className="text-xs text-green-700 italic mb-1">"I am selling online"</p>
                 <p className="text-sm text-neutral-600">Capture Intent and Drive Foot Traffic</p>
@@ -698,7 +696,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-amber-900">E-commerce</h3>
-                  <Badge variant="default" className="bg-amber-100 text-amber-800">$99/mo</Badge>
+                  <Badge variant="light" color="orange">$99/mo</Badge>
                 </div>
                 <p className="text-xs text-amber-700 italic mb-1">"I sell online"</p>
                 <p className="text-sm text-neutral-600">Full-payment only for online merchants</p>
@@ -734,7 +732,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-indigo-900">Omnichannel</h3>
-                  <Badge variant="default" className="bg-indigo-100 text-indigo-800">$149/mo</Badge>
+                  <Badge variant="light" color="indigo">$149/mo</Badge>
                 </div>
                 <p className="text-xs text-indigo-700 italic mb-1">"I sell everywhere"</p>
                 <p className="text-sm text-neutral-600">Physical + online — shopper chooses path</p>
@@ -778,7 +776,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-red-900">Enterprise</h3>
-                  <Badge variant="default" className="bg-red-100 text-red-800">$499/mo</Badge>
+                  <Badge variant="light" color="red">$499/mo</Badge>
                 </div>
                 <p className="text-xs text-red-700 italic mb-1">"I run a complete business"</p>
                 <p className="text-sm text-neutral-600">Complete Business Solution</p>
@@ -821,8 +819,8 @@ export default function OfferingsPage() {
 
         {/* Feature Mapping Display */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Marketing Benefits → Technical Features</h2>
-          <p className="text-neutral-600 mb-6">See how marketing benefits translate to technical implementation</p>
+          <Title order={2} mb="xs">Marketing Benefits → Technical Features</Title>
+          <Text c="dimmed" mb="xl">See how marketing benefits translate to technical implementation</Text>
           
           <div className="space-y-8">
             <FeatureMappingDisplay selectedTier="discovery" compact={false} />
@@ -836,16 +834,16 @@ export default function OfferingsPage() {
 
         {/* Tier Comparison Table */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Complete Tier Comparison</h2>
-          <p className="text-neutral-600 mb-6">Compare all tiers side-by-side with detailed feature breakdown</p>
+          <Title order={2} mb="xs">Complete Tier Comparison</Title>
+          <Text c="dimmed" mb="xl">Compare all tiers side-by-side with detailed feature breakdown</Text>
           
           <TierComparisonTable compact={false} />
         </section>
 
         {/* Content Consistency Validator */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Content Consistency Check</h2>
-          <p className="text-neutral-600 mb-6">Ensure alignment between marketing (/features) and admin (/settings/offerings) pages</p>
+          <Title order={2} mb="xs">Content Consistency Check</Title>
+          <Text c="dimmed" mb="xl">Ensure alignment between marketing (/features) and admin (/settings/offerings) pages</Text>
           
           <ContentConsistencyValidator showOnlyInconsistent={false} />
         </section>
@@ -857,8 +855,8 @@ export default function OfferingsPage() {
 
         {/* Managed Services */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Managed Services</h2>
-          <p className="text-neutral-600 mb-6">Let our team manage your inventory for you</p>
+          <Title order={2} mb="xs">Managed Services</Title>
+          <Text c="dimmed" mb="xl">Let our team manage your inventory for you</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Object.values(MANAGED_SERVICES).filter(s => s.id !== 'self_service').map((service) => (
@@ -903,8 +901,8 @@ export default function OfferingsPage() {
 
         {/* All Benefits Summary */}
         <section>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Everything You Need to Succeed Online</h2>
-          <p className="text-neutral-600 mb-6">All the tools to drive foot traffic and dominate local search</p>
+          <Title order={2} mb="xs">Everything You Need to Succeed Online</Title>
+          <Text c="dimmed" mb="xl">All the tools to drive foot traffic and dominate local search</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card withBorder padding="lg" radius="md">
@@ -985,10 +983,10 @@ export default function OfferingsPage() {
         <section className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-8">
           <div className="max-w-3xl mx-auto text-center">
             <div className="text-5xl mb-4">🔄</div>
-            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Flexible Plans That Grow With You</h2>
-            <p className="text-neutral-700 mb-6">
+            <Title order={2} mb="sm">Flexible Plans That Grow With You</Title>
+            <Text c="dimmed" mb="xl">
               Your business needs change, and your subscription should too. We make it easy to adjust your plan anytime.
-            </p>
+            </Text>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="bg-white rounded-lg p-6 border-2 border-green-200">
@@ -1018,10 +1016,10 @@ export default function OfferingsPage() {
 
         {/* Contact CTA */}
         <section className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-lg p-8 text-center text-white">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-lg mb-6 opacity-90">
+          <Title order={2} mb="md">Ready to Get Started?</Title>
+          <Text size="lg" mb="xl" opacity={0.9}>
             Choose the plan that's right for your business. Change it anytime as your needs evolve.
-          </p>
+          </Text>
           <div className="flex gap-4 justify-center">
             <button 
               onClick={() => window.location.href = '/settings/subscription'}

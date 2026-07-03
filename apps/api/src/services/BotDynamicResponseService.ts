@@ -328,6 +328,23 @@ class BotDynamicResponseService {
           }
         }
       }
+
+      // Directory promotion knowledge — always available when promotion embeddings exist
+      try {
+        const hasPromotion = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'promotion');
+        if (hasPromotion) {
+          const promotionResult = await knowledgeService.searchKnowledge(tenantId, message, ['promotion'], 2);
+          if (promotionResult.chunks.length > 0) {
+            knowledgeContext += '\n\nPromotion context:\n' +
+              promotionResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (promoError) {
+        logger.warn('[BotDynamicResponseService] Promotion RAG search failed, continuing without it', undefined, {
+          error: promoError instanceof Error ? promoError.message : String(promoError),
+        });
+      }
     } catch (knowledgeError) {
       logger.warn('[BotDynamicResponseService] Knowledge RAG search failed, continuing without knowledge context', undefined, {
         error: knowledgeError instanceof Error ? knowledgeError.message : String(knowledgeError),

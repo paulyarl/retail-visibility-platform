@@ -55,10 +55,6 @@ const FLAG_DESCRIPTIONS: Record<string, { title: string; description: string }> 
     title: 'Global Tenant Metadata',
     description: 'Enable global tenant metadata management',
   },
-  FF_SUPPLIER_CATALOG_IMPORT: {
-    title: 'Supplier Catalog Import',
-    description: 'Browse open-source product catalogs and bulk import items into tenant inventory',
-  },
   FF_TENANT_GBP_CATEGORY_SYNC: {
     title: 'GBP Category Sync',
     description: 'Google Business Profile category sync for tenant directory listings',

@@ -318,10 +318,13 @@ export function NavItemRow({
   );
 
   if (hasChildren) {
+    const handleToggle = () => onToggle(key);
+    const ToggleLink = item.href ? Link : 'button' as React.ElementType;
     return (
       <div>
-        <button
-          onClick={() => onToggle(key)}
+        <ToggleLink
+          {...(item.href ? { href: item.href, prefetch: item.prefetch ?? true } : {})}
+          onClick={handleToggle}
           className={sharedClass}
           style={{ paddingLeft, paddingRight: 12 }}
           aria-expanded={isExpanded}
@@ -334,7 +337,7 @@ export function NavItemRow({
           <span className="flex-1 text-left truncate">{item.label}</span>
           {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant || 'default'} />}
           <Icon.ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400')} />
-        </button>
+        </ToggleLink>
         {isExpanded && (
           <div className="mt-0.5 space-y-0.5">
             {item.children!.map(child => (

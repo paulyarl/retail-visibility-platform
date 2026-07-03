@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles, ArrowUpRight, ArrowDownRight, AlertTriangle, RefreshCw,
-  ArrowLeft, CheckCircle, XCircle, Tag,
+  ArrowLeft, CheckCircle, XCircle, Tag, MapPin,
 } from 'lucide-react';
 import Link from 'next/link';
 import badgeSuggestionsService, {
@@ -11,6 +11,7 @@ import badgeSuggestionsService, {
   type BadgeSuggestion,
   type BadgeConflict,
 } from '@/services/BadgeSuggestionsService';
+import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 
 interface BadgeSuggestionsClientProps {
   tenantId: string;
@@ -20,6 +21,7 @@ export default function BadgeSuggestionsClient({ tenantId }: BadgeSuggestionsCli
   const [data, setData] = useState<BadgeSuggestionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const promotedBadge = useBadgeMeta('directory_promoted');
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -134,6 +136,34 @@ export default function BadgeSuggestionsClient({ tenantId }: BadgeSuggestionsCli
           </p>
         </div>
       )}
+
+      {/* Directory Promotion Suggestion */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-5">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                {promotedBadge?.icon ?? '📍'} {promotedBadge?.label ?? 'Directory Promoted'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {promotedBadge?.description ?? 'Promote your store on the directory map and search results with tier-based visibility.'}
+              </p>
+              <p className="text-xs text-amber-700 mt-2">
+                This is a store-level promotional badge. Purchase a directory promotion to activate it.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/t/${tenantId}/settings/promotion`}
+            className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 shrink-0"
+          >
+            Get Promoted
+          </Link>
+        </div>
+      </div>
 
       {/* Assign Suggestions */}
       {data && data.toAssign.length > 0 && (

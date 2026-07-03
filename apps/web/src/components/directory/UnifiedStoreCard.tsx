@@ -8,6 +8,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import { MapPin, Star, Package, ExternalLink, Heart, Phone, Store } from 'lucide-react';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
+import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 
 export interface DirectoryListing {
   id: string;
@@ -32,6 +33,8 @@ export interface DirectoryListing {
   ratingCount?: number;
   productCount?: number | string; // API may return string
   isFeatured?: boolean;
+  isPromoted?: boolean;
+  promotionTier?: string;
   subscriptionTier?: string;
   directoryPublished?: boolean;
   businessHours?: any; // Business hours object for status indicator
@@ -87,6 +90,7 @@ export function UnifiedStoreCard({
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
+  const promotedBadge = useBadgeMeta('directory_promoted');
   // console.log(`UnifiedStoreCard - hoursStatus:`, hoursStatus);
   // console.log(`UnifiedStoreCard - listing:`, listing);
   
@@ -99,6 +103,8 @@ export function UnifiedStoreCard({
   const categories = enhancedStats?.categories || [];
   const totalProducts = enhancedStats?.totalProducts || Number(listing.productCount) || 0;
   const isFeatured = enhancedStats?.isFeatured || listing.isFeatured || false;
+  const isPromoted = listing.isPromoted || false;
+  const promotionTier = listing.promotionTier || null;
 
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
@@ -241,7 +247,17 @@ export function UnifiedStoreCard({
                         >
                           {formattedCategory}
                         </button>
-                        {isFeatured && (
+                        {isPromoted && (
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-bold rounded-full shadow-lg ${
+                            promotionTier === 'featured' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+                            promotionTier === 'premium' ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+                            'bg-gradient-to-r from-amber-500 to-amber-600'
+                          }`}>
+                            <span>{promotedBadge?.icon ?? '⭐'}</span>
+                            {promotionTier?.toUpperCase() || promotedBadge?.label?.toUpperCase() || 'PROMOTED'}
+                          </span>
+                        )}
+                        {isFeatured && !isPromoted && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
                             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -296,7 +312,18 @@ export function UnifiedStoreCard({
                   <Store className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                 </div>
               )}
-              {isFeatured && (
+              {isPromoted && (
+                <div className="absolute top-3 right-3">
+                  <MantineBadge variant="default" className={`text-xs ${
+                    promotionTier === 'featured' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                    promotionTier === 'premium' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                    'bg-amber-100 text-amber-800 border-amber-200'
+                  }`}>
+                    {promotedBadge?.icon ?? '⭐'} {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || (promotedBadge?.label ?? 'Promoted')}
+                  </MantineBadge>
+                </div>
+              )}
+              {isFeatured && !isPromoted && (
                 <div className="absolute top-3 right-3">
                   <MantineBadge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">
                     ⭐ Featured
@@ -328,7 +355,17 @@ export function UnifiedStoreCard({
                  <HoursStatusBadge status={hoursStatus} />
               </Group>
             </div>
-            {!showLogo && isFeatured && (
+            {!showLogo && isPromoted && (
+              <MantineBadge
+                color={promotionTier === 'featured' ? 'grape' : promotionTier === 'premium' ? 'blue' : 'yellow'}
+                variant="light"
+                size="xs"
+                className="shrink-0"
+              >
+                {promotedBadge?.icon ?? '⭐'} {(promotionTier?.charAt(0) ?? '').toUpperCase() + (promotionTier?.slice(1) ?? '') || (promotedBadge?.label ?? 'Promoted')}
+              </MantineBadge>
+            )}
+            {!showLogo && isFeatured && !isPromoted && (
               <MantineBadge 
                 color="yellow"
                 variant="light"

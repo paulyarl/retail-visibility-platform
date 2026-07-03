@@ -3,34 +3,38 @@
  *
  * Optional pre-step in ItemCreationWizard.
  * Search supplier catalogs by barcode/GTIN or text, select a match to auto-populate wizard.
- * Only visible when FF_SUPPLIER_CATALOG_IMPORT is enabled for the tenant.
+ * Only visible when product_options supplier catalog capability is enabled for the tenant.
  */
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Barcode, Package, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Barcode, Package, ChevronRight, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
-import SupplierImportService, { type TenantCatalogItem, type TenantSupplier } from '@/services/SupplierImportService';
+import SupplierImportService, { type TenantCatalogItem, type TenantSupplier, type BarcodeEnrichment } from '@/services/SupplierImportService';
 
 interface CatalogSearchStepProps {
   tenantId: string;
   onUseProduct: (item: TenantCatalogItem) => void;
+  onUseEnrichment: (enrichment: BarcodeEnrichment, barcode: string) => void;
   onSkip: () => void;
 }
 
-export default function CatalogSearchStep({ tenantId, onUseProduct, onSkip }: CatalogSearchStepProps) {
+export default function CatalogSearchStep({ tenantId, onUseProduct, onUseEnrichment, onSkip }: CatalogSearchStepProps) {
   const [suppliers, setSuppliers] = useState<TenantSupplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [gtinQuery, setGtinQuery] = useState('');
   const [results, setResults] = useState<TenantCatalogItem[]>([]);
+  const [enrichmentResult, setEnrichmentResult] = useState<BarcodeEnrichment | null>(null);
+  const [enrichmentLoading, setEnrichmentLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TenantCatalogItem | null>(null);
+  const [selectedEnrichment, setSelectedEnrichment] = useState<BarcodeEnrichment | null>(null);
 
   useEffect(() => {
     SupplierImportService.listSuppliers(tenantId).then(setSuppliers).catch(() => {});
@@ -41,9 +45,23 @@ export default function CatalogSearchStep({ tenantId, onUseProduct, onSkip }: Ca
     try {
       setLoading(true);
       setSearched(true);
+      setEnrichmentResult(null);
+      setSelectedEnrichment(null);
       if (gtinQuery) {
         const items = await SupplierImportService.lookupByBarcode(tenantId, gtinQuery, selectedSupplier || undefined);
         setResults(items);
+        // If no supplier catalog matches, try barcode enrichment as fallback
+        if (items.length === 0) {
+          setEnrichmentLoading(true);
+          try {
+            const enrichment = await SupplierImportService.enrichBarcode(tenantId, gtinQuery);
+            setEnrichmentResult(enrichment);
+          } catch (enrichErr) {
+            console.error('[CatalogSearchStep] Enrichment error:', enrichErr);
+          } finally {
+            setEnrichmentLoading(false);
+          }
+        }
       } else {
         const result = await SupplierImportService.searchCatalog(tenantId, {
           supplierId: selectedSupplier || undefined,
@@ -156,7 +174,14 @@ export default function CatalogSearchStep({ tenantId, onUseProduct, onSkip }: Ca
         </div>
       )}
 
-      {!loading && searched && results.length === 0 && (
+      {enrichmentLoading && (
+        <div className="flex items-center justify-center py-4 text-sm text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin mr-2 text-blue-600" />
+          Looking up barcode in external databases...
+        </div>
+      )}
+
+      {!loading && !enrichmentLoading && searched && results.length === 0 && !enrichmentResult && (
         <div className="text-center py-8 text-gray-500">
           <AlertCircle className="h-8 w-8 mx-auto mb-2 text-gray-400" />
           No catalog items found. Try a different search or skip to enter manually.
@@ -209,17 +234,72 @@ export default function CatalogSearchStep({ tenantId, onUseProduct, onSkip }: Ca
         </>
       )}
 
+      {/* Enrichment Result (fallback when no supplier catalog matches) */}
+      {!loading && !enrichmentLoading && enrichmentResult && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <Sparkles className="h-4 w-4" />
+            <span>Barcode enrichment found — auto-populate from external database</span>
+          </div>
+          <div
+            onClick={() => setSelectedEnrichment(selectedEnrichment === enrichmentResult ? null : enrichmentResult)}
+            className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
+              selectedEnrichment === enrichmentResult
+                ? 'border-blue-500 ring-2 ring-blue-200'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex">
+              <div className="w-24 h-24 bg-gray-100 flex-shrink-0 relative">
+                {enrichmentResult.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={enrichmentResult.imageUrl}
+                    alt={enrichmentResult.name || 'Product'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center w-full h-full text-gray-400 text-xs">No image</div>
+                )}
+              </div>
+              <div className="p-3 space-y-1 flex-1">
+                <div className="font-medium text-sm text-gray-900">{enrichmentResult.name || 'Unknown Product'}</div>
+                {enrichmentResult.brand && <div className="text-xs text-gray-500">{enrichmentResult.brand}</div>}
+                {enrichmentResult.description && (
+                  <div className="text-xs text-gray-500 line-clamp-2">{enrichmentResult.description}</div>
+                )}
+                <div className="flex items-center gap-2 text-xs">
+                  {enrichmentResult.priceCents && (
+                    <span className="font-medium text-gray-700">${(enrichmentResult.priceCents / 100).toFixed(2)}</span>
+                  )}
+                  {enrichmentResult.categoryPath && enrichmentResult.categoryPath.length > 0 && (
+                    <span className="text-gray-400">{enrichmentResult.categoryPath.join(' › ')}</span>
+                  )}
+                  <Badge variant="secondary" className="text-xs">{enrichmentResult.source}</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t">
         <Button variant="outline" onClick={onSkip}>
           Skip & Enter Manually
         </Button>
-        {selectedItem && (
+        {selectedItem ? (
           <Button onClick={() => onUseProduct(selectedItem)} className="gap-2">
             Use This Product
             <ChevronRight className="h-4 w-4" />
           </Button>
-        )}
+        ) : selectedEnrichment ? (
+          <Button onClick={() => onUseEnrichment(selectedEnrichment, gtinQuery)} className="gap-2">
+            Use Enrichment Data
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        ) : null}
       </div>
     </div>
   );

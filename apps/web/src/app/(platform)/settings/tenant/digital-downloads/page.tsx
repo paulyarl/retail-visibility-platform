@@ -11,6 +11,8 @@ import PageHeader from "@/components/PageHeader";
 import { ItemsSingletonService, Item, ProductVariant } from '@/services/ItemsSingletonService';
 import { itemsService } from '@/services/ItemsSingletonService';
 
+export const dynamic = 'force-dynamic';
+
 type DownloadPage = ServiceDownloadPage;
 
 interface CreatePageForm {
@@ -169,7 +171,6 @@ export default function DigitalDownloadsPage() {
         message: 'Download page created successfully',
         color: 'green'
       });
-      fetchPages();
       setCreateModalOpen(false);
       setSelectedItem(null);
       setFormData({
@@ -306,7 +307,6 @@ export default function DigitalDownloadsPage() {
 
   // Check if a digital product already has a download page
   const hasDownloadPage = (itemId: string) => {
-    // console.log(`Checking if item ${itemId} has download page:`, pages);
     return pages.some(page => page.item_id === itemId);
   };
 

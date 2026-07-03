@@ -30,6 +30,28 @@ export interface TenantCatalogItem {
   availability: string;
 }
 
+export interface BarcodeEnrichment {
+  name?: string;
+  description?: string;
+  brand?: string;
+  categoryPath?: string[];
+  categorySuggestion?: {
+    suggestedName: string;
+    googleCategoryId?: string;
+    categoryPath: string[];
+    existingTenantCategory?: {
+      id: string;
+      name: string;
+      googleCategoryId?: string | null;
+    };
+  };
+  priceCents?: number;
+  imageUrl?: string;
+  imageThumbnailUrl?: string;
+  metadata?: Record<string, any>;
+  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback';
+}
+
 export interface TenantCatalogSearchResult {
   items: TenantCatalogItem[];
   total: number;
@@ -166,6 +188,17 @@ class SupplierImportServiceClass extends TenantApiSingleton {
     );
     if (!result.success) return [];
     return result.data?.items || [];
+  }
+
+  async enrichBarcode(tenantId: string, barcode: string): Promise<BarcodeEnrichment | null> {
+    const result = await this.makeDefaultRequest<{ enrichment: BarcodeEnrichment }>(
+      `/api/tenants/${tenantId}/suppliers/enrich/${encodeURIComponent(barcode)}`,
+      {},
+      `tenant-barcode-enrich-${tenantId}-${barcode}`,
+      2 * 60 * 1000
+    );
+    if (!result.success) return null;
+    return result.data?.enrichment || null;
   }
 
   async checkConflicts(tenantId: string, selections: ImportSelection[]): Promise<ConflictReport> {

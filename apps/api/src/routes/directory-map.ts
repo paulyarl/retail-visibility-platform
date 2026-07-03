@@ -113,7 +113,10 @@ router.get('/map/locations', async (req: Request, res: Response) => {
           0
         ) as "productCount",
         0 as "ratingAvg",  -- Placeholder for now
-        0 as "ratingCount" -- Placeholder for now
+        0 as "ratingCount", -- Placeholder for now
+        (dll.is_promoted AND dll.promotion_expires_at IS NOT NULL AND dll.promotion_expires_at > NOW()) as "isPromoted",
+        dll.promotion_tier as "promotionTier",
+        dll.promotion_expires_at as "promotionExpiresAt"
       FROM directory_settings_list dsl
       INNER JOIN tenants t ON dsl.tenant_id = t.id
       LEFT JOIN directory_listings_list dll ON dsl.tenant_id = dll.tenant_id

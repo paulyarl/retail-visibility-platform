@@ -104,7 +104,10 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Plan file-based fallback updates.** Even though the DB is the active system, update `buildTenantNav()` / `buildAdminNavItems()` / `buildNavItems()` for resilience and reference.
 
-- [ ] **Identify any settings cards needed.** If the page should appear on a settings landing page (e.g., `TenantSettings.tsx`), note where to add the card.
+- [ ] **Identify ALL settings cards needed.** New pages often need to be discoverable from settings landing pages, not just the sidebar. Check both:
+  - **Tenant settings** (`apps/web/src/components/settings/TenantSettings.tsx`): If the new page is tenant-facing (under `/t/[tenantId]/settings/...`), identify which group/section to add the card to (e.g., "Featured Products", "Organization Management", "Storefront"). Note the card title, description, icon, color, and href.
+  - **Admin settings** (`apps/web/src/app/(platform)/settings/admin/page.tsx`): If the new page is admin-facing (under `/settings/admin/...`), identify which section/group to add the card or link to. Note the label, icon, and href.
+  - **Don't forget sub-pages**: Even if the parent page already has a settings card, a new sub-page (e.g., `/settings/promotion/analytics`) may need its own card or a link from the parent page's UI.
 
 - [ ] **Check for dynamic template conflicts.** If the new page is a child of a `tenant-locations` or `organization-locations` template parent, it CANNOT be a database link — those children are generated client-side by `DynamicNavTemplates.tsx`.
 
@@ -210,6 +213,7 @@ New entities: _______________
 New ID generators needed: _______________
 New pages/routes: _______________
 New sidebar links: _______________
+New settings cards (tenant and/or admin): _______________
 New migration: _______________
 New background jobs: _______________
 New capability features: _______________

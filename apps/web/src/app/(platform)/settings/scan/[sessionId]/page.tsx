@@ -7,6 +7,9 @@ import BarcodeScanner from '@/components/scan/BarcodeScanner';
 import BatchReview from '@/components/scan/BatchReview';
 import EnrichmentPreview from '@/components/scan/EnrichmentPreview';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
+import { notifications } from '@mantine/notifications';
+
+export const dynamic = 'force-dynamic';
 
 // Interface compatible with BatchReview component
 interface ScanResult {
@@ -49,11 +52,6 @@ export default function ActiveScanPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [committing, setCommitting] = useState(false);
-  // console.log('[PlatformScanPage] Component mounted', { selectedResult });
-  // console.log('[PlatformScanPage] Component mounted', { sessionId });
-  // console.log('[PlatformScanPage] Component mounted', { loading });
-  // console.log('[PlatformScanPage] Component mounted', { scanning });
-  // console.log('[PlatformScanPage] Component mounted', { committing });
 
   useEffect(() => {
     if (sessionId) {
@@ -64,20 +62,14 @@ export default function ActiveScanPage() {
   const loadSession = async () => {
     try {
       const sessionData = await itemsSingletonService.getScanSession(sessionId);
-      // console.log('[PlatformScanPage] Session data:', sessionData);
       
       if (sessionData && sessionData.success && sessionData.data) {
         const session = sessionData.data.session || sessionData.data; // Handle nested structure
-          // console.log('[PlatformScanPage] Session:', session);
-          // console.log('[PlatformScanPage] Device type:', session.device_type, session.deviceType);
-          // console.log('[PlatformScanPage] Session status:', session.status);
-          // console.log('[PlatformScanPage] Tenant ID:', session.tenantId);
         setSession(session);
         
         // Transform results to BatchReview format
         // Results might be nested under different property names
         const results = session.results || session.scan_results_list || [];
-        // console.log('[PlatformScanPage] Results:', results);
         
         const transformedResults = results.map((result: any): ScanResult => ({
           id: result.id,
@@ -96,12 +88,12 @@ export default function ActiveScanPage() {
         }
       } else {
         console.error('[PlatformScanPage] Invalid session response:', sessionData);
-        alert('Failed to load session');
+        notifications.show({ title: 'Error', message: 'Failed to load session', color: 'red' });
         router.push('/scan');
       }
     } catch (error) {
       console.error('Failed to load session:', error);
-      alert('Failed to load session');
+      notifications.show({ title: 'Error', message: 'Failed to load session', color: 'red' });
       router.push('/scan');
     } finally {
       setLoading(false);
@@ -110,7 +102,7 @@ export default function ActiveScanPage() {
 
   const handleScan = async (barcode: string) => {
     if (!session || session.status !== 'active') {
-      alert('Session is not active');
+      notifications.show({ title: 'Warning', message: 'Session is not active', color: 'yellow' });
       return;
     }
 
@@ -120,7 +112,7 @@ export default function ActiveScanPage() {
       const tenantId = session.tenantId;
       if (!tenantId) {
         console.error('[PlatformScanPage] No tenant ID found in session');
-        alert('Session is missing tenant information');
+        notifications.show({ title: 'Error', message: 'Session is missing tenant information', color: 'red' });
         return;
       }
       
@@ -129,7 +121,7 @@ export default function ActiveScanPage() {
       if (data && data.success) {
         // Show duplicate warning
         if (data.duplicate) {
-          alert(`⚠️ Duplicate item detected\n\nItem: ${data.duplicate.name || data.duplicate.sku}`);
+          notifications.show({ title: 'Duplicate Item', message: `Item: ${data.duplicate.name || data.duplicate.sku}`, color: 'yellow' });
         }
         
         // Reload session and results to get updated data
@@ -148,11 +140,11 @@ export default function ActiveScanPage() {
           setSelectedResult(transformedResult);
         }
       } else {
-        alert(data?.error || 'Failed to scan barcode');
+        notifications.show({ title: 'Error', message: data?.error || 'Failed to scan barcode', color: 'red' });
       }
     } catch (error) {
       console.error('Failed to scan barcode:', error);
-      alert('Failed to scan barcode');
+      notifications.show({ title: 'Error', message: 'Failed to scan barcode', color: 'red' });
     } finally {
       setScanning(false);
     }
@@ -201,7 +193,7 @@ export default function ActiveScanPage() {
 
   const handleRemove = async (resultId: string) => {
     if (!session || session.status !== 'active') {
-      alert('Session is not active');
+      notifications.show({ title: 'Warning', message: 'Session is not active', color: 'yellow' });
       return;
     }
 
@@ -217,13 +209,13 @@ export default function ActiveScanPage() {
       await loadSession();
     } catch (error) {
       console.error('Failed to remove item:', error);
-      alert('Failed to remove item');
+      notifications.show({ title: 'Error', message: 'Failed to remove item', color: 'red' });
     }
   };
 
   const handleCommit = async () => {
     if (!session || session.status !== 'active') {
-      alert('Session is not active');
+      notifications.show({ title: 'Warning', message: 'Session is not active', color: 'yellow' });
       return;
     }
 
@@ -237,11 +229,11 @@ export default function ActiveScanPage() {
       setCommitting(true);
       
       await itemsSingletonService.commitScanSession(sessionId);
-      alert(`✅ Successfully committed ${validCount} items to inventory!`);
+      notifications.show({ title: 'Success', message: `Successfully committed ${validCount} items to inventory!`, color: 'green' });
       router.push('/scan');
     } catch (error) {
       console.error('Failed to commit session:', error);
-      alert('Failed to commit session');
+      notifications.show({ title: 'Error', message: 'Failed to commit session', color: 'red' });
     } finally {
       setCommitting(false);
     }
@@ -257,7 +249,7 @@ export default function ActiveScanPage() {
       router.push('/scan');
     } catch (error) {
       console.error('Failed to cancel session:', error);
-      alert('Failed to cancel session');
+      notifications.show({ title: 'Error', message: 'Failed to cancel session', color: 'red' });
     }
   };
 
@@ -298,14 +290,13 @@ export default function ActiveScanPage() {
             {/* Barcode Scanner */}
             <BarcodeScanner
               onScan={handleScan}
-              onError={(error) => alert(error)}
+              onError={(error) => notifications.show({ title: 'Scanner Error', message: error, color: 'red' })}
               mode={session.deviceType === 'manual' ? 'manual' : session.deviceType === 'camera' ? 'camera' : 'usb'}
               disabled={session.status !== 'active' || scanning}
             />
 
             {/* Enrichment Preview */}
             {selectedResult && (
-              // console.log('[ScanPage] Selected result:', selectedResult),
               <EnrichmentPreview
                 barcode={selectedResult.barcode}
                 sku={selectedResult.sku}

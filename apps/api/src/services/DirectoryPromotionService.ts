@@ -14,6 +14,10 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { generatePromotionPurchaseId, generatePromotionCatalogId } from '../lib/id-generator';
 import { getDirectPool } from '../utils/db-pool';
+import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
+import { invalidateBadgeRegistryCache, getBadgeByKey } from './BadgeRegistryService';
+import { getBillingNotificationService } from './subscription/BillingNotificationService';
+import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 import Stripe from 'stripe';
 
 export interface PromotionPlan {
@@ -170,6 +174,16 @@ export class DirectoryPromotionService extends BaseService {
       throw new Error('plan_not_found_or_inactive');
     }
 
+    // Tier gate: check tenant's plan allows this promotion tier
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps?.effective.directory_promotion?.enabled) {
+      throw new Error('directory_promotion_not_available');
+    }
+    const allowedTiers = caps.effective.directory_promotion.allowed_tiers || [];
+    if (!allowedTiers.includes(plan.tier as any)) {
+      throw new Error('tier_not_available');
+    }
+
     // Check for existing active promotion
     const existing = await prisma.promotion_purchases.findFirst({
       where: {
@@ -292,12 +306,47 @@ export class DirectoryPromotionService extends BaseService {
       [purchase.tier, now, expiresAt, purchase.tenant_id]
     );
 
+    // Invalidate badge registry cache so directory_promoted badge appears immediately
+    invalidateBadgeRegistryCache();
+
+    const badge = await getBadgeByKey('directory_promoted');
     logger.info('[DirectoryPromotion] Purchase activated', undefined, {
       purchaseId,
       tenantId: purchase.tenant_id,
       tier: purchase.tier,
       expiresAt,
+      promotionalPriority: badge?.promotionalPriority ?? 200,
     });
+
+    // Send billing notification (email + CRM alert) — fire-and-forget
+    const isRenewal = !!purchase.renewed_from;
+    (async () => {
+      try {
+        await getBillingNotificationService().sendNotification({
+          tenantId: purchase.tenant_id,
+          type: isRenewal ? 'directory_promotion_renewal_success' : 'directory_promotion_purchased',
+          amount: purchase.price_cents,
+          metadata: {
+            tier: purchase.tier,
+            tierLabel: purchase.tier.charAt(0).toUpperCase() + purchase.tier.slice(1),
+            purchaseId,
+            durationDays: purchase.duration_days,
+            expiresAt: expiresAt.toISOString(),
+          },
+        });
+      } catch (err) {
+        logger.warn('[DirectoryPromotion] Failed to send billing notification', undefined, { error: (err as Error).message });
+      }
+    })();
+
+    // Refresh bot knowledge embeddings with promotion info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshPromotionEmbeddings(purchase.tenant_id);
+      } catch (err) {
+        logger.warn('[DirectoryPromotion] Failed to refresh promotion embeddings', undefined, { error: (err as Error).message });
+      }
+    })();
   }
 
   // ====================
@@ -333,11 +382,41 @@ export class DirectoryPromotionService extends BaseService {
       [purchase.tenant_id]
     );
 
+    // Invalidate badge registry cache so directory_promoted badge is removed
+    invalidateBadgeRegistryCache();
+
     logger.info('[DirectoryPromotion] Purchase deactivated', undefined, {
       purchaseId,
       tenantId: purchase.tenant_id,
       reason,
     });
+
+    // Send billing notification (email + CRM alert) — fire-and-forget
+    (async () => {
+      try {
+        await getBillingNotificationService().sendNotification({
+          tenantId: purchase.tenant_id,
+          type: 'directory_promotion_expired',
+          metadata: {
+            tier: purchase.tier,
+            tierLabel: purchase.tier.charAt(0).toUpperCase() + purchase.tier.slice(1),
+            purchaseId,
+            reason,
+          },
+        });
+      } catch (err) {
+        logger.warn('[DirectoryPromotion] Failed to send expiration notification', undefined, { error: (err as Error).message });
+      }
+    })();
+
+    // Refresh bot knowledge embeddings to clear stale promotion info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshPromotionEmbeddings(purchase.tenant_id);
+      } catch (err) {
+        logger.warn('[DirectoryPromotion] Failed to refresh promotion embeddings on deactivation', undefined, { error: (err as Error).message });
+      }
+    })();
   }
 
   // ====================
@@ -478,6 +557,26 @@ export class DirectoryPromotionService extends BaseService {
       tenantId: purchase.tenant_id,
       gracePeriodEndsAt: graceEnds,
     });
+
+    // Send billing notification (email + CRM alert) — fire-and-forget
+    (async () => {
+      try {
+        await getBillingNotificationService().sendNotification({
+          tenantId: purchase.tenant_id,
+          type: 'directory_promotion_grace_period_warning',
+          gracePeriodDaysRemaining: 7,
+          reason: 'Auto-renewal payment failed',
+          metadata: {
+            tier: purchase.tier,
+            tierLabel: purchase.tier.charAt(0).toUpperCase() + purchase.tier.slice(1),
+            purchaseId,
+            gracePeriodEndsAt: graceEnds.toISOString(),
+          },
+        });
+      } catch (err) {
+        logger.warn('[DirectoryPromotion] Failed to send grace period notification', undefined, { error: (err as Error).message });
+      }
+    })();
   }
 
   // ====================
@@ -615,6 +714,51 @@ export class DirectoryPromotionService extends BaseService {
       },
     });
     return purchases.map(this.mapPurchase);
+  }
+
+  // ====================
+  // DASHBOARD STATS (for CRM admin widget)
+  // ====================
+
+  async getDashboardStats(): Promise<{
+    activeCount: number;
+    gracePeriodCount: number;
+    expiredCount: number;
+    totalRevenueCents: number;
+    upcomingRenewals: PromotionPurchase[];
+    gracePeriodPromotions: PromotionPurchase[];
+    recentActivations: PromotionPurchase[];
+  }> {
+    const now = new Date();
+    const renewalWindow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const [activePurchases, gracePeriodPurchases, expiredPurchases, upcomingRenewals, recentActive] = await Promise.all([
+      prisma.promotion_purchases.findMany({ where: { status: 'active' }, select: { id: true, price_cents: true } }),
+      prisma.promotion_purchases.findMany({ where: { status: 'grace_period' }, orderBy: { grace_period_ends_at: 'asc' } }),
+      prisma.promotion_purchases.findMany({ where: { status: 'expired' }, select: { id: true } }),
+      prisma.promotion_purchases.findMany({
+        where: { status: 'active', expires_at: { gte: now, lte: renewalWindow } },
+        orderBy: { expires_at: 'asc' },
+        take: 5,
+      }),
+      prisma.promotion_purchases.findMany({
+        where: { status: 'active' },
+        orderBy: { starts_at: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    const totalRevenueCents = activePurchases.reduce((sum, p) => sum + p.price_cents, 0);
+
+    return {
+      activeCount: activePurchases.length,
+      gracePeriodCount: gracePeriodPurchases.length,
+      expiredCount: expiredPurchases.length,
+      totalRevenueCents,
+      upcomingRenewals: upcomingRenewals.map(this.mapPurchase),
+      gracePeriodPromotions: gracePeriodPurchases.map(this.mapPurchase),
+      recentActivations: recentActive.map(this.mapPurchase),
+    };
   }
 
   async findStalePending(olderThanHours: number = 24): Promise<PromotionPurchase[]> {

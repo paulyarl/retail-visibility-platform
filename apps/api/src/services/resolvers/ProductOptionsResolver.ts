@@ -64,8 +64,9 @@ export function resolveProductOptions(
   const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants || !!features.product_variant;
   const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery || !!features.product_gallery;
   const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video || !!features.product_video;
+  const showsSupplierCatalog = isFlexible || creationGroupEnabled || !!features.product_options_creation_supplier_catalog;
 
-  const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo);
+  const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
 
   // ── Layout group (R16: group gates) ──
   const layoutGroupEnabled = !!features.product_options_layout_enabled;
@@ -125,6 +126,7 @@ export function resolveProductOptions(
     product_opt_fulfillment: merchantPrefs?.product_opt_fulfillment !== false,
     product_opt_categories: merchantPrefs?.product_opt_categories !== false,
     product_opt_location_availability: merchantPrefs?.product_opt_location_availability !== false,
+    product_opt_supplier_catalog: merchantPrefs?.product_opt_supplier_catalog !== false,
   };
 
   // ── Effective types (legacy, for backward compat) ──
@@ -190,6 +192,9 @@ export function resolveProductOptions(
     effective_shows_fulfillment: showsFulfillment && prefs.product_opt_fulfillment,
     effective_shows_categories: showsCategories && prefs.product_opt_categories,
     effective_shows_location_availability: showsLocationAvailability && prefs.product_opt_location_availability,
+    // Supplier catalog (creation group)
+    shows_supplier_catalog: showsSupplierCatalog,
+    effective_shows_supplier_catalog: showsSupplierCatalog && prefs.product_opt_supplier_catalog,
     merchant_preferences: prefs,
     is_flexible: isFlexible,
   };

@@ -544,7 +544,10 @@ class ShopService extends UniversalSingleton {
           dsl.subscription_tier,
           NULLIF(AVG(dsl.average_rating), 0) as rating_avg,
           MAX(CAST(dsl.review_count AS INTEGER)) as rating_count,
-          COALESCE(ic.item_count, 0) as productCount
+          COALESCE(ic.item_count, 0) as productCount,
+          (dl.is_promoted AND dl.promotion_expires_at IS NOT NULL AND dl.promotion_expires_at > NOW()) as is_promoted,
+          dl.promotion_tier,
+          dl.promotion_expires_at
         FROM mv_storefront_discovery dsl
         LEFT JOIN directory_listings_list dl ON dsl.tenant_id = dl.tenant_id
         LEFT JOIN tenant_business_profiles_list bp ON dsl.tenant_id = bp.tenant_id
@@ -561,7 +564,7 @@ class ShopService extends UniversalSingleton {
         GROUP BY 
           dsl.tenant_id, dsl.tenant_name, dsl.tenant_slug,
           dsl.tenant_logo_url, dsl.tenant_address, dsl.tenant_city, dsl.tenant_state,
-          dsl.tenant_zip, dl.primary_category, bp.gbp_category_name, dsl.subscription_tier, ic.item_count
+          dsl.tenant_zip, dl.primary_category, bp.gbp_category_name, dsl.subscription_tier, ic.item_count, dl.is_promoted, dl.promotion_tier, dl.promotion_expires_at
         HAVING COUNT(DISTINCT dsl.inventory_item_id) > 0
         ORDER BY productCount DESC NULLS LAST, dsl.tenant_name ASC
         LIMIT $1 OFFSET $2
@@ -602,6 +605,9 @@ class ShopService extends UniversalSingleton {
         rating_count: row.rating_count ? parseInt(row.rating_count) : null,
         reviewCount: row.rating_count ? parseInt(row.rating_count) : null,
         productCount: row.productcount || 0,
+        is_promoted: row.is_promoted || false,
+        promotion_tier: row.promotion_tier || null,
+        promotion_expires_at: row.promotion_expires_at || null,
         is_published: true,
         primary_category: row.primary_category || 'grocery', // Ensure fallback
         created_at: new Date(),
@@ -713,6 +719,10 @@ class ShopService extends UniversalSingleton {
           dl.description,
           dl.business_hours,
           dl.subscription_tier as dl_subscription_tier,
+          dl.is_promoted,
+          dl.promotion_tier,
+          dl.promotion_started_at,
+          dl.promotion_expires_at,
           dl.created_at,
           dl.updated_at,
           
@@ -812,6 +822,10 @@ class ShopService extends UniversalSingleton {
         ratingCount: parseInt(rawShop.rating_count) || 0,
         productCount: parseInt(rawShop.product_count) || 0,
         isFeatured: rawShop.is_featured || false,
+        isPromoted: (rawShop.is_promoted && rawShop.promotion_expires_at && new Date(rawShop.promotion_expires_at) > new Date()) || false,
+        promotionTier: rawShop.promotion_tier || null,
+        promotionStartedAt: rawShop.promotion_started_at || null,
+        promotionExpiresAt: rawShop.promotion_expires_at || null,
         subscriptionTier: rawShop.dl_subscription_tier || rawShop.fallback_subscription_tier || 'starter',
         isPublished: rawShop.is_published || false,
         createdAt: rawShop.created_at,

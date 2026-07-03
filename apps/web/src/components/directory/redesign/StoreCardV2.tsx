@@ -148,8 +148,20 @@ export default function StoreCardV2({
             </div>
           )}
 
+          {/* Promoted badge */}
+          {store.isPromoted && (
+            <span className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold text-white shadow-sm ${
+              store.promotionTier === 'featured' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+              store.promotionTier === 'premium' ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+              'bg-gradient-to-r from-amber-500 to-amber-600'
+            }`}>
+              <Star className="w-3 h-3 fill-white" />
+              {(store.promotionTier?.charAt(0) ?? '').toUpperCase() + (store.promotionTier?.slice(1) ?? '') || 'Promoted'}
+            </span>
+          )}
+
           {/* Featured badge */}
-          {store.isFeatured && (
+          {store.isFeatured && !store.isPromoted && (
             <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm">
               <Star className="w-3 h-3 fill-white" />
               Featured

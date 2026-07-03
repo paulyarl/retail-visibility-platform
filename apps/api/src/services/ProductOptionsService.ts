@@ -52,6 +52,7 @@ export interface ProductOptionsState {
   showsFulfillment: boolean;
   showsCategories: boolean;
   showsLocationAvailability: boolean;
+  showsSupplierCatalog: boolean;
   features: Record<string, boolean>;
 }
 
@@ -188,7 +189,8 @@ class ProductOptionsService {
     const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants || !!features.product_variant;
     const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery || !!features.product_gallery;
     const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video || !!features.product_video;
-    const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo);
+    const showsSupplierCatalog = isFlexible || creationGroupEnabled || !!features.product_options_creation_supplier_catalog;
+    const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
 
     // ── Layout group (R16) ──
     const layoutGroupEnabled = !!features.product_options_layout_enabled;
@@ -251,6 +253,7 @@ class ProductOptionsService {
       showsFulfillment,
       showsCategories,
       showsLocationAvailability,
+      showsSupplierCatalog,
       features,
     };
   }
@@ -294,6 +297,7 @@ class ProductOptionsService {
       showsFulfillment: false,
       showsCategories: false,
       showsLocationAvailability: false,
+      showsSupplierCatalog: false,
       features: {},
     };
   }

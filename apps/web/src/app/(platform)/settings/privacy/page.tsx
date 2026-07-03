@@ -6,7 +6,7 @@
 import { ConsentManager } from '@/components/security/gdpr/ConsentManager';
 import { DataExportWidget } from '@/components/security/gdpr/DataExportWidget';
 import { DangerZone } from '@/components/security/gdpr/DangerZone';
-import { Card } from '@mantine/core';
+import { Card, Title, Text, Stack } from '@mantine/core';
 
 
 export const metadata = {
@@ -16,12 +16,12 @@ export const metadata = {
 
 export default function PrivacySettingsPage() {
   return (
-    <div className="space-y-6">
+    <Stack gap="lg">
       <div>
-        <h1 className="text-3xl font-bold">Privacy & Data Settings</h1>
-        <p className="text-muted-foreground mt-2">
+        <Title order={1}>Privacy &amp; Data Settings</Title>
+        <Text c="dimmed" mt="sm">
           Manage your privacy preferences, export your data, and control how your information is used
-        </p>
+        </Text>
       </div>
 
       {/* Consent Management */}
@@ -33,8 +33,8 @@ export default function PrivacySettingsPage() {
           <div className="flex items-center gap-2 mb-4">
             <div className="h-3 w-3 rounded-full bg-green-500"></div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Export Your Data</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Download a copy of your personal data in compliance with GDPR</p>
+              <Title order={3}>Export Your Data</Title>
+              <Text size="sm" c="dimmed">Download a copy of your personal data in compliance with GDPR</Text>
             </div>
           </div>
           <DataExportWidget />
@@ -43,6 +43,6 @@ export default function PrivacySettingsPage() {
 
       {/* Danger Zone - Collapsible Account Deletion */}
       <DangerZone />
-    </div>
+    </Stack>
   );
 }

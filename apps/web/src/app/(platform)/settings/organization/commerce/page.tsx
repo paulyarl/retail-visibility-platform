@@ -1,11 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Alert } from '@/components/ui/Alert';
-import { Spinner } from '@/components/ui/Spinner';
+import { Card, Button, Badge, Alert, Title, Text, Stack, Group, Switch, TextInput, Select, Loader, Box, SimpleGrid } from '@mantine/core';
 import { CreditCard, ShoppingCart, Settings, Info, Package, Download, Wrench, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
@@ -13,6 +9,8 @@ import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+
+export const dynamic = 'force-dynamic';
 
 interface OrganizationCommerceSettings {
   // Payment Options
@@ -50,7 +48,7 @@ interface OrganizationCommerceSettings {
 
 export default function OrganizationCommerceSettingsPage() {
   // Get tenantId from localStorage for access control
-  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+  const [tenantId, setTenantId] = useState<string | null>(null);
   
   // Get organizationId from URL if provided
   const [urlOrgId, setUrlOrgId] = useState<string | null>(null);
@@ -60,6 +58,7 @@ export default function OrganizationCommerceSettingsPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
+    setTenantId(localStorage.getItem('tenantId'));
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const orgId = params.get('organizationId');
@@ -186,7 +185,7 @@ export default function OrganizationCommerceSettingsPage() {
   if (accessLoading) {
     return (
       <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
-        <Spinner size="lg" />
+        <Loader size="lg" />
       </div>
     );
   }
@@ -211,80 +210,77 @@ export default function OrganizationCommerceSettingsPage() {
         />
         
         <Card withBorder padding="lg" radius="md">
-          <div className="space-y-6">
+          <Stack gap="lg">
             {(userRole === 'PLATFORM_ADMIN' || tenantRole === 'PLATFORM_ADMIN') ? (
               <>
                 <div>
-                  <h2 className="text-xl font-semibold mb-4">Available Organizations</h2>
-                  <p className="text-neutral-600 mb-6">
+                  <Title order={2} mb="sm">Available Organizations</Title>
+                  <Text c="dimmed" mb="lg">
                     As a Platform Admin, you can manage commerce settings for any organization in the system.
-                  </p>
+                  </Text>
                 </div>
                 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                <Box bg="blue.0" p="lg" style={{ border: '1px solid var(--mantine-color-blue-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                  <Title order={3} c="blue.9" mb="xs">
                     Select an Organization
-                  </h3>
-                  <p className="text-blue-700 mb-4">
+                  </Title>
+                  <Text c="blue.7" mb="md">
                     Please go back to the organization dashboard and select an organization to manage its commerce settings.
-                  </p>
+                  </Text>
                   <Button
                     variant="gradient"
-                    style={{color: 'white'}}
                     onClick={() => window.location.href = '/settings/organization'}
                   >
                     Go to Organization Selection
                   </Button>
-                </div>
+                </Box>
               </>
             ) : ['OWNER', 'TENANT_OWNER', 'TENANT_ADMIN'].includes(tenantRole || '') ? (
               <div className="text-center py-8">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 max-w-md mx-auto">
-                  <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                <Box bg="amber.0" p="lg" maw={400} mx="auto" style={{ border: '1px solid var(--mantine-color-amber-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                  <Title order={3} c="amber.9" mb="xs">
                     Access Your Organization via Tenant Dashboard
-                  </h3>
-                  <p className="text-amber-700 mb-4">
+                  </Title>
+                  <Text c="amber.7" mb="md">
                     To manage your organization commerce settings, please access through your tenant dashboard.
-                  </p>
+                  </Text>
                   <div className="space-y-2">
-                    <p className="text-sm text-amber-600">
-                      Go to: <code className="bg-amber-100 px-2 py-1 rounded">/t/[tenantId]/settings/organization/commerce</code>
-                    </p>
-                    <p className="text-xs text-amber-500">
+                    <Text size="sm" c="amber.6">
+                      Go to: <code style={{ backgroundColor: 'var(--mantine-color-amber-1)', padding: '2px 6px', borderRadius: 4 }}>/t/[tenantId]/settings/organization/commerce</code>
+                    </Text>
+                    <Text size="xs" c="amber.5">
                       Replace [tenantId] with your actual tenant ID
-                    </p>
+                    </Text>
                   </div>
                   <Button
                     variant="gradient"
-                    style={{color: 'white'}}
                     onClick={() => window.location.href = '/settings'}
-                    className="mt-4"
+                    mt="md"
                   >
                     Return to Settings
                   </Button>
-                </div>
+                </Box>
               </div>
             ) : (
               <div className="text-center py-8">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
-                  <h3 className="text-lg font-semibold text-red-900 mb-2">
+                <Box bg="red.0" p="lg" maw={400} mx="auto" style={{ border: '1px solid var(--mantine-color-red-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                  <Title order={3} c="red.9" mb="xs">
                     Access Restricted
-                  </h3>
-                  <p className="text-red-700 mb-4">
+                  </Title>
+                  <Text c="red.7" mb="md">
                     Organization commerce settings are only available to organization administrators.
-                  </p>
+                  </Text>
                   <Button
                     variant="gradient"
-                    style={{color: 'white'}}
                     onClick={() => window.location.href = '/settings'}
-                    className="mt-4"
+                    mt="md"
                   >
                     Return to Settings
                   </Button>
-                </div>
+                </Box>
               </div>
             )}
-          </div>
+          </Stack>
         </Card>
       </div>
     );
@@ -339,20 +335,18 @@ export default function OrganizationCommerceSettingsPage() {
 
       {/* Current Status */}
       <div className="mb-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Current Commerce Mode</h2>
-                <p className="text-sm text-neutral-600">
-                  These settings apply to all locations in your organization unless overridden at the tenant level
-                </p>
-              </div>
-              <Badge variant="outline" className="text-sm">
-                {getCommerceMode()}
-              </Badge>
+        <Card withBorder p="lg">
+          <Group justify="space-between">
+            <div>
+              <Title order={3}>Current Commerce Mode</Title>
+              <Text size="sm" c="dimmed">
+                These settings apply to all locations in your organization unless overridden at the tenant level
+              </Text>
             </div>
-          </CardHeader>
+            <Badge variant="outline" size="lg">
+              {getCommerceMode()}
+            </Badge>
+          </Group>
         </Card>
       </div>
 
@@ -363,113 +357,101 @@ export default function OrganizationCommerceSettingsPage() {
         title="Payment Options"
         description="Configure available payment methods for customers"
       >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment Options
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Card withBorder p="lg">
+          <Stack gap="md">
+            <Group gap="sm">
+              <CreditCard size={20} />
+              <Title order={3}>Payment Options</Title>
+            </Group>
+            
             {/* Deposit Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <Stack gap="md">
+              <Group justify="space-between">
                 <div>
-                  <h3 className="font-semibold">Deposit Payments</h3>
-                  <p className="text-sm text-neutral-600">
+                  <Text fw={600}>Deposit Payments</Text>
+                  <Text size="sm" c="dimmed">
                     Require customers to pay a deposit to reserve items
-                  </p>
+                  </Text>
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.deposit_enabled}
-                    onChange={(e) => setSettings({ ...settings, deposit_enabled: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Enable deposits</span>
-                </label>
-              </div>
+                <Switch
+                  label="Enable deposits"
+                  checked={settings.deposit_enabled}
+                  onChange={(e) => setSettings({ ...settings, deposit_enabled: e.currentTarget.checked })}
+                />
+              </Group>
 
               {settings.deposit_enabled && (
-                <div className="ml-6 space-y-4">
+                <Stack gap="md" ml="lg">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Deposit Percentage (%)</label>
-                    <input
+                    <Text size="sm" fw={500} mb={4}>Deposit Percentage (%)</Text>
+                    <TextInput
                       type="number"
-                      min="5"
-                      max="50"
+                      min={5}
+                      max={50}
                       value={settings.deposit_percentage}
                       onChange={(e) => setSettings({ ...settings, deposit_percentage: parseInt(e.target.value) || 15 })}
-                      className="w-full px-3 py-2 border border-neutral-300 rounded"
                     />
-                    <p className="text-xs text-neutral-500 mt-1">Percentage of total order amount required as deposit (5-50%)</p>
+                    <Text size="xs" c="dimmed" mt={4}>Percentage of total order amount required as deposit (5-50%)</Text>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <SimpleGrid cols={2} spacing="md">
                     <div>
-                      <label className="block text-sm font-medium mb-2">Minimum Deposit ($)</label>
-                      <input
+                      <Text size="sm" fw={500} mb={4}>Minimum Deposit ($)</Text>
+                      <TextInput
                         type="number"
-                        min="0"
+                        min={0}
                         step="1"
                         value={settings.deposit_min_cents / 100}
                         onChange={(e) => setSettings({ ...settings, deposit_min_cents: Math.round(parseFloat(e.target.value) * 100) })}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Maximum Deposit ($)</label>
-                      <input
+                      <Text size="sm" fw={500} mb={4}>Maximum Deposit ($)</Text>
+                      <TextInput
                         type="number"
-                        min="0"
+                        min={0}
                         step="1"
                         value={settings.deposit_max_cents / 100}
                         onChange={(e) => setSettings({ ...settings, deposit_max_cents: Math.round(parseFloat(e.target.value) * 100) })}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded"
                       />
                     </div>
-                  </div>
-                </div>
+                  </SimpleGrid>
+                </Stack>
               )}
-            </div>
+            </Stack>
 
             {/* Full Payment Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <Stack gap="md">
+              <Group justify="space-between">
                 <div>
-                  <h3 className="font-semibold">Full Payment</h3>
-                  <p className="text-sm text-neutral-600">
+                  <Text fw={600}>Full Payment</Text>
+                  <Text size="sm" c="dimmed">
                     Allow customers to pay the full amount upfront
-                  </p>
+                  </Text>
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.full_payment_enabled}
-                    onChange={(e) => setSettings({ ...settings, full_payment_enabled: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Enable full payment</span>
-                </label>
-              </div>
-            </div>
+                <Switch
+                  label="Enable full payment"
+                  checked={settings.full_payment_enabled}
+                  onChange={(e) => setSettings({ ...settings, full_payment_enabled: e.currentTarget.checked })}
+                />
+              </Group>
+            </Stack>
 
             {/* Both Options Available Info */}
             {settings.deposit_enabled && settings.full_payment_enabled && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Info className="h-4 w-4 text-blue-600" />
-                  <h4 className="font-medium text-blue-900">Both Payment Options Available</h4>
-                </div>
-                <p className="text-sm text-blue-800">
+              <Box bg="blue.0" p="md" style={{ border: '1px solid var(--mantine-color-blue-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                <Group gap="xs" mb="xs">
+                  <Info size={16} className="text-blue-600" />
+                  <Text fw={500} c="blue.9">Both Payment Options Available</Text>
+                </Group>
+                <Text size="sm" c="blue.8">
                   When you enable both deposit and full payment options, customers will be able to choose 
                   which payment method they prefer during checkout. Individual locations can override these 
                   organization settings if needed.
-                </p>
-              </div>
+                </Text>
+              </Box>
             )}
-          </CardContent>
+          </Stack>
         </Card>
       </ProtectedCard>
 
@@ -480,101 +462,92 @@ export default function OrganizationCommerceSettingsPage() {
         title="Order Management"
         description="Configure order processing and confirmation settings"
       >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Order Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+        <Card withBorder p="lg">
+          <Stack gap="md">
+            <Group gap="sm">
+              <ShoppingCart size={20} />
+              <Title order={3}>Order Management</Title>
+            </Group>
+            <Stack gap="md">
+              <Group justify="space-between">
                 <div>
-                  <h3 className="font-semibold">Auto-Confirm Orders</h3>
-                  <p className="text-sm text-neutral-600">
+                  <Text fw={600}>Auto-Confirm Orders</Text>
+                  <Text size="sm" c="dimmed">
                     Automatically confirm orders when payment is received
-                  </p>
+                  </Text>
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.auto_confirm_orders}
-                    onChange={(e) => setSettings({ ...settings, auto_confirm_orders: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Enable auto-confirmation</span>
-                </label>
-              </div>
+                <Switch
+                  label="Enable auto-confirmation"
+                  checked={settings.auto_confirm_orders}
+                  onChange={(e) => setSettings({ ...settings, auto_confirm_orders: e.currentTarget.checked })}
+                />
+              </Group>
 
               {settings.auto_confirm_orders && (
                 <div className="ml-6">
-                  <label className="block text-sm font-medium mb-2">Confirmation Delay (minutes)</label>
-                  <input
+                  <Text size="sm" fw={500} mb={4}>Confirmation Delay (minutes)</Text>
+                  <TextInput
                     type="number"
-                    min="5"
-                    max="1440"
+                    min={5}
+                    max={1440}
                     value={settings.order_confirmation_minutes}
                     onChange={(e) => setSettings({ ...settings, order_confirmation_minutes: parseInt(e.target.value) || 15 })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded"
                   />
-                  <p className="text-xs text-neutral-500 mt-1">Minutes to wait before automatically confirming orders (5-1440)</p>
+                  <Text size="xs" c="dimmed" mt={4}>Minutes to wait before automatically confirming orders (5-1440)</Text>
                 </div>
               )}
-            </div>
-          </CardContent>
+            </Stack>
+          </Stack>
         </Card>
       </ProtectedCard>
 
       {/* Product Type Requirements Info Card */}
       <div className="mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Product Type Commerce Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start gap-2 mb-4">
-              <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-neutral-600">
+        <Card withBorder p="lg">
+          <Stack gap="md">
+            <Group gap="sm">
+              <Package size={20} />
+              <Title order={3}>Product Type Commerce Settings</Title>
+            </Group>
+            <Group gap="xs" align="flex-start">
+              <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <Text size="sm" c="dimmed">
                 These settings configure commerce behavior specific to each product type.
                 Sections only apply to locations that have the corresponding product type enabled.
                 Expand each section to configure type-specific options.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <Package className="h-4 w-4 text-blue-600" />
+              </Text>
+            </Group>
+            <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm">
+              <Group gap="xs" p="sm" bg="blue.0" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+                <Package size={16} className="text-blue-600" />
                 <div>
-                  <p className="text-xs font-medium text-blue-900 dark:text-blue-300">Physical</p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400">Shipping & pickup</p>
+                  <Text size="xs" fw={500} c="blue.9">Physical</Text>
+                  <Text size="xs" c="blue.6">Shipping & pickup</Text>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
-                <Download className="h-4 w-4 text-violet-600" />
+              </Group>
+              <Group gap="xs" p="sm" bg="violet.0" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+                <Download size={16} className="text-violet-600" />
                 <div>
-                  <p className="text-xs font-medium text-violet-900 dark:text-violet-300">Digital</p>
-                  <p className="text-xs text-violet-600 dark:text-violet-400">Delivery & access</p>
+                  <Text size="xs" fw={500} c="violet.9">Digital</Text>
+                  <Text size="xs" c="violet.6">Delivery & access</Text>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                <Wrench className="h-4 w-4 text-amber-600" />
+              </Group>
+              <Group gap="xs" p="sm" bg="amber.0" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+                <Wrench size={16} className="text-amber-600" />
                 <div>
-                  <p className="text-xs font-medium text-amber-900 dark:text-amber-300">Service</p>
-                  <p className="text-xs text-amber-600 dark:text-amber-400">Booking & cancellation</p>
+                  <Text size="xs" fw={500} c="amber.9">Service</Text>
+                  <Text size="xs" c="amber.6">Booking & cancellation</Text>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
-                <Layers className="h-4 w-4 text-cyan-600" />
+              </Group>
+              <Group gap="xs" p="sm" bg="cyan.0" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+                <Layers size={16} className="text-cyan-600" />
                 <div>
-                  <p className="text-xs font-medium text-cyan-900 dark:text-cyan-300">Hybrid</p>
-                  <p className="text-xs text-cyan-600 dark:text-cyan-400">Fulfillment split</p>
+                  <Text size="xs" fw={500} c="cyan.9">Hybrid</Text>
+                  <Text size="xs" c="cyan.6">Fulfillment split</Text>
                 </div>
-              </div>
-            </div>
-          </CardContent>
+              </Group>
+            </SimpleGrid>
+          </Stack>
         </Card>
       </div>
 
@@ -585,74 +558,64 @@ export default function OrganizationCommerceSettingsPage() {
         title="Product Type Commerce Settings"
         description="Configure commerce behavior per product type"
       >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Type-Specific Commerce Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Card withBorder p="lg">
+          <Stack gap="md">
+            <Group gap="sm">
+              <Package size={20} />
+              <Title order={3}>Type-Specific Commerce Settings</Title>
+            </Group>
+            
             {/* Physical Products Section */}
             <div className="border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleSection('physical')}
                 className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium">Physical Products</span>
-                  <span className="text-xs text-neutral-500">— Shipping & pickup options</span>
-                </div>
-                {expandedSections.physical ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Group gap="xs">
+                  <Package size={16} className="text-blue-600" />
+                  <Text fw={500}>Physical Products</Text>
+                  <Text size="xs" c="dimmed">— Shipping & pickup options</Text>
+                </Group>
+                {expandedSections.physical ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               {expandedSections.physical && (
-                <div className="p-4 space-y-4 border-t border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center justify-between">
+                <Stack gap="md" className="p-4 border-t border-neutral-200 dark:border-neutral-800">
+                  <Group justify="space-between">
                     <div>
-                      <h4 className="text-sm font-medium">Shipping Enabled</h4>
-                      <p className="text-xs text-neutral-500">Allow shipping for physical products</p>
+                      <Text size="sm" fw={500}>Shipping Enabled</Text>
+                      <Text size="xs" c="dimmed">Allow shipping for physical products</Text>
                     </div>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.physical_shipping_enabled}
-                        onChange={(e) => setSettings({ ...settings, physical_shipping_enabled: e.target.checked })}
-                        className="mr-2"
-                      />
-                      <span className="text-sm">Enable</span>
-                    </label>
-                  </div>
-                  <div className="flex items-center justify-between">
+                    <Switch
+                      label="Enable"
+                      checked={settings.physical_shipping_enabled}
+                      onChange={(e) => setSettings({ ...settings, physical_shipping_enabled: e.currentTarget.checked })}
+                    />
+                  </Group>
+                  <Group justify="space-between">
                     <div>
-                      <h4 className="text-sm font-medium">Pickup Enabled</h4>
-                      <p className="text-xs text-neutral-500">Allow in-store pickup for physical products</p>
+                      <Text size="sm" fw={500}>Pickup Enabled</Text>
+                      <Text size="xs" c="dimmed">Allow in-store pickup for physical products</Text>
                     </div>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.physical_pickup_enabled}
-                        onChange={(e) => setSettings({ ...settings, physical_pickup_enabled: e.target.checked })}
-                        className="mr-2"
-                      />
-                      <span className="text-sm">Enable</span>
-                    </label>
-                  </div>
+                    <Switch
+                      label="Enable"
+                      checked={settings.physical_pickup_enabled}
+                      onChange={(e) => setSettings({ ...settings, physical_pickup_enabled: e.currentTarget.checked })}
+                    />
+                  </Group>
                   {settings.physical_shipping_enabled && (
                     <div>
-                      <label className="block text-sm font-medium mb-2">Default Shipping Rate ($)</label>
-                      <input
+                      <Text size="sm" fw={500} mb={4}>Default Shipping Rate ($)</Text>
+                      <TextInput
                         type="number"
-                        min="0"
+                        min={0}
                         step="1"
                         value={settings.physical_default_shipping_cents / 100}
                         onChange={(e) => setSettings({ ...settings, physical_default_shipping_cents: Math.round(parseFloat(e.target.value) * 100) })}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded"
                       />
-                      <p className="text-xs text-neutral-500 mt-1">Default flat shipping rate in dollars (0 = free shipping)</p>
+                      <Text size="xs" c="dimmed" mt={4}>Default flat shipping rate in dollars (0 = free shipping)</Text>
                     </div>
                   )}
-                </div>
+                </Stack>
               )}
             </div>
 
@@ -662,55 +625,53 @@ export default function OrganizationCommerceSettingsPage() {
                 onClick={() => toggleSection('digital')}
                 className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Download className="h-4 w-4 text-violet-600" />
-                  <span className="font-medium">Digital Products</span>
-                  <span className="text-xs text-neutral-500">— Delivery & access control</span>
-                </div>
-                {expandedSections.digital ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Group gap="xs">
+                  <Download size={16} className="text-violet-600" />
+                  <Text fw={500}>Digital Products</Text>
+                  <Text size="xs" c="dimmed">— Delivery & access control</Text>
+                </Group>
+                {expandedSections.digital ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               {expandedSections.digital && (
-                <div className="p-4 space-y-4 border-t border-neutral-200 dark:border-neutral-800">
+                <Stack gap="md" className="p-4 border-t border-neutral-200 dark:border-neutral-800">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Delivery Method</label>
-                    <select
+                    <Text size="sm" fw={500} mb={4}>Delivery Method</Text>
+                    <Select
                       value={settings.digital_delivery_method}
-                      onChange={(e) => setSettings({ ...settings, digital_delivery_method: e.target.value })}
-                      className="w-full px-3 py-2 border border-neutral-300 rounded"
-                    >
-                      <option value="download">Download Link</option>
-                      <option value="email">Email Delivery</option>
-                      <option value="both">Both (Download + Email)</option>
-                    </select>
-                    <p className="text-xs text-neutral-500 mt-1">How digital products are delivered to customers</p>
+                      onChange={(value) => setSettings({ ...settings, digital_delivery_method: value || 'download' })}
+                      data={[
+                        { value: 'download', label: 'Download Link' },
+                        { value: 'email', label: 'Email Delivery' },
+                        { value: 'both', label: 'Both (Download + Email)' },
+                      ]}
+                    />
+                    <Text size="xs" c="dimmed" mt={4}>How digital products are delivered to customers</Text>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <SimpleGrid cols={2} spacing="md">
                     <div>
-                      <label className="block text-sm font-medium mb-2">Access Duration (days)</label>
-                      <input
+                      <Text size="sm" fw={500} mb={4}>Access Duration (days)</Text>
+                      <TextInput
                         type="number"
-                        min="0"
+                        min={0}
                         placeholder="Unlimited"
                         value={settings.digital_access_duration_days ?? ''}
                         onChange={(e) => setSettings({ ...settings, digital_access_duration_days: e.target.value ? parseInt(e.target.value) : null })}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded"
                       />
-                      <p className="text-xs text-neutral-500 mt-1">How long customers have access (0 = unlimited)</p>
+                      <Text size="xs" c="dimmed" mt={4}>How long customers have access (0 = unlimited)</Text>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Download Limit</label>
-                      <input
+                      <Text size="sm" fw={500} mb={4}>Download Limit</Text>
+                      <TextInput
                         type="number"
-                        min="0"
+                        min={0}
                         placeholder="Unlimited"
                         value={settings.digital_download_limit ?? ''}
                         onChange={(e) => setSettings({ ...settings, digital_download_limit: e.target.value ? parseInt(e.target.value) : null })}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded"
                       />
-                      <p className="text-xs text-neutral-500 mt-1">Max downloads per purchase (0 = unlimited)</p>
+                      <Text size="xs" c="dimmed" mt={4}>Max downloads per purchase (0 = unlimited)</Text>
                     </div>
-                  </div>
-                </div>
+                  </SimpleGrid>
+                </Stack>
               )}
             </div>
 
@@ -720,40 +681,39 @@ export default function OrganizationCommerceSettingsPage() {
                 onClick={() => toggleSection('service')}
                 className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-amber-600" />
-                  <span className="font-medium">Service Products</span>
-                  <span className="text-xs text-neutral-500">— Booking & cancellation</span>
-                </div>
-                {expandedSections.service ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Group gap="xs">
+                  <Wrench size={16} className="text-amber-600" />
+                  <Text fw={500}>Service Products</Text>
+                  <Text size="xs" c="dimmed">— Booking & cancellation</Text>
+                </Group>
+                {expandedSections.service ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               {expandedSections.service && (
-                <div className="p-4 space-y-4 border-t border-neutral-200 dark:border-neutral-800">
+                <Stack gap="md" className="p-4 border-t border-neutral-200 dark:border-neutral-800">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Booking Lead Time (hours)</label>
-                    <input
+                    <Text size="sm" fw={500} mb={4}>Booking Lead Time (hours)</Text>
+                    <TextInput
                       type="number"
-                      min="0"
+                      min={0}
                       value={settings.service_booking_lead_time_hours}
                       onChange={(e) => setSettings({ ...settings, service_booking_lead_time_hours: parseInt(e.target.value) || 24 })}
-                      className="w-full px-3 py-2 border border-neutral-300 rounded"
                     />
-                    <p className="text-xs text-neutral-500 mt-1">Minimum hours before a service can be booked</p>
+                    <Text size="xs" c="dimmed" mt={4}>Minimum hours before a service can be booked</Text>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Cancellation Policy</label>
-                    <select
+                    <Text size="sm" fw={500} mb={4}>Cancellation Policy</Text>
+                    <Select
                       value={settings.service_cancellation_policy}
-                      onChange={(e) => setSettings({ ...settings, service_cancellation_policy: e.target.value })}
-                      className="w-full px-3 py-2 border border-neutral-300 rounded"
-                    >
-                      <option value="flexible">Flexible — Full refund up to 24h before</option>
-                      <option value="moderate">Moderate — Full refund up to 48h before, 50% after</option>
-                      <option value="strict">Strict — No refunds within 72h of booking</option>
-                    </select>
-                    <p className="text-xs text-neutral-500 mt-1">Cancellation policy for service bookings</p>
+                      onChange={(value) => setSettings({ ...settings, service_cancellation_policy: value || 'flexible' })}
+                      data={[
+                        { value: 'flexible', label: 'Flexible — Full refund up to 24h before' },
+                        { value: 'moderate', label: 'Moderate — Full refund up to 48h before, 50% after' },
+                        { value: 'strict', label: 'Strict — No refunds within 72h of booking' },
+                      ]}
+                    />
+                    <Text size="xs" c="dimmed" mt={4}>Cancellation policy for service bookings</Text>
                   </div>
-                </div>
+                </Stack>
               )}
             </div>
 
@@ -763,54 +723,50 @@ export default function OrganizationCommerceSettingsPage() {
                 onClick={() => toggleSection('hybrid')}
                 className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-cyan-600" />
-                  <span className="font-medium">Hybrid Products</span>
-                  <span className="text-xs text-neutral-500">— Fulfillment split</span>
-                </div>
-                {expandedSections.hybrid ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Group gap="xs">
+                  <Layers size={16} className="text-cyan-600" />
+                  <Text fw={500}>Hybrid Products</Text>
+                  <Text size="xs" c="dimmed">— Fulfillment split</Text>
+                </Group>
+                {expandedSections.hybrid ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               {expandedSections.hybrid && (
-                <div className="p-4 space-y-4 border-t border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center justify-between">
+                <Stack gap="md" className="p-4 border-t border-neutral-200 dark:border-neutral-800">
+                  <Group justify="space-between">
                     <div>
-                      <h4 className="text-sm font-medium">Fulfillment Split</h4>
-                      <p className="text-xs text-neutral-500">Ship physical component and deliver digital component separately</p>
+                      <Text size="sm" fw={500}>Fulfillment Split</Text>
+                      <Text size="xs" c="dimmed">Ship physical component and deliver digital component separately</Text>
                     </div>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.hybrid_fulfillment_split}
-                        onChange={(e) => setSettings({ ...settings, hybrid_fulfillment_split: e.target.checked })}
-                        className="mr-2"
-                      />
-                      <span className="text-sm">Enable</span>
-                    </label>
-                  </div>
+                    <Switch
+                      label="Enable"
+                      checked={settings.hybrid_fulfillment_split}
+                      onChange={(e) => setSettings({ ...settings, hybrid_fulfillment_split: e.currentTarget.checked })}
+                    />
+                  </Group>
                   {settings.hybrid_fulfillment_split && (
-                    <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Info className="h-4 w-4 text-cyan-600" />
-                        <h4 className="text-sm font-medium text-cyan-900 dark:text-cyan-300">How Fulfillment Split Works</h4>
-                      </div>
-                      <p className="text-xs text-cyan-800 dark:text-cyan-400">
+                    <Box bg="cyan.0" p="sm" style={{ border: '1px solid var(--mantine-color-cyan-2)', borderRadius: 'var(--mantine-radius-md)' }}>
+                      <Group gap="xs" mb={4}>
+                        <Info size={16} className="text-cyan-600" />
+                        <Text size="sm" fw={500} c="cyan.9">How Fulfillment Split Works</Text>
+                      </Group>
+                      <Text size="xs" c="cyan.8">
                         When enabled, hybrid products will have their physical component shipped using physical product settings
                         and the digital component delivered using digital product settings. When disabled, the entire order
                         follows standard fulfillment.
-                      </p>
-                    </div>
+                      </Text>
+                    </Box>
                   )}
-                </div>
+                </Stack>
               )}
             </div>
-          </CardContent>
+          </Stack>
         </Card>
       </ProtectedCard>
 
       {/* Save Button */}
-      <div className="mt-8 flex justify-end gap-4">
+      <Group justify="flex-end" gap="md" mt="xl">
         <Button
-          variant="outline"
+          variant="default"
           onClick={() => window.location.href = '/settings/organization'}
         >
           Cancel
@@ -818,29 +774,20 @@ export default function OrganizationCommerceSettingsPage() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2"
+          leftSection={saving ? <Loader size={16} /> : <Settings size={16} />}
         >
-          {saving ? (
-            <>
-              <Spinner size="sm" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Settings className="h-4 w-4" />
-              Save Settings
-            </>
-          )}
+          {saving ? 'Saving...' : 'Save Settings'}
         </Button>
-      </div>
+      </Group>
 
       {/* Messages */}
       {message && (
-        <div className="mt-4">
-          <Alert variant={message.type === 'error' ? 'destructive' : 'success'}>
-            {message.text}
-          </Alert>
-        </div>
+        <Alert
+          color={message.type === 'error' ? 'red' : 'green'}
+          mt="md"
+        >
+          {message.text}
+        </Alert>
       )}
     </div>
   );

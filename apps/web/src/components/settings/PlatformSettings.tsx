@@ -24,6 +24,17 @@ export default function PlatformSettings() {
           color: 'bg-blue-500',
         },
         {
+          title: 'My Profile',
+          description: 'View your personal and business information',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: '/settings/profile',
+          color: 'bg-cyan-500',
+        },
+        {
           title: 'Security',
           description: 'Manage sessions, security alerts, and account security',
           icon: (
@@ -85,6 +96,18 @@ export default function PlatformSettings() {
       description: 'Manage your plan and services',
       cards: [
         {
+          title: 'Subscription',
+          description: 'View your current plan, usage, and upgrade options',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          ),
+          href: '/settings/subscription',
+          color: 'bg-purple-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
+        {
           title: 'Platform Offerings',
           description: 'View all subscription tiers, managed services, and benefits',
           icon: (
@@ -96,6 +119,30 @@ export default function PlatformSettings() {
           color: 'bg-emerald-500',
           badge: 'Explore',
         },
+        {
+          title: 'Feature Store',
+          description: 'Purchase additional features and add-ons for your plan',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          ),
+          href: '/settings/feature-store',
+          color: 'bg-indigo-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
+        {
+          title: 'Billing & Invoices',
+          description: 'View your invoice history and download billing statements',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          href: '/settings/billing/invoices',
+          color: 'bg-amber-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
       ],
     },
     {
@@ -104,14 +151,38 @@ export default function PlatformSettings() {
       cards: [
         {
           title: 'Tenant Settings',
-          description: 'Manage your business locations',
+          description: 'Manage business profile, regional settings, and organization',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           ),
-          href: '/tenants',
+          href: '/settings/tenant',
           color: 'bg-blue-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
+        {
+          title: 'Organization',
+          description: 'View your organization dashboard and manage chain settings',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          ),
+          href: '/settings/organization',
+          color: 'bg-orange-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
+        {
+          title: 'SKU Scanning',
+          description: 'Scan barcodes to quickly add products to inventory',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            </svg>
+          ),
+          href: '/settings/scan',
+          color: 'bg-green-500',
         },
         {
           title: 'Location Limits',
@@ -124,6 +195,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin/limits',
           color: 'bg-purple-500',
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
         },
       ],
     },
@@ -141,7 +213,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin/users',
           color: 'bg-blue-500',
-          accessOptions: { roles: ['admin', 'platform_staff'] },
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
         },
       ],
     },
@@ -160,7 +232,7 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin',
           color: 'bg-purple-500',
-          accessOptions: { roles: ['admin', 'platform_staff'] },
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
         },
         {
           title: 'Platform Settings',
@@ -173,7 +245,112 @@ export default function PlatformSettings() {
           ),
           href: '/settings/admin/platform',
           color: 'bg-blue-600',
-          accessOptions: { roles: ['admin', 'platform_staff'] },
+          accessOptions: { requirePlatformRole: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] },
+        },
+      ],
+    },
+    {
+      title: 'Public Directory & Shops',
+      description: 'Browse public store directory, featured shops, and support resources',
+      cards: [
+        {
+          title: 'Platform Directory',
+          description: 'Browse all stores on the platform',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          ),
+          href: '/directory',
+          color: 'bg-rose-500',
+        },
+        {
+          title: 'Directory Categories',
+          description: 'Browse stores by category',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          ),
+          href: '/directory/categories',
+          color: 'bg-indigo-500',
+        },
+        {
+          title: 'About the Directory',
+          description: 'Learn about our store directory and how it works',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: '/directory/about',
+          color: 'bg-blue-500',
+        },
+        {
+          title: 'Shops Overview',
+          description: 'Browse all shops, featured shops, and trending stores',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          ),
+          href: '/shops',
+          color: 'bg-emerald-500',
+        },
+        {
+          title: 'Featured Shops',
+          description: 'Discover featured and highlighted shops on the platform',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          ),
+          href: '/shops/featured',
+          color: 'bg-amber-500',
+        },
+        {
+          title: 'Trending Shops',
+          description: 'See what shops are trending on the platform',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          ),
+          href: '/shops/trending',
+          color: 'bg-orange-500',
+        },
+        {
+          title: 'Shops Directory',
+          description: 'Browse the full shops directory',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          ),
+          href: '/shops/directory',
+          color: 'bg-teal-500',
+        },
+        {
+          title: 'Support Hub',
+          description: 'Access support resources and help center',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ),
+          href: '/support',
+          color: 'bg-cyan-500',
+        },
+        {
+          title: 'Directory Support',
+          description: 'Browse support resources and guides',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ),
+          href: '/support/directory',
+          color: 'bg-cyan-600',
         },
       ],
     },

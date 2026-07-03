@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem } from '@/services/BsaasPurchaseService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
 
+export const dynamic = 'force-dynamic';
+
 export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?: string }) {
   const { user } = useAuth();
   const searchParams = useSearchParams();

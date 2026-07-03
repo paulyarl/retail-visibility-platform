@@ -70,9 +70,11 @@ function SidebarItemComponent({
   }, [hasChildren, item.href, item.label, onToggleExpand])
 
   if (hasChildren) {
+    const ToggleLink = item.href ? Link : 'button' as React.ElementType
     return (
       <div className="w-full">
-        <button
+        <ToggleLink
+          {...(item.href ? { href: item.href } : {})}
           onClick={handleClick}
           className={cn(
             'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors',
@@ -103,7 +105,7 @@ function SidebarItemComponent({
               </svg>
             </>
           )}
-        </button>
+        </ToggleLink>
         
         {isExpanded && !isCollapsed && (
           <div className={cn(

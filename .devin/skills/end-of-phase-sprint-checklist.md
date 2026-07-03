@@ -76,7 +76,10 @@ cd apps/web && npx tsc --noEmit
   - **Update parent metadata**: If adding a child link, update the parent's `metadata.childrenKeys` and `metadata.hasChildren` using nested `jsonb_set`.
   - **Keep file-based fallbacks in sync**: Update the corresponding `buildTenantNav()` / `buildAdminNavItems()` / `buildNavItems()` array as well, for resilience and reference.
 
-- [ ] **Did the session add a settings card?** If a settings page was added, ensure it's linked from the relevant settings landing page (e.g., `TenantSettings.tsx`) in addition to the sidebar.
+- [ ] **Did the session add settings cards?** New pages must be discoverable from settings landing pages, not just the sidebar. Verify both:
+  - **Tenant settings** (`apps/web/src/components/settings/TenantSettings.tsx`): If a tenant-facing page was added (under `/t/[tenantId]/settings/...`), ensure a settings card was added to the appropriate group/section with title, description, icon, color, and href.
+  - **Admin settings** (`apps/web/src/app/(platform)/settings/admin/page.tsx`): If an admin-facing page was added (under `/settings/admin/...`), ensure a card or link was added to the appropriate section with label, icon, and href.
+  - **Sub-pages**: If a new sub-page was added (e.g., `/settings/promotion/analytics`), ensure it has its own settings card or a link from the parent page's UI — don't rely solely on the sidebar for discoverability.
 
 ---
 

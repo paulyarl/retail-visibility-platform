@@ -24,6 +24,7 @@ import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreType
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
 import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
+import PromotedStoresCarousel from '@/components/directory/PromotedStoresCarousel';
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
@@ -138,6 +139,9 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
 
             {/* Active featured products */}
             <ActiveFeaturedSection activeFeatured={data.activeFeatured} />
+
+            {/* Promoted stores carousel */}
+            <PromotedStoresCarousel />
 
             {/* Random featured products */}
             <ProductSingletonProvider>
