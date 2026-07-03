@@ -460,6 +460,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     addPo(po.showsVariants, 'Variants', po.effectiveShowsVariants);
     addPo(po.showsGallery, 'Gallery', po.effectiveShowsGallery);
     addPo(po.showsVideo, 'Video', po.effectiveShowsVideo);
+    addPo(po.showsSupplierCatalog, 'Supplier Catalog', po.effectiveShowsSupplierCatalog);
     // Layouts
     po.allowedLayouts.forEach(t => {
       const label = PRODUCT_LAYOUT_LABELS[t] || t;

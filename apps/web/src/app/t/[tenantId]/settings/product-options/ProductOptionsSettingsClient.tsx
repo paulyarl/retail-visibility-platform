@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Package, Save, AlertCircle, Settings, Image, Video, Copy, ArrowRight, Zap, List, LayoutGrid, Eye, QrCode, ThumbsUp, MapPin, Map, Clock, Search, MessageSquare, Truck, Tag, Store } from 'lucide-react';
+import { Package, Save, AlertCircle, Settings, Image, Video, Copy, ArrowRight, Zap, List, LayoutGrid, Eye, QrCode, ThumbsUp, MapPin, Map, Clock, Search, MessageSquare, Truck, Tag, Store, Boxes } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { useProductOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -26,6 +26,7 @@ interface ProductOptionsSettings {
   product_opt_fulfillment: boolean;
   product_opt_categories: boolean;
   product_opt_location_availability: boolean;
+  product_opt_supplier_catalog: boolean;
 }
 
 interface ProductOptionsSettingsClientProps {
@@ -89,6 +90,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
   const showsFulfillment = productOptionsCap.data?.showsFulfillment ?? true;
   const showsCategories = productOptionsCap.data?.showsCategories ?? true;
   const showsLocationAvailability = productOptionsCap.data?.showsLocationAvailability ?? true;
+  const showsSupplierCatalog = productOptionsCap.data?.showsSupplierCatalog ?? true;
 
   const [settings, setSettings] = useState<ProductOptionsSettings>({
     product_variant_enabled: true,
@@ -106,6 +108,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
     product_opt_fulfillment: true,
     product_opt_categories: true,
     product_opt_location_availability: true,
+    product_opt_supplier_catalog: true,
   });
 
   const [loading, setLoading] = useState(true);
@@ -138,6 +141,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
           product_opt_fulfillment: settings.product_opt_fulfillment ?? true,
           product_opt_categories: settings.product_opt_categories ?? true,
           product_opt_location_availability: settings.product_opt_location_availability ?? true,
+          product_opt_supplier_catalog: settings.product_opt_supplier_catalog ?? true,
         });
       }
     } catch (err) {
@@ -270,6 +274,28 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
                   checked={showsVideo && settings.product_video_enabled}
                   onCheckedChange={() => handleToggle('product_video_enabled')}
                   disabled={!showsVideo}
+                />
+              </div>
+            </div>
+
+            {/* Supplier Catalog */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Boxes className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="font-medium text-neutral-900">Supplier Catalog Import</p>
+                  <p className="text-sm text-neutral-600">Allow importing products from supplier catalogs during creation</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {!showsSupplierCatalog && (
+                  <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+                )}
+                <Switch
+                  id="supplier-catalog-toggle"
+                  checked={showsSupplierCatalog && settings.product_opt_supplier_catalog}
+                  onCheckedChange={() => handleToggle('product_opt_supplier_catalog')}
+                  disabled={!showsSupplierCatalog}
                 />
               </div>
             </div>

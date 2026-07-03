@@ -337,6 +337,7 @@ export default function CapabilityShowcase({
               ...(po?.effectiveShowsVariants ? ["Variants"] : []),
               ...(po?.effectiveShowsGallery ? ["Gallery"] : []),
               ...(po?.effectiveShowsVideo ? ["Video"] : []),
+              ...(po?.effectiveShowsSupplierCatalog ? ["Supplier Catalog"] : []),
             ].join(", ") || "Basic"
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/product-options`,
