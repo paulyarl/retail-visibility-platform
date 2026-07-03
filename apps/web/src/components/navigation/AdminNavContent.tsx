@@ -452,9 +452,11 @@ function NavItemRow({
   );
 
   if (hasChildren) {
+    const ToggleLink = item.href ? Link : 'button' as React.ElementType;
     return (
       <div>
-        <button
+        <ToggleLink
+          {...(item.href ? { href: item.href } : {})}
           onClick={() => onToggle(key)}
           className={sharedClass}
           style={{ paddingLeft, paddingRight: 12 }}
@@ -464,7 +466,7 @@ function NavItemRow({
           <span className="flex-1 text-left truncate">{item.label}</span>
           {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
           <Icon.ChevronRight className={isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400'} />
-        </button>
+        </ToggleLink>
         {isExpanded && (
           <div className="mt-0.5 space-y-0.5">
             {item.children!.map((child, index) => (

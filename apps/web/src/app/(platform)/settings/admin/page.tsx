@@ -1198,7 +1198,7 @@ export default function AdminDashboardPage() {
                 </div>
               </Link>
 
-              <Link href="/settings/admin/features" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
+              <Link href="/settings/admin/feature-overrides" className="p-4 text-left bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors block">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -7,9 +7,10 @@ import PageHeader from '@/components/PageHeader';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { CachedProtectedCard } from '@/lib/auth/CachedProtectedCard';
 import SettingsSearch from '@/components/SettingsSearch';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, Sparkles, ShieldOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTenantBehaviorAccess } from '@/hooks/tenant-access/useTenantBehaviorAccess';
+import { useAllCapabilities, useMerchantGates } from '@/hooks/tenant-access/useCapabilityAccess';
 
 
 // Force dynamic rendering to prevent prerendering issues
@@ -28,6 +29,8 @@ export type UnifiedSettingCard = {
     href: string;
     icon?: string;
   };
+  /** Optional capability key from AllCapabilitiesState. When set and capability is disabled, card renders in locked state. */
+  capabilityKey?: string;
 };
 
 
@@ -52,10 +55,44 @@ interface UnifiedSettingsProps {
 }
 
 
+const CAPABILITY_KEY_TO_GATE_KEY: Record<string, string> = {
+  commerce: 'commerce_types',
+  paymentGateway: 'payment_gateway_options',
+  storefront: 'storefront_types',
+  barcodeScan: 'barcode_scan_options',
+  fulfillment: 'fulfillment_options',
+  productOptions: 'product_options',
+  productType: 'product_types',
+  featuredOptions: 'featured_options',
+  integrationOptions: 'integration_options',
+  quickstartOptions: 'quickstart_options',
+  storefrontOptions: 'storefront_options',
+  directoryEntryOptions: 'directory_entry_options',
+  faqOptions: 'faq_options',
+  crmOptions: 'crm_options',
+  chatbotOptions: 'chatbot_options',
+  socialCommerceOptions: 'social_commerce_options',
+  directoryPromotion: 'directory_promotion',
+};
+
+type CapabilityStatus = 'available' | 'tier-gated' | 'merchant-gated';
+
 export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
   const router = useRouter();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const { canEdit } = useTenantBehaviorAccess(config.tenantId || '');
+  const { data: capabilities } = useAllCapabilities(config.tenantId || null);
+  const { gates: merchantGates } = useMerchantGates(config.tenantId || null);
+
+  const getCapabilityStatus = (capabilityKey?: string): CapabilityStatus => {
+    if (!capabilityKey || !capabilities) return 'available';
+    const capData = (capabilities as any)[capabilityKey];
+    if (!capData) return 'available';
+    if (!capData.enabled) return 'tier-gated';
+    const gateKey = CAPABILITY_KEY_TO_GATE_KEY[capabilityKey];
+    if (gateKey && merchantGates[gateKey]) return 'merchant-gated';
+    return 'available';
+  };
 
   const handleCardClick = async (href: string) => {
     setNavigatingTo(href);
@@ -148,8 +185,12 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {group.cards.map((card, index) => {
-                  const cardRequiresAdmin = card.accessOptions?.roles?.includes('admin');
+                  const cardRequiresAdmin = card.accessOptions?.roles?.includes('admin') ||
+                    card.accessOptions?.requirePlatformRole?.includes('PLATFORM_ADMIN');
                   const isCardDisabled = !canEdit && cardRequiresAdmin;
+                  const capStatus = getCapabilityStatus(card.capabilityKey);
+                  const isCapLocked = capStatus !== 'available';
+                  const isLocked = isCardDisabled || isCapLocked;
 
                   return (
                   <CachedProtectedCard
@@ -162,10 +203,10 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05, duration: 0.3 }}
                     >
-                      <Tooltip label="Admin access required" disabled={!isCardDisabled} position="top">
+                      <Tooltip label={capStatus === 'tier-gated' ? 'Not available on your current plan — upgrade to unlock' : capStatus === 'merchant-gated' ? 'Disabled by merchant — enable in capability settings' : isCardDisabled ? 'Admin access required' : ''} disabled={!isLocked} position="top">
                         <MantineCard
-                          onClick={isCardDisabled ? undefined : () => handleCardClick(card.href)}
-                          className={`${isCardDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} h-full relative group transition-all duration-200 ${isCardDisabled ? '' : 'hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-600'}`}
+                          onClick={isLocked ? undefined : () => handleCardClick(card.href)}
+                          className={`${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} h-full relative group transition-all duration-200 ${isLocked ? '' : 'hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-600'}`}
                           padding="lg"
                           radius="md"
                           style={navigatingTo === card.href ? { opacity: 0.75 } : undefined}
@@ -177,10 +218,28 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                           )}
 
                           <Group justify="space-between" align="flex-start" gap="md">
-                            <div className={`${card.color} p-3 rounded-lg text-white flex-shrink-0 shadow-sm ${isCardDisabled ? 'opacity-50' : ''}`}>
+                            <div className={`${card.color} p-3 rounded-lg text-white flex-shrink-0 shadow-sm ${isLocked ? 'opacity-50' : ''}`}>
                               {card.icon}
                             </div>
-                            {isCardDisabled ? (
+                            {capStatus === 'tier-gated' ? (
+                              <Badge
+                                variant="light"
+                                color="orange"
+                                size="sm"
+                                leftSection={<Sparkles className="w-3 h-3" />}
+                              >
+                                Upgrade
+                              </Badge>
+                            ) : capStatus === 'merchant-gated' ? (
+                              <Badge
+                                variant="light"
+                                color="red"
+                                size="sm"
+                                leftSection={<ShieldOff className="w-3 h-3" />}
+                              >
+                                Disabled
+                              </Badge>
+                            ) : isCardDisabled ? (
                               <Badge
                                 variant="light"
                                 color="gray"
@@ -217,7 +276,7 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
                             </Text>
                           </Box>
 
-                          {card.secondaryLink && !isCardDisabled && (
+                          {card.secondaryLink && !isLocked && (
                             <Box mt="md" pt="md" className="border-t border-gray-200 dark:border-gray-700">
                               <button
                                 onClick={(e) => handleSecondaryLinkClick(e, card.secondaryLink!.href)}

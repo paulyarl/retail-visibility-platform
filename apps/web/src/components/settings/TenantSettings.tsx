@@ -312,6 +312,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-cyan-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'productOptions',
         },
         {
           title: 'Custom Subdomain',
@@ -339,10 +340,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/storefront-policies`,
+          href: `/t/${tenantId}/settings/policies`,
           color: 'bg-indigo-600',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'storefrontOptions',
         },
         {
           title: 'Product Conditions',
@@ -364,7 +366,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/store-policies`,
+          href: `/t/${tenantId}/settings/policies`,
           color: 'bg-indigo-500',
           accessOptions: { roles: ['admin', 'support'] },
         },
@@ -399,7 +401,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/returns`,
+          href: `/t/${tenantId}/returns`,
           color: 'bg-orange-500',
           badge: 'NEW',
         },
@@ -411,10 +413,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/abandoned-cart`,
+          href: `/t/${tenantId}/abandoned-carts`,
           color: 'bg-amber-600',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'socialCommerceOptions',
         },
         {
           title: 'Social Proof',
@@ -427,6 +430,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/social-proof`,
           color: 'bg-pink-600',
           badge: 'NEW',
+          capabilityKey: 'socialCommerceOptions',
         },
         {
           title: 'Social Share Buttons',
@@ -438,6 +442,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/social-share`,
           color: 'bg-pink-500',
+          capabilityKey: 'socialCommerceOptions',
         },
       ],
     },
@@ -457,6 +462,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-amber-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'featuredOptions',
         },
         {
           title: 'Directory Featured Products',
@@ -470,6 +476,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-amber-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'featuredOptions',
         },
         {
           title: 'Storefront Featured Products',
@@ -482,6 +489,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/featured-products`,
           color: 'bg-yellow-500',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'featuredOptions',
         },
         {
           title: 'Featured Store',
@@ -495,6 +503,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-purple-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'featuredOptions',
         },
         {
           title: 'Directory Promotion',
@@ -508,6 +517,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-amber-600',
           badge: 'Directory',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'directoryPromotion',
         },
       ],
     },
@@ -535,7 +545,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/roles`,
+          href: `/t/${tenantId}/settings/users`,
           color: 'bg-cyan-600',
           accessOptions: { roles: ['admin', 'support'] },
         },
@@ -547,7 +557,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/invitations`,
+          href: `/t/${tenantId}/settings/users`,
           color: 'bg-cyan-400',
         },
       ],
@@ -564,10 +574,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 3v-3z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/chatbot`,
+          href: `/t/${tenantId}/bot`,
           color: 'bg-violet-500',
           badge: 'AI',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'chatbotOptions',
         },
         {
           title: 'Bot Knowledge Base',
@@ -577,10 +588,11 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/bot-knowledge`,
+          href: `/t/${tenantId}/bot/knowledge`,
           color: 'bg-violet-600',
           badge: 'AI',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'chatbotOptions',
         },
         {
           title: 'Bot Personality',
@@ -590,9 +602,10 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/bot-personality`,
+          href: `/t/${tenantId}/bot/config`,
           color: 'bg-violet-400',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'chatbotOptions',
         },
       ],
     },
@@ -687,7 +700,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/gbp-connection`,
+          href: `/t/${tenantId}/settings/integrations/google`,
           color: 'bg-red-500',
           accessOptions: { roles: ['admin', 'support'] },
         },
@@ -699,7 +712,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/gbp-sync`,
+          href: `/t/${tenantId}/settings/integrations/google/sync-status`,
           color: 'bg-red-600',
         },
         {
@@ -744,6 +757,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-purple-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'commerce',
         },
         {
           title: 'Payment Gateways',
@@ -757,6 +771,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-emerald-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'paymentGateway',
         },
         {
           title: 'Fulfillment Options',
@@ -770,6 +785,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-blue-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'fulfillment',
         },
         {
           title: 'Commerce Settings',
@@ -783,6 +799,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-violet-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'commerce',
         },
       ],
     },
@@ -802,6 +819,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-green-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'integrationOptions',
         },
         {
           title: 'Clover POS',
@@ -814,6 +832,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations/clover`,
           color: 'bg-green-600',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'integrationOptions',
         },
         {
           title: 'Square POS',
@@ -826,6 +845,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations/square`,
           color: 'bg-green-700',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'integrationOptions',
         },
         {
           title: 'Integration Options',
@@ -839,6 +859,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integration-options`,
           color: 'bg-slate-600',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'integrationOptions',
         },
       ],
     },
@@ -926,6 +947,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-pink-500',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'socialCommerceOptions',
         },
         {
           title: 'Meta Commerce',
@@ -938,6 +960,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations/meta`,
           color: 'bg-blue-500',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'socialCommerceOptions',
         },
         {
           title: 'TikTok Shop',
@@ -950,6 +973,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations/tiktok`,
           color: 'bg-slate-800',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'socialCommerceOptions',
         },
         {
           title: 'Social Pixels',
@@ -962,6 +986,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           href: `/t/${tenantId}/settings/integrations/pixels`,
           color: 'bg-amber-500',
           accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'socialCommerceOptions',
         },
       ],
     },
@@ -988,7 +1013,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           ),
-          href: `/t/${tenantId}/inventory`,
+          href: `/t/${tenantId}/items`,
           color: 'bg-indigo-500',
         },
         {
@@ -999,8 +1024,9 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           ),
-          href: `/t/${tenantId}/products`,
+          href: `/t/${tenantId}/catalog`,
           color: 'bg-indigo-600',
+          capabilityKey: 'productOptions',
         },
         {
           title: 'Storefront',
@@ -1012,6 +1038,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/storefront`,
           color: 'bg-green-500',
+          capabilityKey: 'storefront',
         },
         {
           title: 'Orders',
@@ -1054,8 +1081,9 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h4M4 8h4M4 12h4M4 16h4M16 4h4M16 8h4M16 12h4M16 16h4M4 20h16" />
             </svg>
           ),
-          href: `/t/${tenantId}/scanner`,
+          href: `/t/${tenantId}/scan`,
           color: 'bg-cyan-600',
+          capabilityKey: 'barcodeScan',
         },
         {
           title: 'Customer Lists',
@@ -1065,8 +1093,9 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           ),
-          href: `/t/${tenantId}/customers`,
+          href: `/t/${tenantId}/support/contacts`,
           color: 'bg-teal-500',
+          capabilityKey: 'crmOptions',
         },
         {
           title: 'Organization Dashboard',
@@ -1076,7 +1105,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           ),
-          href: `/t/${tenantId}/organization`,
+          href: `/t/${tenantId}/settings/organization`,
           color: 'bg-orange-500',
           badge: 'Chain',
           accessOptions: { orgMember: true },
