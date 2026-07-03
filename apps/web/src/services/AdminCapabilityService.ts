@@ -106,6 +106,27 @@ export interface ConstraintData {
   updated_at?: string;
 }
 
+export interface ConstraintFieldMeta {
+  field: string;
+  label: string;
+  value_type: 'string' | 'boolean' | 'array';
+  operators: string[];
+  values?: string[];
+}
+
+export interface ConstraintCapabilityMeta {
+  key: string;
+  label: string;
+  fields: ConstraintFieldMeta[];
+}
+
+export interface ConstraintMetadata {
+  capabilities: ConstraintCapabilityMeta[];
+  operators: string[];
+  types: string[];
+  severities: string[];
+}
+
 /**
  * Service for managing admin capability operations
  */
@@ -364,13 +385,27 @@ export class AdminCapabilityService extends AdminApiSingleton {
   // ===== Constraints CRUD =====
 
   async getConstraints(): Promise<ConstraintData[]> {
-    const result = await this.makeDefaultRequest<ConstraintData[]>(
+    const result = await this.makeDefaultRequest<ConstraintData[] | { constraints: ConstraintData[] }>(
       '/api/admin/capability-constraints',
       {},
       'admin-constraints-all',
       this.cacheTTL,
     );
     if (!result.success) throw new Error('Failed to fetch constraints');
+    const data = result.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray((data as any).constraints)) return (data as any).constraints;
+    return [];
+  }
+
+  async getConstraintMetadata(): Promise<ConstraintMetadata> {
+    const result = await this.makeDefaultRequest<ConstraintMetadata>(
+      '/api/admin/capability-constraints/metadata',
+      {},
+      'admin-constraints-metadata',
+      this.cacheTTL,
+    );
+    if (!result.success) throw new Error('Failed to fetch constraint metadata');
     return result.data!;
   }
 

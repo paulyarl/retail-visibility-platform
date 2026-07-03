@@ -18,6 +18,7 @@ import {
   CapabilityType,
   Tier as CapabilityTier,
   ConstraintData,
+  ConstraintMetadata,
 } from '@/services/AdminCapabilityService';
 import {
   tenantTierService,
@@ -102,6 +103,7 @@ export default function CapabilityManagement() {
   const [constraints, setConstraints] = useState<ConstraintData[]>([]);
   const [constraintDialogOpen, setConstraintDialogOpen] = useState(false);
   const [editingConstraint, setEditingConstraint] = useState<ConstraintData | null>(null);
+  const [constraintMetadata, setConstraintMetadata] = useState<ConstraintMetadata | null>(null);
   const [constraintForm, setConstraintForm] = useState({
     constraint_id: '',
     type: 'requires' as string,
@@ -141,7 +143,7 @@ export default function CapabilityManagement() {
     try {
       setLoading(true);
       setError(null);
-      const [caps, feats, capTypes, tierList, legacyTiersList, legacyFeatsList, constraintList] = await Promise.all([
+      const [caps, feats, capTypes, tierList, legacyTiersList, legacyFeatsList, constraintList, metadata] = await Promise.all([
         adminCapabilityService.getAllCapabilities().catch(() => []),
         adminCapabilityService.getFeatures().catch(() => []),
         adminCapabilityService.getCapabilityTypes().catch(() => []),
@@ -149,14 +151,16 @@ export default function CapabilityManagement() {
         tenantTierService.getTierSystemTiersList().catch(() => []),
         tenantTierService.getTierSystemFeaturesList().catch(() => []),
         adminCapabilityService.getConstraints().catch(() => []),
+        adminCapabilityService.getConstraintMetadata().catch(() => null),
       ]);
-      setCapabilities(caps);
-      setFeatures(feats);
-      setCapabilityTypes(capTypes);
-      setTiers(tierList);
-      setLegacyTiers(legacyTiersList);
-      setLegacyFeatures(legacyFeatsList);
-      setConstraints(constraintList);
+      setCapabilities(Array.isArray(caps) ? caps : []);
+      setFeatures(Array.isArray(feats) ? feats : []);
+      setCapabilityTypes(Array.isArray(capTypes) ? capTypes : []);
+      setTiers(Array.isArray(tierList) ? tierList : []);
+      setLegacyTiers(Array.isArray(legacyTiersList) ? legacyTiersList : []);
+      setLegacyFeatures(Array.isArray(legacyFeatsList) ? legacyFeatsList : []);
+      setConstraints(Array.isArray(constraintList) ? constraintList : []);
+      setConstraintMetadata(metadata);
     } catch (err) {
       console.error('Failed to load capability data:', err);
       setError('Failed to load capability data');
@@ -173,7 +177,7 @@ export default function CapabilityManagement() {
     if (!tierKey) return;
     try {
       const data = await adminCapabilityService.getTierCapabilities(tierKey);
-      setTierCapabilities(data);
+      setTierCapabilities(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load tier capabilities:', err);
       setTierCapabilities([]);
@@ -691,6 +695,98 @@ export default function CapabilityManagement() {
       });
     }
     setConstraintDialogOpen(true);
+  };
+
+  const getCapOptions = () => {
+    if (!constraintMetadata) return [];
+    return [...constraintMetadata.capabilities]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(c => ({ value: c.key, label: c.label }));
+  };
+
+  const getFieldOptions = (capKey: string) => {
+    if (!constraintMetadata) return [];
+    const cap = constraintMetadata.capabilities.find(c => c.key === capKey);
+    if (!cap) return [];
+    return [...cap.fields]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(f => ({ value: f.field, label: f.label }));
+  };
+
+  const getOperatorOptions = (capKey: string, field: string) => {
+    if (!constraintMetadata) return [];
+    const cap = constraintMetadata.capabilities.find(c => c.key === capKey);
+    if (!cap) return [];
+    const f = cap.fields.find(fld => fld.field === field);
+    if (!f) return [];
+    return f.operators.map(op => ({ value: op, label: op }));
+  };
+
+  const getValueOptions = (capKey: string, field: string) => {
+    if (!constraintMetadata) return [];
+    const cap = constraintMetadata.capabilities.find(c => c.key === capKey);
+    if (!cap) return [];
+    const f = cap.fields.find(fld => fld.field === field);
+    if (!f || !f.values) return [];
+    return f.values.map(v => ({ value: v, label: v }));
+  };
+
+  const handleSourceCapChange = (capKey: string) => {
+    const fields = getFieldOptions(capKey);
+    const firstField = fields[0]?.value || '';
+    const ops = getOperatorOptions(capKey, firstField);
+    const firstOp = ops[0]?.value || 'equals';
+    const vals = getValueOptions(capKey, firstField);
+    const firstVal = vals[0]?.value || '';
+    setConstraintForm(prev => ({
+      ...prev,
+      source_capability: capKey,
+      source_field: firstField,
+      source_operator: firstOp,
+      source_value: firstVal,
+    }));
+  };
+
+  const handleSourceFieldChange = (field: string) => {
+    const ops = getOperatorOptions(constraintForm.source_capability, field);
+    const firstOp = ops[0]?.value || 'equals';
+    const vals = getValueOptions(constraintForm.source_capability, field);
+    const firstVal = vals[0]?.value || '';
+    setConstraintForm(prev => ({
+      ...prev,
+      source_field: field,
+      source_operator: firstOp,
+      source_value: firstVal,
+    }));
+  };
+
+  const handleTargetCapChange = (capKey: string) => {
+    const fields = getFieldOptions(capKey);
+    const firstField = fields[0]?.value || '';
+    const ops = getOperatorOptions(capKey, firstField);
+    const firstOp = ops[0]?.value || 'equals';
+    const vals = getValueOptions(capKey, firstField);
+    const firstVal = vals[0]?.value || '';
+    setConstraintForm(prev => ({
+      ...prev,
+      target_capability: capKey,
+      target_field: firstField,
+      target_operator: firstOp,
+      target_value: firstVal,
+    }));
+  };
+
+  const handleTargetFieldChange = (field: string) => {
+    const ops = getOperatorOptions(constraintForm.target_capability, field);
+    const firstOp = ops[0]?.value || 'equals';
+    const vals = getValueOptions(constraintForm.target_capability, field);
+    const firstVal = vals[0]?.value || '';
+    setConstraintForm(prev => ({
+      ...prev,
+      target_field: field,
+      target_operator: firstOp,
+      target_value: firstVal,
+    }));
   };
 
   const handleConstraintSave = async () => {
@@ -2034,64 +2130,110 @@ export default function CapabilityManagement() {
             <div className="border rounded-md p-3 bg-gray-50">
               <div className="text-xs font-semibold text-gray-600 mb-2">Source (IF condition)</div>
               <div className="grid grid-cols-2 gap-3">
-                <Input
-                  placeholder="capability key (e.g. product_types)"
-                  value={constraintForm.source_capability}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_capability: e.target.value }))}
-                />
-                <Input
-                  placeholder="field (e.g. effective_types)"
-                  value={constraintForm.source_field}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_field: e.target.value }))}
-                />
-                <select
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  value={constraintForm.source_operator}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_operator: e.target.value }))}
-                >
-                  <option value="equals">equals</option>
-                  <option value="includes">includes</option>
-                  <option value="not_includes">not_includes</option>
-                  <option value="is_true">is_true</option>
-                  <option value="is_false">is_false</option>
-                </select>
-                <Input
-                  placeholder="value (e.g. digital)"
-                  value={constraintForm.source_value}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, source_value: e.target.value }))}
-                />
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Capability</label>
+                  <SearchableSelect
+                    options={getCapOptions()}
+                    value={constraintForm.source_capability}
+                    onChange={handleSourceCapChange}
+                    placeholder="Select capability..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Field</label>
+                  <SearchableSelect
+                    options={getFieldOptions(constraintForm.source_capability)}
+                    value={constraintForm.source_field}
+                    onChange={handleSourceFieldChange}
+                    placeholder="Select field..."
+                    disabled={!constraintForm.source_capability}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Operator</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={constraintForm.source_operator}
+                    onChange={(e) => setConstraintForm(prev => ({ ...prev, source_operator: e.target.value }))}
+                  >
+                    {getOperatorOptions(constraintForm.source_capability, constraintForm.source_field).map(op => (
+                      <option key={op.value} value={op.value}>{op.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Value</label>
+                  {getValueOptions(constraintForm.source_capability, constraintForm.source_field).length > 0 ? (
+                    <SearchableSelect
+                      options={getValueOptions(constraintForm.source_capability, constraintForm.source_field)}
+                      value={constraintForm.source_value}
+                      onChange={(v) => setConstraintForm(prev => ({ ...prev, source_value: v }))}
+                      placeholder="Select value..."
+                      disabled={!constraintForm.source_field}
+                    />
+                  ) : (
+                    <Input
+                      placeholder="value (e.g. digital)"
+                      value={constraintForm.source_value}
+                      onChange={(e) => setConstraintForm(prev => ({ ...prev, source_value: e.target.value }))}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="border rounded-md p-3 bg-gray-50">
               <div className="text-xs font-semibold text-gray-600 mb-2">Target (THEN condition)</div>
               <div className="grid grid-cols-2 gap-3">
-                <Input
-                  placeholder="capability key (e.g. fulfillment)"
-                  value={constraintForm.target_capability}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_capability: e.target.value }))}
-                />
-                <Input
-                  placeholder="field (e.g. shows_shipping)"
-                  value={constraintForm.target_field}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_field: e.target.value }))}
-                />
-                <select
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  value={constraintForm.target_operator}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_operator: e.target.value }))}
-                >
-                  <option value="equals">equals</option>
-                  <option value="includes">includes</option>
-                  <option value="not_includes">not_includes</option>
-                  <option value="is_true">is_true</option>
-                  <option value="is_false">is_false</option>
-                </select>
-                <Input
-                  placeholder="value (e.g. false)"
-                  value={constraintForm.target_value}
-                  onChange={(e) => setConstraintForm(prev => ({ ...prev, target_value: e.target.value }))}
-                />
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Capability</label>
+                  <SearchableSelect
+                    options={getCapOptions()}
+                    value={constraintForm.target_capability}
+                    onChange={handleTargetCapChange}
+                    placeholder="Select capability..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Field</label>
+                  <SearchableSelect
+                    options={getFieldOptions(constraintForm.target_capability)}
+                    value={constraintForm.target_field}
+                    onChange={handleTargetFieldChange}
+                    placeholder="Select field..."
+                    disabled={!constraintForm.target_capability}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Operator</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    value={constraintForm.target_operator}
+                    onChange={(e) => setConstraintForm(prev => ({ ...prev, target_operator: e.target.value }))}
+                  >
+                    {getOperatorOptions(constraintForm.target_capability, constraintForm.target_field).map(op => (
+                      <option key={op.value} value={op.value}>{op.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Value</label>
+                  {getValueOptions(constraintForm.target_capability, constraintForm.target_field).length > 0 ? (
+                    <SearchableSelect
+                      options={getValueOptions(constraintForm.target_capability, constraintForm.target_field)}
+                      value={constraintForm.target_value}
+                      onChange={(v) => setConstraintForm(prev => ({ ...prev, target_value: v }))}
+                      placeholder="Select value..."
+                      disabled={!constraintForm.target_field}
+                    />
+                  ) : (
+                    <Input
+                      placeholder="value (e.g. false)"
+                      value={constraintForm.target_value}
+                      onChange={(e) => setConstraintForm(prev => ({ ...prev, target_value: e.target.value }))}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
