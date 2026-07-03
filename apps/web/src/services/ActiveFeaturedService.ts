@@ -66,7 +66,7 @@ class ActiveFeaturedService extends PublicApiSingleton {
   ): Promise<ActiveFeaturedResult> {
     try {
       const result = await this.makePublicRequest<ActiveFeaturedResult>(
-        `/api/tenants/${tenantId}/active-featured?surface=${surface}&limit=${limit}`,
+        `/api/public/tenants/${tenantId}/active-featured?surface=${surface}&limit=${limit}`,
         {},
         `active-featured-tenant-${tenantId}-${surface}`,
         this.cacheTTL

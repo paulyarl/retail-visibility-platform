@@ -2,7 +2,7 @@
  * Active Featured Routes
  *
  * Public endpoint: GET /api/active-featured?surface=:surface&limit=:limit — platform-level (cross-tenant)
- * Tenant endpoint: GET /api/tenants/:tenantId/active-featured?surface=:surface&limit=:limit — tenant-scoped
+ * Public tenant endpoint: GET /api/public/tenants/:tenantId/active-featured?surface=:surface&limit=:limit — tenant-scoped
  *
  * Used by visibility channels (storefront, directory, shops) to resolve
  * active featured products with fallback behavior.
@@ -18,6 +18,37 @@ import {
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
+
+/**
+ * Public tenant-scoped router — mounted at /api/public/tenants/:tenantId
+ * Uses mergeParams to receive :tenantId from the mount path.
+ */
+const publicTenantRouter = express.Router({ mergeParams: true });
+
+/**
+ * GET /api/public/tenants/:tenantId/active-featured?surface=:surface&limit=:limit
+ * Tenant-scoped active featured products (public — no auth required).
+ * Used by storefronts, product detail, directory entry.
+ */
+publicTenantRouter.get('/active-featured', async (req: express.Request<{ tenantId: string }>, res) => {
+  try {
+    const { tenantId } = req.params;
+    const surface = req.query.surface as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+
+    if (!surface) {
+      return res.status(400).json({ error: 'surface parameter is required' });
+    }
+
+    const result = await getTenantActiveFeatured(tenantId, surface, limit);
+    res.json(result);
+  } catch (error) {
+    console.error('[active-featured] Failed to get tenant active featured:', error);
+    res.status(500).json({ error: 'Failed to fetch active featured products' });
+  }
+});
+
+export { publicTenantRouter };
 
 /**
  * GET /api/active-featured?surface=:surface&limit=:limit
@@ -41,28 +72,6 @@ router.get('/active-featured', async (req, res) => {
   }
 });
 
-/**
- * GET /api/tenants/:tenantId/active-featured?surface=:surface&limit=:limit
- * Tenant-scoped active featured products.
- * Public — no auth required. Used by storefronts, product detail, directory entry.
- */
-router.get('/tenants/:tenantId/active-featured', async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const surface = req.query.surface as string;
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
-
-    if (!surface) {
-      return res.status(400).json({ error: 'surface parameter is required' });
-    }
-
-    const result = await getTenantActiveFeatured(tenantId, surface, limit);
-    res.json(result);
-  } catch (error) {
-    console.error('[active-featured] Failed to get tenant active featured:', error);
-    res.status(500).json({ error: 'Failed to fetch active featured products' });
-  }
-});
 
 /**
  * POST /api/admin/active-featured/invalidate-cache
