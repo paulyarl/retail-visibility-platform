@@ -232,6 +232,36 @@ class DirectoryPromotionServiceClass extends TenantApiSingleton {
   }
 
   // ====================
+  // TRACKING (fire-and-forget, no caching)
+  // ====================
+
+  async trackImpression(tenantId: string): Promise<void> {
+    try {
+      await this.makeDefaultRequest<ApiEnvelope<any>>(
+        `/api/tenants/${tenantId}/promotion/track-impression`,
+        { method: 'POST' },
+        undefined,
+        undefined
+      );
+    } catch {
+      // fire-and-forget — silent failure
+    }
+  }
+
+  async trackClick(tenantId: string): Promise<void> {
+    try {
+      await this.makeDefaultRequest<ApiEnvelope<any>>(
+        `/api/tenants/${tenantId}/promotion/track-click`,
+        { method: 'POST' },
+        undefined,
+        undefined
+      );
+    } catch {
+      // fire-and-forget — silent failure
+    }
+  }
+
+  // ====================
   // ADMIN: CATALOG CRUD
   // ====================
 

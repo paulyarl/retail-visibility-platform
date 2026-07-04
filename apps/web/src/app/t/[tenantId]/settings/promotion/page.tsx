@@ -10,8 +10,8 @@ import { useDirectoryPromotionCapability } from '@/hooks/tenant-access/useCapabi
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: ['Gold marker on map', 'Promoted badge', 'Higher visibility', 'Basic analytics'],
-  premium: ['Everything in Basic', 'Featured in search results', 'Homepage carousel spot', 'Advanced analytics', 'Priority support'],
-  featured: ['Everything in Premium', 'Guaranteed top 3 position', 'Custom marker icon', 'Sponsored content', 'Dedicated account manager'],
+  premium: ['Everything in Basic', 'Featured in search results', 'Homepage carousel spot', 'Detailed analytics dashboard', 'Chatbot promotion awareness'],
+  featured: ['Everything in Premium', 'Highest search priority', 'Premium badge styling', 'Enhanced carousel placement', 'Automated renewal protection'],
 };
 
 const TIER_COLORS: Record<string, string> = {
@@ -295,12 +295,16 @@ export default function PromotionSettingsPage({ tenantId: propTenantId }: { tena
                 const isPopular = tier === 'premium';
 
                 return (
-                  <div
+                  <button
                     key={tier}
-                    className={`relative rounded-xl border-2 p-6 transition-all ${
+                    onClick={() => {
+                      const firstPlan = tierPlans[0];
+                      if (firstPlan) setSelectedPlanKey(firstPlan.planKey);
+                    }}
+                    className={`relative rounded-xl border-2 p-6 transition-all text-left w-full ${
                       selectedPlan && selectedPlan.tier === tier
                         ? 'border-blue-600 shadow-lg scale-105'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md cursor-pointer'
                     }`}
                   >
                     {isPopular && (
@@ -329,7 +333,7 @@ export default function PromotionSettingsPage({ tenantId: propTenantId }: { tena
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </button>
                 );
               })}
             </div>

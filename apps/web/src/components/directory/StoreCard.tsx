@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Badge, Button, Tooltip } from '@/components/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
+import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 
 interface StoreCardProps {
   listing: {
@@ -49,6 +51,14 @@ interface StoreCardProps {
 export default function StoreCard({ listing, index, contextCategory }: StoreCardProps) {
   const router = useRouter();
   const promotedBadge = useBadgeMeta('directory_promoted');
+  const impressionFired = useRef(false);
+
+  useEffect(() => {
+    if (listing.isPromoted && !impressionFired.current) {
+      impressionFired.current = true;
+      DirectoryPromotionService.trackImpression(listing.tenantId);
+    }
+  }, [listing.isPromoted, listing.tenantId]);
 
   // Determine destination URL based on tier and settings
   const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
@@ -94,6 +104,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
         target={isExternalLink ? '_blank' : undefined}
         rel={isExternalLink ? 'noopener noreferrer' : undefined}
         className="block"
+        onClick={() => { if (listing.isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}
       >
         <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:shadow-lg transition-shadow duration-200">
           {/* Logo/Image */}

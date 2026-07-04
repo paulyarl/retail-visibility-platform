@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
@@ -9,6 +9,7 @@ import { MapPin, Star, Package, ExternalLink, Heart, Phone, Store } from 'lucide
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
+import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 
 export interface DirectoryListing {
   id: string;
@@ -91,6 +92,7 @@ export function UnifiedStoreCard({
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
   const promotedBadge = useBadgeMeta('directory_promoted');
+  const impressionFired = useRef(false);
   // console.log(`UnifiedStoreCard - hoursStatus:`, hoursStatus);
   // console.log(`UnifiedStoreCard - listing:`, listing);
   
@@ -105,6 +107,13 @@ export function UnifiedStoreCard({
   const isFeatured = enhancedStats?.isFeatured || listing.isFeatured || false;
   const isPromoted = listing.isPromoted || false;
   const promotionTier = listing.promotionTier || null;
+
+  useEffect(() => {
+    if (isPromoted && !impressionFired.current) {
+      impressionFired.current = true;
+      DirectoryPromotionService.trackImpression(listing.tenantId);
+    }
+  }, [isPromoted, listing.tenantId]);
 
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
@@ -173,7 +182,7 @@ export function UnifiedStoreCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <Link href={linkHref} className={`block ${className}`}>
+                    <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
                       <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate">
                         {listing.businessName}
                       </h3>
@@ -299,7 +308,7 @@ export function UnifiedStoreCard({
           <Card.Section>
             <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center relative overflow-hidden">
               {listing.logoUrl ? (
-                <Link href={linkHref} className={`block ${className}`}>
+                <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
                 <Image
                   src={listing.logoUrl}
                   alt={listing.businessName}
@@ -338,7 +347,7 @@ export function UnifiedStoreCard({
         <Card.Section className="p-4">
           <Group justify="space-between" mb="xs" align="start">
             <div className="flex-1">
-               <Link href={linkHref} className={`block ${className}`}>
+               <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
               <Text 
                 fw={600} 
                 size="lg" 
@@ -457,7 +466,7 @@ export function UnifiedStoreCard({
         {/* Enhanced Action Buttons */}
         <Card.Section className="pt-3">
           <Group gap={8}>
-            <Link href={linkHref} className="flex-1">
+            <Link href={linkHref} className="flex-1" onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
               <Button 
                 radius="md" 
                 size="sm" 

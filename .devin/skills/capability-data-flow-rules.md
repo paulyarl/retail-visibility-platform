@@ -447,6 +447,7 @@ if (currentCaps) {
 - CCL Resolver (evaluation engine): `apps/api/src/services/resolvers/CapabilityConstraintResolver.ts`
 - CCL Service (DB loader + cache): `apps/api/src/services/resolvers/CapabilityConstraintService.ts`
 - CCL Admin API: `apps/api/src/routes/admin/capability-constraints.ts` → `/api/admin/capability-constraints`
+- CCL Metadata API: `apps/api/src/routes/admin/capability-constraints.ts` → `GET /api/admin/capability-constraints/metadata` (static `CONSTRAINT_METADATA` constant — MUST be updated when adding a new capability domain)
 
 ### Frontend
 - State types: `apps/web/src/services/CapabilityResolutionService.ts`

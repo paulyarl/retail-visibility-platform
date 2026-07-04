@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Star, MapPin, Package } from 'lucide-react';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
+import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 
 interface PromotedStore {
   tenantId: string;
@@ -28,12 +29,18 @@ export default function PromotedStoresCarousel() {
   const [stores, setStores] = useState<PromotedStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const impressionFired = useRef(false);
 
   useEffect(() => {
     const fetchPromoted = async () => {
       try {
         const promoted = await directorySingletonService.getPromotedStores(12);
         setStores(promoted);
+        // Fire impression tracking for all promoted stores in the carousel
+        if (!impressionFired.current && promoted.length > 0) {
+          impressionFired.current = true;
+          promoted.forEach(s => DirectoryPromotionService.trackImpression(s.tenantId));
+        }
       } catch {
         setError(true);
       } finally {
@@ -93,6 +100,7 @@ export default function PromotedStoresCarousel() {
               key={store.tenantId}
               href={`/directory/${store.slug || store.tenantId}`}
               className="flex-shrink-0 w-64 snap-start group"
+              onClick={() => DirectoryPromotionService.trackClick(store.tenantId)}
             >
               <div className={`relative h-40 rounded-xl overflow-hidden border-2 ${
                 store.promotionTier === 'featured' ? 'border-purple-300 dark:border-purple-700' :
