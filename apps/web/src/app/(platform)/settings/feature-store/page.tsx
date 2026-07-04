@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
 import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag } from '@tabler/icons-react';
-import PageHeader from '@/components/PageHeader';
+import { TrendingUp, Eye, Zap, BarChart3, Sparkles, Star } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem } from '@/services/BsaasPurchaseService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
@@ -160,12 +161,6 @@ export default function FeatureStorePage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <PageHeader
-        title="Feature Store"
-        description="Purchase à la carte features to enhance your plan"
-        icon={<IconBolt className="w-6 h-6" />}
-      />
-
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {error && (
           <Alert icon={<IconAlertCircle size={16} />} color="red" onClose={() => setError(null)} withCloseButton>
@@ -250,6 +245,81 @@ export default function FeatureStorePage() {
             );
           })}
         </Grid>
+
+        {/* Benefits Section */}
+        <div className="bg-gray-50 rounded-lg p-8 mt-6">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Zap className="w-6 h-6 text-blue-600" />
+            Why Purchase Add-On Features?
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Only Pay for What You Need</h4>
+                <p className="text-gray-600 text-sm">Add individual capabilities without upgrading your entire subscription tier</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Instant Activation</h4>
+                <p className="text-gray-600 text-sm">Features activate immediately after purchase — no waiting, no setup required</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Eye className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Flexible Billing</h4>
+                <p className="text-gray-600 text-sm">Choose monthly or annual billing, or one-time purchases — cancel anytime</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Tier-Aware Pricing</h4>
+                <p className="text-gray-600 text-sm">Features already included in your plan are clearly marked — never pay twice</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/t/${tenantId}/settings/featured-products`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              Manage Featured Products
+            </Link>
+            <Link
+              href={`/t/${tenantId}/settings/promotion`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              Explore Directory Promotion
+            </Link>
+          </div>
+        </div>
 
         {/* Purchase Confirmation Modal */}
         <Modal
